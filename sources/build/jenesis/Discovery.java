@@ -7,6 +7,8 @@ public final class Discovery {
     private static final String LOCATION = "https://{domain}/.well-known/java-repository.properties";
     private static final Pattern SUFFIX = Pattern.compile("[A-Za-z0-9]+");
     private static final Pattern NAME = Pattern.compile("[A-Za-z0-9_-]{1,63}(\\.[A-Za-z0-9_-]{1,63})+");
+    private static final Pattern SELECTED = Pattern.compile("([a-z]+)\\[([^\\]]*)]");
+    private static final Pattern SELECTOR = Pattern.compile("[A-Za-z0-9_.-]+\\*?");
 
     private final String uri;
     private final Repository.Connection connection;
@@ -42,7 +44,7 @@ public final class Discovery {
         return String.join(".", labels);
     }
 
-    public Optional<DiscoveredLocation> lookup(String namespace, String key) throws IOException {
+    public Optional<DiscoveredLocation> lookup(String namespace, String kind, String name) throws IOException {
         if (connection.offline() || !NAME.matcher(namespace).matches()) {
             return Optional.empty();
         }
@@ -93,7 +95,28 @@ public final class Discovery {
                         + " the default, to answer alone for every name below " + domain + ", or true to let the files"
                         + " of its subdomains answer first");
             }
-            if (properties.containsKey(key)) {
+            String key = properties.containsKey(kind) ? kind : null;
+            int matched = -1;
+            for (String property : properties.stringPropertyNames()) {
+                Matcher matcher = SELECTED.matcher(property);
+                if (!matcher.matches() || !matcher.group(1).equals(kind)) {
+                    continue;
+                }
+                String selector = matcher.group(2);
+                if (!SELECTOR.matcher(selector).matches()) {
+                    throw new IllegalArgumentException(source + " names " + property + ", where a selector is a module"
+                            + " name or an artifact ID, such as " + kind + "[build.jenesis.launcher], or the start of"
+                            + " one followed by *, such as " + kind + "[byte-buddy-*]");
+                }
+                int score = selector.endsWith("*")
+                        ? (name.startsWith(selector.substring(0, selector.length() - 1)) ? selector.length() - 1 : -1)
+                        : (name.equals(selector) ? Integer.MAX_VALUE : -1);
+                if (score > matched) {
+                    key = property;
+                    matched = score;
+                }
+            }
+            if (key != null) {
                 String suffixes = value(properties, source, key + ".suffixes");
                 List<String> admitted = null;
                 if (suffixes != null) {
@@ -121,7 +144,7 @@ public final class Discovery {
                             + location.target() + ", but only a template naming {version} needs to be told the"
                             + " newest version, as a root or a Maven coordinate lists its versions itself");
                 }
-                if (!location.coordinate() || location.template() || count == labels.length) {
+                if (!location.coordinate() || location.template() || count == labels.length || matched >= 0) {
                     found = location;
                 }
             }

@@ -168,7 +168,7 @@ public record DiscoveredLocation(String domain,
             if (status == HttpURLConnection.HTTP_NOT_FOUND || status == HttpURLConnection.HTTP_GONE) {
                 return null;
             }
-            String announced = http.getHeaderField(key.equals("maven")
+            String announced = http.getHeaderField(key.startsWith("maven")
                     ? "Jenesis-MavenVersion"
                     : "Jenesis-ModuleVersion");
             String redirect = http.getHeaderField("Location");

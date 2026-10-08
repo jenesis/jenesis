@@ -115,6 +115,29 @@ and a module whose suffix names no artifact, `net.bytebuddy.utility` as
 `byte-buddy-utility`, resolves nothing from it. A coordinate without placeholders
 belongs to one module only, the one whose own domain publishes the file.
 
+Several projects under one domain
+---------------------------------
+
+A key may name, in brackets, the module or artifact it is for, where one is
+published apart from the rest. `jenesis.build` serves three projects, each from
+GitHub releases of its own with versions of its own, so beside the keys above it
+publishes, for the launcher:
+
+    module[build.jenesis.launcher]=https://github.com/jenesis/jenesis-launcher/releases/download/v{version}/{module}-{version}{-classifier}.{type}
+    module[build.jenesis.launcher].latest=https://github.com/jenesis/jenesis-launcher/releases/latest/download/{module}.jar
+    maven[build.jenesis.launcher]=https://github.com/jenesis/jenesis-launcher/releases/download/v{version}/{artifactId}-{version}{-classifier}.{type}
+    maven[build.jenesis.launcher].latest=https://github.com/jenesis/jenesis-launcher/releases/latest/download/{artifactId}.pom
+
+`module` and `moduletomaven` select by module name, `maven` by artifact ID, and the
+keys beside a selected key - `.latest`, `.since`, `.suffixes` - carry its selector.
+A name ending in `*` selects every name that starts with the rest, as
+`maven[byte-buddy-*]` does. The exact name wins over the longest such prefix, and
+either over the key for all. A coordinate a selected key names applies to its
+module wherever it sits below the domain, so a module whose artifact breaks the
+pattern takes one line of its own:
+
+    moduletomaven[com.example.legacy]=com.example:example-classic
+
 Which key answers
 -----------------
 
