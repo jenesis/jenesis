@@ -62,10 +62,11 @@ public class MavenRepositoryStaging implements BuildStep {
                 if (abstractTest && !includeTests) {
                     continue;
                 }
+                boolean packaged = !"pom".equals(inventory.value(prefix + ".packaging"));
                 Path artifact = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".artifacts"),
                         prefix,
                         "artifacts",
-                        true,
+                        packaged,
                         inventoryFile);
                 Path sources = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".sources"),
                         prefix,

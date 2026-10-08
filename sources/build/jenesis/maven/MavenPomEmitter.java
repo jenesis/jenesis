@@ -2,6 +2,7 @@ package build.jenesis.maven;
 
 import module java.base;
 import module java.xml;
+import build.jenesis.SequencedProperties;
 
 public class MavenPomEmitter {
 
@@ -26,6 +27,16 @@ public class MavenPomEmitter {
                            String version,
                            SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies,
                            Metadata metadata) {
+        return emit(groupId, artifactId, version, null, dependencies, Collections.emptyNavigableMap(), metadata);
+    }
+
+    public IOConsumer emit(String groupId,
+                           String artifactId,
+                           String version,
+                           String packaging,
+                           SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies,
+                           SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies,
+                           Metadata metadata) {
         Document document;
         try {
             document = documentBuilderFactory.newDocumentBuilder().newDocument();
@@ -40,6 +51,9 @@ public class MavenPomEmitter {
         appendText(document, project, "groupId", groupId);
         appendText(document, project, "artifactId", artifactId);
         appendText(document, project, "version", version);
+        if (packaging != null) {
+            appendText(document, project, "packaging", packaging);
+        }
         if (metadata != null) {
             if (metadata.name() != null) {
                 appendText(document, project, "name", metadata.name());
@@ -106,44 +120,13 @@ public class MavenPomEmitter {
                 }
             }
         }
+        if (!managedDependencies.isEmpty()) {
+            Node wrapper = appendChild(document, appendChild(document, project, "dependencyManagement"), "dependencies");
+            managedDependencies.forEach((key, value) -> appendDependency(document, wrapper, key, value));
+        }
         if (!dependencies.isEmpty()) {
             Node wrapper = appendChild(document, project, "dependencies");
-            for (Map.Entry<MavenDependencyKey, MavenDependencyValue> dependency : dependencies.entrySet()) {
-                Node node = appendChild(document, wrapper, "dependency");
-                appendText(document, node, "groupId", dependency.getKey().groupId());
-                appendText(document, node, "artifactId", dependency.getKey().artifactId());
-                appendText(document, node, "version", dependency.getValue().version());
-                if (!Objects.equals(dependency.getKey().type(), "jar")) {
-                    appendText(document, node, "type", dependency.getKey().type());
-                }
-                if (dependency.getKey().classifier() != null) {
-                    appendText(document, node, "classifier", dependency.getKey().classifier());
-                }
-                if (dependency.getValue().scope() != MavenDependencyScope.COMPILE) {
-                    appendText(document, node, "scope", switch (dependency.getValue().scope()) {
-                        case PROVIDED -> "provided";
-                        case RUNTIME -> "runtime";
-                        case TEST -> "test";
-                        case SYSTEM -> "system";
-                        case IMPORT -> "import";
-                        default -> throw new IllegalStateException("Unexpected scope: " + dependency.getValue().scope());
-                    });
-                }
-                if (dependency.getValue().systemPath() != null) {
-                    appendText(document, node, "systemPath", dependency.getValue().systemPath().toString());
-                }
-                if (dependency.getValue().optional() != null) {
-                    appendText(document, node, "optional", dependency.getValue().optional().toString());
-                }
-                if (dependency.getValue().exclusions() != null) {
-                    Node exclusions = appendChild(document, node, "exclusions");
-                    dependency.getValue().exclusions().forEach(name -> {
-                        Node exclusion = appendChild(document, exclusions, "exclusion");
-                        appendText(document, exclusion, "groupId", name.groupId());
-                        appendText(document, exclusion, "artifactId", name.artifactId());
-                    });
-                }
-            }
+            dependencies.forEach((key, value) -> appendDependency(document, wrapper, key, value));
         }
         Transformer transformer;
         try {
@@ -163,6 +146,48 @@ public class MavenPomEmitter {
             }
             writer.write(buffer.toString().replace("\r\n", "\n"));
         };
+    }
+
+    private static void appendDependency(Document document,
+                                         Node wrapper,
+                                         MavenDependencyKey key,
+                                         MavenDependencyValue value) {
+        Node node = appendChild(document, wrapper, "dependency");
+        appendText(document, node, "groupId", key.groupId());
+        appendText(document, node, "artifactId", key.artifactId());
+        if (value.version() != null) {
+            appendText(document, node, "version", value.version());
+        }
+        if (!Objects.equals(key.type(), "jar")) {
+            appendText(document, node, "type", key.type());
+        }
+        if (key.classifier() != null) {
+            appendText(document, node, "classifier", key.classifier());
+        }
+        if (value.scope() != null && value.scope() != MavenDependencyScope.COMPILE) {
+            appendText(document, node, "scope", switch (value.scope()) {
+                case PROVIDED -> "provided";
+                case RUNTIME -> "runtime";
+                case TEST -> "test";
+                case SYSTEM -> "system";
+                case IMPORT -> "import";
+                default -> throw new IllegalStateException("Unexpected scope: " + value.scope());
+            });
+        }
+        if (value.systemPath() != null) {
+            appendText(document, node, "systemPath", value.systemPath().toString());
+        }
+        if (value.optional() != null) {
+            appendText(document, node, "optional", value.optional().toString());
+        }
+        if (value.exclusions() != null) {
+            Node exclusions = appendChild(document, node, "exclusions");
+            value.exclusions().forEach(name -> {
+                Node exclusion = appendChild(document, exclusions, "exclusion");
+                appendText(document, exclusion, "groupId", name.groupId());
+                appendText(document, exclusion, "artifactId", name.artifactId());
+            });
+        }
     }
 
     private static Node appendChild(Document document, Node parent, String name) {
@@ -192,6 +217,57 @@ public class MavenPomEmitter {
         public Metadata {
             licenses = licenses == null ? List.of() : List.copyOf(licenses);
             developers = developers == null ? List.of() : List.copyOf(developers);
+        }
+
+        static Metadata of(SequencedProperties metadata) {
+            if (metadata.isEmpty()) {
+                return null;
+            }
+            SequencedSet<String> licenseIds = new LinkedHashSet<>(), developerIds = new LinkedHashSet<>();
+            for (String key : metadata.stringPropertyNames()) {
+                int dot = key.lastIndexOf('.');
+                if (key.startsWith("license.") && dot > "license.".length()) {
+                    licenseIds.add(key.substring("license.".length(), dot));
+                } else if (key.startsWith("developer.") && dot > "developer.".length()) {
+                    developerIds.add(key.substring("developer.".length(), dot));
+                }
+            }
+            List<License> licenses = new ArrayList<>();
+            for (String id : licenseIds) {
+                licenses.add(new License(
+                        metadata.getProperty("license." + id + ".name"),
+                        metadata.getProperty("license." + id + ".url")));
+            }
+            List<Developer> developers = new ArrayList<>();
+            for (String id : developerIds) {
+                String declared = metadata.getProperty("developer." + id + ".id");
+                developers.add(new Developer(
+                        declared == null ? id : declared.isBlank() ? null : declared.strip(),
+                        metadata.getProperty("developer." + id + ".name"),
+                        metadata.getProperty("developer." + id + ".email")));
+            }
+            Scm scm = null;
+            String scmConnection = metadata.getProperty("scm.connection");
+            String scmDeveloperConnection = metadata.getProperty("scm.developerConnection");
+            String scmUrl = metadata.getProperty("scm.url");
+            String scmTag = metadata.value("scm.tag");
+            if (scmConnection != null || scmDeveloperConnection != null || scmUrl != null || scmTag != null) {
+                scm = new Scm(
+                        scmConnection,
+                        scmDeveloperConnection,
+                        scmUrl,
+                        scmTag);
+            }
+            return new Metadata(
+                    metadata.getProperty("name"),
+                    metadata.getProperty("description"),
+                    metadata.getProperty("url"),
+                    licenses,
+                    developers,
+                    scm,
+                    metadata.value("organization.name") == null && metadata.value("organization.url") == null
+                            ? null
+                            : new Metadata.Organization(metadata.value("organization.name"), metadata.value("organization.url")));
         }
 
         public record License(String name, String url) implements Serializable {

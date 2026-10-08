@@ -43,8 +43,8 @@ import static java.util.Objects.requireNonNull;
 
 public class MavenProject implements BuildExecutorModule {
 
-    public static final String POM = "pom/", MAVEN = "maven/";
-    private static final String SCAN = "scan", POM_METADATA = "metadata.";
+    public static final String POM = "pom/", MAVEN = "maven/", BOM = "bom/";
+    private static final String SCAN = "scan", POM_METADATA = "metadata.", BOMS = "boms";
     private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-";
     private static final Set<String> COMMANDED = Set.of("version", "scm.tag", "scm.revision", "scm.tree");
 
@@ -132,7 +132,9 @@ public class MavenProject implements BuildExecutorModule {
         MavenResolver resolver = MavenResolver.of(resolvers.get(prefix));
         Dependencies dependencyModule = Dependencies.ofEnvironment(environment, repositories, resolvers);
         return new MultiProjectModule(MavenProject.ofEnvironment(environment, root, prefix, repository, resolver).group(group),
-                identifier -> Optional.of(identifier.substring(0, identifier.indexOf('/'))),
+                identifier -> identifier.indexOf('/') < 0
+                        ? Optional.empty()
+                        : Optional.of(identifier.substring(0, identifier.indexOf('/'))),
                 _ -> (name, dependencies, arguments) -> {
                     Path location = MultiProjectModule.location(root, arguments);
                     SequencedSet<String> spdxInherited = new LinkedHashSet<>();
@@ -232,7 +234,7 @@ public class MavenProject implements BuildExecutorModule {
         if (path.startsWith(wrapped)) {
             return Optional.of(path.substring(wrapped.length()));
         }
-        return Optional.empty();
+        return path.equals(BOMS) ? Optional.of(BOMS) : Optional.empty();
     }
 
     @Override
@@ -244,6 +246,7 @@ public class MavenProject implements BuildExecutorModule {
         Platform platform = this.platform;
         buildExecutor.addStep(SCAN, new Scan(root));
         buildExecutor.addStep(PREPARE, new Prepare(prefix, resolver, repository), SCAN);
+        buildExecutor.addStep(BOMS, new Boms(), Stream.concat(Stream.of(PREPARE), inherited.sequencedKeySet().stream()));
         buildExecutor.addModule(MODULE, (modules, paths) -> {
             try (DirectoryStream<Path> files = Files.newDirectoryStream(
                     paths.get(PREVIOUS + PREPARE).resolve(MAVEN),
@@ -521,37 +524,7 @@ public class MavenProject implements BuildExecutorModule {
                                     }
                                 }
                                 descriptor.store(context.next().resolve(BuildStep.MODULE));
-                                SequencedProperties metadata = new SequencedProperties();
-                                metadata.setProperty("project", properties.getProperty("groupId"));
-                                metadata.setProperty("artifact", properties.getProperty("artifactId"));
-                                metadata.setProperty("version", properties.getProperty("version"));
-                                SequencedProperties own = new SequencedProperties();
-                                for (String key : properties.stringPropertyNames()) {
-                                    if (key.startsWith(POM_METADATA)) {
-                                        own.setProperty(key.substring(POM_METADATA.length()), properties.getProperty(key));
-                                    }
-                                }
-                                own.forEach(metadata::put);
-                                Set<String> lists = own.stringPropertyNames().stream()
-                                        .filter(key -> key.startsWith("license.") || key.startsWith("developer."))
-                                        .map(key -> key.substring(0, key.indexOf('.') + 1))
-                                        .collect(Collectors.toSet());
-                                for (BuildStepArgument argument : manifestArgs.values()) {
-                                    if (argument.removed()) {
-                                        continue;
-                                    }
-                                    Path upstream = argument.folder().resolve(BuildStep.METADATA);
-                                    if (Files.isRegularFile(upstream)) {
-                                        SequencedProperties.ofFiles(upstream).forEachProperty((key, value) -> {
-                                            if (COMMANDED.contains(key)
-                                                    || !own.containsKey(key)
-                                                    && lists.stream().noneMatch(key::startsWith)) {
-                                                metadata.setProperty(key, value);
-                                            }
-                                        });
-                                    }
-                                }
-                                metadata.store(context.next().resolve(BuildStep.METADATA));
+                                metadata(properties, manifestArgs.values()).store(context.next().resolve(BuildStep.METADATA));
                                 return CompletableFuture.completedStage(new BuildStepResult(true));
                             }, modInherited.sequencedKeySet());
                         }
@@ -559,6 +532,109 @@ public class MavenProject implements BuildExecutorModule {
                 }
             }
         }, Stream.concat(Stream.of(SCAN, PREPARE), inherited.sequencedKeySet().stream()));
+    }
+
+    private static SequencedProperties metadata(SequencedProperties properties,
+                                                Collection<BuildStepArgument> arguments) throws IOException {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", properties.getProperty("groupId"));
+        metadata.setProperty("artifact", properties.getProperty("artifactId"));
+        metadata.setProperty("version", properties.getProperty("version"));
+        SequencedProperties own = new SequencedProperties();
+        for (String key : properties.stringPropertyNames()) {
+            if (key.startsWith(POM_METADATA)) {
+                own.setProperty(key.substring(POM_METADATA.length()), properties.getProperty(key));
+            }
+        }
+        own.forEach(metadata::put);
+        Set<String> lists = own.stringPropertyNames().stream()
+                .filter(key -> key.startsWith("license.") || key.startsWith("developer."))
+                .map(key -> key.substring(0, key.indexOf('.') + 1))
+                .collect(Collectors.toSet());
+        for (BuildStepArgument argument : arguments) {
+            if (argument.removed()) {
+                continue;
+            }
+            Path upstream = argument.folder().resolve(BuildStep.METADATA);
+            if (Files.isRegularFile(upstream)) {
+                SequencedProperties.ofFiles(upstream).forEachProperty((key, value) -> {
+                    if (COMMANDED.contains(key)
+                            || !own.containsKey(key)
+                            && lists.stream().noneMatch(key::startsWith)) {
+                        metadata.setProperty(key, value);
+                    }
+                });
+            }
+        }
+        return metadata;
+    }
+
+    private record Boms() implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Path descriptors = arguments.get(PREPARE).folder().resolve(BOM);
+            if (!Files.isDirectory(descriptors)) {
+                return CompletableFuture.completedStage(new BuildStepResult(true));
+            }
+            List<BuildStepArgument> upstream = arguments.entrySet().stream()
+                    .filter(entry -> !entry.getKey().equals(PREPARE))
+                    .map(Map.Entry::getValue)
+                    .toList();
+            List<Path> files = new ArrayList<>();
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(descriptors, "*.properties")) {
+                stream.forEach(files::add);
+            }
+            files.sort(null);
+            SequencedProperties inventory = new SequencedProperties();
+            MavenPomEmitter emitter = new MavenPomEmitter();
+            for (Path file : files) {
+                SequencedProperties properties = SequencedProperties.ofFiles(file);
+                SequencedProperties metadata = metadata(properties, upstream);
+                SequencedMap<MavenDependencyKey, MavenDependencyValue> managed = new LinkedHashMap<>();
+                for (int index = 0; properties.value("managed." + index) != null; index++) {
+                    String prefix = "managed." + index;
+                    MavenDependencyKey.Versioned parsed = MavenDependencyKey.parse(properties.value(prefix));
+                    List<String> exclusions = properties.entries(prefix + ".exclusions");
+                    String scope = properties.value(prefix + ".scope"), optional = properties.value(prefix + ".optional");
+                    managed.put(parsed.key(), new MavenDependencyValue(parsed.version(),
+                            scope == null ? null : MavenDependencyScope.of(scope),
+                            null,
+                            exclusions == null ? null : exclusions.stream().map(exclusion -> new MavenDependencyName(
+                                    exclusion.substring(0, exclusion.indexOf('/')),
+                                    exclusion.substring(exclusion.indexOf('/') + 1))).toList(),
+                            optional == null ? null : Boolean.valueOf(optional)));
+                }
+                String name = file.getFileName().toString(), path = properties.getProperty("path");
+                Path pom = Files.createDirectory(context.next().resolve(name.substring(0, name.length() - ".properties".length())))
+                        .resolve(Pom.POM);
+                try (Writer writer = Files.newBufferedWriter(pom)) {
+                    emitter.emit(metadata.getProperty("project"),
+                            metadata.getProperty("artifact"),
+                            metadata.getProperty("version"),
+                            "pom",
+                            Collections.emptyNavigableMap(),
+                            managed,
+                            MavenPomEmitter.Metadata.of(metadata)).accept(writer);
+                }
+                String prefix = Inventory.prefixOf(path);
+                inventory.setProperty(prefix + "path", path);
+                inventory.setProperty(prefix + "pom", context.next().relativize(pom).toString().replace(File.separatorChar, '/'));
+                inventory.setProperty(prefix + "packaging", "pom");
+                for (String published : List.of("deploy", "install")) {
+                    if (!properties.flag(published, true)) {
+                        inventory.setProperty(prefix + published, "false");
+                    }
+                }
+            }
+            if (!inventory.isEmpty()) {
+                inventory.store(context.next().resolve(Inventory.INVENTORY));
+            }
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
     }
 
     private record Scan(Path root) implements BuildStep {
@@ -623,7 +699,10 @@ public class MavenProject implements BuildExecutorModule {
                             .folder()
                             .resolve(POM)).entrySet()) {
                 MavenLocalPom value = entry.getValue();
-                if (value.packaging() != null && !"jar".equals(value.packaging())) {
+                if (value.bom() != null) {
+                    writeBom(Files.createDirectories(context.next().resolve(BOM)), value, entry.getKey());
+                    continue;
+                } else if (value.packaging() != null && !"jar".equals(value.packaging())) {
                     continue;
                 }
                 String coordinate = new MavenDependencyKey(value.groupId(), value.artifactId(), "jar", null)
@@ -637,6 +716,39 @@ public class MavenProject implements BuildExecutorModule {
                 writeModule(maven, value, relativePath, coordinate, selfPom, true, qualifiedDependencies, attachments(value, true));
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+
+        private static void writeBom(Path folder, MavenLocalPom value, Path path) throws IOException {
+            String relativePath = path.toString().replace(File.separatorChar, '/');
+            SequencedProperties properties = new SequencedProperties();
+            properties.setProperty("path", relativePath);
+            properties.setProperty("groupId", value.groupId());
+            properties.setProperty("artifactId", value.artifactId());
+            properties.setProperty("version", value.version());
+            int index = 0;
+            for (Map.Entry<MavenDependencyKey, MavenDependencyValue> managed : value.bom().entrySet()) {
+                String prefix = "managed." + index++;
+                properties.setProperty(prefix, managed.getKey().coordinate(null, managed.getValue().version()));
+                if (managed.getValue().scope() != null) {
+                    properties.setProperty(prefix + ".scope", managed.getValue().scope().name().toLowerCase(Locale.ROOT));
+                }
+                if (managed.getValue().exclusions() != null) {
+                    properties.setProperty(prefix + ".exclusions", managed.getValue().exclusions().stream()
+                            .map(name -> name.groupId() + "/" + name.artifactId())
+                            .collect(Collectors.joining(",")));
+                }
+                if (managed.getValue().optional() != null) {
+                    properties.setProperty(prefix + ".optional", managed.getValue().optional().toString());
+                }
+            }
+            value.metadata().forEach((key, metadata) -> properties.setProperty(POM_METADATA + key, metadata));
+            if (!value.deploy()) {
+                properties.setProperty("deploy", "false");
+            }
+            if (!value.install()) {
+                properties.setProperty("install", "false");
+            }
+            properties.store(folder.resolve("module-" + BuildExecutorModule.encodePath(relativePath) + ".properties"));
         }
 
         private String attachments(MavenLocalPom value, boolean test) {

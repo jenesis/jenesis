@@ -168,7 +168,9 @@ orders them, and lets them depend on one another with no wiring.
 depends on it and on external `commons-lang3`. `java-modular-multi` is the modular
 twin, where `app` requires the sibling `demo.greeter` and the external
 `org.slf4j`. Pinning records the external dependencies; a sibling has no
-published version to pin against.
+published version to pin against. The Maven project also carries a `bom` module
+of `pom` packaging, whose `<dependencyManagement>` names both modules: it compiles
+nothing and is staged as its POM alone, a bill of materials beside the jars.
 
 Both demos also run tests. In the Maven project the `greeter` module adds a
 `<testSourceDirectory>` and a test-scoped JUnit dependency; in the modular one a
