@@ -854,6 +854,9 @@ public record Project(
                                                            ^(?!.*IntegrationTest$).*
                       argLine, jvmArgs of the tests        process-test.properties
                       environment of the tests             environment-test.properties
+                      manifestEntries,                     a META-INF/MANIFEST.MF among the resources,
+                      jar.manifest.attributes              the basis of the jar's manifest; jar takes
+                                                           no --manifest in process-jar.properties
                       a resource outside the resource      -Djenesis.project.resources=
                       folders, or with a targetPath          <file>:<path in the jar>
                       <profiles>, Gradle properties        jenesis.properties and a
@@ -994,6 +997,9 @@ public record Project(
 
                       maven-jar-plugin / jar -> on by default; archives are reproducible unless
                           jenesis.archive.timestamp is emptied (70)
+                      maven-jar-plugin manifestEntries, addDefaultImplementationEntries /
+                          jar.manifest.attributes -> a META-INF/MANIFEST.MF among the resources,
+                          the basis of the jar's manifest (12)
                       maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (48, 66)
                       maven-javadoc-plugin / withJavadocJar(), Dokka
                           -> -Djenesis.project.documentation=true (48, 66)
