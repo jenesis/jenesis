@@ -889,6 +889,14 @@ public record Project(
                                  at all, and a src/test/java/module-info.java is a module of its own
                                  rather than patched into the main one
 
+                    A test module-info.java that names the main module itself, the --patch-module
+                    idiom Gradle and Maven use for white-box tests, is not supported: compiled as a
+                    module of its own it shadows the main one, and javac fails on every main class.
+                    With pom.xml, move it out of the test sources, to a folder the old build alone
+                    compiles, so the tests run on the class path against the main jar and an
+                    --add-opens of theirs targets ALL-UNNAMED; with module-info.java, give the tests
+                    a module of their own, as step 3b takes white-box tests apart.
+
                     Nothing ignored is reported, so list the old build's plugins, profiles and
                     repositories before deleting anything: each needs an answer in step 4. A
                     resource directory is copied whole, so one that holds target/ or .jenesis/,
@@ -934,6 +942,12 @@ public record Project(
                     module build resolves the newest versions. Write a bare @jenesis.pin <module>
                     <version> for each version to keep, then run `pin`, which adds the checksums
                     and the closure.
+                    The old build's javadoc fails on the @jenesis tags of a module-info.java as
+                    unknown, so register each tag the module uses as disabled there - javadoc takes
+                    no wildcard: `-tag jenesis.pin:X` on its command line, Gradle's
+                    `tags("jenesis.pin:X")` among the javadoc options, a
+                    <tag><name>jenesis.pin</name><placement>X</placement></tag> in the <tags> of
+                    maven-javadoc-plugin.
 
                       a dependency         `requires <module>`, `requires static` where it is only
                                            compiled against; a jar that declares no module name
@@ -978,7 +992,16 @@ public record Project(
                     for both halves, src/main/build.jenesis/ for the main code alone and
                     src/test/build.jenesis/ for the tests alone, in a module-info.java build the
                     META-INF/build.jenesis/ folder beside the module's sources, and build.jenesis/ at
-                    the root for every module. Configuration that lived inside a plugin moves here:
+                    the root for every module. A tool resolves in a group named after it, such as
+                    checkstyle, pmd or jacoco, and once per module, since each module resolves alone.
+                    A pom.xml pins it with a comment that is a child of <project>, one coordinate per
+                    line, `<!--jenesis.pin checkstyle/maven/com.puppycrawl.tools/checkstyle 10.18.2-->`,
+                    which `pin` completes with the tool's closure; a module inherits the comments of
+                    its local parent, never of a POM that only lists it under <modules>, so a module
+                    outside the parent chain pins its tools itself. A module-info.java pins it with
+                    @jenesis.pin checkstyle/maven/com.puppycrawl.tools/checkstyle 10.18.2. JaCoCo's
+                    agent follows the release its group pins for the CLI. Configuration that lived
+                    inside a plugin moves here:
 
                       compilerArgs, options.compilerArgs   process-javac.properties
                       annotationProcessorPaths             @jenesis.plugin, or <type>processor</type>
