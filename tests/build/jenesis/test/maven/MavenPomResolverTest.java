@@ -4920,7 +4920,10 @@ public class MavenPomResolverTest {
                 List.of("[11,12),[16,)", "11.0.2", "true"),
                 List.of("[11,12),[16,)", "14.0.1", "false"),
                 List.of("[17]", "17", "true"),
-                List.of("[17]", "21", "false"));
+                List.of("[17]", "21", "false"),
+                List.of("[9,", "25.0.4.1", "true"),
+                List.of("[9,", "1.8.0_402", "false"),
+                List.of("[11,12),[16,", "25.0.4.1", "true"));
         for (List<String> entry : cases) {
             Files.writeString(project.resolve("pom.xml"), """
                     <?xml version="1.0" encoding="UTF-8"?>
@@ -5067,6 +5070,87 @@ public class MavenPomResolverTest {
         assertThat(pom.resourceDirectories())
                 .as("a profile's resources replace the default folder, as in Maven")
                 .containsExactly("src/extra");
+    }
+
+    @Test
+    public void an_unclosed_jdk_range_of_a_fetched_parent_is_open_ended_as_in_objenesis() throws IOException {
+        addToRepository("org/objenesis", "objenesis-parent", "3.4", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.objenesis</groupId>
+                    <artifactId>objenesis-parent</artifactId>
+                    <version>3.4</version>
+                    <packaging>pom</packaging>
+                    <profiles>
+                        <profile>
+                            <id>java9</id>
+                            <activation>
+                                <jdk>[9,</jdk>
+                            </activation>
+                            <properties>
+                                <maven.compiler.release>8</maven.compiler.release>
+                            </properties>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.objenesis</groupId>
+                        <artifactId>objenesis-parent</artifactId>
+                        <version>3.4</version>
+                    </parent>
+                    <artifactId>objenesis</artifactId>
+                </project>
+                """);
+        assertThat(mavenPomResolver.jdk("25.0.4.1").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .as("Maven reads <jdk>[9,</jdk> as [9,) and activates the profile on Java 25")
+                .isEqualTo("8");
+        assertThat(mavenPomResolver.jdk("1.8.0_402").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .isNull();
+    }
+
+    @Test
+    public void a_jdk_activation_of_a_fetched_pom_that_is_no_version_range_leaves_its_profile_inactive() throws IOException {
+        addToRepository("parent", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>parent</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <profiles>
+                        <profile>
+                            <activation>
+                                <jdk>[nine,)</jdk>
+                            </activation>
+                            <properties>
+                                <maven.compiler.release>8</maven.compiler.release>
+                            </properties>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>parent</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                </project>
+                """);
+        assertThat(mavenPomResolver.jdk("25.0.4.1").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .as("a third-party POM's activation that cannot be read does not stop the build")
+                .isNull();
     }
 
     @Test

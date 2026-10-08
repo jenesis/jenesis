@@ -25,6 +25,7 @@ public class MavenPomResolver implements MavenResolver {
     private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
     private static final Pattern JDK_RANGE = Pattern.compile(
             "\\s*([\\[(])\\s*([0-9]{1,8}(?:\\.[0-9]{1,8})*)?\\s*(,)?\\s*([0-9]{1,8}(?:\\.[0-9]{1,8})*)?\\s*([\\])])\\s*(,|$)");
+    private static final Pattern JDK_UNCLOSED = Pattern.compile(".*[\\[(]\\s*[0-9.]*\\s*,\\s*");
     public static final String CHECKSUM_PREFIX = "Checksum/";
 
     private final Supplier<MavenVersionNegotiator> negotiatorSupplier;
@@ -885,7 +886,7 @@ public class MavenPomResolver implements MavenResolver {
                             properties.put("project." + property, value);
                         }));
                 List<Node> models = Stream.concat(Stream.of(document.getDocumentElement()),
-                        toActiveProfiles(document.getDocumentElement(), path)).toList();
+                        toActiveProfiles(document.getDocumentElement(), path, trusted)).toList();
                 models.stream()
                         .flatMap(model -> toElements(model, "properties").limit(1))
                         .flatMap(MavenPomResolver::toChildren)
@@ -1309,7 +1310,7 @@ public class MavenPomResolver implements MavenResolver {
                 .toList();
     }
 
-    private Stream<Node> toActiveProfiles(Node project, Path path) {
+    private Stream<Node> toActiveProfiles(Node project, Path path, boolean trusted) {
         List<Node> profiles = toElements(project, "profiles")
                 .limit(1)
                 .flatMap(node -> toElements(node, "profile"))
@@ -1320,7 +1321,7 @@ public class MavenPomResolver implements MavenResolver {
                         .filter(condition -> condition.getNodeType() == Node.ELEMENT_NODE)
                         .allMatch(condition -> JDK_ACTIVATIONS.contains(condition.getLocalName())))
                 .flatMap(activation -> toElementText(activation, "jdk"))
-                .filter(range -> isJdk(range, path))
+                .filter(range -> isJdk(range, path, trusted))
                 .isPresent()).toList();
         return activated.isEmpty()
                 ? profiles.stream().filter(profile -> toElements(profile, "activation")
@@ -1331,11 +1332,14 @@ public class MavenPomResolver implements MavenResolver {
                 : activated.stream();
     }
 
-    private boolean isJdk(String activation, Path path) {
+    private boolean isJdk(String activation, Path path, boolean trusted) {
         boolean negated = activation.startsWith("!");
         String required = negated ? activation.substring(1).trim() : activation;
         if (!required.startsWith("[") && !required.startsWith("(")) {
             return jdk.startsWith(required) != negated;
+        }
+        if (JDK_UNCLOSED.matcher(required).matches()) {
+            required = required + ")";
         }
         Matcher matcher = JDK_RANGE.matcher(required);
         boolean matched = false;
@@ -1352,6 +1356,9 @@ public class MavenPomResolver implements MavenResolver {
             end = matcher.end();
         }
         if (end != required.length() || required.endsWith(",")) {
+            if (!trusted) {
+                return false;
+            }
             throw new IllegalArgumentException("The profile activation <jdk>" + activation + "</jdk> of "
                     + (path == null ? "a POM" : path.resolve("pom.xml"))
                     + " is neither a version prefix, such as 1.8, nor ranges of versions, such as [9,), [1.8,17)"

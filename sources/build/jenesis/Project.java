@@ -877,8 +877,10 @@ public record Project(
                                  wins and `pin` writes into the module's POM;
                                  a profile of any POM - the module's, a parent's, a BOM's or a
                                  dependency's - that Maven activates by <jdk>, matched against the
-                                 JDK the build runs on, or by <activeByDefault> when no other
-                                 profile of that POM is active, with its <properties>,
+                                 JDK the build runs on (an unclosed [9, reads as [9,); a fetched
+                                 POM's range that is none leaves its profile inactive, the
+                                 project's own is refused), or by <activeByDefault> when no
+                                 other profile of that POM is active, with its <properties>,
                                  dependencies, <dependencyManagement> and resource directories
                       ignored    <build><plugins> and <pluginManagement>, a profile activated by
                                  a property, the OS, a file or -P, a profile's <modules>,
