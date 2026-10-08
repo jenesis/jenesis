@@ -533,6 +533,35 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void sources_jar_holds_what_a_generator_added_to_the_sources() throws IOException {
+        Fixture fixture = setUp("path=\n", false, true, false);
+        Files.writeString(Files.createDirectories(fixture.sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { Generated generated; }");
+        Files.writeString(fixture.configuration().resolve("plugin-generator.properties"), "");
+        SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("generator+binary/generated", (_, _) -> new GeneratingStep().asModule("generator"));
+        Path sourcesOutput = fixture.execute(new InferredMultiProjectAssembler().plugins(plugins), "sub/sources/archive")
+                .get("sub/sources/archive");
+        try (JarFile jar = new JarFile(sourcesOutput.resolve("sources").resolve("sources.jar").toFile())) {
+            assertThat(jar.stream().map(JarEntry::getName))
+                    .as("a sources jar holds the generated sources the module is compiled from, as Maven's does")
+                    .contains("sample/Sample.java", "sample/Generated.java");
+        }
+    }
+
+    private record GeneratingStep() implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.SOURCES + "sample")).resolve("Generated.java"),
+                    "package sample; public class Generated { }");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    @Test
     public void source_flag_disabled_omits_sources_jar_step() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/sources/archive"))
