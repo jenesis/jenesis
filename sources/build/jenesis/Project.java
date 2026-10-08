@@ -1082,7 +1082,9 @@ public record Project(
                           the basis of the jar's manifest (12)
                       maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (48, 66)
                       maven-javadoc-plugin / withJavadocJar(), Dokka
-                          -> -Djenesis.project.documentation=true (48, 66)
+                          -> -Djenesis.project.documentation=true (48, 66); javadoc runs with
+                          -Xdoclint:none unless process-javadoc.properties names an -Xdoclint flag,
+                          and fails the build on an error, -Werror= making a warning one
                       maven-shade-plugin, Spring Boot repackage / shadow, bootJar
                           -> launcher=true, one executable jar (08)
                       maven-assembly-plugin / application, distZip -> bundle=true (10)
