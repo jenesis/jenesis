@@ -4059,6 +4059,80 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_reads_a_developers_details_and_the_issue_and_ci_management_and_inherits_them() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <developers>
+                        <developer>
+                            <id>alice</id>
+                            <name>Alice Example</name>
+                            <url>https://example.com/alice</url>
+                            <organization>Example Ltd</organization>
+                            <organizationUrl>https://example.com</organizationUrl>
+                            <roles>
+                                <role>lead</role>
+                                <role>developer</role>
+                            </roles>
+                            <timezone>Europe/Oslo</timezone>
+                        </developer>
+                        <developer>
+                            <id>bob</id>
+                            <url>https://example.com/bob</url>
+                        </developer>
+                    </developers>
+                    <issueManagement>
+                        <system>GitHub</system>
+                        <url>https://example.com/issues</url>
+                    </issueManagement>
+                    <ciManagement>
+                        <system>GitHub Actions</system>
+                        <url>https://example.com/actions</url>
+                    </ciManagement>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("child")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <issueManagement>
+                        <url>https://example.com/child/issues</url>
+                    </issueManagement>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("child")).metadata())
+                .as("the developers are inherited as a list, the issue and ci management field by field as Maven merges them")
+                .containsOnly(
+                        Map.entry("developer.alice.name", "Alice Example"),
+                        Map.entry("developer.alice.url", "https://example.com/alice"),
+                        Map.entry("developer.alice.organization", "Example Ltd"),
+                        Map.entry("developer.alice.organizationUrl", "https://example.com"),
+                        Map.entry("developer.alice.roles", "lead,developer"),
+                        Map.entry("developer.alice.timezone", "Europe/Oslo"),
+                        Map.entry("developer.bob.id", "bob"),
+                        Map.entry("developer.bob.url", "https://example.com/bob"),
+                        Map.entry("issueManagement.url", "https://example.com/child/issues"),
+                        Map.entry("issueManagement.system", "GitHub"),
+                        Map.entry("ciManagement.system", "GitHub Actions"),
+                        Map.entry("ciManagement.url", "https://example.com/actions"));
+    }
+
+    @Test
     public void local_pom_inherits_the_metadata_of_a_parent_it_fetches() throws IOException {
         addToRepository("group", "grandparent", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>

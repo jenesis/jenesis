@@ -456,6 +456,40 @@ public class PomTest {
     }
 
     @Test
+    public void emits_a_developers_details_and_the_issue_and_ci_management() throws IOException {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.setProperty("developer.alice.name", "Alice Example");
+        metadata.setProperty("developer.alice.url", "https://example.com/alice");
+        metadata.setProperty("developer.alice.organization", "Example Ltd");
+        metadata.setProperty("developer.alice.organizationUrl", "https://example.com");
+        metadata.setProperty("developer.alice.roles", "lead, developer");
+        metadata.setProperty("developer.alice.timezone", "Europe/Oslo");
+        metadata.setProperty("issueManagement.system", "GitHub");
+        metadata.setProperty("issueManagement.url", "https://example.com/issues");
+        metadata.setProperty("ciManagement.system", "GitHub Actions");
+        metadata.setProperty("ciManagement.url", "https://example.com/actions");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        String pom = Files.readString(next.resolve(Pom.POM)).replaceAll(">\\s+<", "><");
+        assertThat(pom).contains("<developer><id>alice</id><name>Alice Example</name>"
+                + "<url>https://example.com/alice</url><organization>Example Ltd</organization>"
+                + "<organizationUrl>https://example.com</organizationUrl>"
+                + "<roles><role>lead</role><role>developer</role></roles>"
+                + "<timezone>Europe/Oslo</timezone></developer>");
+        assertThat(pom).contains("<issueManagement><system>GitHub</system><url>https://example.com/issues</url></issueManagement>"
+                + "<ciManagement><system>GitHub Actions</system><url>https://example.com/actions</url></ciManagement>");
+    }
+
+    @Test
     public void emits_a_developer_without_an_id_where_its_id_is_empty() throws IOException {
         SequencedProperties metadata = new SequencedProperties();
         metadata.setProperty("project", "build.jenesis");

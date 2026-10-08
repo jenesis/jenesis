@@ -1019,7 +1019,9 @@ public class MavenPomResolver implements MavenResolver {
                     switch (key) {
                         case "name" -> {
                         }
-                        case "description", "organization.name", "organization.url" -> metadata.putIfAbsent(key, value);
+                        case "description", "organization.name", "organization.url",
+                             "issueManagement.system", "issueManagement.url",
+                             "ciManagement.system", "ciManagement.url" -> metadata.putIfAbsent(key, value);
                         case "url", "scm.connection", "scm.developerConnection", "scm.url" -> metadata.putIfAbsent(key,
                                 parentVerbatim.contains(key) || value.isEmpty() || child == null
                                         ? value
@@ -1628,17 +1630,40 @@ public class MavenPomResolver implements MavenResolver {
                     id = derived + "_" + suffix;
                 }
                 metadata.put("developer." + id + ".id", "");
-            } else if (name == null && email == null) {
-                metadata.put("developer." + id + ".id", id);
             }
-            ids.add(id);
+            SequencedMap<String, String> details = new LinkedHashMap<>();
             if (name != null) {
-                metadata.put("developer." + id + ".name", name);
+                details.put("name", name);
             }
             if (email != null) {
-                metadata.put("developer." + id + ".email", email);
+                details.put("email", email);
+            }
+            for (String property : List.of("url", "organization", "organizationUrl", "timezone")) {
+                toElementText(developer, property).ifPresent(value -> details.put(property, value));
+            }
+            String roles = toElements(developer, "roles").limit(1)
+                    .flatMap(declared -> toElements(declared, "role"))
+                    .map(role -> role.getTextContent().trim())
+                    .filter(role -> !role.isEmpty())
+                    .collect(Collectors.joining(","));
+            if (!roles.isEmpty()) {
+                details.put("roles", roles);
+            }
+            if (name == null && email == null) {
+                metadata.putIfAbsent("developer." + id + ".id", id);
+            }
+            ids.add(id);
+            for (Map.Entry<String, String> detail : details.entrySet()) {
+                metadata.put("developer." + id + "." + detail.getKey(), detail.getValue());
             }
         });
+        for (String management : List.of("issueManagement", "ciManagement")) {
+            toElements(node, management).findFirst().ifPresent(declared -> {
+                for (String property : List.of("system", "url")) {
+                    toElementText(declared, property).ifPresent(value -> metadata.put(management + "." + property, value));
+                }
+            });
+        }
         toElements(node, "scm").findFirst().ifPresent(scm -> {
             for (String property : List.of("connection", "developerConnection", "tag", "url")) {
                 toElementText(scm, property).ifPresent(value -> metadata.put("scm." + property, value));
