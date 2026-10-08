@@ -21,6 +21,7 @@ public class CheckstyleModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
+    private static final String STRICT = "source.checkstyle.strict";
     private static final String REPORT = BuildStep.REPORTS + "checkstyle/checkstyle-report.xml";
     private static final String MAVEN_GROUP = "com.puppycrawl.tools", MAVEN_ARTIFACT = "checkstyle";
     private static final Pattern CONFIG_LOC = Pattern.compile("\\$\\{config_loc}/([^\"'<>${}\\s]+)");
@@ -49,7 +50,7 @@ public class CheckstyleModule implements BuildExecutorModule {
                 null,
                 "checkstyle",
                 "checkstyle.xml",
-                false,
+                environment.flag(STRICT, false),
                 ProcessBuildStep.Terms.ofEnvironment(environment, "checkstyle"));
     }
 
@@ -167,7 +168,8 @@ public class CheckstyleModule implements BuildExecutorModule {
                                           Executor executor,
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
-            return code == 0 || !strict && completeReport(context.next().resolve(REPORT));
+            Path report = context.next().resolve(REPORT);
+            return reported(code, context, report, findings(report, "error"), true, strict, STRICT);
         }
 
         @Override

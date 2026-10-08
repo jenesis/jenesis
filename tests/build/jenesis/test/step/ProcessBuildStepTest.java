@@ -259,6 +259,68 @@ public class ProcessBuildStepTest {
                 .hasMessageContaining("-1");
     }
 
+    @Test
+    public void a_linter_that_found_something_prints_its_findings_and_where_its_report_lands() throws IOException {
+        List<String> printed = new ArrayList<>();
+        BuildStepResult result = lint(new Linter(new Environment(Map.of()).out(printed::add), 0, false, false));
+        assertThat(result.next()).isTrue();
+        assertThat(printed).singleElement().asString()
+                .contains("[FINDINGS]")
+                .as("the line names the folder the report lands in once the step completes")
+                .contains("linter found 2 findings, reported in " + root.resolve("check").resolve("output").resolve("report.xml"));
+    }
+
+    @Test
+    public void a_report_only_linter_accepts_the_violations_its_exit_code_reports() throws IOException {
+        List<String> printed = new ArrayList<>();
+        assertThat(lint(new Linter(new Environment(Map.of()).out(printed::add), 1, true, false)).next()).isTrue();
+        assertThat(printed).singleElement().asString().contains("linter found 2 findings");
+    }
+
+    @Test
+    public void a_strict_linter_fails_the_build_on_the_violations_its_exit_code_reports() {
+        assertThatThrownBy(() -> lint(new Linter(new Environment(Map.of()).out(_ -> { }), 1, true, true)))
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("linter found 2 findings, reported in " + root.resolve("check~").resolve("output").resolve("report.xml"))
+                .hasMessageContaining("jenesis.source.linter.strict");
+    }
+
+    @Test
+    public void a_strict_linter_accepts_the_findings_its_exit_code_does_not_count_as_violations() throws IOException {
+        List<String> printed = new ArrayList<>();
+        assertThat(lint(new Linter(new Environment(Map.of()).out(printed::add), 0, true, true)).next()).isTrue();
+        assertThat(printed).singleElement().asString().contains("linter found 2 findings");
+    }
+
+    @Test
+    public void a_strict_linter_whose_exit_code_judges_nothing_fails_on_any_finding_of_its_report() {
+        assertThatThrownBy(() -> lint(new Linter(new Environment(Map.of()).out(_ -> { }), 0, false, true)))
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("linter found 2 findings");
+    }
+
+    @Test
+    public void the_findings_line_is_left_out_without_an_environment_or_when_switched_off() throws IOException {
+        List<String> printed = new ArrayList<>();
+        assertThat(lint(new Linter(new Environment(Map.of("print.findings", "false")).out(printed::add), 0, false, false)).next())
+                .isTrue();
+        assertThat(printed).isEmpty();
+        assertThat(ProcessBuildStep.Terms.of("linter").reporting())
+                .as("a step built without an environment prints nothing")
+                .isNull();
+    }
+
+    private BuildStepResult lint(Linter linter) throws IOException {
+        Path step = Files.createDirectory(root.resolve("check~"));
+        return linter.apply(Runnable::run,
+                new BuildStepContext(null,
+                        Files.createDirectory(step.resolve("output")),
+                        Files.createDirectory(step.resolve("supplement"))),
+                new LinkedHashMap<>()).toCompletableFuture().join();
+    }
+
     private void run(Supplier<ProcessBuildStep> steps) throws Exception {
         List<CompletionStage<BuildStepResult>> results = new ArrayList<>();
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
@@ -298,6 +360,54 @@ public class ProcessBuildStepTest {
         };
     }
 
+    private record Reporting(int code) implements ToolProvider {
+
+        @Override
+        public String name() {
+            return "linter";
+        }
+
+        @Override
+        public int run(PrintWriter out, PrintWriter err, String... arguments) {
+            try {
+                Files.writeString(Path.of(arguments[0]), """
+                        <checkstyle><file name="Sample.java"><error/><error/></file></checkstyle>
+                        """);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            return code;
+        }
+    }
+
+    private static final class Linter extends ProcessBuildStep {
+
+        private final boolean judged, strict;
+
+        private Linter(Environment environment, int code, boolean judged, boolean strict) {
+            super("linter", ProcessHandler.OfTool.of(new Reporting(code)), Terms.ofEnvironment(environment, "linter"));
+            this.judged = judged;
+            this.strict = strict;
+        }
+
+        @Override
+        protected CompletionStage<List<String>> process(Executor executor,
+                                                        BuildStepContext context,
+                                                        SequencedMap<String, BuildStepArgument> arguments,
+                                                        SequencedMap<String, SequencedMap<String, String>> properties) {
+            return CompletableFuture.completedStage(List.of(context.next().resolve("report.xml").toString()));
+        }
+
+        @Override
+        public boolean acceptableExitCode(int code,
+                                          Executor executor,
+                                          BuildStepContext context,
+                                          SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Path report = context.next().resolve("report.xml");
+            return reported(code, context, report, findings(report, "error"), judged, strict, "source.linter.strict");
+        }
+    }
+
     private static final class Gated extends ProcessBuildStep {
 
         private Gated(ToolProvider provider) {
@@ -309,7 +419,7 @@ public class ProcessBuildStepTest {
         }
 
         private Gated(ToolProvider provider, Semaphore permits) {
-            super("gated", ProcessHandler.OfTool.of(provider), new Terms(null, permits, null));
+            super("gated", ProcessHandler.OfTool.of(provider), new Terms(null, permits, null, null));
         }
 
         @Override
