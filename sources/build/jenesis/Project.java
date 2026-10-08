@@ -1076,6 +1076,11 @@ public record Project(
                       jacoco-maven-plugin / jacoco -> jacoco.properties, a report (36)
                       pitest-maven / info.solidsoft.pitest -> pitest.properties (38)
                       jmh-maven-plugin / me.champeau.jmh -> @jenesis.plugin and @jenesis.main (39)
+                      byte-buddy-maven-plugin / net.bytebuddy.byte-buddy-gradle-plugin -> no built-in:
+                          those plugins discover Byte Buddy plugins themselves and take their settings
+                          as XML or DSL, which configures awkwardly; here a plugin of the project
+                          constructs its net.bytebuddy.build.Plugin instances in Java and hands them
+                          to Plugin.Engine, with values from plugin-<name>.properties (skill/extend)
                       japicmp-maven-plugin / me.champeau.gradle.japicmp -> japicmp.properties (40)
 
                     ## Dependencies
@@ -1769,7 +1774,11 @@ public record Project(
 
                     Prefer a tool's Java API to a process: require it in the plugin's module-info.java
                     and it resolves by module name into the plugin's own layer, pinned as
-                    plugin-<name>/module/<module>. A JDK tool is forked by extending ProcessBuildStep,
+                    plugin-<name>/module/<module>. Configure the tool in that code, too: where a Maven
+                    or Gradle plugin discovers the tool's own extensions and takes their settings as XML,
+                    as Byte Buddy's build plugin does, the provider constructs them in Java - the
+                    net.bytebuddy.build.Plugin instances handed to Plugin.Engine, say - and reads only
+                    plain values from plugin-<name>.properties. A JDK tool is forked by extending ProcessBuildStep,
                     which also reads process-<tool>.properties; one that runs a program extends
                     EnvironmentalProcessBuildStep for environment-<tool>.properties. Write nothing
                     outside context.next(): a step that must, as an exporter does, overrides
