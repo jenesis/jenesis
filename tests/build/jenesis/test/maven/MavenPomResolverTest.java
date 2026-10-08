@@ -6,6 +6,7 @@ import build.jenesis.BuildStepHashFunction;
 import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.License;
+import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.maven.MavenDefaultRepository;
@@ -1277,6 +1278,71 @@ public class MavenPomResolverTest {
                 .containsExactly(Map.entry(
                         new MavenDependencyKey("other", "artifact", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
+    }
+
+    @Test
+    public void follows_a_relocation_to_the_coordinate_it_names_and_says_so() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>old</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                            <scope>runtime</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("old", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>old</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <distributionManagement>
+                        <relocation>
+                            <groupId>new</groupId>
+                        </relocation>
+                    </distributionManagement>
+                </project>
+                """);
+        addToRepository("new", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>transitive</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("transitive", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                </project>
+                """);
+        List<String> printed = new ArrayList<>();
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver
+                .printing(printed::add, Palette.NONE)
+                .dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null);
+        assertThat(dependencies)
+                .as("the relocated artifact publishes no jar, so the coordinate it names takes its place and scope")
+                .containsExactly(Map.entry(
+                                new MavenDependencyKey("new", "artifact", "jar", null),
+                                new MavenDependencyValue("1", MavenDependencyScope.RUNTIME, null, null, null)),
+                        Map.entry(
+                                new MavenDependencyKey("transitive", "artifact", "jar", null),
+                                new MavenDependencyValue("1", MavenDependencyScope.RUNTIME, null, null, null)));
+        assertThat(printed).containsExactly("[RELOCATED] old:artifact:1 is relocated to new:artifact:1,"
+                + " which is resolved in its place");
     }
 
     @Test
