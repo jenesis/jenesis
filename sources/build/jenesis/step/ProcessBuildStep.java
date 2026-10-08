@@ -67,7 +67,7 @@ public abstract class ProcessBuildStep implements BuildStep {
         public static Terms ofEnvironment(Environment environment,
                                    String command,
                                    boolean printing) {
-            int concurrency = environment.number("process.concurrency", 0);
+            int concurrency = environment.number("process.concurrency", Runtime.getRuntime().availableProcessors());
             if (concurrency < 0) {
                 throw new IllegalArgumentException("Process concurrency must not be negative: " + concurrency);
             }

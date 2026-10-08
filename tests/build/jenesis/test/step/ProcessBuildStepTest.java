@@ -264,6 +264,19 @@ public class ProcessBuildStepTest {
     }
 
     @Test
+    public void bounds_the_processes_running_at_once_to_the_processor_count_by_default() {
+        assertThat(ProcessBuildStep.Terms.ofEnvironment(Environment.NONE, "probe").permits())
+                .as("an unset limit is one process per processor, so a build of many modules forks no more JVMs than it can run")
+                .isNotNull()
+                .isSameAs(ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.concurrency",
+                        Integer.toString(Runtime.getRuntime().availableProcessors()))), "probe").permits());
+        assertThat(ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.concurrency", "0")), "probe")
+                .permits())
+                .as("0 is unbounded")
+                .isNull();
+    }
+
+    @Test
     public void runs_every_process_at_once_without_a_limit() throws Exception {
         CountDownLatch started = new CountDownLatch(4);
         run(() -> new Gated(new ToolProvider() {
@@ -284,7 +297,7 @@ public class ProcessBuildStepTest {
                 }
                 return 0;
             }
-        }));
+        }, new Environment(Map.of("process.concurrency", "0"))));
     }
 
     @Test

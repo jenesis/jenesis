@@ -1711,6 +1711,10 @@ public record Project(
                       -Djenesis.dependency.pin=strict  fail the build on any unpinned artifact
                       -Djenesis.test.filter=<regex>    run one test class or method; <module>/<regex>
                                                        runs it in that module alone
+                      -Djenesis.process.concurrency=2  run at most two compilers, tools and test
+                                                       JVMs at once rather than one per processor -
+                                                       with many test modules on little memory,
+                                                       beside an -Xmx in process-test.properties
                       -Djenesis.executor.rebuild       wipe target/ - avoid it, see skill/engine
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
@@ -3541,13 +3545,13 @@ public record Project(
                 toolchain.version||JDK the build runs on, as 25, 25.0.3 or 25-temurin: the numbers match as a prefix, every word must be one of the vendor and version words in the JDK's release file, and a pre-release matches only when its word is named; Make and Execute relaunch on a match when the running JVM is none
                 toolchain.searchpath|@|Comma-separated JDK folders searched for toolchain.version, absolute or under ~, * standing for any one folder name; @ splices this system's usual JDK locations and empty only checks the running JVM; settable only on the command line or in ~/.jenesis/jenesis.properties
                 toolchain.installer||Program run with the requested version as its last argument when no JDK under toolchain.searchpath matches, such as jenesis-jdk from the SDK; a name is looked up on the absolute folders of the PATH, a path must be absolute or start with ~; settable only on the command line or in ~/.jenesis/jenesis.properties, and an empty value names none (env JENESIS_TOOLCHAIN_INSTALLER, which the jenesis command sets to its own jenesis-jdk for the run it starts where SDKMAN, mise or Scoop installed it)
-                executor.concurrency|0|Run at most this many build steps at once; 0 is unbounded
+                executor.concurrency|0|Run at most this many build steps at once; 0 is unbounded, while process.concurrency still bounds the tools they run
                 executor.timeout|PT0S|ISO-8601 timeout per step; PT0S is no timeout
                 executor.digest|MD5|Algorithm behind the content and step hashes that drive the cache
                 executor.rebuild|false|Wipe target/ before building; prefer letting the cache decide
                 executor.aggregate|false|Collect independent step failures into one report
                 executor.events|true|Write each step's outcome of the latest build as one JSON object per line to .jenesis.events.jsonl in the target folder, replaced by every build
-                process.concurrency|0|Run at most this many JDK tool runs at once; 0 is unbounded
+                process.concurrency|(processor count)|Run at most this many tool runs at once - a compiler, a JDK tool, a forked JVM such as a test run; 0 is unbounded
                 process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
                 archive.timestamp|1980-02-01T00:00:00Z|ISO-8601 date-time with an offset recorded on every entry of the jars, jmods and zips the build writes; empty keeps the times the tools record and makes the archives unreproducible; set explicitly, it is also the creation time a generated Docker image is labelled with
