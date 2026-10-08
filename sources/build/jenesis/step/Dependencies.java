@@ -1085,8 +1085,13 @@ public class Dependencies implements BuildExecutorModule {
                                 + module
                                 + " in group "
                                 + group
-                                + " - a module path resolves whichever of the two comes first,"
-                                + " so drop one with @jenesis.exclude");
+                                + " - a module path resolves whichever of the two comes first, so "
+                                + (carrier.dependency().substring(0, carrier.dependency().lastIndexOf('/'))
+                                        .equals(dependency.substring(0, dependency.lastIndexOf('/')))
+                                        ? "settle on one version: a <dependencyManagement> entry in pom.xml"
+                                                + " or a @jenesis.pin line in module-info.java manages it"
+                                        : "drop one: an <exclusions> entry in pom.xml or @jenesis.exclude in"
+                                                + " module-info.java"));
                     }
                 }
             }

@@ -9,9 +9,11 @@ import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
+import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.PathPlacement;
+import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
@@ -837,6 +839,47 @@ public class TestModuleTest {
                 .containsExactly("main/runtime/maven/org.junit.platform/junit-platform-console");
         assertThat(readVersions(stepFolder).getProperty("main/maven/org.junit.platform/junit-platform-console"))
                 .isEqualTo("RELEASE");
+    }
+
+    @Test
+    public void the_project_dependencies_are_declared_before_the_runner_so_mediation_prefers_them() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/runtime/maven/org.example/library/1.0", "");
+        requires.store(emptyDependencies.resolve(BuildStep.REQUIRES));
+        RecordingResolver.ORDER.clear();
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", emptyDependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", new RecordingResolver()))
+                        .framework(new JUnitPlatform())
+                        .isTest(candidate -> candidate.endsWith("TestSample"))
+                        .jarsOnly(false)
+                        .skip(true),
+                "dependencies", "classes");
+        executor.execute();
+
+        assertThat(RecordingResolver.ORDER)
+                .as("a launcher the build adds fills what the tests lack, as a Maven test class path would, so the"
+                        + " version a nearest-first mediation picks on a tie is the project's own")
+                .containsExactly("org.example/library/1.0", "org.junit.platform/junit-platform-console");
+    }
+
+    private record RecordingResolver() implements Resolver {
+
+        private static final List<String> ORDER = new CopyOnWriteArrayList<>();
+
+        @Override
+        public Resolver.Resolution dependencies(Executor executor,
+                                                String prefix,
+                                                Map<String, Repository> repositories,
+                                                SequencedMap<String, SequencedSet<String>> coordinates,
+                                                SequencedMap<String, String> versions,
+                                                DependencyScope scope) {
+            ORDER.addAll(coordinates.sequencedKeySet());
+            return new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>());
+        }
     }
 
     @Test
