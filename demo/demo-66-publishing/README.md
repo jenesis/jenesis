@@ -36,6 +36,7 @@ two channels described under "Where the POM metadata comes from" below:
     <licenses>...</licenses>
     <developers>...</developers>
     <scm>...</scm>
+    <issueManagement>...</issueManagement>
 
 Then `Demo.java` proves the bundle is real: the staged tree is itself a Maven
 repository, so it recovers the coordinate from the staged layout (hard-coding
@@ -76,7 +77,7 @@ Layout
     demo/demo-66-publishing
     |-- build/jenesis            symlink to ../../../sources/build/jenesis
     |-- build/Demo.java          stages the release bundle, then resolves it back to prove it is consumable
-    |-- project.properties       only what a module declaration cannot express: url, license, developer, scm
+    |-- project.properties       only what a module declaration cannot express: url, license, developer, scm, issues
     `-- sources
         |-- module-info.java     module build.jenesis.demo.publishing (MODULAR_TO_MAVEN: a POM is generated)
         `-- sample/Sample.java   the library being published
@@ -98,9 +99,10 @@ duplicated:
   apart from a link, which becomes its label.
 - **`project.properties`**, read because it sits at the project root, carries only what a
   module declaration cannot express: `url`, every `license.<id>.name|url`, every
-  `developer.<id>.name|email` - published under `<id>`, unless `developer.<id>.id`
-  names another id or is empty for none - and the `scm.connection|developerConnection|url`
-  block. A file elsewhere, or several, is named with `Project.metadata(...)` or
+  `developer.<id>.name|email|url|organization|organizationUrl|roles|timezone`, the
+  roles comma-separated - published under `<id>`, unless `developer.<id>.id`
+  names another id or is empty for none - the `scm.connection|developerConnection|url`
+  block, and `issueManagement.system|url` and `ciManagement.system|url`. A file elsewhere, or several, is named with `Project.metadata(...)` or
   `-Djenesis.project.metadata`, and an empty value there reads none.
 
 The version is stamped by `Project.version("1.0.0")`. Without one, the module is

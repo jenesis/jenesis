@@ -98,6 +98,22 @@ public class MavenPomEmitter {
                     if (developer.email() != null) {
                         appendText(document, node, "email", developer.email());
                     }
+                    if (developer.url() != null) {
+                        appendText(document, node, "url", developer.url());
+                    }
+                    if (developer.organization() != null) {
+                        appendText(document, node, "organization", developer.organization());
+                    }
+                    if (developer.organizationUrl() != null) {
+                        appendText(document, node, "organizationUrl", developer.organizationUrl());
+                    }
+                    if (!developer.roles().isEmpty()) {
+                        Node roles = appendChild(document, node, "roles");
+                        developer.roles().forEach(role -> appendText(document, roles, "role", role));
+                    }
+                    if (developer.timezone() != null) {
+                        appendText(document, node, "timezone", developer.timezone());
+                    }
                 }
             }
             if (metadata.scm() != null) {
@@ -118,6 +134,12 @@ public class MavenPomEmitter {
                 if (scm.url() != null) {
                     appendText(document, node, "url", scm.url());
                 }
+            }
+            if (metadata.issueManagement() != null) {
+                appendManagement(document, project, "issueManagement", metadata.issueManagement());
+            }
+            if (metadata.ciManagement() != null) {
+                appendManagement(document, project, "ciManagement", metadata.ciManagement());
             }
         }
         if (!managedDependencies.isEmpty()) {
@@ -190,6 +212,16 @@ public class MavenPomEmitter {
         }
     }
 
+    private static void appendManagement(Document document, Node project, String name, Metadata.Management management) {
+        Node node = appendChild(document, project, name);
+        if (management.system() != null) {
+            appendText(document, node, "system", management.system());
+        }
+        if (management.url() != null) {
+            appendText(document, node, "url", management.url());
+        }
+    }
+
     private static Node appendChild(Document document, Node parent, String name) {
         return parent.appendChild(document.createElementNS(NAMESPACE_4_0_0, name));
     }
@@ -211,12 +243,24 @@ public class MavenPomEmitter {
             List<License> licenses,
             List<Developer> developers,
             Scm scm,
-            Organization organization
+            Organization organization,
+            Management issueManagement,
+            Management ciManagement
     ) implements Serializable {
 
         public Metadata {
             licenses = licenses == null ? List.of() : List.copyOf(licenses);
             developers = developers == null ? List.of() : List.copyOf(developers);
+        }
+
+        public Metadata(String name,
+                        String description,
+                        String url,
+                        List<License> licenses,
+                        List<Developer> developers,
+                        Scm scm,
+                        Organization organization) {
+            this(name, description, url, licenses, developers, scm, organization, null, null);
         }
 
         static Metadata of(SequencedProperties metadata) {
@@ -241,10 +285,17 @@ public class MavenPomEmitter {
             List<Developer> developers = new ArrayList<>();
             for (String id : developerIds) {
                 String declared = metadata.getProperty("developer." + id + ".id");
+                String prefix = "developer." + id + ".";
+                List<String> roles = metadata.entries(prefix + "roles");
                 developers.add(new Developer(
                         declared == null ? id : declared.isBlank() ? null : declared.strip(),
-                        metadata.getProperty("developer." + id + ".name"),
-                        metadata.getProperty("developer." + id + ".email")));
+                        metadata.getProperty(prefix + "name"),
+                        metadata.getProperty(prefix + "email"),
+                        metadata.value(prefix + "url"),
+                        metadata.value(prefix + "organization"),
+                        metadata.value(prefix + "organizationUrl"),
+                        roles == null ? List.of() : roles,
+                        metadata.value(prefix + "timezone")));
             }
             Scm scm = null;
             String scmConnection = metadata.getProperty("scm.connection");
@@ -267,19 +318,44 @@ public class MavenPomEmitter {
                     scm,
                     metadata.value("organization.name") == null && metadata.value("organization.url") == null
                             ? null
-                            : new Metadata.Organization(metadata.value("organization.name"), metadata.value("organization.url")));
+                            : new Organization(metadata.value("organization.name"), metadata.value("organization.url")),
+                    Management.of(metadata, "issueManagement"),
+                    Management.of(metadata, "ciManagement"));
         }
 
         public record License(String name, String url) implements Serializable {
         }
 
-        public record Developer(String id, String name, String email) implements Serializable {
+        public record Developer(String id,
+                                String name,
+                                String email,
+                                String url,
+                                String organization,
+                                String organizationUrl,
+                                List<String> roles,
+                                String timezone) implements Serializable {
+
+            public Developer {
+                roles = roles == null ? List.of() : List.copyOf(roles);
+            }
+
+            public Developer(String id, String name, String email) {
+                this(id, name, email, null, null, null, List.of(), null);
+            }
         }
 
         public record Scm(String connection, String developerConnection, String url, String tag) implements Serializable {
         }
 
         public record Organization(String name, String url) implements Serializable {
+        }
+
+        public record Management(String system, String url) implements Serializable {
+
+            private static Management of(SequencedProperties metadata, String kind) {
+                String system = metadata.value(kind + ".system"), url = metadata.value(kind + ".url");
+                return system == null && url == null ? null : new Management(system, url);
+            }
         }
     }
 }
