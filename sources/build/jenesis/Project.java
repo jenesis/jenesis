@@ -1815,7 +1815,7 @@ public record Project(
                 case "demos" -> """
                     # Jenesis - Copy a demo
 
-                    72 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    73 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
