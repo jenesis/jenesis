@@ -137,9 +137,13 @@ public class PinPom implements BuildStep {
             }
         }
         Matcher pinMatcher = PIN_COMMENT.matcher(existing);
-        List<String> preserved = pinMatcher.find()
-                ? preserveGuarded(pinMatcher.group(2), qualified, managed)
-                : List.of();
+        StringBuilder pinned = new StringBuilder();
+        while (pinMatcher.find()) {
+            pinned.append(pinMatcher.group(2)).append('\n');
+        }
+        List<String> preserved = pinned.isEmpty()
+                ? List.of()
+                : preserveGuarded(pinned.toString(), qualified, managed);
         String block = managed.isEmpty() && imports.isEmpty() ? "" : renderBlock(imports, managed, indent);
         String updated;
         if (dependencyManagementMatcher.find(0)) {
@@ -161,7 +165,12 @@ public class PinPom implements BuildStep {
         Matcher requiresMatcher = PIN_COMMENT.matcher(updated);
         String requires = qualified.isEmpty() && preserved.isEmpty() ? "" : renderRequires(qualified, preserved, indent);
         if (requiresMatcher.find()) {
-            updated = requiresMatcher.replaceFirst(Matcher.quoteReplacement(requires));
+            StringBuilder rewritten = new StringBuilder();
+            requiresMatcher.appendReplacement(rewritten, Matcher.quoteReplacement(requires));
+            while (requiresMatcher.find()) {
+                requiresMatcher.appendReplacement(rewritten, "");
+            }
+            updated = requiresMatcher.appendTail(rewritten).toString();
         } else if (!requires.isEmpty()) {
             Matcher projectCloseMatcher = PROJECT_CLOSE.matcher(updated);
             if (!projectCloseMatcher.find()) {
