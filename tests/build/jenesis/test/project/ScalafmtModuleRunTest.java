@@ -109,7 +109,7 @@ public class ScalafmtModuleRunTest {
         assertThatThrownBy(executor::execute)
                 .hasRootCauseInstanceOf(IllegalStateException.class)
                 .rootCause()
-                .hasMessageContaining("Unexpected exit code");
+                .hasMessageContaining("scalafmt found 1 finding, reported in ");
     }
 
     @Test

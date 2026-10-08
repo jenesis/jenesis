@@ -21,6 +21,7 @@ public class ScalafmtModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
+    private static final String STRICT = "source.scalafmt.strict";
     private static final String MAVEN_GROUP = "org.scalameta", MAVEN_ARTIFACT = "scalafmt-cli_2.13";
     private static final int TEST_ERROR = 1;
 
@@ -48,7 +49,7 @@ public class ScalafmtModule implements BuildExecutorModule {
                 null,
                 "scalafmt",
                 ".scalafmt.conf",
-                false,
+                environment.flag(STRICT, false),
                 ProcessBuildStep.Terms.ofEnvironment(environment, "scalafmt"));
     }
 
@@ -144,8 +145,19 @@ public class ScalafmtModule implements BuildExecutorModule {
         public boolean acceptableExitCode(int code,
                                           Executor executor,
                                           BuildStepContext context,
-                                          SequencedMap<String, BuildStepArgument> arguments) {
-            return code == 0 || !strict && code == TEST_ERROR;
+                                          SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Path diff = context.supplement().resolve("error");
+            int findings = code == 0 ? 0 : -1;
+            if (code == TEST_ERROR && Files.isRegularFile(diff)) {
+                List<String> lines = Files.readAllLines(diff, NATIVE_ENCODING);
+                findings = 0;
+                for (int index = 1; index < lines.size(); index++) {
+                    if (lines.get(index - 1).startsWith("--- a") && lines.get(index).startsWith("+++ b")) {
+                        findings++;
+                    }
+                }
+            }
+            return reported(code, context, diff, findings, true, strict, STRICT);
         }
 
         @Override

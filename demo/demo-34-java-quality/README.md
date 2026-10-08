@@ -112,10 +112,27 @@ in its own subfolder: `target/stage/reports/<kind>/<module>/`, for example
 `target/stage/reports/checkstyle/sources/checkstyle-report.xml`.
 
 By default the linters are report-only: they record findings but do not fail the
-build. Pass `.strict(true)` when wiring a tool yourself to turn a finding into a
-build failure. Report-only covers findings, not a tool that never ran: a linter
-that fails on its own configuration, and so writes no complete report, fails its
-step either way.
+build. A linter that found something says so in one line of the build's output,
+with the number of findings and where its report is:
+
+    [FINDINGS] checkstyle found 2 findings, reported in target/build/.../checkstyle/check/output/reports/checkstyle/checkstyle-report.xml
+
+`-Djenesis.print.findings=false` leaves that line out. To turn findings into a
+build failure, set the tool's strict switch, on the command line or in
+`jenesis.properties`:
+
+    jenesis.source.<tool>.strict       Checkstyle, PMD, Detekt, Ktlint, Scalastyle, Scalafmt, CodeNarc
+    jenesis.validator.spotbugs.strict  SpotBugs
+
+For example `-Djenesis.source.checkstyle.strict=true` fails the build when
+Checkstyle reports a violation, naming the number of findings and the report.
+Checkstyle, PMD, detekt, ktlint, Scalastyle and scalafmt fail as their own exit
+code decides, so a Checkstyle finding at severity `warning` is reported but does
+not fail the build; SpotBugs and CodeNarc fail on any finding their report holds.
+When wiring a tool yourself, `.strict(true)` on its module does the same.
+Report-only covers findings, not a tool that never ran: a linter that fails on
+its own configuration, and so writes no complete report, fails its step either
+way.
 
 Checkstyle reads `${config_loc}` as the folder of `checkstyle.xml`, as the Maven
 and Gradle plugins define it. A file the configuration names as

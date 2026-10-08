@@ -2,6 +2,7 @@ package build.jenesis.step;
 
 import module java.base;
 import module java.xml;
+import build.jenesis.BuildExecutor;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -9,6 +10,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.Palette;
 import build.jenesis.SequencedProperties;
+import org.xml.sax.Attributes;
 
 public abstract class ProcessBuildStep implements BuildStep {
 
@@ -44,14 +46,17 @@ public abstract class ProcessBuildStep implements BuildStep {
         this.terms = terms;
     }
 
-    public record Terms(BiConsumer<Boolean, String> printing, Semaphore permits, Consumer<String> announcing) {
+    public record Terms(BiConsumer<Boolean, String> printing,
+                        Semaphore permits,
+                        Consumer<String> announcing,
+                        Consumer<String> reporting) {
 
         public static Terms of(String command) {
-            return ofEnvironment(Environment.NONE, command, false);
+            return of(command, false);
         }
 
         public static Terms of(String command, boolean printing) {
-            return ofEnvironment(Environment.NONE, command, printing);
+            return ofEnvironment(Environment.NONE, command, printing).reporting(null);
         }
 
         public static Terms ofEnvironment(Environment environment, String command) {
@@ -77,11 +82,19 @@ public abstract class ProcessBuildStep implements BuildStep {
                     environment.flag("print.command")
                             ? executed -> out.accept("%s%-11s%s %s".formatted(
                                     palette.info(), "[EXECUTED]", palette.reset(), executed))
+                            : null,
+                    environment.flag("print.findings", true)
+                            ? found -> out.accept("%s%-11s%s %s".formatted(
+                                    palette.warning(), "[FINDINGS]", palette.reset(), found))
                             : null);
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {
-            return new Terms(printing, permits, announcing);
+            return new Terms(printing, permits, announcing, reporting);
+        }
+
+        public Terms reporting(Consumer<String> reporting) {
+            return new Terms(printing, permits, announcing, reporting);
         }
     }
 
@@ -198,21 +211,60 @@ public abstract class ProcessBuildStep implements BuildStep {
         return prepended;
     }
 
-    protected static boolean completeReport(Path report) throws IOException {
+    protected static int findings(Path report, String finding) throws IOException {
         if (!Files.isRegularFile(report)) {
-            return false;
+            return -1;
         }
         try {
             SAXParserFactory factory = SAXParserFactory.newInstance();
             factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-            factory.newSAXParser().parse(report.toFile(), new DefaultHandler());
-            return true;
+            AtomicInteger findings = new AtomicInteger();
+            factory.newSAXParser().parse(report.toFile(), new DefaultHandler() {
+                @Override
+                public void startElement(String uri, String localName, String qualifiedName, Attributes attributes) {
+                    if (qualifiedName.equals(finding)) {
+                        findings.incrementAndGet();
+                    }
+                }
+            });
+            return findings.get();
         } catch (SAXException _) {
-            return false;
+            return -1;
         } catch (ParserConfigurationException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    protected boolean reported(int code,
+                               BuildStepContext context,
+                               Path report,
+                               int findings,
+                               boolean judged,
+                               boolean strict,
+                               String setting) {
+        if (findings < 0) {
+            return code == 0;
+        }
+        String found = command + " found " + findings + (findings == 1 ? " finding" : " findings");
+        if (strict && findings > 0 && (code != 0 || !judged)) {
+            throw new IllegalStateException(found + ", reported in " + report
+                    + ", and fails the build on them as jenesis." + setting
+                    + " is set: fix them, or set it to false to report them without failing");
+        }
+        if (strict && code != 0) {
+            return false;
+        }
+        Consumer<String> reporting = terms.reporting();
+        if (findings > 0 && reporting != null) {
+            Path step = context.next().getParent();
+            String name = step == null ? "" : step.getFileName().toString();
+            reporting.accept(found + ", reported in " + (name.endsWith(BuildExecutor.NEXT)
+                    ? step.resolveSibling(name.substring(0, name.length() - BuildExecutor.NEXT.length()))
+                            .resolve(step.relativize(report))
+                    : report));
+        }
+        return true;
     }
 
     public boolean acceptableExitCode(int code,

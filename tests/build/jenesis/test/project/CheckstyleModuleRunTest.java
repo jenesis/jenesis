@@ -125,7 +125,43 @@ public class CheckstyleModuleRunTest {
         assertThatThrownBy(executor::execute)
                 .hasRootCauseInstanceOf(IllegalStateException.class)
                 .rootCause()
-                .hasMessageContaining("Unexpected exit code");
+                .hasMessageContaining("checkstyle found 1 finding, reported in ");
+    }
+
+    @Test
+    public void the_strict_setting_fails_the_build_on_a_violation() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "checkstyle",
+                CheckstyleModule.ofEnvironment(new Environment(Map.of("source.checkstyle.strict", "true")),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .hasMessageContaining("checkstyle found 1 finding")
+                .hasMessageContaining("jenesis.source.checkstyle.strict");
+    }
+
+    @Test
+    public void a_report_only_run_prints_the_number_of_findings_and_the_report() throws IOException {
+        List<String> printed = new ArrayList<>();
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "checkstyle",
+                CheckstyleModule.ofEnvironment(new Environment(Map.of()).out(printed::add),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                "project");
+        executor.execute();
+
+        Path report = root.resolve("checkstyle").resolve("check").resolve("output").resolve("reports").resolve("checkstyle").resolve("checkstyle-report.xml");
+        assertThat(printed).anySatisfy(line -> assertThat(line)
+                .contains("[FINDINGS]")
+                .contains("checkstyle found 1 finding, reported in " + report));
     }
 
     @Test
