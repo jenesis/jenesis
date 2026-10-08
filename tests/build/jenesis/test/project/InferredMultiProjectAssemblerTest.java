@@ -871,6 +871,32 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void hands_the_tests_the_project_resources_beside_the_module_jar() throws IOException {
+        Fixture fixture = setUp("path=\ntest=main_artifact\n", true, false, false);
+        SequencedMap<Path, Path> resources = new LinkedHashMap<>();
+        resources.put(Path.of("META-INF/NOTICE"), Files.writeString(root.resolve("NOTICE"), "notice"));
+        Path recorded = fixture.execute(new InferredMultiProjectAssembler()
+                                .resources(resources)
+                                .observe(observe -> observe.test(null).custom("inputs", new InputsStep())),
+                        "sub/observed/custom/inputs")
+                .get("sub/observed/custom/inputs");
+        assertThat(Files.readAllLines(recorded.resolve("inputs.txt")))
+                .as("with jenesis.test.jars=false the tests run against the resources folders, so they read them")
+                .anyMatch(input -> input.endsWith("include/resources"));
+    }
+
+    private record InputsStep() implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Files.write(context.next().resolve("inputs.txt"), arguments.sequencedKeySet());
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    @Test
     public void wires_a_plugin_whose_properties_file_is_found_and_hands_it_the_values() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("plugin-lint.properties"), "level=strict\n");
