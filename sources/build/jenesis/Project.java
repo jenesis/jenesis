@@ -1075,7 +1075,8 @@ public record Project(
                     inventing a side channel; the schemas are constants on the writing step.
 
                       metadata.properties   project, artifact, version, name, description, url,
-                                            license.<id>.{name,url}, developer.<id>.{name,email},
+                                            license.<id>.{name,url}, developer.<id>.{name,email,id}
+                                            (id: the POM's <id>, the key when absent, none when empty),
                                             organization.{name,url}, copyright, manufacturer.{name,url},
                                             publisher,
                                             scm.{connection,developerConnection,url,tag,revision,tree}. Project-level

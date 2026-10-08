@@ -1385,6 +1385,61 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void keeps_a_developer_that_names_no_id_under_a_key_derived_from_its_name() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <developers>
+                        <developer>
+                            <id>alice</id>
+                            <name>Alice Example</name>
+                        </developer>
+                        <developer>
+                            <name>Bob Example</name>
+                        </developer>
+                        <developer>
+                            <name>Bob Example</name>
+                            <email>bob@example.org</email>
+                        </developer>
+                        <developer>
+                            <email>carol@example.com</email>
+                        </developer>
+                    </developers>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        SequencedProperties metadata = SequencedProperties.ofFiles(results.get("maven/module-/manifests")
+                .resolve(BuildStep.METADATA));
+        assertThat(metadata)
+                .as("a developer without an id is kept under a key of its name, marked as having no id")
+                .contains(
+                        Map.entry("developer.alice.name", "Alice Example"),
+                        Map.entry("developer.bob_example.id", ""),
+                        Map.entry("developer.bob_example.name", "Bob Example"),
+                        Map.entry("developer.bob_example_2.id", ""),
+                        Map.entry("developer.bob_example_2.name", "Bob Example"),
+                        Map.entry("developer.bob_example_2.email", "bob@example.org"),
+                        Map.entry("developer.carol_example_com.id", ""),
+                        Map.entry("developer.carol_example_com.email", "carol@example.com"))
+                .doesNotContainKey("developer.alice.id");
+    }
+
+    @Test
     public void checksum_comment_in_dependency_management_lands_in_versions_properties() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

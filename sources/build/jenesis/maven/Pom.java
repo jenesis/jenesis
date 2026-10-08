@@ -190,8 +190,9 @@ public class Pom implements BuildStep {
         }
         List<MavenPomEmitter.Metadata.Developer> developers = new ArrayList<>();
         for (String id : developerIds) {
+            String declared = metadata.getProperty("developer." + id + ".id");
             developers.add(new MavenPomEmitter.Metadata.Developer(
-                    id,
+                    declared == null ? id : declared.isBlank() ? null : declared.strip(),
                     metadata.getProperty("developer." + id + ".name"),
                     metadata.getProperty("developer." + id + ".email")));
         }
