@@ -16,6 +16,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.ScalastyleModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class ScalastyleModuleRunTest {
 
@@ -74,6 +75,36 @@ public class ScalastyleModuleRunTest {
         Path report = root.resolve("scalastyle").resolve("check").resolve("output").resolve("reports").resolve("scalastyle").resolve("scalastyle-report.xml");
         assertThat(report).isNotEmptyFile();
         assertThat(report).content().contains("FileLineLengthChecker");
+    }
+
+    @Test
+    public void fails_a_report_only_run_when_scalastyle_cannot_load_its_configuration() throws IOException {
+        SequencedProperties versions = new SequencedProperties();
+        versions.load(new StringReader(PINS));
+        versions.store(project.resolve(BuildStep.VERSIONS));
+        Files.writeString(project.resolve("scalastyle-config.xml"), """
+                <scalastyle>
+                    <name>test</name>
+                    <check level="error" class="org.scalastyle.file.FileLineLengthChecker" enabled="true">
+                </scalastyle>
+                """);
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Sample.scala"), """
+                package sample
+                class Sample
+                """);
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "scalastyle",
+                new ScalastyleModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .as("report-only covers findings, not a Scalastyle that never ran")
+                .hasMessageContaining("Unexpected exit code");
     }
 
     private BuildExecutor newExecutor() throws IOException {
