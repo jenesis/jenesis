@@ -965,6 +965,24 @@ public record Project(
                     or `-parameters=`. A key of jenesis.properties keeps its prefix,
                     `jenesis.test.tag=-slow`, as `configuration` prints it.
 
+                    Shading is not supported: nothing is relocated, and no class file is rewritten.
+                    What shading did is answered one way each:
+
+                      a dependency kept private, a version that must not meet the consumer's
+                                           a layer: @jenesis.layer <name> provider <coordinate>
+                                           resolves it and its closure into a ModuleLayer of its
+                                           own at run time, so two versions share one JVM under
+                                           the same package names, with the API module the layer
+                                           shares named by @jenesis.layer <name> api <module>.
+                                           Layers are declared in module-info.java alone, so a
+                                           pom.xml build that shaded keeps the dependency plain
+                                           until phase two; the published POM lists the launcher
+                                           and the API module, never what a layer holds (demo
+                                           24, 25)
+                      one runnable jar     launcher=true in packaging.properties (demo 08)
+                      fewer dependencies   publish the dependency as a dependency, and make a
+                                           `requires static` on it a `requires`
+
                     jenesis.test.filter matches the whole class name and replaces the default naming
                     (Test*, *Test, *Tests, *TestCase, IT*, *IT, *ITCase, never a nested class); a
                     <module>/<regex> entry reaches that module only, and a module no entry reaches
@@ -1067,10 +1085,10 @@ public record Project(
                       an imported BOM / platform() -> kept in pom.xml, or @jenesis.bom (20)
                       moditect / an extra-java-module-info plugin
                           -> @jenesis.alias, modules.properties (21)
-                      a relocating shade / shadow -> no relocation: @jenesis.layer keeps two
-                          versions apart without rewriting a class (24, 25); a library that shaded
-                          a dependency publishes it as a dependency instead, and a `requires static`
-                          on it becomes `requires`
+                      a relocating shade / shadow -> not supported, nothing is relocated: a
+                          layer, @jenesis.layer in module-info.java, keeps a private dependency
+                          and its version apart at run time (24, 25); a fat jar is launcher=true;
+                          skill/migrate says which answers which use of shading
                       versions locking, checksums / dependency locking and verification
                           -> `pin`, -Djenesis.dependency.pin=strict (28)
                       pgpverify-maven-plugin / verification-metadata.xml signatures
