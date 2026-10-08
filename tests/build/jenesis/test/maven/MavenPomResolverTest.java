@@ -1239,6 +1239,47 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void a_processor_a_dependency_declares_is_not_followed_as_an_artifact() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>processing</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                            <type>processor</type>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("other", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                </project>
+                """);
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+                Runnable::run,
+                mavenRepository,
+                "group",
+                "artifact",
+                "1",
+                null);
+        assertThat(dependencies)
+                .as("a processor compiles the module that declares it and is no artifact of the module's consumers")
+                .containsExactly(Map.entry(
+                        new MavenDependencyKey("other", "artifact", "jar", null),
+                        new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
+    }
+
+    @Test
     public void can_resolve_transitive_dependencies_with_scope() throws IOException {
         addToRepository("group", "artifact", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -4263,6 +4304,45 @@ public class MavenPomResolverTest {
         assertThat(app.testSourceDirectory()).isEqualTo("src/test/java");
         assertThat(app.resourceDirectories()).containsExactly("assets");
         assertThat(poms.get(Path.of("api")).version()).isEqualTo("1.2");
+    }
+
+    @Test
+    public void a_processor_dependency_compiles_only_the_half_whose_scope_declares_it() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.plugin javac maven/org.example/checker/1-->
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>main-processor</artifactId>
+                            <version>1</version>
+                            <type>processor</type>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>test-processor</artifactId>
+                            <version>1</version>
+                            <type>processor</type>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        MavenLocalPom pom = mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of(""));
+        assertThat(pom.plugins())
+                .as("a processor of the main scopes compiles the main half alone, beside the plugins every half takes")
+                .containsExactly(Map.entry("maven/org.example/checker/1", "javac"),
+                        Map.entry("maven/org.example/main-processor/1", "plugin"));
+        assertThat(pom.testPlugins())
+                .as("a test-scoped processor compiles the test half alone")
+                .containsExactly(Map.entry("maven/org.example/checker/1", "javac"),
+                        Map.entry("maven/org.example/test-processor/1", "plugin"));
+        assertThat(pom.dependencies()).isEmpty();
     }
 
     @Test
