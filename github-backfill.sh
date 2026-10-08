@@ -186,9 +186,9 @@ for VERSION in "${VERSIONS[@]}"; do
     echo "$RELEASE: complete"
   elif [ "$APPLY" = true ]; then
     gh release upload "$RELEASE" "${UPLOAD[@]}" --repo "$REPOSITORY"
-    printf "$RELEASE: uploaded %s\n" "${UPLOAD[@]##*/}"
+    for FILE in "${UPLOAD[@]}"; do echo "$RELEASE: uploaded ${FILE##*/}"; done
   else
-    printf "$RELEASE: would upload %s\n" "${UPLOAD[@]##*/}"
+    for FILE in "${UPLOAD[@]}"; do echo "$RELEASE: would upload ${FILE##*/}"; done
   fi
 done
 
