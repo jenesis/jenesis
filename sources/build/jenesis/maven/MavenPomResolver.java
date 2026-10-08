@@ -6,6 +6,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.License;
+import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.Platform;
 import build.jenesis.Repository;
@@ -28,6 +29,8 @@ public class MavenPomResolver implements MavenResolver {
 
     private final Supplier<MavenVersionNegotiator> negotiatorSupplier;
     private final String jdk;
+    private final transient Consumer<String> printing;
+    private final transient Palette palette;
     private final transient DocumentBuilderFactory factory = MavenDefaultVersionNegotiator.toDocumentBuilderFactory();
 
     public MavenPomResolver() {
@@ -36,34 +39,44 @@ public class MavenPomResolver implements MavenResolver {
 
     public static MavenPomResolver ofEnvironment(Environment environment) {
         String property = environment.getProperty("resolver.maven");
-        if (property == null) {
-            return new MavenPomResolver();
-        }
-        return new MavenPomResolver(switch (property.toLowerCase(Locale.ROOT)) {
-            case "maven" -> MavenDefaultVersionNegotiator.maven();
-            case "latest" -> MavenDefaultVersionNegotiator.latest();
-            case "release" -> MavenDefaultVersionNegotiator.release();
-            case "stable" -> MavenDefaultVersionNegotiator.stable();
-            case "closest" -> MavenDefaultVersionNegotiator.closest();
-            case "fail" -> MavenDefaultVersionNegotiator.fail();
-            case "managed" -> MavenDefaultVersionNegotiator.managed();
-            default -> throw new IllegalArgumentException("Unknown jenesis.resolver.maven '"
-                    + property
-                    + "', expected one of: maven, latest, release, stable, closest, fail, managed");
-        });
+        MavenPomResolver resolver = property == null
+                ? new MavenPomResolver()
+                : new MavenPomResolver(switch (property.toLowerCase(Locale.ROOT)) {
+                    case "maven" -> MavenDefaultVersionNegotiator.maven();
+                    case "latest" -> MavenDefaultVersionNegotiator.latest();
+                    case "release" -> MavenDefaultVersionNegotiator.release();
+                    case "stable" -> MavenDefaultVersionNegotiator.stable();
+                    case "closest" -> MavenDefaultVersionNegotiator.closest();
+                    case "fail" -> MavenDefaultVersionNegotiator.fail();
+                    case "managed" -> MavenDefaultVersionNegotiator.managed();
+                    default -> throw new IllegalArgumentException("Unknown jenesis.resolver.maven '"
+                            + property
+                            + "', expected one of: maven, latest, release, stable, closest, fail, managed");
+                });
+        return resolver.printing(environment.flag("print.progress", true) ? environment.out() : null,
+                Palette.ofEnvironment(environment));
     }
 
     public <S extends Supplier<MavenVersionNegotiator> & Serializable> MavenPomResolver(S negotiatorSupplier) {
-        this(negotiatorSupplier, System.getProperty("java.version"));
+        this(negotiatorSupplier, System.getProperty("java.version"), null, Palette.NONE);
     }
 
-    private MavenPomResolver(Supplier<MavenVersionNegotiator> negotiatorSupplier, String jdk) {
+    private MavenPomResolver(Supplier<MavenVersionNegotiator> negotiatorSupplier,
+                             String jdk,
+                             Consumer<String> printing,
+                             Palette palette) {
         this.negotiatorSupplier = negotiatorSupplier;
         this.jdk = jdk;
+        this.printing = printing;
+        this.palette = palette;
     }
 
     public MavenPomResolver jdk(String jdk) {
-        return new MavenPomResolver(negotiatorSupplier, jdk);
+        return new MavenPomResolver(negotiatorSupplier, jdk, printing, palette);
+    }
+
+    public MavenPomResolver printing(Consumer<String> printing, Palette palette) {
+        return new MavenPomResolver(negotiatorSupplier, jdk, printing, palette);
     }
 
     @Override
@@ -128,7 +141,7 @@ public class MavenPomResolver implements MavenResolver {
         });
         Traversal traversal = dependencies(executor,
                 MavenRepository.of(repositories.getOrDefault(Resolver.base(prefix), Repository.empty())),
-                new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of()), true, null, Set.of(), null, null),
+                new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of(), null), true, null, Set.of(), null, null),
                 new ConcurrentHashMap<>(),
                 new ConcurrentHashMap<>(),
                 prefix);
@@ -174,7 +187,7 @@ public class MavenPomResolver implements MavenResolver {
             SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies) throws IOException {
         return dependencies(executor,
                 repository,
-                new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of()),
+                new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of(), null),
                         true,
                         null,
                         Set.of(),
@@ -269,7 +282,7 @@ public class MavenPomResolver implements MavenResolver {
         }
         Traversal traversal = dependencies(executor,
                 repository,
-                new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of()), true, scope, Set.of(), null, null),
+                new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of(), null), true, scope, Set.of(), null, null),
                 unresolved,
                 resolved,
                 prefix);
@@ -397,6 +410,40 @@ public class MavenPomResolver implements MavenResolver {
         SequencedSet<MavenDependencyKey> conflicting = new LinkedHashSet<>();
         Queue<PendingPom> queue = new ArrayDeque<>();
         do {
+            DependencyCoordinate relocation = current.pom().relocation();
+            if (relocation != null && current.origin() != null) {
+                MavenDependencyKey origin = current.origin(), target = new MavenDependencyKey(
+                        relocation.groupId() == null ? origin.groupId() : relocation.groupId(),
+                        relocation.artifactId() == null ? origin.artifactId() : relocation.artifactId(),
+                        origin.type(),
+                        origin.classifier());
+                String version = relocation.version() == null
+                        ? resolutions.get(origin).currentVersion
+                        : relocation.version();
+                if (!target.equals(origin)) {
+                    dependencies.remove(origin);
+                    if (printing != null) {
+                        printing.accept("%s%-11s%s %s:%s:%s is relocated to %s:%s:%s, which is resolved in its place"
+                                .formatted(palette.warning(),
+                                        "[RELOCATED]",
+                                        palette.reset(),
+                                        origin.groupId(),
+                                        origin.artifactId(),
+                                        resolutions.get(origin).currentVersion,
+                                        target.groupId(),
+                                        target.artifactId(),
+                                        version));
+                    }
+                    SequencedMap<MavenDependencyKey, MavenDependencyValue> relocated = new LinkedHashMap<>();
+                    relocated.put(target, new MavenDependencyValue(version, MavenDependencyScope.COMPILE, null, null, null));
+                    current = new ContextualPom(new ResolvedPom(Map.of(), relocated, List.of(), null),
+                            false,
+                            current.scope(),
+                            current.exclusions(),
+                            origin,
+                            current.originVersion());
+                }
+            }
             for (Map.Entry<MavenDependencyKey, MavenDependencyValue> entry : current.pom().dependencies().entrySet()) {
                 if (current.exclusions().contains(MavenDependencyName.EXCLUDE_ALL)) {
                     break;
@@ -985,7 +1032,15 @@ public class MavenPomResolver implements MavenResolver {
                         ownLicenses.isEmpty() ? parentLicenses : ownLicenses,
                         metadata,
                         verbatim,
-                        false);
+                        false,
+                        toElements(project, "distributionManagement")
+                                .flatMap(management -> toElements(management, "relocation"))
+                                .findFirst()
+                                .map(relocation -> new DependencyCoordinate(
+                                        toElementText(relocation, "groupId").orElse(null),
+                                        toElementText(relocation, "artifactId").orElse(null),
+                                        toElementText(relocation, "version").orElse(null)))
+                                .orElse(null));
             }
             default -> throw new IllegalArgumentException("Unknown namespace: " + namespace);
         };
@@ -1031,7 +1086,8 @@ public class MavenPomResolver implements MavenResolver {
                             List.of(),
                             Collections.emptyNavigableMap(),
                             Set.of(),
-                            true);
+                            true,
+                            null);
                 } else {
                     Path localPath = candidate.file().map(Path::getParent).orElse(null);
                     Map<Path, UnresolvedPom> localPaths = localPath == null ? null : new HashMap<>();
@@ -1097,7 +1153,13 @@ public class MavenPomResolver implements MavenResolver {
         pom.dependencies().forEach((key, value) -> dependencies.put(
                 key.resolve(pom.properties()),
                 value.resolve(pom.properties())));
-        return new ResolvedPom(managedDependencies, dependencies, pom.licenses());
+        return new ResolvedPom(managedDependencies,
+                dependencies,
+                pom.licenses(),
+                pom.relocation() == null ? null : new DependencyCoordinate(
+                        property(pom.relocation().groupId(), pom.properties()),
+                        property(pom.relocation().artifactId(), pom.properties()),
+                        property(pom.relocation().version(), pom.properties())));
     }
 
     private SequencedMap<MavenDependencyKey, MavenDependencyValue> managed(Executor executor,
@@ -1817,12 +1879,14 @@ public class MavenPomResolver implements MavenResolver {
                                  List<License> licenses,
                                  SequencedMap<String, String> metadata,
                                  Set<String> verbatim,
-                                 boolean missing) {
+                                 boolean missing,
+                                 DependencyCoordinate relocation) {
     }
 
     private record ResolvedPom(Map<MavenDependencyKey, MavenDependencyValue> managedDependencies,
                                SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies,
-                               List<License> licenses) {
+                               List<License> licenses,
+                               DependencyCoordinate relocation) {
     }
 
     private record ContextualPom(ResolvedPom pom,
