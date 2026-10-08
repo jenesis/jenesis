@@ -97,46 +97,41 @@ public class Ide implements BuildExecutorModule {
                 continue;
             }
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
-            String prefix = prefix(inventory);
-            if (prefix == null) {
-                continue;
-            }
-            String path = inventory.getProperty(prefix + ".path");
-            if (path == null) {
-                continue;
-            }
-            Path content = path.isEmpty() ? base : base.resolve(path).normalize();
-            String module = inventory.getProperty(prefix + ".module");
-            boolean modular = module != null && !module.isEmpty();
-            String name = modular ? module : name(path, base);
-            String declared = inventory.getProperty(prefix + ".release");
-            Integer release = declared == null || declared.isEmpty() ? null : Integer.valueOf(declared);
-            boolean fixture = inventory.getProperty(prefix + ".abstract") != null;
-            boolean test = !fixture && inventory.getProperty(prefix + ".test") != null;
-            List<String> coordinates = new ArrayList<>();
-            List<Path> jars = new ArrayList<>();
-            for (int index = 0; ; index++) {
-                String value = inventory.getProperty(prefix + ".dependency." + index);
-                if (value == null) {
-                    break;
+            for (String prefix : Inventory.prefixes(inventory)) {
+                String path = inventory.getProperty(prefix + ".path");
+                Path content = path.isEmpty() ? base : base.resolve(path).normalize();
+                String module = inventory.getProperty(prefix + ".module");
+                boolean modular = module != null && !module.isEmpty();
+                String name = modular ? module : name(path, base);
+                String declared = inventory.getProperty(prefix + ".release");
+                Integer release = declared == null || declared.isEmpty() ? null : Integer.valueOf(declared);
+                boolean fixture = inventory.getProperty(prefix + ".abstract") != null;
+                boolean test = !fixture && inventory.getProperty(prefix + ".test") != null;
+                List<String> coordinates = new ArrayList<>();
+                List<Path> jars = new ArrayList<>();
+                for (int index = 0; ; index++) {
+                    String value = inventory.getProperty(prefix + ".dependency." + index);
+                    if (value == null) {
+                        break;
+                    }
+                    String group = inventory.getProperty(prefix + ".dependency." + index + ".group");
+                    String[] parts = value.split(" ");
+                    if (group != null && !group.equals("main") || parts[0].contains("/pom/")) {
+                        continue;
+                    }
+                    coordinates.add(parts[0]);
+                    jars.add(argument.folder().resolve(parts[1]).toAbsolutePath().normalize());
                 }
-                String group = inventory.getProperty(prefix + ".dependency." + index + ".group");
-                String[] parts = value.split(" ");
-                if (group != null && !group.equals("main") || parts[0].contains("/pom/")) {
-                    continue;
-                }
-                coordinates.add(parts[0]);
-                jars.add(argument.folder().resolve(parts[1]).toAbsolutePath().normalize());
-            }
-            for (String key : inventory.stringPropertyNames()) {
-                if (key.startsWith(prefix + ".identity.")) {
-                    String coordinate = inventory.getProperty(key);
-                    if (!coordinate.contains("/pom/")) {
-                        identities.putIfAbsent(coordinate, name);
+                for (String key : inventory.stringPropertyNames()) {
+                    if (key.startsWith(prefix + ".identity.")) {
+                        String coordinate = inventory.getProperty(key);
+                        if (!coordinate.contains("/pom/")) {
+                            identities.putIfAbsent(coordinate, name);
+                        }
                     }
                 }
+                raws.add(new Raw(name, content, modular, test, release, coordinates, jars));
             }
-            raws.add(new Raw(name, content, modular, test, release, coordinates, jars));
         }
         List<Module> modules = new ArrayList<>();
         for (Raw raw : raws) {
@@ -191,16 +186,6 @@ public class Ide implements BuildExecutorModule {
             return name == null ? "root" : name.toString();
         }
         return path.replace('/', '.').replace('\\', '.');
-    }
-
-    private static String prefix(SequencedProperties inventory) {
-        for (String key : inventory.stringPropertyNames()) {
-            int dot = key.indexOf('.');
-            if (dot > 0) {
-                return key.substring(0, dot);
-            }
-        }
-        return null;
     }
 
     private static void idea(List<Module> modules, Path base) throws IOException {

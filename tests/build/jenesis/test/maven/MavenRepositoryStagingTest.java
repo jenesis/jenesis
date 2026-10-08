@@ -57,6 +57,7 @@ public class MavenRepositoryStagingTest {
         Files.writeString(sbomDir.resolve("sbom.json"), "{}");
 
         SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-foo.path", "foo");
         inventory.setProperty("module-foo.pom", "../../produce/describe/pom/output/pom.xml");
         inventory.setProperty("module-foo.artifacts.0",
                 "../../produce/assemble/binary/artifacts/jar/output/artifacts/classes.jar");
@@ -80,6 +81,22 @@ public class MavenRepositoryStagingTest {
         attached.setProperty("module-foo.attachment.licenses", "attachment/licenses/LICENSES.zip");
         attached.store(additions.resolve(Inventory.INVENTORY));
         Files.writeString(Files.createDirectories(additions.resolve("attachment/licenses")).resolve("LICENSES.zip"), "zip");
+
+        run(true, inv, additions);
+
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).hasContent("c");
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-licenses.zip")).hasContent("zip");
+    }
+
+    @Test
+    public void stages_a_module_whose_path_holds_dots_with_what_another_inventory_attaches() throws IOException {
+        Path inv = mainInventory("org.example.foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(inv, "classes.jar", "c");
+        Path additions = Files.createDirectory(source.resolve("additions"));
+        SequencedProperties attached = new SequencedProperties();
+        attached.setProperty("module-org.example.foo.attachment.licenses", "LICENSES.zip");
+        attached.store(additions.resolve(Inventory.INVENTORY));
+        Files.writeString(additions.resolve("LICENSES.zip"), "zip");
 
         run(true, inv, additions);
 
@@ -526,6 +543,7 @@ public class MavenRepositoryStagingTest {
         Files.writeString(folder.resolve("pom.xml"), buildPom(groupId, artifactId, version, deps));
         SequencedProperties inventory = new SequencedProperties();
         String prefix = "module-" + name;
+        inventory.setProperty(prefix + ".path", name);
         inventory.setProperty(prefix + ".pom", "pom.xml");
         for (String artifactFile : artifactFiles) {
             switch (artifactFile) {

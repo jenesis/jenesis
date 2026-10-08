@@ -79,12 +79,9 @@ public record Execution(Project project, String mainClass, String module, Contai
                 continue;
             }
             SequencedProperties loaded = SequencedProperties.ofFiles(inventory);
-            for (String key : loaded.stringPropertyNames()) {
-                merged.setProperty(key, loaded.getProperty(key));
-                int dot = key.indexOf('.');
-                if (dot > 0 && key.endsWith(".path")) {
-                    sourceByPrefix.put(key.substring(0, dot), entry.getValue());
-                }
+            loaded.forEachProperty(merged::setProperty);
+            for (String prefix : Inventory.prefixes(loaded)) {
+                sourceByPrefix.put(prefix, entry.getValue());
             }
         }
         String selectedPrefix = module == null
