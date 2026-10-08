@@ -1,6 +1,7 @@
 package build.jenesis.project;
 
 import module java.base;
+import module java.xml;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
@@ -17,11 +18,13 @@ import build.jenesis.step.Dependencies;
 import build.jenesis.step.Java;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
+import org.xml.sax.Attributes;
 
 public class TestModule implements BuildExecutorModule {
 
     public static final String REQUIRED = "required", ARTIFACTS = "artifacts", EXECUTED = "executed";
     private static final String RESOLVED = "resolved", DEPENDENCIES = "dependencies";
+    private static final int NAMED_FAILURES = 20;
 
     private final TestFramework framework;
     private final Predicate<String> isTest;
@@ -854,6 +857,83 @@ public class TestModule implements BuildExecutorModule {
         @Override
         protected List<String> configurations() {
             return List.of("java", "test");
+        }
+
+        @Override
+        protected String diagnosis(BuildStepContext context) throws IOException {
+            SequencedSet<String> failed = new LinkedHashSet<>();
+            SequencedSet<Path> reported = new LinkedHashSet<>();
+            for (Path folder : List.of(context.next().resolve(BuildStep.REPORTS + "tests"), context.supplement())) {
+                if (!Files.isDirectory(folder)) {
+                    continue;
+                }
+                List<Path> reports;
+                try (Stream<Path> files = Files.walk(folder)) {
+                    reports = files.filter(file -> file.getFileName().toString().endsWith(".xml"))
+                            .filter(Files::isRegularFile)
+                            .sorted()
+                            .toList();
+                }
+                for (Path report : reports) {
+                    if (failures(report, failed)) {
+                        reported.add(report.getParent());
+                    }
+                }
+            }
+            if (failed.isEmpty()) {
+                return "";
+            }
+            List<String> named = failed.stream().limit(NAMED_FAILURES).map(test -> "  " + test).toList();
+            return failed.size()
+                    + (failed.size() == 1 ? " test failed" : " tests failed")
+                    + ", as reported in "
+                    + reported.stream().map(Path::toString).collect(Collectors.joining(", "))
+                    + ":\n"
+                    + String.join("\n", named)
+                    + (failed.size() > named.size() ? "\n  ... and " + (failed.size() - named.size()) + " more" : "")
+                    + "\n";
+        }
+
+        private static boolean failures(Path report, SequencedSet<String> failed) throws IOException {
+            int before = failed.size();
+            try {
+                SAXParserFactory factory = SAXParserFactory.newInstance();
+                factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+                factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+                factory.newSAXParser().parse(report.toFile(), new DefaultHandler() {
+
+                    private String testcase;
+
+                    @Override
+                    public void startElement(String uri, String localName, String qualifiedName, Attributes attributes) {
+                        switch (qualifiedName) {
+                            case "testcase" -> {
+                                String type = attributes.getValue("classname"), name = attributes.getValue("name");
+                                testcase = type == null || type.isEmpty() ? name : name == null ? type : type + "#" + name;
+                            }
+                            case "failure", "error" -> {
+                                if (testcase != null) {
+                                    failed.add(testcase);
+                                }
+                            }
+                            default -> {
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void endElement(String uri, String localName, String qualifiedName) {
+                        if (qualifiedName.equals("testcase")) {
+                            testcase = null;
+                        }
+                    }
+                });
+            } catch (SAXException _) {
+                return failed.size() > before;
+            } catch (ParserConfigurationException e) {
+                throw new IllegalStateException(e);
+            }
+            return failed.size() > before;
         }
 
         @Override

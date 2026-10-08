@@ -144,6 +144,43 @@ public class TestModuleTest {
     }
 
     @Test
+    public void a_failed_run_names_its_failed_tests_even_when_the_tests_swallow_the_output() throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "SilentTest", """
+                package sample;
+                public class SilentTest {
+                    @org.junit.jupiter.api.BeforeAll
+                    public static void silence() throws java.io.IOException {
+                        new java.io.FileOutputStream(java.io.FileDescriptor.out).close();
+                    }
+                    @org.junit.jupiter.api.Test
+                    public void fails() { throw new AssertionError("broken"); }
+                    @org.junit.jupiter.api.Test
+                    public void passes() { }
+                }
+                """, bootModuleJars());
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .isTest(candidate -> candidate.endsWith("SilentTest")).jarsOnly(false),
+                "dependencies", "classes");
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .as("the reports the runner writes name what failed whatever reached the console")
+                .hasMessageContaining("1 test failed")
+                .hasMessageContaining(":\n  sample.SilentTest#fails()\nTo reproduce")
+                .hasMessageNotContaining("passes()");
+    }
+
+    @Test
     public void refuses_to_run_the_tests_of_a_module_on_the_module_path_against_folders() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", dependencies);

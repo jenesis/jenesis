@@ -268,6 +268,10 @@ public abstract class ProcessBuildStep implements BuildStep {
         return true;
     }
 
+    protected String diagnosis(BuildStepContext context) throws IOException {
+        return "";
+    }
+
     public boolean acceptableExitCode(int code,
                                       Executor executor,
                                       BuildStepContext context,
@@ -306,6 +310,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                             future.complete(new BuildStepResult(true));
                         } else {
                             throw new IllegalStateException("Unexpected exit code: " + exitCode + "\n"
+                                    + diagnosis(context)
                                     + "To reproduce, execute:\n "
                                     + reproduction(context.supplement().resolve("reproduce.args"), handler.commands())
                                     + tail("Output", output)

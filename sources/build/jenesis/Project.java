@@ -1233,7 +1233,10 @@ public record Project(
                     what the step wrote and a .jenesis.failed marker beside its output/ and
                     supplement/, until the step runs again. A tool that fails prints the last 200
                     lines of its output and of its error, naming the file under supplement/ that
-                    holds the rest. One build at a time per target: the root
+                    holds the rest; a failed test run first names its failed tests, read from the
+                    reports the runner writes under supplement/ (or reports/tests with
+                    jenesis.test.reporting), so a test that swallows the console still says which
+                    failed. One build at a time per target: the root
                     holds an exclusive .jenesis.lock and a second process fails fast.
 
                     Read the outcome of the latest build from %{target}/.jenesis.events.jsonl rather
