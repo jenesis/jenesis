@@ -989,7 +989,8 @@ public record Project(
                                            wins over the root for any key
                       url, licenses,       project.properties, with the keys skill/target lists
                       developers, scm
-                      the version          -Djenesis.project.version
+                      the version          version=<version> in project.properties at the root,
+                                           which -Djenesis.project.version overrides
 
                     demo-02 is one module, demo-04 several with a test module, demo-66 the
                     published coordinate; skill/tags lists every tag.
@@ -1119,7 +1120,10 @@ public record Project(
                     project so no IDE depends on the old build: one IDE module per module, its
                     tests in its test sources. The IDE files it writes into a source folder never
                     reach a jar. A Maven layout keeps its pom.xml files, which are now its build
-                    declaration.
+                    declaration. A module-info.java build that deletes them loses the version they
+                    held: keep it as version=<version> in project.properties at the root, which
+                    -Djenesis.project.version overrides for a release, or what is staged is
+                    unversioned and its POM 0-SNAPSHOT.
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
