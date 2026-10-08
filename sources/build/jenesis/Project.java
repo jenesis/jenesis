@@ -186,9 +186,18 @@ public record Project(
             trees.put(ProjectPlugins.PROJECT, new ProjectFiles());
             executor.addModule(STAGE, project.plugins().stage(project.profiles(), trees), BUILD);
             executor.addModule(EXPORT, (export, inherited) -> {
-                export.addStep("maven", MavenRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/maven");
-                project.plugins().export(project.profiles()).accept(export, inherited);
-            }, STAGE);
+                SequencedMap<String, Path> staged = new LinkedHashMap<>(inherited);
+                staged.keySet().removeIf(key -> key.startsWith(BuildExecutorModule.PREVIOUS + BUILD + "/"));
+                export.addStep("uninstalled",
+                        new MavenRepositoryExport.Uninstalled(),
+                        inherited.sequencedKeySet().stream()
+                                .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + BUILD + "/")));
+                export.addStep("maven",
+                        MavenRepositoryExport.ofEnvironment(project.environment()),
+                        BuildExecutorModule.PREVIOUS + STAGE + "/maven",
+                        "uninstalled");
+                project.plugins().export(project.profiles()).accept(export, staged);
+            }, STAGE, BUILD);
             String prefix = BUILD + "/maven/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
             executor.addModule(PIN, PinModule.ofEnvironment(project.environment(),
                     project.root(),
@@ -992,6 +1001,12 @@ public record Project(
                                                            in a file the project provides
                       a toolchain                          -Djenesis.toolchain.version
                       a -tests jar (test-jar goal)         -Djenesis.stage.tests=true
+                      maven.deploy.skip, as for a module   read from the pom's properties as the
+                      of tests alone                       deploy plugin does (true, releases,
+                                                           snapshots): built and tested, never
+                                                           staged, so neither released nor exported
+                      maven.install.skip                   read the same way: staged, but `export`
+                                                           leaves it out of the local repository
 
                     A process-<tool>.properties line is a flag and its argument, `-Xmaxwarns=500`, and a
                     bare flag has an empty value, `-parameters=`. A flag given more than once, as --add-opens

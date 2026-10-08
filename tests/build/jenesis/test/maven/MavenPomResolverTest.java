@@ -4111,6 +4111,67 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_reads_whether_maven_would_deploy_and_install_it() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <maven.install.skip>true</maven.install.skip>
+                    </properties>
+                    <modules>
+                        <module>releases</module>
+                        <module>snapshots</module>
+                    </modules>
+                </project>
+                """);
+        for (String skipped : List.of("releases", "snapshots")) {
+            Files.createDirectory(project.resolve(skipped));
+            Files.writeString(project.resolve(skipped).resolve("pom.xml"), """
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>project</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1-SNAPSHOT</version>
+                        </parent>
+                        <artifactId>%s</artifactId>
+                        <properties>
+                            <maven.deploy.skip>%s</maven.deploy.skip>
+                        </properties>
+                    </project>
+                    """.formatted(skipped, skipped));
+        }
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).deploy()).isTrue();
+        assertThat(poms.get(Path.of("releases")).deploy()).as("a snapshot is no release").isTrue();
+        assertThat(poms.get(Path.of("snapshots")).deploy()).isFalse();
+        assertThat(poms.values()).as("a child inherits the properties of its parent").noneMatch(MavenLocalPom::install);
+    }
+
+    @Test
+    public void local_pom_refuses_a_deploy_skip_maven_does_not_read() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.deploy.skip>never</maven.deploy.skip>
+                    </properties>
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("'never'")
+                .hasMessageContaining("true, false, releases or snapshots");
+    }
+
+    @Test
     public void local_pom_dependency_management_checksum_is_honored() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
