@@ -313,6 +313,30 @@ public class DependenciesAliasTest {
     }
 
     @Test
+    public void an_alias_a_dependency_declares_for_a_static_requirement_is_ignored_where_its_target_is_not_resolved()
+            throws IOException {
+        plainLib();
+        Path classes = Files.createDirectories(work.resolve("static-consumer-classes"));
+        Files.write(classes.resolve("module-info.class"), ClassFile.of().buildModule(ModuleAttribute.of(
+                ModuleDesc.of("lib.consumer"),
+                module -> module.requires(ModuleDesc.of("java.base"), ClassFile.ACC_MANDATED, null)
+                        .requires(ModuleDesc.of("toolkit.lib"), ClassFile.ACC_STATIC_PHASE, null))));
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().putValue(PathPlacement.ALIASES, "toolkit.lib=org.example/plain-lib");
+        addPom("org.example", "consumer-lib", "1.0", List.of());
+        jarOf(Files.createDirectories(mavenRepoFolder.resolve("org/example/consumer-lib/1.0"))
+                .resolve("consumer-lib-1.0.jar"), classes, manifest);
+
+        resolve(Map.of(), "org.example/consumer-lib/1.0");
+
+        assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar"))
+                .as("a consumer never resolves what the declaring module requires statically, so its alias stays"
+                        + " where the declaring module itself is built")
+                .doesNotExist();
+    }
+
+    @Test
     public void an_alias_a_dependency_declares_for_another_target_is_rejected() throws IOException {
         plainLib();
         addPom("org.example", "other-lib", "1.0", List.of());

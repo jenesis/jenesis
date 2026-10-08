@@ -95,7 +95,9 @@ nothing to rename.
 The declaration also travels. Jenesis writes it into this module's own manifest as
 `Jenesis-Aliases: org.kohsuke.args4j=args4j/args4j`, so a downstream module that
 depends on `demo.cli` inherits the name without redeclaring it, and two modules
-that disagree about a name fail the build rather than racing over one file.
+that disagree about a name fail the build rather than racing over one file. An
+alias for a `requires static` target applies only where that target is resolved:
+a downstream module that never pulls the optional dependency in ignores it.
 
 The alias itself never carries a version - the tag is exactly two words, and a
 third is rejected with an error naming the `@jenesis.pin` line to write instead,
