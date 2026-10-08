@@ -51,6 +51,11 @@ public class Jar extends ProcessBuildStep {
     }
 
     @Override
+    protected List<String> configurations() {
+        return sort == Sort.CLASSES ? super.configurations() : List.of();
+    }
+
+    @Override
     public CompletionStage<List<String>> process(Executor executor,
                                                  BuildStepContext context,
                                                  SequencedMap<String, BuildStepArgument> arguments,
