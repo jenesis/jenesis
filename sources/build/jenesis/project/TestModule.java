@@ -672,6 +672,13 @@ public class TestModule implements BuildExecutorModule {
             TestFramework resolved = framework != null ? framework : TestFramework.detect(artifacts).orElse(null);
             SequencedProperties properties = new SequencedProperties();
             SequencedProperties versions = new SequencedProperties();
+            SequencedMap<String, String> pinned = new LinkedHashMap<>();
+            for (Path folder : folders) {
+                Path versionsFile = folder.resolve(BuildStep.VERSIONS);
+                if (Files.exists(versionsFile)) {
+                    SequencedProperties.ofFiles(versionsFile).forEachProperty(pinned::putIfAbsent);
+                }
+            }
             if (resolved != null) {
                 SequencedMap<String, String> runners = resolved.missingCoordinates(artifacts);
                 String selectedPrefix = null;
@@ -686,19 +693,9 @@ public class TestModule implements BuildExecutorModule {
                     }
                 }
                 if (selectedPrefix != null) {
-                    for (BuildStepArgument argument : arguments.values()) {
-                        if (argument.removed()) {
-                            continue;
-                        }
-                        Path versionsFile = argument.folder().resolve(BuildStep.VERSIONS);
-                        if (!Files.exists(versionsFile)) {
-                            continue;
-                        }
-                        SequencedProperties upstream = SequencedProperties.ofFiles(versionsFile);
-                        for (String key : upstream.stringPropertyNames()) {
-                            if (key.startsWith(group + "/" + selectedPrefix + "/")) {
-                                versions.putIfAbsent(key, upstream.getProperty(key));
-                            }
+                    for (Map.Entry<String, String> entry : pinned.entrySet()) {
+                        if (entry.getKey().startsWith(group + "/" + selectedPrefix + "/")) {
+                            versions.putIfAbsent(entry.getKey(), entry.getValue());
                         }
                     }
                     for (Map.Entry<String, String> entry : runners.entrySet()) {
@@ -712,7 +709,11 @@ public class TestModule implements BuildExecutorModule {
             }
             for (ObservabilityEngine observer : observers) {
                 for (Map.Entry<String, String> entry : observer.coordinates().entrySet()) {
-                    properties.setProperty(group + "/runtime/" + entry.getKey() + "/" + entry.getValue(), "");
+                    properties.setProperty(observer.name()
+                            + "/runtime/"
+                            + entry.getKey()
+                            + "/"
+                            + released(pinned, observer.name(), entry.getKey(), entry.getValue()), "");
                 }
             }
             properties.store(context.next().resolve(BuildStep.REQUIRES));
@@ -720,6 +721,31 @@ public class TestModule implements BuildExecutorModule {
                 versions.store(context.next().resolve(BuildStep.VERSIONS));
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+
+        private static String released(SequencedMap<String, String> pinned,
+                                       String engine,
+                                       String coordinate,
+                                       String version) {
+            int repository = coordinate.indexOf('/'), groupId = coordinate.indexOf('/', repository + 1);
+            if (!version.equals("RELEASE") || repository < 1 || groupId < 0) {
+                return version;
+            }
+            String own = engine + "/" + coordinate, release = engine + "/" + coordinate.substring(0, groupId + 1);
+            String train = null;
+            for (Map.Entry<String, String> entry : pinned.entrySet()) {
+                String pin = entry.getValue().trim().split("\\s+", 2)[0];
+                if (pin.isEmpty() || pin.startsWith(":")) {
+                    continue;
+                }
+                if (entry.getKey().equals(own)) {
+                    return pin;
+                }
+                if (train == null && entry.getKey().startsWith(release)) {
+                    train = pin;
+                }
+            }
+            return train == null ? version : train;
         }
     }
 
@@ -917,7 +943,7 @@ public class TestModule implements BuildExecutorModule {
             List<TestTags> ran = ran(context, arguments);
             List<String> commands = new ArrayList<>();
             for (ObservabilityEngine observer : observers) {
-                commands.addAll(observer.commands(agentJars(arguments, observer, group), context.next()));
+                commands.addAll(observer.commands(agentJars(arguments, observer), context.next()));
             }
             SequencedMap<String, String> attachments = attachments(arguments);
             SequencedMap<String, Path> attached = attachedJars(arguments, attachments.sequencedKeySet());
@@ -1286,8 +1312,7 @@ public class TestModule implements BuildExecutorModule {
         }
 
         private static SequencedMap<String, Path> agentJars(SequencedMap<String, BuildStepArgument> arguments,
-                                                            ObservabilityEngine observer,
-                                                            String group) throws IOException {
+                                                            ObservabilityEngine observer) throws IOException {
             SequencedMap<String, Path> resolved = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
@@ -1299,7 +1324,7 @@ public class TestModule implements BuildExecutorModule {
                 }
                 SequencedProperties properties = SequencedProperties.ofFiles(file);
                 for (String coordinate : observer.coordinates().sequencedKeySet()) {
-                    String prefix = group + "/runtime/" + coordinate + "/";
+                    String prefix = observer.name() + "/runtime/" + coordinate + "/";
                     for (String key : properties.stringPropertyNames()) {
                         if (key.startsWith(prefix)) {
                             String value = properties.getProperty(key);

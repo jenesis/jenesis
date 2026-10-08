@@ -75,6 +75,15 @@ Pinning
 JUnit is pinned in the POM the usual way. JaCoCo's agent and CLI resolve a
 floating `RELEASE` in the `jacoco` group; run `java build/jenesis/Make.java
 pin` to record them with checksums when you want a reproducible tool chain.
+The pins sit in the POM's `<!--jenesis.pin-->` comment, each line prefixed with
+the group. The agent writes the data the CLI reads, so it follows the release
+the group pins: pinning only the CLI by hand, as
+
+    <!--jenesis.pin
+    jacoco/maven/org.jacoco/org.jacoco.cli 0.8.14
+    -->
+
+runs the tests under the 0.8.14 agent as well, until `pin` records both.
 
 Recording the tests with Java Flight Recorder
 ---------------------------------------------

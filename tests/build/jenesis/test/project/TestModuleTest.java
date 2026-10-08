@@ -1143,7 +1143,31 @@ public class TestModuleTest {
         assertThat(readRequires(root.resolve("test").resolve("resolved")).stringPropertyNames())
                 .containsExactlyInAnyOrder(
                         "main/runtime/maven/org.junit.platform/junit-platform-console",
-                        "main/runtime/maven/org.jacoco/org.jacoco.agent/jar/runtime/RELEASE");
+                        "jacoco/runtime/maven/org.jacoco/org.jacoco.agent/jar/runtime/RELEASE");
+    }
+
+    @Test
+    public void an_observability_agent_follows_the_release_its_engine_pins() throws IOException {
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("jacoco/maven/org.ow2.asm/asm", "9.7");
+        versions.setProperty("jacoco/maven/org.jacoco/org.jacoco.cli", "0.8.12 SHA-256/0000");
+        versions.store(emptyDependencies.resolve(BuildStep.VERSIONS));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", emptyDependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                        .framework(new JUnitPlatform())
+                        .observe(new JaCoCo())
+                        .isTest(candidate -> candidate.endsWith("TestSample"))
+                        .jarsOnly(false),
+                "dependencies", "classes");
+        executor.execute("test/" + "resolved");
+
+        assertThat(readRequires(root.resolve("test").resolve("resolved")).stringPropertyNames())
+                .as("the agent writes what the report reads, so it takes the release of the tool its group pins")
+                .contains("jacoco/runtime/maven/org.jacoco/org.jacoco.agent/jar/runtime/0.8.12");
     }
 
     @Test
