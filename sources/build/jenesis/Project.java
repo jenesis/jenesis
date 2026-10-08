@@ -946,8 +946,9 @@ public record Project(
                       compilerArgs, options.compilerArgs   process-javac.properties
                       annotationProcessorPaths             @jenesis.plugin, or <type>processor</type>
                       surefire includes and groups         -Djenesis.test.filter, -Djenesis.test.tag
-                      surefire excludes                    a negative look-ahead in the filter,
-                                                           ^(?!.*IntegrationTest$).*
+                      surefire excludes                    -Djenesis.test.exclude=<regex>[,...],
+                                                           as .*IntegrationTest, after the default
+                                                           naming or the filter
                       argLine, jvmArgs of the tests        process-test.properties
                       environment of the tests             environment-test.properties
                       manifestEntries,                     a META-INF/MANIFEST.MF among the resources,
@@ -997,7 +998,10 @@ public record Project(
                     jenesis.test.filter matches the whole class name and replaces the default naming
                     (Test*, *Test, *Tests, *TestCase, IT*, *IT, *ITCase, never a nested class); a
                     <module>/<regex> entry reaches that module only, and a module no entry reaches
-                    runs no tests. The tests run against the module's jar, so a test that turns
+                    runs no tests. jenesis.test.exclude takes the same entries, without a #method,
+                    and leaves out what they match, so excluding one class keeps the default naming;
+                    a module whose every test it leaves out runs none.
+                    The tests run against the module's jar, so a test that turns
                     getResource into a java.io.File fails with "URI is not hierarchical";
                     -Djenesis.test.jars=false runs them against its classes and resources folders
                     instead, as Maven does, while the modules it depends on stay jars. A build prints
@@ -3489,6 +3493,7 @@ public record Project(
                 cache.insecure|false|Permit the cache key over plaintext http off loopback, and over https accept a certificate that does not verify; likewise yours alone to allow
                 test.skip|false|Skip executing tests, still resolving what running them needs
                 test.filter||Comma-separated [<module>/]<classRegex>[#<method>] entries restricting which tests run; an entry naming a module applies to its tests alone, and a test module no entry reaches runs none
+                test.exclude||Comma-separated [<module>/]<classRegex> entries, each matched against the whole class name, leaving out of a run the test classes they match among those the default naming or jenesis.test.filter selects; an entry naming a module applies to its tests alone, and a test module whose every selected class is left out runs none
                 test.tag||Comma-separated alternatives, a test running when it matches any of them: a tag, several joined by + for the tests carrying all of them, and -<tag> for the tests not carrying it, as -container or release+-soak,-container, with nothing to quote on a command line and translated for the test framework; a run remembers what it covered until the tests' inputs change, so a later selection runs only the tests no earlier one ran
                 test.force|false|Execute tests even where a previous run already covered them
                 test.jars|true|Run the tests against the packaged test jar; false runs them against the module's classes and resources folders ahead of it, as Maven and Gradle do, so a test can read its own resources as files, while the modules it depends on stay jars; a module tested on the module path refuses false

@@ -649,6 +649,92 @@ public class TestModuleTest {
     }
 
     @Test
+    public void exclude_leaves_out_a_test_class_the_default_naming_selects() throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "SkippedTest", """
+                package sample;
+                public class SkippedTest {
+                    @org.junit.jupiter.api.Test
+                    public void test() { System.out.println("must not run"); }
+                }
+                """, bootModuleJars());
+        Files.writeString(manifests.resolve(BuildStep.MODULE), "path=greeter\n");
+        settings.put("test.exclude", "other/sample\\.TestSample, .*\\.SkippedTest");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addSource("manifests", manifests);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnitPlatform()).jarsOnly(false),
+                "dependencies", "classes", "manifests");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content()
+                .contains("Hello world!")
+                .doesNotContain("must not run");
+        assertThat(supplement.resolve("java.args")).content()
+                .as("an excluded class leaves the default naming in force, and an entry naming another module does not apply")
+                .contains("--select-class=sample.TestSample")
+                .doesNotContain("SkippedTest");
+    }
+
+    @Test
+    public void a_test_module_whose_every_test_is_excluded_runs_no_tests() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnitPlatform())
+                        .exclude(".*TestSample").jarsOnly(false),
+                "dependencies", "classes");
+        executor.execute();
+
+        assertThat(root.resolve("test").resolve("executed").resolve("supplement").resolve("java.args"))
+                .as("a module whose tests are all excluded runs none, rather than failing")
+                .doesNotExist();
+    }
+
+    @Test
+    public void exclude_refuses_an_entry_naming_a_method() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnitPlatform())
+                        .exclude("sample\\.TestSample#test").jarsOnly(false),
+                "dependencies", "classes");
+
+        assertThatThrownBy(executor::execute).rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.test.exclude")
+                .hasMessageContaining("jenesis.test.filter");
+    }
+
+    @Test
     public void filter_with_method_selector_targets_specific_method() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", dependencies);
