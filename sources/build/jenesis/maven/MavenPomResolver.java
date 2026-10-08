@@ -700,6 +700,11 @@ public class MavenPomResolver implements MavenResolver {
                             .toList(),
                     dependencies,
                     managedDependencies,
+                    pom.bom() == null ? null : pom.bom().entrySet().stream().collect(Collectors.toMap(
+                            entry -> entry.getKey().resolve(pom.properties()),
+                            entry -> entry.getValue().resolve(pom.properties()),
+                            (left, _) -> left,
+                            LinkedHashMap::new)),
                     pom.qualifiedDependencies(),
                     pom.attachments(),
                     pom.natives(),
@@ -898,6 +903,7 @@ public class MavenPomResolver implements MavenResolver {
                         .flatMap(node -> toElements(node, "dependency"))
                         .map(node -> toDependency(node, trusted))
                         .forEach(entry -> managedDependencies.put(entry.getKey(), entry.getValue()));
+                Map<DependencyKey, DependencyValue> declaredManagedDependencies = new LinkedHashMap<>(managedDependencies);
                 inheritedManagedDependencies.forEach(managedDependencies::putIfAbsent);
                 SequencedMap<DependencyKey, DependencyValue> declaredDependencies = new LinkedHashMap<>();
                 models.stream()
@@ -913,6 +919,7 @@ public class MavenPomResolver implements MavenResolver {
                         ? models.stream().flatMap(model -> toElements(model, "build").limit(1)).toList()
                         : List.of();
                 List<String> subprojects = null;
+                boolean bom = false;
                 if (extended) {
                     Node listed = toElements(document.getDocumentElement(), "subprojects").findFirst()
                             .or(() -> toElements(document.getDocumentElement(), "modules").findFirst())
@@ -930,6 +937,9 @@ public class MavenPomResolver implements MavenResolver {
                                     .toList();
                         }
                     }
+                    bom = (subprojects == null || subprojects.isEmpty())
+                            && ("pom".equals(packaging) || "bom".equals(packaging))
+                            && !declaredManagedDependencies.isEmpty();
                 }
                 String sourceDirectory = build == null ? null : toElementText(build, "sourceDirectory").orElse(null),
                         testSourceDirectory = build == null ? null : toElementText(build, "testSourceDirectory").orElse(null);
@@ -1060,6 +1070,7 @@ public class MavenPomResolver implements MavenResolver {
                         ownLicenses.isEmpty() ? parentLicenses : ownLicenses,
                         metadata,
                         verbatim,
+                        bom ? declaredManagedDependencies : null,
                         false,
                         toElements(project, "distributionManagement")
                                 .flatMap(management -> toElements(management, "relocation"))
@@ -1115,6 +1126,7 @@ public class MavenPomResolver implements MavenResolver {
                             List.of(),
                             Collections.emptyNavigableMap(),
                             Set.of(),
+                            null,
                             true,
                             null);
                 } else {
@@ -1964,6 +1976,7 @@ public class MavenPomResolver implements MavenResolver {
                                  List<License> licenses,
                                  SequencedMap<String, String> metadata,
                                  Set<String> verbatim,
+                                 Map<DependencyKey, DependencyValue> bom,
                                  boolean missing,
                                  DependencyCoordinate relocation) {
     }

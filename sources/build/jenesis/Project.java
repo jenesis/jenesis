@@ -890,6 +890,12 @@ public record Project(
                                  - a pom aggregator is followed for its modules, a war is not built
                                  at all, and a src/test/java/module-info.java is a module of its own
                                  rather than patched into the main one
+                      a BOM      a module of pom packaging that lists no modules but declares a
+                                 <dependencyManagement>, such as a mockito-bom, is staged, exported
+                                 and released as its POM alone: its coordinate, packaging and
+                                 metadata, and that <dependencyManagement> with its ${...}
+                                 resolved and its parent's left out, since the parent is not
+                                 published
 
                     A test module-info.java that names the main module itself, the --patch-module
                     idiom Gradle and Maven use for white-box tests, is not supported: compiled as a
@@ -1184,6 +1190,8 @@ public record Project(
                       dependency:tree / dependencies -> the `dependencies` selector
                       <exclusions> / exclude -> kept in pom.xml, or @jenesis.exclude (19)
                       an imported BOM / platform() -> kept in pom.xml, or @jenesis.bom (20)
+                      a published BOM / java-platform -> a pom.xml of pom packaging with a
+                          <dependencyManagement> and no modules, staged as that POM
                       moditect / an extra-java-module-info plugin
                           -> @jenesis.alias, modules.properties (21)
                       a relocating shade / shadow -> not supported, nothing is relocated: a
@@ -2073,7 +2081,8 @@ public record Project(
                 }
                 SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
                 for (String key : inventory.stringPropertyNames()) {
-                    if (key.endsWith(".path")) {
+                    if (key.endsWith(".path")
+                            && inventory.value(key.substring(0, key.length() - ".path".length()) + ".packaging") == null) {
                         paths.add(inventory.getProperty(key));
                     }
                 }

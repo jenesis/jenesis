@@ -861,6 +861,90 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void describes_a_bom_by_its_own_dependency_management_with_its_properties_resolved() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <url>https://example.com</url>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>other</groupId>
+                                <artifactId>inherited</artifactId>
+                                <version>2</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <modules>
+                        <module>bom</module>
+                    </modules>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("bom")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>bom</artifactId>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <maven.deploy.skip>false</maven.deploy.skip>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>${project.groupId}</groupId>
+                                <artifactId>library</artifactId>
+                                <version>${project.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>other</groupId>
+                                <artifactId>other-bom</artifactId>
+                                <version>3</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results.keySet())
+                .as("neither the aggregator nor the BOM is a module that compiles")
+                .noneMatch(key -> key.contains("module-"));
+        Path boms = results.get("maven/boms");
+        SequencedProperties inventory = SequencedProperties.ofFiles(boms.resolve("inventory.properties"));
+        assertThat(inventory).containsEntry("module-bom.path", "bom").containsEntry("module-bom.packaging", "pom");
+        String pom = Files.readString(boms.resolve(inventory.getProperty("module-bom.pom")));
+        assertThat(pom)
+                .contains("<groupId>group</groupId>", "<artifactId>bom</artifactId>", "<version>1</version>",
+                        "<packaging>pom</packaging>", "<url>https://example.com/bom</url>")
+                .contains("<artifactId>library</artifactId>", "<artifactId>other-bom</artifactId>", "<scope>import</scope>")
+                .doesNotContain("${", "<parent>")
+                .as("the parent's managed versions stay with the parent, which is not published")
+                .doesNotContain("inherited");
+    }
+
+    @Test
     public void can_resolve_multi_pom() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

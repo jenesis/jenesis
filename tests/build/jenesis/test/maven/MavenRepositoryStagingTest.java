@@ -46,6 +46,25 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
+    public void stages_the_pom_of_a_bom_without_any_jar() throws IOException {
+        Path inventoryDir = Files.createDirectory(source.resolve("bom"));
+        Files.writeString(inventoryDir.resolve("pom.xml"), buildPom("com.example", "foo-bom", "1.2.3", List.of()));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-bom.path", "bom");
+        inventory.setProperty("module-bom.pom", "pom.xml");
+        inventory.setProperty("module-bom.packaging", "pom");
+        inventory.store(inventoryDir.resolve(Inventory.INVENTORY));
+
+        BuildStepResult result = run(true, inventoryDir);
+
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve("com/example/foo-bom/1.2.3/foo-bom-1.2.3.pom")).exists();
+        try (Stream<Path> files = Files.list(next.resolve("com/example/foo-bom/1.2.3"))) {
+            assertThat(files).as("a BOM is its POM alone").hasSize(1);
+        }
+    }
+
+    @Test
     public void leaves_out_a_module_whose_pom_skips_deployment() throws IOException {
         Path published = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(published, "classes.jar", "classes-bytes");

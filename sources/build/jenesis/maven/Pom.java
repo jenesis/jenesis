@@ -152,7 +152,7 @@ public class Pom implements BuildStep {
                     artifactId,
                     version,
                     deps,
-                    parseMetadata(metadata)).accept(writer);
+                    MavenPomEmitter.Metadata.of(metadata)).accept(writer);
         }
         if (embedded) {
             Path folder = Files.createDirectories(context.next()
@@ -168,56 +168,4 @@ public class Pom implements BuildStep {
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
-
-    private static MavenPomEmitter.Metadata parseMetadata(SequencedProperties metadata) {
-        if (metadata.isEmpty()) {
-            return null;
-        }
-        SequencedSet<String> licenseIds = new LinkedHashSet<>(), developerIds = new LinkedHashSet<>();
-        for (String key : metadata.stringPropertyNames()) {
-            int dot = key.lastIndexOf('.');
-            if (key.startsWith("license.") && dot > "license.".length()) {
-                licenseIds.add(key.substring("license.".length(), dot));
-            } else if (key.startsWith("developer.") && dot > "developer.".length()) {
-                developerIds.add(key.substring("developer.".length(), dot));
-            }
-        }
-        List<MavenPomEmitter.Metadata.License> licenses = new ArrayList<>();
-        for (String id : licenseIds) {
-            licenses.add(new MavenPomEmitter.Metadata.License(
-                    metadata.getProperty("license." + id + ".name"),
-                    metadata.getProperty("license." + id + ".url")));
-        }
-        List<MavenPomEmitter.Metadata.Developer> developers = new ArrayList<>();
-        for (String id : developerIds) {
-            String declared = metadata.getProperty("developer." + id + ".id");
-            developers.add(new MavenPomEmitter.Metadata.Developer(
-                    declared == null ? id : declared.isBlank() ? null : declared.strip(),
-                    metadata.getProperty("developer." + id + ".name"),
-                    metadata.getProperty("developer." + id + ".email")));
-        }
-        MavenPomEmitter.Metadata.Scm scm = null;
-        String scmConnection = metadata.getProperty("scm.connection");
-        String scmDeveloperConnection = metadata.getProperty("scm.developerConnection");
-        String scmUrl = metadata.getProperty("scm.url");
-        String scmTag = metadata.value("scm.tag");
-        if (scmConnection != null || scmDeveloperConnection != null || scmUrl != null || scmTag != null) {
-            scm = new MavenPomEmitter.Metadata.Scm(
-                    scmConnection,
-                    scmDeveloperConnection,
-                    scmUrl,
-                    scmTag);
-        }
-        return new MavenPomEmitter.Metadata(
-                metadata.getProperty("name"),
-                metadata.getProperty("description"),
-                metadata.getProperty("url"),
-                licenses,
-                developers,
-                scm,
-                metadata.value("organization.name") == null && metadata.value("organization.url") == null
-                        ? null
-                        : new MavenPomEmitter.Metadata.Organization(metadata.value("organization.name"), metadata.value("organization.url")));
-    }
-
 }

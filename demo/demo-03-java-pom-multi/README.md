@@ -22,14 +22,15 @@ The project is an aggregator `pom.xml` over two module directories:
 
     demo/demo-03-java-pom-multi
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
-    |-- pom.xml              aggregator (packaging pom); lists the two modules
+    |-- pom.xml              aggregator (packaging pom); lists the modules
     |-- greeter/            the library module (with a JUnit test)
     |   |-- pom.xml          <sourceDirectory> + <testSourceDirectory>; a test-scoped JUnit dependency
     |   |-- sources/sample/greeter/Greeter.java
     |   `-- test/sample/greeter/GreeterTest.java
-    `-- app/                the consumer module
-        |-- pom.xml          depends on greeter + commons-lang3
-        `-- sources/sample/app/App.java   uses Greeter + StringUtils
+    |-- app/                the consumer module
+    |   |-- pom.xml          depends on greeter + commons-lang3
+    |   `-- sources/sample/app/App.java   uses Greeter + StringUtils
+    `-- bom/pom.xml          a bill of materials over greeter and app (packaging pom)
 
 The root `pom.xml` carries `<packaging>pom</packaging>`, so Jenesis treats it as
 an aggregator and never builds it as a jar; its presence is what selects the
@@ -42,6 +43,23 @@ Jenesis builds `greeter` first, exposes its output through the sibling's `assign
 step, and prepends that as a repository when resolving `app`, so the sibling
 coordinate resolves from within the build while `commons-lang3` is fetched from
 Maven Central.
+
+Publishing a bill of materials
+------------------------------
+
+`bom/pom.xml` is a module of `<packaging>pom</packaging>` that lists no modules
+but declares a `<dependencyManagement>` naming `greeter` and `app` at
+`${project.version}`. Such a POM is a BOM: nothing is compiled for it, and a
+`stage` publishes it beside the two jars, as its POM alone:
+
+    java -Djenesis.test.skip=true build/jenesis/Make.java stage
+
+    target/stage/maven/output/build/jenesis/demo/bom/1.0.0/bom-1.0.0.pom
+
+The staged POM carries the BOM's coordinate, its packaging and its metadata, and
+its own `<dependencyManagement>` with every `${...}` resolved. It names no parent
+and leaves out the parent's managed versions, since the aggregator is never
+published. `export` installs it and `release` publishes it like any staged POM.
 
 Tests
 -----
