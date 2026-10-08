@@ -191,7 +191,14 @@ public class MavenDefaultVersionNegotiator implements MavenVersionNegotiator {
                           String classifier,
                           String version) throws IOException {
         return switch (version) {
-            case "RELEASE" -> toMetadata(executor, repository, groupId, artifactId).release();
+            case "RELEASE" -> {
+                Metadata metadata = toMetadata(executor, repository, groupId, artifactId);
+                String release = metadata.release();
+                yield isStable(release) ? release : metadata.versions().stream()
+                        .filter(MavenDefaultVersionNegotiator::isStable)
+                        .max(MavenDefaultVersionNegotiator::compareVersions)
+                        .orElse(release);
+            }
             case "LATEST" -> toMetadata(executor, repository, groupId, artifactId).latest();
             case "STABLE" -> toStable(toMetadata(executor, repository, groupId, artifactId), groupId, artifactId);
             case String range when isRange(range) -> {

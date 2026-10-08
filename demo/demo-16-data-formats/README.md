@@ -99,9 +99,10 @@ platform it is for so `pin` keeps the ones it cannot resolve itself:
     protoc-grpc-java/maven/io.grpc/protoc-gen-grpc-java/exe/linux-x86_64 1.83.1 SHA-256/db4044... (linux,x86_64)
     -->
 
-Pin `protoc` rather than floating it: `com.google.protobuf:protoc` still publishes
-a `21.0-rc-1` that Maven Central reports as the latest release, and the generated
-code has to match the `protobuf-java` the module depends on.
+Pin `protoc` rather than floating it: the generated code has to match the
+`protobuf-java` the module depends on. An unpinned `protoc` takes the newest release
+without a pre-release qualifier, passing over the `21.0-rc-1` that Maven Central
+reports as the latest release.
 
 A protoc plugin is a second native executable, named and resolved the same way:
 
