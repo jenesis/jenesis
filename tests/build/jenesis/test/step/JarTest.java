@@ -100,6 +100,31 @@ public class JarTest {
     }
 
     @ParameterizedTest
+    @EnumSource(value = Jar.Sort.class, names = {"CLASSES", "SOURCES"})
+    public void leaves_the_configuration_folder_out_of_the_jar(Jar.Sort sort) throws IOException {
+        Path folder = Files.createDirectories(classes.resolve(sort == Jar.Sort.CLASSES ? BuildStep.RESOURCES : BuildStep.SOURCES));
+        Files.writeString(Files.createDirectory(folder.resolve("sample")).resolve("Sample.txt"), "sample");
+        Path configuration = Files.createDirectories(folder.resolve("META-INF/build.jenesis"));
+        Files.writeString(configuration.resolve("project.properties"), "artifact=sample");
+        Files.writeString(folder.resolve("META-INF/LICENSE"), "licence");
+        BuildStepResult result = Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, sort).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of())))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        Path jar;
+        try (Stream<Path> files = Files.walk(next)) {
+            jar = files.filter(file -> file.toString().endsWith(".jar")).findFirst().orElseThrow();
+        }
+        try (JarFile file = new JarFile(jar.toFile())) {
+            assertThat(file.stream().map(JarEntry::getName).toList())
+                    .contains("sample/Sample.txt", "META-INF/LICENSE")
+                    .as("the build's configuration is no content of the module")
+                    .noneMatch(name -> name.startsWith("META-INF/build.jenesis"));
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void can_execute_javadoc_jar(boolean process) throws IOException {
         Path folder = Files.createDirectory(classes.resolve(Javadoc.JAVADOC));

@@ -126,10 +126,28 @@ public class Jar extends ProcessBuildStep {
             }
             for (String name : sort.folders) {
                 Path folder = argument.folder().resolve(name);
-                if (Files.exists(folder)) {
+                if (!Files.exists(folder)) {
+                    continue;
+                }
+                Path metaInf = folder.resolve("META-INF");
+                if (!Files.isDirectory(metaInf.resolve("build.jenesis"))) {
                     commands.add("-C");
                     commands.add(folder.toString());
                     commands.add(".");
+                    continue;
+                }
+                List<Path> entries = new ArrayList<>();
+                try (Stream<Path> files = Files.list(folder)) {
+                    files.filter(file -> !file.equals(metaInf)).forEach(entries::add);
+                }
+                try (Stream<Path> files = Files.list(metaInf)) {
+                    files.filter(file -> !BuildStep.underBuildJenesis(folder.relativize(file))).forEach(entries::add);
+                }
+                entries.sort(null);
+                for (Path entry : entries) {
+                    commands.add("-C");
+                    commands.add(folder.toString());
+                    commands.add(folder.relativize(entry).toString());
                 }
             }
         }
