@@ -485,6 +485,91 @@ public class TestModuleTest {
     }
 
     @Test
+    public void selects_by_name_only_the_junit4_classes_that_can_hold_tests() throws Exception {
+        Path junitJar = downloadJar(junit4Dependencies.resolve("junit-4.13.2.jar"),
+                "https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar",
+                "8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3");
+        Path hamcrestJar = downloadJar(junit4Dependencies.resolve("hamcrest-core-1.3.jar"),
+                "https://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar",
+                "66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9");
+        populateFilteredArtifacts(junit4Dependencies, Set.of("junit-4.13.2.jar", "hamcrest-core-1.3.jar"));
+        Path sampleClasses = classes.resolve(Javac.CLASSES + "sample");
+        List<Path> classPath = List.of(junitJar, hamcrestJar, sampleClasses.getParent());
+        compileSource(sampleClasses, "SampleTest", """
+                package sample;
+                public class SampleTest {
+                    @org.junit.Test
+                    public void test() { System.out.println("Annotated!"); }
+                }
+                """, classPath);
+        compileSource(sampleClasses, "AbstractBase", """
+                package sample;
+                public abstract class AbstractBase {
+                    @org.junit.Test
+                    public void test() { System.out.println("Inherited!"); }
+                }
+                """, classPath);
+        compileSource(sampleClasses, "InheritingTest", """
+                package sample;
+                public class InheritingTest extends AbstractBase { }
+                """, classPath);
+        compileSource(sampleClasses, "LegacyTest", """
+                package sample;
+                public class LegacyTest extends junit.framework.TestCase {
+                    public void testLegacy() { System.out.println("Legacy!"); }
+                }
+                """, classPath);
+        compileSource(sampleClasses, "TestTypes", """
+                package sample;
+                public class TestTypes {
+                    public static final String VALUE = "helper";
+                }
+                """, classPath);
+        compileSource(sampleClasses, "Holder", """
+                package sample;
+                public class Holder extends java.util.ArrayList<String> { }
+                """, classPath);
+        compileSource(sampleClasses, "RfcTests", """
+                package sample;
+                public class RfcTests extends Holder { }
+                """, classPath);
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("main/maven/junit/junit",
+                "4.13.2 SHA-256/8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3");
+        versions.setProperty("main/maven/org.hamcrest/hamcrest-core",
+                "1.3 SHA-256/66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9");
+        versions.store(junit4Dependencies.resolve(BuildStep.VERSIONS));
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/runtime/maven/junit/junit", "");
+        requires.store(junit4Dependencies.resolve(BuildStep.REQUIRES));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", junit4Dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnit4())
+                        .jarsOnly(false)
+                        .pathPlacement(PathPlacement.CLASS_PATH),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output"))
+                .as("a class named like a test that declares, inherits or extends none is not handed to the runner")
+                .content()
+                .contains("Annotated!", "Inherited!", "Legacy!", "OK (3 tests)")
+                .doesNotContain("initializationError");
+    }
+
+    @Test
     public void can_execute_testng() throws Exception {
         Path testngJar = downloadJar(testngDependencies.resolve("testng-7.10.2.jar"),
                 "https://repo1.maven.org/maven2/org/testng/testng/7.10.2/testng-7.10.2.jar",

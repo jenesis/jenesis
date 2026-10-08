@@ -19,6 +19,10 @@ public interface TestFramework extends Serializable {
         return Collections.emptyNavigableMap();
     }
 
+    default boolean holdsTests(ClassModel type) {
+        return true;
+    }
+
     default Map<String, String> systemProperties() {
         return Map.of();
     }
