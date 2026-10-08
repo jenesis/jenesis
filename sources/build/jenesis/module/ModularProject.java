@@ -371,7 +371,10 @@ public class ModularProject implements BuildExecutorModule {
                 }
             }
             info.plugins().forEach((coordinate, group) ->
-                    requires.setProperty(group + "/plugin/" + coordinate, ""));
+                    requires.setProperty(group + "/plugin/" + coordinate
+                            + (coordinate.startsWith("maven/") && coordinate.split("/").length == 3
+                                    ? "/RELEASE"
+                                    : ""), ""));
             info.layers().forEach((layer, coordinates) -> coordinates.forEach(coordinate ->
                     requires.setProperty("layer:"
                             + layer

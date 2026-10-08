@@ -357,9 +357,13 @@ public class MavenProject implements BuildExecutorModule {
                                 String declared = properties.getProperty("plugins", "");
                                 for (String entry : declared.isEmpty() ? new String[0] : declared.split("\t")) {
                                     int split = entry.indexOf('=');
+                                    String plugin = entry.substring(0, split);
                                     requires.setProperty(entry.substring(split + 1)
                                             + "/plugin/"
-                                            + entry.substring(0, split), "");
+                                            + plugin
+                                            + (plugin.startsWith("maven/") && plugin.split("/").length == 3
+                                                    ? "/RELEASE"
+                                                    : ""), "");
                                 }
                                 requires.store(context.next().resolve(BuildStep.REQUIRES));
                                 String keys = properties.getProperty("signatures", "");

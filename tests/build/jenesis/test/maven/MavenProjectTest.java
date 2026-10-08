@@ -280,6 +280,40 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void an_unversioned_plugin_takes_its_newest_release_until_it_is_pinned() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.plugin
+                    javac maven/com.google.errorprone/error_prone_core
+                    maven/org.example/processor/1.0
+                    -->
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.REQUIRES))
+                .stringPropertyNames())
+                .as("a plugin declared without a version floats as a tool the build resolves itself does, until a pin settles it")
+                .contains("javac/plugin/maven/com.google.errorprone/error_prone_core/RELEASE",
+                        "plugin/plugin/maven/org.example/processor/1.0");
+    }
+
+    @Test
     public void test_scoped_attach_is_routed_to_test_module_only() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
