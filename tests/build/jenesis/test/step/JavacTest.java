@@ -724,6 +724,41 @@ public class JavacTest {
         assertThat(errors.toString()).contains("Main.java:3: error: cannot find symbol");
     }
 
+    @Test
+    public void a_failure_is_reproduced_with_the_launcher_options_in_front_of_the_argument_file() throws Exception {
+        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javac.properties"),
+                "-J-Xmx256m=\n-J--add-exports\\=jdk.compiler/com.sun.tools.javac.api\\=ALL-UNNAMED=\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Main.java"), """
+                package sample;
+                public class Main {
+                    Missing missing;
+                }
+                """);
+        assertThatThrownBy(() -> new Javac(ProcessHandler.Factory.FORK).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/sample/Main.java"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .as("javac refuses a -J option in an argument file, so the launcher options stay on the line")
+                .hasMessageContaining(" -J-Xmx256m -J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED ")
+                .hasMessageContaining("@" + supplement.resolve("reproduce.args"));
+        assertThat(Files.readAllLines(supplement.resolve("reproduce.args"))).noneMatch(line -> line.contains("-J"));
+        Process process = new ProcessBuilder(
+                Path.of(System.getProperty("java.home"), "bin", File.separatorChar == '\\' ? "javac.exe" : "javac").toString(),
+                "-J-Xmx256m",
+                "-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+                "@" + supplement.resolve("reproduce.args"))
+                .redirectErrorStream(true)
+                .start();
+        String output = new String(process.getInputStream().readAllBytes());
+        assertThat(process.waitFor()).isNotZero();
+        assertThat(output).contains("Main.java:3: error: cannot find symbol").doesNotContain("invalid flag");
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void a_failure_of_an_overlay_is_reproduced_from_an_argument_file(boolean process) throws IOException {

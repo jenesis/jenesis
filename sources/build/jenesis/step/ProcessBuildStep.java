@@ -368,15 +368,16 @@ public abstract class ProcessBuildStep implements BuildStep {
     }
 
     protected String reproduction(Path file, List<String> commands) throws IOException {
-        List<String> moved = new ArrayList<>(), kept = new ArrayList<>();
+        List<String> launcher = new ArrayList<>(), moved = new ArrayList<>(), kept = new ArrayList<>();
         for (String argument : commands.subList(1, commands.size())) {
-            (argument.startsWith("@") ? kept : moved).add(argument);
+            (argument.startsWith("-J") ? launcher : argument.startsWith("@") ? kept : moved).add(argument);
         }
         if (!ARGUMENT_FILES.contains(command) || moved.isEmpty()) {
             return shell(commands);
         }
         List<String> line = new ArrayList<>();
         line.add(commands.getFirst());
+        line.addAll(launcher);
         line.add("@" + argumentFile(file, moved));
         line.addAll(kept);
         return shell(line);
