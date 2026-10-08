@@ -688,6 +688,33 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void a_failure_of_an_overlay_is_reproduced_from_an_argument_file(boolean process) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/21/sample"))
+                .resolve("Sample.java"), "package sample; public class Sample { Missing missing; }\n");
+        Javac.writeRelease(sources, "17", Runtime.version().feature());
+        assertThatThrownBy(() -> new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("sources/META-INF/versions/21/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .as("the overlay's sources and options go into a file of its release, as the main compilation's do")
+                .hasMessageContaining("(multi-release 21)")
+                .hasMessageContaining("@" + supplement.resolve("reproduce-21.args"))
+                .hasMessageContaining("cannot find symbol");
+        assertThat(Files.readAllLines(supplement.resolve("reproduce-21.args")))
+                .anyMatch(line -> line.contains("META-INF") && line.endsWith("Sample.java\""));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void modular_compilation_does_not_reach_a_class_path_dependency(boolean process)
             throws IOException {
         plainJar(Files.createDirectories(root.resolve("library")).resolve("plain.jar"));
