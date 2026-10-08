@@ -119,11 +119,11 @@ compiler chain:
 
     generated/<tool>/generate -> compiled/javac -> classes -> artifacts/jar
 
-Everything downstream of the compiler sees the generated classes, so tests and
-`javadoc` cover them. Everything *upstream* does not: the inferred linters and
-formatters (`check`, `format`) read the module's own sources only, so generated
-code is never linted or reformatted. The sources jar is upstream too: it carries
-the schema, from which the generated files follow, not the generated files.
+Everything downstream of the generators sees the generated sources, so tests and
+`javadoc` cover them, and the sources jar carries them beside the schema they
+follow from, as Maven's does. Everything *upstream* does not: the inferred linters
+and formatters (`check`, `format`) read the module's own sources only, so
+generated code is never linted or reformatted.
 
 Layout
 ------

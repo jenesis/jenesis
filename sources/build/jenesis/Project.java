@@ -1606,7 +1606,8 @@ public record Project(
                     ## Pick the hook point by what the step produces
 
                       binary/generated       sources/ that the module compiles with its own, the
-                                             place of a code generator
+                                             place of a code generator; javadoc and the sources
+                                             jar carry them too
                       check, format          a verdict on the sources, beside Checkstyle and the
                                              formatters
                       compliance             a verdict on the resolved dependencies

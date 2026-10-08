@@ -392,7 +392,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         module.addStep("archive",
                                 Jar.ofEnvironment(environment, factory, Jar.Sort.SOURCES),
                                 inherited.sequencedKeySet()),
-                        Stream.concat(descriptor.sources().stream(), descriptor.manifests().stream()));
+                        Stream.of(descriptor.sources().stream(), descriptor.manifests().stream(), Stream.of("binary"))
+                                .flatMap(Function.identity()));
             }
             if (descriptor.documentation()) {
                 InferredDocumentationModule documentationModule = InferredDocumentationModule.ofEnvironment(environment,
