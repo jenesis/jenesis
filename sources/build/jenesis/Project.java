@@ -170,7 +170,8 @@ public record Project(
                                                 .source(project.sources())
                                                 .documentation(project.documentation())
                                                 .pinning(project.pinning())
-                                                .pathPlacement(PathPlacement.CLASS_PATH),
+                                                .pathPlacement(PathPlacement.CLASS_PATH)
+                                                .sourceResources(false),
                                         mergedRepos,
                                         mergedResolvers)),
                               mavenDeps);
@@ -876,6 +877,9 @@ public record Project(
                     repositories before deleting anything: each needs an answer in step 4. A
                     resource directory is copied whole, so one that holds target/ or .jenesis/,
                     as ./ does, fails the build and its file moves to jenesis.project.resources.
+                    A source directory gives the jar only what its compilers read - .java, .kt,
+                    .scala, .groovy - as Maven's does, so a template beside the sources stays
+                    out of it, and a file that must ship moves to a resource directory.
                     A module inherits its parents' metadata as Maven's model does: the url and the
                     scm locations with the module's artifactId appended, unless the parent sets
                     child.*.inherit.append.path="false", and licenses or developers only as a whole.
@@ -1505,7 +1509,9 @@ public record Project(
                     src/test/build.jenesis/ for its tests, and in every layout build.jenesis/ at the
                     project root, which reaches every module. Generators read their inputs from META-INF/build.jenesis/ in the
                     sources, which the compiler never copies into the artifact, unless folders=<paths>
-                    names other folders; each reads only the file kinds it compiles.
+                    names other folders, found among the sources and the resources alike; each reads
+                    only the file kinds it compiles. In the maven layout only a resource directory
+                    ships what such a folder holds.
 
                       packaging.properties      jmod/jlink/bundle/launcher/native booleans,
                                                 jpackage=<type>[,<type>...] packaging and staging each,

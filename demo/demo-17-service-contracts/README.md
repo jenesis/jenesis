@@ -12,15 +12,16 @@ Run it
 
 | Module | Config file                            | Input                 | Ships? | Generator | Generated |
 | ------ | -------------------------------------- | --------------------- | --- | --------- | --------- |
-| `soap` | `soap/build.jenesis/wsimport.properties` | `wsdl/greeter.wsdl`   | yes | `wsimport` | `demo.greeter` |
-| `rest` | `rest/build.jenesis/openapi.properties`  | `META-INF/build.jenesis/greeting.yaml` | no | OpenAPI Generator | `demo.greeting` |
+| `soap` | `soap/build.jenesis/wsimport.properties` | `resources/wsdl/greeter.wsdl` | yes | `wsimport` | `demo.greeter` |
+| `rest` | `rest/build.jenesis/openapi.properties`  | `sources/META-INF/build.jenesis/greeting.yaml` | no | OpenAPI Generator | `demo.greeting` |
 
 The two modules differ on purpose. A generator reads `META-INF/build.jenesis/` under
 the module's sources by default, and the compiler never copies that folder into the
 artifact - which is what `rest` wants, since nothing reads the specification at run
 time. `soap` needs the opposite: a JAX-WS client reads its WSDL when the service class
-is constructed, so the description has to be in the jar. Naming the folder in the
-config file puts it where the module ships it:
+is constructed, so the description has to be in the jar. It sits in the resource
+directory `soap/pom.xml` declares, which ships whole, and naming the folder in the
+config file has the generator read it there:
 
     folders=wsdl
 
@@ -45,7 +46,11 @@ wsimport
     location=/wsdl/greeter.wsdl
 
 Every `.wsdl` in the named folders is compiled; `folders` moves them out of the
-build's own folder, here to keep the description where it ships. The
+build's own folder, here to keep the description where it ships. A named folder is
+looked up in the sources and in the resource directories alike. It has to be a
+resource directory to ship: as with Maven, only the sources a compiler reads - `.java`,
+`.kt`, `.scala`, `.groovy` - are taken from a `pom.xml` source directory, and every
+other file there stays out of the jar. The
 build passes `-Xnocompile`, because generating the sources is the whole job -
 `javac` compiles them as part of the module, on the same source path as
 everything else.
@@ -53,11 +58,11 @@ everything else.
 It also states where the description will be at run time. Left alone, wsimport
 writes the path it read into the generated service:
 
-    wsdlLocation = "file:/home/you/project/target/build/.../sources/wsdl/greeter.wsdl"
+    wsdlLocation = "file:/home/you/project/target/build/.../resources/wsdl/greeter.wsdl"
 
 which is an absolute path, to a build directory, compiled into the artifact you
 ship. So `location` states the place the description ships under instead -
-`sources/wsdl/greeter.wsdl` is copied into the jar like any other resource, so a
+`resources/wsdl/greeter.wsdl` is copied into the jar like any other resource, so a
 class-path lookup finds it:
 
     GREETERSERVICE_WSDL_LOCATION = GreeterService.class.getResource("/wsdl/greeter.wsdl");
@@ -111,9 +116,10 @@ Layout
     |-- pom.xml                  parent, two modules
     |-- soap
     |   |-- build.jenesis/wsimport.properties
-    |   |-- pom.xml              jakarta.xml.ws-api
+    |   |-- pom.xml              jakarta.xml.ws-api, resources as a resource directory
+    |   |-- resources
+    |   |   `-- wsdl/greeter.wsdl                      named, so the client can read it
     |   `-- sources
-    |       |-- wsdl/greeter.wsdl                      named, so the client can read it
     |       `-- demo/contract/soap/Greeters.java
     `-- rest
         |-- build.jenesis/openapi.properties

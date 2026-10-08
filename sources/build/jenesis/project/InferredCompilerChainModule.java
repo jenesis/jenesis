@@ -30,6 +30,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
     private final PathPlacement pathPlacement;
+    private final boolean includeResources;
     private final Javac javacStep;
     private final KotlinCompilerModule kotlincModule;
     private final ScalaCompilerModule scalacModule;
@@ -49,6 +50,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 resolvers,
                 null,
                 PathPlacement.INFERRED,
+                true,
                 new Javac(ProcessHandler.Factory.of()),
                 new KotlinCompilerModule(repositories, resolvers),
                 new ScalaCompilerModule(repositories, resolvers),
@@ -70,6 +72,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 resolvers,
                 null,
                 PathPlacement.INFERRED,
+                true,
                 Javac.ofEnvironment(environment, ProcessHandler.Factory.of()),
                 KotlinCompilerModule.ofEnvironment(environment, repositories, resolvers),
                 ScalaCompilerModule.ofEnvironment(environment, repositories, resolvers),
@@ -89,6 +92,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                                         Map<String, Resolver> resolvers,
                                         Pinning pinning,
                                         PathPlacement pathPlacement,
+                                        boolean includeResources,
                                         Javac javacStep,
                                         KotlinCompilerModule kotlincModule,
                                         ScalaCompilerModule scalacModule,
@@ -104,6 +108,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
         this.resolvers = resolvers;
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
+        this.includeResources = includeResources;
         this.javacStep = javacStep;
         this.kotlincModule = kotlincModule;
         this.scalacModule = scalacModule;
@@ -122,6 +127,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 resolvers,
                 pinning,
                 pathPlacement,
+                includeResources,
                 javacStep,
                 kotlincModule,
                 scalacModule,
@@ -140,6 +146,26 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 resolvers,
                 pinning,
                 pathPlacement,
+                includeResources,
+                javacStep,
+                kotlincModule,
+                scalacModule,
+                groovycModule,
+                javac,
+                kotlinc,
+                scalac,
+                groovyc,
+                errorprone,
+                custom);
+    }
+
+    public InferredCompilerChainModule includeResources(boolean includeResources) {
+        return new InferredCompilerChainModule(configuration,
+                repositories,
+                resolvers,
+                pinning,
+                pathPlacement,
+                includeResources,
                 javacStep,
                 kotlincModule,
                 scalacModule,
@@ -158,6 +184,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 resolvers,
                 pinning,
                 pathPlacement,
+                includeResources,
                 javacStep,
                 kotlincModule,
                 scalacModule,
@@ -176,6 +203,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 resolvers,
                 pinning,
                 pathPlacement,
+                includeResources,
                 javacStep,
                 kotlincModule,
                 scalacModule,
@@ -194,6 +222,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 resolvers,
                 pinning,
                 pathPlacement,
+                includeResources,
                 javacStep,
                 kotlincModule,
                 scalacModule,
@@ -212,6 +241,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 resolvers,
                 pinning,
                 pathPlacement,
+                includeResources,
                 javacStep,
                 kotlincModule,
                 scalacModule,
@@ -230,6 +260,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 resolvers,
                 pinning,
                 pathPlacement,
+                includeResources,
                 javacStep,
                 kotlincModule,
                 scalacModule,
@@ -248,6 +279,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 resolvers,
                 pinning,
                 pathPlacement,
+                includeResources,
                 javacStep,
                 kotlincModule,
                 scalacModule,
@@ -285,6 +317,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                         resolvers,
                         pinning,
                         pathPlacement,
+                        includeResources,
                         javacStep,
                         kotlincModule,
                         scalacModule,
@@ -362,6 +395,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                            Map<String, Resolver> resolvers,
                            Pinning pinning,
                            PathPlacement pathPlacement,
+                           boolean includeResources,
                            Javac javacStep,
                            KotlinCompilerModule kotlincModule,
                            ScalaCompilerModule scalacModule,
@@ -391,7 +425,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
             SequencedSet<String> dependencies = new LinkedHashSet<>(sourceInputs);
             if (hasKotlin) {
                 BuildExecutorModule compiler = kotlinc.apply(kotlincModule.pinning(pinning)
-                        .includeResources(!hasJava && !hasScala && !hasGroovy));
+                        .includeResources(includeResources && !hasJava && !hasScala && !hasGroovy));
                 if (compiler != null) {
                     buildExecutor.addModule(KOTLINC, compiler, dependencies);
                     SequencedSet<String> updated = new LinkedHashSet<>(dependencies);
@@ -401,7 +435,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
             }
             if (hasScala) {
                 BuildExecutorModule compiler = scalac.apply(scalacModule.pinning(pinning)
-                        .includeResources(!hasJava && !hasKotlin && !hasGroovy));
+                        .includeResources(includeResources && !hasJava && !hasKotlin && !hasGroovy));
                 if (compiler != null) {
                     buildExecutor.addModule(SCALAC, compiler, dependencies);
                     SequencedSet<String> updated = new LinkedHashSet<>(dependencies);
@@ -414,7 +448,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 BuildStep compiler = javac.apply((plugin == null
                         ? javacStep
                         : javacStep.factory(ProcessHandler.Factory.FORK))
-                        .includeResources(!hasKotlin && !hasScala && !hasGroovy)
+                        .includeResources(includeResources && !hasKotlin && !hasScala && !hasGroovy)
                         .pathPlacement(pathPlacement));
                 if (compiler != null) {
                     SequencedSet<String> javacInputs = new LinkedHashSet<>(dependencies);
@@ -430,13 +464,13 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
             }
             if (hasGroovy) {
                 BuildExecutorModule compiler = groovyc.apply(groovycModule.pinning(pinning)
-                        .includeResources(!hasJava && !hasKotlin && !hasScala));
+                        .includeResources(includeResources && !hasJava && !hasKotlin && !hasScala));
                 if (compiler != null) {
                     buildExecutor.addModule(GROOVYC, compiler, dependencies);
                 }
             }
             int compilers = (hasJava ? 1 : 0) + (hasKotlin ? 1 : 0) + (hasScala ? 1 : 0) + (hasGroovy ? 1 : 0);
-            if (hasResource && compilers != 1) {
+            if (includeResources && hasResource && compilers != 1) {
                 buildExecutor.addStep(RESOURCE, new Resources(), sourceInputs);
             }
         }

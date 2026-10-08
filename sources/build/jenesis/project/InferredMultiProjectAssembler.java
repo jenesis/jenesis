@@ -330,12 +330,12 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         repositories,
                         resolvers).custom(hooks.get("binary/generated")));
             }
-            if (hooks.containsKey("binary/compiled")) {
-                toolchainModule = toolchainModule.compilerModule(InferredCompilerChainModule.ofEnvironment(environment,
-                        descriptor.configuration(),
-                        repositories,
-                        resolvers).custom(hooks.get("binary/compiled")));
-            }
+            toolchainModule = toolchainModule.compilerModule(InferredCompilerChainModule.ofEnvironment(environment,
+                            descriptor.configuration(),
+                            repositories,
+                            resolvers)
+                    .includeResources(descriptor.sourceResources())
+                    .custom(hooks.getOrDefault("binary/compiled", none)));
             if (hooks.containsKey("binary/validate")) {
                 toolchainModule = toolchainModule.validatorModule(InferredByteCodeQualityModule.ofEnvironment(environment,
                         descriptor.configuration(),
