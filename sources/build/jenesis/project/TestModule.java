@@ -75,7 +75,7 @@ public class TestModule implements BuildExecutorModule {
                 null,
                 resolvers,
                 Dependencies.ofEnvironment(environment, repositories, resolvers),
-                true,
+                environment.flag("test.jars", true),
                 true,
                 null,
                 PathPlacement.CLASS_PATH,
@@ -553,6 +553,11 @@ public class TestModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        if (!jarsOnly && pathPlacement.modular() && moduleName != null) {
+            throw new IllegalArgumentException("The tests of module " + moduleName + " run on the module path, where"
+                    + " a folder of resources is no part of the module: run them against its jar, as"
+                    + " jenesis.test.jars=true does");
+        }
         TestFramework resolved = framework;
         if (resolved == null) {
             resolved = TestFramework.detect(() -> inherited.values().stream().iterator()).orElse(null);
