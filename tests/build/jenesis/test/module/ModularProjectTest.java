@@ -207,6 +207,34 @@ public class ModularProjectTest {
     }
 
     @Test
+    public void an_unversioned_plugin_takes_its_newest_release_until_it_is_pinned() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.plugin javac maven/com.google.errorprone/error_prone_core
+                 * @jenesis.plugin processor
+                 */
+                module foo {
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("module/module-/manifests").resolve(BuildStep.REQUIRES)))
+                .as("a Maven coordinate without a version floats as a tool the build resolves itself does,"
+                        + " and a module is resolved by its name as ever")
+                .containsOnlyKeys("javac/plugin/maven/com.google.errorprone/error_prone_core/RELEASE",
+                        "plugin/plugin/module/processor");
+    }
+
+    @Test
     public void grants_native_access_to_what_it_names_and_records_every_name_in_its_manifest()
             throws IOException {
         Files.writeString(project.resolve("module-info.java"), """

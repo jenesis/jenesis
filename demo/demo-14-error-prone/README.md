@@ -41,8 +41,9 @@ itself:
 
 It is the same tag that names an annotation processor, with the compiler named
 first, and there is no second way to name it: an Error Prone plugin such as
-NullAway is another `@jenesis.plugin javac` line. The `pin` goal pins the
-closure under the compiler's own group:
+NullAway is another `@jenesis.plugin javac` line. Until it is pinned, a
+coordinate declared without a version takes the newest release, and the `pin`
+goal pins the closure under the compiler's own group:
 
     @jenesis.pin javac/maven/com.google.errorprone/error_prone_core 2.50.0 SHA-256/40a88d3...
 
