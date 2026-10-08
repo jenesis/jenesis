@@ -194,6 +194,55 @@ public class ProjectTest {
     }
 
     @Test
+    public void every_page_and_demo_a_skill_page_names_exists() throws IOException {
+        List<String> printed = new ArrayList<>();
+        Project.ofEnvironment(new Environment(settings).out(printed::add), root)
+                .target(root.resolve("target"))
+                .build(Project.SKILL);
+        String pages = String.join("\n", printed);
+        SequencedSet<String> named = Pattern.compile("skill/([a-z]+)").matcher(pages).results()
+                .map(match -> match.group(1))
+                .collect(Collectors.toCollection(TreeSet::new));
+        assertThat(named).contains("start", "migrate", "demos");
+        for (String page : named) {
+            List<String> single = new ArrayList<>();
+            Project.ofEnvironment(new Environment(settings).out(single::add), root)
+                    .target(root.resolve("target"))
+                    .build(Project.SKILL + "/" + page);
+            assertThat(single)
+                    .as("skill/%s names a page that is printed on its own", page)
+                    .anyMatch(text -> text.startsWith("# Jenesis "));
+        }
+        Path demo = Path.of("demo");
+        assertThat(demo).as("the tests run from the root of the repository, beside its demos").isDirectory();
+        SequencedSet<String> folders;
+        try (Stream<Path> listed = Files.list(demo)) {
+            folders = listed.map(folder -> folder.getFileName().toString())
+                    .filter(folder -> folder.matches("demo-\\d{2}-.+"))
+                    .collect(Collectors.toCollection(TreeSet::new));
+        }
+        Set<String> numbers = folders.stream().map(folder -> folder.substring(5, 7)).collect(Collectors.toSet());
+        Pattern.compile("\\((\\d{2}(?:, \\d{2})*)\\)").matcher(pages).results()
+                .flatMap(match -> Stream.of(match.group(1).split(", ")))
+                .forEach(number -> assertThat(numbers).as("demo %s, named in parentheses", number).contains(number));
+        Pattern.compile("demo-(\\d{2})((?:-[a-z0-9]+)*)").matcher(pages).results()
+                .forEach(match -> assertThat(folders)
+                        .as("%s, named by its folder", match.group())
+                        .anyMatch(folder -> folder.equals(match.group()) || folder.startsWith(match.group() + "-")));
+        String recipes = printed.stream().filter(page -> page.startsWith("# Jenesis - Copy a demo")).findFirst().orElseThrow();
+        Matcher count = Pattern.compile("(\\d+) demos under `demo/`").matcher(recipes);
+        assertThat(count.find()).isTrue();
+        assertThat(Integer.parseInt(count.group(1))).as("the demos the page counts").isEqualTo(folders.size());
+        String listing = recipes.substring(count.end());
+        Pattern.compile("\\b(\\d{2})\\b").matcher(listing).results()
+                .forEach(match -> assertThat(numbers).as("demo %s of skill/demos", match.group(1)).contains(match.group(1)));
+        Pattern.compile("(?<!, )\\b(\\d{2}) ([a-z][a-z0-9-]*[a-z0-9])\\b(?![*-])").matcher(listing).results()
+                .forEach(match -> assertThat(folders)
+                        .as("demo %s of skill/demos is named for its folder", match.group(1))
+                        .contains("demo-" + match.group(1) + "-" + match.group(2)));
+    }
+
+    @Test
     public void runs_transform_and_inspect_without_a_plugin_in_each_concrete_layout() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
         Files.writeString(root.resolve("pom.xml"), """
