@@ -431,6 +431,42 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void hands_a_compiler_plugin_to_the_compilation_of_an_overlay(boolean process) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/17"))
+                .resolve("module-info.java"), "module sample { exports sample; }\n");
+        Javac.writeRelease(sources, "11", Runtime.version().feature());
+        Path record = root.resolve("plugin.log");
+        SequencedProperties javac = SequencedProperties.ofFiles(sources.resolve("process/javac.properties"));
+        javac.setProperty("-Xplugin:Marker " + record, "");
+        javac.store(sources.resolve("process/javac.properties"));
+        Path pluginRoot = Files.createDirectories(root.resolve("plugin").resolve("resolved"));
+        Files.copy(buildCompilerPluginJar(Files.createDirectories(root.resolve("marker"))), pluginRoot.resolve("marker.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("javac/plugin/maven/marker", "resolved/marker.jar");
+        index.store(root.resolve("plugin").resolve(BuildStep.DEPENDENCIES));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/META-INF/versions/17/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("plugins/artifacts", new BuildStepArgument(root.resolve("plugin"), Map.of(
+                Path.of("resolved/marker.jar"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .pathPlacement(PathPlacement.CLASS_PATH)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "META-INF/versions/17/module-info.class")).isNotEmptyFile();
+        assertThat(Files.readAllLines(record))
+                .as("the plugin the options name is found for the overlay's compilation as for the main one")
+                .hasSize(2);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void versioned_compilation_mixes_overlay_and_additional_files(boolean process) throws IOException {
         Path main = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(main.resolve("Sample.java"), """
@@ -939,6 +975,36 @@ public class JavacTest {
                 output.closeEntry();
             }
         }
+    }
+
+    private Path buildCompilerPluginJar(Path dir) throws IOException {
+        Path classes = Files.createDirectories(dir.resolve("plugin-classes"));
+        Path source = dir.resolve("Marker.java");
+        Files.writeString(source, """
+                package marker;
+                import com.sun.source.util.JavacTask;
+                import com.sun.source.util.Plugin;
+                import java.nio.file.Files;
+                import java.nio.file.Path;
+                import java.nio.file.StandardOpenOption;
+                public class Marker implements Plugin {
+                    public String getName() { return "Marker"; }
+                    public void init(JavacTask task, String... args) {
+                        try {
+                            Files.writeString(Path.of(args[0]), "ran\\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+                """);
+        assertThat(ToolProvider.findFirst("javac").orElseThrow()
+                .run(System.out, System.err, "-d", classes.toString(), source.toString())).isZero();
+        Files.writeString(Files.createDirectories(classes.resolve("META-INF/services")).resolve("com.sun.source.util.Plugin"),
+                "marker.Marker\n");
+        Path jar = dir.resolve("marker.jar");
+        jarOf(jar, classes);
+        return jar;
     }
 
     private Path buildProcessorJar(Path dir, String pkg, String suffix, String moduleName) throws IOException {

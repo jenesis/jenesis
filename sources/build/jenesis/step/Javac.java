@@ -293,25 +293,29 @@ public class Javac extends ProcessBuildStep {
                         .append(String.join(File.pathSeparator, siblingClasses).replace("\\", "\\\\").replace("\"", "\\\""))
                         .append("\"\n");
             }
-            if (!processorPath.isEmpty()) {
-                boolean processorModules = pathPlacement.modular() && !compilerPlugins;
-                if (processorModules) {
-                    try {
-                        ModuleFinder.of(processorPath.stream().map(Path::of).toArray(Path[]::new)).findAll();
-                    } catch (FindException _) {
-                        processorModules = false;
-                    }
-                }
-                args.append(processorModules ? "--processor-module-path\n\"" : "--processor-path\n\"")
-                        .append(String.join(File.pathSeparator, processorPath).replace("\\", "\\\\").replace("\"", "\\\""))
-                        .append("\"\n");
-            }
+            args.append(processorPath(processorPath, pathPlacement.modular() && !compilerPlugins));
             Path file = context.supplement().resolve("javac.args");
             Files.writeString(file, args.toString());
             commands.add("@" + file);
         }
         commands.addAll(files);
         return CompletableFuture.completedStage(commands);
+    }
+
+    private static String processorPath(List<String> processorPath, boolean processorModules) {
+        if (processorPath.isEmpty()) {
+            return "";
+        }
+        if (processorModules) {
+            try {
+                ModuleFinder.of(processorPath.stream().map(Path::of).toArray(Path[]::new)).findAll();
+            } catch (FindException _) {
+                processorModules = false;
+            }
+        }
+        return (processorModules ? "--processor-module-path\n\"" : "--processor-path\n\"")
+                + String.join(File.pathSeparator, processorPath).replace("\\", "\\\\").replace("\"", "\\\"")
+                + "\"\n";
     }
 
     private CompletionStage<Void> compileVersioned(Executor executor,
@@ -321,7 +325,8 @@ public class Javac extends ProcessBuildStep {
         SequencedMap<Integer, List<String>> versionedFiles = new TreeMap<>();
         SequencedMap<Integer, List<String>> versionedRoots = new TreeMap<>();
         SequencedMap<Integer, String> versionedModules = new TreeMap<>();
-        List<String> dependencyPath = new ArrayList<>();
+        List<String> dependencyPath = new ArrayList<>(), processorPath = new ArrayList<>();
+        boolean compilerPlugins = false;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -332,6 +337,13 @@ public class Javac extends ProcessBuildStep {
             }
             for (Path jar : Dependencies.select(argument.folder(), group, "compile")) {
                 dependencyPath.add(jar.toString());
+            }
+            for (Path jar : Dependencies.select(argument.folder(), "plugin", "plugin")) {
+                processorPath.add(jar.toString());
+            }
+            for (Path jar : Dependencies.select(argument.folder(), "javac", "plugin")) {
+                processorPath.add(jar.toString());
+                compilerPlugins = true;
             }
             Path sources = argument.folder().resolve(Bind.SOURCES);
             if (Files.exists(sources)) {
@@ -379,6 +391,7 @@ public class Javac extends ProcessBuildStep {
         } else {
             moduleName = null;
         }
+        boolean plugins = compilerPlugins;
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
         for (Map.Entry<Integer, List<String>> entry : versionedFiles.entrySet()) {
             int release = entry.getKey();
@@ -390,6 +403,8 @@ public class Javac extends ProcessBuildStep {
                             context,
                             prepended,
                             dependencyPath,
+                            processorPath,
+                            plugins,
                             moduleName,
                             versionedModules.get(release),
                             mainTarget,
@@ -440,6 +455,8 @@ public class Javac extends ProcessBuildStep {
                                                BuildStepContext context,
                                                List<String> prepended,
                                                List<String> dependencyPath,
+                                               List<String> processorPath,
+                                               boolean compilerPlugins,
                                                String moduleName,
                                                String versionedModule,
                                                Path mainTarget,
@@ -475,7 +492,7 @@ public class Javac extends ProcessBuildStep {
             }
             classPath.addAll(dependencyPath);
         }
-        for (List<String> entries : List.of(classPath, modulePath, patchModule)) {
+        for (List<String> entries : List.of(classPath, modulePath, patchModule, processorPath)) {
             for (String entry : entries) {
                 if (entry.indexOf(File.pathSeparatorChar) != -1) {
                     throw new IllegalArgumentException(
@@ -506,6 +523,8 @@ public class Javac extends ProcessBuildStep {
                     .append(escaped)
                     .append("\"\n");
         }
+        args.append(processorPath(processorPath,
+                this.pathPlacement.forModuleInfo(patched != null).modular() && !compilerPlugins));
         if (!args.isEmpty()) {
             Path argFile = context.supplement().resolve("javac-" + release + ".args");
             Files.writeString(argFile, args.toString());
