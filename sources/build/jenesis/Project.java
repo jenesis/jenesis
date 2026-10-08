@@ -1101,7 +1101,8 @@ public record Project(
                       maven-jarsigner-plugin / jar signing -> jenesis.jarsigner.* (64)
                       maven-install-plugin / publishToMavenLocal -> `export` (65)
                       deploy, central-publishing, maven-gpg-plugin / maven-publish, signing
-                          -> `release` with a jreleaser.yml (66)
+                          -> `release` with a jreleaser.yml, handed JRELEASER_PROJECT_VERSION: the
+                          version setting, or the version every staged POM carries (66)
                       maven-toolchains-plugin / java toolchains -> jenesis.toolchain.version (07)
                       <profiles> / properties and conventions -> jenesis-<profile>.properties (48)
                       a Gradle build cache -> jenesis.cache.uri (49)

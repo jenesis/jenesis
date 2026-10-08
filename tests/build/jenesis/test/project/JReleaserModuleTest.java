@@ -89,6 +89,44 @@ public class JReleaserModuleTest {
     }
 
     @Test
+    public void emits_the_version_of_the_staged_poms_when_no_setting_names_one() throws IOException {
+        Files.writeString(root.resolve("jreleaser.yml"), "");
+        for (String artifact : List.of("library", "library-assert")) {
+            Files.writeString(Files.createDirectories(source.resolve("com/acme").resolve(artifact).resolve("3.0.0"))
+                    .resolve(artifact + "-3.0.0.pom"), "<project/>");
+        }
+        Path emitted = release("release/jreleaser/environment", null).get("release/jreleaser/environment");
+        assertThat(SequencedProperties.ofFiles(emitted.resolve(JReleaserModule.VARIABLES))
+                .getProperty("JRELEASER_PROJECT_VERSION"))
+                .as("a pom.xml build stamps the version its POMs declare, which is the version JReleaser releases")
+                .isEqualTo("3.0.0");
+    }
+
+    @Test
+    public void emits_no_version_when_the_staged_poms_disagree() throws IOException {
+        Files.writeString(root.resolve("jreleaser.yml"), "");
+        Files.writeString(Files.createDirectories(source.resolve("com/acme/library/3.0.0"))
+                .resolve("library-3.0.0.pom"), "<project/>");
+        Files.writeString(Files.createDirectories(source.resolve("com/acme/other/1.0.0"))
+                .resolve("other-1.0.0.pom"), "<project/>");
+        Path emitted = release("release/jreleaser/environment", null).get("release/jreleaser/environment");
+        assertThat(SequencedProperties.ofFiles(emitted.resolve(JReleaserModule.VARIABLES)).stringPropertyNames())
+                .as("no single version was stamped, so the release configuration has to name one")
+                .isEmpty();
+    }
+
+    @Test
+    public void prefers_the_version_setting_over_the_staged_poms() throws IOException {
+        Files.writeString(root.resolve("jreleaser.yml"), "");
+        Files.writeString(Files.createDirectories(source.resolve("com/acme/library/3.0.0"))
+                .resolve("library-3.0.0.pom"), "<project/>");
+        Path emitted = release("release/jreleaser/environment").get("release/jreleaser/environment");
+        assertThat(SequencedProperties.ofFiles(emitted.resolve(JReleaserModule.VARIABLES))
+                .getProperty("JRELEASER_PROJECT_VERSION"))
+                .isEqualTo("1.2.3");
+    }
+
+    @Test
     public void reports_a_missing_executable_by_name() throws IOException {
         Files.writeString(root.resolve("jreleaser.yml"), "");
         settings.put("jreleaser.executable", "jreleaser-is-not-installed");
