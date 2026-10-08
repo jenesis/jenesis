@@ -1016,6 +1016,7 @@ public class TestModule implements BuildExecutorModule {
                                         (left ? excludedClasses : matchedClasses).add(className);
                                     }
                                 } else {
+                                    SequencedSet<String> methods = new TreeSet<>();
                                     for (TestSpec spec : specs) {
                                         if (spec.classPattern.matcher(className).matches()) {
                                             if (left) {
@@ -1023,12 +1024,12 @@ public class TestModule implements BuildExecutorModule {
                                             } else if (spec.method == null) {
                                                 matchedClasses.add(className);
                                             } else {
-                                                matchedMethods
-                                                        .computeIfAbsent(className, _ -> new TreeSet<>())
-                                                        .add(spec.method);
+                                                methods.add(spec.method);
                                             }
-                                            break;
                                         }
+                                    }
+                                    if (!methods.isEmpty() && !matchedClasses.contains(className)) {
+                                        matchedMethods.put(className, methods);
                                     }
                                 }
                             }
