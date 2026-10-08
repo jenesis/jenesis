@@ -21,7 +21,8 @@ public class MavenPomResolver implements MavenResolver {
     private static final Set<String> JDK_ACTIVATIONS = Set.of("jdk", "activeByDefault");
     private static final Pattern PROPERTY = Pattern.compile("(\\$\\{([^}]+)})");
     private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
-    private static final Pattern JDK_BOUND = Pattern.compile("([0-9]{1,8}(\\.[0-9]{1,8})*)?");
+    private static final Pattern JDK_RANGE = Pattern.compile(
+            "\\s*([\\[(])\\s*([0-9]{1,8}(?:\\.[0-9]{1,8})*)?\\s*(,)?\\s*([0-9]{1,8}(?:\\.[0-9]{1,8})*)?\\s*([\\])])\\s*(,|$)");
     public static final String CHECKSUM_PREFIX = "Checksum/";
 
     private final Supplier<MavenVersionNegotiator> negotiatorSupplier;
@@ -1221,18 +1222,27 @@ public class MavenPomResolver implements MavenResolver {
         if (!required.startsWith("[") && !required.startsWith("(")) {
             return jdk.startsWith(required) != negated;
         }
-        String[] bounds = required.split(",", -1);
-        String lower = bounds[0].trim(), upper = bounds.length == 1 ? "" : bounds[bounds.length - 1].trim();
-        String minimum = lower.replaceAll("[\\[\\]()]", "").trim(), maximum = upper.replaceAll("[\\[\\]()]", "").trim();
-        if (bounds.length > 2 || !JDK_BOUND.matcher(minimum).matches() || !JDK_BOUND.matcher(maximum).matches()) {
+        Matcher matcher = JDK_RANGE.matcher(required);
+        boolean matched = false;
+        int end = 0;
+        while (end < required.length() && matcher.find(end) && matcher.start() == end) {
+            String minimum = matcher.group(2), maximum = matcher.group(3) == null ? minimum : matcher.group(4);
+            if (minimum == null && maximum == null && matcher.group(3) == null) {
+                break;
+            }
+            int fromMinimum = minimum == null ? 1 : compareJdk(minimum),
+                    fromMaximum = maximum == null ? -1 : compareJdk(maximum);
+            matched |= (fromMinimum > 0 || fromMinimum == 0 && matcher.group(1).equals("["))
+                    && (fromMaximum < 0 || fromMaximum == 0 && matcher.group(5).equals("]"));
+            end = matcher.end();
+        }
+        if (end != required.length() || required.endsWith(",")) {
             throw new IllegalArgumentException("The profile activation <jdk>" + activation + "</jdk> of "
                     + (path == null ? "a POM" : path.resolve("pom.xml"))
-                    + " is neither a version prefix, such as 1.8, nor a range of versions, such as [9,) or [1.8,17)");
+                    + " is neither a version prefix, such as 1.8, nor ranges of versions, such as [9,), [1.8,17)"
+                    + " or [11,12),[16,)");
         }
-        int fromMinimum = minimum.isEmpty() ? 1 : compareJdk(minimum),
-                fromMaximum = maximum.isEmpty() ? -1 : compareJdk(maximum);
-        return ((fromMinimum > 0 || fromMinimum == 0 && lower.startsWith("["))
-                && (fromMaximum < 0 || fromMaximum == 0 && upper.endsWith("]"))) != negated;
+        return matched != negated;
     }
 
     private int compareJdk(String bound) {

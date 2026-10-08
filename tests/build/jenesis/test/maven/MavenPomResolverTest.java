@@ -4439,7 +4439,12 @@ public class MavenPomResolverTest {
                 List.of("(,11)", "1.8.0_402", "true"),
                 List.of("(,11)", "11.0.2", "false"),
                 List.of("(17,)", "17", "false"),
-                List.of("!(,11)", "25.0.4.1", "true"));
+                List.of("!(,11)", "25.0.4.1", "true"),
+                List.of("[11,12),[16,)", "25.0.4.1", "true"),
+                List.of("[11,12),[16,)", "11.0.2", "true"),
+                List.of("[11,12),[16,)", "14.0.1", "false"),
+                List.of("[17]", "17", "true"),
+                List.of("[17]", "21", "false"));
         for (List<String> entry : cases) {
             Files.writeString(project.resolve("pom.xml"), """
                     <?xml version="1.0" encoding="UTF-8"?>
@@ -4609,7 +4614,7 @@ public class MavenPomResolverTest {
         assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("<jdk>[nine,)</jdk>")
-                .hasMessageContaining("such as [9,) or [1.8,17)");
+                .hasMessageContaining("such as [9,), [1.8,17) or [11,12),[16,)");
     }
 
     @Test
