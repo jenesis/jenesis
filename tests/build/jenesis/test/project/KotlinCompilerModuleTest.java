@@ -190,6 +190,41 @@ public class KotlinCompilerModuleTest {
     }
 
     @Test
+    public void release_8_reaches_kotlin_as_the_jvm_target_1_8_it_names_java_8_by() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
+        properties.store(project.resolve(BuildStep.VERSIONS));
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Sample.kt"), """
+                package sample
+                class Sample
+                """);
+        SequencedProperties javacProperties = new SequencedProperties();
+        javacProperties.setProperty("--release", "8");
+        javacProperties.store(Files.createDirectories(project.resolve("process")).resolve("javac.properties"));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "kotlin",
+                new KotlinCompilerModule(
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
+                "project");
+        executor.execute();
+
+        byte[] bytes = Files.readAllBytes(root
+                .resolve("kotlin")
+                .resolve(KotlinCompilerModule.CLASSES)
+                .resolve("output")
+                .resolve(BuildStep.CLASSES)
+                .resolve("sample/Sample.class"));
+        assertThat(((bytes[6] & 0xFF) << 8) | (bytes[7] & 0xFF))
+                .as("kotlinc refuses the target 8 and takes Java 8 as 1.8, which emits major version 52")
+                .isEqualTo(52);
+    }
+
+    @Test
     public void kotlin_can_reference_java_sources_supplied_to_the_same_step() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);

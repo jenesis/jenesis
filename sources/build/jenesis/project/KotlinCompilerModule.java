@@ -301,7 +301,7 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                     "-classpath", String.join(File.pathSeparator, userClasspath)));
             if (release != null) {
                 commands.add("-jvm-target");
-                commands.add(release);
+                commands.add(Integer.parseInt(release) < 9 ? "1." + release : release);
             }
             for (String plugin : plugins) {
                 commands.add("-Xplugin=" + plugin);
