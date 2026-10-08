@@ -841,7 +841,9 @@ public record Project(
                                  and maven.compiler.enablePreview; name, description, url, licenses,
                                  developers, organization and scm of the module's own POM;
                                  sourceDirectory, testSourceDirectory and the <directory> of each
-                                 resource
+                                 resource; the <!--jenesis.plugin--> and <!--jenesis.pin-->
+                                 comments of the module's POM and of a local parent, where the
+                                 module's own pin wins and `pin` writes into the module's POM
                       ignored    <build><plugins> and <pluginManagement>, <profiles>, <repositories>
                                  and settings.xml, a resource's includes, excludes, targetPath and
                                  filtering, maven.compiler.source and target, system scope, the
