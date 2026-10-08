@@ -102,6 +102,36 @@ public class JavadocTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void an_excluded_package_and_its_subpackages_are_not_documented(boolean process) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; /** Documented. */ public class Sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample/internal")).resolve("Hidden.java"),
+                "package sample.internal; /** Hidden. */ public class Hidden { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample/internal/deep")).resolve("Deeper.java"),
+                "package sample.internal.deep; /** Hidden. */ public class Deeper { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample/internals")).resolve("Kept.java"),
+                "package sample.internals; /** Kept. */ public class Kept { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javadoc.properties"),
+                "-exclude=sample.internal:sample.other\n");
+        BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE,
+                        process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javadoc.JAVADOC + "sample/Sample.html")).exists();
+        assertThat(next.resolve(Javadoc.JAVADOC + "sample/internals/Kept.html"))
+                .as("a package whose name only starts like an excluded one is documented")
+                .exists();
+        assertThat(next.resolve(Javadoc.JAVADOC + "sample/internal"))
+                .as("-exclude leaves out the package and its subpackages, as it does with -subpackages")
+                .doesNotExist();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void fails_where_javadoc_reports_an_error(boolean process) throws IOException {
         Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"),
                 "package sample; /** Tagged @unknown. */ public class Sample { /** @custom value */ public void run() { } }\n");

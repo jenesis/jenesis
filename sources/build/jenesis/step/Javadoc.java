@@ -98,6 +98,13 @@ public class Javadoc extends ProcessBuildStep {
                 .anyMatch(key -> key.startsWith("-Xdoclint")))) {
             commands.add("-Xdoclint:none");
         }
+        List<String> excluded = properties.values().stream()
+                .map(folder -> folder.get("-exclude"))
+                .filter(Objects::nonNull)
+                .flatMap(value -> Stream.of(value.split("[:\n]")))
+                .map(String::strip)
+                .filter(name -> !name.isEmpty())
+                .toList();
         String preview = null;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -130,9 +137,11 @@ public class Javadoc extends ProcessBuildStep {
                 Files.walkFileTree(sources, new SimpleFileVisitor<>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                        String name = file.toString();
+                        String name = file.toString(),
+                                owner = sources.relativize(file.getParent()).toString().replace(File.separatorChar, '.');
                         if (name.endsWith(".java")
-                                && !(classpath && name.endsWith(File.separator + "module-info.java"))) {
+                                && !(classpath && name.endsWith(File.separator + "module-info.java"))
+                                && excluded.stream().noneMatch(prefix -> owner.equals(prefix) || owner.startsWith(prefix + "."))) {
                             files.add(name);
                         }
                         return FileVisitResult.CONTINUE;
