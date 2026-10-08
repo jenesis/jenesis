@@ -900,6 +900,16 @@ public class ProjectTest {
     }
 
     @Test
+    public void refuses_a_project_version_that_is_no_module_version() {
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.version", "bd7698f")), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.project.version is bd7698f")
+                .hasMessageContaining("--module-version");
+        assertThat(Project.ofEnvironment(new Environment(Map.of("project.version", "1.2.0-3-gbd7698f")), root).version())
+                .isEqualTo("1.2.0-3-gbd7698f");
+    }
+
+    @Test
     public void reads_the_plugins_named_beside_jenesis_properties() throws IOException {
         Files.writeString(root.resolve("jenesis.plugins.properties"), """
                 lint+check=./lint@lint
