@@ -1329,7 +1329,9 @@ public record Project(
                           several artifacts declare: alias org.bouncycastle.pg to bcpg-jdk18on and
                           neither the -debug nor the -lts build can land instead. Aliasing a name the
                           target already declares is allowed and does exactly that, so an alias need
-                          not be dropped when its target grows a module name.
+                          not be dropped when its target grows a module name. The jar's manifest
+                          hands the alias to its consumers; one for a `requires static` target
+                          applies only to a consumer that resolves that target.
                       @jenesis.exclude <module> <groupId>/<artifactId>...
                           Drop transitive dependencies of <module>, each with the subtree it pulled
                           in, from the compile path, runtime path and generated pom alike. Repeated

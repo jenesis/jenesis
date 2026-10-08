@@ -483,7 +483,7 @@ public class Dependencies implements BuildExecutorModule {
             SequencedMap<String, Alias> aliasTargets = new LinkedHashMap<>();
             for (SequencedMap<String, SequencedMap<String, String>> byRepository : moduleAliases.values()) {
                 for (SequencedMap<String, String> byAlias : byRepository.values()) {
-                    byAlias.forEach((alias, token) -> merge(aliasTargets, alias, token, LOCAL));
+                    byAlias.forEach((alias, token) -> merge(aliasTargets, alias, token, LOCAL, false));
                 }
             }
             SequencedMap<String, Overridden> overrideTargets = new LinkedHashMap<>();
@@ -906,7 +906,7 @@ public class Dependencies implements BuildExecutorModule {
 
     private static final String LOCAL = "a local @jenesis.alias declaration";
 
-    private record Alias(String token, String origin) {
+    private record Alias(String token, String origin, boolean optional) {
     }
 
     private record Overridden(SequencedSet<String> carriers, String origin) {
@@ -942,9 +942,12 @@ public class Dependencies implements BuildExecutorModule {
     private static void merge(SequencedMap<String, Alias> declared,
                               String alias,
                               String token,
-                              String origin) {
-        Alias previous = declared.putIfAbsent(alias, new Alias(token, origin));
-        if (previous != null && !previous.token().equals(token)) {
+                              String origin,
+                              boolean optional) {
+        Alias previous = declared.putIfAbsent(alias, new Alias(token, origin, optional));
+        if (previous != null && previous.token().equals(token) && previous.optional() && !optional) {
+            declared.put(alias, new Alias(token, origin, false));
+        } else if (previous != null && !previous.token().equals(token)) {
             throw new IllegalArgumentException("Module alias "
                     + alias
                     + " is declared for "
@@ -978,14 +981,24 @@ public class Dependencies implements BuildExecutorModule {
                 continue;
             }
             String origin = entry.getValue().getFileName().toString();
+            ModuleDescriptor declaring = PathPlacement.moduleDescriptor(entry.getValue());
             for (Map.Entry<String, String> declaration : PathPlacement.aliases(entry.getValue()).entrySet()) {
-                merge(declared, declaration.getKey(), declaration.getValue(), origin);
+                merge(declared,
+                        declaration.getKey(),
+                        declaration.getValue(),
+                        origin,
+                        declaring != null && declaring.requires().stream().anyMatch(requires ->
+                                requires.name().equals(declaration.getKey())
+                                        && requires.modifiers().contains(ModuleDescriptor.Requires.Modifier.STATIC)));
             }
         }
         SequencedMap<String, String> aliased = new LinkedHashMap<>(), owners = new LinkedHashMap<>();
         for (Map.Entry<String, Alias> entry : declared.entrySet()) {
             String alias = entry.getKey(), token = entry.getValue().token();
             String coordinate = coordinates.get(token);
+            if (coordinate == null && entry.getValue().optional()) {
+                continue;
+            }
             if (coordinate == null) {
                 throw new IllegalArgumentException("Module alias "
                         + alias
