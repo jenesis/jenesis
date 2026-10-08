@@ -591,6 +591,9 @@ public class MavenProject implements BuildExecutorModule {
                         ids.add(id);
                         copyChildText(developer, "name", result, "developer." + id + ".name");
                         copyChildText(developer, "email", result, "developer." + id + ".email");
+                        if (!result.containsKey("developer." + id + ".name") && !result.containsKey("developer." + id + ".email")) {
+                            result.setProperty("developer." + id + ".id", id);
+                        }
                     }
                 }
                 case "organization" -> {
