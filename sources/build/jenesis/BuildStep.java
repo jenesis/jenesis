@@ -21,6 +21,7 @@ public interface BuildStep extends Serializable {
             MODULE = "module.properties",
             METADATA = "metadata.properties",
             EXCLUSIONS = "exclusions.properties",
+            OPTIONALS = "optionals.properties",
             OVERRIDES = "overrides.properties",
             ATTACHMENTS = "attachments.properties",
             NATIVES = "natives.properties",

@@ -1094,6 +1094,8 @@ public record Project(
                                             ending in /* for a whole groupId
                       exclusions.properties <group>/<scope>/<repository>/<coordinate> -> comma-separated
                                             <groupId>/<artifactId>
+                      optionals.properties  <group>/<scope>/<repository>/<coordinate> -> empty, for a
+                                            dependency the generated POM marks <optional>
                       inventory.properties  what staging reads: artifacts, sources, documentation,
                                             pom, runtime, prefixed
                       divergence.properties written by pin/divergence: <group>/<repository>/<coordinate>
