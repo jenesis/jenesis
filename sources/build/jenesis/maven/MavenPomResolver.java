@@ -664,9 +664,28 @@ public class MavenPomResolver implements MavenResolver {
                 release = (release == null ? Integer.toString(Runtime.version().feature()) : release) + "-preview";
                 testRelease = testRelease == null ? null : testRelease + "-preview";
             }
+            String version = property(pom.version(), pom.properties()),
+                    deploySkip = property(pom.properties().get("maven.deploy.skip"), pom.properties()),
+                    installSkip = property(pom.properties().get("maven.install.skip"), pom.properties());
+            boolean snapshot = version != null && version.endsWith("-SNAPSHOT");
+            boolean deploy = switch (deploySkip == null ? "" : deploySkip.trim().toLowerCase(Locale.ROOT)) {
+                case "", "false" -> true;
+                case "true" -> false;
+                case "releases" -> snapshot;
+                case "snapshots" -> !snapshot;
+                default -> throw new IllegalArgumentException("maven.deploy.skip is '" + deploySkip + "' in "
+                        + root.relativize(module).resolve("pom.xml") + ", where Maven's deploy plugin reads true, false, releases"
+                        + " or snapshots");
+            };
+            boolean install = switch (installSkip == null ? "" : installSkip.trim().toLowerCase(Locale.ROOT)) {
+                case "", "false" -> true;
+                case "true" -> false;
+                default -> throw new IllegalArgumentException("maven.install.skip is '" + installSkip + "' in "
+                        + root.relativize(module).resolve("pom.xml") + ", where Maven's install plugin reads true or false");
+            };
             results.put(root.relativize(module), new MavenLocalPom(property(pom.groupId(), pom.properties()),
                     property(pom.artifactId(), pom.properties()),
-                    property(pom.version(), pom.properties()),
+                    version,
                     property(pom.packaging(), pom.properties()),
                     release,
                     testRelease == null ? release : testRelease,
@@ -691,7 +710,9 @@ public class MavenPomResolver implements MavenResolver {
                     pom.metadata().entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
                             entry -> property(entry.getValue(), pom.properties()),
                             (left, _) -> left,
-                            LinkedHashMap::new))));
+                            LinkedHashMap::new)),
+                    deploy,
+                    install));
         }
         return results;
     }

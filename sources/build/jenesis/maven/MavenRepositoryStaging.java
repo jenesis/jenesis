@@ -54,7 +54,7 @@ public class MavenRepositoryStaging implements BuildStep {
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
             for (String prefix : Inventory.prefixes(inventory)) {
                 Path pom = resolve(argument.folder(), inventory.getProperty(prefix + ".pom"));
-                if (pom == null) {
+                if (pom == null || !inventory.flag(prefix + ".deploy", true)) {
                     continue;
                 }
                 Coordinates coordinates = parseCoordinates(pom);

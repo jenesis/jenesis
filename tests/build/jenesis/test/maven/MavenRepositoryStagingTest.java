@@ -46,6 +46,24 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
+    public void leaves_out_a_module_whose_pom_skips_deployment() throws IOException {
+        Path published = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(published, "classes.jar", "classes-bytes");
+        Path skipped = mainInventory("bar", "com.example", "bar", "1.2.3", "classes.jar");
+        writeArtifact(skipped, "classes.jar", "classes-bytes");
+        SequencedProperties inventory = SequencedProperties.ofFiles(skipped.resolve(Inventory.INVENTORY));
+        inventory.setProperty("module-bar.deploy", "false");
+        inventory.store(skipped.resolve(Inventory.INVENTORY));
+
+        run(true, published, skipped);
+
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).exists();
+        assertThat(next.resolve("com/example/bar"))
+                .as("a module built and tested only, as maven.deploy.skip declares, is never published")
+                .doesNotExist();
+    }
+
+    @Test
     public void resolves_inventory_paths_that_navigate_to_sibling_step_outputs() throws IOException {
         Path module = source.resolve("mod");
         Path inventoryDir = Files.createDirectories(module.resolve("inventory/output"));

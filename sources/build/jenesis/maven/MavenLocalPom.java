@@ -22,5 +22,7 @@ public record MavenLocalPom(String groupId,
                             SequencedMap<String, String> aliases,
                             SequencedMap<String, String> signatures,
                             String mainClass,
-                            SequencedMap<String, String> metadata) {
+                            SequencedMap<String, String> metadata,
+                            boolean deploy,
+                            boolean install) {
 }

@@ -515,6 +515,11 @@ public class MavenProject implements BuildExecutorModule {
                                 if (properties.flag("native")) {
                                     descriptor.setProperty("native", "true");
                                 }
+                                for (String published : List.of("deploy", "install")) {
+                                    if (!properties.flag(published, true)) {
+                                        descriptor.setProperty(published, "false");
+                                    }
+                                }
                                 descriptor.store(context.next().resolve(BuildStep.MODULE));
                                 SequencedProperties metadata = new SequencedProperties();
                                 metadata.setProperty("project", properties.getProperty("groupId"));
@@ -820,6 +825,12 @@ public class MavenProject implements BuildExecutorModule {
                 properties.setProperty("resources." + index, resources.get(index));
             }
             value.metadata().forEach((key, metadata) -> properties.setProperty(POM_METADATA + key, metadata));
+            if (!value.deploy()) {
+                properties.setProperty("deploy", "false");
+            }
+            if (!value.install()) {
+                properties.setProperty("install", "false");
+            }
             properties.store(maven.resolve((test ? "test-module-" : "module-")
                     + BuildExecutorModule.encodePath(relativePath) + ".properties"));
         }

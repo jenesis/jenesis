@@ -134,7 +134,7 @@ public class Inventory implements BuildStep {
         String module = null;
         String tests = null;
         String release = null;
-        boolean abstractTest = false;
+        boolean abstractTest = false, deploy = true, install = true;
         String version = null;
         String artifact = null;
         Path pomFile = null;
@@ -185,6 +185,8 @@ public class Inventory implements BuildStep {
                     tests = properties.getProperty("test");
                 }
                 abstractTest |= properties.flag("abstract");
+                deploy &= properties.flag("deploy", true);
+                install &= properties.flag("install", true);
                 self |= properties.flag("native");
                 modular |= properties.flag("modular");
             }
@@ -500,6 +502,12 @@ public class Inventory implements BuildStep {
         }
         if (abstractTest) {
             inventory.setProperty(prefix + "abstract", "true");
+        }
+        if (!deploy) {
+            inventory.setProperty(prefix + "deploy", "false");
+        }
+        if (!install) {
+            inventory.setProperty(prefix + "install", "false");
         }
         if (mainClass != null) {
             inventory.setProperty(prefix + "mainClass", mainClass);
