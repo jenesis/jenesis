@@ -1187,7 +1187,9 @@ public record Project(
                     and wiping only forces repeated work. A folder ending in `~` is a running step's
                     staging area, renamed into place on success. When the step fails, it stays with
                     what the step wrote and a .jenesis.failed marker beside its output/ and
-                    supplement/, until the step runs again. One build at a time per target: the root
+                    supplement/, until the step runs again. A tool that fails prints the last 200
+                    lines of its output and of its error, naming the file under supplement/ that
+                    holds the rest. One build at a time per target: the root
                     holds an exclusive .jenesis.lock and a second process fails fast.
 
                     Read the outcome of the latest build from %{target}/.jenesis.events.jsonl rather

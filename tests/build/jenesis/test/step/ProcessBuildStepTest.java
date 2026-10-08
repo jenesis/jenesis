@@ -107,6 +107,41 @@ public class ProcessBuildStepTest {
     }
 
     @Test
+    public void a_failure_prints_the_tail_of_a_long_output_and_names_the_file_that_keeps_all_of_it() throws IOException {
+        Path source = root.resolve("Verbose.java");
+        Files.writeString(source, """
+                public class Verbose {
+                    public static void main(String[] args) {
+                        for (int line = 1; line <= 5000; line++) {
+                            System.out.println("printed line " + line);
+                        }
+                        System.err.println("the reason it failed");
+                        System.exit(1);
+                    }
+                }
+                """);
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        assertThatThrownBy(() -> new Program("java",
+                ProcessHandler.OfProcess.ofJavaHome("bin/java"),
+                List.of(),
+                List.of(source.toString()))
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .as("a failing step prints a bounded tail of what it wrote, and where the rest of it is")
+                .hasMessageContaining("printed line 5000\n")
+                .hasMessageContaining("printed line 4801\n")
+                .hasMessageNotContaining("printed line 4800\n")
+                .hasMessageContaining(supplement.resolve("output").toString())
+                .hasMessageContaining("the reason it failed")
+                .hasMessageNotContaining(supplement.resolve("error").toString());
+        assertThat(Files.readAllLines(supplement.resolve("output")))
+                .as("the supplement keeps the whole output")
+                .hasSize(5000);
+    }
+
+    @Test
     public void a_jdk_tool_refuses_an_environment_even_when_forked() throws IOException {
         Path folder = Files.createDirectories(root.resolve("argument/environment")).getParent();
         Files.writeString(folder.resolve("environment/javac.properties"), "SAMPLE=value\n");

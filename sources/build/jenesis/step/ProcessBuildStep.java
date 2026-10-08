@@ -19,6 +19,7 @@ public abstract class ProcessBuildStep implements BuildStep {
     private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
     private static final Set<String> ARGUMENT_FILES = Set.of("jar", "javac", "javadoc", "jdeps", "jlink", "jmod", "jpackage");
     private static final Pattern UNQUOTED = Pattern.compile("[A-Za-z0-9_@%+=:,./-]+");
+    private static final int TAIL_LINES = 200, TAIL_BYTES = 256 * 1024;
 
     static {
         if (System.getProperty("java.home") == null) {
@@ -304,13 +305,11 @@ public abstract class ProcessBuildStep implements BuildStep {
                         if (acceptableExitCode(exitCode, executor, context, arguments)) {
                             future.complete(new BuildStepResult(true));
                         } else {
-                            String outputString = Files.exists(output) ? new String(Files.readAllBytes(output), NATIVE_ENCODING) : "";
-                            String errorString = Files.exists(error) ? new String(Files.readAllBytes(error), NATIVE_ENCODING) : "";
                             throw new IllegalStateException("Unexpected exit code: " + exitCode + "\n"
                                     + "To reproduce, execute:\n "
                                     + reproduction(context.supplement().resolve("reproduce.args"), handler.commands())
-                                    + (outputString.isBlank() ? "" : ("\n\nOutput:\n" + outputString))
-                                    + (errorString.isBlank() ? "" : ("\n\nError:\n" + errorString)));
+                                    + tail("Output", output)
+                                    + tail("Error", error));
                         }
                     } catch (Throwable t) {
                         future.completeExceptionally(t);
@@ -333,6 +332,34 @@ public abstract class ProcessBuildStep implements BuildStep {
             }
         });
         return result;
+    }
+
+    protected static String tail(String label, Path file) throws IOException {
+        if (!Files.exists(file)) {
+            return "";
+        }
+        long size = Files.size(file);
+        byte[] bytes;
+        try (InputStream stream = Files.newInputStream(file)) {
+            stream.skipNBytes(Math.max(0, size - TAIL_BYTES));
+            bytes = stream.readNBytes(TAIL_BYTES);
+        }
+        String text = new String(bytes, NATIVE_ENCODING);
+        if (text.isBlank()) {
+            return "";
+        }
+        List<String> lines = text.lines().toList();
+        boolean cut = size > bytes.length;
+        if (cut && lines.size() > 1) {
+            lines = lines.subList(1, lines.size());
+        }
+        if (lines.size() > TAIL_LINES) {
+            lines = lines.subList(lines.size() - TAIL_LINES, lines.size());
+            cut = true;
+        }
+        return "\n\n" + label
+                + (cut ? ", its last " + lines.size() + " lines - " + file + " holds all of it" : "")
+                + ":\n" + String.join("\n", lines) + "\n";
     }
 
     protected String reproduction(Path file, List<String> commands) throws IOException {
