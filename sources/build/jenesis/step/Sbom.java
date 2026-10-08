@@ -68,6 +68,7 @@ public class Sbom implements BuildStep {
                 Path.of(METADATA),
                 Path.of(Dependencies.GRAPH),
                 Path.of(Dependencies.LICENSES),
+                Path.of(Dependencies.SOURCES),
                 Path.of(Dependencies.RESOLVED),
                 Path.of(Dependencies.SPDX),
                 Path.of(RELEASE))
@@ -136,6 +137,10 @@ public class Sbom implements BuildStep {
             SequencedProperties licenses = Files.exists(sidecar)
                     ? SequencedProperties.ofFiles(sidecar)
                     : new SequencedProperties();
+            Path located = argument.folder().resolve(Dependencies.SOURCES);
+            SequencedProperties sources = Files.exists(located)
+                    ? SequencedProperties.ofFiles(located)
+                    : new SequencedProperties();
             Set<Path> runtime = new HashSet<>();
             for (String key : dependencies.stringPropertyNames()) {
                 int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
@@ -158,9 +163,14 @@ public class Sbom implements BuildStep {
                     if (components.containsKey(coordinate) || Files.isRegularFile(jar) && !described.add(jar)) {
                         continue;
                     }
-                    components.put(coordinate, component(coordinate,
+                    CycloneDx.Component component = component(coordinate,
                             Files.exists(jar) ? HexFormat.of().formatHex(hash.hash(jar)) : null,
-                            readLicenses(licenses, licenseKey)).scope(runtime.contains(jar) ? "required" : "excluded"));
+                            readLicenses(licenses, licenseKey)).scope(runtime.contains(jar) ? "required" : "excluded");
+                    String source = sources.getProperty(licenseKey);
+                    components.put(coordinate, source == null
+                            ? component
+                            : component.externalReferences(List.of(
+                                    new CycloneDx.ExternalReference("source-distribution", source))));
                 }
             }
         }

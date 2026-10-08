@@ -9,6 +9,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.DependencyScope;
+import build.jenesis.DiscoverySources;
 import build.jenesis.Environment;
 import build.jenesis.License;
 import build.jenesis.Palette;
@@ -26,6 +27,7 @@ public class Dependencies implements BuildExecutorModule {
     public static final String SPDX = "spdx.properties",
             GRAPH = "graph.properties",
             LICENSES = "licenses.properties",
+            SOURCES = "sources.properties",
             ALIASED = "aliased.properties",
             INTERNAL = "internal.properties",
             MODULAR = "modular.properties";
@@ -865,6 +867,30 @@ public class Dependencies implements BuildExecutorModule {
                                 + " (strict pinning is enabled)"
                                 + managing(managed, entry.getKey()));
                     }
+                }
+            }
+            Repository locator = repositories.get(DiscoverySources.NAME);
+            if (locator != null) {
+                SequencedProperties sources = new SequencedProperties();
+                for (Map.Entry<String, Resolver.Resolved> entry : materialized.entrySet()) {
+                    String key = entry.getKey();
+                    int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+                    if (first < 0 || second < 0 || entry.getValue().internal()) {
+                        continue;
+                    }
+                    String coordinate = key.substring(second + 1);
+                    if (sources.getProperty(coordinate) == null) {
+                        RepositoryItem item = locator.fetch(executor, coordinate).orElse(null);
+                        if (item != null) {
+                            try (InputStream inputStream = item.toInputStream()) {
+                                sources.setProperty(coordinate,
+                                        new String(inputStream.readAllBytes(), StandardCharsets.UTF_8));
+                            }
+                        }
+                    }
+                }
+                if (!sources.isEmpty()) {
+                    sources.store(context.next().resolve(SOURCES));
                 }
             }
             index.store(context.next().resolve(DEPENDENCIES));

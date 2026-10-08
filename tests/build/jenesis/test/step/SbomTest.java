@@ -31,7 +31,9 @@ public class SbomTest {
 
     @Test
     public void shouldRun_fires_when_licenses_or_graph_changed() {
-        for (Path changed : List.of(Path.of("licenses.properties"), Path.of("graph.properties"))) {
+        for (Path changed : List.of(Path.of("licenses.properties"),
+                Path.of("sources.properties"),
+                Path.of("graph.properties"))) {
             BuildStepArgument argument = new BuildStepArgument(root, Map.of(
                     changed, Checksum.of(ChecksumStatus.ADDED)));
             SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
@@ -111,6 +113,39 @@ public class SbomTest {
         assertThat(manifest.getProperty("Sbom-Location")).isEqualTo("META-INF/sbom/demo.cdx.json");
 
         assertThat(next.resolve("reports").resolve("sbom").resolve("demo-1.0.0.cdx.json")).isNotEmptyFile();
+    }
+
+    @Test
+    public void lists_the_source_archive_a_domain_names_for_a_dependency() throws Exception {
+        Files.write(Files.createDirectories(argument.resolve("resolved")).resolve("lib.jar"), new byte[] {1});
+        SequencedProperties dependencies = new SequencedProperties();
+        dependencies.setProperty("main/runtime/maven/org.example/lib/1.2.3", "resolved/lib.jar");
+        dependencies.setProperty("main/runtime/maven/org.example/other/1.0", "resolved/lib.jar");
+        dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties sources = new SequencedProperties();
+        sources.setProperty("maven/org.example/lib/1.2.3", "https://example.org/lib/archive/v1.2.3.zip");
+        sources.store(argument.resolve("sources.properties"));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "demo");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+
+        new Sbom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+
+        String sbom = Files.readString(next.resolve("reports").resolve("sbom").resolve("demo-1.0.0.cdx.json"));
+        assertThat(sbom)
+                .contains("{ \"type\": \"source-distribution\","
+                        + " \"url\": \"https://example.org/lib/archive/v1.2.3.zip\" }");
+        assertThat(sbom.indexOf("source-distribution"))
+                .as("only the dependency a domain names an archive for carries one")
+                .isEqualTo(sbom.lastIndexOf("source-distribution"));
     }
 
     @Test
