@@ -34,6 +34,7 @@ public class TestModule implements BuildExecutorModule {
     private final PathPlacement pathPlacement;
     private final String moduleName;
     private final String filter;
+    private final String exclude;
     private final String tag;
     private final boolean force;
     private final boolean parallel;
@@ -54,6 +55,7 @@ public class TestModule implements BuildExecutorModule {
                 true,
                 null,
                 PathPlacement.CLASS_PATH,
+                null,
                 null,
                 null,
                 null,
@@ -81,6 +83,7 @@ public class TestModule implements BuildExecutorModule {
                 PathPlacement.CLASS_PATH,
                 null,
                 environment.getProperty("test.filter"),
+                environment.getProperty("test.exclude"),
                 environment.getProperty("test.tag"),
                 environment.flag("test.force"),
                 environment.flag("test.parallel"),
@@ -125,6 +128,7 @@ public class TestModule implements BuildExecutorModule {
                        PathPlacement pathPlacement,
                        String moduleName,
                        String filter,
+                       String exclude,
                        String tag,
                        boolean force,
                        boolean parallel,
@@ -146,6 +150,7 @@ public class TestModule implements BuildExecutorModule {
         this.pathPlacement = pathPlacement;
         this.moduleName = moduleName;
         this.filter = filter;
+        this.exclude = exclude;
         this.tag = tag;
         this.force = force;
         this.parallel = parallel;
@@ -168,6 +173,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -191,6 +197,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -214,6 +221,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -237,6 +245,31 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
+                tag,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                incrementalDigest,
+                terms,
+                skip);
+    }
+
+    public TestModule exclude(String exclude) {
+        return new TestModule(framework,
+                isTest,
+                factory,
+                resolvers,
+                dependencies,
+                jarsOnly,
+                requireFramework,
+                pinning,
+                pathPlacement,
+                moduleName,
+                filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -260,6 +293,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -283,6 +317,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -306,6 +341,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -329,6 +365,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -352,6 +389,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -375,6 +413,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -398,6 +437,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -421,6 +461,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -444,6 +485,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -467,6 +509,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -494,6 +537,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -517,6 +561,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -540,6 +585,7 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
                 force,
                 parallel,
@@ -589,6 +635,7 @@ public class TestModule implements BuildExecutorModule {
                         pathPlacement,
                         moduleName,
                         filter,
+                        exclude,
                         tag,
                         force,
                         parallel,
@@ -734,6 +781,7 @@ public class TestModule implements BuildExecutorModule {
         private final Predicate<String> isTest;
         private final String moduleName;
         private final transient String filter;
+        private final String exclude;
         private final transient String tag;
         private final transient boolean force;
         private final transient boolean parallel;
@@ -750,6 +798,7 @@ public class TestModule implements BuildExecutorModule {
                     PathPlacement pathPlacement,
                     String moduleName,
                     String filter,
+                    String exclude,
                     String tag,
                     boolean force,
                     boolean parallel,
@@ -766,6 +815,7 @@ public class TestModule implements BuildExecutorModule {
             this.isTest = isTest;
             this.moduleName = moduleName;
             this.filter = filter;
+            this.exclude = exclude;
             this.tag = tag;
             this.force = force;
             this.parallel = parallel;
@@ -846,6 +896,16 @@ public class TestModule implements BuildExecutorModule {
             if (!requested.isEmpty() && specs.isEmpty()) {
                 return CompletableFuture.completedFuture(null);
             }
+            List<Pattern> excluded = new ArrayList<>();
+            for (TestSpec spec : TestSpec.parse(exclude)) {
+                if (spec.method() != null) {
+                    throw new IllegalArgumentException("jenesis.test.exclude names test classes, as [<module>/]<regex>,"
+                            + " but " + exclude + " names the method " + spec.method()
+                            + " - narrow a class to some of its methods with jenesis.test.filter");
+                } else if (spec.module() == null || spec.module().equals(path)) {
+                    excluded.add(spec.classPattern());
+                }
+            }
             TestTags tags = TestTags.parse(tag);
             List<TestTags> ran = ran(context, arguments);
             List<String> commands = new ArrayList<>();
@@ -924,7 +984,7 @@ public class TestModule implements BuildExecutorModule {
             } else {
                 commands.add(resolved.runnerClass());
             }
-            SequencedSet<String> matchedClasses = new TreeSet<>();
+            SequencedSet<String> matchedClasses = new TreeSet<>(), excludedClasses = new TreeSet<>();
             SequencedMap<String, SequencedSet<String>> matchedMethods = new TreeMap<>();
             ClassFile classFile = ClassFile.of();
             for (BuildStepArgument argument : arguments.values()) {
@@ -950,14 +1010,17 @@ public class TestModule implements BuildExecutorModule {
                                         & (ClassFile.ACC_ABSTRACT | ClassFile.ACC_MODULE)) != 0) {
                                     return FileVisitResult.CONTINUE;
                                 }
+                                boolean left = excluded.stream().anyMatch(pattern -> pattern.matcher(className).matches());
                                 if (specs.isEmpty()) {
                                     if (isTest.test(className)) {
-                                        matchedClasses.add(className);
+                                        (left ? excludedClasses : matchedClasses).add(className);
                                     }
                                 } else {
                                     for (TestSpec spec : specs) {
                                         if (spec.classPattern.matcher(className).matches()) {
-                                            if (spec.method == null) {
+                                            if (left) {
+                                                excludedClasses.add(className);
+                                            } else if (spec.method == null) {
                                                 matchedClasses.add(className);
                                             } else {
                                                 matchedMethods
@@ -974,7 +1037,9 @@ public class TestModule implements BuildExecutorModule {
                     });
                 }
             }
-            if (matchedClasses.isEmpty() && matchedMethods.isEmpty() && tags.all()) {
+            if (matchedClasses.isEmpty() && matchedMethods.isEmpty() && !excludedClasses.isEmpty()) {
+                return CompletableFuture.completedFuture(null);
+            } else if (matchedClasses.isEmpty() && matchedMethods.isEmpty() && tags.all()) {
                 throw new IllegalStateException("No tests matched the requested selection"
                         + (filter != null ? ", filter: " + filter : "")
                         + (tag != null ? ", tag: " + tag : "")

@@ -133,6 +133,13 @@ The test step's summary then reports `1 tests successful` instead of the default
 `2`. The `-D` flag must come **before** the source file - anything after it is
 read as a selector.
 
+`-Djenesis.test.exclude` takes the same comma-separated class patterns, without a
+`#<method>`, and leaves out the classes they match while the default naming stays
+in force, as surefire's `<excludes>` does. A module whose every test is left out
+runs none, so this builds both modules and runs no test at all:
+
+    java -Djenesis.test.exclude='.*GreeterTest' build/jenesis/Make.java
+
 Tests can also be selected by tag with `-Djenesis.test.tag`, a comma-separated
 list of alternatives, a test running where it matches one of them. An alternative
 is a tag, or tags joined by `+` for the tests carrying all of them, and a tag
