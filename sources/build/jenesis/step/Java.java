@@ -127,6 +127,7 @@ public abstract class Java extends EnvironmentalProcessBuildStep {
         SequencedMap<String, Path> pool = new LinkedHashMap<>();
         SequencedMap<Path, Boolean> placed = new LinkedHashMap<>();
         SequencedSet<String> natives = new LinkedHashSet<>();
+        Set<String> selected = new HashSet<>();
         ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
             BuildStepArgument argument = entry.getValue();
@@ -150,6 +151,9 @@ public abstract class Java extends EnvironmentalProcessBuildStep {
                 }
             }
             for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
+                if (!selected.add(file.getFileName().toString())) {
+                    continue;
+                }
                 boolean module = graph.place(pathPlacement, file);
                 (module ? modulePath : classPath).add(file.toString());
                 placed.putIfAbsent(file, module);

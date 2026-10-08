@@ -168,6 +168,41 @@ public class JavaTest {
         assertThat(supplement.resolve("output")).content().isEqualTo("Hello world!");
     }
 
+    @Test
+    public void a_jar_two_predecessors_resolved_is_named_once_on_the_class_path() throws IOException {
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        for (String name : List.of("module", "observed")) {
+            Path folder = Files.createDirectories(root.resolve(name).resolve("resolved"));
+            for (String jar : List.of("first-1.0.jar", "second-1.0.jar")) {
+                try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(folder.resolve(jar)))) {
+                    output.putNextEntry(new JarEntry("db/data.sql"));
+                    output.write(new byte[]{1});
+                    output.closeEntry();
+                }
+            }
+            Files.writeString(root.resolve(name).resolve(BuildStep.DEPENDENCIES), name.equals("module")
+                    ? "main/runtime/maven/sample/first/1.0=resolved/first-1.0.jar\n"
+                            + "main/runtime/maven/sample/second/1.0=resolved/second-1.0.jar\n"
+                    : "main/runtime/maven/sample/second/1.0=resolved/second-1.0.jar\n"
+                            + "main/runtime/maven/sample/first/1.0=resolved/first-1.0.jar\n");
+            arguments.put(name, new BuildStepArgument(root.resolve(name), Map.of()));
+        }
+        BuildStepResult result = Java.of(PathPlacement.CLASS_PATH, true, "-version").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                arguments).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(supplement.resolve("java.args"))
+                .as("a jar resolved by two predecessors is one jar, and naming it twice doubles every resource it holds")
+                .content()
+                .contains("\"--class-path\"\n\""
+                        + root.resolve("module/resolved/first-1.0.jar")
+                        + File.pathSeparator
+                        + root.resolve("module/resolved/second-1.0.jar")
+                        + "\"\n")
+                .doesNotContain("observed");
+    }
+
     private static String reportedErrors(Path supplement) throws IOException {
         return Files.readString(supplement.resolve("error"))
                 .lines()
