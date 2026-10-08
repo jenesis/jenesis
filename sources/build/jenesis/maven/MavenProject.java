@@ -714,8 +714,9 @@ public class MavenProject implements BuildExecutorModule {
             properties.setProperty("groupId", value.groupId());
             properties.setProperty("artifactId", value.artifactId());
             properties.setProperty("version", value.version());
-            if (value.release() != null) {
-                properties.setProperty("release", value.release());
+            String release = test ? value.testRelease() : value.release();
+            if (release != null) {
+                properties.setProperty("release", release);
             }
             if (!test && value.mainClass() != null) {
                 properties.setProperty("mainClass", value.mainClass());

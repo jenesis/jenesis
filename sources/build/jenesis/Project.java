@@ -817,14 +817,15 @@ public record Project(
                                  ${...}; dependencies of compile, provided, runtime and test scope;
                                  <optional>, <exclusions> with wildcards, <type> and <classifier>;
                                  <dependencyManagement> with import-scoped BOMs;
-                                 maven.compiler.release and maven.compiler.enablePreview; name,
-                                 description, url, licenses, developers, organization and scm of the
-                                 module's own POM; sourceDirectory, testSourceDirectory and the
-                                 <directory> of each resource
+                                 maven.compiler.release, maven.compiler.testRelease for the tests
+                                 and maven.compiler.enablePreview; name, description, url, licenses,
+                                 developers, organization and scm of the module's own POM;
+                                 sourceDirectory, testSourceDirectory and the <directory> of each
+                                 resource
                       ignored    <build><plugins> and <pluginManagement>, <profiles>, <repositories>
                                  and settings.xml, a resource's includes, excludes, targetPath and
-                                 filtering, maven.compiler.source, target and testRelease, system
-                                 scope, the profiles of a dependency's POM, and every packaging but jar
+                                 filtering, maven.compiler.source and target, system scope, the
+                                 profiles of a dependency's POM, and every packaging but jar
                                  - a pom aggregator is followed for its modules, a war is not built
                                  at all, and a src/test/java/module-info.java is a module of its own
                                  rather than patched into the main one
@@ -913,6 +914,8 @@ public record Project(
 
                       maven-compiler-plugin release / java toolchain release
                           -> maven.compiler.release in pom.xml, @jenesis.release (15)
+                      maven-compiler-plugin testRelease, a test-compile execution's release
+                          -> maven.compiler.testRelease in pom.xml, the test module's @jenesis.release
                       compilerArgs / options.compilerArgs -> process-javac.properties (12)
                       annotationProcessorPaths / annotationProcessor -> @jenesis.plugin (13, 39)
                       Error Prone / net.ltgt.errorprone

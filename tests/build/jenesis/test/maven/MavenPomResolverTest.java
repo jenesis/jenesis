@@ -4012,6 +4012,82 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_compiles_its_tests_for_the_test_release_or_else_its_release() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>tested</module>
+                        <module>plain</module>
+                    </modules>
+                    <properties>
+                        <tests.version>17</tests.version>
+                        <maven.compiler.release>8</maven.compiler.release>
+                    </properties>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("tested")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>project</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>tested</artifactId>
+                    <properties>
+                        <maven.compiler.testRelease>${tests.version}</maven.compiler.testRelease>
+                    </properties>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("plain")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>project</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>plain</artifactId>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("tested")).release()).isEqualTo("8");
+        assertThat(poms.get(Path.of("tested")).testRelease()).isEqualTo("17");
+        assertThat(poms.get(Path.of("plain")).testRelease())
+                .as("without maven.compiler.testRelease the tests are compiled for the release of the main code")
+                .isEqualTo("8");
+    }
+
+    @Test
+    public void local_pom_enables_the_preview_features_of_its_test_release() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>21</maven.compiler.release>
+                        <maven.compiler.testRelease>25</maven.compiler.testRelease>
+                        <maven.compiler.enablePreview>true</maven.compiler.enablePreview>
+                    </properties>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).release()).isEqualTo("21-preview");
+        assertThat(poms.get(Path.of("")).testRelease()).isEqualTo("25-preview");
+    }
+
+    @Test
     public void local_pom_direct_dependency_checksum_is_ignored() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
