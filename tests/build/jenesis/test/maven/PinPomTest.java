@@ -288,6 +288,33 @@ public class PinPomTest {
     }
 
     @Test
+    public void merges_every_pin_comment_into_one_block_so_none_shadows_it() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.pin javac/maven/a/b 1-->
+                    <!--jenesis.pin javac/maven/c/d 2 (windows)-->
+                    <!--jenesis.pin javac/maven/e/f 3-->
+                </project>
+                """);
+        writeResolved("javac", Map.of("maven/a/b", "1 SHA-256/ab", "maven/e/f", "3 SHA-256/ef"));
+        String result = run(pom);
+        assertThat(result.split("<!--jenesis.pin", -1))
+                .as("a later pin comment would win over the block pin writes")
+                .hasSize(2);
+        assertThat(result)
+                .contains("javac/maven/a/b 1 SHA-256/ab")
+                .contains("javac/maven/c/d 2 (windows)")
+                .contains("javac/maven/e/f 3 SHA-256/ef")
+                .doesNotContain("javac/maven/e/f 3-->");
+    }
+
+    @Test
     public void encodes_double_hyphen_in_a_comment_block() throws IOException {
         Path pom = root.resolve("pom.xml");
         Files.writeString(pom, """
