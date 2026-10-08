@@ -12,6 +12,11 @@
 
     <build>
         <sourceDirectory>sources</sourceDirectory>
+        <resources>
+            <resource>
+                <directory>resources</directory>
+            </resource>
+        </resources>
     </build>
 
     <dependencyManagement>

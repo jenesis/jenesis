@@ -243,6 +243,39 @@ public class ProjectTest {
     }
 
     @Test
+    public void packages_only_the_compiled_sources_of_a_maven_source_directory_beside_its_resources() throws IOException {
+        Files.writeString(root.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>demo</groupId>
+                    <artifactId>templated</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        Path sources = Files.createDirectories(root.resolve("src/main/java/demo"));
+        Files.writeString(sources.resolve("Hello.java"), "package demo; public class Hello { }\n");
+        Files.writeString(sources.resolve("Hello.java.in"), "template");
+        Files.writeString(Files.createDirectories(root.resolve("src/main/resources/demo")).resolve("hello.txt"), "hello");
+        Path target = root.resolve("target");
+        Project.ofEnvironment(new Environment(settings), root)
+                .target(target)
+                .layout(Project.Layout.MAVEN)
+                .build(Project.BUILD);
+        Path jar;
+        try (Stream<Path> files = Files.walk(target)) {
+            jar = files.filter(file -> file.toString().endsWith(".jar") && file.getParent().endsWith("output/artifacts"))
+                    .findFirst()
+                    .orElseThrow();
+        }
+        try (JarFile file = new JarFile(jar.toFile())) {
+            assertThat(file.stream().map(JarEntry::getName).toList())
+                    .contains("demo/Hello.class", "demo/hello.txt")
+                    .as("a file of the source directory that no compiler reads stays out of the jar, as with Maven")
+                    .doesNotContain("demo/Hello.java.in");
+        }
+    }
+
+    @Test
     public void runs_transform_and_inspect_without_a_plugin_in_each_concrete_layout() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
         Files.writeString(root.resolve("pom.xml"), """

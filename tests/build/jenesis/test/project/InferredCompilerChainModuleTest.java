@@ -253,6 +253,32 @@ public class InferredCompilerChainModuleTest {
     }
 
     @Test
+    public void javac_copies_no_file_beside_the_sources_when_resources_are_not_included() throws IOException {
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("OnlyJava.java"), "package sample; public class OnlyJava { }\n");
+        Files.writeString(sampleDir.resolve("OnlyJava.java.in"), "template");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "chain",
+                new InferredCompilerChainModule(
+                        Collections.emptyNavigableSet(),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)))
+                        .includeResources(false),
+                "project");
+        executor.execute();
+
+        Path javaClasses = chainCompile()
+                .resolve(InferredCompilerChainModule.JAVAC)
+                .resolve("output")
+                .resolve(BuildStep.CLASSES);
+        assertThat(javaClasses.resolve("sample/OnlyJava.class")).isNotEmptyFile();
+        assertThat(javaClasses.resolve("sample/OnlyJava.java.in")).doesNotExist();
+    }
+
+    @Test
     public void resource_step_copies_resources_when_no_compilers_are_wired() throws IOException {
         Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(sampleDir.resolve("app.properties"), "key=value");
