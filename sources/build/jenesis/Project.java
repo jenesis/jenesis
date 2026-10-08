@@ -796,7 +796,9 @@ public record Project(
                     `/build/*` and `!/build/jenesis/` instead. Gradle's own output is build/ as well,
                     so `gradle clean` deletes build/jenesis; and `mvn` writes into the target/ this
                     build reads. Run the old build in a second checkout (`git worktree add`) while
-                    both exist.
+                    both exist, and exclude build/jenesis from a header or licence check the old
+                    build runs (Apache RAT, license-maven-plugin), which would flag the vendored
+                    sources.
 
                     ## 2. Choose the build declaration
 
@@ -955,9 +957,13 @@ public record Project(
                                                            its credential, jenesis.maven.token, never
                                                            in a file the project provides
                       a toolchain                          -Djenesis.toolchain.version
+                      a -tests jar (test-jar goal)         -Djenesis.stage.tests=true
 
                     A process-<tool>.properties line is a flag and its argument, `-Xmaxwarns=500`, and a
-                    bare flag has an empty value, `-parameters=`. A flag that holds a `:` or `=` escapes
+                    bare flag has an empty value, `-parameters=`. A flag given more than once, as --add-opens
+                    is, takes one argument per line of its value:
+                    `--add-opens=java.base/java.lang=ALL-UNNAMED\\njava.base/java.util=ALL-UNNAMED`.
+                    A flag that holds a `:` or `=` escapes
                     it, since a properties file splits there: `-Xlint\\:all=`. The release is not such a
                     flag: a `--release` there is refused, since maven.compiler.release, its testRelease
                     or @jenesis.release declares it for every tool. javac runs without -g, where
