@@ -864,9 +864,11 @@ public record Project(
                                                            in a file the project provides
                       a toolchain                          -Djenesis.toolchain.version
 
-                    A process-<tool>.properties line is a flag and its argument, `--release=17`, and a
+                    A process-<tool>.properties line is a flag and its argument, `-Xmaxwarns=500`, and a
                     bare flag has an empty value, `-parameters=`. A flag that holds a `:` or `=` escapes
-                    it, since a properties file splits there: `-Xlint\\:all=`. javac runs without -g, where
+                    it, since a properties file splits there: `-Xlint\\:all=`. The release is not such a
+                    flag: a `--release` there is refused, since maven.compiler.release, its testRelease
+                    or @jenesis.release declares it for every tool. javac runs without -g, where
                     Maven and Gradle pass it, so a test reading parameter or local names needs `-g=`
                     or `-parameters=`. A key of jenesis.properties keeps its prefix,
                     `jenesis.test.tag=-slow`, as `configuration` prints it.
@@ -1387,7 +1389,9 @@ public record Project(
                       process-<tool>.properties extra arguments for a forked JDK tool (javac, javadoc,
                                                 jar, jlink, jpackage, ...), one flag per key and its
                                                 argument as the value, `-parameters=` for a bare one
-                                                and `-Xlint\\:all=` where the flag holds a : or =;
+                                                and `-Xlint\\:all=` where the flag holds a : or =,
+                                                refusing one the module's declaration sets already,
+                                                as javac's --release;
                                                 process-test.properties targets the test JVM, merged
                                                 over process-java.properties; a linter reads only its
                                                 own configuration file

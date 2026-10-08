@@ -807,6 +807,28 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         }
                     }
                 }
+                for (Map.Entry<String, SequencedMap<String, String>> override : overrides.entrySet()) {
+                    Path generated = argument.folder().resolve(ProcessBuildStep.PROCESS + override.getKey() + ".properties");
+                    if (!Files.isRegularFile(generated)) {
+                        continue;
+                    }
+                    SequencedProperties declared = SequencedProperties.ofFiles(generated);
+                    for (String key : override.getValue().keySet()) {
+                        if (declared.containsKey(key)) {
+                            String value = declared.getProperty(key);
+                            throw new IllegalArgumentException("process-" + override.getKey() + ".properties sets "
+                                    + key + ", which the build already hands " + override.getKey() + " as "
+                                    + (value.isEmpty() ? key : key + " " + value) + " from the module's declaration - "
+                                    + (key.equals("--release") || key.equals("--enable-preview")
+                                            ? "declare the release there instead: @jenesis.release in"
+                                                    + " module-info.java, or maven.compiler.release and, for the"
+                                                    + " tests, maven.compiler.testRelease in pom.xml, written"
+                                                    + " <release>-preview or with maven.compiler.enablePreview for"
+                                                    + " preview features"
+                                            : "change it there instead and remove the line"));
+                        }
+                    }
+                }
                 Path metadataFile = argument.folder().resolve(BuildStep.METADATA);
                 if (Files.isRegularFile(metadataFile)) {
                     SequencedProperties metadata = SequencedProperties.ofFiles(metadataFile);
