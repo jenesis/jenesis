@@ -2,6 +2,7 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import module org.junit.jupiter.params;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -139,6 +140,73 @@ public class ProcessHandlerTest {
         assertThat(Files.readString(error)).contains("err-one");
         assertThat(outLines).containsExactly("out-one", "out-two");
         assertThat(errLines).containsExactly("err-one");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void a_tool_writing_what_the_native_encoding_cannot_hold_keeps_every_line(boolean teed) throws Exception {
+        ToolProvider tool = new ToolProvider() {
+            @Override
+            public String name() {
+                return "quoting";
+            }
+
+            @Override
+            public int run(PrintWriter out, PrintWriter err, String... arguments) {
+                err.println("@Foo(\"\u201Cx\u201D\")");
+                for (int index = 0; index < 200; index++) {
+                    err.println("line " + index);
+                }
+                return 1;
+            }
+        };
+        Path output = root.resolve("output"), error = root.resolve("error");
+        List<String> errLines = new CopyOnWriteArrayList<>();
+        ProcessHandler handler = ProcessHandler.OfTool.of(tool).apply(List.of());
+        assertThat(handler.execute(output,
+                error,
+                teed ? new ProcessHandler.Tee(Runnable::run, _ -> { }, errLines::add) : null)).isEqualTo(1);
+        List<String> lines = new String(Files.readAllBytes(error), nativeEncoding()).lines().toList();
+        assertThat(lines)
+                .as("a character the platform cannot encode is replaced, as the tool would print it, rather than"
+                        + " stalling the capture")
+                .hasSize(201)
+                .endsWith("line 199");
+        assertThat(lines.getFirst()).startsWith("@Foo(\"").endsWith("\")").hasSize(11);
+    }
+
+    @Test
+    public void a_forked_process_writing_what_the_native_encoding_cannot_decode_is_teed_as_written() throws Exception {
+        Path source = root.resolve("Raw.java");
+        Files.writeString(source, """
+                public class Raw {
+                    public static void main(String[] args) throws Exception {
+                        System.out.write(new byte[] {(byte) 0xE2, (byte) 0x9C, (byte) 0x94, ' ', 'o', 'k', '\\n'});
+                        System.out.write("after\\n".getBytes());
+                        System.out.flush();
+                    }
+                }
+                """);
+        Path output = root.resolve("output"), error = root.resolve("error");
+        List<String> outLines = new CopyOnWriteArrayList<>();
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            ProcessHandler handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(List.of(source.toString()));
+            assertThat(handler.execute(output, error, new ProcessHandler.Tee(executor, outLines::add, _ -> { })))
+                    .as("output in a charset the build does not read never fails the build")
+                    .isZero();
+        } finally {
+            executor.shutdown();
+        }
+        assertThat(Files.readAllBytes(output))
+                .as("the file holds what the process wrote")
+                .startsWith((byte) 0xE2, (byte) 0x9C, (byte) 0x94);
+        assertThat(outLines).hasSize(2).last().isEqualTo("after");
+        assertThat(outLines.getFirst()).endsWith(" ok");
+    }
+
+    private static Charset nativeEncoding() {
+        return Charset.forName(System.getProperty("native.encoding"));
     }
 
     @Test

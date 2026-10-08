@@ -123,15 +123,19 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
         private int run(Path output, Path error, Tee tee) throws IOException {
             if (tee == null) {
-                try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(output, encoding()));
-                     PrintWriter err = new PrintWriter(Files.newBufferedWriter(error, encoding()))) {
+                try (PrintWriter out = new PrintWriter(writer(output));
+                     PrintWriter err = new PrintWriter(writer(error))) {
                     return toolProvider.run(out, err, commands.toArray(String[]::new));
                 }
             }
-            try (PrintWriter out = new PrintWriter(new LineTee(Files.newBufferedWriter(output, encoding()), tee.out()), true);
-                 PrintWriter err = new PrintWriter(new LineTee(Files.newBufferedWriter(error, encoding()), tee.err()), true)) {
+            try (PrintWriter out = new PrintWriter(new LineTee(writer(output), tee.out()), true);
+                 PrintWriter err = new PrintWriter(new LineTee(writer(error), tee.err()), true)) {
                 return toolProvider.run(out, err, commands.toArray(String[]::new));
             }
+        }
+
+        private static Writer writer(Path file) throws IOException {
+            return new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(file), encoding()));
         }
 
         private static final class LineTee extends Writer {
@@ -360,16 +364,30 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         private static void drain(InputStream stream, Path file, Consumer<String> consumer) throws IOException {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, encoding()));
-                 BufferedWriter writer = Files.newBufferedWriter(file, encoding())) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    writer.write(line);
-                    writer.newLine();
-                    writer.flush();
-                    consumer.accept(line);
+            try (OutputStream out = Files.newOutputStream(file)) {
+                ByteArrayOutputStream line = new ByteArrayOutputStream();
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = stream.read(buffer)) != -1) {
+                    out.write(buffer, 0, read);
+                    for (int index = 0; index < read; index++) {
+                        if (buffer[index] == '\n') {
+                            consumer.accept(line(line));
+                        } else {
+                            line.write(buffer[index]);
+                        }
+                    }
+                }
+                if (line.size() > 0) {
+                    consumer.accept(line(line));
                 }
             }
+        }
+
+        private static String line(ByteArrayOutputStream bytes) {
+            String line = bytes.toString(encoding());
+            bytes.reset();
+            return line.endsWith("\r") ? line.substring(0, line.length() - 1) : line;
         }
     }
 }
