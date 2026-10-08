@@ -1603,6 +1603,16 @@ public record Project(
                     plugin-<name>.properties hands it over as the argument ../inputs/<input>, whose
                     checksum then decides whether the step runs.
 
+                    The arguments are a SequencedMap<String, BuildStepArgument>, keyed by the
+                    predecessor's path; argument.folder() is its output and argument.files() each
+                    file's checksum. Beside the source folders, a module's hook point is handed its
+                    metadata.properties (version, name, ...) and its module.properties, whose `test`
+                    tells the test half of a pom from the main one, so a step that belongs to one of
+                    them returns early on the other. The resolved dependencies arrive as a folder too:
+                    Dependencies.select(folder, "main", "compile") lists the jars of one group and
+                    scope, Dependencies.all(folder) every one. What a step at binary/compiled writes
+                    as classes/ and a manifest.mf is merged into the module's jar.
+
                     ## Pick the hook point by what the step produces
 
                       binary/generated       sources/ that the module compiles with its own, the
