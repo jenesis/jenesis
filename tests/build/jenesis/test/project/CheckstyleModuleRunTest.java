@@ -128,6 +128,70 @@ public class CheckstyleModuleRunTest {
                 .hasMessageContaining("Unexpected exit code");
     }
 
+    @Test
+    public void fails_a_report_only_run_when_checkstyle_cannot_load_its_configuration() throws IOException {
+        Files.writeString(project.resolve("checkstyle.xml"), """
+                <?xml version="1.0"?>
+                <!DOCTYPE module PUBLIC
+                    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+                    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+                <module name="Checker">
+                    <module name="NoSuchCheck"/>
+                </module>
+                """);
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "checkstyle",
+                new CheckstyleModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .as("report-only covers findings, not a Checkstyle that never ran")
+                .hasMessageContaining("Unexpected exit code")
+                .hasMessageContaining("NoSuchCheck");
+    }
+
+    @Test
+    public void expands_config_loc_to_the_folder_of_the_configuration() throws IOException {
+        Files.writeString(project.resolve("checkstyle.xml"), """
+                <?xml version="1.0"?>
+                <!DOCTYPE module PUBLIC
+                    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+                    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+                <module name="Checker">
+                    <property name="severity" value="error"/>
+                    <module name="SuppressionFilter">
+                        <property name="file" value="${config_loc}/suppressions.xml"/>
+                    </module>
+                    <module name="TreeWalker">
+                        <module name="TypeName"/>
+                    </module>
+                </module>
+                """);
+        Files.writeString(project.resolve("suppressions.xml"), """
+                <?xml version="1.0"?>
+                <!DOCTYPE suppressions PUBLIC
+                    "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+                    "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+                <suppressions>
+                    <suppress checks="TypeName" files="badName"/>
+                </suppressions>
+                """);
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "checkstyle",
+                new CheckstyleModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT)
+                        .strict(true),
+                "project");
+        executor.execute();
+
+        Path report = root.resolve("checkstyle").resolve("check").resolve("output").resolve("reports").resolve("checkstyle").resolve("checkstyle-report.xml");
+        assertThat(report).content().doesNotContain("<error");
+    }
+
     private BuildExecutor newExecutor() throws IOException {
         return BuildExecutor.of(root,
                 Duration.ZERO,

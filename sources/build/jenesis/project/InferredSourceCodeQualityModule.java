@@ -344,12 +344,14 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
     }
 
     @Override
-    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
+    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        Path checkstyleFile = CheckstyleModule.configurationFile(configuration);
         Bind.configured(buildExecutor,
                 inherited.sequencedKeySet(),
                 CHECKSTYLE,
                 checkstyle,
-                CheckstyleModule.configurationFile(configuration),
+                checkstyleFile,
+                checkstyle == null ? Collections.emptyNavigableSet() : CheckstyleModule.siblings(checkstyleFile),
                 () -> checkstyleModule.pinning(pinning));
         Bind.configured(buildExecutor,
                 inherited.sequencedKeySet(),

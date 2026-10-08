@@ -113,7 +113,15 @@ in its own subfolder: `target/stage/reports/<kind>/<module>/`, for example
 
 By default the linters are report-only: they record findings but do not fail the
 build. Pass `.strict(true)` when wiring a tool yourself to turn a finding into a
-build failure.
+build failure. Report-only covers findings, not a tool that never ran: a linter
+that fails on its own configuration, and so writes no complete report, fails its
+step either way.
+
+Checkstyle reads `${config_loc}` as the folder of `checkstyle.xml`, as the Maven
+and Gradle plugins define it. A file the configuration names as
+`${config_loc}/<path>`, such as a suppressions file beside it, is handed to
+Checkstyle with it and re-runs the check when it changes; any other file of the
+configuration directory is not.
 
 Formatting: verify, and how to reformat
 ---------------------------------------

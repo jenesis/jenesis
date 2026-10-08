@@ -21,6 +21,7 @@ public class KtlintModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
+    private static final String REPORT = BuildStep.REPORTS + "ktlint/ktlint-report.xml";
     private static final String MAVEN_GROUP = "com.pinterest.ktlint", MAVEN_ARTIFACT = "ktlint-cli";
 
     private final Dependencies dependencies;
@@ -131,8 +132,8 @@ public class KtlintModule implements BuildExecutorModule {
         public boolean acceptableExitCode(int code,
                                           Executor executor,
                                           BuildStepContext context,
-                                          SequencedMap<String, BuildStepArgument> arguments) {
-            return !strict || code == 0;
+                                          SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            return code == 0 || !strict && completeReport(context.next().resolve(REPORT));
         }
 
         @Override
@@ -180,7 +181,8 @@ public class KtlintModule implements BuildExecutorModule {
                     break;
                 }
             }
-            Path report = Files.createDirectories(context.next().resolve(BuildStep.REPORTS + "ktlint")).resolve("ktlint-report.xml");
+            Path report = context.next().resolve(REPORT);
+            Files.createDirectories(report.getParent());
             List<String> commands = new ArrayList<>(List.of(
                     "-cp", String.join(File.pathSeparator, jars),
                     "com.pinterest.ktlint.Main",

@@ -1410,7 +1410,9 @@ public record Project(
 
                     Linters and the ktlint/scalafmt formatters activate from their own native config
                     files instead (checkstyle.xml, pmd.xml, spotbugs-exclude.xml, .editorconfig,
-                    .scalafmt.conf, ...).
+                    .scalafmt.conf, ...). A linter is report-only for its findings, but a linter that
+                    cannot load its configuration fails the build. Checkstyle's ${config_loc} is the
+                    folder of checkstyle.xml, and a ${config_loc}/<path> it names is handed over with it.
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
