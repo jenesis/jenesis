@@ -966,6 +966,39 @@ public class TestModuleTest {
     }
 
     @Test
+    public void names_the_folder_the_tests_were_compiled_from_when_none_matches() throws IOException {
+        SequencedProperties described = new SequencedProperties();
+        described.setProperty("path", "impl");
+        described.setProperty("sources", "src/test/java");
+        described.setProperty("test", "impl");
+        described.store(manifests.resolve(BuildStep.MODULE));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("manifests", manifests);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnitPlatform())
+                        .isTest((Predicate<String> & Serializable) _ -> false)
+                        .jarsOnly(false),
+                "dependencies", "manifests", "classes");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .as("a test folder the module does not name is not compiled, which the message makes visible")
+                .hasMessageContaining("No tests matched the requested selection among the 1 classes compiled from"
+                        + " impl/src/test/java")
+                .hasMessageContaining("src/test/groovy");
+    }
+
+    @Test
     public void throws_when_no_framework_found() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", emptyDependencies);

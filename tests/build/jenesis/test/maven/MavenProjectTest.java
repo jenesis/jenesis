@@ -1637,6 +1637,7 @@ public class MavenProjectTest {
         SequencedProperties moduleProperties = SequencedProperties.ofFiles(moduleFile);
         assertThat(moduleProperties).containsOnly(
                 Map.entry("path", ""),
+                Map.entry("sources", "src/main/java"),
                 Map.entry("modular", "false"));
         Path metadataFile = module.resolve(BuildStep.METADATA);
         assertThat(metadataFile).exists();

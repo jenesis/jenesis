@@ -876,14 +876,19 @@ public class TestModule implements BuildExecutorModule {
                             .map(BuildStepArgument::folder)
                             .iterator())
                     .orElseThrow(() -> new IllegalArgumentException("No test framework found"));
-            String path = null;
+            String path = null, compiledFrom = null;
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
                 }
                 Path module = argument.folder().resolve(BuildStep.MODULE);
                 if (Files.isRegularFile(module)) {
-                    path = SequencedProperties.ofFiles(module).getProperty("path");
+                    SequencedProperties described = SequencedProperties.ofFiles(module);
+                    path = described.getProperty("path");
+                    String sources = described.value("sources");
+                    compiledFrom = path == null || path.isEmpty() ? sources
+                            : sources == null ? path
+                            : path + "/" + sources;
                     break;
                 }
             }
@@ -987,6 +992,7 @@ public class TestModule implements BuildExecutorModule {
             SequencedSet<String> matchedClasses = new TreeSet<>(), excludedClasses = new TreeSet<>();
             SequencedMap<String, SequencedSet<String>> matchedMethods = new TreeMap<>();
             ClassFile classFile = ClassFile.of();
+            AtomicInteger compiled = new AtomicInteger();
             List<Path> classFolders = new ArrayList<>(), jars = new ArrayList<>();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
@@ -1046,6 +1052,7 @@ public class TestModule implements BuildExecutorModule {
                             if (file.toString().endsWith(".class")) {
                                 String raw = classes.relativize(file).toString();
                                 String className = raw.substring(0, raw.length() - 6).replace(File.separatorChar, '.');
+                                compiled.incrementAndGet();
                                 ClassModel model = classFile.parse(file);
                                 if ((model.flags().flagsMask()
                                         & (ClassFile.ACC_ABSTRACT | ClassFile.ACC_MODULE)) != 0) {
@@ -1085,7 +1092,11 @@ public class TestModule implements BuildExecutorModule {
                 throw new IllegalStateException("No tests matched the requested selection"
                         + (filter != null ? ", filter: " + filter : "")
                         + (tag != null ? ", tag: " + tag : "")
-                        + ". Adjust jenesis.test.filter / jenesis.test.tag or the isTest predicate,"
+                        + " among the " + compiled.get() + " classes compiled"
+                        + (compiledFrom == null ? ". Adjust" : " from " + compiledFrom + ", the one folder compiled for"
+                                + " these tests, so tests kept in another one, such as src/test/groovy, need it named"
+                                + " as the test sources, by testSourceDirectory in a pom.xml. Otherwise adjust")
+                        + " jenesis.test.filter / jenesis.test.tag or the isTest predicate,"
                         + " or set jenesis.test.skip to skip testing.");
             }
             SequencedSet<String> selection = matchedClasses;
