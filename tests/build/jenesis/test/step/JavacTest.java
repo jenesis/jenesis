@@ -252,6 +252,44 @@ public class JavacTest {
     }
 
     @ParameterizedTest
+    @CsvSource({"true,0", "false,0", "true,4", "false,4"})
+    public void compiles_against_jdk_internals_that_an_add_exports_names_by_passing_the_release_as_source_and_target(
+            boolean process, int older) throws IOException {
+        Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(folder.resolve("Sample.java"), """
+                package sample;
+                public class Sample {
+                    public final Object context = new com.sun.tools.javac.util.Context();
+                }
+                """);
+        int release = Runtime.version().feature() - older;
+        Javac.writeRelease(sources, Integer.toString(release), Runtime.version().feature());
+        Path configuration = Files.createDirectories(root.resolve("configuration"));
+        Files.createDirectories(configuration.resolve("process"));
+        SequencedProperties exports = new SequencedProperties();
+        exports.setProperty("--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED");
+        exports.store(configuration.resolve("process/javac.properties"));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("configuration", new BuildStepArgument(configuration, Map.of(
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        assertThat(Files.readString(supplement.resolve("command")))
+                .as("javac refuses --add-exports of a system module beside --release")
+                .doesNotContain("--release")
+                .contains("--source " + release, "--target " + release);
+        try (InputStream in = Files.newInputStream(next.resolve(Javac.CLASSES + "sample/Sample.class"))) {
+            assertThat(ClassFile.of().parse(in.readAllBytes()).majorVersion()).isEqualTo(44 + release);
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void stamps_module_version_when_javac_properties_contains_module_version(boolean process) throws IOException {
         Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES));
