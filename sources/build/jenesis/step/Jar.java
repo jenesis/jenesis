@@ -61,6 +61,15 @@ public class Jar extends ProcessBuildStep {
                                                  SequencedMap<String, BuildStepArgument> arguments,
                                                  SequencedMap<String, SequencedMap<String, String>> properties)
             throws IOException {
+        for (SequencedMap<String, String> configured : properties.values()) {
+            for (String option : List.of("--manifest", "-m")) {
+                if (configured.containsKey(option)) {
+                    throw new IllegalArgumentException("process-jar.properties sets " + option + ", but the jar step"
+                            + " writes the manifest itself - place the attributes in a META-INF/MANIFEST.MF among"
+                            + " the module's resources instead, which is the basis of the jar's manifest");
+                }
+            }
+        }
         List<String> commands = new ArrayList<>(List.of(
                 "--create",
                 "--file",
@@ -71,6 +80,17 @@ public class Jar extends ProcessBuildStep {
             commands.add("--date=" + timestamp);
         }
         List<Path> manifestFiles = new ArrayList<>();
+        for (BuildStepArgument argument : sort == Sort.CLASSES ? arguments.values() : List.<BuildStepArgument>of()) {
+            if (argument.removed()) {
+                continue;
+            }
+            for (String name : sort.folders) {
+                Path candidate = argument.folder().resolve(name).resolve(JarFile.MANIFEST_NAME);
+                if (Files.isRegularFile(candidate)) {
+                    manifestFiles.add(candidate);
+                }
+            }
+        }
         for (BuildStepArgument argument : sort == Sort.CLASSES ? arguments.values() : List.<BuildStepArgument>of()) {
             if (argument.removed()) {
                 continue;
