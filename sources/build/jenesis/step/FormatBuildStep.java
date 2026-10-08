@@ -37,7 +37,7 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
 
     @Override
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
-        return true;
+        return !verify || arguments.values().stream().anyMatch(BuildStepArgument::hasChanged);
     }
 
     @Override
