@@ -629,6 +629,20 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void documents_no_test_module_unless_the_tests_are_staged() throws IOException {
+        Fixture fixture = setUp("path=\ntest=main_artifact\n", false, false, true);
+        assertThatThrownBy(() -> fixture.execute("sub/documentation/archive"))
+                .as("the documentation of a test module is never published unless its artifacts are staged")
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: documentation/archive - ");
+        Files.createDirectory(fixture.sources.resolve(BuildStep.SOURCES));
+        Files.writeString(fixture.sources.resolve(BuildStep.SOURCES).resolve("FooTest.java"), "public class FooTest {}");
+        Path javadocOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
+                new Environment(Map.of("stage.tests", "true"))), "sub/documentation/archive").get("sub/documentation/archive");
+        assertThat(javadocOutput.resolve("documentation").resolve("javadoc.jar")).exists();
+    }
+
+    @Test
     public void javadoc_flag_disabled_omits_javadoc_sub_module() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/documentation/archive"))
