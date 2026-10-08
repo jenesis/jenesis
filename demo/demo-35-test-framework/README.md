@@ -112,6 +112,20 @@ as above. The demo ships the file under a profile, so both paths stay runnable:
 Being a file in the project rather than a command-line flag, the declaration is
 what every checkout and every CI run reads.
 
+Choosing the engines
+--------------------
+
+On the JUnit Platform every engine on the path discovers tests, including one a
+library or the test resources register for a test of their own. Name the engines
+a run uses by their ids, a leading `-` leaving one out, so this runs the Jupiter
+tests alone:
+
+    java -Djenesis.test.engines=-junit-vintage -Djenesis.print.tests=true build/jenesis/Make.java
+
+The same list under the key `engines` in a module's `test.properties` applies to
+that module alone and wins over the setting. JUnit 4 and TestNG run no platform
+engine, so they refuse it.
+
 Selecting by category
 ---------------------
 

@@ -15,8 +15,8 @@ import build.jenesis.step.Bind;
 public class InferredTestObservationModule implements BuildExecutorModule {
 
     public static final String TEST = "test", MUTATE = "mutate";
-    private static final String FRAMEWORK = "framework";
-    private static final Set<String> TEST_KEYS = Set.of(FRAMEWORK);
+    private static final String FRAMEWORK = "framework", ENGINES = "engines";
+    private static final Set<String> TEST_KEYS = Set.of(FRAMEWORK, ENGINES);
 
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
@@ -86,9 +86,9 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         return module;
     }
 
-    private static TestFramework declaredFramework(Path file) throws IOException {
+    private static TestModule declared(TestModule module, Path file) throws IOException {
         if (file == null) {
-            return null;
+            return module;
         }
         SequencedProperties properties = SequencedProperties.ofFiles(file);
         for (String key : properties.stringPropertyNames()) {
@@ -96,8 +96,9 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 throw new IllegalArgumentException("Unknown test property: " + key);
             }
         }
-        String framework = properties.value(FRAMEWORK);
-        return framework == null ? null : TestFramework.named(framework);
+        String framework = properties.value(FRAMEWORK), engines = properties.value(ENGINES);
+        TestModule declared = framework == null ? module : module.framework(TestFramework.named(framework));
+        return engines == null ? declared : declared.engines(engines);
     }
 
     private InferredTestObservationModule(SequencedSet<Path> configuration,
@@ -318,8 +319,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                     .pinning(pinning)
                     .pathPlacement(pathPlacement)
                     .moduleName(moduleName);
-            TestFramework declared = declaredFramework(BuildStep.locate(configuration, "test.properties"));
-            BuildExecutorModule executed = test.apply(declared == null ? module : module.framework(declared));
+            BuildExecutorModule executed = test.apply(declared(module, BuildStep.locate(configuration, "test.properties")));
             if (executed != null) {
                 buildExecutor.addModule(TEST, executed, inherited.sequencedKeySet());
                 SequencedSet<String> reportInputs = new LinkedHashSet<>();

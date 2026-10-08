@@ -165,7 +165,7 @@ public class InferredTestObservationModuleTest {
 
     @Test
     public void a_test_properties_file_rejects_an_unknown_property() throws IOException {
-        Files.writeString(project.resolve("test.properties"), "engines=junit-platform");
+        Files.writeString(project.resolve("test.properties"), "runner=junit-platform");
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule("observed", observation(), "project");
@@ -173,7 +173,7 @@ public class InferredTestObservationModuleTest {
         assertThatThrownBy(executor::execute)
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .rootCause()
-                .hasMessageContaining("Unknown test property: engines");
+                .hasMessageContaining("Unknown test property: runner");
     }
 
     @Test

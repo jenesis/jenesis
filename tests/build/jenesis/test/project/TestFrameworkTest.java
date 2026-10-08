@@ -302,6 +302,28 @@ public class TestFrameworkTest {
     }
 
     @Test
+    public void junit_platform_includes_and_excludes_the_engines_it_is_given() {
+        assertThat(new JUnitPlatform().engines(List.of("execute"), "junit-jupiter, -test-only-engine"))
+                .containsExactly("execute", "--include-engine=junit-jupiter", "--exclude-engine=test-only-engine");
+        assertThat(new JUnitPlatform().engines(List.of("execute"), null)).containsExactly("execute");
+    }
+
+    @Test
+    public void junit_platform_refuses_an_engine_selection_that_names_no_engine() {
+        assertThatThrownBy(() -> new JUnitPlatform().engines(List.of(), "junit-jupiter,-"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("junit-jupiter,-junit-vintage");
+    }
+
+    @Test
+    public void a_framework_off_the_junit_platform_refuses_an_engine_selection() {
+        assertThatThrownBy(() -> new JUnit4().engines(List.of(), "junit-jupiter"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.test.engines");
+        assertThat(new TestNG().engines(List.of("-d"), null)).containsExactly("-d");
+    }
+
+    @Test
     public void testng_joins_classes_and_methods() {
         SequencedMap<String, SequencedSet<String>> methods = new LinkedHashMap<>();
         methods.put("sample.AlphaTest", new LinkedHashSet<>(List.of("first")));

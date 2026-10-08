@@ -156,6 +156,24 @@ public record JUnitPlatform(String console) implements TestFramework {
         return selection;
     }
 
+    @Override
+    public List<String> engines(List<String> arguments, String engines) {
+        if (engines == null) {
+            return arguments;
+        }
+        List<String> selection = new ArrayList<>(arguments);
+        for (String entry : engines.split(",")) {
+            String engine = entry.strip(), id = engine.startsWith("-") ? engine.substring(1).strip() : engine;
+            if (id.isEmpty() || id.chars().anyMatch(Character::isWhitespace)) {
+                throw new IllegalArgumentException("jenesis.test.engines names JUnit Platform engines by their id,"
+                        + " comma-separated, a leading - leaving one out, as junit-jupiter,-junit-vintage: "
+                        + engines);
+            }
+            selection.add((engine.startsWith("-") ? "--exclude-engine=" : "--include-engine=") + id);
+        }
+        return selection;
+    }
+
     private static void artifact(SequencedMap<String, String> coordinates,
                                  String module,
                                  String maven,
