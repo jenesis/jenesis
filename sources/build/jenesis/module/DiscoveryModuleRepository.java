@@ -99,7 +99,7 @@ public class DiscoveryModuleRepository implements JenesisRepository {
         for (String key : scope == Scope.MODULE
                 ? List.of("module", "moduletomaven")
                 : List.of("moduletomaven", "module")) {
-            DiscoveredLocation location = discovery.lookup(module, key).orElse(null);
+            DiscoveredLocation location = discovery.lookup(module, key, module).orElse(null);
             if (location == null) {
                 continue;
             }
@@ -113,7 +113,7 @@ public class DiscoveryModuleRepository implements JenesisRepository {
             Optional<RepositoryItem> item;
             if (key.equals("moduletomaven")) {
                 if (!location.coordinate()) {
-                    throw new IllegalArgumentException("moduletomaven in " + location.source() + " names "
+                    throw new IllegalArgumentException(location.key() + " in " + location.source() + " names "
                             + location.target() + ", where it expects"
                             + " <groupId>:<artifactId>[:<extension>[:<classifier>]] - a location belongs in module");
                 }
@@ -121,7 +121,7 @@ public class DiscoveryModuleRepository implements JenesisRepository {
                         .orElseThrow();
                 String[] elements = text.split(":", -1);
                 if (elements.length < 2 || elements.length > 4 || Arrays.stream(elements).anyMatch(String::isEmpty)) {
-                    throw new IllegalArgumentException("moduletomaven in " + location.source() + " maps " + module
+                    throw new IllegalArgumentException(location.key() + " in " + location.source() + " maps " + module
                             + " to " + text + ", where it expects <groupId>:<artifactId>[:<extension>[:<classifier>]]");
                 }
                 MavenDependencyKey coordinate = new MavenDependencyKey(elements[0],
@@ -131,8 +131,9 @@ public class DiscoveryModuleRepository implements JenesisRepository {
                 item = coordinates.computeIfAbsent(Map.entry(module, coordinate), _ -> new MavenModuleRepository(maven)
                         .mapping(Map.of(module, coordinate))).fetch(executor, module, classifier, resolved, type);
             } else if (location.coordinate()) {
-                throw new IllegalArgumentException("module in " + location.source() + " names " + location.target()
-                        + ", where it expects a location naming :// - a Maven coordinate belongs in moduletomaven");
+                throw new IllegalArgumentException(location.key() + " in " + location.source() + " names "
+                        + location.target() + ", where it expects a location naming :// - a Maven coordinate"
+                        + " belongs in moduletomaven");
             } else if (!location.template()) {
                 URI root = location.root(connection).resolve(scope == Scope.MODULE ? "module/" : "artifact/");
                 item = repositories.computeIfAbsent(root, _ -> new JenesisModuleRepository(root)

@@ -72,7 +72,7 @@ public class DiscoveryMavenRepository implements MavenRepository {
                                           String type,
                                           String classifier,
                                           String checksum) throws IOException {
-        DiscoveredLocation location = discovery.lookup(groupId, "maven").orElse(null);
+        DiscoveredLocation location = discovery.lookup(groupId, "maven", artifactId).orElse(null);
         if (location == null || !location.admits(version)) {
             return Optional.empty();
         }
@@ -102,7 +102,7 @@ public class DiscoveryMavenRepository implements MavenRepository {
                                                   String groupId,
                                                   String artifactId,
                                                   String checksum) throws IOException {
-        DiscoveredLocation location = discovery.lookup(groupId, "maven").orElse(null);
+        DiscoveredLocation location = discovery.lookup(groupId, "maven", artifactId).orElse(null);
         if (location == null) {
             return Optional.empty();
         }

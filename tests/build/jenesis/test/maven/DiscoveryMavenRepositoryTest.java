@@ -95,6 +95,22 @@ public class DiscoveryMavenRepositoryTest {
     }
 
     @Test
+    public void resolves_each_artifact_of_a_group_from_the_releases_its_selected_key_names() throws IOException {
+        server.domain("jenesis.build",
+                        "maven=" + server.files() + "jenesis/v{version}/{artifactId}-{version}.{type}",
+                        "maven[build.jenesis.launcher]=" + server.files()
+                                + "launcher/v{version}/{artifactId}-{version}.{type}")
+                .file("jenesis/v1.0/build.jenesis-1.0.jar", "tool")
+                .file("launcher/v0.5/build.jenesis.launcher-0.5.jar", "launcher");
+
+        DiscoveryMavenRepository repository = repository();
+
+        assertThat(content(repository.fetch(Runnable::run, "build.jenesis/build.jenesis/1.0"))).isEqualTo("tool");
+        assertThat(content(repository.fetch(Runnable::run, "build.jenesis/build.jenesis.launcher/0.5")))
+                .isEqualTo("launcher");
+    }
+
+    @Test
     public void validates_an_artifact_from_a_template_against_the_checksum_beside_it() {
         server.domain("bytebuddy.net", "maven=" + server.files() + "{artifactId}-{version}.{type}")
                 .file("byte-buddy-1.0.jar", "jar")
