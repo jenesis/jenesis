@@ -881,7 +881,9 @@ public record Project(
 
                     ## 5. Pin, then compare
 
-                    Commit before the first `pin`. It rewrites each pom.xml's <dependencyManagement>
+                    Until it is pinned, a tool the build resolves itself - JUnit's launcher, Error
+                    Prone, Checkstyle, a code generator - takes its newest release, so the first pin
+                    also settles those. Commit before the first `pin`. It rewrites each pom.xml's <dependencyManagement>
                     with the versions and checksums it resolved, keeping only the imported BOMs, so
                     review that diff. A pinned entry outranks a BOM, as any managed version does: to
                     move to a new BOM version, change it, delete the entries `pin` wrote and pin
@@ -914,7 +916,8 @@ public record Project(
                       compilerArgs / options.compilerArgs -> process-javac.properties (12)
                       annotationProcessorPaths / annotationProcessor -> @jenesis.plugin (13, 39)
                       Error Prone / net.ltgt.errorprone
-                          -> errorprone.properties with @jenesis.plugin javac <coordinate> (14)
+                          -> errorprone.properties with @jenesis.plugin javac <coordinate> (14), in
+                          a pom.xml <!--jenesis.plugin javac maven/<groupId>/<artifactId>-->
                       kotlin-maven-plugin / kotlin("jvm") -> .kt sources, found on their own (41, 43)
                       scala-maven-plugin / scala -> .scala sources, compiled by Scala 3 (44)
                       gmavenplus / groovy -> .groovy sources (46)
