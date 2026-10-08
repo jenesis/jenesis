@@ -106,6 +106,61 @@ public class TestModuleTest {
     }
 
     @Test
+    public void reads_its_resources_as_files_when_the_tests_run_against_folders() throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "FileTest", """
+                package sample;
+                public class FileTest {
+                    @org.junit.jupiter.api.Test
+                    public void test() throws Exception {
+                        java.io.File file = new java.io.File(getClass().getResource("/data.txt").toURI());
+                        System.out.println("Read " + java.nio.file.Files.readString(file.toPath()));
+                    }
+                }
+                """, bootModuleJars());
+        Files.writeString(Files.createDirectories(classes.resolve(BuildStep.RESOURCES)).resolve("data.txt"), "a file");
+        settings.put("test.jars", "false");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .isTest(candidate -> candidate.endsWith("FileTest")),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content()
+                .as("a resource in a folder has a file: URL, where one in a jar is not hierarchical")
+                .contains("Read a file");
+    }
+
+    @Test
+    public void refuses_to_run_the_tests_of_a_module_on_the_module_path_against_folders() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                new TestModule(Map.of(), Map.of())
+                        .jarsOnly(false)
+                        .pathPlacement(PathPlacement.MODULE_PATH)
+                        .moduleName("sample"),
+                "dependencies", "classes");
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("module sample")
+                .hasMessageContaining("jenesis.test.jars=true");
+    }
+
+    @Test
     public void selects_by_maven_naming_in_the_default_package_but_not_nested_or_versioned_classes() throws IOException {
         compileSource(classes.resolve(Javac.CLASSES + "sample"), "PlainTest", """
                 public class PlainTest {

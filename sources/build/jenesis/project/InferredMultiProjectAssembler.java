@@ -381,8 +381,11 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                         .pathPlacement(descriptor.pathPlacement())
                                         .moduleName(properties.getProperty("module"))
                                         .custom(hooks.getOrDefault("observed", none))),
-                                Stream.concat(Stream.of("prepare", "binary", "layers"),
-                                        inputs(descriptor, closure)));
+                                Stream.of(descriptor.resources().stream(),
+                                                resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"),
+                                                Stream.of("prepare", "binary", "layers"),
+                                                inputs(descriptor, closure))
+                                        .flatMap(Function.identity()));
                     }
                 }
             }

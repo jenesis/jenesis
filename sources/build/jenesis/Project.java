@@ -877,7 +877,9 @@ public record Project(
                     (Test*, *Test, *Tests, *TestCase, IT*, *IT, *ITCase, never a nested class); a
                     <module>/<regex> entry reaches that module only, and a module no entry reaches
                     runs no tests. The tests run against the module's jar, so a test that turns
-                    getResource into a java.io.File fails; read the resource as a stream. A build prints
+                    getResource into a java.io.File fails with "URI is not hierarchical";
+                    -Djenesis.test.jars=false runs them against its classes and resources folders
+                    instead, as Maven does, while the modules it depends on stay jars. A build prints
                     no test totals: -Djenesis.print.tests streams the runner's summary, and the test
                     step's supplement/output keeps it.
 
@@ -3329,6 +3331,7 @@ public record Project(
                 test.filter||Comma-separated [<module>/]<classRegex>[#<method>] entries restricting which tests run; an entry naming a module applies to its tests alone, and a test module no entry reaches runs none
                 test.tag||Comma-separated alternatives, a test running when it matches any of them: a tag, several joined by + for the tests carrying all of them, and -<tag> for the tests not carrying it, as -container or release+-soak,-container, with nothing to quote on a command line and translated for the test framework; a run remembers what it covered until the tests' inputs change, so a later selection runs only the tests no earlier one ran
                 test.force|false|Execute tests even where a previous run already covered them
+                test.jars|true|Run the tests against the packaged test jar; false runs them against the module's classes and resources folders ahead of it, as Maven and Gradle do, so a test can read its own resources as files, while the modules it depends on stay jars; a module tested on the module path refuses false
                 test.incremental||Run only the tests a change can reach: true, or the setting named with no value, detects changes with MD5, the name of another message digest with that one, and false runs every test
                 test.parallel|false|Let the engine execute the matched tests concurrently
                 test.reporting|false|Write test reports into the module's reports/tests folder
