@@ -2,6 +2,7 @@ package build.jenesis.maven;
 
 import module java.base;
 import module java.xml;
+import build.jenesis.BuildExecutor;
 import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.License;
@@ -508,9 +509,16 @@ public class MavenPomResolver implements MavenResolver {
         SequencedSet<Path> modules = new LinkedHashSet<>();
         Map<DependencyCoordinate, UnresolvedPom> unresolved = new HashMap<>();
         Map<Path, UnresolvedPom> paths = new HashMap<>();
-        Queue<Path> queue = new ArrayDeque<>();
-        Path current = root;
-        do {
+        Queue<Map.Entry<Path, String>> queue = new ArrayDeque<>(List.of(Map.entry(root, "")));
+        while (!queue.isEmpty()) {
+            Map.Entry<Path, String> listed = queue.remove();
+            Path current = listed.getKey();
+            if (Files.exists(current.resolve(BuildExecutor.SKIP_MARKER))) {
+                continue;
+            } else if (!Files.isRegularFile(current.resolve("pom.xml"))) {
+                throw new IllegalArgumentException(listed.getValue() + " names "
+                        + root.relativize(current) + ", which holds no pom.xml - correct or remove the entry");
+            }
             if (modules.add(current)) {
                 UnresolvedPom pom;
                 try {
@@ -528,14 +536,15 @@ public class MavenPomResolver implements MavenResolver {
                 }
                 if (pom.modules() != null) {
                     for (String module : pom.modules()) {
-                        queue.add(current.resolve(module).normalize());
+                        queue.add(Map.entry(current.resolve(module).normalize(),
+                                "<module>" + module + "</module> of " + root.relativize(current.resolve("pom.xml"))));
                     }
                 }
                 paths.put(current, pom);
             } else {
                 throw new IllegalArgumentException("Circular POM module reference to " + current);
             }
-        } while ((current = queue.poll()) != null);
+        }
         Map<MavenDependencyName, String> subprojects = new HashMap<>();
         for (Path module : modules) {
             UnresolvedPom pom = paths.get(module);

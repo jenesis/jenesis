@@ -522,8 +522,10 @@ public class MavenProject implements BuildExecutorModule {
                 }
 
                 @Override
-                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
                     if (!dir.equals(root) && Files.exists(dir.resolve(BuildExecutor.SKIP_MARKER))) {
+                        Files.createFile(Files.createDirectories(poms.resolve(root.relativize(dir)))
+                                .resolve(BuildExecutor.SKIP_MARKER));
                         return FileVisitResult.SKIP_SUBTREE;
                     }
                     return FileVisitResult.CONTINUE;

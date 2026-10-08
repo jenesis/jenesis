@@ -85,6 +85,85 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void skips_a_listed_module_whose_folder_is_marked_to_be_skipped() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>kept</module>
+                        <module>skipped</module>
+                    </modules>
+                </project>
+                """);
+        for (String name : List.of("kept", "skipped")) {
+            Path subproject = Files.createDirectory(project.resolve(name));
+            Files.writeString(Files.createDirectories(subproject.resolve("src/main/java")).resolve("source"), "foo");
+            Files.writeString(subproject.resolve("pom.xml"), """
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>group</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>%s</artifactId>
+                    </project>
+                    """.formatted(name));
+        }
+        Files.createFile(project.resolve("skipped").resolve(BuildExecutor.SKIP_MARKER));
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results).containsKey("maven/module-kept/manifests");
+        assertThat(results.keySet())
+                .as("a module the aggregator lists is left out when its folder carries the skip marker")
+                .noneMatch(key -> key.contains("skipped"));
+    }
+
+    @Test
+    public void names_the_module_entry_that_points_at_a_folder_without_a_pom() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>missing</module>
+                    </modules>
+                </project>
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("<module>missing</module>")
+                .hasMessageContaining("no pom.xml");
+    }
+
+    @Test
     public void can_resolve_pom() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
