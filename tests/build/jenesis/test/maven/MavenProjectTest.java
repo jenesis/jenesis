@@ -246,6 +246,40 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void compiles_the_tests_for_the_release_maven_compiler_test_release_names() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>8</maven.compiler.release>
+                        <maven.compiler.testRelease>17</maven.compiler.testRelease>
+                    </properties>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve("process/javac.properties"))
+                .getProperty("--release")).isEqualTo("8");
+        assertThat(SequencedProperties.ofFiles(results.get("maven/test-module-/manifests").resolve("process/javac.properties"))
+                .getProperty("--release")).isEqualTo("17");
+    }
+
+    @Test
     public void test_scoped_attach_is_routed_to_test_module_only() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
