@@ -46,6 +46,14 @@ public interface TestFramework extends Serializable {
         return arguments;
     }
 
+    default List<String> engines(List<String> arguments, String engines) {
+        if (engines != null) {
+            throw new IllegalArgumentException(getClass().getSimpleName() + " runs on no JUnit Platform engine, so"
+                    + " jenesis.test.engines cannot select " + engines + " - leave it unset for these tests");
+        }
+        return arguments;
+    }
+
     static TestFramework named(String name) {
         return switch (name.toLowerCase(Locale.ROOT)) {
             case "junit-platform" -> new JUnitPlatform();

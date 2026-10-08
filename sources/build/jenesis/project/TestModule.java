@@ -39,6 +39,7 @@ public class TestModule implements BuildExecutorModule {
     private final String filter;
     private final String exclude;
     private final String tag;
+    private final String engines;
     private final boolean force;
     private final boolean parallel;
     private final boolean reporting;
@@ -58,6 +59,7 @@ public class TestModule implements BuildExecutorModule {
                 true,
                 null,
                 PathPlacement.CLASS_PATH,
+                null,
                 null,
                 null,
                 null,
@@ -88,6 +90,7 @@ public class TestModule implements BuildExecutorModule {
                 environment.getProperty("test.filter"),
                 environment.getProperty("test.exclude"),
                 environment.getProperty("test.tag"),
+                environment.value("test.engines"),
                 environment.flag("test.force"),
                 environment.flag("test.parallel"),
                 environment.flag("test.reporting"),
@@ -133,6 +136,7 @@ public class TestModule implements BuildExecutorModule {
                        String filter,
                        String exclude,
                        String tag,
+                       String engines,
                        boolean force,
                        boolean parallel,
                        boolean reporting,
@@ -155,6 +159,7 @@ public class TestModule implements BuildExecutorModule {
         this.filter = filter;
         this.exclude = exclude;
         this.tag = tag;
+        this.engines = engines;
         this.force = force;
         this.parallel = parallel;
         this.reporting = reporting;
@@ -178,6 +183,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -202,6 +208,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -226,6 +233,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -250,6 +258,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -274,6 +283,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -298,6 +308,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -322,6 +333,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -346,6 +358,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -370,6 +383,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -394,6 +408,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -418,6 +433,32 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                incrementalDigest,
+                terms,
+                skip);
+    }
+
+    public TestModule engines(String engines) {
+        return new TestModule(framework,
+                isTest,
+                factory,
+                resolvers,
+                dependencies,
+                jarsOnly,
+                requireFramework,
+                pinning,
+                pathPlacement,
+                moduleName,
+                filter,
+                exclude,
+                tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -442,6 +483,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -466,6 +508,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -490,6 +533,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -514,6 +558,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -542,6 +587,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -566,6 +612,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -590,6 +637,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 exclude,
                 tag,
+                engines,
                 force,
                 parallel,
                 reporting,
@@ -640,6 +688,7 @@ public class TestModule implements BuildExecutorModule {
                         filter,
                         exclude,
                         tag,
+                        engines,
                         force,
                         parallel,
                         reporting,
@@ -812,6 +861,7 @@ public class TestModule implements BuildExecutorModule {
         private final transient String filter;
         private final String exclude;
         private final transient String tag;
+        private final String engines;
         private final transient boolean force;
         private final transient boolean parallel;
         private final boolean reporting;
@@ -829,6 +879,7 @@ public class TestModule implements BuildExecutorModule {
                     String filter,
                     String exclude,
                     String tag,
+                    String engines,
                     boolean force,
                     boolean parallel,
                     boolean reporting,
@@ -846,6 +897,7 @@ public class TestModule implements BuildExecutorModule {
             this.filter = filter;
             this.exclude = exclude;
             this.tag = tag;
+            this.engines = engines;
             this.force = force;
             this.parallel = parallel;
             this.reporting = reporting;
@@ -1216,13 +1268,13 @@ public class TestModule implements BuildExecutorModule {
                     selection = narrowed;
                 }
             }
-            commands.addAll(resolved.tags(resolved.arguments(
+            commands.addAll(resolved.engines(resolved.tags(resolved.arguments(
                     context.supplement(),
                     context.next(),
                     selection,
                     matchedMethods,
                     parallel,
-                    reporting), tags, ran));
+                    reporting), tags, ran), engines));
             return CompletableFuture.completedFuture(commands);
         }
 

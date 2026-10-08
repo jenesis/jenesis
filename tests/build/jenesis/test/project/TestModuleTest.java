@@ -108,6 +108,31 @@ public class TestModuleTest {
     }
 
     @Test
+    public void runs_only_the_engines_the_selection_leaves_in() throws IOException {
+        settings.put("test.engines", "-junit-jupiter");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content()
+                .as("an engine left out discovers nothing, so its tests do not run")
+                .doesNotContain("Hello world!");
+    }
+
+    @Test
     public void reads_its_resources_as_files_when_the_tests_run_against_folders() throws IOException {
         compileSource(classes.resolve(Javac.CLASSES + "sample"), "FileTest", """
                 package sample;
