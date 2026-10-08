@@ -1704,8 +1704,8 @@ public record Project(
                     Write one only when skill/registry has no line for the job. A plugin adds steps
                     to the stock build and replaces none; skill/plugins wires it in. The smallest
                     whole example is demo-57-internal-module, the same plugin published is
-                    demo-58-external-module, and demo-59-project-plugins uses every project-wide
-                    hook point.
+                    demo-58-external-module, demo-59-project-plugins uses every project-wide
+                    hook point, and demo-73-byte-buddy generates classes with a library's API.
 
                     ## The shape
 
@@ -1746,7 +1746,8 @@ public record Project(
                     them returns early on the other. The resolved dependencies arrive as a folder too:
                     Dependencies.select(folder, "main", "compile") lists the jars of one group and
                     scope, Dependencies.all(folder) every one. What a step at binary/compiled writes
-                    as classes/ and a manifest.mf is merged into the module's jar.
+                    as classes/ and a manifest.mf is merged into the module's jar beside what javac
+                    compiled, which it never sees or replaces: a class both write fails the build.
 
                     ## Pick the hook point by what the step produces
 
@@ -1848,7 +1849,8 @@ public record Project(
                                          59 project-plugins (hooks from a first check to release),
                                          60 custom-maven, 61 custom-modular,
                                          62 custom-build (no Project at all),
-                                         63 tools-api (a build inside another program's JVM)
+                                         63 tools-api (a build inside another program's JVM),
+                                         73 byte-buddy (a plugin that generates classes)
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;

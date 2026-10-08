@@ -121,6 +121,7 @@ Quick index
 | 70 | [`reproducible`](demo-70-reproducible/README.md)                  | Build the same bytes on every machine, checked against a recorded digest     | `java build/Demo.java`            |
 | 71 | [`native-image`](demo-71-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
 | 72 | [`jpx`](demo-72-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
+| 73 | [`byte-buddy`](demo-73-byte-buddy/README.md)                      | Generate classes in a plugin written against Byte Buddy's API                | `java build/jenesis/Execute.java` |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1094,6 +1095,20 @@ be pointed at a mirror with `JENESIS_REPOSITORY_URI` and `MAVEN_REPOSITORY_URI`.
 
 The demo runs those same commands from `java build/Demo.java`, with the
 installation directed at its own `target/` so your home directory is left alone.
+
+## 55. A plugin on a library's API - [`byte-buddy`](demo-73-byte-buddy/README.md)
+
+The plugins of the `internal-module` demo write sources. A plugin of
+`binary/compiled` runs beside `javac` instead, and what it writes below `classes/`
+joins the module's jar:
+
+    greeter+binary/compiled=./plugin
+
+This one requires `net.bytebuddy` and generates `sample.Greeting`, a `Supplier`
+returning the text its properties file names. Byte Buddy resolves into the
+plugin's own module layer and never reaches the application. The plugin adds
+classes and never replaces one `javac` compiled: a class both write fails the
+build.
 
 Cross-cutting concepts
 ----------------------
