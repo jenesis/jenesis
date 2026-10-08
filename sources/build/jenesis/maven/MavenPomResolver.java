@@ -19,6 +19,7 @@ public class MavenPomResolver implements MavenResolver {
             NAMESPACE_4_1_0 = "http://maven.apache.org/POM/4.1.0";
     private static final Set<String> IMPLICITS = Set.of("groupId", "artifactId", "version", "packaging");
     private static final Set<String> JDK_ACTIVATIONS = Set.of("jdk", "activeByDefault");
+    private static final Set<String> PROCESSORS = Set.of("processor", "classpath-processor", "modular-processor");
     private static final Pattern PROPERTY = Pattern.compile("(\\$\\{([^}]+)})");
     private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
     private static final Pattern JDK_RANGE = Pattern.compile(
@@ -401,7 +402,8 @@ public class MavenPomResolver implements MavenResolver {
                     break;
                 } else if (current.exclusions().contains(new MavenDependencyName(entry.getKey().groupId(), entry.getKey().artifactId()))
                         || current.exclusions().contains(new MavenDependencyName(entry.getKey().groupId(), "*"))
-                        || current.exclusions().contains(new MavenDependencyName("*", entry.getKey().artifactId()))) {
+                        || current.exclusions().contains(new MavenDependencyName("*", entry.getKey().artifactId()))
+                        || PROCESSORS.contains(entry.getKey().type())) {
                     continue;
                 }
                 MavenDependencyValue override = managedDependencies.get(entry.getKey()), value;
@@ -571,7 +573,8 @@ public class MavenPomResolver implements MavenResolver {
         SequencedMap<Path, MavenLocalPom> results = new LinkedHashMap<>();
         for (Path module : modules) {
             UnresolvedPom pom = paths.get(module);
-            SequencedMap<String, String> plugins = new LinkedHashMap<>(pom.plugins());
+            SequencedMap<String, String> plugins = new LinkedHashMap<>(pom.plugins()),
+                    testPlugins = new LinkedHashMap<>(pom.plugins());
             SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = new LinkedHashMap<>();
             SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies = managed(executor,
                     MavenRepository.of(repository),
@@ -591,10 +594,11 @@ public class MavenPomResolver implements MavenResolver {
                             resolved.checksum());
                 }
                 switch (resolvedKey.type()) {
-                    case "processor", "classpath-processor", "modular-processor" -> plugins.put("maven/"
-                            + resolvedKey.groupId() + "/"
-                            + resolvedKey.artifactId()
-                            + (resolved.version() == null ? "" : "/" + resolved.version()), "plugin");
+                    case "processor", "classpath-processor", "modular-processor" ->
+                            (resolved.scope() == MavenDependencyScope.TEST ? testPlugins : plugins).put("maven/"
+                                    + resolvedKey.groupId() + "/"
+                                    + resolvedKey.artifactId()
+                                    + (resolved.version() == null ? "" : "/" + resolved.version()), "plugin");
                     case "classpath-jar", "modular-jar" -> throw new IllegalArgumentException("The dependency on "
                             + resolvedKey.groupId() + ":" + resolvedKey.artifactId() + " in " + module.resolve("pom.xml")
                             + " is of type " + resolvedKey.type() + ", but Jenesis places a jar by whether it"
@@ -633,6 +637,7 @@ public class MavenPomResolver implements MavenResolver {
                     pom.attachments(),
                     pom.natives(),
                     plugins,
+                    testPlugins,
                     pom.signatures(),
                     property(pom.properties().get("mainClass"), pom.properties()),
                     pom.metadata().entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,

@@ -765,8 +765,9 @@ public class MavenProject implements BuildExecutorModule {
                     properties.setProperty("natives", natives);
                 }
             }
-            if (value.plugins() != null && !value.plugins().isEmpty()) {
-                properties.setProperty("plugins", value.plugins().entrySet().stream()
+            SequencedMap<String, String> plugins = test ? value.testPlugins() : value.plugins();
+            if (plugins != null && !plugins.isEmpty()) {
+                properties.setProperty("plugins", plugins.entrySet().stream()
                         .map(plugin -> plugin.getKey() + "=" + plugin.getValue())
                         .collect(Collectors.joining("\t")));
             }
