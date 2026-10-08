@@ -68,7 +68,7 @@ public class Sbom implements BuildStep {
                 Path.of(METADATA),
                 Path.of(Dependencies.GRAPH),
                 Path.of(Dependencies.LICENSES),
-                Path.of(Dependencies.SOURCES),
+                Path.of(Dependencies.ARCHIVES),
                 Path.of(Dependencies.RESOLVED),
                 Path.of(Dependencies.SPDX),
                 Path.of(RELEASE))
@@ -137,8 +137,8 @@ public class Sbom implements BuildStep {
             SequencedProperties licenses = Files.exists(sidecar)
                     ? SequencedProperties.ofFiles(sidecar)
                     : new SequencedProperties();
-            Path located = argument.folder().resolve(Dependencies.SOURCES);
-            SequencedProperties sources = Files.exists(located)
+            Path located = argument.folder().resolve(Dependencies.ARCHIVES);
+            SequencedProperties archives = Files.exists(located)
                     ? SequencedProperties.ofFiles(located)
                     : new SequencedProperties();
             Set<Path> runtime = new HashSet<>();
@@ -166,7 +166,7 @@ public class Sbom implements BuildStep {
                     CycloneDx.Component component = component(coordinate,
                             Files.exists(jar) ? HexFormat.of().formatHex(hash.hash(jar)) : null,
                             readLicenses(licenses, licenseKey)).scope(runtime.contains(jar) ? "required" : "excluded");
-                    String source = sources.getProperty(licenseKey);
+                    String source = archives.getProperty(licenseKey);
                     components.put(coordinate, source == null
                             ? component
                             : component.externalReferences(List.of(
