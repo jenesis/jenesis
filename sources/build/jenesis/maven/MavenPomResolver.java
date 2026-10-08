@@ -701,6 +701,8 @@ public class MavenPomResolver implements MavenResolver {
                 Map<DependencyKey, DependencyValue> inheritedManagedDependencies = new LinkedHashMap<>();
                 SequencedMap<DependencyKey, DependencyValue> dependencies = new LinkedHashMap<>();
                 List<License> parentLicenses = List.of();
+                SequencedMap<String, String> parentQualified = Collections.emptyNavigableMap(),
+                        parentPlugins = Collections.emptyNavigableMap();
                 String groupId = null, artifactId = null, version = null;
                 if (parent != null) {
                     if (!children.add(new DependencyCoordinate(parent.groupId(),
@@ -735,6 +737,9 @@ public class MavenPomResolver implements MavenResolver {
                                     || !parent.artifactId().equals(artifactId)
                                     || !parent.version().equals(version)) {
                                 resolution = null;
+                            } else {
+                                parentQualified = resolution.qualifiedDependencies();
+                                parentPlugins = resolution.plugins();
                             }
                         }
                     }
@@ -882,8 +887,8 @@ public class MavenPomResolver implements MavenResolver {
                         properties,
                         managedDependencies,
                         dependencies,
-                        extended
-                                ? toQualifiedDependencies(document.getDocumentElement())
+                        extended || trusted && path != null
+                                ? inherited(toQualifiedDependencies(document.getDocumentElement()), parentQualified)
                                 : Collections.emptyNavigableMap(),
                         extended
                                 ? toAttachments(document.getDocumentElement())
@@ -891,8 +896,8 @@ public class MavenPomResolver implements MavenResolver {
                         extended
                                 ? toNatives(document.getDocumentElement())
                                 : Collections.emptyNavigableSet(),
-                        extended
-                                ? toPlugins(document.getDocumentElement())
+                        extended || trusted && path != null
+                                ? inherited(toPlugins(document.getDocumentElement()), parentPlugins)
                                 : Collections.emptyNavigableMap(),
                         extended
                                 ? toSignatures(document.getDocumentElement())
@@ -1308,6 +1313,12 @@ public class MavenPomResolver implements MavenResolver {
                     }
                 });
         return entries;
+    }
+
+    private static SequencedMap<String, String> inherited(SequencedMap<String, String> own,
+                                                          SequencedMap<String, String> parent) {
+        parent.forEach(own::putIfAbsent);
+        return own;
     }
 
     private static SequencedMap<String, String> toPlugins(Node node) {

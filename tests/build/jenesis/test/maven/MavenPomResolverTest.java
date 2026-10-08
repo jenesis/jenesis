@@ -4113,6 +4113,62 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_inherits_the_plugin_and_pin_comments_of_its_local_parent() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <!--jenesis.plugin
+                    javac maven/com.google.errorprone/error_prone_core
+                    maven/org.example/processor/1.0
+                    -->
+                    <!--jenesis.pin
+                    javac/maven/com.google.errorprone/error_prone_core 2.50.0
+                    javac/maven/com.google.guava/guava 33.0.0-jre
+                    -->
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("child")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>project</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <!--jenesis.plugin
+                    maven/org.example/other/2.0
+                    -->
+                    <!--jenesis.pin
+                    javac/maven/com.google.guava/guava 33.5.0-jre
+                    -->
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        MavenLocalPom child = poms.get(Path.of("child"));
+        assertThat(child.plugins())
+                .as("a module inherits the plugins its parent in the project declares, beside its own")
+                .containsEntry("maven/com.google.errorprone/error_prone_core", "javac")
+                .containsEntry("maven/org.example/processor/1.0", "plugin")
+                .containsEntry("maven/org.example/other/2.0", "plugin");
+        assertThat(child.qualifiedDependencies())
+                .as("a pin the module declares itself wins over its parent's")
+                .containsEntry("javac/maven/com.google.errorprone/error_prone_core", "2.50.0")
+                .containsEntry("javac/maven/com.google.guava/guava", "33.5.0-jre");
+        assertThat(poms.get(Path.of("")).qualifiedDependencies())
+                .containsEntry("javac/maven/com.google.guava/guava", "33.0.0-jre");
+    }
+
+    @Test
     public void local_pom_reads_plugin_comment_block() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
