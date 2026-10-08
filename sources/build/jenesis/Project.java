@@ -962,7 +962,9 @@ public record Project(
                       moditect / an extra-java-module-info plugin
                           -> @jenesis.alias, modules.properties (21)
                       a relocating shade / shadow -> no relocation: @jenesis.layer keeps two
-                          versions apart without rewriting a class (24, 25)
+                          versions apart without rewriting a class (24, 25); a library that shaded
+                          a dependency publishes it as a dependency instead, and a `requires static`
+                          on it becomes `requires`
                       versions locking, checksums / dependency locking and verification
                           -> `pin`, -Djenesis.dependency.pin=strict (28)
                       pgpverify-maven-plugin / verification-metadata.xml signatures
