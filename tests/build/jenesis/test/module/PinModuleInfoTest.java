@@ -171,6 +171,24 @@ public class PinModuleInfoTest {
     }
 
     @Test
+    public void refreshes_a_classified_pin_spelt_from_its_repository() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.pin maven/org.example/lib/tests 0.9
+                 */
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib/tests", "1.0 SHA-256/cafebabe"));
+        String result = run(file);
+        assertThat(result)
+                .as("maven/<coordinate> is read in the module's group, so it names the coordinate that was resolved")
+                .contains("@jenesis.pin main/maven/org.example/lib/tests 1.0 SHA-256/cafebabe")
+                .doesNotContain("0.9");
+    }
+
+    @Test
     public void writes_qualified_dependencies_as_jenesis_pin_tags() throws IOException {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """
