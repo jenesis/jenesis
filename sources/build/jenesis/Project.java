@@ -805,16 +805,28 @@ public record Project(
                                          one per project; steps 3 and 4 follow it.
                       module-info.java   the modular_to_maven layout; the Java Module System
                                          declares the build, and the published POM is generated
-                                         from it. For code that is a named module already, or is
-                                         to become one; step 3b follows it.
+                                         from it; step 3b follows it.
 
-                    Either way the first build that passes is the baseline every later step is
-                    compared against. A Gradle build has no counterpart, since no build.gradle is
-                    read: a pom.xml needs only coordinates, dependencies with their scopes and
-                    maven.compiler.release. Tests that share the main code's packages, as most
-                    white-box tests do, need a pom.xml: there they run on the class path, while a
-                    module of tests cannot hold a package of the module it tests. skill/layout has
-                    the rest.
+                    Check first whether the code can be modules as it stands. It cannot while a
+                    package is split: held by the tests and the main code of one project, as
+                    white-box tests are, or by two projects of the build. Per project, and across
+                    the main sources of all of them:
+
+                      comm -12 <(cd src/main/java && find . -name '*.java' | sed 's|/[^/]*$||' | sort -u) \\
+                               <(cd src/test/java && find . -name '*.java' | sed 's|/[^/]*$||' | sort -u)
+                      find . -path '*/src/main/java/*.java' | sed 's|/src/main/java/| |; s|/[^/]*$||' \\
+                          | sort -u | cut -d' ' -f2 | sort | uniq -d
+
+                    A package either line prints, or one that a dependency holds as well, rules
+                    modules out for now: migrate to pom.xml first, whichever declaration was asked
+                    for, and say so - which packages are split and where. That is phase one; it
+                    changes the build and nothing of the code. Phase two moves the result to
+                    module-info.java as a change of its own, once the pom.xml build compares equal
+                    with the old one, so close phase one by naming the split packages and offering
+                    phase two, as step 3b describes. A Gradle build has no counterpart, since no
+                    build.gradle is read: a pom.xml needs only coordinates, dependencies with their
+                    scopes and maven.compiler.release. The first build that passes is the baseline
+                    every later step is compared against. skill/layout has the rest.
 
                     ## 3. Know what a pom.xml keeps
 
@@ -844,6 +856,22 @@ public record Project(
                     project.properties at the root, which skill/target lists the keys of.
 
                     ## 3b. Or declare the build in module-info.java
+
+                    Directly, where step 2 found no split package, or as phase two over a pom.xml
+                    build that already compares equal. Phase two first takes the splits apart, one
+                    package at a time and building after each:
+
+                      white-box tests      move them into packages of the test module's own, such
+                                           as <package>.test, testing the public API where they
+                                           can; what a test still needs becomes public in a
+                                           package the module exports to the tests alone,
+                                           `exports <package> to <test module>`, and `opens
+                                           <package> to <test module>` where it reflects
+                      two projects         move the classes so each package lives in one module,
+                                           or merge the projects, keeping a qualified export for
+                                           a package only a sibling uses
+                      a dependency         exclude the jar that holds the package, or move the
+                                           project's classes out of it
 
                     Each module is the folder whose module-info.java sits at the root of its
                     sources; in a Maven tree that is src/main/java, so the file stays where it is.
