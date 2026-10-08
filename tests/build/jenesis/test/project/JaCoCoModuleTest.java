@@ -75,6 +75,39 @@ public class JaCoCoModuleTest {
                 .doesNotContain(third.toString());
     }
 
+    @Test
+    public void report_leaves_out_the_classes_of_the_tests_when_told_they_are_no_code_under_test() throws IOException {
+        Path resolved = Files.createDirectory(project.resolve(Dependencies.RESOLVED));
+        Path first = Files.write(resolved.resolve("maven%2Forg.example%2Flibrary%2F1.0.jar"), new byte[0]);
+        Files.write(project.resolve("jacoco.exec"), new byte[0]);
+        Path tests = Files.createDirectories(project.resolve(BuildStep.CLASSES + "sample"));
+        Files.write(tests.resolve("SampleTest.class"), new byte[0]);
+        Path testSources = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(testSources.resolve("SampleTest.java"), "class SampleTest {}");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/compile/maven/org.example/library/1.0",
+                Dependencies.RESOLVED + first.getFileName());
+        index.store(project.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("vertex/main/compile/maven/org.example/library", "1.0\t\tfalse\ttrue");
+        graph.store(project.resolve(Dependencies.GRAPH));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "jacoco",
+                new JaCoCoModule(Map.of("maven", serving(cli())), Map.of("maven", Resolver.identity())).classes(false),
+                "project");
+        executor.execute("jacoco/report");
+
+        assertThat(root.resolve("jacoco").resolve("report").resolve("supplement").resolve("command"))
+                .content()
+                .contains("--classfiles " + first)
+                .as("the compiled tests are not counted as covered code")
+                .doesNotContain(project.resolve(BuildStep.CLASSES).toString())
+                .doesNotContain(project.resolve(BuildStep.SOURCES).toString());
+    }
+
     private Path cli() throws IOException {
         Path source = tool.resolve("Main.java");
         Files.writeString(source, """

@@ -291,7 +291,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         SequencedMap<String, BuildExecutorModule> reports = new LinkedHashMap<>();
         List<ObservabilityEngine> engines = new ArrayList<>();
         if (jacoco != null && BuildStep.locate(configuration, "jacoco.properties") != null) {
-            BuildExecutorModule report = jacoco.apply(jacocoModule.pinning(pinning));
+            BuildExecutorModule report = jacoco.apply(jacocoModule.pinning(pinning).classes(false));
             if (report != null) {
                 JaCoCo engine = new JaCoCo();
                 engines.add(engine);
