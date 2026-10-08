@@ -4412,6 +4412,60 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void reads_a_module_alias_from_a_pom_comment_and_inherits_one_from_a_local_parent() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <!--jenesis.alias groovy.all org.codehaus.groovy/groovy-all-->
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("child")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <!--jenesis.alias
+                    jline jline/jline
+                    -->
+                </project>
+                """);
+        assertThat(mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of("child")).aliases())
+                .as("a jar without a module name is named for the module path, as @jenesis.alias does in module-info.java")
+                .containsExactly(Map.entry("jline", "jline/jline"), Map.entry("groovy.all", "org.codehaus.groovy/groovy-all"));
+    }
+
+    @Test
+    public void refuses_a_module_alias_comment_that_names_no_coordinate() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.alias jline jline-->
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed jenesis.alias target 'jline'")
+                .hasMessageContaining("<groupId>/<artifactId>");
+    }
+
+    @Test
     public void local_pom_of_model_4_1_0_discovers_its_subprojects_without_a_list() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

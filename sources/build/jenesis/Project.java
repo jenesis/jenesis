@@ -826,7 +826,10 @@ public record Project(
                     migrates to pom.xml and stays there, whichever declaration was asked for: say so,
                     and attempt no phase two. Where it ships a descriptor for Java 9 and later, the
                     module-info.java lives in META-INF/versions/9/ of its sources and the pom.xml build
-                    compiles it there.
+                    compiles it there, against the dependencies that carry a module name; one whose
+                    jar declares none, as jline 2 or groovy-all 2 do, is named by a
+                    <!--jenesis.alias <module> <groupId>/<artifactId>--> comment in the pom.xml, the
+                    name the descriptor requires.
 
                     Otherwise a package either line prints, or one that a dependency holds as well,
                     rules modules out for now: migrate to pom.xml first, whichever declaration was asked
@@ -859,9 +862,10 @@ public record Project(
                                  sourceDirectory, testSourceDirectory and the <directory> of each
                                  resource, a local parent's where the module names none - one
                                  folder per scope, so .groovy tests in src/test/groovy are found
-                                 once testSourceDirectory names it; the <!--jenesis.plugin--> and <!--jenesis.pin-->
-                                 comments of the module's POM and of a local parent, where the
-                                 module's own pin wins and `pin` writes into the module's POM;
+                                 once testSourceDirectory names it; the <!--jenesis.plugin-->,
+                                 <!--jenesis.pin--> and <!--jenesis.alias--> comments of the
+                                 module's POM and of a local parent, where the module's own pin
+                                 wins and `pin` writes into the module's POM;
                                  a profile of any POM - the module's, a parent's, a BOM's or a
                                  dependency's - that Maven activates by <jdk>, matched against the
                                  JDK the build runs on, or by <activeByDefault> when no other
@@ -1330,8 +1334,7 @@ public record Project(
                     guard applies a line only on a matching platform, with an unguarded line for the
                     same coordinate as fallback. Parentheses rather than brackets, because a
                     bracketed word is a link in a Markdown documentation comment and javadoc fails
-                    on one it cannot resolve. alias, exclude and override are MODULAR_TO_MAVEN
-                    only.
+                    on one it cannot resolve. exclude and override are MODULAR_TO_MAVEN only.
 
                       @jenesis.release <V>   Java release target (default: the running JDK's); <V>-preview also
                                              enables its preview features, to compile and to run
@@ -1420,7 +1423,10 @@ public record Project(
                           target already declares is allowed and does exactly that, so an alias need
                           not be dropped when its target grows a module name. The jar's manifest
                           hands the alias to its consumers; one for a `requires static` target
-                          applies only to a consumer that resolves that target.
+                          applies only to a consumer that resolves that target. MAVEN modules declare
+                          the same lines in a project-level <!--jenesis.alias <module>
+                          <groupId>/<artifactId>--> comment, a local parent's included, which names
+                          the jar for a module-info.java the build compiles in META-INF/versions/<N>.
                       @jenesis.exclude <module> <groupId>/<artifactId>...
                           Drop transitive dependencies of <module>, each with the subtree it pulled
                           in, from the compile path, runtime path and generated pom alike. Repeated

@@ -685,6 +685,7 @@ public class MavenPomResolver implements MavenResolver {
                     pom.natives(),
                     plugins,
                     testPlugins,
+                    pom.aliases(),
                     pom.signatures(),
                     property(pom.properties().get("mainClass"), pom.properties()),
                     pom.metadata().entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
@@ -773,6 +774,7 @@ public class MavenPomResolver implements MavenResolver {
                 List<License> parentLicenses = List.of();
                 SequencedMap<String, String> parentQualified = Collections.emptyNavigableMap(),
                         parentPlugins = Collections.emptyNavigableMap(),
+                        parentAliases = Collections.emptyNavigableMap(),
                         parentMetadata = Collections.emptyNavigableMap();
                 Set<String> parentVerbatim = Set.of();
                 String groupId = null, artifactId = null, version = null;
@@ -813,6 +815,7 @@ public class MavenPomResolver implements MavenResolver {
                             } else {
                                 parentQualified = resolution.qualifiedDependencies();
                                 parentPlugins = resolution.plugins();
+                                parentAliases = resolution.aliases();
                                 localParent = resolution;
                             }
                         }
@@ -1026,6 +1029,9 @@ public class MavenPomResolver implements MavenResolver {
                         extended || trusted && path != null
                                 ? inherited(toPlugins(document.getDocumentElement()), parentPlugins)
                                 : Collections.emptyNavigableMap(),
+                        extended || trusted && path != null
+                                ? inherited(toAliases(document.getDocumentElement()), parentAliases)
+                                : Collections.emptyNavigableMap(),
                         extended
                                 ? toSignatures(document.getDocumentElement())
                                 : Collections.emptyNavigableMap(),
@@ -1081,6 +1087,7 @@ public class MavenPomResolver implements MavenResolver {
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableSet(),
+                            Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
                             List.of(),
@@ -1638,6 +1645,55 @@ public class MavenPomResolver implements MavenResolver {
         return entries;
     }
 
+    private static SequencedMap<String, String> toAliases(Node node) {
+        SequencedMap<String, String> entries = new LinkedHashMap<>();
+        toChildren(node)
+                .filter(child -> child.getNodeType() == Node.COMMENT_NODE)
+                .map(Node::getNodeValue)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(text -> text.startsWith("jenesis.alias"))
+                .forEach(text -> {
+                    for (String line : text.substring("jenesis.alias".length()).replace("&#45;", "-").split("\n")) {
+                        String declaration = line.trim().replaceAll("\\s+", " ");
+                        if (declaration.isEmpty()) {
+                            continue;
+                        }
+                        String[] words = declaration.split(" ");
+                        if (words.length != 2) {
+                            throw new IllegalArgumentException("Malformed jenesis.alias declaration '"
+                                    + declaration
+                                    + "': expected <module> <groupId>/<artifactId>[/<type>[/<classifier>]]."
+                                    + " Every line inside a jenesis.alias comment is a declaration of its own,"
+                                    + " so prose written among them is read as one; move it outside the comment");
+                        }
+                        if (words[0].startsWith("java.") || words[0].startsWith("jdk.") || words[0].indexOf('/') >= 0) {
+                            throw new IllegalArgumentException("Illegal jenesis.alias name '"
+                                    + words[0]
+                                    + "': expected the name of a module that is not a platform module");
+                        }
+                        String[] segments = words[1].split("/", -1);
+                        if (segments.length < 2
+                                || segments.length > 4
+                                || Arrays.stream(segments).anyMatch(String::isEmpty)) {
+                            throw new IllegalArgumentException("Malformed jenesis.alias target '"
+                                    + words[1]
+                                    + "': expected <groupId>/<artifactId>[/<type>[/<classifier>]]");
+                        }
+                        String previous = entries.putIfAbsent(words[0], words[1]);
+                        if (previous != null && !previous.equals(words[1])) {
+                            throw new IllegalArgumentException("Duplicate jenesis.alias for "
+                                    + words[0]
+                                    + ": "
+                                    + previous
+                                    + " and "
+                                    + words[1]);
+                        }
+                    }
+                });
+        return entries;
+    }
+
     private static SequencedMap<String, String> toAttachments(Node node) {
         SequencedMap<String, String> entries = new LinkedHashMap<>();
         toChildren(node)
@@ -1875,6 +1931,7 @@ public class MavenPomResolver implements MavenResolver {
                                  SequencedMap<String, String> attachments,
                                  SequencedSet<String> natives,
                                  SequencedMap<String, String> plugins,
+                                 SequencedMap<String, String> aliases,
                                  SequencedMap<String, String> signatures,
                                  List<License> licenses,
                                  SequencedMap<String, String> metadata,

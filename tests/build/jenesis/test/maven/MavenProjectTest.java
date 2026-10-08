@@ -21,6 +21,7 @@ import build.jenesis.maven.MavenRepository;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.JavaToolchainModule;
 import build.jenesis.step.Bind;
+import build.jenesis.step.Versions;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -492,6 +493,40 @@ public class MavenProjectTest {
                 .stringPropertyNames())
                 .as("the main half's processor does not compile the tests")
                 .noneMatch(key -> key.contains("org.example/processor"));
+    }
+
+    @Test
+    public void a_module_alias_comment_names_the_jar_for_the_dependency_resolution_and_the_manifest() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.alias jline jline/jline-->
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path manifests = results.get("maven/module-/manifests");
+        assertThat(SequencedProperties.ofFiles(manifests.resolve(BuildStep.ALIASES)))
+                .containsOnly(Map.entry("main/module/jline", "jline/jline"));
+        try (InputStream input = Files.newInputStream(manifests.resolve(Versions.MANIFEST))) {
+            assertThat(new Manifest(input).getMainAttributes().getValue(PathPlacement.ALIASES))
+                    .as("the jar tells a consumer which name its descriptor requires the dependency by")
+                    .isEqualTo("jline=jline/jline");
+        }
     }
 
     @Test

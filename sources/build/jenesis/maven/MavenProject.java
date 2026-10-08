@@ -410,13 +410,28 @@ public class MavenProject implements BuildExecutorModule {
                                     }
                                     natives.store(context.next().resolve(BuildStep.NATIVES));
                                 }
+                                List<String> aliased = properties.value("aliases") == null
+                                        ? List.of()
+                                        : List.of(properties.value("aliases").split("\t"));
+                                if (!aliased.isEmpty()) {
+                                    SequencedProperties aliases = new SequencedProperties();
+                                    for (String entry : aliased) {
+                                        int split = entry.indexOf('=');
+                                        aliases.setProperty(group + "/module/" + entry.substring(0, split),
+                                                entry.substring(split + 1));
+                                    }
+                                    aliases.store(context.next().resolve(BuildStep.ALIASES));
+                                }
                                 String named = properties.getProperty("named"), release = properties.getProperty("release");
                                 boolean preview = release != null && release.endsWith("-preview");
-                                if (named != null || preview) {
+                                if (named != null || preview || !aliased.isEmpty()) {
                                     Manifest manifest = new Manifest();
                                     manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
                                     if (named != null) {
                                         manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, named);
+                                    }
+                                    if (!aliased.isEmpty()) {
+                                        manifest.getMainAttributes().putValue(PathPlacement.ALIASES, String.join(",", aliased));
                                     }
                                     if (preview) {
                                         manifest.getMainAttributes().putValue(PathPlacement.PREVIEW,
@@ -769,6 +784,11 @@ public class MavenProject implements BuildExecutorModule {
             if (plugins != null && !plugins.isEmpty()) {
                 properties.setProperty("plugins", plugins.entrySet().stream()
                         .map(plugin -> plugin.getKey() + "=" + plugin.getValue())
+                        .collect(Collectors.joining("\t")));
+            }
+            if (value.aliases() != null && !value.aliases().isEmpty()) {
+                properties.setProperty("aliases", value.aliases().entrySet().stream()
+                        .map(alias -> alias.getKey() + "=" + alias.getValue())
                         .collect(Collectors.joining("\t")));
             }
             if (value.signatures() != null && !value.signatures().isEmpty()) {
