@@ -868,7 +868,10 @@ public record Project(
                                            can; what a test still needs becomes public in a
                                            package the module exports to the tests alone,
                                            `exports <package> to <test module>`, and `opens
-                                           <package> to <test module>` where it reflects
+                                           <package> to <test module>` where it reflects; javac
+                                           warns that the test module is not found when it
+                                           compiles the main one, so -Werror needs
+                                           `-Xlint\\:-module=` beside it
                       two projects         move the classes so each package lives in one module,
                                            or merge the projects, keeping a qualified export for
                                            a package only a sibling uses
