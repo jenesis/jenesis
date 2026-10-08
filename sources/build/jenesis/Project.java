@@ -3511,6 +3511,7 @@ public record Project(
                 tree.merge|true|One tree per module whose every node names the scopes it applies to; false prints one tree per module and scope
                 tree.internal|false|List the project's own modules among the resolved dependencies and count them in the license summary
                 tree.tests|true|Include test-variant modules in that output
+                tree.tools|false|Show apart, under a heading naming each, the groups a module resolves for its build rather than for itself - a linter, a formatter, a plugin, an annotation processor - and count them in the license summary
                 execute.module||Module to run, named by its source folder (server/ui or server+ui)
                 execute.main||Main class to run, overriding the module's @jenesis.main
                 execute.docker|false|Run the launched program in a container, independently of the build
