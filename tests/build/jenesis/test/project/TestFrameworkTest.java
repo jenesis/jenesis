@@ -236,6 +236,7 @@ public class TestFrameworkTest {
                 false,
                 false))
                 .containsExactly("execute", "--disable-banner", "--disable-ansi-colors",
+                        "--reports-dir=" + root.resolve("reports"),
                         "--select-class=sample.BetaTest",
                         "--select-method=sample.AlphaTest#first",
                         "--select-method=sample.AlphaTest#second");
@@ -353,8 +354,8 @@ public class TestFrameworkTest {
                 Collections.emptyNavigableMap(),
                 false,
                 false))
-                .noneMatch(command -> command.startsWith("--reports-dir")
-                        || command.startsWith("--config=junit.platform.reporting."));
+                .contains("--reports-dir=" + root.resolve("reports"))
+                .noneMatch(command -> command.startsWith("--config=junit.platform.reporting."));
     }
 
     @Test

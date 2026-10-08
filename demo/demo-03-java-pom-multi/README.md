@@ -172,11 +172,14 @@ too (by default only the main artifact is staged).
 When a test fails
 -----------------
 
-A failing test fails the build. The `failed` line of the test step in
+A failing test fails the build, and the error names each failed test, at most
+twenty of them, read from the reports the runner writes whatever reached the
+console. The `failed` line of the test step in
 `target/.jenesis.events.jsonl` names a `folder` ending in `~`, which keeps the
 run as it ended: the command under `supplement/command`, the runner's output
-under `supplement/output` and `supplement/error`, and the reports with
-`-Djenesis.test.reporting=true`, beside a `.jenesis.failed` marker. It stays
+under `supplement/output` and `supplement/error`, and its reports under
+`supplement/reports` - or under `reports/tests` with
+`-Djenesis.test.reporting=true` - beside a `.jenesis.failed` marker. It stays
 until the step runs again.
 
 Pinned dependencies
