@@ -724,6 +724,7 @@ public class MavenPomResolver implements MavenResolver {
                         parentMetadata = Collections.emptyNavigableMap();
                 Set<String> parentVerbatim = Set.of();
                 String groupId = null, artifactId = null, version = null;
+                UnresolvedPom localParent = null;
                 if (parent != null) {
                     if (!children.add(new DependencyCoordinate(parent.groupId(),
                             parent.artifactId(),
@@ -760,6 +761,7 @@ public class MavenPomResolver implements MavenResolver {
                             } else {
                                 parentQualified = resolution.qualifiedDependencies();
                                 parentPlugins = resolution.plugins();
+                                localParent = resolution;
                             }
                         }
                     }
@@ -818,10 +820,10 @@ public class MavenPomResolver implements MavenResolver {
                         .map(node -> toDependency(node, false))
                         .forEach(entry -> declaredDependencies.put(entry.getKey(), entry.getValue()));
                 declaredDependencies.forEach(dependencies::putLast);
-                Node build = extended
+                Node build = extended || trusted && path != null
                         ? toElements(document.getDocumentElement(), "build").findFirst().orElse(null)
                         : null;
-                List<Node> builds = extended
+                List<Node> builds = extended || trusted && path != null
                         ? models.stream().flatMap(model -> toElements(model, "build").limit(1)).toList()
                         : List.of();
                 List<String> subprojects = null;
@@ -847,6 +849,14 @@ public class MavenPomResolver implements MavenResolver {
                         testSourceDirectory = build == null ? null : toElementText(build, "testSourceDirectory").orElse(null);
                 List<String> resourceDirectories = toDirectories(builds, "resources", "resource"),
                         testResourceDirectories = toDirectories(builds, "testResources", "testResource");
+                if (localParent != null) {
+                    sourceDirectory = sourceDirectory == null ? localParent.sourceDirectory() : sourceDirectory;
+                    testSourceDirectory = testSourceDirectory == null ? localParent.testSourceDirectory() : testSourceDirectory;
+                    resourceDirectories = resourceDirectories == null ? localParent.resourceDirectories() : resourceDirectories;
+                    testResourceDirectories = testResourceDirectories == null
+                            ? localParent.testResourceDirectories()
+                            : testResourceDirectories;
+                }
                 Node sources = build == null || !inferring ? null : toElements(build, "sources").findFirst().orElse(null);
                 if (sources != null) {
                     SequencedMap<String, List<String>> declaredSources = new LinkedHashMap<>();

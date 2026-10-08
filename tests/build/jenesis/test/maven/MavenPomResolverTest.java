@@ -4033,6 +4033,83 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_inherits_the_source_and_resource_directories_of_its_local_parent_unless_it_names_its_own() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>inheriting</module>
+                        <module>overriding</module>
+                    </modules>
+                    <build>
+                        <sourceDirectory>src/main/groovy</sourceDirectory>
+                        <testSourceDirectory>src/test/groovy</testSourceDirectory>
+                        <resources>
+                            <resource>
+                                <directory>assets</directory>
+                            </resource>
+                        </resources>
+                        <testResources>
+                            <testResource>
+                                <directory>fixtures</directory>
+                            </testResource>
+                        </testResources>
+                    </build>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("inheriting")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>project</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>inheriting</artifactId>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("overriding")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>project</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>overriding</artifactId>
+                    <build>
+                        <testSourceDirectory>src/test/java</testSourceDirectory>
+                        <testResources>
+                            <testResource>
+                                <directory>data</directory>
+                            </testResource>
+                        </testResources>
+                    </build>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        MavenLocalPom inheriting = poms.get(Path.of("inheriting"));
+        assertThat(inheriting.sourceDirectory()).isEqualTo("src/main/groovy");
+        assertThat(inheriting.testSourceDirectory()).isEqualTo("src/test/groovy");
+        assertThat(inheriting.resourceDirectories()).containsExactly("assets");
+        assertThat(inheriting.testResourceDirectories()).containsExactly("fixtures");
+        MavenLocalPom overriding = poms.get(Path.of("overriding"));
+        assertThat(overriding.sourceDirectory()).isEqualTo("src/main/groovy");
+        assertThat(overriding.testSourceDirectory())
+                .as("a module's own directory wins over its parent's")
+                .isEqualTo("src/test/java");
+        assertThat(overriding.resourceDirectories()).containsExactly("assets");
+        assertThat(overriding.testResourceDirectories()).containsExactly("data");
+    }
+
+    @Test
     public void local_pom_of_model_4_1_0_infers_its_parent_subprojects_sources_and_sibling_versions() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
