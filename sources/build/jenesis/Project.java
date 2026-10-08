@@ -798,17 +798,23 @@ public record Project(
                     build reads. Run the old build in a second checkout (`git worktree add`) while
                     both exist.
 
-                    ## 2. Keep or write the build declaration
+                    ## 2. Choose the build declaration
 
-                    A Maven build keeps its pom.xml files: the maven layout builds them as they stand,
-                    so the first `java build/jenesis/Make.java` is the baseline every later step is
+                      pom.xml            the maven layout; the quicker move. A Maven build keeps
+                                         its pom.xml files as they stand, a Gradle build writes
+                                         one per project; steps 3 and 4 follow it.
+                      module-info.java   the modular_to_maven layout; the Java Module System
+                                         declares the build, and the published POM is generated
+                                         from it. For code that is a named module already, or is
+                                         to become one; step 3b follows it.
+
+                    Either way the first build that passes is the baseline every later step is
                     compared against. A Gradle build has no counterpart, since no build.gradle is
-                    read: write a pom.xml per project, which needs only coordinates, dependencies with
-                    their scopes and maven.compiler.release, or a module-info.java per module, which
-                    the modular_to_maven layout builds and generates the published POM for. Take
-                    module-info.java where the code is already a named module whose tests live in a
-                    module of their own; where the tests share the main packages, as most do, keep a
-                    pom.xml, whose tests run on the class path. skill/layout has the rest.
+                    read: a pom.xml needs only coordinates, dependencies with their scopes and
+                    maven.compiler.release. Tests that share the main code's packages, as most
+                    white-box tests do, need a pom.xml: there they run on the class path, while a
+                    module of tests cannot hold a package of the module it tests. skill/layout has
+                    the rest.
 
                     ## 3. Know what a pom.xml keeps
 
@@ -837,6 +843,46 @@ public record Project(
                     Metadata a parent outside the project declares (url, scm, developers) goes into
                     project.properties at the root, which skill/target lists the keys of.
 
+                    ## 3b. Or declare the build in module-info.java
+
+                    Each module is the folder whose module-info.java sits at the root of its
+                    sources; in a Maven tree that is src/main/java, so the file stays where it is.
+                    A root pom.xml makes the build pick the maven layout, so pass
+                    -Djenesis.project.layout=modular_to_maven while the old build still needs it.
+
+                      a dependency         `requires <module>`, `requires static` where it is only
+                                           compiled against; a jar that declares no module name
+                                           resolves by the name the Jenesis Module Index gives it,
+                                           or by @jenesis.alias <module> <groupId>/<artifactId>
+                      a version            @jenesis.pin <module> <version>, which `pin` writes;
+                                           @jenesis.bom for a BOM
+                      the release          @jenesis.release <N> on the module's Javadoc
+                      a processor          @jenesis.plugin maven/<groupId>/<artifactId>
+                      a main class         @jenesis.main <class>
+                      resources            there is no resources folder: a file beside the sources
+                                           is packaged, so src/main/resources moves into
+                                           src/main/java; -Djenesis.project.resources places a
+                                           file of the project
+                      the tests            a module of their own, such as src/test/java, whose
+                                           module-info.java names another module, carries
+                                           @jenesis.test <module it tests> and `requires` it and
+                                           the test framework; its packages differ from the
+                                           tested module's
+                      name, description    the first sentence and the second paragraph of the
+                                           module's Javadoc
+                      the coordinate       groupId from the first two segments of the module name
+                                           (jenesis.maven.segments), artifactId the module name;
+                                           project=<groupId> and artifact=<artifactId> in
+                                           project.properties keep a published one, for every
+                                           module of the project, so several modules that must
+                                           keep coordinates of their own stay on pom.xml
+                      url, licenses,       project.properties, with the keys skill/target lists
+                      developers, scm
+                      the version          -Djenesis.project.version
+
+                    demo-02 is one module, demo-04 several with a test module, demo-66 the
+                    published coordinate; skill/tags lists every tag.
+
                     ## 4. Replace each plugin
 
                     Look every plugin up in skill/registry. Most become a file that switches a
@@ -844,8 +890,9 @@ public record Project(
                     comment, or a -Djenesis.* setting; copy the demo it names. Such a file sits in a
                     configuration location of the module: in the maven layout <module>/build.jenesis/
                     for both halves, src/main/build.jenesis/ for the main code alone and
-                    src/test/build.jenesis/ for the tests alone, and build.jenesis/ at the root for
-                    every module. Configuration that lived inside a plugin moves here:
+                    src/test/build.jenesis/ for the tests alone, in a module-info.java build the
+                    META-INF/build.jenesis/ folder beside the module's sources, and build.jenesis/ at
+                    the root for every module. Configuration that lived inside a plugin moves here:
 
                       compilerArgs, options.compilerArgs   process-javac.properties
                       annotationProcessorPaths             @jenesis.plugin, or <type>processor</type>
