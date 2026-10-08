@@ -524,8 +524,8 @@ public class Javac extends ProcessBuildStep {
                 if (exitCode == 0) {
                     future.complete(null);
                 } else {
-                    String outputString = Files.exists(output) ? Files.readString(output) : "";
-                    String errorString = Files.exists(error) ? Files.readString(error) : "";
+                    String outputString = Files.exists(output) ? new String(Files.readAllBytes(output), NATIVE_ENCODING) : "";
+                    String errorString = Files.exists(error) ? new String(Files.readAllBytes(error), NATIVE_ENCODING) : "";
                     future.completeExceptionally(new IllegalStateException(
                             "Unexpected exit code: " + exitCode + " (multi-release " + release + ")\n"
                                     + "To reproduce, execute:\n "
