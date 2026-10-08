@@ -353,41 +353,40 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             sbom == null ? Stream.<String>empty() : Stream.of("sbom"),
                             resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"))
                             .flatMap(Function.identity()));
+            SequencedProperties described = null;
+            for (String manifest : descriptor.manifests()) {
+                Path candidate = outerInherited.get(manifest);
+                if (candidate != null && Files.isRegularFile(candidate.resolve(BuildStep.MODULE))) {
+                    described = SequencedProperties.ofFiles(candidate.resolve(BuildStep.MODULE));
+                    break;
+                }
+            }
+            boolean tests = described != null && described.getProperty("test") != null;
+            InferredArtifactQualityModule artifactModule = InferredArtifactQualityModule.ofEnvironment(environment,
+                            descriptor.configuration(),
+                            repositories,
+                            resolvers)
+                    .pinning(descriptor.pinning())
+                    .custom(hooks.getOrDefault("artifact", none));
             sub.addModule("artifact",
-                    artifact.apply(
-                            InferredArtifactQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
-                                    .pinning(descriptor.pinning())
-                                    .custom(hooks.getOrDefault("artifact", none))),
+                    artifact.apply(tests ? artifactModule.japicmp(null) : artifactModule),
                     Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             sub.addStep("layers",
                     new Layers(),
                     Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
-            if (descriptor.test()) {
-                Path module = null;
-                for (String manifest : descriptor.manifests()) {
-                    Path candidate = outerInherited.get(manifest);
-                    if (candidate != null && Files.isRegularFile(candidate.resolve(BuildStep.MODULE))) {
-                        module = candidate.resolve(BuildStep.MODULE);
-                        break;
-                    }
-                }
-                if (module != null) {
-                    SequencedProperties properties = SequencedProperties.ofFiles(module);
-                    if (properties.getProperty("test") != null && !properties.flag("abstract")) {
-                        sub.addModule("observed",
-                                observe.apply(
-                                InferredTestObservationModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
-                                        .pinning(descriptor.pinning())
-                                        .pathPlacement(descriptor.pathPlacement())
-                                        .moduleName(properties.getProperty("module"))
-                                        .custom(hooks.getOrDefault("observed", none))),
-                                Stream.of(descriptor.resources().stream(),
-                                                resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"),
-                                                Stream.of("prepare", "binary", "layers"),
-                                                inputs(descriptor, closure))
-                                        .flatMap(Function.identity()));
-                    }
-                }
+            if (descriptor.test() && tests && !described.flag("abstract")) {
+                sub.addModule("observed",
+                        observe.apply(
+                        InferredTestObservationModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
+                                .pinning(descriptor.pinning())
+                                .pathPlacement(descriptor.pathPlacement())
+                                .moduleName(described.getProperty("module"))
+                                .custom(hooks.getOrDefault("observed", none))),
+                        Stream.of(descriptor.resources().stream(),
+                                        resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"),
+                                        Stream.of("prepare", "binary", "layers"),
+                                        inputs(descriptor, closure))
+                                .flatMap(Function.identity()));
             }
             if (descriptor.source()) {
                 sub.addModule("sources",

@@ -599,6 +599,24 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void compares_the_api_of_a_main_module_against_its_last_release() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("japicmp.properties"), "baseline=org.example/sample/1.0\n");
+        Path required = fixture.execute("sub/artifact/japicmp/required").get("sub/artifact/japicmp/required");
+        assertThat(required.resolve(BuildStep.REQUIRES)).exists();
+    }
+
+    @Test
+    public void compares_no_api_of_a_test_module() throws IOException {
+        Fixture fixture = setUp("path=\ntest=main_artifact\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("japicmp.properties"), "baseline=org.example/sample/1.0\n");
+        assertThatThrownBy(() -> fixture.execute("sub/artifact/japicmp/required"))
+                .as("the tests of a module have no release of their own to be compatible with")
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: japicmp/required - ");
+    }
+
+    @Test
     public void javadoc_flag_disabled_omits_javadoc_sub_module() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/documentation/archive"))

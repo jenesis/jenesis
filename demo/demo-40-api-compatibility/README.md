@@ -71,7 +71,8 @@ not by any suffix:
 A module with no Maven coordinate has nothing to default to, so leaving the key out there fails with a
 message naming it. The file is read per module, so a project-wide `japicmp.properties` with no
 `baseline` gives every module its own coordinate; a `baseline` there would point every module at the
-same artifact, so a per-module baseline belongs in that module's own configuration location.
+same artifact, so a per-module baseline belongs in that module's own configuration location. A test
+module, such as the tests variant of a Maven module, has no release of its own and is never compared.
 
 The remaining keys map onto japicmp's own options and all default to off: `access`, `include`,
 `exclude`, `format` (`xml`, `html`, or both), `ignore-missing-classes` (on by default, because the
