@@ -942,6 +942,22 @@ public record Project(
                       a dependency         exclude the jar that holds the package, or move the
                                            project's classes out of it
 
+                    The tests then run on the module path, which breaks what read the class path:
+
+                      the unnamed package  a module holds none, so a test class there fails to
+                                           load: move it into a package, and have a test that
+                                           needs such a class compile it at run time
+                      javac in a test      compile-testing and javax.tools compile against
+                                           java.class.path, which is empty now: hand the compiler
+                                           -classpath with System.getProperty("jdk.module.path"),
+                                           or append that property to java.class.path before the
+                                           tests run, from a LauncherSessionListener the test
+                                           module provides
+                      Mockito              mocking an interface of a JDK module, as java.compiler's
+                                           Element, needs org.mockito to read that module:
+                                           `--add-reads=org.mockito=java.compiler` in
+                                           process-test.properties, naming the module concerned
+
                     Each module is the folder whose module-info.java sits at the root of its
                     sources; in a Maven tree that is src/main/java, so the file stays where it is.
                     Every module-info.java below the root becomes a module, so one the old build
@@ -1052,8 +1068,15 @@ public record Project(
                     flag: a `--release` there is refused, since maven.compiler.release, its testRelease
                     or @jenesis.release declares it for every tool. javac runs without -g, where
                     Maven and Gradle pass it, so a test reading parameter or local names needs `-g=`
-                    or `-parameters=`. A key of jenesis.properties keeps its prefix,
-                    `jenesis.test.tag=-slow`, as `configuration` prints it.
+                    or `-parameters=`. A plugin may pass flags its configuration never shows, as
+                    Palantir Baseline adds -parameters and Error Prone's -Xep flags, so compare the
+                    old build's effective javac arguments: `mvn -X compile` prints them after
+                    "Command line options:", `gradle compileJava --debug` on its "Compiler
+                    arguments:" line. Checkstyle reads a copy of the sources below target/build/,
+                    so a suppression keyed on a source folder, as src/test/java, matches nothing:
+                    key it on the package's folders, as `[/\\\\]example[/\\\\]test[/\\\\]`. A key of
+                    jenesis.properties keeps its prefix, `jenesis.test.tag=-slow`, as
+                    `configuration` prints it.
 
                     Shading is not supported: nothing is relocated, and no class file is rewritten.
                     What shading did is answered one way each:
