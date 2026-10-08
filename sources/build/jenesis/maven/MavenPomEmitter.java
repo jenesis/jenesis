@@ -64,6 +64,9 @@ public class MavenPomEmitter {
             if (metadata.url() != null) {
                 appendText(document, project, "url", metadata.url());
             }
+            if (metadata.inceptionYear() != null) {
+                appendText(document, project, "inceptionYear", metadata.inceptionYear());
+            }
             if (metadata.organization() != null) {
                 Node node = appendChild(document, project, "organization");
                 if (metadata.organization().name() != null) {
@@ -82,6 +85,9 @@ public class MavenPomEmitter {
                     }
                     if (license.url() != null) {
                         appendText(document, node, "url", license.url());
+                    }
+                    if (license.distribution() != null) {
+                        appendText(document, node, "distribution", license.distribution());
                     }
                 }
             }
@@ -245,7 +251,8 @@ public class MavenPomEmitter {
             Scm scm,
             Organization organization,
             Management issueManagement,
-            Management ciManagement
+            Management ciManagement,
+            String inceptionYear
     ) implements Serializable {
 
         public Metadata {
@@ -260,7 +267,7 @@ public class MavenPomEmitter {
                         List<Developer> developers,
                         Scm scm,
                         Organization organization) {
-            this(name, description, url, licenses, developers, scm, organization, null, null);
+            this(name, description, url, licenses, developers, scm, organization, null, null, null);
         }
 
         static Metadata of(SequencedProperties metadata) {
@@ -280,7 +287,8 @@ public class MavenPomEmitter {
             for (String id : licenseIds) {
                 licenses.add(new License(
                         metadata.getProperty("license." + id + ".name"),
-                        metadata.getProperty("license." + id + ".url")));
+                        metadata.getProperty("license." + id + ".url"),
+                        metadata.value("license." + id + ".distribution")));
             }
             List<Developer> developers = new ArrayList<>();
             for (String id : developerIds) {
@@ -320,10 +328,15 @@ public class MavenPomEmitter {
                             ? null
                             : new Organization(metadata.value("organization.name"), metadata.value("organization.url")),
                     Management.of(metadata, "issueManagement"),
-                    Management.of(metadata, "ciManagement"));
+                    Management.of(metadata, "ciManagement"),
+                    metadata.value("inceptionYear"));
         }
 
-        public record License(String name, String url) implements Serializable {
+        public record License(String name, String url, String distribution) implements Serializable {
+
+            public License(String name, String url) {
+                this(name, url, null);
+            }
         }
 
         public record Developer(String id,
