@@ -262,6 +262,50 @@ public class IdeTest {
     }
 
     @Test
+    public void idea_folds_the_tests_of_a_pom_module_into_its_one_module_with_the_main_sources_as_production() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("src/main/java"));
+        Files.createDirectories(root.resolve("greeter").resolve("src/test/java"));
+        Path main = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
+        });
+        library(main, "lib.jar");
+        Path test = inventory("test-module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.test", "greeter");
+            properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
+            properties.setProperty("module-greeter.dependency.1", "maven/org.example/testing/1.0 lib/testing.jar");
+        });
+        library(test, "lib.jar");
+        library(test, "testing.jar");
+
+        run(Ide.IDEA, main, test);
+
+        Path iml = root.resolve("greeter").resolve("greeter.iml");
+        assertThat(modulePaths())
+                .as("the main and the test half of a pom.xml module share its folder and are one module")
+                .containsExactly("$PROJECT_DIR$/greeter/greeter.iml");
+        assertThat(sourceFolders(iml)).containsExactly(
+                Map.entry("file://$MODULE_DIR$/src/main/java", false),
+                Map.entry("file://$MODULE_DIR$/src/test/java", true));
+        assertThat(attributes(iml, "orderEntry", "scope"))
+                .as("what only the tests resolve is a test library")
+                .containsExactly("", "", "", "TEST");
+    }
+
+    @Test
+    public void idea_marks_no_folder_that_holds_another_source_folder_as_a_source_folder() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("src/main/java"));
+        Path inventory = inventory("module-greeter", properties ->
+                properties.setProperty("module-greeter.path", "greeter"));
+
+        run(Ide.IDEA, inventory);
+
+        assertThat(sourceFolders(root.resolve("greeter").resolve("greeter.iml")))
+                .containsExactly(Map.entry("file://$MODULE_DIR$/src/main/java", false));
+    }
+
+    @Test
     public void idea_treats_an_abstract_test_module_as_production_sources() throws IOException {
         Files.createDirectories(root.resolve("greeter-testing").resolve("sources"));
         Path inventory = inventory("module-greeter-testing", abstractTestModule());
