@@ -1243,7 +1243,9 @@ public record Project(
                           version setting, or the version every staged POM carries (66). JReleaser
                           is not resolved like the other tools but run as the `jreleaser` program
                           on the PATH, or the one jenesis.jreleaser.executable names, so it is
-                          installed apart from the build
+                          installed apart from the build. It runs with --dry-run, publishing
+                          nothing, unless -Djenesis.jreleaser.dry=false, as jenesis.jreleaser.dry
+                          defaults to true
                       maven-toolchains-plugin / java toolchains -> jenesis.toolchain.version (07)
                       <profiles> chosen with -P or a property / properties and conventions
                           -> jenesis-<profile>.properties; those activated by <jdk> or
