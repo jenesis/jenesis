@@ -817,8 +817,10 @@ public record Project(
                       find . -path '*/src/main/java/*.java' | sed 's|/src/main/java/| |; s|/[^/]*$||' \\
                           | sort -u | cut -d' ' -f2 | sort | uniq -d
 
-                    A package either line prints, or one that a dependency holds as well, rules
-                    modules out for now: migrate to pom.xml first, whichever declaration was asked
+                    A package either line prints, one that a dependency holds as well, or a base
+                    release below 9, as a library that still runs on Java 8 has, rules modules out
+                    for now - the last for good, where its module-info.java lives in
+                    META-INF/versions/9/ of the sources and the pom.xml build ships it: migrate to pom.xml first, whichever declaration was asked
                     for, and say so - which packages are split and where. That is phase one; it
                     changes the build and nothing of the code. Phase two moves the result to
                     module-info.java as a change of its own, once the pom.xml build compares equal
