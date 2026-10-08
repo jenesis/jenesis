@@ -1078,9 +1078,11 @@ public record Project(
                       jmh-maven-plugin / me.champeau.jmh -> @jenesis.plugin and @jenesis.main (39)
                       byte-buddy-maven-plugin / net.bytebuddy.byte-buddy-gradle-plugin -> no built-in:
                           those plugins discover Byte Buddy plugins themselves and take their settings
-                          as XML or DSL, which configures awkwardly; here a plugin of the project
-                          constructs its net.bytebuddy.build.Plugin instances in Java and hands them
-                          to Plugin.Engine, with values from plugin-<name>.properties (skill/extend)
+                          as XML or DSL, which configures awkwardly; here a plugin of the project uses
+                          Byte Buddy's API in Java, with values from plugin-<name>.properties, to
+                          generate classes at binary/compiled (73). No hook point hands a plugin the
+                          classes javac compiled to enhance, so a net.bytebuddy.build.Plugin that
+                          rewrites them has no place yet
                       japicmp-maven-plugin / me.champeau.gradle.japicmp -> japicmp.properties (40)
 
                     ## Dependencies
@@ -1777,9 +1779,8 @@ public record Project(
                     and it resolves by module name into the plugin's own layer, pinned as
                     plugin-<name>/module/<module>. Configure the tool in that code, too: where a Maven
                     or Gradle plugin discovers the tool's own extensions and takes their settings as XML,
-                    as Byte Buddy's build plugin does, the provider constructs them in Java - the
-                    net.bytebuddy.build.Plugin instances handed to Plugin.Engine, say - and reads only
-                    plain values from plugin-<name>.properties. A JDK tool is forked by extending ProcessBuildStep,
+                    as Byte Buddy's build plugin does, the provider constructs them in Java and reads
+                    only plain values from plugin-<name>.properties, as demo-73 does with Byte Buddy. A JDK tool is forked by extending ProcessBuildStep,
                     which also reads process-<tool>.properties; one that runs a program extends
                     EnvironmentalProcessBuildStep for environment-<tool>.properties. Write nothing
                     outside context.next(): a step that must, as an exporter does, overrides
