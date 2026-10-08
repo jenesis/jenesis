@@ -879,8 +879,8 @@ public record Project(
                     A module inherits its parents' metadata as Maven's model does: the url and the
                     scm locations with the module's artifactId appended, unless the parent sets
                     child.*.inherit.append.path="false", and licenses or developers only as a whole.
-                    What a module declares wins; project.properties at the root, which skill/target
-                    lists the keys of, overrides every module instead.
+                    What a module declares or inherits wins; project.properties at the root, which
+                    skill/target lists the keys of, fills in only what the POMs leave out.
 
                     ## 3b. Or declare the build in module-info.java
 
@@ -1247,7 +1247,11 @@ public record Project(
                                             -Djenesis.project.metadata=<path> names, or
                                             project.properties at the root when it names none;
                                             in a module-info.java build, a module's own
-                                            META-INF/build.jenesis/project.properties wins over both.
+                                            META-INF/build.jenesis/project.properties wins over both;
+                                            in a pom.xml build, what a module's own POM declares
+                                            wins over that file, a list such as its licenses or
+                                            developers as a whole, and the version, tag, revision
+                                            and tree of the command line win over both.
                       module.properties     graph state: path, module, test, main
                       identity.properties   <repository>/<coordinate> -> path or empty
                       requires.properties   <group>/<scope>/<repository>/<coordinate> -> empty, or

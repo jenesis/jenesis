@@ -46,6 +46,7 @@ public class MavenProject implements BuildExecutorModule {
     public static final String POM = "pom/", MAVEN = "maven/";
     private static final String SCAN = "scan", POM_METADATA = "metadata.";
     private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-";
+    private static final Set<String> COMMANDED = Set.of("version", "scm.tag", "scm.revision", "scm.tree");
 
     private final Path root;
     private final String group;
@@ -503,18 +504,30 @@ public class MavenProject implements BuildExecutorModule {
                                 metadata.setProperty("project", properties.getProperty("groupId"));
                                 metadata.setProperty("artifact", properties.getProperty("artifactId"));
                                 metadata.setProperty("version", properties.getProperty("version"));
+                                SequencedProperties own = new SequencedProperties();
                                 for (String key : properties.stringPropertyNames()) {
                                     if (key.startsWith(POM_METADATA)) {
-                                        metadata.setProperty(key.substring(POM_METADATA.length()), properties.getProperty(key));
+                                        own.setProperty(key.substring(POM_METADATA.length()), properties.getProperty(key));
                                     }
                                 }
+                                own.forEach(metadata::put);
+                                Set<String> lists = own.stringPropertyNames().stream()
+                                        .filter(key -> key.startsWith("license.") || key.startsWith("developer."))
+                                        .map(key -> key.substring(0, key.indexOf('.') + 1))
+                                        .collect(Collectors.toSet());
                                 for (BuildStepArgument argument : manifestArgs.values()) {
                                     if (argument.removed()) {
                                         continue;
                                     }
                                     Path upstream = argument.folder().resolve(BuildStep.METADATA);
                                     if (Files.isRegularFile(upstream)) {
-                                        SequencedProperties.ofFiles(upstream).forEach(metadata::put);
+                                        SequencedProperties.ofFiles(upstream).forEachProperty((key, value) -> {
+                                            if (COMMANDED.contains(key)
+                                                    || !own.containsKey(key)
+                                                    && lists.stream().noneMatch(key::startsWith)) {
+                                                metadata.setProperty(key, value);
+                                            }
+                                        });
                                     }
                                 }
                                 metadata.store(context.next().resolve(BuildStep.METADATA));
