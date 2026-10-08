@@ -60,7 +60,7 @@ public class DependenciesModuleClaimTest {
                 .hasStackTraceContaining("maven/org.example/lib/1.0 and maven/org.example/lib/2.0"
                         + " both carry module lib.shared in group main")
                 .hasStackTraceContaining("settle on one version: a <dependencyManagement> entry in pom.xml"
-                        + " or a @jenesis.pin line in module-info.java manages it");
+                        + " or a @jenesis.pin main/maven/org.example/lib <version> line in module-info.java manages it");
     }
 
     @Test

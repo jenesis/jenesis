@@ -564,6 +564,10 @@ public class ModuleInfoParser {
     }
 
     private String expand(String tag, String token) {
+        return expand(group, tag, token);
+    }
+
+    static String expand(String group, String tag, String token) {
         int firstSlash = token.indexOf('/');
         int secondSlash = firstSlash < 0 ? -1 : token.indexOf('/', firstSlash + 1);
         if (firstSlash < 0) {
@@ -582,6 +586,17 @@ public class ModuleInfoParser {
                         + token
                         + "': expected <module>, <groupId>/<artifactId>,"
                         + " or <group>/<repository>/<coordinate>");
+            }
+            String first = token.substring(0, firstSlash), second = token.substring(firstSlash + 1, secondSlash);
+            if (first.equals("maven")) {
+                return group + "/" + token;
+            }
+            if (first.indexOf('.') >= 0 && !second.equals("maven") && !second.equals("module")) {
+                throw new IllegalArgumentException("Malformed @" + tag + " token '"
+                        + token
+                        + "': " + first + " reads as a group and " + second + " as a repository, which"
+                        + " names nothing - a Maven coordinate with a type or a classifier is written maven/"
+                        + token + ", or <group>/maven/" + token + " for a group other than " + group);
             }
             return token;
         }
