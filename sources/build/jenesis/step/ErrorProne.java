@@ -54,6 +54,9 @@ public class ErrorProne implements BuildStep {
         if (!declared) {
             boolean pom = false;
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
                 Path module = argument.folder().resolve(BuildStep.MODULE);
                 pom |= Files.isRegularFile(module) && SequencedProperties.ofFiles(module).value("module") == null;
             }

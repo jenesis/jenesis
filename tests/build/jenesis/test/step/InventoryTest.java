@@ -107,6 +107,19 @@ public class InventoryTest {
     }
 
     @Test
+    public void attaches_nothing_from_an_input_that_was_removed() throws IOException {
+        Path module = Files.createDirectory(root.resolve("module"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module.path", "");
+        inventory.setProperty("module.attachment.notice", "notice.txt");
+        inventory.store(module.resolve(Inventory.INVENTORY));
+        assertThat(Inventory.attachments(List.of(
+                new BuildStepArgument(null, Checksum.removed(Set.of(Path.of(Inventory.INVENTORY)))),
+                new BuildStepArgument(module, Map.of()))))
+                .containsExactly(Map.entry("module", new LinkedHashMap<>(Map.of("notice", module.resolve("notice.txt")))));
+    }
+
+    @Test
     public void writes_all_fields_when_present() throws IOException {
         Path manifests = Files.createDirectory(root.resolve("manifests"));
         SequencedProperties module = new SequencedProperties();
