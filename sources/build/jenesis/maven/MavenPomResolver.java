@@ -18,11 +18,14 @@ public class MavenPomResolver implements MavenResolver {
     private static final String NAMESPACE_4_0_0 = "http://maven.apache.org/POM/4.0.0",
             NAMESPACE_4_1_0 = "http://maven.apache.org/POM/4.1.0";
     private static final Set<String> IMPLICITS = Set.of("groupId", "artifactId", "version", "packaging");
+    private static final Set<String> JDK_ACTIVATIONS = Set.of("jdk", "activeByDefault");
     private static final Pattern PROPERTY = Pattern.compile("(\\$\\{([^}]+)})");
     private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
+    private static final Pattern JDK_BOUND = Pattern.compile("([0-9]{1,8}(\\.[0-9]{1,8})*)?");
     public static final String CHECKSUM_PREFIX = "Checksum/";
 
     private final Supplier<MavenVersionNegotiator> negotiatorSupplier;
+    private final String jdk;
     private final transient DocumentBuilderFactory factory = MavenDefaultVersionNegotiator.toDocumentBuilderFactory();
 
     public MavenPomResolver() {
@@ -49,7 +52,16 @@ public class MavenPomResolver implements MavenResolver {
     }
 
     public <S extends Supplier<MavenVersionNegotiator> & Serializable> MavenPomResolver(S negotiatorSupplier) {
+        this(negotiatorSupplier, System.getProperty("java.version"));
+    }
+
+    private MavenPomResolver(Supplier<MavenVersionNegotiator> negotiatorSupplier, String jdk) {
         this.negotiatorSupplier = negotiatorSupplier;
+        this.jdk = jdk;
+    }
+
+    public MavenPomResolver jdk(String jdk) {
+        return new MavenPomResolver(negotiatorSupplier, jdk);
     }
 
     @Override
@@ -793,27 +805,33 @@ public class MavenPomResolver implements MavenResolver {
                             properties.put(property, value);
                             properties.put("project." + property, value);
                         }));
-                toElements(document.getDocumentElement(), "properties")
-                        .limit(1)
+                List<Node> models = Stream.concat(Stream.of(document.getDocumentElement()),
+                        toActiveProfiles(document.getDocumentElement(), path)).toList();
+                models.stream()
+                        .flatMap(model -> toElements(model, "properties").limit(1))
                         .flatMap(MavenPomResolver::toChildren)
                         .filter(node -> node.getNodeType() == Node.ELEMENT_NODE)
                         .forEach(node -> properties.put(node.getLocalName(), node.getTextContent().trim()));
-                toElements(document.getDocumentElement(), "dependencyManagement")
-                        .limit(1)
-                        .flatMap(node -> toElements(node, "dependencies"))
-                        .limit(1)
+                models.stream()
+                        .flatMap(model -> toElements(model, "dependencyManagement").limit(1))
+                        .flatMap(node -> toElements(node, "dependencies").limit(1))
                         .flatMap(node -> toElements(node, "dependency"))
                         .map(node -> toDependency(node, trusted))
                         .forEach(entry -> managedDependencies.put(entry.getKey(), entry.getValue()));
                 inheritedManagedDependencies.forEach(managedDependencies::putIfAbsent);
-                toElements(document.getDocumentElement(), "dependencies")
-                        .limit(1)
+                SequencedMap<DependencyKey, DependencyValue> declaredDependencies = new LinkedHashMap<>();
+                models.stream()
+                        .flatMap(model -> toElements(model, "dependencies").limit(1))
                         .flatMap(node -> toElements(node, "dependency"))
                         .map(node -> toDependency(node, false))
-                        .forEach(entry -> dependencies.putLast(entry.getKey(), entry.getValue()));
+                        .forEach(entry -> declaredDependencies.put(entry.getKey(), entry.getValue()));
+                declaredDependencies.forEach(dependencies::putLast);
                 Node build = extended
                         ? toElements(document.getDocumentElement(), "build").findFirst().orElse(null)
                         : null;
+                List<Node> builds = extended
+                        ? models.stream().flatMap(model -> toElements(model, "build").limit(1)).toList()
+                        : List.of();
                 List<String> subprojects = null;
                 if (extended) {
                     Node listed = toElements(document.getDocumentElement(), "subprojects").findFirst()
@@ -835,18 +853,8 @@ public class MavenPomResolver implements MavenResolver {
                 }
                 String sourceDirectory = build == null ? null : toElementText(build, "sourceDirectory").orElse(null),
                         testSourceDirectory = build == null ? null : toElementText(build, "testSourceDirectory").orElse(null);
-                List<String> resourceDirectories = build == null ? null : toElements(build, "resources").findFirst()
-                        .map(node -> toElements(node, "resource")
-                                .map(child -> toElementText(child, "directory").orElse(null))
-                                .filter(Objects::nonNull)
-                                .toList())
-                        .orElse(null),
-                        testResourceDirectories = build == null ? null : toElements(build, "testResources").findFirst()
-                                .map(node -> toElements(node, "testResource")
-                                        .map(child -> toElementText(child, "directory").orElse(null))
-                                        .filter(Objects::nonNull)
-                                        .toList())
-                                .orElse(null);
+                List<String> resourceDirectories = toDirectories(builds, "resources", "resource"),
+                        testResourceDirectories = toDirectories(builds, "testResources", "testResource");
                 Node sources = build == null || !inferring ? null : toElements(build, "sources").findFirst().orElse(null);
                 if (sources != null) {
                     SequencedMap<String, List<String>> declaredSources = new LinkedHashMap<>();
@@ -1169,6 +1177,69 @@ public class MavenPomResolver implements MavenResolver {
                 && (child.getNamespaceURI() == null
                         || NAMESPACE_4_0_0.equals(child.getNamespaceURI())
                         || NAMESPACE_4_1_0.equals(child.getNamespaceURI())));
+    }
+
+    private static List<String> toDirectories(List<Node> builds, String list, String element) {
+        List<Node> declared = builds.stream().flatMap(build -> toElements(build, list).limit(1)).toList();
+        return declared.isEmpty() ? null : declared.stream()
+                .flatMap(node -> toElements(node, element))
+                .map(child -> toElementText(child, "directory").orElse(null))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private Stream<Node> toActiveProfiles(Node project, Path path) {
+        List<Node> profiles = toElements(project, "profiles")
+                .limit(1)
+                .flatMap(node -> toElements(node, "profile"))
+                .toList();
+        List<Node> activated = profiles.stream().filter(profile -> toElements(profile, "activation")
+                .findFirst()
+                .filter(activation -> toChildren(activation)
+                        .filter(condition -> condition.getNodeType() == Node.ELEMENT_NODE)
+                        .allMatch(condition -> JDK_ACTIVATIONS.contains(condition.getLocalName())))
+                .flatMap(activation -> toElementText(activation, "jdk"))
+                .filter(range -> isJdk(range, path))
+                .isPresent()).toList();
+        return activated.isEmpty()
+                ? profiles.stream().filter(profile -> toElements(profile, "activation")
+                        .findFirst()
+                        .flatMap(activation -> toElementText(activation, "activeByDefault"))
+                        .filter("true"::equals)
+                        .isPresent())
+                : activated.stream();
+    }
+
+    private boolean isJdk(String activation, Path path) {
+        boolean negated = activation.startsWith("!");
+        String required = negated ? activation.substring(1).trim() : activation;
+        if (!required.startsWith("[") && !required.startsWith("(")) {
+            return jdk.startsWith(required) != negated;
+        }
+        String[] bounds = required.split(",", -1);
+        String lower = bounds[0].trim(), upper = bounds.length == 1 ? "" : bounds[bounds.length - 1].trim();
+        String minimum = lower.replaceAll("[\\[\\]()]", "").trim(), maximum = upper.replaceAll("[\\[\\]()]", "").trim();
+        if (bounds.length > 2 || !JDK_BOUND.matcher(minimum).matches() || !JDK_BOUND.matcher(maximum).matches()) {
+            throw new IllegalArgumentException("The profile activation <jdk>" + activation + "</jdk> of "
+                    + (path == null ? "a POM" : path.resolve("pom.xml"))
+                    + " is neither a version prefix, such as 1.8, nor a range of versions, such as [9,) or [1.8,17)");
+        }
+        int fromMinimum = minimum.isEmpty() ? 1 : compareJdk(minimum),
+                fromMaximum = maximum.isEmpty() ? -1 : compareJdk(maximum);
+        return ((fromMinimum > 0 || fromMinimum == 0 && lower.startsWith("["))
+                && (fromMaximum < 0 || fromMaximum == 0 && upper.endsWith("]"))) != negated;
+    }
+
+    private int compareJdk(String bound) {
+        String[] running = jdk.replaceAll("[^0-9._-]", "").split("[._-]+"), required = bound.split("\\.");
+        for (int index = 0; index < 3; index++) {
+            int left = index < running.length && !running[index].isEmpty() ? Integer.parseInt(running[index]) : 0,
+                    right = index < required.length ? Integer.parseInt(required[index]) : 0;
+            if (left != right) {
+                return Integer.compare(left, right);
+            }
+        }
+        return 0;
     }
 
     private static Optional<String> toElementText(Node node, String localName) {
