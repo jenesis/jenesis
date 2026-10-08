@@ -1,6 +1,7 @@
 package build.jenesis.step;
 
 import module java.base;
+import module java.xml;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -193,6 +194,23 @@ public abstract class ProcessBuildStep implements BuildStep {
             }
         }
         return prepended;
+    }
+
+    protected static boolean completeReport(Path report) throws IOException {
+        if (!Files.isRegularFile(report)) {
+            return false;
+        }
+        try {
+            SAXParserFactory factory = SAXParserFactory.newInstance();
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            factory.newSAXParser().parse(report.toFile(), new DefaultHandler());
+            return true;
+        } catch (SAXException _) {
+            return false;
+        } catch (ParserConfigurationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     public boolean acceptableExitCode(int code,

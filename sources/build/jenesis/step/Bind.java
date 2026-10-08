@@ -79,6 +79,16 @@ public class Bind implements BuildStep {
                                                                   Function<M, BuildExecutorModule> configurator,
                                                                   Path configurationFile,
                                                                   Supplier<M> module) {
+        configured(buildExecutor, inputs, name, configurator, configurationFile, Collections.emptyNavigableSet(), module);
+    }
+
+    public static <M extends BuildExecutorModule> void configured(BuildExecutor buildExecutor,
+                                                                  SequencedSet<String> inputs,
+                                                                  String name,
+                                                                  Function<M, BuildExecutorModule> configurator,
+                                                                  Path configurationFile,
+                                                                  SequencedSet<Path> siblings,
+                                                                  Supplier<M> module) {
         if (configurator == null || configurationFile == null) {
             return;
         }
@@ -87,9 +97,19 @@ public class Bind implements BuildStep {
             return;
         }
         buildExecutor.addModule(name, (nested, inherited) -> {
-            nested.addSource("configuration",
-                    new Bind(Map.of(Path.of(""), configurationFile.getFileName())),
-                    configurationFile);
+            if (siblings.isEmpty()) {
+                nested.addSource("configuration",
+                        new Bind(Map.of(Path.of(""), configurationFile.getFileName())),
+                        configurationFile);
+            } else {
+                SequencedSet<String> sources = new LinkedHashSet<>();
+                for (Path file : Stream.concat(Stream.of(configurationFile.getFileName()), siblings.stream()).toList()) {
+                    String source = "configuration-" + sources.size();
+                    nested.addSource(source, new Bind(Map.of(Path.of(""), file)), configurationFile.resolveSibling(file));
+                    sources.add(source);
+                }
+                nested.addStep("configuration", new Bind(Map.of(Path.of(""), Path.of(""))), sources);
+            }
             SequencedSet<String> toolInputs = new LinkedHashSet<>();
             toolInputs.add("configuration");
             toolInputs.addAll(inherited.sequencedKeySet());

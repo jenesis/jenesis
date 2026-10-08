@@ -22,6 +22,7 @@ public class ScalafmtModule implements BuildExecutorModule {
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
     private static final String MAVEN_GROUP = "org.scalameta", MAVEN_ARTIFACT = "scalafmt-cli_2.13";
+    private static final int TEST_ERROR = 1;
 
     private final Dependencies dependencies;
     private final Pinning pinning;
@@ -144,7 +145,7 @@ public class ScalafmtModule implements BuildExecutorModule {
                                           Executor executor,
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) {
-            return !strict || code == 0;
+            return code == 0 || !strict && code == TEST_ERROR;
         }
 
         @Override

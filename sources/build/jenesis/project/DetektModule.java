@@ -21,6 +21,7 @@ public class DetektModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
+    private static final String REPORT = BuildStep.REPORTS + "detekt/detekt-report.xml";
     private static final String MAVEN_GROUP = "io.gitlab.arturbosch.detekt", MAVEN_ARTIFACT = "detekt-cli";
 
     private final Dependencies dependencies;
@@ -143,8 +144,8 @@ public class DetektModule implements BuildExecutorModule {
         public boolean acceptableExitCode(int code,
                                           Executor executor,
                                           BuildStepContext context,
-                                          SequencedMap<String, BuildStepArgument> arguments) {
-            return !strict || code == 0;
+                                          SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            return code == 0 || !strict && completeReport(context.next().resolve(REPORT));
         }
 
         @Override
@@ -184,7 +185,8 @@ public class DetektModule implements BuildExecutorModule {
             if (config == null) {
                 throw new IllegalStateException("No " + configFile + " found among the inputs of the detekt step");
             }
-            Path report = Files.createDirectories(context.next().resolve(BuildStep.REPORTS + "detekt")).resolve("detekt-report.xml");
+            Path report = context.next().resolve(REPORT);
+            Files.createDirectories(report.getParent());
             List<String> commands = new ArrayList<>(List.of(
                     "-cp", String.join(File.pathSeparator, jars),
                     "io.gitlab.arturbosch.detekt.cli.Main",

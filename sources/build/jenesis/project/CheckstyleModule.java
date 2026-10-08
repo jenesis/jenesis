@@ -21,7 +21,9 @@ public class CheckstyleModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
+    private static final String REPORT = BuildStep.REPORTS + "checkstyle/checkstyle-report.xml";
     private static final String MAVEN_GROUP = "com.puppycrawl.tools", MAVEN_ARTIFACT = "checkstyle";
+    private static final Pattern CONFIG_LOC = Pattern.compile("\\$\\{config_loc}/([^\"'<>${}\\s]+)");
 
     private final Dependencies dependencies;
     private final Pinning pinning;
@@ -67,6 +69,27 @@ public class CheckstyleModule implements BuildExecutorModule {
 
     public static Path configurationFile(SequencedSet<Path> configuration) {
         return BuildStep.locate(configuration, "checkstyle.xml");
+    }
+
+    public static SequencedSet<Path> siblings(Path configurationFile) throws IOException {
+        SequencedSet<Path> siblings = new LinkedHashSet<>();
+        if (configurationFile == null) {
+            return siblings;
+        }
+        Matcher matcher = CONFIG_LOC.matcher(Files.readString(configurationFile));
+        while (matcher.find()) {
+            Path sibling = Path.of(matcher.group(1)).normalize();
+            if (sibling.isAbsolute() || sibling.startsWith("..")) {
+                throw new IllegalArgumentException(configurationFile + " references ${config_loc}/" + matcher.group(1)
+                        + ", which is not beside or below it - place the file in the folder of "
+                        + configurationFile.getFileName());
+            }
+            if (!sibling.equals(configurationFile.getFileName())
+                    && Files.isRegularFile(configurationFile.resolveSibling(sibling))) {
+                siblings.add(sibling);
+            }
+        }
+        return siblings;
     }
 
     public CheckstyleModule pinning(Pinning pinning) {
@@ -143,8 +166,8 @@ public class CheckstyleModule implements BuildExecutorModule {
         public boolean acceptableExitCode(int code,
                                           Executor executor,
                                           BuildStepContext context,
-                                          SequencedMap<String, BuildStepArgument> arguments) {
-            return !strict || code == 0;
+                                          SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            return code == 0 || !strict && completeReport(context.next().resolve(REPORT));
         }
 
         @Override
@@ -190,11 +213,17 @@ public class CheckstyleModule implements BuildExecutorModule {
                 throw new IllegalStateException("No " + configFile + " found among the inputs of the Checkstyle step");
             }
             files.sort(null);
-            Path report = Files.createDirectories(context.next().resolve(BuildStep.REPORTS + "checkstyle")).resolve("checkstyle-report.xml");
+            Path report = context.next().resolve(REPORT);
+            Files.createDirectories(report.getParent());
+            SequencedProperties expansions = new SequencedProperties();
+            expansions.setProperty("config_loc", config.getParent().toString());
+            Path expanded = context.supplement().resolve("checkstyle.properties");
+            expansions.store(expanded);
             List<String> commands = new ArrayList<>(List.of(
                     "-cp", String.join(File.pathSeparator, jars),
                     "com.puppycrawl.tools.checkstyle.Main",
                     "-c", config.toString(),
+                    "-p", expanded.toString(),
                     "-f", "xml",
                     "-o", report.toString()));
             commands.addAll(files);

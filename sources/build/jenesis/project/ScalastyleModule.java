@@ -21,6 +21,7 @@ public class ScalastyleModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
+    private static final String REPORT = BuildStep.REPORTS + "scalastyle/scalastyle-report.xml";
     private static final String MAVEN_GROUP = "com.beautiful-scala", MAVEN_ARTIFACT = "scalastyle_2.13";
 
     private final Dependencies dependencies;
@@ -143,8 +144,8 @@ public class ScalastyleModule implements BuildExecutorModule {
         public boolean acceptableExitCode(int code,
                                           Executor executor,
                                           BuildStepContext context,
-                                          SequencedMap<String, BuildStepArgument> arguments) {
-            return !strict || code == 0;
+                                          SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            return code == 0 || !strict && completeReport(context.next().resolve(REPORT));
         }
 
         @Override
@@ -184,7 +185,8 @@ public class ScalastyleModule implements BuildExecutorModule {
             if (config == null) {
                 throw new IllegalStateException("No " + configFile + " found among the inputs of the Scalastyle step");
             }
-            Path report = Files.createDirectories(context.next().resolve(BuildStep.REPORTS + "scalastyle")).resolve("scalastyle-report.xml");
+            Path report = context.next().resolve(REPORT);
+            Files.createDirectories(report.getParent());
             List<String> commands = new ArrayList<>(List.of(
                     "-cp", String.join(File.pathSeparator, jars),
                     "org.scalastyle.Main",
