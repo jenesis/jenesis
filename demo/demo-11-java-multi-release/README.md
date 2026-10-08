@@ -65,6 +65,12 @@ in a separate pass with `--release <N>` and writes the classes to
 marks the JAR's manifest with `Multi-Release: true`, which is what tells the JVM
 to consult the versioned directory.
 
+An overlay may also carry the `module-info.java` itself, as a library whose main
+code targets Java 8 declares its module: placed in `META-INF/versions/9/`, the
+descriptor is compiled against the module path with the main classes as part of
+the module, so its `requires` may name library modules, and the jar is a named
+module on Java 9 and later while Java 8 reads it from the class path as before.
+
 No dependencies
 ---------------
 

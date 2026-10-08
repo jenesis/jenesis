@@ -320,6 +320,7 @@ public class Javac extends ProcessBuildStep {
             throws IOException {
         SequencedMap<Integer, List<String>> versionedFiles = new TreeMap<>();
         SequencedMap<Integer, List<String>> versionedRoots = new TreeMap<>();
+        SequencedMap<Integer, String> versionedModules = new TreeMap<>();
         List<String> dependencyPath = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -336,7 +337,7 @@ public class Javac extends ProcessBuildStep {
             if (Files.exists(sources)) {
                 Files.walkFileTree(sources, new SimpleFileVisitor<>() {
                     @Override
-                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                         String name = file.toString();
                         if (!name.endsWith(".java")) {
                             return FileVisitResult.CONTINUE;
@@ -344,7 +345,11 @@ public class Javac extends ProcessBuildStep {
                         Integer release = versionOf(sources.relativize(file));
                         if (release != null) {
                             versionedFiles.computeIfAbsent(release, _ -> new ArrayList<>()).add(name);
-                            String root = sources.resolve("META-INF/versions/" + release).toString();
+                            Path versions = sources.resolve("META-INF/versions/" + release);
+                            if (versions.relativize(file).equals(Path.of("module-info.java"))) {
+                                versionedModules.put(release, new ModuleInfoParser().identify(file).coordinate());
+                            }
+                            String root = versions.toString();
                             List<String> roots = versionedRoots.computeIfAbsent(release, _ -> new ArrayList<>());
                             if (!roots.contains(root)) {
                                 roots.add(root);
@@ -361,7 +366,9 @@ public class Javac extends ProcessBuildStep {
         if (versionedFiles.isEmpty()) {
             return CompletableFuture.completedStage(null);
         }
-        List<String> prepended = prepended(properties(arguments));
+        SequencedMap<String, SequencedMap<String, String>> properties = properties(arguments);
+        properties.values().forEach(folder -> folder.remove("--release"));
+        List<String> prepended = prepended(properties);
         Path mainTarget = context.next().resolve(CLASSES);
         Path moduleInfo = mainTarget.resolve("module-info.class");
         String moduleName;
@@ -379,7 +386,16 @@ public class Javac extends ProcessBuildStep {
             List<String> roots = versionedRoots.get(release);
             chain = chain.thenComposeAsync(_ -> {
                 try {
-                    return runVersioned(executor, context, prepended, dependencyPath, moduleName, mainTarget, roots, release, files);
+                    return runVersioned(executor,
+                            context,
+                            prepended,
+                            dependencyPath,
+                            moduleName,
+                            versionedModules.get(release),
+                            mainTarget,
+                            roots,
+                            release,
+                            files);
                 } catch (IOException e) {
                     return CompletableFuture.failedFuture(e);
                 }
@@ -425,6 +441,7 @@ public class Javac extends ProcessBuildStep {
                                                List<String> prepended,
                                                List<String> dependencyPath,
                                                String moduleName,
+                                               String versionedModule,
                                                Path mainTarget,
                                                List<String> versionedRoots,
                                                int release,
@@ -436,14 +453,22 @@ public class Javac extends ProcessBuildStep {
                 "-d", target.toString(),
                 "--release", Integer.toString(release)));
         List<String> classPath = new ArrayList<>(), modulePath = new ArrayList<>(), patchModule = new ArrayList<>();
-        if (moduleName != null) {
-            if (Files.exists(mainTarget)) {
-                modulePath.add(mainTarget.toString());
+        String patched = versionedModule == null ? moduleName : versionedModule;
+        if (patched != null) {
+            if (versionedModule != null) {
+                if (Files.exists(mainTarget)) {
+                    patchModule.add(mainTarget.toString());
+                }
+            } else {
+                if (Files.exists(mainTarget)) {
+                    modulePath.add(mainTarget.toString());
+                }
+                patchModule.addAll(versionedRoots);
             }
+            PathPlacement pathPlacement = this.pathPlacement.forModuleInfo(true);
             for (String entry : dependencyPath) {
                 (pathPlacement.test(Path.of(entry)) ? modulePath : classPath).add(entry);
             }
-            patchModule.addAll(versionedRoots);
         } else {
             if (Files.exists(mainTarget)) {
                 classPath.add(mainTarget.toString());
@@ -476,7 +501,7 @@ public class Javac extends ProcessBuildStep {
                     .replace("\\", "\\\\")
                     .replace("\"", "\\\"");
             args.append("--patch-module\n\"")
-                    .append(moduleName)
+                    .append(patched)
                     .append("=")
                     .append(escaped)
                     .append("\"\n");

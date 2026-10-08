@@ -938,6 +938,8 @@ public record Project(
                       build-helper add-source / sourceSets
                           -> sourceDirectory in pom.xml, or a plugin at binary/generated
                       multi-release jar configuration -> sources/META-INF/versions/<N>/ (11)
+                      moditect add-module-info, a descriptor for a Java 8 base
+                          -> module-info.java in sources/META-INF/versions/9/ (11)
                       replacer, templating, a generated version class
                           -> a plugin at binary/generated that writes the source (57)
                       maven-resources-plugin targetPath, a file outside the resource folders
