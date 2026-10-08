@@ -129,6 +129,53 @@ public class DependenciesMavenBomTest {
     }
 
     @Test
+    public void a_resolution_reading_another_resolution_takes_its_maven_bom_record_for_no_declaration() throws Exception {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.acme/lib", "");
+        requires.store(dependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties boms = new SequencedProperties();
+        boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
+        boms.store(dependencies.resolve(BuildStep.BOMS));
+        Path runner = Files.createDirectory(root.resolve("runner"));
+        SequencedProperties runnerRequires = new SequencedProperties();
+        runnerRequires.setProperty("main/runtime/maven/org.acme/runner/1.0", "");
+        runnerRequires.store(runner.resolve(BuildStep.REQUIRES));
+        Dependencies module = new Dependencies(
+                Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
+                        <project xmlns="http://maven.apache.org/POM/4.0.0">
+                            <modelVersion>4.0.0</modelVersion>
+                            <dependencyManagement>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>org.acme</groupId>
+                                        <artifactId>lib</artifactId>
+                                        <version>2.0</version>
+                                    </dependency>
+                                </dependencies>
+                            </dependencyManagement>
+                        </project>
+                        """))),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)));
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("runner", runner);
+        executor.addModule("resolved", module, "dependencies");
+        executor.addModule("tests", module, "resolved", "runner");
+        Path tests = executor.execute().get("tests");
+        assertThat(SequencedProperties.ofFiles(tests.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
+                .as("the record of a bill of materials another resolution imported is no reference to import again")
+                .contains("main/runtime/maven/org.acme/runner/1.0");
+    }
+
+    @Test
     public void a_scoped_step_ignores_a_maven_bom_of_another_group() throws IOException {
         SequencedProperties requires = new SequencedProperties();
         requires.setProperty("tool/runtime/maven/org.acme/tool/1.0", "");
