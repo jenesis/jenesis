@@ -2478,6 +2478,55 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void draws_no_edge_to_a_test_or_provided_dependency_of_a_library_that_is_resolved_otherwise() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>tested</artifactId>
+                            <version>0.9</version>
+                            <scope>test</scope>
+                        </dependency>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>provided</artifactId>
+                            <version>0.9</version>
+                            <scope>provided</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        for (String artifact : List.of("tested", "provided")) {
+            addToRepository("other", artifact, "1", """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                        <modelVersion>4.0.0</modelVersion>
+                    </project>
+                    """);
+            addJarToRepository("other", artifact, "1");
+        }
+        addJarToRepository("group", "artifact", "1");
+        Resolver.Resolution resolution = mavenPomResolver.dependencies(
+                Runnable::run,
+                "maven",
+                Map.<String, Repository>of("maven", mavenRepository),
+                new LinkedHashMap<>(Map.of(
+                        "other/tested/1", Collections.emptyNavigableSet(),
+                        "other/provided/1", Collections.emptyNavigableSet(),
+                        "group/artifact/1", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE);
+        assertThat(resolution.edges())
+                .as("a library's own test and provided dependencies are not followed, so the tree draws no edge to them")
+                .noneMatch(edge -> "maven/group/artifact/1".equals(edge.parent()));
+        assertThat(resolution.vertices().get("maven/other/tested").resolvedVersion()).isEqualTo("1");
+        assertThat(resolution.vertices().get("maven/other/provided").resolvedVersion()).isEqualTo("1");
+    }
+
+    @Test
     public void can_resolve_open_range_version() throws IOException {
         addToRepository("group", "artifact", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>

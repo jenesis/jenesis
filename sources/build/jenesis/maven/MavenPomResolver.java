@@ -401,9 +401,6 @@ public class MavenPomResolver implements MavenResolver {
                 if (!current.root() && Objects.equals(Boolean.TRUE, value.optional())) {
                     continue;
                 }
-                DependencyResolution resolution = resolutions.computeIfAbsent(
-                        entry.getKey(),
-                        _ -> new DependencyResolution());
                 MavenDependencyScope resolvedScope = switch (current.scope()) {
                     case null -> value.scope();
                     case COMPILE -> switch (value.scope()) {
@@ -415,12 +412,16 @@ public class MavenPomResolver implements MavenResolver {
                         default -> null;
                     };
                     case SYSTEM, IMPORT -> null;
-                }, scope = resolution.currentScope == null || resolution.currentScope.reduces(resolvedScope)
-                        ? resolvedScope
-                        : resolution.currentScope;
-                if (scope == null) {
+                };
+                if (resolvedScope == null) {
                     continue;
                 }
+                DependencyResolution resolution = resolutions.computeIfAbsent(
+                        entry.getKey(),
+                        _ -> new DependencyResolution());
+                MavenDependencyScope scope = resolution.currentScope == null || resolution.currentScope.reduces(resolvedScope)
+                        ? resolvedScope
+                        : resolution.currentScope;
                 String version;
                 resolution.bindChecksum(entry.getKey(), value.version(), value.checksum());
                 if (resolution.currentVersion == null) {
