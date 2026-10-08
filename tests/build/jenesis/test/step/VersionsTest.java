@@ -12,6 +12,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.step.Versions;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class VersionsTest {
 
@@ -322,6 +323,30 @@ public class VersionsTest {
                 .content()
                 .contains("Multi-Release: true")
                 .contains("Sbom-Format: CycloneDX");
+    }
+
+    @Test
+    public void refuses_a_class_that_two_inputs_write() throws IOException {
+        Path compiled = Files.createDirectories(classesInput.resolve(BuildStep.CLASSES).resolve("sample"));
+        Files.write(compiled.resolve("Sample.class"), new byte[] { 0x01 });
+        Path added = Files.createDirectories(requiresInput.resolve(BuildStep.CLASSES).resolve("sample"));
+        Files.write(added.resolve("Sample.class"), new byte[] { 0x02 });
+        writeRequires(Map.of());
+        assertThatThrownBy(this::runStep)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("classes/sample/Sample.class is written by both")
+                .hasMessageContaining("never replaces");
+    }
+
+    @Test
+    public void refuses_a_module_descriptor_that_two_inputs_write() throws IOException {
+        writeModuleInfo("foo", null, false);
+        Path added = Files.createDirectories(requiresInput.resolve(BuildStep.CLASSES));
+        Files.copy(classesInput.resolve(BuildStep.CLASSES).resolve("module-info.class"), added.resolve("module-info.class"));
+        writeRequires(Map.of());
+        assertThatThrownBy(this::runStep)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("classes/module-info.class is written by both");
     }
 
     private static ModuleRequireInfo require(String name) {
