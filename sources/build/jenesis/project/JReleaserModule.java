@@ -133,9 +133,25 @@ public class JReleaserModule implements BuildExecutorModule {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
+            String stamped = version;
+            if (stamped == null || stamped.isEmpty()) {
+                SequencedSet<String> staged = new TreeSet<>();
+                for (BuildStepArgument argument : arguments.values()) {
+                    if (argument.removed()) {
+                        continue;
+                    }
+                    try (Stream<Path> files = Files.walk(argument.folder())) {
+                        files.filter(file -> file.getNameCount() > 2)
+                                .filter(file -> file.getFileName().toString().equals(file.getParent().getParent().getFileName()
+                                        + "-" + file.getParent().getFileName() + ".pom"))
+                                .forEach(file -> staged.add(file.getParent().getFileName().toString()));
+                    }
+                }
+                stamped = staged.size() == 1 ? staged.getFirst() : null;
+            }
             SequencedProperties variables = new SequencedProperties();
-            if (version != null && !version.isEmpty()) {
-                variables.setProperty("JRELEASER_PROJECT_VERSION", version);
+            if (stamped != null && !stamped.isEmpty()) {
+                variables.setProperty("JRELEASER_PROJECT_VERSION", stamped);
             }
             variables.store(context.next().resolve(VARIABLES));
             return CompletableFuture.completedStage(new BuildStepResult(true));

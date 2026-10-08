@@ -179,7 +179,9 @@ was uploaded. It is environmental setup, like the JDK or `git`.
 
 The goal also contributes one thing to a release run by somebody else. Its
 `release/jreleaser/environment` step writes a `jreleaser.properties` carrying
-`JRELEASER_PROJECT_VERSION`, the version this build stamped, which a configuration
+`JRELEASER_PROJECT_VERSION`, the version this build stamped - `jenesis.project.version`,
+or where no setting names one, the version every staged POM carries, as a `pom.xml`
+build declares it in `<version>` - which a configuration
 picks up with a single `environment: { variables: ... }` line - so the version is
 stated once, by the build, instead of being passed separately to the build and to
 the release tool and drifting. That step runs no process and has no side effect,
