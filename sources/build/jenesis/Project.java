@@ -1113,8 +1113,10 @@ public record Project(
 
                     Remove what Jenesis now replaces - the plugin configuration, the wrapper and the CI
                     steps that called it - and let `ide` write the IntelliJ, VS Code or Eclipse
-                    project so no IDE depends on the old build. A Maven layout keeps its pom.xml
-                    files, which are now its build declaration.
+                    project so no IDE depends on the old build: one IDE module per module, its
+                    tests in its test sources. The IDE files it writes into a source folder never
+                    reach a jar. A Maven layout keeps its pom.xml files, which are now its build
+                    declaration.
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;

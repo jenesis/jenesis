@@ -184,6 +184,11 @@ files your editor reads with `ide`:
     java build/jenesis/Make.java +greeter
     java build/jenesis/Make.java ide
 
+`ide` writes one IDE module per Maven module, its tests among its test sources and
+the libraries only they need in the test scope. Where a module's folder is its
+source folder, as in a `module-info.java` build, the `.iml`, `.project` and
+`.classpath` files land there, and the build leaves them out of the jar.
+
 ## 4. Maven 4's POM model - [`java-pom-model-4-1-0`](demo-05-java-pom-model-4-1-0/README.md)
 
 The project of `java-pom-multi`, written in POM model 4.1.0: the aggregator lists
