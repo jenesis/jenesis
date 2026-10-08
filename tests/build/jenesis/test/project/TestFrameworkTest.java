@@ -251,7 +251,8 @@ public class TestFrameworkTest {
                 false,
                 false))
                 .as("the execute command exists from JUnit Platform 1.10 on, and an older launcher rejects it")
-                .containsExactly("--disable-banner", "--disable-ansi-colors", "--select-class=sample.BetaTest");
+                .containsExactly("--disable-banner", "--disable-ansi-colors", "--reports-dir=" + root.resolve("reports"),
+                        "--select-class=sample.BetaTest");
     }
 
     @Test
@@ -264,7 +265,8 @@ public class TestFrameworkTest {
                     false,
                     false))
                     .as("version %s", version)
-                    .containsExactly("execute", "--disable-banner", "--disable-ansi-colors", "--select-class=sample.BetaTest");
+                    .containsExactly("execute", "--disable-banner", "--disable-ansi-colors",
+                            "--reports-dir=" + root.resolve("reports"), "--select-class=sample.BetaTest");
         }
     }
 
