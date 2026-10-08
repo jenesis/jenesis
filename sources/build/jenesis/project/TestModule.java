@@ -987,6 +987,46 @@ public class TestModule implements BuildExecutorModule {
             SequencedSet<String> matchedClasses = new TreeSet<>(), excludedClasses = new TreeSet<>();
             SequencedMap<String, SequencedSet<String>> matchedMethods = new TreeMap<>();
             ClassFile classFile = ClassFile.of();
+            List<Path> classFolders = new ArrayList<>(), jars = new ArrayList<>();
+            for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
+                Path classes = argument.folder().resolve(CLASSES), artifacts = argument.folder().resolve(ARTIFACTS);
+                if (Files.isDirectory(classes)) {
+                    classFolders.add(classes);
+                }
+                if (Files.isDirectory(artifacts)) {
+                    try (DirectoryStream<Path> stream = Files.newDirectoryStream(artifacts, "*.jar")) {
+                        stream.forEach(jars::add);
+                    }
+                }
+                jars.addAll(Dependencies.select(argument.folder(), group, "runtime"));
+            }
+            Map<String, Optional<ClassModel>> located = new HashMap<>();
+            Function<String, Optional<ClassModel>> locator = name -> located.computeIfAbsent(name, _ -> {
+                try {
+                    for (Path folder : classFolders) {
+                        Path file = folder.resolve(name + ".class");
+                        if (Files.isRegularFile(file)) {
+                            return Optional.of(classFile.parse(file));
+                        }
+                    }
+                    for (Path jar : jars) {
+                        try (JarFile file = new JarFile(jar.toFile())) {
+                            JarEntry entry = file.getJarEntry(name + ".class");
+                            if (entry != null) {
+                                try (InputStream input = file.getInputStream(entry)) {
+                                    return Optional.of(classFile.parse(input.readAllBytes()));
+                                }
+                            }
+                        }
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                return Optional.empty();
+            });
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
@@ -1006,13 +1046,14 @@ public class TestModule implements BuildExecutorModule {
                             if (file.toString().endsWith(".class")) {
                                 String raw = classes.relativize(file).toString();
                                 String className = raw.substring(0, raw.length() - 6).replace(File.separatorChar, '.');
-                                if ((classFile.parse(file).flags().flagsMask()
+                                ClassModel model = classFile.parse(file);
+                                if ((model.flags().flagsMask()
                                         & (ClassFile.ACC_ABSTRACT | ClassFile.ACC_MODULE)) != 0) {
                                     return FileVisitResult.CONTINUE;
                                 }
                                 boolean left = excluded.stream().anyMatch(pattern -> pattern.matcher(className).matches());
                                 if (specs.isEmpty()) {
-                                    if (isTest.test(className)) {
+                                    if (isTest.test(className) && holdsTests(resolved, model, locator)) {
                                         (left ? excludedClasses : matchedClasses).add(className);
                                     }
                                 } else {
@@ -1064,6 +1105,24 @@ public class TestModule implements BuildExecutorModule {
                     parallel,
                     reporting), tags, ran));
             return CompletableFuture.completedFuture(commands);
+        }
+
+        private static boolean holdsTests(TestFramework framework,
+                                          ClassModel type,
+                                          Function<String, Optional<ClassModel>> locator) {
+            ClassModel current = type;
+            while (!framework.holdsTests(current)) {
+                String superclass = current.superclass().map(ClassEntry::asInternalName).orElse(null);
+                if (superclass == null || superclass.startsWith("java/")) {
+                    return false;
+                }
+                Optional<ClassModel> located = locator.apply(superclass);
+                if (located.isEmpty()) {
+                    return true;
+                }
+                current = located.get();
+            }
+            return true;
         }
 
         private SequencedSet<String> selected(SequencedMap<String, BuildStepArgument> arguments,

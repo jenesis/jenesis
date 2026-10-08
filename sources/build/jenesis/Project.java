@@ -1006,7 +1006,9 @@ public record Project(
                                            `requires static` on it a `requires`
 
                     jenesis.test.filter matches the whole class name and replaces the default naming
-                    (Test*, *Test, *Tests, *TestCase, IT*, *IT, *ITCase, never a nested class); a
+                    (Test*, *Test, *Tests, *TestCase, IT*, *IT, *ITCase, never a nested class), which
+                    under JUnit 4, as in Surefire, takes a class only where it or a superclass
+                    declares an @Test method, a @RunWith or a suite(), or extends TestCase; a
                     <module>/<regex> entry reaches that module only, and a module no entry reaches
                     runs no tests. jenesis.test.exclude takes the same entries, without a #method,
                     and leaves out what they match, so excluding one class keeps the default naming;
