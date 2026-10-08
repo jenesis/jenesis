@@ -163,7 +163,7 @@ public class Bind implements BuildStep {
                                     if (filtered) {
                                         Files.createDirectories(resolved.getParent());
                                     }
-                                    BuildStep.linkOrCopy(resolved, file);
+                                    BuildStep.linkOrCopy(resolved, Files.isSymbolicLink(file) ? file.toRealPath() : file);
                                     return FileVisitResult.CONTINUE;
                                 }
                             });

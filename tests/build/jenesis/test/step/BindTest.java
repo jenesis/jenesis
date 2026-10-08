@@ -118,4 +118,23 @@ public class BindTest {
                         + " acts on that decision has to reach the same files")
                 .content().isEqualTo("org.example/lib=1.0");
     }
+
+    @Test
+    public void binds_the_file_a_relative_symbolic_link_points_to() throws IOException {
+        Files.writeString(root.resolve("LICENSE"), "licence");
+        Path folder = Files.createDirectories(original.resolve("META-INF"));
+        Files.createSymbolicLink(folder.resolve("LICENSE"), Path.of("../../LICENSE"));
+        BuildStepResult result = Bind.asResources().apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("original", new BuildStepArgument(
+                        original,
+                        Map.of(Path.of("META-INF/LICENSE"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve("resources/META-INF/LICENSE"))
+                .as("a relative link reproduced in the output would point past it and dangle")
+                .isRegularFile()
+                .content().isEqualTo("licence");
+    }
 }
