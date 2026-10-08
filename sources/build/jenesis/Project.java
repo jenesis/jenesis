@@ -824,8 +824,10 @@ public record Project(
                     white-box tests are, or by two projects of the build. Per project, and across
                     the main sources of all of them:
 
-                      comm -12 <(cd src/main/java && find . -name '*.java' | sed 's|/[^/]*$||' | sort -u) \\
-                               <(cd src/test/java && find . -name '*.java' | sed 's|/[^/]*$||' | sort -u)
+                      comm -12 <(cd src/main/java && find . -name '*.java' ! -name module-info.java \\
+                                     | sed 's|/[^/]*$||' | sort -u) \\
+                               <(cd src/test/java && find . -name '*.java' ! -name module-info.java \\
+                                     | sed 's|/[^/]*$||' | sort -u)
                       find . -path '*/src/main/java/*.java' | sed 's|/src/main/java/| |; s|/[^/]*$||' \\
                           | sort -u | cut -d' ' -f2 | sort | uniq -d
 
