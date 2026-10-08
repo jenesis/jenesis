@@ -98,7 +98,8 @@ duplicated:
   apart from a link, which becomes its label.
 - **`project.properties`**, read because it sits at the project root, carries only what a
   module declaration cannot express: `url`, every `license.<id>.name|url`, every
-  `developer.<id>.name|email`, and the `scm.connection|developerConnection|url`
+  `developer.<id>.name|email` - published under `<id>`, unless `developer.<id>.id`
+  names another id or is empty for none - and the `scm.connection|developerConnection|url`
   block. A file elsewhere, or several, is named with `Project.metadata(...)` or
   `-Djenesis.project.metadata`, and an empty value there reads none.
 

@@ -455,6 +455,35 @@ public class PomTest {
         assertThat(pom).contains("<connection>scm:git:https://example.com/jenesis.git</connection>");
     }
 
+    @Test
+    public void emits_a_developer_without_an_id_where_its_id_is_empty() throws IOException {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.setProperty("developer.alice.name", "Alice Example");
+        metadata.setProperty("developer.bob_example.id", "");
+        metadata.setProperty("developer.bob_example.name", "Bob Example");
+        metadata.setProperty("developer.carol.id", "carol-id");
+        metadata.setProperty("developer.carol.name", "Carol Example");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        String pom = Files.readString(next.resolve(Pom.POM));
+        assertThat(pom)
+                .as("a developer's key is its id unless an id is declared")
+                .contains("<id>alice</id>", "<id>carol-id</id>", "<name>Bob Example</name>")
+                .doesNotContain("<id>carol</id>");
+        assertThat(pom)
+                .as("a developer whose id is empty is published by name alone")
+                .doesNotContain("<id>bob_example</id>", "<id/>", "<id></id>");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"v1.0.0", ""})
     public void emits_a_scm_tag_unless_it_is_empty(String tag) throws IOException {

@@ -532,6 +532,7 @@ public class MavenProject implements BuildExecutorModule {
                 }
                 case "developers" -> {
                     NodeList developers = node.getChildNodes();
+                    Set<String> ids = new HashSet<>();
                     for (int developerIndex = 0; developerIndex < developers.getLength(); developerIndex++) {
                         Node devNode = developers.item(developerIndex);
                         if (devNode.getNodeType() != Node.ELEMENT_NODE) {
@@ -543,13 +544,24 @@ public class MavenProject implements BuildExecutorModule {
                         }
                         Element developer = (Element) devNode;
                         Element idElement = firstChild(developer, "id");
-                        if (idElement == null) {
-                            continue;
-                        }
-                        String id = idElement.getTextContent().trim();
+                        String id = idElement == null ? "" : idElement.getTextContent().trim();
                         if (id.isEmpty()) {
-                            continue;
+                            Element label = firstChild(developer, "name") == null
+                                    ? firstChild(developer, "email")
+                                    : firstChild(developer, "name");
+                            String derived = label == null ? "" : label.getTextContent().trim()
+                                    .toLowerCase(Locale.ROOT)
+                                    .replaceAll("[^a-z0-9]+", "_");
+                            if (derived.isEmpty()) {
+                                continue;
+                            }
+                            id = derived;
+                            for (int suffix = 2; ids.contains(id); suffix++) {
+                                id = derived + "_" + suffix;
+                            }
+                            result.setProperty("developer." + id + ".id", "");
                         }
+                        ids.add(id);
                         copyChildText(developer, "name", result, "developer." + id + ".name");
                         copyChildText(developer, "email", result, "developer." + id + ".email");
                     }
