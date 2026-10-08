@@ -4291,6 +4291,30 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_reads_the_compiler_target_or_else_its_source_as_the_release_it_does_not_declare() throws IOException {
+        Map<String, String> cases = new LinkedHashMap<>();
+        cases.put("<maven.compiler.source>1.8</maven.compiler.source><maven.compiler.target>1.8</maven.compiler.target>", "8");
+        cases.put("<maven.compiler.source>11</maven.compiler.source>", "11");
+        cases.put("<maven.compiler.release></maven.compiler.release><maven.compiler.target>1.8</maven.compiler.target>", "8");
+        cases.put("<maven.compiler.release>17</maven.compiler.release><maven.compiler.target>1.8</maven.compiler.target>", "17");
+        for (Map.Entry<String, String> entry : cases.entrySet()) {
+            Files.writeString(project.resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>project</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                        <properties>%s</properties>
+                    </project>
+                    """.formatted(entry.getKey()));
+            MavenLocalPom pom = mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of(""));
+            assertThat(pom.release()).as(entry.getKey()).isEqualTo(entry.getValue());
+            assertThat(pom.testRelease()).as(entry.getKey()).isEqualTo(entry.getValue());
+        }
+    }
+
+    @Test
     public void a_profile_of_a_fetched_parent_that_the_jdk_activates_sets_the_release() throws IOException {
         addToRepository("parent", "artifact", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>
