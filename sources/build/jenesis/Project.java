@@ -912,8 +912,15 @@ public record Project(
 
                     Each module is the folder whose module-info.java sits at the root of its
                     sources; in a Maven tree that is src/main/java, so the file stays where it is.
+                    Every module-info.java below the root becomes a module, so one the old build
+                    keeps for itself, as src/moditect/module-info.java, needs an empty .jenesis.skip
+                    file in its folder, which leaves that folder and all below it out.
                     A root pom.xml makes the build pick the maven layout, so pass
                     -Djenesis.project.layout=modular_to_maven while the old build still needs it.
+                    The pins `pin` wrote into pom.xml do not carry over: until `pin` runs again, the
+                    module build resolves the newest versions. Write a bare @jenesis.pin <module>
+                    <version> for each version to keep, then run `pin`, which adds the checksums
+                    and the closure.
 
                       a dependency         `requires <module>`, `requires static` where it is only
                                            compiled against; a jar that declares no module name
@@ -1510,7 +1517,12 @@ public record Project(
                     folder of the module's sources, in the maven layout <module>/build.jenesis/ for both
                     halves of a pom, src/main/build.jenesis/ for its main code and
                     src/test/build.jenesis/ for its tests, and in every layout build.jenesis/ at the
-                    project root, which reaches every module. Generators read their inputs from META-INF/build.jenesis/ in the
+                    project root, which reaches every module. For each file name the first location
+                    that holds one configures the tool alone, and nothing merges: a folder named after
+                    an active profile inside any location comes first, then the module's own
+                    locations, then the root's. So a module's process-javac.properties replaces the
+                    root's rather than adding to it, and repeats the lines of the root's it still
+                    needs. Generators read their inputs from META-INF/build.jenesis/ in the
                     sources, which the compiler never copies into the artifact, unless folders=<paths>
                     names other folders, found among the sources and the resources alike; each reads
                     only the file kinds it compiles. In the maven layout only a resource directory
