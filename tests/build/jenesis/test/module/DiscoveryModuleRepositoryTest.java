@@ -8,6 +8,7 @@ import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.module.DiscoveryModuleRepository;
 import build.jenesis.module.JenesisRepository;
 import build.jenesis.test.DiscoveryServer;
+import java.util.jar.Attributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -32,7 +33,7 @@ public class DiscoveryModuleRepositoryTest {
     @Test
     public void resolves_a_module_from_the_template_its_domain_publishes() throws IOException {
         server.domain("bytebuddy.net", "module=" + server.files() + "{module}-{version}.{type}")
-                .file("net.bytebuddy.agent-1.0.jar", "agent");
+                .file("net.bytebuddy.agent-1.0.jar", jar("net.bytebuddy.agent", "agent"));
 
         assertThat(content(repository().fetch(Runnable::run, "net.bytebuddy.agent/1.0"))).isEqualTo("agent");
     }
@@ -42,8 +43,8 @@ public class DiscoveryModuleRepositoryTest {
         server.domain("bytebuddy.net",
                         "module=" + server.files() + "{module}-{version}.{type}",
                         "module.since=1.2.3")
-                .file("net.bytebuddy-1.2.2.jar", "old")
-                .file("net.bytebuddy-1.2.3.jar", "floor");
+                .file("net.bytebuddy-1.2.2.jar", jar("net.bytebuddy", "old"))
+                .file("net.bytebuddy-1.2.3.jar", jar("net.bytebuddy", "floor"));
 
         DiscoveryModuleRepository repository = repository();
 
@@ -55,7 +56,7 @@ public class DiscoveryModuleRepositoryTest {
     public void asks_the_module_service_a_record_names_as_its_root() throws IOException {
         List<String> requested = new CopyOnWriteArrayList<>();
         server.domain("bytebuddy.net", "module=" + server.root() + "/service")
-                .context("/service/", "fromService", requested);
+                .context("/service/", jar("net.bytebuddy", "fromService"), requested);
 
         assertThat(content(repository().fetch(Runnable::run, "net.bytebuddy"))).isEqualTo("fromService");
         assertThat(requested).allMatch(path -> path.startsWith("/service/module/"));
@@ -64,7 +65,8 @@ public class DiscoveryModuleRepositoryTest {
     @Test
     public void maps_every_module_below_a_domain_to_the_maven_coordinate_its_record_names() throws IOException {
         server.domain("jenesis.build", "moduletomaven=build.jenesis:{module}")
-                .file("maven/build/jenesis/build.jenesis.tools/1.0/build.jenesis.tools-1.0.jar", "tools")
+                .file("maven/build/jenesis/build.jenesis.tools/1.0/build.jenesis.tools-1.0.jar",
+                        jar("build.jenesis.tools", "tools"))
                 .file("maven/build/jenesis/build.jenesis.tools/1.0/build.jenesis.tools-1.0-sources.jar", "sources");
 
         DiscoveryModuleRepository repository = repository();
@@ -78,7 +80,7 @@ public class DiscoveryModuleRepositoryTest {
         server.domain("jenesis.build", "moduletomaven=build.jenesis:{module}")
                 .file("maven/build/jenesis/build.jenesis/maven-metadata.xml",
                         "<metadata><versioning><release>2.0</release></versioning></metadata>")
-                .file("maven/build/jenesis/build.jenesis/2.0/build.jenesis-2.0.jar", "release");
+                .file("maven/build/jenesis/build.jenesis/2.0/build.jenesis-2.0.jar", jar("build.jenesis", "release"));
 
         assertThat(content(repository().fetch(Runnable::run, "build.jenesis"))).isEqualTo("release");
     }
@@ -87,7 +89,7 @@ public class DiscoveryModuleRepositoryTest {
     public void applies_a_coordinate_without_the_module_placeholder_only_to_the_module_it_is_published_for()
             throws IOException {
         server.domain("bytebuddy.net", "moduletomaven=net.bytebuddy:byte-buddy")
-                .file("maven/net/bytebuddy/byte-buddy/1.0/byte-buddy-1.0.jar", "byte-buddy");
+                .file("maven/net/bytebuddy/byte-buddy/1.0/byte-buddy-1.0.jar", jar("net.bytebuddy", "byte-buddy"));
 
         DiscoveryModuleRepository repository = repository();
 
@@ -104,7 +106,8 @@ public class DiscoveryModuleRepositoryTest {
     public void maps_a_module_by_the_file_of_its_own_domain_where_no_shorter_domain_publishes_one()
             throws IOException {
         server.domain("agent.bytebuddy.net", "moduletomaven=net.bytebuddy:byte-buddy-agent")
-                .file("maven/net/bytebuddy/byte-buddy-agent/1.0/byte-buddy-agent-1.0.jar", "agent");
+                .file("maven/net/bytebuddy/byte-buddy-agent/1.0/byte-buddy-agent-1.0.jar",
+                        jar("net.bytebuddy.agent", "agent"));
 
         assertThat(content(repository().fetch(Runnable::run, "net.bytebuddy.agent/1.0"))).isEqualTo("agent");
     }
@@ -113,7 +116,8 @@ public class DiscoveryModuleRepositoryTest {
     public void lets_the_coordinate_its_domain_maps_every_module_to_outrank_a_subdomain() throws IOException {
         server.domain("agent.bytebuddy.net", "moduletomaven=net.bytebuddy:other-agent")
                 .domain("bytebuddy.net", "moduletomaven=net.bytebuddy:byte-buddy{-suffix}")
-                .file("maven/net/bytebuddy/byte-buddy-agent/1.0/byte-buddy-agent-1.0.jar", "agent");
+                .file("maven/net/bytebuddy/byte-buddy-agent/1.0/byte-buddy-agent-1.0.jar",
+                        jar("net.bytebuddy.agent", "agent"));
 
         assertThat(content(repository().fetch(Runnable::run, "net.bytebuddy.agent/1.0"))).isEqualTo("agent");
         assertThat(server.queried()).containsExactly("bytebuddy.net");
@@ -122,7 +126,7 @@ public class DiscoveryModuleRepositoryTest {
     @Test
     public void maps_a_module_to_the_extension_and_classifier_its_coordinate_names() throws IOException {
         server.domain("example.com", "moduletomaven=com.example:tool:jar:shaded")
-                .file("maven/com/example/tool/1.0/tool-1.0-shaded.jar", "shaded");
+                .file("maven/com/example/tool/1.0/tool-1.0-shaded.jar", jar("com.example", "shaded"));
 
         assertThat(content(repository().fetch(Runnable::run, "com.example/1.0"))).isEqualTo("shaded");
     }
@@ -133,9 +137,9 @@ public class DiscoveryModuleRepositoryTest {
         server.domain("jenesis.build",
                         "module=" + server.files() + "release/{module}-{version}{-classifier}.{type}",
                         "moduletomaven=build.jenesis:{module}")
-                .file("release/build.jenesis-1.0.jar", "fromModule")
+                .file("release/build.jenesis-1.0.jar", jar("build.jenesis", "fromModule"))
                 .file("release/build.jenesis-1.0.pom", "fromModule")
-                .file("maven/build/jenesis/build.jenesis/1.0/build.jenesis-1.0.jar", "fromMaven")
+                .file("maven/build/jenesis/build.jenesis/1.0/build.jenesis-1.0.jar", jar("build.jenesis", "fromMaven"))
                 .file("maven/build/jenesis/build.jenesis/1.0/build.jenesis-1.0.pom", "fromMaven");
 
         assertThat(content(repository().fetch(Runnable::run, "build.jenesis/1.0")))
@@ -154,7 +158,7 @@ public class DiscoveryModuleRepositoryTest {
                         "moduletomaven=build.jenesis:{module}")
                 .file("maven/build/jenesis/build.jenesis/maven-metadata.xml",
                         "<metadata><versioning><release>2.0</release></versioning></metadata>")
-                .file("maven/build/jenesis/build.jenesis/2.0/build.jenesis-2.0.jar", "release");
+                .file("maven/build/jenesis/build.jenesis/2.0/build.jenesis-2.0.jar", jar("build.jenesis", "release"));
 
         assertThat(content(repository().fetch(Runnable::run, "build.jenesis")))
                 .as("a template names no version, so the newest release comes from the Maven metadata")
@@ -182,7 +186,7 @@ public class DiscoveryModuleRepositoryTest {
                         "module=" + server.files() + "{module}-{version}{-classifier}.{type}",
                         "module.latest=" + server.latest() + "{module}.jar")
                 .answer("net.bytebuddy.agent.jar", 302, "Location", server.files() + "net.bytebuddy.agent-1.2.3.jar")
-                .file("net.bytebuddy.agent-1.2.3.jar", "newest")
+                .file("net.bytebuddy.agent-1.2.3.jar", jar("net.bytebuddy.agent", "newest"))
                 .file("net.bytebuddy.agent-1.2.3-sources.jar", "sources");
 
         DiscoveryModuleRepository repository = repository();
@@ -201,7 +205,7 @@ public class DiscoveryModuleRepositoryTest {
                         "module.latest=" + server.files() + "meta/{module}/maven-metadata.xml")
                 .file("meta/net.bytebuddy/maven-metadata.xml", "<metadata><versioning><release>1.5</release>"
                         + "<versions><version>1.0</version><version>1.5</version></versions></versioning></metadata>")
-                .file("net.bytebuddy-1.5.jar", "release");
+                .file("net.bytebuddy-1.5.jar", jar("net.bytebuddy", "release"));
 
         assertThat(content(repository().fetch(Runnable::run, "net.bytebuddy"))).isEqualTo("release");
     }
@@ -213,7 +217,7 @@ public class DiscoveryModuleRepositoryTest {
                         "module.latest=" + server.latest() + "{module}.jar",
                         "module.suffixes=none")
                 .answer("net.bytebuddy.jar", 302, "Location", server.files() + "net.bytebuddy-1.3.0-SNAPSHOT.jar")
-                .file("net.bytebuddy-1.3.0-SNAPSHOT.jar", "snapshot");
+                .file("net.bytebuddy-1.3.0-SNAPSHOT.jar", jar("net.bytebuddy", "snapshot"));
 
         assertThat(repository().fetch(Runnable::run, "net.bytebuddy")).isEmpty();
     }
@@ -243,7 +247,7 @@ public class DiscoveryModuleRepositoryTest {
         server.domain("jenesis.build",
                         "moduletomaven=build.jenesis:{module}",
                         "maven=" + server.files() + "release/{artifactId}-{version}{-classifier}.{type}")
-                .file("release/build.jenesis-1.0.jar", "fromRelease")
+                .file("release/build.jenesis-1.0.jar", jar("build.jenesis", "fromRelease"))
                 .context("/service/", "fromService");
         Map<String, String> settings = Map.of("repository.insecure", "true",
                 "module.uri", server.root() + "/service/",
@@ -303,8 +307,9 @@ public class DiscoveryModuleRepositoryTest {
     @Test
     public void maps_every_module_of_a_domain_with_one_record_through_the_suffix_of_its_name() throws IOException {
         server.domain("bytebuddy.net", "moduletomaven=net.bytebuddy:byte-buddy{-suffix}")
-                .file("maven/net/bytebuddy/byte-buddy/1.0/byte-buddy-1.0.jar", "byte-buddy")
-                .file("maven/net/bytebuddy/byte-buddy-agent/1.0/byte-buddy-agent-1.0.jar", "agent");
+                .file("maven/net/bytebuddy/byte-buddy/1.0/byte-buddy-1.0.jar", jar("net.bytebuddy", "byte-buddy"))
+                .file("maven/net/bytebuddy/byte-buddy-agent/1.0/byte-buddy-agent-1.0.jar",
+                        jar("net.bytebuddy.agent", "agent"));
 
         DiscoveryModuleRepository repository = repository();
 
@@ -319,7 +324,7 @@ public class DiscoveryModuleRepositoryTest {
     public void fills_in_the_suffix_of_a_module_in_a_template_naming_its_files() throws IOException {
         server.domain("bytebuddy.net", "module=" + server.files()
                         + "byte-buddy-{version}/byte-buddy{-suffix}-{version}{-classifier}.{type}")
-                .file("byte-buddy-1.0/byte-buddy-agent-1.0.jar", "agent");
+                .file("byte-buddy-1.0/byte-buddy-agent-1.0.jar", jar("net.bytebuddy.agent", "agent"));
 
         assertThat(content(repository().fetch(Runnable::run, "net.bytebuddy.agent/1.0"))).isEqualTo("agent");
     }
@@ -339,7 +344,7 @@ public class DiscoveryModuleRepositoryTest {
     @Test
     public void serves_a_classifier_or_another_type_only_where_the_template_names_it() throws IOException {
         server.domain("bytebuddy.net", "module=" + server.files() + "{module}-{version}.jar")
-                .file("net.bytebuddy-1.0.jar", "jar");
+                .file("net.bytebuddy-1.0.jar", jar("net.bytebuddy", "jar"));
 
         DiscoveryModuleRepository repository = repository();
 
@@ -380,7 +385,7 @@ public class DiscoveryModuleRepositoryTest {
     @Test
     public void resolves_through_discovery_alone_where_the_module_remotes_are_empty() throws IOException {
         server.domain("bytebuddy.net", "module=" + server.files() + "{module}-{version}.{type}")
-                .file("net.bytebuddy-1.0.jar", "fromDomain");
+                .file("net.bytebuddy-1.0.jar", jar("net.bytebuddy", "fromDomain"));
         Environment environment = new Environment(Map.of("repository.insecure", "true",
                 "module.uri", "",
                 "maven.uri", "",
@@ -399,7 +404,7 @@ public class DiscoveryModuleRepositoryTest {
     @Test
     public void asks_the_domain_before_the_module_repository_where_discovery_is_given() throws IOException {
         server.domain("bytebuddy.net", "module=" + server.files() + "{module}-{version}.{type}")
-                .file("net.bytebuddy-1.0.jar", "fromDomain")
+                .file("net.bytebuddy-1.0.jar", jar("net.bytebuddy", "fromDomain"))
                 .context("/service/", "fromService");
         Environment environment = new Environment(Map.of("repository.insecure", "true",
                 "module.uri", server.root() + "/service/",
@@ -422,10 +427,89 @@ public class DiscoveryModuleRepositoryTest {
                 .connection(server.connection());
     }
 
+    @Test
+    public void refuses_a_jar_that_declares_another_module_than_the_one_asked_for() throws IOException {
+        server.domain("bytebuddy.net", "moduletomaven=net.bytebuddy:byte-buddy{-suffix}")
+                .file("maven/net/bytebuddy/byte-buddy-agent/1.0/byte-buddy-agent-1.0.jar", jar("com.other", "agent"));
+
+        assertThatThrownBy(() -> repository().fetch(Runnable::run, "net.bytebuddy.agent/1.0"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("moduletomaven in ")
+                .hasMessageContaining("declares com.other")
+                .hasMessageContaining("must declare net.bytebuddy.agent");
+    }
+
+    @Test
+    public void refuses_a_jar_that_declares_no_module_name() throws IOException {
+        server.domain("bytebuddy.net", "module=" + server.files() + "{module}-{version}.{type}")
+                .file("net.bytebuddy-1.0.jar", jar(null, "plain"));
+
+        assertThatThrownBy(() -> repository().fetch(Runnable::run, "net.bytebuddy/1.0"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("declares no module name");
+    }
+
+    @Test
+    public void reads_the_name_of_a_module_descriptor_over_the_name_of_its_manifest() throws IOException {
+        server.domain("bytebuddy.net", "module=" + server.files() + "{module}-{version}.{type}")
+                .file("net.bytebuddy-1.0.jar", modular("net.bytebuddy", "com.other"))
+                .file("net.bytebuddy.agent-1.0.jar", modular("com.other", "net.bytebuddy.agent"));
+        DiscoveryModuleRepository repository = repository();
+
+        assertThat(repository.fetch(Runnable::run, "net.bytebuddy/1.0")).isPresent();
+        assertThatThrownBy(() -> repository.fetch(Runnable::run, "net.bytebuddy.agent/1.0"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("declares com.other");
+    }
+
+    @Test
+    public void reads_no_module_name_from_a_sources_jar() throws IOException {
+        server.domain("bytebuddy.net", "module=" + server.files() + "{module}-{version}{-classifier}.{type}")
+                .file("net.bytebuddy-1.0-sources.jar", jar(null, "sources"));
+
+        assertThat(content(repository().fetch(Runnable::run, "net.bytebuddy-sources/1.0"))).isEqualTo("sources");
+    }
+
     private static String content(Optional<RepositoryItem> item) throws IOException {
         assertThat(item).isPresent();
+        byte[] bytes;
         try (InputStream inputStream = item.orElseThrow().toInputStream()) {
-            return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+            bytes = inputStream.readAllBytes();
         }
+        try (JarInputStream jar = new JarInputStream(new ByteArrayInputStream(bytes))) {
+            for (JarEntry entry = jar.getNextJarEntry(); entry != null; entry = jar.getNextJarEntry()) {
+                if (entry.getName().equals("content")) {
+                    return new String(jar.readAllBytes(), StandardCharsets.UTF_8);
+                }
+            }
+        }
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
+
+    private static byte[] modular(String module, String automatic) throws IOException {
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().putValue("Automatic-Module-Name", automatic);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        try (JarOutputStream jar = new JarOutputStream(outputStream, manifest)) {
+            jar.putNextEntry(new JarEntry("module-info.class"));
+            jar.write(ClassFile.of().buildModule(ModuleAttribute.of(ModuleDesc.of(module),
+                    builder -> builder.requires(ModuleRequireInfo.of(ModuleDesc.of("java.base"), 0, null)))));
+        }
+        return outputStream.toByteArray();
+    }
+
+    private static byte[] jar(String module, String content) throws IOException {
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        if (module != null) {
+            manifest.getMainAttributes().putValue("Automatic-Module-Name", module);
+        }
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        try (JarOutputStream jar = new JarOutputStream(outputStream, manifest)) {
+            jar.putNextEntry(new JarEntry("content"));
+            jar.write(content.getBytes(StandardCharsets.UTF_8));
+        }
+        return outputStream.toByteArray();
     }
 }

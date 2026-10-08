@@ -222,6 +222,9 @@ Trusting the file
 The file is always read from its domain over `https`, so the domain's certificate
 vouches for it. A location it names is read over `https` as well, never from a
 `file:`, `jar:` or any other kind of URI, and a download is never redirected to
-one. The file only says where a module comes from: a pinned module is still checked
-against its pin, and a module with a declared signature against its signature, so a
-domain that changed hands can break a build but never change what it accepts.
+one. A module's jar must declare the name it was asked for, in its `module-info` or
+as its `Automatic-Module-Name`, so a domain cannot answer for one of its names with
+someone else's module. The file only says where a module comes from: a pinned module
+is still checked against its pin, and a module with a declared signature against its
+signature, so a domain that changed hands can break a build but never change what it
+accepts.

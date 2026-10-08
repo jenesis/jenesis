@@ -11,7 +11,7 @@ public final class DiscoveryServer implements AutoCloseable {
 
     private final HttpServer server;
     private final Map<String, String> domains = new ConcurrentHashMap<>();
-    private final Map<String, String> files = new ConcurrentHashMap<>();
+    private final Map<String, byte[]> files = new ConcurrentHashMap<>();
     private final List<String> queried = new CopyOnWriteArrayList<>();
     private final Map<String, Map.Entry<Integer, List<String>>> answers = new ConcurrentHashMap<>();
     private final List<String> asked = new CopyOnWriteArrayList<>();
@@ -26,8 +26,8 @@ public final class DiscoveryServer implements AutoCloseable {
             respond(exchange, content == null ? 404 : 200, content == null ? "" : content);
         });
         server.createContext("/files/", exchange -> {
-            String content = files.get(exchange.getRequestURI().getPath().substring("/files/".length()));
-            respond(exchange, content == null ? 404 : 200, content == null ? "" : content);
+            byte[] content = files.get(exchange.getRequestURI().getPath().substring("/files/".length()));
+            respond(exchange, content == null ? 404 : 200, content == null ? new byte[0] : content);
         });
         server.createContext("/latest/", exchange -> {
             String path = exchange.getRequestURI().getPath().substring("/latest/".length());
@@ -52,6 +52,10 @@ public final class DiscoveryServer implements AutoCloseable {
     }
 
     public DiscoveryServer file(String path, String content) {
+        return file(path, content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    public DiscoveryServer file(String path, byte[] content) {
         files.put(path, content);
         return this;
     }
@@ -98,6 +102,10 @@ public final class DiscoveryServer implements AutoCloseable {
     }
 
     public DiscoveryServer context(String path, String content, List<String> requested) {
+        return context(path, content.getBytes(StandardCharsets.UTF_8), requested);
+    }
+
+    public DiscoveryServer context(String path, byte[] content, List<String> requested) {
         server.createContext(path, exchange -> {
             requested.add(exchange.getRequestURI().getPath());
             respond(exchange, 200, content);
@@ -111,7 +119,10 @@ public final class DiscoveryServer implements AutoCloseable {
     }
 
     private static void respond(HttpExchange exchange, int status, String content) throws IOException {
-        byte[] body = content.getBytes(StandardCharsets.UTF_8);
+        respond(exchange, status, content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static void respond(HttpExchange exchange, int status, byte[] body) throws IOException {
         exchange.sendResponseHeaders(status, body.length == 0 ? -1 : body.length);
         if (body.length > 0) {
             exchange.getResponseBody().write(body);

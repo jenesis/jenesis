@@ -16,6 +16,7 @@ import build.jenesis.maven.MavenRepository;
 public class DiscoveryModuleRepository implements JenesisRepository {
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
+    private static final Pattern VERSIONED = Pattern.compile("META-INF/versions/[0-9]+/module-info\\.class");
 
     private final Scope scope;
     private final Discovery discovery;
@@ -149,9 +150,40 @@ public class DiscoveryModuleRepository implements JenesisRepository {
                 item = location.fetch(values, type.indexOf('.') < 0, connection, printing, palette);
             }
             if (item.isPresent()) {
-                return item;
+                return classifier == null && type.equals("jar")
+                        ? Optional.of(declaring(item.get(), module, location))
+                        : item;
             }
         }
         return Optional.empty();
+    }
+
+    private static RepositoryItem declaring(RepositoryItem item, String module, DiscoveredLocation location)
+            throws IOException {
+        byte[] bytes;
+        try (InputStream inputStream = item.toInputStream()) {
+            bytes = inputStream.readAllBytes();
+        }
+        String automatic = null, named = null, versioned = null;
+        try (JarInputStream jar = new JarInputStream(new ByteArrayInputStream(bytes))) {
+            Manifest manifest = jar.getManifest();
+            if (manifest != null) {
+                automatic = manifest.getMainAttributes().getValue("Automatic-Module-Name");
+            }
+            for (JarEntry entry = jar.getNextJarEntry(); entry != null; entry = jar.getNextJarEntry()) {
+                if (entry.getName().equals("module-info.class")) {
+                    named = ModuleDescriptor.read(jar).name();
+                } else if (versioned == null && VERSIONED.matcher(entry.getName()).matches()) {
+                    versioned = ModuleDescriptor.read(jar).name();
+                }
+            }
+        }
+        String declared = named != null ? named : versioned != null ? versioned : automatic;
+        if (!module.equals(declared)) {
+            throw new IllegalArgumentException(location.key() + " in " + location.source() + " answers " + module
+                    + " with a jar that " + (declared == null ? "declares no module name" : "declares " + declared)
+                    + ", where it must declare " + module + " in its module-info or as its Automatic-Module-Name");
+        }
+        return () -> new ByteArrayInputStream(bytes);
     }
 }
