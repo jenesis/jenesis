@@ -71,17 +71,20 @@ subdomains anyway - so one request answers for all of a vendor's modules, and a 
 that file does not hold is absent rather than asked of a subdomain. A file that says
 `delegate=true` lets its subdomains speak for themselves: their files are read as well,
 the most specific one holding a key answers, and its own entries stand for the
-subdomains whose files do not hold the key. `jenesis.build` publishes:
+subdomains whose files do not hold the key. `jenesis.build` publishes, for the
+module `build.jenesis`:
 
-    module=https://github.com/jenesis/jenesis/releases/download/v{version}/{module}-{version}{-classifier}.{type}
-    module.latest=https://github.com/jenesis/jenesis/releases/latest/download/{module}.jar
-    module.suffixes=none
+    module[build.jenesis]=https://github.com/jenesis/jenesis/releases/download/v{version}/{module}-{version}{-classifier}.{type}
+    module[build.jenesis].latest=https://github.com/jenesis/jenesis/releases/latest/download/{module}.jar
+    module[build.jenesis].suffixes=none
     moduletomaven=build.jenesis:{module}
-    maven=https://github.com/jenesis/jenesis/releases/download/v{version}/{artifactId}-{version}{-classifier}.{type}
-    maven.latest=https://github.com/jenesis/jenesis/releases/latest/download/{artifactId}.pom
-    maven.suffixes=none
+    maven[build.jenesis]=https://github.com/jenesis/jenesis/releases/download/v{version}/{artifactId}-{version}{-classifier}.{type}
+    maven[build.jenesis].latest=https://github.com/jenesis/jenesis/releases/latest/download/{artifactId}.pom
+    maven[build.jenesis].suffixes=none
 
-A module is answered by two keys, one for each way a build resolves modules.
+The name in brackets is the module or artifact a key is for, and a key without
+one, as `moduletomaven` here, serves every name below the domain. A module is
+answered by two keys, one for each way a build resolves modules.
 
 **`module` says where a module's files are.** Its value is a location, in one of two
 forms:
@@ -118,10 +121,10 @@ belongs to one module only, the one whose own domain publishes the file.
 Several projects under one domain
 ---------------------------------
 
-A key may name, in brackets, the module or artifact it is for, where one is
-published apart from the rest. `jenesis.build` serves three projects, each from
-GitHub releases of its own with versions of its own, so beside the keys above it
-publishes, for the launcher:
+Because a key names the module or artifact it is for, one domain serves projects
+that are published apart from each other. `jenesis.build` serves three projects,
+each from GitHub releases of its own with versions of its own, so beside the keys
+above it publishes, for the launcher:
 
     module[build.jenesis.launcher]=https://github.com/jenesis/jenesis-launcher/releases/download/v{version}/{module}-{version}{-classifier}.{type}
     module[build.jenesis.launcher].latest=https://github.com/jenesis/jenesis-launcher/releases/latest/download/{module}.jar
@@ -131,10 +134,10 @@ publishes, for the launcher:
 `module` and `moduletomaven` select by module name, `maven` by artifact ID, and the
 keys beside a selected key - `.latest`, `.since`, `.suffixes` - carry its selector.
 A name ending in `*` selects every name that starts with the rest, as
-`maven[byte-buddy-*]` does. The exact name wins over the longest such prefix, and
-either over the key for all. A coordinate a selected key names applies to its
-module wherever it sits below the domain, so a module whose artifact breaks the
-pattern takes one line of its own:
+`maven[build.jenesis.repository.*]` does for the modules of Jenesis Repository.
+The exact name wins over the longest such prefix, and either over the key for all.
+A coordinate a selected key names applies to its module wherever it sits below the
+domain, so a module whose artifact breaks the pattern takes one line of its own:
 
     moduletomaven[com.example.legacy]=com.example:example-classic
 
@@ -176,7 +179,7 @@ checked against `module.since` and `module.suffixes` like any other, and a link 
 answers `404` leaves the request to the module repository. A link may also name a
 `maven-metadata.xml`, wherever it is hosted, whose release becomes the newest version:
 
-    module.latest=https://maven-repository.example.com/releases/build/jenesis/{module}/maven-metadata.xml
+    module[build.jenesis].latest=https://maven-repository.example.com/releases/build/jenesis/{module}/maven-metadata.xml
 
 Which versions are served
 -------------------------

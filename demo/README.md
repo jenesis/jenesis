@@ -1004,7 +1004,7 @@ and which Maven artifact it is published as:
     jenesis.maven.uri=
     jenesis.module.uri=
 
-    module=https://github.com/jenesis/jenesis/releases/download/v{version}/{module}-{version}{-classifier}.{type}
+    module[build.jenesis]=https://github.com/jenesis/jenesis/releases/download/v{version}/{module}-{version}{-classifier}.{type}
     moduletomaven=build.jenesis:{module}
 
 The demo builds with `jenesis.project.layout=modular`, which asks `module` first and
@@ -1023,8 +1023,8 @@ pin still decides what is accepted.
 A groupId is a reversed domain too, and `discovery-maven` resolves a `pom.xml`
 dependency on Jenesis from the `maven` key beside the module's:
 
-    maven=https://github.com/jenesis/jenesis/releases/download/v{version}/{artifactId}-{version}{-classifier}.{type}
-    maven.suffixes=none
+    maven[build.jenesis]=https://github.com/jenesis/jenesis/releases/download/v{version}/{artifactId}-{version}{-classifier}.{type}
+    maven[build.jenesis].suffixes=none
 
 Its location is a template of each file, as here, or the root of a traditional
 Maven repository, whose metadata is merged with that of the Maven remotes. A file
