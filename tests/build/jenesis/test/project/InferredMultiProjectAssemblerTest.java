@@ -313,6 +313,21 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void a_process_command_file_refuses_an_argument_the_module_declaration_hands_the_tool() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(Files.createDirectories(fixture.manifests().resolve(ProcessBuildStep.PROCESS))
+                .resolve("javac.properties"), "--release=8\n");
+        Files.writeString(fixture.configuration().resolve("process-javac.properties"), "--release=17\n-g=\n");
+        assertThatThrownBy(() -> fixture.execute("sub/prepare"))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("process-javac.properties sets --release, which the build already hands javac as"
+                        + " --release 8")
+                .hasMessageContaining("@jenesis.release")
+                .hasMessageContaining("maven.compiler.testRelease");
+    }
+
+    @Test
     public void an_empty_higher_precedence_process_command_file_shadows_a_lower_one() throws IOException {
         Fixture fixture = setUp("main=\n", false, false, false);
         Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "version=1.0\n");

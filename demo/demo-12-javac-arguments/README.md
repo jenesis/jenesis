@@ -51,6 +51,12 @@ where a configuration key overrides a build-generated one of the same name. Here
 `javac` receives the build's own `--release 25` (from `@jenesis.release`) and the
 configured `-parameters` together.
 
+The release is the one flag the file cannot set: the module's declaration names it
+for every tool that reads it, so a `--release` (or `--enable-preview`) line fails the
+build and names where to declare it instead - `@jenesis.release` in `module-info.java`,
+or `maven.compiler.release` and, for the tests, `maven.compiler.testRelease` in a
+`pom.xml`.
+
 This is the general, profile-aware way to give a tool an argument the inferred
 build does not set for you - for instance compiling a single module with extra
 `javac` flags.
