@@ -272,6 +272,15 @@ public class MavenProject implements BuildExecutorModule {
                                 active = true;
                             }
                         }
+                        Path tests = file.resolveSibling("test-" + name);
+                        if (!active && name.startsWith(SIBLING_MODULE_PREFIX) && Files.exists(tests)) {
+                            SequencedProperties testProperties = SequencedProperties.ofFiles(tests);
+                            active = testProperties.stringPropertyNames().stream()
+                                    .filter(key -> key.equals("sources") || key.startsWith("resources."))
+                                    .map(testProperties::getProperty)
+                                    .filter(folder -> !folder.isEmpty())
+                                    .anyMatch(folder -> Files.exists(base.resolve(folder)));
+                        }
                         if (active) {
                             module.addSource("sources", Bind.asSources(), sources == null ? base : sources);
                             module.addStep(COORDINATES, (_, context, _) -> {
