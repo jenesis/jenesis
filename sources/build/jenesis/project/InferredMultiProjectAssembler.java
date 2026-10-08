@@ -407,7 +407,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
                 sub.addModule("documentation",
                         documentation.apply(documentationModule),
-                        Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
+                        Stream.concat(Stream.of("prepare", "binary"), inputs(descriptor, closure)));
             }
             if (packaging.jmod() || packaging.jlink() || packaging.jpackaged() || packaging.nativeImage()) {
                 sub.addStep("legal", Legal.ofEnvironment(environment), Stream.concat(Stream.of("binary"), closure.stream()));

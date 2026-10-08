@@ -538,6 +538,23 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void a_process_command_file_for_javadoc_reaches_the_javadoc_of_the_documentation_jar() throws IOException {
+        Fixture fixture = setUp("main=foo.Main\n", false, false, true);
+        Files.writeString(fixture.configuration().resolve("process-javadoc.properties"), "-windowtitle=Configured\n");
+        Files.createDirectory(fixture.sources.resolve(BuildStep.SOURCES));
+        Files.writeString(fixture.sources.resolve(BuildStep.SOURCES).resolve("Foo.java"), "public class Foo {}");
+        Path javadocOutput = fixture.execute("sub/documentation/archive").get("sub/documentation/archive");
+        assertThat(fixture.build().resolve("sub/documentation/generate/document/javadoc/supplement/command"))
+                .content()
+                .contains("-windowtitle Configured");
+        try (JarFile jar = new JarFile(javadocOutput.resolve("documentation").resolve("javadoc.jar").toFile())) {
+            assertThat(jar.getManifest().getMainAttributes().getValue("Main-Class"))
+                    .as("the main class the module's own jar names does not reach its documentation jar")
+                    .isNull();
+        }
+    }
+
+    @Test
     public void javadoc_flag_disabled_omits_javadoc_sub_module() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/documentation/archive"))
