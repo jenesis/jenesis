@@ -3966,6 +3966,73 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_dependency_management_wins_over_a_parent_entry_naming_the_artifact_by_a_property() throws IOException {
+        Path subproject = Files.createDirectory(project.resolve("subproject"));
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>subproject</module>
+                    </modules>
+                    <properties>
+                        <managed.artifactId>artifact</managed.artifactId>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>group</groupId>
+                                <artifactId>${managed.artifactId}</artifactId>
+                                <version>1</version>
+                                <scope>test</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        Files.writeString(subproject.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>project</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>artifact</artifactId>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>group</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>1</version>
+                                <!--Checksum/SHA256/cafebabe-->
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>${managed.artifactId}</artifactId>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        MavenLocalPom pom = poms.get(Path.of("subproject"));
+        assertThat(pom.managedDependencies().get(new MavenDependencyKey("group", "artifact", "jar", null)).checksum())
+                .as("the subproject's own entry is the one that manages the artifact the parent names by a property")
+                .isEqualTo("SHA256/cafebabe");
+        assertThat(pom.dependencies().get(new MavenDependencyKey("group", "artifact", "jar", null)).checksum())
+                .isEqualTo("SHA256/cafebabe");
+    }
+
+    @Test
     public void local_pom_of_model_4_1_0_infers_its_parent_subprojects_sources_and_sibling_versions() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
