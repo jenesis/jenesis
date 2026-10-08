@@ -359,6 +359,65 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void compiles_for_the_compiler_target_when_no_release_is_set_and_names_a_module_that_sets_neither() throws IOException {
+        for (String name : List.of("targeted", "unset")) {
+            Path module = Files.createDirectory(project.resolve(name));
+            Files.writeString(Files.createDirectories(module.resolve("src/main/java")).resolve("source"), "foo");
+            Files.writeString(module.resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>group</groupId>
+                        <artifactId>%s</artifactId>
+                        <version>1</version>
+                        %s
+                    </project>
+                    """.formatted(name, name.equals("targeted")
+                    ? "<properties><maven.compiler.source>1.8</maven.compiler.source><maven.compiler.target>1.8</maven.compiler.target></properties>"
+                    : ""));
+        }
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>targeted</module>
+                        <module>unset</module>
+                    </modules>
+                </project>
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        List<String> printed = new ArrayList<>();
+        executor.addModule("maven", MavenProject.ofEnvironment(new Environment(Map.of("palette.colors", "none")).out(printed::add),
+                project,
+                "maven",
+                mavenRepository,
+                mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-targeted/manifests").resolve("process/javac.properties"))
+                .getProperty("--release"))
+                .as("maven.compiler.target 1.8 compiles for release 8, as the compiler plugin does")
+                .isEqualTo("8");
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-unset/manifests").resolve("process/javac.properties"))
+                .getProperty("--release")).isEqualTo(Integer.toString(Runtime.version().feature()));
+        assertThat(printed).containsExactly("[RELEASE]   group:unset compiles for release " + Runtime.version().feature()
+                + ", the JDK the build runs on, as unset/pom.xml sets neither maven.compiler.release nor its target or source"
+                + " - maven.compiler.release sets it");
+    }
+
+    @Test
     public void an_unversioned_plugin_takes_its_newest_release_until_it_is_pinned() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

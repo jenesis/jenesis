@@ -10,6 +10,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.Platform;
 import build.jenesis.Repository;
@@ -52,12 +53,14 @@ public class MavenProject implements BuildExecutorModule {
     private final MavenRepository repository;
     private final MavenResolver resolver;
     private final Platform platform;
+    private final Consumer<String> printing;
+    private final Palette palette;
 
     public MavenProject(Path root,
                         String prefix,
                         MavenRepository repository,
                         MavenResolver resolver) {
-        this(root, "main", prefix, repository, resolver, new Platform());
+        this(root, "main", prefix, repository, resolver, new Platform(), null, Palette.NONE);
     }
 
     public static MavenProject ofEnvironment(Environment environment,
@@ -65,7 +68,10 @@ public class MavenProject implements BuildExecutorModule {
                                       String prefix,
                                       MavenRepository repository,
                                       MavenResolver resolver) {
-        return new MavenProject(root, prefix, repository, resolver).platform(Platform.ofEnvironment(environment));
+        return new MavenProject(root, prefix, repository, resolver)
+                .platform(Platform.ofEnvironment(environment))
+                .printing(environment.flag("print.progress", true) ? environment.out() : null,
+                        Palette.ofEnvironment(environment));
     }
 
     private MavenProject(Path root,
@@ -73,21 +79,29 @@ public class MavenProject implements BuildExecutorModule {
                          String prefix,
                          MavenRepository repository,
                          MavenResolver resolver,
-                         Platform platform) {
+                         Platform platform,
+                         Consumer<String> printing,
+                         Palette palette) {
         this.root = root;
         this.group = group;
         this.prefix = prefix;
         this.repository = repository;
         this.resolver = resolver;
         this.platform = platform;
+        this.printing = printing;
+        this.palette = palette;
     }
 
     public MavenProject group(String group) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette);
     }
 
     public MavenProject platform(Platform platform) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette);
+    }
+
+    public MavenProject printing(Consumer<String> printing, Palette palette) {
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette);
     }
 
     public static BuildExecutorModule make(Environment environment,
@@ -282,6 +296,16 @@ public class MavenProject implements BuildExecutorModule {
                                     .map(testProperties::getProperty)
                                     .filter(folder -> !folder.isEmpty())
                                     .anyMatch(folder -> Files.exists(base.resolve(folder)));
+                        }
+                        if (active && printing != null && !name.startsWith("test-") && properties.getProperty("release") == null) {
+                            printing.accept(("%s%-11s%s %s compiles for release %d, the JDK the build runs on, as %s sets"
+                                    + " neither maven.compiler.release nor its target or source - maven.compiler.release sets it")
+                                    .formatted(palette.warning(),
+                                            "[RELEASE]",
+                                            palette.reset(),
+                                            properties.getProperty("groupId") + ":" + properties.getProperty("artifactId"),
+                                            Runtime.version().feature(),
+                                            Path.of(properties.getProperty("path")).resolve("pom.xml")));
                         }
                         if (active) {
                             module.addSource("sources", Bind.asSources(), sources == null ? base : sources);

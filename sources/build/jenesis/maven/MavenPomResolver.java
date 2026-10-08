@@ -615,7 +615,12 @@ public class MavenPomResolver implements MavenResolver {
                     default -> dependencies.put(resolvedKey, resolved);
                 }
             });
-            String release = property(pom.properties().get("maven.compiler.release"), pom.properties()),
+            String release = Stream.of("maven.compiler.release", "maven.compiler.target", "maven.compiler.source")
+                    .map(key -> property(pom.properties().get(key), pom.properties()))
+                    .filter(value -> value != null && !value.isBlank())
+                    .findFirst()
+                    .map(value -> value.startsWith("1.") ? value.substring(2) : value)
+                    .orElse(null),
                     testRelease = property(pom.properties().get("maven.compiler.testRelease"), pom.properties());
             if (Boolean.parseBoolean(property(pom.properties().get("maven.compiler.enablePreview"), pom.properties()))) {
                 release = (release == null ? Integer.toString(Runtime.version().feature()) : release) + "-preview";

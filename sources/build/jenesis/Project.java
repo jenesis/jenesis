@@ -820,8 +820,8 @@ public record Project(
                           | sort -u | cut -d' ' -f2 | sort | uniq -d
 
                     First, though, the release: code compiled for Java 8 or older, as
-                    maven.compiler.release, a toolchain or a Gradle release of 8 or below says, can
-                    never be a module, because a module-info.java needs release 9. Such a project
+                    maven.compiler.release or target, a toolchain or a Gradle release of 8 or below
+                    says, can never be a module, because a module-info.java needs release 9. Such a project
                     migrates to pom.xml and stays there, whichever declaration was asked for: say so,
                     and attempt no phase two. Where it ships a descriptor for Java 9 and later, the
                     module-info.java lives in META-INF/versions/9/ of its sources and the pom.xml build
@@ -845,11 +845,13 @@ public record Project(
                                  ${...}; dependencies of compile, provided, runtime and test scope;
                                  <optional>, <exclusions> with wildcards, <type> and <classifier>;
                                  <dependencyManagement> with import-scoped BOMs;
-                                 maven.compiler.release, maven.compiler.testRelease for the tests
-                                 and maven.compiler.enablePreview; name, description, url, licenses,
-                                 developers, organization and scm of the module's own POM, and
-                                 all of them but the name from its parents, local or fetched,
-                                 where it declares none;
+                                 maven.compiler.release, or else maven.compiler.target or its
+                                 source, 1.8 read as 8 - with none of them the JDK the build runs
+                                 on, which a [RELEASE] line names; maven.compiler.testRelease for
+                                 the tests and maven.compiler.enablePreview; name, description,
+                                 url, licenses, developers, organization and scm of the module's
+                                 own POM, and all of them but the name from its parents, local or
+                                 fetched, where it declares none;
                                  sourceDirectory, testSourceDirectory and the <directory> of each
                                  resource; the <!--jenesis.plugin--> and <!--jenesis.pin-->
                                  comments of the module's POM and of a local parent, where the
@@ -859,11 +861,11 @@ public record Project(
                                  JDK the build runs on, or by <activeByDefault> when no other
                                  profile of that POM is active, with its <properties>,
                                  dependencies, <dependencyManagement> and resource directories
-                      ignored    <build><plugins> and <pluginManagement>, a profile activated by a
-                                 property, the OS, a file or -P, a profile's <modules>,
-                                 <repositories> and settings.xml, a resource's includes, excludes,
-                                 targetPath and filtering, maven.compiler.source and target,
-                                 system scope, and every packaging but jar
+                      ignored    <build><plugins> and <pluginManagement>, a profile activated by
+                                 a property, the OS, a file or -P, a profile's <modules>,
+                                 <repositories> and settings.xml, a resource's includes,
+                                 excludes, targetPath and filtering, system scope, and every
+                                 packaging but jar
                                  - a pom aggregator is followed for its modules, a war is not built
                                  at all, and a src/test/java/module-info.java is a module of its own
                                  rather than patched into the main one
