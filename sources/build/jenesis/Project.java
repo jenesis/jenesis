@@ -932,7 +932,7 @@ public record Project(
                     ## Package and ship
 
                       maven-jar-plugin / jar -> on by default; archives are reproducible unless
-                          jenesis.archive.timestamp is emptied (68)
+                          jenesis.archive.timestamp is emptied (70)
                       maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (48, 66)
                       maven-javadoc-plugin / withJavadocJar(), Dokka
                           -> -Djenesis.project.documentation=true (48, 66)
@@ -945,7 +945,7 @@ public record Project(
                       jib-maven-plugin / com.google.cloud.tools.jib
                           -> docker=<image>, a build context; the build never runs Docker (08, 09)
                       native-maven-plugin / org.graalvm.buildtools.native
-                          -> native=true, graal.properties (69)
+                          -> native=true, graal.properties (71)
                       maven-jarsigner-plugin / jar signing -> jenesis.jarsigner.* (64)
                       maven-install-plugin / publishToMavenLocal -> `export` (65)
                       deploy, central-publishing, maven-gpg-plugin / maven-publish, signing
@@ -1571,7 +1571,7 @@ public record Project(
                 case "demos" -> """
                     # Jenesis - Copy a demo
 
-                    70 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    72 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -1586,7 +1586,7 @@ public record Project(
                       Starting a build   06 startup (what launching costs, the daemon, the AOT cache),
                                          07 toolchain (the JDK the build runs on)
                       Runnable output    08, 09 java-*-executable (jpackage), 10 bundle (jars for a
-                                         stock JRE), 11 java-multi-release, 69 native-image (GraalVM),
+                                         stock JRE), 11 java-multi-release, 71 native-image (GraalVM),
                                          54 class-path (a modular jar's services on the class path)
                       Compiler control   12 javac-arguments (process-javac.properties),
                                          13 annotations (an annotation processor via @jenesis.plugin),
@@ -1615,8 +1615,10 @@ public record Project(
                       Shipping it        64 code-signing (jarsigner), 65 export (into the local repositories),
                                          66 publishing (Maven Central),
                                          67 module-convention (resolving what you published),
-                                         68 reproducible (a jar checked against a recorded digest),
-                                         70 jpx (run a released program without building)
+                                         68, 69 discovery (a dependency resolved from its
+                                         publisher's own domain, as a module or by coordinate),
+                                         70 reproducible (a jar checked against a recorded digest),
+                                         72 jpx (run a released program without building)
                       Extending it       55 custom-assembler, 56 custom-jmod, 57 internal-module,
                                          58 external-module,
                                          59 project-plugins (hooks from a first check to release),
