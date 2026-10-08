@@ -869,13 +869,15 @@ public class TestModule implements BuildExecutorModule {
                                                         BuildStepContext context,
                                                         SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            TestFramework resolved = framework != null
+            List<Path> folders = arguments.values().stream()
+                    .filter(argument -> !argument.removed())
+                    .map(BuildStepArgument::folder)
+                    .toList();
+            TestFramework resolved = (framework != null
                     ? framework
-                    : TestFramework.detect(() -> arguments.values().stream()
-                            .filter(argument -> !argument.removed())
-                            .map(BuildStepArgument::folder)
-                            .iterator())
-                    .orElseThrow(() -> new IllegalArgumentException("No test framework found"));
+                    : TestFramework.detect(folders)
+                            .orElseThrow(() -> new IllegalArgumentException("No test framework found")))
+                    .runningOn(TestFramework.jars(folders));
             String path = null, compiledFrom = null;
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {

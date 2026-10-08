@@ -242,6 +242,65 @@ public class TestFrameworkTest {
     }
 
     @Test
+    public void junit_platform_drives_a_console_launcher_older_than_1_10_without_the_execute_command() {
+        assertThat(new JUnitPlatform("1.9.3").arguments(root,
+                root,
+                new LinkedHashSet<>(List.of("sample.BetaTest")),
+                new LinkedHashMap<>(),
+                false,
+                false))
+                .as("the execute command exists from JUnit Platform 1.10 on, and an older launcher rejects it")
+                .containsExactly("--disable-banner", "--disable-ansi-colors", "--select-class=sample.BetaTest");
+    }
+
+    @Test
+    public void junit_platform_drives_a_console_launcher_from_1_10_with_the_execute_command() {
+        for (String version : List.of("1.10.0", "1.14.4", "6.0.0")) {
+            assertThat(new JUnitPlatform(version).arguments(root,
+                    root,
+                    new LinkedHashSet<>(List.of("sample.BetaTest")),
+                    new LinkedHashMap<>(),
+                    false,
+                    false))
+                    .as("version %s", version)
+                    .containsExactly("execute", "--disable-banner", "--disable-ansi-colors", "--select-class=sample.BetaTest");
+        }
+    }
+
+    @Test
+    public void junit_platform_refuses_a_console_launcher_older_than_1_5_naming_how_to_raise_it() {
+        assertThatThrownBy(() -> new JUnitPlatform("1.3.2").arguments(root,
+                root,
+                new LinkedHashSet<>(List.of("sample.BetaTest")),
+                new LinkedHashMap<>(),
+                false,
+                false))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("1.3.2")
+                .hasMessageContaining("raise the JUnit Platform to 1.5 or newer")
+                .hasMessageContaining("org.junit:junit-bom");
+    }
+
+    @Test
+    public void junit_platform_reads_the_console_launcher_version_from_the_jar_that_holds_it() throws IOException {
+        Path unrelated = root.resolve("unrelated.jar"), launcher = root.resolve("launcher.jar");
+        writeJar(root, "unrelated.jar", "org.junit.platform.engine");
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().put(Attributes.Name.IMPLEMENTATION_VERSION, "1.9.3");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(launcher), manifest)) {
+            output.putNextEntry(new JarEntry("org/junit/platform/console/ConsoleLauncher.class"));
+            output.closeEntry();
+        }
+        assertThat(new JUnitPlatform().runningOn(List.of(unrelated, launcher)))
+                .as("a standalone launcher declares no module, so its version is read off its manifest")
+                .isEqualTo(new JUnitPlatform("1.9.3"));
+        assertThat(new JUnitPlatform().runningOn(List.of(unrelated)))
+                .as("without a launcher on the path the newest command line is written")
+                .isEqualTo(new JUnitPlatform());
+    }
+
+    @Test
     public void testng_joins_classes_and_methods() {
         SequencedMap<String, SequencedSet<String>> methods = new LinkedHashMap<>();
         methods.put("sample.AlphaTest", new LinkedHashSet<>(List.of("first")));
