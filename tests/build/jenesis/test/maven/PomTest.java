@@ -594,4 +594,40 @@ public class PomTest {
                 .isLessThan(pom.indexOf("<artifactId>other</artifactId>"));
     }
 
+    @Test
+    public void keeps_a_dependency_optional_that_its_module_declared_optional() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.example/lib/1.2.3", "");
+        requires.setProperty("main/runtime/maven/org.example/lib/1.2.3", "");
+        requires.setProperty("main/compile/maven/org.example/other/4.5.6", "");
+        requires.setProperty("main/runtime/maven/org.example/other/4.5.6", "");
+        requires.store(argument.resolve(BuildStep.REQUIRES));
+        SequencedProperties optionals = new SequencedProperties();
+        optionals.setProperty("main/compile/maven/org.example/lib/1.2.3", "");
+        optionals.setProperty("main/runtime/maven/org.example/lib/1.2.3", "");
+        optionals.store(argument.resolve(BuildStep.OPTIONALS));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.OPTIONALS), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        String pom = Files.readString(next.resolve(Pom.POM));
+        assertThat(pom.indexOf("<optional>true</optional>"))
+                .as("the optional dependency stays optional, so a consumer does not inherit it")
+                .isGreaterThan(pom.indexOf("<artifactId>lib</artifactId>"))
+                .isLessThan(pom.indexOf("<artifactId>other</artifactId>"));
+        assertThat(pom.indexOf("<optional>", pom.indexOf("<artifactId>other</artifactId>")))
+                .as("the other dependency is required as declared")
+                .isNegative();
+    }
+
 }

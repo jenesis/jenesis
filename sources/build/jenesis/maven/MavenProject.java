@@ -388,6 +388,17 @@ public class MavenProject implements BuildExecutorModule {
                                 if (!exclusionsProperties.isEmpty()) {
                                     exclusionsProperties.store(context.next().resolve(BuildStep.EXCLUSIONS));
                                 }
+                                List<String> optional = properties.entries("optional");
+                                if (optional != null) {
+                                    SequencedProperties optionals = new SequencedProperties();
+                                    for (String key : requires.stringPropertyNames()) {
+                                        int scopeSlash = key.indexOf('/', key.indexOf('/') + 1);
+                                        if (optional.contains(key.substring(scopeSlash + 1))) {
+                                            optionals.setProperty(key, "");
+                                        }
+                                    }
+                                    optionals.store(context.next().resolve(BuildStep.OPTIONALS));
+                                }
                                 SequencedProperties versions = new SequencedProperties();
                                 String managed = properties.getProperty("managedDependencies", "");
                                 if (!managed.isEmpty()) {
@@ -744,6 +755,16 @@ public class MavenProject implements BuildExecutorModule {
                                     .filter(dep -> dep.getValue().scope() == scope)
                                     .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version()))
                                     .collect(Collectors.joining(",")));
+                }
+            }
+            if (!test && value.dependencies() != null) {
+                String optional = value.dependencies().entrySet().stream()
+                        .filter(dep -> dep.getValue().scope() != MavenDependencyScope.TEST
+                                && Boolean.TRUE.equals(dep.getValue().optional()))
+                        .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version()))
+                        .collect(Collectors.joining(","));
+                if (!optional.isEmpty()) {
+                    properties.setProperty("optional", optional);
                 }
             }
             if (value.dependencies() != null) {

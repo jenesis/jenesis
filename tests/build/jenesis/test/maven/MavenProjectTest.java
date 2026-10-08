@@ -565,6 +565,52 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void marks_an_optional_dependency_of_the_main_module_and_none_of_the_test_module() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>optional</artifactId>
+                            <version>1</version>
+                            <optional>true</optional>
+                        </dependency>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>required</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.OPTIONALS))
+                .stringPropertyNames())
+                .as("the published POM keeps the dependency optional, so a consumer does not inherit it")
+                .containsExactlyInAnyOrder("main/compile/maven/other/optional/1", "main/runtime/maven/other/optional/1");
+        assertThat(results.get("maven/test-module-/manifests").resolve(BuildStep.OPTIONALS))
+                .as("the test module publishes no POM")
+                .doesNotExist();
+    }
+
+    @Test
     public void can_resolve_multi_pom() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

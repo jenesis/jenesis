@@ -55,6 +55,7 @@ public class Pom implements BuildStep {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(resolved ? DEPENDENCIES : REQUIRES),
                 Path.of(EXCLUSIONS),
+                Path.of(OPTIONALS),
                 Path.of(METADATA)));
     }
 
@@ -69,6 +70,7 @@ public class Pom implements BuildStep {
                 .toList();
         SequencedProperties requires = SequencedProperties.ofFolders(folders, resolved ? DEPENDENCIES : REQUIRES);
         SequencedProperties exclusions = SequencedProperties.ofFolders(folders, EXCLUSIONS);
+        SequencedProperties optionals = SequencedProperties.ofFolders(folders, OPTIONALS);
         SequencedProperties metadata = SequencedProperties.ofFolders(folders, METADATA);
         SequencedMap<String, SequencedSet<String>> coordinateScopes = new LinkedHashMap<>();
         for (String key : requires.stringPropertyNames()) {
@@ -85,6 +87,12 @@ public class Pom implements BuildStep {
         for (String key : exclusions.stringPropertyNames()) {
             int second = key.indexOf('/', key.indexOf('/') + 1);
             coordinateExclusions.putIfAbsent(key.substring(second + 1), exclusions.getProperty(key));
+        }
+        Set<String> coordinateOptionals = new HashSet<>();
+        for (String key : optionals.stringPropertyNames()) {
+            if (key.startsWith(group + "/")) {
+                coordinateOptionals.add(key.substring(key.indexOf('/', key.indexOf('/') + 1) + 1));
+            }
         }
         shared.forEach(metadata::setProperty);
         String groupId = metadata.getProperty("project");
@@ -136,7 +144,7 @@ public class Pom implements BuildStep {
                     scope,
                     null,
                     excludes,
-                    null));
+                    coordinateOptionals.contains(name) ? Boolean.TRUE : null));
         }
         try (Writer writer = Files.newBufferedWriter(context.next().resolve(POM))) {
             emitter.emit(
