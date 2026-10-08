@@ -45,11 +45,11 @@ The maven key
 A group is looked up in the same file a module is, the file of the shortest domain
 its groupId reverses to that publishes one, so one file at the domain covers every
 group below it. Its key is `maven`, beside the `module` and `moduletomaven` keys of
-the same file. `jenesis.build` publishes:
+the same file. `jenesis.build` publishes, for the artifact `build.jenesis`:
 
-    maven=https://github.com/jenesis/jenesis/releases/download/v{version}/{artifactId}-{version}{-classifier}.{type}
-    maven.latest=https://github.com/jenesis/jenesis/releases/latest/download/{artifactId}.pom
-    maven.suffixes=none
+    maven[build.jenesis]=https://github.com/jenesis/jenesis/releases/download/v{version}/{artifactId}-{version}{-classifier}.{type}
+    maven[build.jenesis].latest=https://github.com/jenesis/jenesis/releases/latest/download/{artifactId}.pom
+    maven[build.jenesis].suffixes=none
 
 The location takes the same two forms as a module's:
 
