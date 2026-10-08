@@ -13,6 +13,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.InferredCompilerChainModule;
+import build.jenesis.project.JavaToolchainModule;
 import build.jenesis.project.KotlinCompilerModule;
 import build.jenesis.project.ScalaCompilerModule;
 import build.jenesis.step.Dependencies;
@@ -145,6 +146,64 @@ public class InferredCompilerChainModuleTest {
         Object instance = top.getConstructor().newInstance();
         Object description = top.getMethod("describe").invoke(instance);
         assertThat(description).isEqualTo("base->kotlin->scala");
+    }
+
+    @Test
+    public void java_kotlin_and_scala_classes_merge_into_one_classes_folder_each_written_once() throws Exception {
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
+        versions.setProperty("scalac/scalac/maven/org.scala-lang/scala3-compiler_3", SCALA_VERSION);
+        versions.store(project.resolve(BuildStep.VERSIONS));
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Base.java"), """
+                package sample;
+                public class Base {
+                    public String name() { return "base"; }
+                }
+                """);
+        Files.writeString(sampleDir.resolve("Mid.kt"), """
+                package sample
+                class Mid {
+                    fun describe(): String = Base().name() + "->kotlin"
+                }
+                """);
+        Files.writeString(sampleDir.resolve("Top.scala"), """
+                package sample
+                class Top:
+                  def describe(): String = Base().name() + "->scala"
+                """);
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "toolchain",
+                new JavaToolchainModule()
+                        .compiler(new InferredCompilerChainModule(
+                                Collections.emptyNavigableSet(),
+                                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))))
+                        .archiver(null),
+                "project");
+        executor.execute();
+
+        Path classes = root.resolve("toolchain")
+                .resolve(JavaToolchainModule.CLASSES)
+                .resolve("output")
+                .resolve(BuildStep.CLASSES);
+        assertThat(classes.resolve("sample/Base.class")).isNotEmptyFile();
+        assertThat(classes.resolve("sample/Mid.class")).isNotEmptyFile();
+        assertThat(classes.resolve("sample/Top.class")).isNotEmptyFile();
+        Path scalaClasses = root.resolve("toolchain")
+                .resolve("compiled")
+                .resolve(InferredCompilerChainModule.COMPILE)
+                .resolve(InferredCompilerChainModule.SCALAC)
+                .resolve(ScalaCompilerModule.CLASSES)
+                .resolve("output")
+                .resolve(BuildStep.CLASSES);
+        assertThat(scalaClasses.resolve("sample/Top.class")).isNotEmptyFile();
+        assertThat(scalaClasses.resolve("sample/Mid.class"))
+                .as("the Scala compiler reads the Kotlin classes but does not pass them on as its own")
+                .doesNotExist();
     }
 
     @Test

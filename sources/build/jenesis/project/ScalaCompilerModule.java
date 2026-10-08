@@ -122,9 +122,7 @@ public class ScalaCompilerModule implements BuildExecutorModule {
         buildExecutor.addStep(COMPILED,
                 factory == null ? new Compile(terms, includeResources, tool, group) : new Compile(terms, includeResources, tool, group, factory),
                 compileInputs);
-        buildExecutor.addStep(CLASSES, new Versions(), Stream.concat(
-                Stream.of(COMPILED),
-                compileInputs.stream()));
+        buildExecutor.addStep(CLASSES, new Versions(), COMPILED);
     }
 
     @Override
