@@ -304,6 +304,23 @@ public class InferredCompilerChainModuleTest {
     }
 
     @Test
+    public void resource_step_leaves_the_configuration_folder_out() throws IOException {
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("app.properties"), "key=value");
+        Path configuration = Files.createDirectories(project.resolve(BuildStep.SOURCES + "META-INF/build.jenesis"));
+        Files.writeString(configuration.resolve("project.properties"), "artifact=sample");
+
+        runChain();
+
+        Path resourceOutput = chainCompile()
+                .resolve(InferredCompilerChainModule.RESOURCE)
+                .resolve("output")
+                .resolve(BuildStep.CLASSES);
+        assertThat(resourceOutput.resolve("sample/app.properties")).content().isEqualTo("key=value");
+        assertThat(resourceOutput.resolve("META-INF/build.jenesis")).doesNotExist();
+    }
+
+    @Test
     public void scala_only_project_runs_scala_and_resource_only() throws IOException {
         SequencedProperties versions = new SequencedProperties();
         versions.setProperty("scalac/scalac/maven/org.scala-lang/scala3-compiler_3", SCALA_VERSION);
