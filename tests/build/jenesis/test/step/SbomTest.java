@@ -32,7 +32,7 @@ public class SbomTest {
     @Test
     public void shouldRun_fires_when_licenses_or_graph_changed() {
         for (Path changed : List.of(Path.of("licenses.properties"),
-                Path.of("sources.properties"),
+                Path.of("archives.properties"),
                 Path.of("graph.properties"))) {
             BuildStepArgument argument = new BuildStepArgument(root, Map.of(
                     changed, Checksum.of(ChecksumStatus.ADDED)));
@@ -124,7 +124,7 @@ public class SbomTest {
         dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
         SequencedProperties sources = new SequencedProperties();
         sources.setProperty("maven/org.example/lib/1.2.3", "https://example.org/lib/archive/v1.2.3.zip");
-        sources.store(argument.resolve("sources.properties"));
+        sources.store(argument.resolve("archives.properties"));
         SequencedProperties metadata = new SequencedProperties();
         metadata.setProperty("project", "build.jenesis");
         metadata.setProperty("artifact", "demo");
