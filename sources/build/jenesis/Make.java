@@ -709,6 +709,12 @@ public final class Make {
     }
 
     private static void requireApplicable(Path root, Path file, Properties properties, boolean trusted) {
+        for (String name : new TreeSet<>(properties.stringPropertyNames())) {
+            if (!name.startsWith("jenesis.")) {
+                throw new IllegalArgumentException(name + " in " + file + " is no setting: every key of this file"
+                        + " is written in full, as `configuration` prints it, so write jenesis." + name);
+            }
+        }
         if (properties.getProperty(PROVIDED) != null) {
             throw new IllegalStateException(PROVIDED + " cannot be set in " + file
                     + ": it records which settings the files a project provides supplied, and Make derives it");

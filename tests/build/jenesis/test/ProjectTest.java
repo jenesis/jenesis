@@ -1249,6 +1249,15 @@ public class ProjectTest {
     }
 
     @Test
+    public void the_layered_settings_rejects_a_key_written_without_its_prefix() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "maven.uri=https://example.com/\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maven.uri in ")
+                .hasMessageContaining("write jenesis.maven.uri");
+    }
+
+    @Test
     public void the_layered_settings_rejects_root_in_a_profile() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
         Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.make.root=elsewhere\n");
