@@ -887,6 +887,35 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void builds_an_empty_main_module_for_a_pom_with_test_sources_alone() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results)
+                .as("the test module requires the main artifact, which Maven builds as an empty jar")
+                .containsKeys("maven/module-/manifests", "maven/module-/coordinates", "maven/test-module-/manifests");
+        assertThat(results.get("maven/module-/sources")).isEmptyDirectory();
+    }
+
+    @Test
     public void can_resolve_test_sources_and_resources_explicit() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
