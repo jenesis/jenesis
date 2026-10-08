@@ -4133,6 +4133,75 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_reads_a_licence_distribution_and_the_inception_year_and_inherits_them() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <inceptionYear>2010</inceptionYear>
+                    <licenses>
+                        <license>
+                            <name>Apache 2.0</name>
+                            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+                            <distribution>repo</distribution>
+                        </license>
+                    </licenses>
+                    <modules>
+                        <module>child</module>
+                        <module>other</module>
+                    </modules>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("child")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("other")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>other</artifactId>
+                    <inceptionYear>2020</inceptionYear>
+                    <licenses>
+                        <license>
+                            <name>MIT</name>
+                        </license>
+                    </licenses>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("child")).metadata())
+                .as("the inception year and the licences with their distribution are inherited where a module declares none")
+                .containsOnly(
+                        Map.entry("license.apache_2_0.name", "Apache 2.0"),
+                        Map.entry("license.apache_2_0.url", "https://www.apache.org/licenses/LICENSE-2.0.txt"),
+                        Map.entry("license.apache_2_0.distribution", "repo"),
+                        Map.entry("inceptionYear", "2010"));
+        assertThat(poms.get(Path.of("other")).metadata())
+                .as("a module's own inception year and licences win over its parent's")
+                .containsOnly(
+                        Map.entry("inceptionYear", "2020"),
+                        Map.entry("license.mit.name", "MIT"));
+    }
+
+    @Test
     public void local_pom_inherits_the_metadata_of_a_parent_it_fetches() throws IOException {
         addToRepository("group", "grandparent", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>

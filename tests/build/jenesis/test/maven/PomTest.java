@@ -490,6 +490,32 @@ public class PomTest {
     }
 
     @Test
+    public void emits_a_licence_distribution_and_the_inception_year() throws IOException {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.setProperty("url", "https://example.com");
+        metadata.setProperty("inceptionYear", "2010");
+        metadata.setProperty("license.apache_2_0.name", "Apache 2.0");
+        metadata.setProperty("license.apache_2_0.url", "https://www.apache.org/licenses/LICENSE-2.0.txt");
+        metadata.setProperty("license.apache_2_0.distribution", "repo");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        String pom = Files.readString(next.resolve(Pom.POM)).replaceAll(">\\s+<", "><");
+        assertThat(pom).contains("<url>https://example.com</url><inceptionYear>2010</inceptionYear><licenses>");
+        assertThat(pom).contains("<license><name>Apache 2.0</name>"
+                + "<url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>"
+                + "<distribution>repo</distribution></license>");
+    }
+
+    @Test
     public void emits_a_developer_without_an_id_where_its_id_is_empty() throws IOException {
         SequencedProperties metadata = new SequencedProperties();
         metadata.setProperty("project", "build.jenesis");

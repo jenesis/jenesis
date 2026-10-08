@@ -1019,7 +1019,7 @@ public class MavenPomResolver implements MavenResolver {
                     switch (key) {
                         case "name" -> {
                         }
-                        case "description", "organization.name", "organization.url",
+                        case "description", "inceptionYear", "organization.name", "organization.url",
                              "issueManagement.system", "issueManagement.url",
                              "ciManagement.system", "ciManagement.url" -> metadata.putIfAbsent(key, value);
                         case "url", "scm.connection", "scm.developerConnection", "scm.url" -> metadata.putIfAbsent(key,
@@ -1602,6 +1602,7 @@ public class MavenPomResolver implements MavenResolver {
         toElementText(node, "name").ifPresent(value -> metadata.put("name", value));
         toElementText(node, "description").ifPresent(value -> metadata.put("description", value));
         toElementText(node, "url").ifPresent(value -> metadata.put("url", value));
+        toElementText(node, "inceptionYear").ifPresent(value -> metadata.put("inceptionYear", value));
         toElements(node, "organization").findFirst().ifPresent(organization -> {
             toElementText(organization, "name").ifPresent(value -> metadata.put("organization.name", value));
             toElementText(organization, "url").ifPresent(value -> metadata.put("organization.url", value));
@@ -1611,7 +1612,9 @@ public class MavenPomResolver implements MavenResolver {
             if (!title.isEmpty()) {
                 String id = title.toLowerCase(Locale.ROOT).replace(' ', '_').replace('.', '_');
                 metadata.put("license." + id + ".name", title);
-                toElementText(license, "url").ifPresent(value -> metadata.put("license." + id + ".url", value));
+                for (String property : List.of("url", "distribution")) {
+                    toElementText(license, property).ifPresent(value -> metadata.put("license." + id + "." + property, value));
+                }
             }
         });
         Set<String> ids = new HashSet<>();

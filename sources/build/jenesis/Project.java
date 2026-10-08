@@ -865,9 +865,10 @@ public record Project(
                                  source, 1.8 read as 8 - with none of them the JDK the build runs
                                  on, which a [RELEASE] line names; maven.compiler.testRelease for
                                  the tests and maven.compiler.enablePreview; name, description,
-                                 url, licenses, developers, organization, scm, issueManagement
-                                 and ciManagement of the module's own POM, and all of them but the
-                                 name from its parents, local or fetched, where it declares none;
+                                 url, inceptionYear, licenses with their distribution, developers,
+                                 organization, scm, issueManagement and ciManagement of the
+                                 module's own POM, and all of them but the name from its parents,
+                                 local or fetched, where it declares none;
                                  sourceDirectory, testSourceDirectory and the <directory> of each
                                  resource, a local parent's where the module names none - one
                                  folder per scope, so .groovy tests in src/test/groovy are found
@@ -1325,8 +1326,9 @@ public record Project(
                     inventing a side channel; the schemas are constants on the writing step.
 
                       metadata.properties   project, artifact, version, name, description, url,
-                                            license.<id>.{name,url}, developer.<id>.{name,email,id,
-                                            url,organization,organizationUrl,roles,timezone}
+                                            inceptionYear, license.<id>.{name,url,distribution},
+                                            developer.<id>.{name,email,id,url,organization,
+                                            organizationUrl,roles,timezone}
                                             (id: the POM's <id>, the key when absent, none when empty;
                                             roles: comma-separated), organization.{name,url},
                                             copyright, manufacturer.{name,url}, publisher,

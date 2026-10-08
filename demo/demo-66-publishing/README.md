@@ -33,6 +33,7 @@ two channels described under "Where the POM metadata comes from" below:
     <name>Jenesis Publishing Demo</name>
     <description>A sample library whose name and description are taken from this Javadoc ...</description>
     <url>https://github.com/jenesis/jenesis</url>
+    <inceptionYear>2024</inceptionYear>
     <licenses>...</licenses>
     <developers>...</developers>
     <scm>...</scm>
@@ -77,7 +78,7 @@ Layout
     demo/demo-66-publishing
     |-- build/jenesis            symlink to ../../../sources/build/jenesis
     |-- build/Demo.java          stages the release bundle, then resolves it back to prove it is consumable
-    |-- project.properties       only what a module declaration cannot express: url, license, developer, scm, issues
+    |-- project.properties       only what a module declaration cannot express: url, inception year, license, developer, scm, issues
     `-- sources
         |-- module-info.java     module build.jenesis.demo.publishing (MODULAR_TO_MAVEN: a POM is generated)
         `-- sample/Sample.java   the library being published
@@ -98,7 +99,8 @@ duplicated:
   the words they mark. A Markdown comment (`///`) keeps its inline markup as written,
   apart from a link, which becomes its label.
 - **`project.properties`**, read because it sits at the project root, carries only what a
-  module declaration cannot express: `url`, every `license.<id>.name|url`, every
+  module declaration cannot express: `url`, `inceptionYear`, every
+  `license.<id>.name|url|distribution`, every
   `developer.<id>.name|email|url|organization|organizationUrl|roles|timezone`, the
   roles comma-separated - published under `<id>`, unless `developer.<id>.id`
   names another id or is empty for none - the `scm.connection|developerConnection|url`
