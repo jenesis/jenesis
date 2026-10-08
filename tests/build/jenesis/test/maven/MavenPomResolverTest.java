@@ -4291,6 +4291,304 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void a_profile_of_a_fetched_parent_that_the_jdk_activates_sets_the_release() throws IOException {
+        addToRepository("parent", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>parent</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <profiles>
+                        <profile>
+                            <id>java-9-up</id>
+                            <activation>
+                                <jdk>[9,)</jdk>
+                            </activation>
+                            <properties>
+                                <maven.compiler.release>8</maven.compiler.release>
+                            </properties>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>parent</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                </project>
+                """);
+        assertThat(mavenPomResolver.jdk("25.0.4.1").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .as("Maven activates the parent's profile on a JDK of 9 or newer, so the jar is compiled for release 8")
+                .isEqualTo("8");
+        assertThat(mavenPomResolver.jdk("1.8.0_402").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .isNull();
+    }
+
+    @Test
+    public void a_dependency_that_a_profile_active_by_default_declares_is_resolved() throws IOException {
+        addToRepository("group", "artifact", "1", rootPom("", "client"));
+        addToRepository("client", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <profiles>
+                        <profile>
+                            <id>default</id>
+                            <activation>
+                                <activeByDefault>true</activeByDefault>
+                            </activation>
+                            <dependencies>
+                                %s
+                            </dependencies>
+                        </profile>
+                    </profiles>
+                </project>
+                """.formatted(dependencyOn("core", "1")));
+        addToRepository("core", "artifact", "1", leafPom());
+        assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null).keySet())
+                .containsExactly(
+                        new MavenDependencyKey("client", "artifact", "jar", null),
+                        new MavenDependencyKey("core", "artifact", "jar", null));
+    }
+
+    @Test
+    public void a_profile_active_by_default_yields_to_one_the_jdk_activates_in_the_same_pom() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>${chosen}</maven.compiler.release>
+                    </properties>
+                    <profiles>
+                        <profile>
+                            <id>default</id>
+                            <activation>
+                                <activeByDefault>true</activeByDefault>
+                            </activation>
+                            <properties>
+                                <chosen>11</chosen>
+                            </properties>
+                        </profile>
+                        <profile>
+                            <id>modern</id>
+                            <activation>
+                                <jdk>[17,)</jdk>
+                            </activation>
+                            <properties>
+                                <chosen>17</chosen>
+                            </properties>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        assertThat(mavenPomResolver.jdk("25.0.4.1").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .isEqualTo("17");
+        assertThat(mavenPomResolver.jdk("11.0.2").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .isEqualTo("11");
+    }
+
+    @Test
+    public void a_jdk_activation_matches_a_prefix_a_negation_and_a_range_as_maven_does() throws IOException {
+        List<List<String>> cases = List.of(
+                List.of("1.8", "1.8.0_402", "true"),
+                List.of("1.8", "25.0.4.1", "false"),
+                List.of("25", "25.0.4.1", "true"),
+                List.of("!1.8", "25.0.4.1", "true"),
+                List.of("!1.8", "1.8.0_402", "false"),
+                List.of("[9,)", "25.0.4.1", "true"),
+                List.of("[9,)", "1.8.0_402", "false"),
+                List.of("[1.8,17)", "11.0.2", "true"),
+                List.of("[1.8,17)", "17", "false"),
+                List.of("[1.8,17]", "17", "true"),
+                List.of("(,11)", "1.8.0_402", "true"),
+                List.of("(,11)", "11.0.2", "false"),
+                List.of("(17,)", "17", "false"),
+                List.of("!(,11)", "25.0.4.1", "true"));
+        for (List<String> entry : cases) {
+            Files.writeString(project.resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>project</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                        <profiles>
+                            <profile>
+                                <activation>
+                                    <jdk>%s</jdk>
+                                </activation>
+                                <properties>
+                                    <maven.compiler.release>21</maven.compiler.release>
+                                </properties>
+                            </profile>
+                        </profiles>
+                    </project>
+                    """.formatted(entry.get(0)));
+            assertThat(mavenPomResolver.jdk(entry.get(1)).local(Runnable::run, mavenRepository, project).get(Path.of("")).release() != null)
+                    .as("<jdk>%s</jdk> on Java %s", entry.get(0), entry.get(1))
+                    .isEqualTo(Boolean.parseBoolean(entry.get(2)));
+        }
+    }
+
+    @Test
+    public void a_profile_activated_by_a_property_an_os_or_a_file_stays_inactive() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>${chosen}</maven.compiler.release>
+                    </properties>
+                    <profiles>
+                        <profile>
+                            <id>default</id>
+                            <activation>
+                                <activeByDefault>true</activeByDefault>
+                            </activation>
+                            <properties>
+                                <chosen>11</chosen>
+                            </properties>
+                        </profile>
+                        <profile>
+                            <id>property</id>
+                            <activation>
+                                <jdk>[1.8,)</jdk>
+                                <property>
+                                    <name>!skip</name>
+                                </property>
+                            </activation>
+                            <properties>
+                                <chosen>17</chosen>
+                            </properties>
+                        </profile>
+                        <profile>
+                            <id>os</id>
+                            <activation>
+                                <os>
+                                    <family>unix</family>
+                                </os>
+                            </activation>
+                            <properties>
+                                <chosen>21</chosen>
+                            </properties>
+                        </profile>
+                        <profile>
+                            <id>file</id>
+                            <activation>
+                                <file>
+                                    <exists>pom.xml</exists>
+                                </file>
+                            </activation>
+                            <properties>
+                                <chosen>25</chosen>
+                            </properties>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        assertThat(mavenPomResolver.jdk("25.0.4.1").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .isEqualTo("11");
+    }
+
+    @Test
+    public void a_profile_of_the_module_adds_its_dependencies_managed_versions_and_resource_directories() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>declared</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                    <profiles>
+                        <profile>
+                            <id>default</id>
+                            <activation>
+                                <activeByDefault>true</activeByDefault>
+                            </activation>
+                            <dependencyManagement>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>managed</groupId>
+                                        <artifactId>artifact</artifactId>
+                                        <version>2</version>
+                                    </dependency>
+                                </dependencies>
+                            </dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>managed</groupId>
+                                    <artifactId>artifact</artifactId>
+                                </dependency>
+                            </dependencies>
+                            <build>
+                                <resources>
+                                    <resource>
+                                        <directory>src/extra</directory>
+                                    </resource>
+                                </resources>
+                            </build>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        MavenLocalPom pom = mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of(""));
+        assertThat(pom.dependencies()).containsExactly(
+                Map.entry(new MavenDependencyKey("declared", "artifact", "jar", null),
+                        new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)),
+                Map.entry(new MavenDependencyKey("managed", "artifact", "jar", null),
+                        new MavenDependencyValue("2", MavenDependencyScope.COMPILE, null, null, null)));
+        assertThat(pom.resourceDirectories())
+                .as("a profile's resources replace the default folder, as in Maven")
+                .containsExactly("src/extra");
+    }
+
+    @Test
+    public void a_jdk_activation_that_is_no_version_range_is_refused() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <profiles>
+                        <profile>
+                            <activation>
+                                <jdk>[nine,)</jdk>
+                            </activation>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("<jdk>[nine,)</jdk>")
+                .hasMessageContaining("such as [9,) or [1.8,17)");
+    }
+
+    @Test
     public void local_pom_direct_dependency_checksum_is_ignored() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

@@ -853,11 +853,17 @@ public record Project(
                                  sourceDirectory, testSourceDirectory and the <directory> of each
                                  resource; the <!--jenesis.plugin--> and <!--jenesis.pin-->
                                  comments of the module's POM and of a local parent, where the
-                                 module's own pin wins and `pin` writes into the module's POM
-                      ignored    <build><plugins> and <pluginManagement>, <profiles>, <repositories>
-                                 and settings.xml, a resource's includes, excludes, targetPath and
-                                 filtering, maven.compiler.source and target, system scope, the
-                                 profiles of a dependency's POM, and every packaging but jar
+                                 module's own pin wins and `pin` writes into the module's POM;
+                                 a profile of any POM - the module's, a parent's, a BOM's or a
+                                 dependency's - that Maven activates by <jdk>, matched against the
+                                 JDK the build runs on, or by <activeByDefault> when no other
+                                 profile of that POM is active, with its <properties>,
+                                 dependencies, <dependencyManagement> and resource directories
+                      ignored    <build><plugins> and <pluginManagement>, a profile activated by a
+                                 property, the OS, a file or -P, a profile's <modules>,
+                                 <repositories> and settings.xml, a resource's includes, excludes,
+                                 targetPath and filtering, maven.compiler.source and target,
+                                 system scope, and every packaging but jar
                                  - a pom aggregator is followed for its modules, a war is not built
                                  at all, and a src/test/java/module-info.java is a module of its own
                                  rather than patched into the main one
@@ -956,8 +962,8 @@ public record Project(
                                                            no --manifest in process-jar.properties
                       a resource outside the resource      -Djenesis.project.resources=
                       folders, or with a targetPath          <file>:<path in the jar>
-                      <profiles>, Gradle properties        jenesis.properties and a
-                                                           jenesis-<profile>.properties each, selected
+                      a <profile> chosen with -P or a      jenesis.properties and a
+                      property, Gradle properties          jenesis-<profile>.properties each, selected
                                                            with -Djenesis.make.profiles
                       <repositories>, settings.xml         -Djenesis.maven.uri or MAVEN_REPOSITORY_URI;
                                                            its credential, jenesis.maven.token, never
@@ -1153,7 +1159,9 @@ public record Project(
                           -> `release` with a jreleaser.yml, handed JRELEASER_PROJECT_VERSION: the
                           version setting, or the version every staged POM carries (66)
                       maven-toolchains-plugin / java toolchains -> jenesis.toolchain.version (07)
-                      <profiles> / properties and conventions -> jenesis-<profile>.properties (48)
+                      <profiles> chosen with -P or a property / properties and conventions
+                          -> jenesis-<profile>.properties; those activated by <jdk> or
+                          <activeByDefault> are read from the POM (48)
                       a Gradle build cache -> jenesis.cache.uri (49)
 
                     ## No built-in

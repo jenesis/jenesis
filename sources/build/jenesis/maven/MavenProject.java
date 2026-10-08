@@ -265,8 +265,9 @@ public class MavenProject implements BuildExecutorModule {
                                                 + ", which the build writes itself; a resource directory is copied whole,"
                                                 + " without its includes, excludes or targetPath, so place a single file with"
                                                 + " -Djenesis.project.resources=<file>:<path in the jar>, as"
-                                                + " LICENSE:META-INF/LICENSE, and move that resource into a <profile> active by default, which"
-                                                + " Maven still reads and this build does not");
+                                                + " LICENSE:META-INF/LICENSE, and move that resource into a <profile> activated by"
+                                                + " a property, such as <property><name>!jenesis</name></property>, which Maven"
+                                                + " still activates and this build does not");
                                     }
                                 }
                                 module.addSource("resources-" + ++index, Bind.asResources(), resources);
