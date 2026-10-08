@@ -7,6 +7,14 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
+import com.sun.source.tree.ClassTree;
+import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.tree.Tree;
+import com.sun.source.util.JavacTask;
+import javax.lang.model.element.Modifier;
+import javax.tools.JavaCompiler;
+import javax.tools.StandardJavaFileManager;
+import javax.tools.ToolProvider;
 
 public class Javadoc extends ProcessBuildStep {
 
@@ -57,14 +65,6 @@ public class Javadoc extends ProcessBuildStep {
     }
 
     @Override
-    public boolean acceptableExitCode(int code,
-                                      Executor executor,
-                                      BuildStepContext context,
-                                      SequencedMap<String, BuildStepArgument> arguments) {
-        return true;
-    }
-
-    @Override
     protected CompletionStage<List<String>> process(Executor executor,
                                                     BuildStepContext context,
                                                     SequencedMap<String, BuildStepArgument> arguments,
@@ -78,7 +78,6 @@ public class Javadoc extends ProcessBuildStep {
                 commands = new ArrayList<>(List.of(
                         "-d", documentation.toString(),
                         "-quiet",
-                        "-Xdoclint:none",
                         "-tag", "jenesis.release:a:Release:",
                         "-tag", "jenesis.main:a:Main class:",
                         "-tag", "jenesis.test:a:Tests the module:",
@@ -94,6 +93,10 @@ public class Javadoc extends ProcessBuildStep {
                         "-tag", "jenesis.signature:a:Signing keys:"));
         if (!timestamped) {
             commands.add("-notimestamp");
+        }
+        if (properties.values().stream().noneMatch(folder -> folder.keySet().stream()
+                .anyMatch(key -> key.startsWith("-Xdoclint")))) {
+            commands.add("-Xdoclint:none");
         }
         String preview = null;
         for (BuildStepArgument argument : arguments.values()) {
@@ -141,6 +144,11 @@ public class Javadoc extends ProcessBuildStep {
             commands.addAll(List.of("--enable-preview", "--release", preview));
         }
         files.sort(null);
+        if (properties.values().stream().noneMatch(folder -> folder.keySet().stream()
+                .anyMatch(key -> key.equals("-package") || key.equals("-private") || key.startsWith("--show-types")))
+                && !declaresPublicType(files)) {
+            return CompletableFuture.completedStage(null);
+        }
         path.sort(null);
         boolean module = !classpath
                 && files.stream().anyMatch(file -> file.endsWith(File.separator + "module-info.java"));
@@ -177,5 +185,29 @@ public class Javadoc extends ProcessBuildStep {
         }
         commands.addAll(files);
         return CompletableFuture.completedStage(commands);
+    }
+
+    private static boolean declaresPublicType(List<String> files) throws IOException {
+        if (files.isEmpty()) {
+            return false;
+        }
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        try (StandardJavaFileManager manager = compiler.getStandardFileManager(_ -> { }, null, StandardCharsets.UTF_8)) {
+            JavacTask task = (JavacTask) compiler.getTask(Writer.nullWriter(),
+                    manager,
+                    _ -> { },
+                    null,
+                    null,
+                    manager.getJavaFileObjectsFromStrings(files));
+            for (CompilationUnitTree unit : task.parse()) {
+                for (Tree type : unit.getTypeDecls()) {
+                    if (type instanceof ClassTree declaration
+                            && declaration.getModifiers().getFlags().contains(Modifier.PUBLIC)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 }

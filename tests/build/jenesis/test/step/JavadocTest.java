@@ -15,6 +15,7 @@ import build.jenesis.step.Javadoc;
 import build.jenesis.step.ProcessHandler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class JavadocTest {
 
@@ -78,6 +79,80 @@ public class JavadocTest {
                         Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         assertThat(next.resolve(Javadoc.JAVADOC + "sample/Sample.html")).content().contains("Describes a value.");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void a_configured_doclint_flag_replaces_the_build_default(boolean process) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; /** Links {@link Missing}. */ public class Sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javadoc.properties"),
+                "-Xdoclint\\:all=\n");
+        assertThatThrownBy(() -> Javadoc.ofEnvironment(Environment.NONE,
+                        process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
+                .as("doclint reports the broken link as an error once the configuration switches it on")
+                .hasMessageContaining("Unexpected exit code");
+        assertThat(Files.readString(supplement.resolve("command"))).doesNotContain("-Xdoclint:none");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void fails_where_javadoc_reports_an_error(boolean process) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; /** Tagged @unknown. */ public class Sample { /** @custom value */ public void run() { } }\n");
+        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javadoc.properties"),
+                "-Werror=\n");
+        assertThatThrownBy(() -> Javadoc.ofEnvironment(Environment.NONE,
+                        process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
+                .as("-Werror turns the warning about an unknown tag into a failure of the build")
+                .hasMessageContaining("Unexpected exit code");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void documents_nothing_where_no_type_is_public(boolean process) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("SampleTest.java"),
+                "package sample; class SampleTest { }\n");
+        BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE,
+                process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sample/SampleTest.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javadoc.JAVADOC))
+                .as("javadoc documents public and protected types alone, so a module without one has no documentation")
+                .isEmptyDirectory();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void documents_a_type_that_is_not_public_where_the_configuration_asks_for_it(boolean process)
+            throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("SampleTest.java"),
+                "package sample; /** Documented. */ class SampleTest { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javadoc.properties"),
+                "-package=\n");
+        BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE,
+                process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sample/SampleTest.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javadoc.JAVADOC + "sample/SampleTest.html")).content().contains("Documented.");
     }
 
     @ParameterizedTest
