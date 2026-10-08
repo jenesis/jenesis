@@ -512,7 +512,7 @@ public class Signatures extends ProcessBuildStep {
                     + command
                     + " for " + file
                     + "\nTo reproduce, execute:\n "
-                    + String.join(" ", handler.commands())
+                    + shell(handler.commands())
                     + (Files.isRegularFile(error)
                             ? "\n\nError:\n" + new String(Files.readAllBytes(error), NATIVE_ENCODING)
                             : ""));

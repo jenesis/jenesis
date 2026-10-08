@@ -84,6 +84,29 @@ public class ProcessBuildStepTest {
     }
 
     @Test
+    public void a_failure_names_a_reproduction_quoted_for_a_shell() throws IOException {
+        Path source = root.resolve("Failing.java");
+        Files.writeString(source, """
+                public class Failing {
+                    public static void main(String[] args) {
+                        System.exit(3);
+                    }
+                }
+                """);
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        assertThatThrownBy(() -> new Program("java",
+                ProcessHandler.OfProcess.ofJavaHome("bin/java"),
+                List.of(),
+                List.of(source.toString(), "-Xplugin:Sample -XepExcludedPaths:.*/(generated)/.*", "it's"))
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .as("an argument holding spaces, parentheses or a quote stays one word when pasted into a shell")
+                .hasMessageContaining(" '-Xplugin:Sample -XepExcludedPaths:.*/(generated)/.*' 'it'\\''s'");
+    }
+
+    @Test
     public void a_jdk_tool_refuses_an_environment_even_when_forked() throws IOException {
         Path folder = Files.createDirectories(root.resolve("argument/environment")).getParent();
         Files.writeString(folder.resolve("environment/javac.properties"), "SAMPLE=value\n");
