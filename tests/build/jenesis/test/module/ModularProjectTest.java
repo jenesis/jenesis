@@ -17,6 +17,7 @@ import build.jenesis.module.ModularProject;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.JavaToolchainModule;
 import build.jenesis.project.MultiProjectModule;
+import build.jenesis.step.Bind;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -1072,6 +1073,35 @@ public class ModularProjectTest {
         SequencedProperties module = SequencedProperties.ofFiles(
                 results.get("module/module-/manifests").resolve(BuildStep.MODULE));
         assertThat(module.getProperty("main")).isNull();
+    }
+
+    @Test
+    public void a_module_overrides_the_coordinate_of_the_project_in_its_own_configuration_location() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                module com.acme.check {
+                  requires bar;
+                }
+                """);
+        Path configuration = Files.createDirectories(project.resolve("META-INF").resolve("build.jenesis"));
+        Files.writeString(configuration.resolve("project.properties"), "artifact=acme-check\nurl=https://acme.example/check\n");
+        Path root = Files.writeString(project.resolve("project.properties"),
+                "project=com.acme.legacy\nurl=https://acme.example\nscm.url=https://acme.example/scm\n");
+        BuildExecutor executor = executor();
+        executor.addSource("metadata", Bind.asMetadata(), root);
+        executor.addModule("module", new ModularProject("module", project), "metadata");
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        SequencedProperties metadata = SequencedProperties.ofFiles(
+                results.get("module/module-/manifests").resolve(BuildStep.METADATA));
+        assertThat(metadata.getProperty("project"))
+                .as("the project's file overrides the groupId the module name derives")
+                .isEqualTo("com.acme.legacy");
+        assertThat(metadata.getProperty("artifact"))
+                .as("the module's own file overrides the artifactId")
+                .isEqualTo("acme-check");
+        assertThat(metadata.getProperty("url"))
+                .as("the module's own file is layered over the project's")
+                .isEqualTo("https://acme.example/check");
+        assertThat(metadata.getProperty("scm.url")).isEqualTo("https://acme.example/scm");
     }
 
     private BuildExecutor executor() throws IOException {
