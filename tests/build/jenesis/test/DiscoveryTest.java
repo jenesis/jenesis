@@ -52,8 +52,8 @@ public class DiscoveryTest {
     }
 
     @Test
-    public void lets_the_files_of_subdomains_answer_first_where_a_file_says_stop_false() throws IOException {
-        server.domain("bytebuddy.net", "maven=https://root/", "stop=false")
+    public void lets_the_files_of_subdomains_answer_first_where_a_file_delegates_to_them() throws IOException {
+        server.domain("bytebuddy.net", "maven=https://root/", "delegate=true")
                 .domain("agent.bytebuddy.net", "maven=https://agent/")
                 .domain("dep.bytebuddy.net", "module=https://dep/");
 
@@ -71,13 +71,13 @@ public class DiscoveryTest {
     }
 
     @Test
-    public void refuses_a_stop_that_is_neither_true_nor_false() {
-        server.domain("bytebuddy.net", "maven=https://root/", "stop=no");
+    public void refuses_a_delegate_that_is_neither_true_nor_false() {
+        server.domain("bytebuddy.net", "maven=https://root/", "delegate=no");
 
         assertThatThrownBy(() -> server.discovery().lookup("net.bytebuddy", "maven"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("stop=no")
-                .hasMessageContaining("true, the default");
+                .hasMessageContaining("delegate=no")
+                .hasMessageContaining("false, the default");
     }
 
     @Test

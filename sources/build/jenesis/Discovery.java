@@ -87,10 +87,10 @@ public final class Discovery {
                 continue;
             }
             Properties properties = file.get();
-            String stop = value(properties, source, "stop");
-            if (stop != null && !stop.equals("true") && !stop.equals("false")) {
-                throw new IllegalArgumentException(source + " names stop=" + stop + ", where it expects true, the"
-                        + " default, to answer alone for every name below " + domain + ", or false to let the files"
+            String delegate = value(properties, source, "delegate");
+            if (delegate != null && !delegate.equals("true") && !delegate.equals("false")) {
+                throw new IllegalArgumentException(source + " names delegate=" + delegate + ", where it expects false,"
+                        + " the default, to answer alone for every name below " + domain + ", or true to let the files"
                         + " of its subdomains answer first");
             }
             if (properties.containsKey(key)) {
@@ -125,7 +125,7 @@ public final class Discovery {
                     found = location;
                 }
             }
-            if (!"false".equals(stop)) {
+            if (!"true".equals(delegate)) {
                 break;
             }
         }
