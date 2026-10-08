@@ -13,6 +13,7 @@ import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.project.InferredTestObservationModule;
 import build.jenesis.project.JaCoCoModule;
 import build.jenesis.step.Dependencies;
 import java.util.jar.JarEntry;
@@ -106,6 +107,46 @@ public class JaCoCoModuleTest {
                 .as("the compiled tests are not counted as covered code")
                 .doesNotContain(project.resolve(BuildStep.CLASSES).toString())
                 .doesNotContain(project.resolve(BuildStep.SOURCES).toString());
+    }
+
+    @Test
+    public void the_observation_of_a_test_module_reports_no_coverage_of_the_tests_themselves() throws IOException {
+        Path resolved = Files.createDirectory(project.resolve(Dependencies.RESOLVED));
+        Path first = Files.write(resolved.resolve("maven%2Forg.example%2Flibrary%2F1.0.jar"), new byte[0]);
+        Files.write(project.resolve("jacoco.exec"), new byte[0]);
+        Files.write(Files.createDirectories(project.resolve(BuildStep.CLASSES + "sample")).resolve("SampleTest.class"),
+                new byte[0]);
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/compile/maven/org.example/library/1.0",
+                Dependencies.RESOLVED + first.getFileName());
+        index.store(project.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("vertex/main/compile/maven/org.example/library", "1.0\t\tfalse\ttrue");
+        graph.store(project.resolve(Dependencies.GRAPH));
+        Path configuration = Files.createDirectory(tool.resolve("configuration"));
+        Files.writeString(configuration.resolve("jacoco.properties"), "");
+        List<JaCoCoModule> wired = new ArrayList<>();
+        new InferredTestObservationModule(new LinkedHashSet<>(List.of(configuration)),
+                Map.of("maven", serving(cli())),
+                Map.of("maven", Resolver.identity()))
+                .test(null)
+                .jacoco(jacoco -> {
+                    wired.add(jacoco);
+                    return null;
+                })
+                .accept(newExecutor(), new LinkedHashMap<>());
+        assertThat(wired).hasSize(1);
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("jacoco", wired.getFirst(), "project");
+        executor.execute("jacoco/report");
+
+        assertThat(root.resolve("jacoco").resolve("report").resolve("supplement").resolve("command"))
+                .content()
+                .contains("--classfiles " + first)
+                .as("the classes a test module compiles are its tests, which are no code under test")
+                .doesNotContain(project.resolve(BuildStep.CLASSES).toString());
     }
 
     private Path cli() throws IOException {
