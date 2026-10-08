@@ -1102,7 +1102,11 @@ public class Dependencies implements BuildExecutorModule {
                                 + (carrier.dependency().substring(0, carrier.dependency().lastIndexOf('/'))
                                         .equals(dependency.substring(0, dependency.lastIndexOf('/')))
                                         ? "settle on one version: a <dependencyManagement> entry in pom.xml"
-                                                + " or a @jenesis.pin line in module-info.java manages it"
+                                                + " or a @jenesis.pin "
+                                                + group
+                                                + "/"
+                                                + dependency.substring(0, dependency.lastIndexOf('/'))
+                                                + " <version> line in module-info.java manages it"
                                         : "drop one: an <exclusions> entry in pom.xml or @jenesis.exclude in"
                                                 + " module-info.java"));
                     }

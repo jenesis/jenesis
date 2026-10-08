@@ -94,6 +94,40 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_pin_reads_a_repository_first_token_in_the_group_of_the_module() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin maven/org.glassfish/jakarta.json/jar/module 2.0.1
+                 */
+                module foo {
+                    requires bar;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.versions())
+                .as("a classified coordinate is spelt as a key of a pin-<name>.properties file spells it")
+                .containsOnlyKeys("main/maven/org.glassfish/jakarta.json/jar/module")
+                .containsEntry("main/maven/org.glassfish/jakarta.json/jar/module", "2.0.1");
+    }
+
+    @Test
+    public void jenesis_pin_refuses_a_classified_coordinate_that_reads_as_a_group() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin org.glassfish/jakarta.json/jar/module 2.0.1
+                 */
+                module foo {
+                    requires bar;
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("a group named like a groupId would be stored where no resolution ever looks")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.pin token 'org.glassfish/jakarta.json/jar/module'")
+                .hasMessageContaining("written maven/org.glassfish/jakarta.json/jar/module");
+    }
+
+    @Test
     public void jenesis_pin_tolerates_surrounding_whitespace() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**

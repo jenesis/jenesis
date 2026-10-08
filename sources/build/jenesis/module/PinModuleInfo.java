@@ -613,11 +613,7 @@ public class PinModuleInfo implements BuildStep {
     }
 
     private static String expand(String token) {
-        int first = token.indexOf('/');
-        if (first < 0) {
-            return "main/module/" + token;
-        }
-        return token.indexOf('/', first + 1) < 0 ? "main/maven/" + token : token;
+        return ModuleInfoParser.expand("main", "jenesis.pin", token);
     }
 
     private static String renderJavadoc(SequencedMap<String, String> entries) {

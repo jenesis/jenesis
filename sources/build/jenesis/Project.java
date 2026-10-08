@@ -1237,8 +1237,11 @@ public record Project(
                     no comment at all.
 
                     Token grammar, shared below: `<group>/<repo>/<coordinate>`, where a bare
-                    `<module>` abbreviates `<group>/module/<module>` and `<groupId>/<artifactId>`
-                    abbreviates `<group>/maven/<groupId>/<artifactId>`. A trailing `(<token>,...)`
+                    `<module>` abbreviates `<group>/module/<module>`, `<groupId>/<artifactId>`
+                    abbreviates `<group>/maven/<groupId>/<artifactId>`, and `maven/<coordinate>`
+                    abbreviates `<group>/maven/<coordinate>` - the form a type or a classifier needs,
+                    as in maven/org.glassfish/jakarta.json/jar/module, because a longer token without
+                    the repository reads its groupId as a group, which is refused. A trailing `(<token>,...)`
                     guard applies a line only on a matching platform, with an unguarded line for the
                     same coordinate as fallback. Parentheses rather than brackets, because a
                     bracketed word is a link in a Markdown documentation comment and javadoc fails
