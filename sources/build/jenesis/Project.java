@@ -1364,7 +1364,8 @@ public record Project(
                       japicmp.properties        japicmp compares the built jar against the last release of
                                                 the module's own coordinate, or of baseline=<groupId>/
                                                 <artifactId>[/<version>]; report-only until an
-                                                error-on-<kind> key says otherwise
+                                                error-on-<kind> key says otherwise; a test
+                                                module is never compared
                                                 (access, include, exclude, format, ignore-missing-classes,
                                                 only-incompatible, only-modified, semantic-versioning,
                                                 error-on-binary-incompatibility, ...)
