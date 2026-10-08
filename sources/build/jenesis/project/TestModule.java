@@ -572,9 +572,8 @@ public class TestModule implements BuildExecutorModule {
         }
         SequencedSet<String> upstream = inherited.sequencedKeySet();
         buildExecutor.addStep(RESOLVED, new Requires(group, resolved, Set.copyOf(resolvers.keySet()), observers), upstream);
-        SequencedSet<String> resolveInputs = new LinkedHashSet<>();
+        SequencedSet<String> resolveInputs = new LinkedHashSet<>(upstream);
         resolveInputs.add(RESOLVED);
-        resolveInputs.addAll(upstream);
         buildExecutor.addModule(DEPENDENCIES,
                 dependencies.pinning(pinning),
                 resolveInputs);

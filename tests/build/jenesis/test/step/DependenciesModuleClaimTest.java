@@ -46,7 +46,21 @@ public class DependenciesModuleClaimTest {
                 .hasStackTraceContaining("maven/org.example/one-lib/1.0 and maven/org.example/two-lib/2.0"
                         + " both carry module lib.shared in group main"
                         + " - a module path resolves whichever of the two comes first,"
-                        + " so drop one with @jenesis.exclude");
+                        + " so drop one: an <exclusions> entry in pom.xml or @jenesis.exclude in module-info.java");
+    }
+
+    @Test
+    public void names_version_management_when_two_versions_of_one_artifact_carry_its_module() throws IOException {
+        modularLib("lib", "1.0", "lib.shared", "one");
+        modularLib("lib", "2.0", "lib.shared", "one");
+
+        assertThatThrownBy(() -> resolveScoped("main/compile/maven/org.example/lib/1.0", "main/runtime/maven/org.example/lib/2.0"))
+                .as("two scopes of one group that mediate to different versions cannot share a module path,"
+                        + " and a version is settled by managing it rather than by excluding a path to it")
+                .hasStackTraceContaining("maven/org.example/lib/1.0 and maven/org.example/lib/2.0"
+                        + " both carry module lib.shared in group main")
+                .hasStackTraceContaining("settle on one version: a <dependencyManagement> entry in pom.xml"
+                        + " or a @jenesis.pin line in module-info.java manages it");
     }
 
     @Test
@@ -111,9 +125,13 @@ public class DependenciesModuleClaimTest {
     }
 
     private Path resolve(String... coordinates) throws IOException {
+        return resolveScoped(Stream.of(coordinates).map(coordinate -> "main/compile/maven/" + coordinate).toArray(String[]::new));
+    }
+
+    private Path resolveScoped(String... keys) throws IOException {
         SequencedProperties requires = new SequencedProperties();
-        for (String coordinate : coordinates) {
-            requires.setProperty("main/compile/maven/" + coordinate, "");
+        for (String key : keys) {
+            requires.setProperty(key, "");
         }
         requires.store(dependencies.resolve(BuildStep.REQUIRES));
         BuildExecutor executor = BuildExecutor.of(build,
