@@ -154,7 +154,8 @@ default - asks `moduletomaven` first. Run the demo that way:
 and the module resolves as the Maven artifact it is mapped to, `build.jenesis:build.jenesis`,
 whose POM is read before its jar. The `maven` key names where both are, so a release
 that attaches its POM serves the module whole. One that does not fails the build with
-`No POM found for build.jenesis`, since no Maven remote is left to ask - with
+`The module name build.jenesis has no artifact behind it`, since no Maven remote is left
+to ask - with
 `jenesis.maven.uri` back at its default, the POM would come from Maven Central.
 
 A key that does not answer leaves the request to the other: a template without a
