@@ -93,10 +93,6 @@ jobs:
           done
 
       - name: JReleaser deploy
-        uses: jreleaser/release-action@90ac653bb9c79d11179e65d81499f3f34527dcd5 # 2.5.0
-        with:
-          version: latest
-          arguments: full-release
         env:
           JRELEASER_PROJECT_VERSION: ${{ steps.version.outputs.version }}
           JRELEASER_REPRODUCIBLE: "true"
@@ -108,6 +104,11 @@ jobs:
           JRELEASER_GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
           JRELEASER_HOMEBREW_GITHUB_TOKEN: ${{ secrets.HOMEBREW_GITHUB_TOKEN }}
           JRELEASER_SCOOP_GITHUB_TOKEN: ${{ secrets.SCOOP_GITHUB_TOKEN }}
+        run: |
+          curl -fsSL -o "${RUNNER_TEMP}/jreleaser.jar" \
+            https://github.com/jreleaser/jreleaser/releases/download/v1.26.0/jreleaser-tool-provider-1.26.0.jar
+          echo "e601850b1da17b36848953c4c45671b8108b25ba94ee8b35caf37cd656e40639  ${RUNNER_TEMP}/jreleaser.jar" | sha256sum -c -
+          java -jar "${RUNNER_TEMP}/jreleaser.jar" full-release
 
       - name: Publish the SDKMAN candidates
         env:
