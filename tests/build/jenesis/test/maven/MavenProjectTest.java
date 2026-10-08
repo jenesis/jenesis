@@ -7,6 +7,7 @@ import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
+import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.PathPlacement;
@@ -19,6 +20,7 @@ import build.jenesis.maven.MavenProject;
 import build.jenesis.maven.MavenRepository;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.JavaToolchainModule;
+import build.jenesis.step.Bind;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -1657,6 +1659,65 @@ public class MavenProjectTest {
                 Map.entry("scm.connection", "scm:git:https://example.com/project.git"),
                 Map.entry("scm.developerConnection", "scm:git:git@example.com:project.git"),
                 Map.entry("scm.tag", "v1"),
+                Map.entry("scm.url", "https://example.com/project"));
+    }
+
+    @Test
+    public void the_module_pom_wins_over_the_project_metadata_for_what_it_declares_and_the_command_line_over_both()
+            throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <description>Own description.</description>
+                    <licenses>
+                        <license>
+                            <name>MIT</name>
+                        </license>
+                    </licenses>
+                    <scm>
+                        <tag>HEAD</tag>
+                    </scm>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Path file = Files.writeString(project.resolve("project.properties"), """
+                description=Project description.
+                url=https://example.com/project
+                license.apache.name=Apache-2.0
+                scm.url=https://example.com/project
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addSource("file", Bind.asMetadata(), file);
+        executor.addStep("command", (_, context, _) -> {
+            SequencedProperties values = new SequencedProperties();
+            values.setProperty("version", "2");
+            values.setProperty("scm.tag", "v2");
+            values.store(context.next().resolve(BuildStep.METADATA));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "file", "command");
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        SequencedProperties metadata = SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.METADATA));
+        assertThat(metadata).containsOnly(
+                Map.entry("project", "group"),
+                Map.entry("artifact", "artifact"),
+                Map.entry("version", "2"),
+                Map.entry("description", "Own description."),
+                Map.entry("url", "https://example.com/project"),
+                Map.entry("license.mit.name", "MIT"),
+                Map.entry("scm.tag", "v2"),
                 Map.entry("scm.url", "https://example.com/project"));
     }
 
