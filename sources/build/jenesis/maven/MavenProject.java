@@ -255,6 +255,19 @@ public class MavenProject implements BuildExecutorModule {
                             }
                             Path resources = base.resolve(resource);
                             if (Files.exists(resources)) {
+                                Path directory = resources.toAbsolutePath().normalize();
+                                for (Path owned : List.of(paths.get(PREVIOUS + PREPARE), root.resolve(".jenesis"))) {
+                                    Path normalized = owned.toAbsolutePath().normalize();
+                                    if (normalized.startsWith(directory)) {
+                                        throw new IllegalArgumentException("The resource directory " + resource
+                                                + " of " + base.resolve("pom.xml")
+                                                + " contains " + directory.relativize(normalized).getName(0)
+                                                + ", which the build writes itself; a resource directory is copied whole,"
+                                                + " without its includes, excludes or targetPath, so place a single file with"
+                                                + " -Djenesis.project.resources=<file>:<path in the jar>, as"
+                                                + " LICENSE:META-INF/LICENSE, and keep that resource for Maven alone");
+                                    }
+                                }
                                 module.addSource("resources-" + ++index, Bind.asResources(), resources);
                                 active = true;
                             }

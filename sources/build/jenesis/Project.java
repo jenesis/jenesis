@@ -831,7 +831,9 @@ public record Project(
                                  rather than patched into the main one
 
                     Nothing ignored is reported, so list the old build's plugins, profiles and
-                    repositories before deleting anything: each needs an answer in step 4.
+                    repositories before deleting anything: each needs an answer in step 4. A
+                    resource directory is copied whole, so one that holds target/ or .jenesis/,
+                    as ./ does, fails the build and its file moves to jenesis.project.resources.
                     Metadata a parent outside the project declares (url, scm, developers) goes into
                     project.properties at the root, which skill/target lists the keys of.
 
