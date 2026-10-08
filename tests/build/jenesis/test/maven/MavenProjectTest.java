@@ -1577,6 +1577,42 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void keeps_a_developer_that_names_only_its_id() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <developers>
+                        <developer>
+                            <id>google</id>
+                            <organization>Google Inc.</organization>
+                        </developer>
+                    </developers>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        SequencedProperties metadata = SequencedProperties.ofFiles(results.get("maven/module-/manifests")
+                .resolve(BuildStep.METADATA));
+        assertThat(metadata)
+                .as("a developer that names neither a name nor an email is kept by its id")
+                .containsEntry("developer.google.id", "google");
+    }
+
+    @Test
     public void checksum_comment_in_dependency_management_lands_in_versions_properties() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
