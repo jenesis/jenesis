@@ -111,7 +111,16 @@ public class MavenModuleResolver implements Resolver {
                         ? coordinate + ":pom"
                         : coordinate + "/" + managed.version() + ":pom";
                 RepositoryItem item = repository.fetch(executor, fetchCoord)
-                        .orElseThrow(() -> new IllegalArgumentException("No POM found for " + coordinate));
+                        .orElseThrow(() -> new IllegalArgumentException("The module name " + coordinate
+                                + " has no artifact behind it"
+                                + (managed == null ? "" : " in version " + managed.version())
+                                + ": no POM is found for it, as the module repositories name no Maven artifact"
+                                + " that declares it - which is so for a jar that declares no module name and is"
+                                + " required by the name its file name derives - or the artifact they name"
+                                + " publishes no POM; map the name to its artifact with @jenesis.alias "
+                                + coordinate + " <groupId>/<artifactId> in module-info.java, or with"
+                                + " <!--jenesis.alias " + coordinate + " <groupId>/<artifactId>--> in pom.xml"
+                                + (managed == null ? "" : ", or pin a version the artifact is published in")));
                 List<MavenDependencyName> exclusions = null;
                 if (!entry.getValue().isEmpty()) {
                     exclusions = new ArrayList<>();
