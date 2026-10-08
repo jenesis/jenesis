@@ -69,7 +69,7 @@ of `agent.bytebuddy.net` only where `bytebuddy.net` publishes none. The first fi
 found speaks for every name below its domain - whoever owns a domain controls its
 subdomains anyway - so one request answers for all of a vendor's modules, and a key
 that file does not hold is absent rather than asked of a subdomain. A file that says
-`stop=false` lets its subdomains speak for themselves: their files are read as well,
+`delegate=true` lets its subdomains speak for themselves: their files are read as well,
 the most specific one holding a key answers, and its own entries stand for the
 subdomains whose files do not hold the key. `jenesis.build` publishes:
 
