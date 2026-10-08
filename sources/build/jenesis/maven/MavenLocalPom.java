@@ -19,5 +19,6 @@ public record MavenLocalPom(String groupId,
                             SequencedSet<String> natives,
                             SequencedMap<String, String> plugins,
                             SequencedMap<String, String> signatures,
-                            String mainClass) {
+                            String mainClass,
+                            SequencedMap<String, String> metadata) {
 }

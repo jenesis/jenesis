@@ -847,7 +847,9 @@ public record Project(
                                  <dependencyManagement> with import-scoped BOMs;
                                  maven.compiler.release, maven.compiler.testRelease for the tests
                                  and maven.compiler.enablePreview; name, description, url, licenses,
-                                 developers, organization and scm of the module's own POM;
+                                 developers, organization and scm of the module's own POM, and
+                                 all of them but the name from its parents, local or fetched,
+                                 where it declares none;
                                  sourceDirectory, testSourceDirectory and the <directory> of each
                                  resource; the <!--jenesis.plugin--> and <!--jenesis.pin-->
                                  comments of the module's POM and of a local parent, where the
@@ -864,8 +866,11 @@ public record Project(
                     repositories before deleting anything: each needs an answer in step 4. A
                     resource directory is copied whole, so one that holds target/ or .jenesis/,
                     as ./ does, fails the build and its file moves to jenesis.project.resources.
-                    Metadata a parent outside the project declares (url, scm, developers) goes into
-                    project.properties at the root, which skill/target lists the keys of.
+                    A module inherits its parents' metadata as Maven's model does: the url and the
+                    scm locations with the module's artifactId appended, unless the parent sets
+                    child.*.inherit.append.path="false", and licenses or developers only as a whole.
+                    What a module declares wins; project.properties at the root, which skill/target
+                    lists the keys of, overrides every module instead.
 
                     ## 3b. Or declare the build in module-info.java
 
