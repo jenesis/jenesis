@@ -621,7 +621,11 @@ public class MavenPomResolver implements MavenResolver {
                     pom.natives(),
                     plugins,
                     pom.signatures(),
-                    property(pom.properties().get("mainClass"), pom.properties())));
+                    property(pom.properties().get("mainClass"), pom.properties()),
+                    pom.metadata().entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                            entry -> property(entry.getValue(), pom.properties()),
+                            (left, _) -> left,
+                            LinkedHashMap::new))));
         }
         return results;
     }
@@ -703,7 +707,9 @@ public class MavenPomResolver implements MavenResolver {
                 SequencedMap<DependencyKey, DependencyValue> dependencies = new LinkedHashMap<>();
                 List<License> parentLicenses = List.of();
                 SequencedMap<String, String> parentQualified = Collections.emptyNavigableMap(),
-                        parentPlugins = Collections.emptyNavigableMap();
+                        parentPlugins = Collections.emptyNavigableMap(),
+                        parentMetadata = Collections.emptyNavigableMap();
+                Set<String> parentVerbatim = Set.of();
                 String groupId = null, artifactId = null, version = null;
                 if (parent != null) {
                     if (!children.add(new DependencyCoordinate(parent.groupId(),
@@ -768,6 +774,8 @@ public class MavenPomResolver implements MavenResolver {
                     inheritedManagedDependencies.putAll(resolution.managedDependencies());
                     dependencies.putAll(resolution.dependencies());
                     parentLicenses = resolution.licenses();
+                    parentMetadata = resolution.metadata();
+                    parentVerbatim = resolution.verbatim();
                 }
                 IMPLICITS.forEach(property -> toElements(document.getDocumentElement(), property)
                         .findFirst()
@@ -875,6 +883,44 @@ public class MavenPomResolver implements MavenResolver {
                                 toElementText(node, "name").orElse(null),
                                 toElementText(node, "url").orElse(null)))
                         .toList();
+                Element project = document.getDocumentElement(),
+                        scm = (Element) toElements(project, "scm").findFirst().orElse(null);
+                SequencedMap<String, String> metadata = toMetadata(project);
+                Set<String> verbatim = new HashSet<>(), kinds = metadata.keySet().stream()
+                        .map(key -> key.substring(0, key.indexOf('.') + 1))
+                        .collect(Collectors.toSet());
+                String child = toElementText(project, "artifactId").orElse(artifactId);
+                for (String key : List.of("url", "scm.connection", "scm.developerConnection", "scm.url")) {
+                    Element holder = key.equals("url") ? project : scm;
+                    String append = holder == null
+                            ? ""
+                            : holder.getAttribute("child." + (key.equals("url") ? "project.url" : key) + ".inherit.append.path").trim();
+                    if (append.isEmpty() ? parentVerbatim.contains(key) : append.equals("false")) {
+                        verbatim.add(key);
+                    }
+                }
+                for (Map.Entry<String, String> entry : parentMetadata.entrySet()) {
+                    String key = entry.getKey(), value = entry.getValue();
+                    switch (key) {
+                        case "name" -> {
+                        }
+                        case "description", "organization.name", "organization.url" -> metadata.putIfAbsent(key, value);
+                        case "url", "scm.connection", "scm.developerConnection", "scm.url" -> metadata.putIfAbsent(key,
+                                parentVerbatim.contains(key) || value.isEmpty() || child == null
+                                        ? value
+                                        : value.endsWith("/") ? value + child + "/" : value + "/" + child);
+                        case "scm.tag" -> {
+                            if (scm == null) {
+                                metadata.putIfAbsent(key, value);
+                            }
+                        }
+                        default -> {
+                            if (!kinds.contains(key.substring(0, key.indexOf('.') + 1))) {
+                                metadata.put(key, value);
+                            }
+                        }
+                    }
+                }
                 yield new UnresolvedPom(
                         toElementText(document.getDocumentElement(), "groupId").orElse(groupId),
                         toElementText(document.getDocumentElement(), "artifactId").orElse(artifactId),
@@ -903,7 +949,9 @@ public class MavenPomResolver implements MavenResolver {
                         extended
                                 ? toSignatures(document.getDocumentElement())
                                 : Collections.emptyNavigableMap(),
-                        ownLicenses.isEmpty() ? parentLicenses : ownLicenses);
+                        ownLicenses.isEmpty() ? parentLicenses : ownLicenses,
+                        metadata,
+                        verbatim);
             }
             default -> throw new IllegalArgumentException("Unknown namespace: " + namespace);
         };
@@ -946,7 +994,9 @@ public class MavenPomResolver implements MavenResolver {
                             Collections.emptyNavigableSet(),
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
-                            List.of());
+                            List.of(),
+                            Collections.emptyNavigableMap(),
+                            Set.of());
                 } else {
                     Path localPath = candidate.file().map(Path::getParent).orElse(null);
                     Map<Path, UnresolvedPom> localPaths = localPath == null ? null : new HashMap<>();
@@ -1316,6 +1366,58 @@ public class MavenPomResolver implements MavenResolver {
         return entries;
     }
 
+    private static SequencedMap<String, String> toMetadata(Node node) {
+        SequencedMap<String, String> metadata = new LinkedHashMap<>();
+        toElementText(node, "name").ifPresent(value -> metadata.put("name", value));
+        toElementText(node, "description").ifPresent(value -> metadata.put("description", value));
+        toElementText(node, "url").ifPresent(value -> metadata.put("url", value));
+        toElements(node, "organization").findFirst().ifPresent(organization -> {
+            toElementText(organization, "name").ifPresent(value -> metadata.put("organization.name", value));
+            toElementText(organization, "url").ifPresent(value -> metadata.put("organization.url", value));
+        });
+        toElements(node, "licenses").limit(1).flatMap(licenses -> toElements(licenses, "license")).forEach(license -> {
+            String title = toElementText(license, "name").orElse("");
+            if (!title.isEmpty()) {
+                String id = title.toLowerCase(Locale.ROOT).replace(' ', '_').replace('.', '_');
+                metadata.put("license." + id + ".name", title);
+                toElementText(license, "url").ifPresent(value -> metadata.put("license." + id + ".url", value));
+            }
+        });
+        Set<String> ids = new HashSet<>();
+        toElements(node, "developers").limit(1).flatMap(developers -> toElements(developers, "developer")).forEach(developer -> {
+            String id = toElementText(developer, "id").orElse(""),
+                    name = toElementText(developer, "name").orElse(null),
+                    email = toElementText(developer, "email").orElse(null);
+            if (id.isEmpty()) {
+                String label = name == null ? email : name,
+                        derived = label == null ? "" : label.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
+                if (derived.isEmpty()) {
+                    return;
+                }
+                id = derived;
+                for (int suffix = 2; ids.contains(id); suffix++) {
+                    id = derived + "_" + suffix;
+                }
+                metadata.put("developer." + id + ".id", "");
+            } else if (name == null && email == null) {
+                metadata.put("developer." + id + ".id", id);
+            }
+            ids.add(id);
+            if (name != null) {
+                metadata.put("developer." + id + ".name", name);
+            }
+            if (email != null) {
+                metadata.put("developer." + id + ".email", email);
+            }
+        });
+        toElements(node, "scm").findFirst().ifPresent(scm -> {
+            for (String property : List.of("connection", "developerConnection", "tag", "url")) {
+                toElementText(scm, property).ifPresent(value -> metadata.put("scm." + property, value));
+            }
+        });
+        return metadata;
+    }
+
     private static SequencedMap<String, String> inherited(SequencedMap<String, String> own,
                                                           SequencedMap<String, String> parent) {
         parent.forEach(own::putIfAbsent);
@@ -1592,7 +1694,9 @@ public class MavenPomResolver implements MavenResolver {
                                  SequencedSet<String> natives,
                                  SequencedMap<String, String> plugins,
                                  SequencedMap<String, String> signatures,
-                                 List<License> licenses) {
+                                 List<License> licenses,
+                                 SequencedMap<String, String> metadata,
+                                 Set<String> verbatim) {
     }
 
     private record ResolvedPom(Map<MavenDependencyKey, MavenDependencyValue> managedDependencies,

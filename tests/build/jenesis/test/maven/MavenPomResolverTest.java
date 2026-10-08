@@ -3779,6 +3779,160 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_inherits_the_metadata_of_its_parent_in_the_project_as_maven_does() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <name>Parent</name>
+                    <description>The parent.</description>
+                    <url>https://example.com/project</url>
+                    <organization>
+                        <name>Example Ltd</name>
+                    </organization>
+                    <licenses>
+                        <license>
+                            <name>Apache-2.0</name>
+                            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+                        </license>
+                    </licenses>
+                    <developers>
+                        <developer>
+                            <id>google</id>
+                        </developer>
+                    </developers>
+                    <scm child.scm.connection.inherit.append.path="false">
+                        <connection>scm:git:https://example.com/project.git</connection>
+                        <developerConnection>scm:git:git@example.com:project.git</developerConnection>
+                        <tag>v1</tag>
+                        <url>https://example.com/project/</url>
+                    </scm>
+                    <modules>
+                        <module>inheriting</module>
+                        <module>declaring</module>
+                    </modules>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("inheriting")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>inheriting-artifact</artifactId>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("declaring")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>declaring</artifactId>
+                    <description>Its own.</description>
+                    <url>https://example.com/${project.artifactId}</url>
+                    <developers>
+                        <developer>
+                            <id>alice</id>
+                            <name>Alice Example</name>
+                        </developer>
+                    </developers>
+                    <scm>
+                        <url>https://example.com/declaring</url>
+                    </scm>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("inheriting")).metadata())
+                .as("everything but the name is inherited, the url and the scm locations with the artifactId appended")
+                .containsOnly(
+                        Map.entry("description", "The parent."),
+                        Map.entry("url", "https://example.com/project/inheriting-artifact"),
+                        Map.entry("organization.name", "Example Ltd"),
+                        Map.entry("license.apache-2_0.name", "Apache-2.0"),
+                        Map.entry("license.apache-2_0.url", "https://www.apache.org/licenses/LICENSE-2.0.txt"),
+                        Map.entry("developer.google.id", "google"),
+                        Map.entry("scm.connection", "scm:git:https://example.com/project.git"),
+                        Map.entry("scm.developerConnection", "scm:git:git@example.com:project.git/inheriting-artifact"),
+                        Map.entry("scm.tag", "v1"),
+                        Map.entry("scm.url", "https://example.com/project/inheriting-artifact/"));
+        assertThat(poms.get(Path.of("declaring")).metadata())
+                .as("what a module declares wins, a list replaces the parent's, and a declared scm keeps its own tag")
+                .containsOnly(
+                        Map.entry("description", "Its own."),
+                        Map.entry("url", "https://example.com/declaring"),
+                        Map.entry("organization.name", "Example Ltd"),
+                        Map.entry("license.apache-2_0.name", "Apache-2.0"),
+                        Map.entry("license.apache-2_0.url", "https://www.apache.org/licenses/LICENSE-2.0.txt"),
+                        Map.entry("developer.alice.name", "Alice Example"),
+                        Map.entry("scm.connection", "scm:git:https://example.com/project.git"),
+                        Map.entry("scm.developerConnection", "scm:git:git@example.com:project.git/declaring"),
+                        Map.entry("scm.url", "https://example.com/declaring"));
+    }
+
+    @Test
+    public void local_pom_inherits_the_metadata_of_a_parent_it_fetches() throws IOException {
+        addToRepository("group", "grandparent", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>grandparent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <url>https://example.com</url>
+                    <licenses>
+                        <license>
+                            <name>MIT</name>
+                        </license>
+                    </licenses>
+                </project>
+                """);
+        addToRepository("group", "parent", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>grandparent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>parent</artifactId>
+                    <packaging>pom</packaging>
+                </project>
+                """);
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                        <relativePath/>
+                    </parent>
+                    <artifactId>artifact</artifactId>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).metadata())
+                .as("each generation appends its artifactId to the url it inherits")
+                .containsOnly(
+                        Map.entry("url", "https://example.com/parent/artifact"),
+                        Map.entry("license.mit.name", "MIT"));
+    }
+
+    @Test
     public void local_pom_dependency_management_checksum_is_honored() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

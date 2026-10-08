@@ -43,7 +43,7 @@ import static java.util.Objects.requireNonNull;
 public class MavenProject implements BuildExecutorModule {
 
     public static final String POM = "pom/", MAVEN = "maven/";
-    private static final String SCAN = "scan";
+    private static final String SCAN = "scan", POM_METADATA = "metadata.";
     private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-";
 
     private final Path root;
@@ -298,10 +298,6 @@ public class MavenProject implements BuildExecutorModule {
                             });
                             int feature = Runtime.version().feature();
                             module.addStep(MANIFESTS, (_, context, manifestArgs) -> {
-                                Path pomFile = paths.get(PREVIOUS + SCAN)
-                                        .resolve(POM)
-                                        .resolve(properties.getProperty("path"))
-                                        .resolve("pom.xml");
                                 String[] coordinateParts = properties.getProperty("coordinate").split("/");
                                 String testsOf = coordinateParts.length == 6 && "tests".equals(coordinateParts[4])
                                         ? coordinateParts[2]
@@ -482,7 +478,11 @@ public class MavenProject implements BuildExecutorModule {
                                 metadata.setProperty("project", properties.getProperty("groupId"));
                                 metadata.setProperty("artifact", properties.getProperty("artifactId"));
                                 metadata.setProperty("version", properties.getProperty("version"));
-                                extractMetadata(pomFile).forEach(metadata::put);
+                                for (String key : properties.stringPropertyNames()) {
+                                    if (key.startsWith(POM_METADATA)) {
+                                        metadata.setProperty(key.substring(POM_METADATA.length()), properties.getProperty(key));
+                                    }
+                                }
                                 for (BuildStepArgument argument : manifestArgs.values()) {
                                     if (argument.removed()) {
                                         continue;
@@ -500,135 +500,6 @@ public class MavenProject implements BuildExecutorModule {
                 }
             }
         }, Stream.concat(Stream.of(SCAN, PREPARE), inherited.sequencedKeySet().stream()));
-    }
-
-    private static SequencedProperties extractMetadata(Path pomFile) throws IOException {
-        SequencedProperties result = new SequencedProperties();
-        if (!Files.isRegularFile(pomFile)) {
-            return result;
-        }
-        Document document;
-        try (InputStream stream = Files.newInputStream(pomFile)) {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setNamespaceAware(true);
-            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            document = factory.newDocumentBuilder().parse(stream);
-        } catch (ParserConfigurationException | SAXException e) {
-            throw new IOException(e);
-        }
-        NodeList children = document.getDocumentElement().getChildNodes();
-        for (int index = 0; index < children.getLength(); index++) {
-            Node node = children.item(index);
-            if (node.getNodeType() != Node.ELEMENT_NODE) {
-                continue;
-            }
-            String name = node.getLocalName() == null ? node.getNodeName() : node.getLocalName();
-            switch (name) {
-                case "name" -> result.setProperty("name", node.getTextContent().trim());
-                case "description" -> result.setProperty("description", node.getTextContent().trim());
-                case "url" -> result.setProperty("url", node.getTextContent().trim());
-                case "licenses" -> {
-                    NodeList licenses = node.getChildNodes();
-                    for (int licenseIndex = 0; licenseIndex < licenses.getLength(); licenseIndex++) {
-                        Node licenseNode = licenses.item(licenseIndex);
-                        if (licenseNode.getNodeType() != Node.ELEMENT_NODE) {
-                            continue;
-                        }
-                        String licenseName = licenseNode.getLocalName() == null
-                                ? licenseNode.getNodeName()
-                                : licenseNode.getLocalName();
-                        if (!"license".equals(licenseName)) {
-                            continue;
-                        }
-                        Element license = (Element) licenseNode;
-                        Element nameElement = firstChild(license, "name");
-                        if (nameElement == null) {
-                            continue;
-                        }
-                        String licenseTitle = nameElement.getTextContent().trim();
-                        if (licenseTitle.isEmpty()) {
-                            continue;
-                        }
-                        String id = licenseTitle.toLowerCase(Locale.ROOT)
-                                .replace(' ', '_')
-                                .replace('.', '_');
-                        result.setProperty("license." + id + ".name", licenseTitle);
-                        copyChildText(license, "url", result, "license." + id + ".url");
-                    }
-                }
-                case "developers" -> {
-                    NodeList developers = node.getChildNodes();
-                    Set<String> ids = new HashSet<>();
-                    for (int developerIndex = 0; developerIndex < developers.getLength(); developerIndex++) {
-                        Node devNode = developers.item(developerIndex);
-                        if (devNode.getNodeType() != Node.ELEMENT_NODE) {
-                            continue;
-                        }
-                        String devName = devNode.getLocalName() == null ? devNode.getNodeName() : devNode.getLocalName();
-                        if (!"developer".equals(devName)) {
-                            continue;
-                        }
-                        Element developer = (Element) devNode;
-                        Element idElement = firstChild(developer, "id");
-                        String id = idElement == null ? "" : idElement.getTextContent().trim();
-                        if (id.isEmpty()) {
-                            Element label = firstChild(developer, "name") == null
-                                    ? firstChild(developer, "email")
-                                    : firstChild(developer, "name");
-                            String derived = label == null ? "" : label.getTextContent().trim()
-                                    .toLowerCase(Locale.ROOT)
-                                    .replaceAll("[^a-z0-9]+", "_");
-                            if (derived.isEmpty()) {
-                                continue;
-                            }
-                            id = derived;
-                            for (int suffix = 2; ids.contains(id); suffix++) {
-                                id = derived + "_" + suffix;
-                            }
-                            result.setProperty("developer." + id + ".id", "");
-                        }
-                        ids.add(id);
-                        copyChildText(developer, "name", result, "developer." + id + ".name");
-                        copyChildText(developer, "email", result, "developer." + id + ".email");
-                        if (!result.containsKey("developer." + id + ".name") && !result.containsKey("developer." + id + ".email")) {
-                            result.setProperty("developer." + id + ".id", id);
-                        }
-                    }
-                }
-                case "organization" -> {
-                    copyChildText(node, "name", result, "organization.name");
-                    copyChildText(node, "url", result, "organization.url");
-                }
-                case "scm" -> {
-                    copyChildText(node, "connection", result, "scm.connection");
-                    copyChildText(node, "developerConnection", result, "scm.developerConnection");
-                    copyChildText(node, "tag", result, "scm.tag");
-                    copyChildText(node, "url", result, "scm.url");
-                }
-                default -> {
-                }
-            }
-        }
-        return result;
-    }
-
-    private static Element firstChild(Node parent, String localName) {
-        NodeList children = parent.getChildNodes();
-        for (int index = 0; index < children.getLength(); index++) {
-            Node node = children.item(index);
-            if (node.getNodeType() == Node.ELEMENT_NODE && localName.equals(node.getLocalName())) {
-                return (Element) node;
-            }
-        }
-        return null;
-    }
-
-    private static void copyChildText(Node parent, String localName, SequencedProperties target, String key) {
-        Element child = firstChild(parent, localName);
-        if (child != null) {
-            target.setProperty(key, child.getTextContent().trim());
-        }
     }
 
     private record Scan(Path root) implements BuildStep {
@@ -886,6 +757,7 @@ public class MavenProject implements BuildExecutorModule {
             for (int index = 0; index < resources.size(); index++) {
                 properties.setProperty("resources." + index, resources.get(index));
             }
+            value.metadata().forEach((key, metadata) -> properties.setProperty(POM_METADATA + key, metadata));
             properties.store(maven.resolve((test ? "test-module-" : "module-")
                     + BuildExecutorModule.encodePath(relativePath) + ".properties"));
         }
