@@ -653,6 +653,12 @@ public class ModularProject implements BuildExecutorModule {
                     SequencedProperties.ofFiles(upstream).forEach(metadata::put);
                 }
             }
+            Path own = arguments.get("sources").folder()
+                    .resolve(BuildStep.SOURCES)
+                    .resolve("META-INF/build.jenesis/project.properties");
+            if (Files.isRegularFile(own)) {
+                SequencedProperties.ofFiles(own).forEach(metadata::put);
+            }
             metadata.store(context.next().resolve(BuildStep.METADATA));
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }

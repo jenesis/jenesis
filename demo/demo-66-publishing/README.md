@@ -107,7 +107,12 @@ The version is stamped by `Project.version("1.0.0")`. Without one, the module is
 published unversioned and its POM, which cannot omit a version, carries
 `0-SNAPSHOT`. If you ever need a coordinate that does not follow from the module
 name, `project=...` / `artifact=...` in `project.properties` override the derived
-values - but the point here is that you usually do not have to.
+values for every module of the project. A module that keeps a coordinate of its own
+declares it in a `project.properties` of its own configuration folder,
+`META-INF/build.jenesis/` beside its sources, which is layered over the root file and
+wins for every key it names - so a module `json.path` can still publish as
+`com.jayway.jsonpath:json-path`, and a sibling that `requires` it lists it in its POM
+under that coordinate. The point here, though, is that you usually do not have to.
 
 Reproducibility
 ---------------

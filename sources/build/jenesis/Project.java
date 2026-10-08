@@ -907,10 +907,11 @@ public record Project(
                                            module's Javadoc
                       the coordinate       groupId from the first two segments of the module name
                                            (jenesis.maven.segments), artifactId the module name;
-                                           project=<groupId> and artifact=<artifactId> in
-                                           project.properties keep a published one, for every
-                                           module of the project, so several modules that must
-                                           keep coordinates of their own stay on pom.xml
+                                           project=<groupId> and artifact=<artifactId> keep a
+                                           published one: in project.properties at the root for
+                                           every module, in META-INF/build.jenesis/project.properties
+                                           beside a module's sources for that module alone, which
+                                           wins over the root for any key
                       url, licenses,       project.properties, with the keys skill/target lists
                       developers, scm
                       the version          -Djenesis.project.version
@@ -1180,7 +1181,9 @@ public record Project(
                                             scm.{connection,developerConnection,url,tag,revision,tree}. Project-level
                                             overrides live in the file that
                                             -Djenesis.project.metadata=<path> names, or
-                                            project.properties at the root when it names none.
+                                            project.properties at the root when it names none;
+                                            in a module-info.java build, a module's own
+                                            META-INF/build.jenesis/project.properties wins over both.
                       module.properties     graph state: path, module, test, main
                       identity.properties   <repository>/<coordinate> -> path or empty
                       requires.properties   <group>/<scope>/<repository>/<coordinate> -> empty, or
