@@ -1255,7 +1255,8 @@ public record Project(
                                             wins over that file, a list such as its licenses or
                                             developers as a whole, and the version, tag, revision
                                             and tree of the command line win over both.
-                      module.properties     graph state: path, module, test, main
+                      module.properties     graph state: path, sources (below path, in a pom.xml build),
+                                            module, test, main
                       identity.properties   <repository>/<coordinate> -> path or empty
                       requires.properties   <group>/<scope>/<repository>/<coordinate> -> empty, or
                                             <algo>/<hex> when pinned
