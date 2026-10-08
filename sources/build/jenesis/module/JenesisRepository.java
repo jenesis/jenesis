@@ -102,7 +102,7 @@ public interface JenesisRepository extends Repository {
     static JenesisRepository ofEnvironment(Environment environment, Scope scope) {
         return ofEnvironment(environment,
                 scope,
-                environment.flag("repository.discover") ? Discovery.ofEnvironment(environment) : null);
+                environment.flag("repository.discovery") ? Discovery.ofEnvironment(environment) : null);
     }
 
     static JenesisRepository ofEnvironment(Environment environment, Scope scope, Discovery discovery) {

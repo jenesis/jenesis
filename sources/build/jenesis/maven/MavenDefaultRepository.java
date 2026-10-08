@@ -25,7 +25,7 @@ public class MavenDefaultRepository implements MavenRepository {
 
     public static MavenRepository ofEnvironment(Environment environment) {
         return ofEnvironment(environment,
-                environment.flag("repository.discover") ? Discovery.ofEnvironment(environment) : null);
+                environment.flag("repository.discovery") ? Discovery.ofEnvironment(environment) : null);
     }
 
     public static MavenRepository ofEnvironment(Environment environment, Discovery discovery) {

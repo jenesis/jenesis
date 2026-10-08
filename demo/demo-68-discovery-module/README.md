@@ -50,7 +50,7 @@ Discovery is used only where you switch it on, in `jenesis.properties` as here o
 the command line. This demo's file switches it on, builds on the module path, and
 names no repository beside it:
 
-    jenesis.repository.discover=true
+    jenesis.repository.discovery=true
     jenesis.project.layout=modular
     jenesis.maven.uri=
     jenesis.module.uri=
