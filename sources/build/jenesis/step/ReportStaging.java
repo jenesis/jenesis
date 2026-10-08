@@ -23,23 +23,24 @@ public class ReportStaging implements BuildStep {
                 continue;
             }
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
-            String prefix = inventoryPrefix(inventory, inventoryFile);
-            String module = prefix.startsWith("module-") ? prefix.substring("module-".length()) : prefix;
-            String marker = prefix + ".report.";
-            for (String key : inventory.stringPropertyNames()) {
-                if (!key.startsWith(marker)) {
-                    continue;
-                }
-                String kind = key.substring(marker.length());
-                Path source = argument.folder().resolve(inventory.getProperty(key)).normalize();
-                Path target = context.next().resolve(kind).resolve(module);
-                if (Files.isDirectory(source)) {
-                    copyTree(source, target);
-                } else if (Files.isRegularFile(source)) {
-                    Files.createDirectories(target);
-                    Path destination = target.resolve(source.getFileName().toString());
-                    if (!Files.exists(destination)) {
-                        BuildStep.linkOrCopy(destination, source);
+            for (String prefix : Inventory.prefixes(inventory)) {
+                String module = prefix.startsWith("module-") ? prefix.substring("module-".length()) : prefix;
+                String marker = prefix + ".report.";
+                for (String key : inventory.stringPropertyNames()) {
+                    if (!key.startsWith(marker)) {
+                        continue;
+                    }
+                    String kind = key.substring(marker.length());
+                    Path source = argument.folder().resolve(inventory.getProperty(key)).normalize();
+                    Path target = context.next().resolve(kind).resolve(module);
+                    if (Files.isDirectory(source)) {
+                        copyTree(source, target);
+                    } else if (Files.isRegularFile(source)) {
+                        Files.createDirectories(target);
+                        Path destination = target.resolve(source.getFileName().toString());
+                        if (!Files.exists(destination)) {
+                            BuildStep.linkOrCopy(destination, source);
+                        }
                     }
                 }
             }
@@ -59,15 +60,5 @@ public class ReportStaging implements BuildStep {
                 return FileVisitResult.CONTINUE;
             }
         });
-    }
-
-    private static String inventoryPrefix(SequencedProperties inventory, Path file) {
-        for (String key : inventory.stringPropertyNames()) {
-            int dot = key.indexOf('.');
-            if (dot > 0) {
-                return key.substring(0, dot);
-            }
-        }
-        throw new IllegalStateException("Inventory contains no prefixed keys: " + file);
     }
 }

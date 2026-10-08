@@ -21,13 +21,11 @@ public class Inventory implements BuildStep {
         }
         SequencedProperties properties = SequencedProperties.ofFiles(file);
         SequencedMap<String, String> agents = new LinkedHashMap<>();
-        for (String key : properties.stringPropertyNames()) {
-            int agent = key.indexOf(".agent.");
-            if (agent < 0 || key.indexOf('.', agent + ".agent.".length()) >= 0) {
-                continue;
+        for (String prefix : prefixes(properties)) {
+            for (int index = 0; properties.getProperty(prefix + ".agent." + index) != null; index++) {
+                agents.putIfAbsent(Path.of(properties.getProperty(prefix + ".agent." + index)).getFileName().toString(),
+                        properties.getProperty(prefix + ".agent." + index + ".arguments", ""));
             }
-            agents.putIfAbsent(Path.of(properties.getProperty(key)).getFileName().toString(),
-                    properties.getProperty(key + ".arguments", ""));
         }
         return agents;
     }
@@ -39,10 +37,9 @@ public class Inventory implements BuildStep {
         }
         SequencedProperties properties = SequencedProperties.ofFiles(file);
         SequencedSet<Path> granted = new LinkedHashSet<>();
-        for (String key : properties.stringPropertyNames()) {
-            int grant = key.indexOf(".nativeAccess.");
-            if (grant >= 0 && key.indexOf('.', grant + ".nativeAccess.".length()) < 0) {
-                granted.add(folder.resolve(properties.getProperty(key)).toAbsolutePath().normalize());
+        for (String prefix : prefixes(properties)) {
+            for (Path path : paths(properties, folder, prefix + ".nativeAccess")) {
+                granted.add(path.toAbsolutePath().normalize());
             }
         }
         return granted;
@@ -567,6 +564,26 @@ public class Inventory implements BuildStep {
         return ((path == null || path.isEmpty()) ? "module" : "module-" + path) + ".";
     }
 
+    public static SequencedSet<String> prefixes(SequencedProperties inventory) {
+        SequencedSet<String> prefixes = new LinkedHashSet<>();
+        for (String key : inventory.stringPropertyNames()) {
+            if (key.endsWith(".path") && key.equals(prefixOf(inventory.getProperty(key)) + "path")) {
+                prefixes.add(key.substring(0, key.length() - ".path".length()));
+            }
+        }
+        return prefixes;
+    }
+
+    public static String ownerOf(String key, Collection<String> prefixes) {
+        String owner = null;
+        for (String prefix : prefixes) {
+            if (key.startsWith(prefix + ".") && (owner == null || prefix.length() > owner.length())) {
+                owner = prefix;
+            }
+        }
+        return owner;
+    }
+
     public record Dependency(Path jar, String checksum, String scope, String group) {
 
         public String checksum(HashDigestFunction hashFunction) throws IOException {
@@ -631,23 +648,26 @@ public class Inventory implements BuildStep {
 
     public static SequencedMap<String, SequencedMap<String, Path>> attachments(Iterable<BuildStepArgument> arguments)
             throws IOException {
-        SequencedMap<String, SequencedMap<String, Path>> attachments = new LinkedHashMap<>();
+        SequencedMap<Path, SequencedProperties> inventories = new LinkedHashMap<>();
+        SequencedSet<String> prefixes = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments) {
-            if (argument.removed()) {
-                continue;
-            }
             Path inventoryFile = argument.folder().resolve(INVENTORY);
-            if (!Files.isRegularFile(inventoryFile)) {
-                continue;
+            if (!argument.removed() && Files.isRegularFile(inventoryFile)) {
+                SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
+                inventories.put(argument.folder(), inventory);
+                prefixes.addAll(prefixes(inventory));
             }
-            SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
+        }
+        SequencedMap<String, SequencedMap<String, Path>> attachments = new LinkedHashMap<>();
+        for (Map.Entry<Path, SequencedProperties> entry : inventories.entrySet()) {
+            SequencedProperties inventory = entry.getValue();
             for (String key : inventory.stringPropertyNames()) {
-                int dot = key.indexOf('.');
-                if (dot <= 0 || !key.startsWith("attachment.", dot + 1)) {
+                String prefix = ownerOf(key, prefixes);
+                if (prefix == null || !key.startsWith("attachment.", prefix.length() + 1)) {
                     continue;
                 }
-                String prefix = key.substring(0, dot), classifier = key.substring(dot + 1 + "attachment.".length());
-                Path file = argument.folder().resolve(inventory.getProperty(key)).normalize();
+                String classifier = key.substring(prefix.length() + 1 + "attachment.".length());
+                Path file = entry.getKey().resolve(inventory.getProperty(key)).normalize();
                 if (attachments.computeIfAbsent(prefix, _ -> new LinkedHashMap<>()).putIfAbsent(classifier, file) != null) {
                     throw new IllegalStateException("More than one file is attached to " + prefix + " as " + classifier
                             + " - give each attachment a classifier of its own");

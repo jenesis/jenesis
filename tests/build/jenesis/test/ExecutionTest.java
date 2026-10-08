@@ -402,6 +402,72 @@ public class ExecutionTest {
     }
 
     @Test
+    public void execute_resolves_the_main_class_of_a_module_whose_folder_holds_dots()
+            throws IOException, InterruptedException {
+        Path target = Files.createDirectory(root.resolve("target"));
+        Path cli = Files.createDirectory(root.resolve("cli-inventory"));
+        Path classesJar = packageSample(cli.resolve("classes.jar"));
+        writeInventoryFile(cli, "modules/org.example.cli", Sample.class.getName(), null,
+                cli.relativize(classesJar).toString());
+        Path library = writeInventory("library", "modules/org.example.library", null, null, null);
+        Project.Layout layout = layoutWithModules(Map.of("module-cli", cli, "module-library", library));
+        Project project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layout);
+        assertThat(Execution.ofEnvironment(Environment.NONE, project).execute())
+                .as("the module's keys are prefixed module-modules/org.example.cli, not cut at the first dot")
+                .isEqualTo(0);
+    }
+
+    @Test
+    public void executes_a_project_of_two_modules_whose_folders_hold_dots() throws IOException, InterruptedException {
+        Path greeting = Files.createDirectories(root.resolve("modules/org.example.greeting/org/example/greeting"));
+        Files.writeString(greeting.resolve("../../../module-info.java"), """
+                module org.example.greeting {
+                    exports org.example.greeting;
+                }
+                """);
+        Files.writeString(greeting.resolve("Greeting.java"), """
+                package org.example.greeting;
+
+                public class Greeting {
+
+                    public static String text() {
+                        return "Hello world!";
+                    }
+                }
+                """);
+        Path cli = Files.createDirectories(root.resolve("modules/org.example.cli/org/example/cli"));
+        Files.writeString(cli.resolve("../../../module-info.java"), """
+                /**
+                 * @jenesis.main org.example.cli.Main
+                 */
+                module org.example.cli {
+                    requires org.example.greeting;
+                }
+                """);
+        Files.writeString(cli.resolve("Main.java"), """
+                package org.example.cli;
+
+                public class Main {
+
+                    public static void main(String[] args) {
+                        System.exit(org.example.greeting.Greeting.text().equals("Hello world!") ? 0 : 3);
+                    }
+                }
+                """);
+        Project project = Project.ofEnvironment(Environment.NONE, root)
+                .target(Files.createDirectory(root.resolve("target")))
+                .artifacts(Files.createDirectory(root.resolve("artifacts")))
+                .layout(Project.Layout.MODULAR)
+                .tests(false);
+        assertThat(Execution.ofEnvironment(Environment.NONE, project).execute())
+                .as("the module in modules/org.example.cli declares the main class and runs with its dependency")
+                .isEqualTo(0);
+        assertThat(Execution.ofEnvironment(Environment.NONE, project).module("modules/org.example.cli").execute())
+                .as("the module is selected by its folder, dots included")
+                .isEqualTo(0);
+    }
+
+    @Test
     public void execute_honours_explicit_main_class_override() throws IOException, InterruptedException {
         Path target = Files.createDirectory(root.resolve("target"));
         Path alpha = Files.createDirectory(root.resolve("alpha-inventory"));

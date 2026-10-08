@@ -328,11 +328,7 @@ public record ProjectPlugins(Path pins,
                     for (Path folder : inherited.values()) {
                         Path file = folder.resolve(Inventory.INVENTORY);
                         if (Files.isRegularFile(file)) {
-                            for (String key : SequencedProperties.ofFiles(file).stringPropertyNames()) {
-                                if (key.indexOf('.') > 0 && key.endsWith(".path")) {
-                                    prefixes.add(key.substring(0, key.indexOf('.')));
-                                }
-                            }
+                            prefixes.addAll(Inventory.prefixes(SequencedProperties.ofFiles(file)));
                         }
                     }
                     buildExecutor.addModule(TRANSFORM, (transform, given) -> {
@@ -475,12 +471,12 @@ public record ProjectPlugins(Path pins,
                 }
                 SequencedProperties inventory = SequencedProperties.ofFiles(file);
                 for (String key : inventory.stringPropertyNames()) {
-                    int dot = key.indexOf('.');
-                    String owner = dot > 0 ? key.substring(0, dot) : key, entry = dot > 0 ? key.substring(dot + 1) : "";
-                    if (!prefixes.contains(owner)) {
+                    String owner = prefixes.contains(key) ? key : Inventory.ownerOf(key, prefixes);
+                    if (owner == null) {
                         throw new IllegalArgumentException("A transform adds " + key + " in " + file
                                 + ", which names no module of this build - prefix it with one of " + prefixes);
                     }
+                    String entry = key.substring(Math.min(owner.length() + 1, key.length()));
                     if (entry.isEmpty() || entry.contains("/") || Arrays.asList(entry.split("\\.", -1)).contains("")) {
                         throw new IllegalArgumentException("A transform adds " + key + " in " + file + " - name what it"
                                 + " adds as <module>.<key>, a key of dot-separated names, for a file below its own"
