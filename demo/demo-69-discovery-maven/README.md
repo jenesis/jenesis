@@ -73,4 +73,4 @@ The location takes the same two forms as a module's:
 leaves them the versions of other qualifiers, so a location that holds releases
 only, such as a GitHub release, says so with `maven.suffixes=none` and is never
 asked for a `-SNAPSHOT`. The rules of the file, what fails the build and the
-`jenesis.repository.discover` setting are those the module demo describes.
+`jenesis.repository.discovery` setting are those the module demo describes.

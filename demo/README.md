@@ -1000,7 +1000,7 @@ first looked up in the file `jenesis.build` publishes at
 `/.well-known/java-repository.properties`, which says where the module's files are
 and which Maven artifact it is published as:
 
-    jenesis.repository.discover=true
+    jenesis.repository.discovery=true
     jenesis.maven.uri=
     jenesis.module.uri=
 

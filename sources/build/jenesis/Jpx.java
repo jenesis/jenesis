@@ -31,7 +31,7 @@ public record Jpx(Path storage,
 
     private Jpx(Environment environment, PathPlacement placement) {
         boolean modular = placement == PathPlacement.MODULE_PATH;
-        Discovery discovery = environment.flag("repository.discover") ? Discovery.ofEnvironment(environment) : null;
+        Discovery discovery = environment.flag("repository.discovery") ? Discovery.ofEnvironment(environment) : null;
         Repository module = JenesisRepository.ofEnvironment(environment, modular
                                                                   ? JenesisRepository.Scope.MODULE
                                                                   : JenesisRepository.Scope.ARTIFACT, discovery);
