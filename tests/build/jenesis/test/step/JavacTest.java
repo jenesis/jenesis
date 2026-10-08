@@ -9,6 +9,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Javac;
 import build.jenesis.step.ProcessHandler;
@@ -379,8 +380,53 @@ public class JavacTest {
         assertThat(ClassFile.of()
                 .parse(next.resolve(Javac.CLASSES + "META-INF/versions/21/sample/Sample.class"))
                 .majorVersion())
-                .as("the overlay's own release is appended after the supplied options, and javac honours the last --release")
+                .as("the overlay is compiled for its own release")
                 .isEqualTo(ClassFile.JAVA_21_VERSION);
+        assertThat(Files.readString(supplement.resolve("command-21")))
+                .as("the release of the main sources is not handed to the overlay's compilation")
+                .doesNotContain("--release 17");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void compiles_a_module_descriptor_only_an_overlay_declares_against_the_module_path(boolean process)
+            throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/17"))
+                .resolve("module-info.java"), "module sample { requires lib.named; exports sample; }\n");
+        modularJar(Files.createDirectories(root.resolve("library")).resolve("named.jar"), "lib.named");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/compile/maven/named", "../library/named.jar");
+        index.store(sources.resolve(BuildStep.DEPENDENCIES));
+        Javac.writeRelease(sources, "11", Runtime.version().feature());
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .pathPlacement(PathPlacement.CLASS_PATH)
+                .apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                                sources,
+                                Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of("sources/META-INF/versions/17/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "module-info.class"))
+                .as("only the overlay declares the module, so the main sources stay on the class path")
+                .doesNotExist();
+        assertThat(ClassFile.of().parse(next.resolve(Javac.CLASSES + "sample/Sample.class")).majorVersion())
+                .isEqualTo(ClassFile.JAVA_11_VERSION);
+        ModuleDescriptor descriptor;
+        try (InputStream input = Files.newInputStream(next.resolve(Javac.CLASSES + "META-INF/versions/17/module-info.class"))) {
+            descriptor = ModuleDescriptor.read(input);
+        }
+        assertThat(descriptor.name()).isEqualTo("sample");
+        assertThat(descriptor.requires()).anyMatch(requires -> requires.name().equals("lib.named"));
+        assertThat(descriptor.exports())
+                .as("the descriptor exports a package of the main sources, which the compilation patches into the module")
+                .anyMatch(exports -> exports.source().equals("sample"));
     }
 
     @ParameterizedTest
