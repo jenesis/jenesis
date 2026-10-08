@@ -47,8 +47,9 @@ system property defaults to `true` and can be set to `false` to suppress it):
 - With no engine enabled (the default for most projects), it is a plain test run.
 - With coverage on, the test step is launched with the JaCoCo agent prepended as
   a `-javaagent`, writing its execution data (`jacoco.exec`) into the test step's
-  own output. A downstream report step then runs the JaCoCo CLI over that data,
-  the compiled classes, and the sources.
+  own output. A downstream report step then runs the JaCoCo CLI over that data
+  and the classes of the code under test: the module the tests exercise, never
+  the compiled tests themselves.
 
 The agent instruments the run without touching your sources, and JaCoCo resolves
 its agent and CLI in their own `jacoco` group, kept separate from the project's
