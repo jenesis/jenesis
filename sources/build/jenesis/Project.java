@@ -1028,7 +1028,9 @@ public record Project(
                     under JUnit 4, as in Surefire, takes a class only where it or a superclass
                     declares an @Test method, a @RunWith or a suite(), or extends TestCase; a
                     <module>/<regex> entry reaches that module only, and a module no entry reaches
-                    runs no tests. jenesis.test.exclude takes the same entries, without a #method,
+                    runs no tests. In a pom.xml build <module> is the folder of the module's pom.xml
+                    relative to the root, so the root module's entry is written /<regex>, with
+                    nothing before the slash. jenesis.test.exclude takes the same entries, without a #method,
                     and leaves out what they match, so excluding one class keeps the default naming;
                     a module whose every test it leaves out runs none.
                     The tests run against the module's jar, so a test that turns
@@ -1054,6 +1056,12 @@ public record Project(
                     contents, the dependency tree (`dependencies` against mvn dependency:tree or
                     gradle dependencies), the number of tests run, and the POM a consumer receives,
                     which is generated and flattened here rather than copied from yours.
+                    A pom.xml resolves a conflict as Maven does, the version nearest the root
+                    winning, where Gradle takes the highest version requested. No setting of
+                    jenesis.resolver.maven does the latter: latest takes the newest version the
+                    repository lists for every dependency, whatever was requested. Manage each
+                    version Gradle resolved higher in <dependencyManagement>; comparing the
+                    dependency trees lists them.
 
                     ## 6. Retire the old build
 
@@ -1182,7 +1190,10 @@ public record Project(
                       maven-install-plugin / publishToMavenLocal -> `export` (65)
                       deploy, central-publishing, maven-gpg-plugin / maven-publish, signing
                           -> `release` with a jreleaser.yml, handed JRELEASER_PROJECT_VERSION: the
-                          version setting, or the version every staged POM carries (66)
+                          version setting, or the version every staged POM carries (66). JReleaser
+                          is not resolved like the other tools but run as the `jreleaser` program
+                          on the PATH, or the one jenesis.jreleaser.executable names, so it is
+                          installed apart from the build
                       maven-toolchains-plugin / java toolchains -> jenesis.toolchain.version (07)
                       <profiles> chosen with -P or a property / properties and conventions
                           -> jenesis-<profile>.properties; those activated by <jdk> or
