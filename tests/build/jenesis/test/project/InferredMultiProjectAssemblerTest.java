@@ -328,6 +328,18 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void a_process_command_file_sets_an_argument_that_a_module_it_depends_on_sets_as_well() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(Files.createDirectories(fixture.artifacts().resolve(ProcessBuildStep.PROCESS))
+                .resolve("javac.properties"), "-g=\n");
+        Files.writeString(fixture.configuration().resolve("process-javac.properties"), "-g=\n");
+        Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
+        assertThat(SequencedProperties.ofFiles(prepareOutput.resolve(ProcessBuildStep.PROCESS + "javac.properties")))
+                .as("only the module's own declaration hands javac an argument, not what an upstream module prepared")
+                .containsEntry("-g", "");
+    }
+
+    @Test
     public void an_empty_higher_precedence_process_command_file_shadows_a_lower_one() throws IOException {
         Fixture fixture = setUp("main=\n", false, false, false);
         Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "version=1.0\n");

@@ -285,7 +285,11 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 closure = new LinkedHashSet<>(Set.of("modules"));
             }
             sub.addStep("prepare",
-                    new Prepare(descriptor.pathPlacement(), List.copyOf(packaging.formats()), overrides, environments),
+                    new Prepare(descriptor.pathPlacement(),
+                            List.copyOf(packaging.formats()),
+                            List.copyOf(descriptor.manifests()),
+                            overrides,
+                            environments),
                     outerInherited.sequencedKeySet().stream());
             sub.addModule("check",
                     check.apply(InferredSourceCodeQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
@@ -777,6 +781,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
 
     private record Prepare(PathPlacement pathPlacement,
                            List<String> packageTypes,
+                           List<String> manifests,
                            SequencedMap<String, SequencedMap<String, String>> overrides,
                            SequencedMap<String, SequencedMap<String, String>> environments) implements BuildStep {
 
@@ -790,7 +795,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             String artifact = null;
             String moduleName = null;
             SequencedProperties described = null;
-            for (BuildStepArgument argument : arguments.values()) {
+            for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
+                BuildStepArgument argument = entry.getValue();
                 if (argument.removed()) {
                     continue;
                 }
@@ -810,25 +816,27 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         }
                     }
                 }
-                for (Map.Entry<String, SequencedMap<String, String>> override : overrides.entrySet()) {
-                    Path generated = argument.folder().resolve(ProcessBuildStep.PROCESS + override.getKey() + ".properties");
-                    if (!Files.isRegularFile(generated)) {
-                        continue;
-                    }
-                    SequencedProperties declared = SequencedProperties.ofFiles(generated);
-                    for (String key : override.getValue().keySet()) {
-                        if (declared.containsKey(key)) {
-                            String value = declared.getProperty(key);
-                            throw new IllegalArgumentException("process-" + override.getKey() + ".properties sets "
-                                    + key + ", which the build already hands " + override.getKey() + " as "
-                                    + (value.isEmpty() ? key : key + " " + value) + " from the module's declaration - "
-                                    + (key.equals("--release") || key.equals("--enable-preview")
-                                            ? "declare the release there instead: @jenesis.release in"
-                                                    + " module-info.java, or maven.compiler.release and, for the"
-                                                    + " tests, maven.compiler.testRelease in pom.xml, written"
-                                                    + " <release>-preview or with maven.compiler.enablePreview for"
-                                                    + " preview features"
-                                            : "change it there instead and remove the line"));
+                if (manifests.contains(entry.getKey())) {
+                    for (Map.Entry<String, SequencedMap<String, String>> override : overrides.entrySet()) {
+                        Path generated = argument.folder().resolve(ProcessBuildStep.PROCESS + override.getKey() + ".properties");
+                        if (!Files.isRegularFile(generated)) {
+                            continue;
+                        }
+                        SequencedProperties declared = SequencedProperties.ofFiles(generated);
+                        for (String key : override.getValue().keySet()) {
+                            if (declared.containsKey(key)) {
+                                String value = declared.getProperty(key);
+                                throw new IllegalArgumentException("process-" + override.getKey() + ".properties sets "
+                                        + key + ", which the build already hands " + override.getKey() + " as "
+                                        + (value.isEmpty() ? key : key + " " + value) + " from the module's declaration - "
+                                        + (key.equals("--release") || key.equals("--enable-preview")
+                                                ? "declare the release there instead: @jenesis.release in"
+                                                        + " module-info.java, or maven.compiler.release and, for the"
+                                                        + " tests, maven.compiler.testRelease in pom.xml, written"
+                                                        + " <release>-preview or with maven.compiler.enablePreview for"
+                                                        + " preview features"
+                                                : "change it there instead and remove the line"));
+                            }
                         }
                     }
                 }
