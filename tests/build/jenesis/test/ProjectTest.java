@@ -160,10 +160,8 @@ public class ProjectTest {
     }
 
     @Test
-    public void auto_throws_when_neither_descriptor_is_present() {
-        assertThatThrownBy(() -> Project.Layout.of(root))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("No build descriptor found");
+    public void auto_detects_no_layout_when_neither_descriptor_is_present() throws IOException {
+        assertThat(Project.Layout.of(root)).isSameAs(Project.Layout.UNDESCRIBED);
     }
 
     @Test
@@ -178,8 +176,21 @@ public class ProjectTest {
     @Test
     public void build_throws_when_no_descriptor_is_detected() {
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root).target(root.resolve("target")).build())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("No build descriptor found");
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .rootCause()
+                .hasMessageContaining("No build descriptor found")
+                .hasMessageContaining("skill/migrate");
+    }
+
+    @Test
+    public void prints_the_briefing_before_a_descriptor_is_written() throws IOException {
+        List<String> printed = new ArrayList<>();
+        Project.ofEnvironment(new Environment(settings).out(printed::add), root)
+                .target(root.resolve("target"))
+                .build(Project.SKILL + "/migrate", Project.HELP);
+        assertThat(String.join("\n", printed))
+                .contains("Migrate a Maven or Gradle build")
+                .contains("no pom.xml or module-info.java yet");
     }
 
     @Test

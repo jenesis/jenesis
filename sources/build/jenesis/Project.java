@@ -416,6 +416,26 @@ public record Project(
             };
         };
 
+        Layout UNDESCRIBED = (executor, project, assembler) -> {
+            executor.addModule(HELP, new HelpModule("none, no pom.xml or module-info.java yet",
+                    assembler.getClass().getName(),
+                    project.environment().out(),
+                    Palette.ofEnvironment(project.environment())));
+            executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
+            for (String name : List.of(BUILD, STAGE, EXPORT, RELEASE, PLUGIN, PIN, DEPENDENCIES, IDE, METADATA)) {
+                executor.addModule(name, (_, _) -> {
+                    throw new IllegalStateException("No build descriptor found under "
+                            + project.root().toAbsolutePath().normalize()
+                            + " (expected a module-info.java or a pom.xml); to move a Maven or Gradle build here,"
+                            + " run java build/jenesis/Make.java skill/migrate");
+                });
+            }
+            return name -> {
+                throw new IllegalStateException("No build descriptor found under "
+                        + project.root().toAbsolutePath().normalize() + ", so +" + name + " names no module");
+            };
+        };
+
         Layout AUTO = (executor, project, assembler) -> of(project.root()).apply(executor, project, assembler);
 
         static Layout of(Path root) throws IOException {
@@ -443,12 +463,7 @@ public record Project(
                     return FileVisitResult.CONTINUE;
                 }
             });
-            if (!moduleInfos.isEmpty()) {
-                return MODULAR_TO_MAVEN;
-            }
-            throw new IllegalStateException(
-                    "No build descriptor found under " + root.toAbsolutePath()
-                            + " (expected a module-info.java or a pom.xml)");
+            return moduleInfos.isEmpty() ? UNDESCRIBED : MODULAR_TO_MAVEN;
         }
     }
 
