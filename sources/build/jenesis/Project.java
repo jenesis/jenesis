@@ -853,7 +853,9 @@ public record Project(
                                  own POM, and all of them but the name from its parents, local or
                                  fetched, where it declares none;
                                  sourceDirectory, testSourceDirectory and the <directory> of each
-                                 resource; the <!--jenesis.plugin--> and <!--jenesis.pin-->
+                                 resource, a local parent's where the module names none - one
+                                 folder per scope, so .groovy tests in src/test/groovy are found
+                                 once testSourceDirectory names it; the <!--jenesis.plugin--> and <!--jenesis.pin-->
                                  comments of the module's POM and of a local parent, where the
                                  module's own pin wins and `pin` writes into the module's POM;
                                  a profile of any POM - the module's, a parent's, a BOM's or a
