@@ -846,6 +846,77 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void fails_naming_a_parent_that_cannot_be_fetched() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>parent</groupId>
+                        <artifactId>missing</artifactId>
+                        <version>1-SNAPSHOT</version>
+                    </parent>
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null))
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cannot fetch the parent parent:missing:1-SNAPSHOT")
+                .hasMessageContaining("-Djenesis.maven.uri");
+    }
+
+    @Test
+    public void resolves_a_snapshot_parent_by_the_timestamped_pom_its_metadata_names() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>parent</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1-SNAPSHOT</version>
+                    </parent>
+                </project>
+                """);
+        Path folder = Files.createDirectories(repository.resolve("parent/artifact/1-SNAPSHOT"));
+        Files.writeString(folder.resolve("maven-metadata.xml"), """
+                <metadata>
+                  <versioning>
+                    <snapshotVersions>
+                      <snapshotVersion>
+                        <extension>pom</extension>
+                        <value>1-20261001.194937-10</value>
+                      </snapshotVersion>
+                    </snapshotVersions>
+                  </versioning>
+                </metadata>
+                """);
+        Files.writeString(folder.resolve("artifact-1-20261001.194937-10.pom"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("other", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                </project>
+                """);
+        assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null))
+                .containsExactly(Map.entry(
+                        new MavenDependencyKey("other", "artifact", "jar", null),
+                        new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
+    }
+
+    @Test
     public void can_resolve_dependencies_from_parent_before_transitive() throws IOException {
         addToRepository("group", "artifact", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>

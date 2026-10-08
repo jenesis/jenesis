@@ -842,7 +842,10 @@ public record Project(
                     ## 3. Know what a pom.xml keeps
 
                       read       coordinates; a parent, local when relativePath points at one with the
-                                 same coordinates, fetched otherwise; <modules>; <properties> and
+                                 same coordinates, fetched otherwise, and the build fails naming one
+                                 it cannot fetch; a -SNAPSHOT from the local repository, or else
+                                 as the remote repository's maven-metadata.xml names its newest
+                                 timestamped file; <modules>; <properties> and
                                  ${...}; dependencies of compile, provided, runtime and test scope;
                                  <optional>, <exclusions> with wildcards, <type> and <classifier>;
                                  <dependencyManagement> with import-scoped BOMs;

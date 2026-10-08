@@ -774,6 +774,15 @@ public class MavenPomResolver implements MavenResolver {
                                 null,
                                 children,
                                 unresolved);
+                        if (resolution.missing()) {
+                            throw new IllegalStateException("Cannot fetch the parent " + parent.groupId() + ":"
+                                    + parent.artifactId() + ":" + parent.version()
+                                    + toElementText(document.getDocumentElement(), "artifactId")
+                                            .map(child -> ", the parent of " + child + ",")
+                                            .orElse("")
+                                    + " from the Maven repositories in use - name the repository that publishes it"
+                                    + " with -Djenesis.maven.uri, or point the parent's relativePath at a local copy");
+                        }
                         groupId = property(resolution.groupId(), resolution.properties());
                         artifactId = property(resolution.artifactId(), resolution.properties());
                         version = property(resolution.version(), resolution.properties());
@@ -970,7 +979,8 @@ public class MavenPomResolver implements MavenResolver {
                                 : Collections.emptyNavigableMap(),
                         ownLicenses.isEmpty() ? parentLicenses : ownLicenses,
                         metadata,
-                        verbatim);
+                        verbatim,
+                        false);
             }
             default -> throw new IllegalArgumentException("Unknown namespace: " + namespace);
         };
@@ -1015,7 +1025,8 @@ public class MavenPomResolver implements MavenResolver {
                             Collections.emptyNavigableMap(),
                             List.of(),
                             Collections.emptyNavigableMap(),
-                            Set.of());
+                            Set.of(),
+                            true);
                 } else {
                     Path localPath = candidate.file().map(Path::getParent).orElse(null);
                     Map<Path, UnresolvedPom> localPaths = localPath == null ? null : new HashMap<>();
@@ -1800,7 +1811,8 @@ public class MavenPomResolver implements MavenResolver {
                                  SequencedMap<String, String> signatures,
                                  List<License> licenses,
                                  SequencedMap<String, String> metadata,
-                                 Set<String> verbatim) {
+                                 Set<String> verbatim,
+                                 boolean missing) {
     }
 
     private record ResolvedPom(Map<MavenDependencyKey, MavenDependencyValue> managedDependencies,
