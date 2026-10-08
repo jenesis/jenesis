@@ -21,17 +21,19 @@ public class Javadoc extends ProcessBuildStep {
     public static final String JAVADOC = "javadoc/";
 
     private final String within;
+    private final String group;
     private final boolean classpath;
     private final boolean timestamped;
 
     public Javadoc(ProcessHandler.Factory factory) {
-        this(factory.apply("javadoc", "bin/javadoc"), null, false, false, Terms.of("javadoc"));
+        this(factory.apply("javadoc", "bin/javadoc"), null, "main", false, false, Terms.of("javadoc"));
     }
 
     public static Javadoc ofEnvironment(Environment environment,
                                         ProcessHandler.Factory factory) {
         return new Javadoc(factory.apply("javadoc", "bin/javadoc"),
                 null,
+                "main",
                 false,
                 BuildStep.timestamp(environment) == null,
                 Terms.ofEnvironment(environment, "javadoc"));
@@ -39,29 +41,35 @@ public class Javadoc extends ProcessBuildStep {
 
     private Javadoc(Function<List<String>, ? extends ProcessHandler> factory,
                     String within,
+                    String group,
                     boolean classpath,
                     boolean timestamped,
                     Terms terms) {
         super("javadoc", factory, terms);
         this.within = within;
+        this.group = group;
         this.classpath = classpath;
         this.timestamped = timestamped;
     }
 
     public Javadoc within(String within) {
-        return new Javadoc(factory, within, classpath, timestamped, terms);
+        return new Javadoc(factory, within, group, classpath, timestamped, terms);
+    }
+
+    public Javadoc group(String group) {
+        return new Javadoc(factory, within, group, classpath, timestamped, terms);
     }
 
     public Javadoc classpath(boolean classpath) {
-        return new Javadoc(factory, within, classpath, timestamped, terms);
+        return new Javadoc(factory, within, group, classpath, timestamped, terms);
     }
 
     public Javadoc timestamped(boolean timestamped) {
-        return new Javadoc(factory, within, classpath, timestamped, terms);
+        return new Javadoc(factory, within, group, classpath, timestamped, terms);
     }
 
     public Javadoc verbose(BiConsumer<Boolean, String> printing) {
-        return new Javadoc(factory, within, classpath, timestamped, terms.printing(printing));
+        return new Javadoc(factory, within, group, classpath, timestamped, terms.printing(printing));
     }
 
     @Override
@@ -130,7 +138,7 @@ public class Javadoc extends ProcessBuildStep {
                     }
                 }
             }
-            for (Path jar : Dependencies.all(argument.folder())) {
+            for (Path jar : Dependencies.select(argument.folder(), group, "compile")) {
                 path.add(jar.toString());
             }
             if (Files.exists(sources)) {

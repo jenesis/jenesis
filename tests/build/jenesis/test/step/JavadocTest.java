@@ -244,6 +244,36 @@ public class JavadocTest {
                 .doesNotContain("--add-reads");
     }
 
+    @Test
+    public void documents_against_the_module_dependencies_alone() throws IOException {
+        Path library = Files.createDirectories(root.resolve("library"));
+        Path own = plainJar(library.resolve("plain.jar")), tool = modularJar(library.resolve("tool.jar"), "plugin.tool");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/compile/maven/plain", "../library/plain.jar");
+        index.setProperty("plugin-manifest/compile/module/plugin.tool", "../library/tool.jar");
+        index.setProperty("checkstyle/runtime/maven/checkstyle", "../library/tool.jar");
+        index.store(sources.resolve(BuildStep.DEPENDENCIES));
+        Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"), """
+                package sample;
+                /** Documented. */
+                public class Sample { }
+                """);
+
+        BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        assertThat(Files.readString(supplement.resolve("javadoc.args")))
+                .as("a plugin's or a tool's closure resolved beside the module is no dependency of the module")
+                .contains(escaped(own))
+                .doesNotContain(escaped(tool));
+    }
+
     private static String escaped(Path path) {
         return path.toString().replace("\\", "\\\\");
     }
