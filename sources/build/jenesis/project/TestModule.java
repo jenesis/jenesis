@@ -106,9 +106,9 @@ public class TestModule implements BuildExecutorModule {
 
     private static Predicate<String> defaultIsTest() {
         List<Pattern> patterns = Stream.of(
-                        ".*\\.Test[a-zA-Z0-9$]*", ".*\\..*Test", ".*\\..*Tests", ".*\\..*TestCase",
-                        ".*\\.IT[a-zA-Z0-9$]*", ".*\\..*IT", ".*\\..*ITCase")
-                .map(Pattern::compile)
+                        "Test[a-zA-Z0-9]*", "[^.$]*Test", "[^.$]*Tests", "[^.$]*TestCase",
+                        "IT[a-zA-Z0-9]*", "[^.$]*IT", "[^.$]*ITCase")
+                .map(pattern -> Pattern.compile("(?:.*\\.)?" + pattern))
                 .toList();
         return (Predicate<String> & Serializable)
                 (name -> patterns.stream().anyMatch(pattern -> pattern.matcher(name).matches()));
@@ -931,11 +931,19 @@ public class TestModule implements BuildExecutorModule {
                 if (Files.exists(classes)) {
                     Files.walkFileTree(classes, new SimpleFileVisitor<>() {
                         @Override
+                        public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) {
+                            return directory.equals(classes.resolve("META-INF"))
+                                    ? FileVisitResult.SKIP_SUBTREE
+                                    : FileVisitResult.CONTINUE;
+                        }
+
+                        @Override
                         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                             if (file.toString().endsWith(".class")) {
                                 String raw = classes.relativize(file).toString();
                                 String className = raw.substring(0, raw.length() - 6).replace(File.separatorChar, '.');
-                                if ((classFile.parse(file).flags().flagsMask() & ClassFile.ACC_ABSTRACT) != 0) {
+                                if ((classFile.parse(file).flags().flagsMask()
+                                        & (ClassFile.ACC_ABSTRACT | ClassFile.ACC_MODULE)) != 0) {
                                     return FileVisitResult.CONTINUE;
                                 }
                                 if (specs.isEmpty()) {

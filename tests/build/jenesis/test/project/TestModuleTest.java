@@ -3,6 +3,7 @@ package build.jenesis.test.project;
 import module java.base;
 import module java.compiler;
 import module org.junit.jupiter.api;
+import module org.junit.jupiter.params;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
@@ -101,6 +102,45 @@ public class TestModuleTest {
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
+        assertThat(reportedErrors(supplement)).isEmpty();
+    }
+
+    @Test
+    public void selects_by_maven_naming_in_the_default_package_but_not_nested_or_versioned_classes() throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "PlainTest", """
+                public class PlainTest {
+                    @org.junit.jupiter.api.Test
+                    public void test() { System.out.println("Default package!"); }
+                    public static class HelperTest {
+                        @org.junit.jupiter.api.Test
+                        public void test() { System.out.println("Nested helper!"); }
+                    }
+                }
+                """, bootModuleJars());
+        Path versioned = Files.createDirectories(classes.resolve(Javac.CLASSES + "META-INF/versions/11/sample"));
+        Files.copy(classes.resolve(Javac.CLASSES + "sample/TestSample.class"), versioned.resolve("TestSample.class"));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .jarsOnly(false),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content()
+                .contains("Hello world!")
+                .contains("Default package!")
+                .as("a nested class is run by its enclosing class's engine, as Maven's default excludes leave it")
+                .doesNotContain("Nested helper!");
         assertThat(reportedErrors(supplement)).isEmpty();
     }
 
@@ -274,8 +314,14 @@ public class TestModuleTest {
         assertThat(reportedErrors(supplement)).isEmpty();
     }
 
-    @Test
-    public void opens_a_test_module_that_is_not_open_to_the_framework() throws Exception {
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = ".*")
+    public void opens_a_test_module_that_is_not_open_to_the_framework_and_never_selects_its_descriptor(String filter)
+            throws Exception {
+        if (filter != null) {
+            settings.put("test.filter", filter);
+        }
         Path output = Files.createDirectories(module.resolve(Javac.CLASSES));
         List<Path> modulePath = new ArrayList<>(bootModuleJars());
         modulePath.add(downloadJar(Files.createTempFile(root, "apiguardian", ".jar"),
