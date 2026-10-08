@@ -1652,4 +1652,88 @@ public class ProjectTest {
         assertThat(project.version()).isNull();
         assertThat(project.cache()).isNull();
     }
+    @Test
+    public void the_pom_of_a_maven_module_lists_its_own_dependencies_and_not_those_of_a_sibling_it_depends_on() throws IOException {
+        Path repository = Files.createDirectories(elsewhere.resolve("repository/external/library/1"));
+        Files.writeString(repository.resolve("library-1.pom"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>external</groupId>
+                    <artifactId>library</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        try (JarOutputStream _ = new JarOutputStream(Files.newOutputStream(repository.resolve("library-1.jar")))) {
+        }
+        Files.writeString(root.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>base</module>
+                        <module>user</module>
+                    </modules>
+                </project>
+                """);
+        for (String module : List.of("base", "user")) {
+            Files.writeString(Files.createDirectories(root.resolve(module + "/src/main/java/" + module)).resolve("Type.java"),
+                    "package " + module + "; public class Type { }\n");
+        }
+        Files.writeString(root.resolve("base/pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>base</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>external</groupId>
+                            <artifactId>library</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(root.resolve("user/pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>user</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>base</artifactId>
+                            <version>1</version>
+                            <scope>runtime</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        settings.put("maven.uri", elsewhere.resolve("repository").toUri().toString());
+        settings.put("maven.local", Files.createDirectory(elsewhere.resolve("local")).toString());
+        SequencedMap<String, Path> outputs = Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .layout(Project.Layout.MAVEN)
+                .build(Project.BUILD);
+        String pom = Files.readString(outputs.entrySet().stream()
+                .filter(entry -> entry.getKey().endsWith("/module-user/produce/describe/pom"))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElseThrow()
+                .resolve("pom.xml"));
+        assertThat(pom)
+                .contains("<artifactId>base</artifactId>")
+                .as("what only the sibling declares reaches a consumer through the sibling's own POM")
+                .doesNotContain("<artifactId>library</artifactId>");
+    }
 }
