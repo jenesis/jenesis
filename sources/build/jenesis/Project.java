@@ -1650,7 +1650,12 @@ public record Project(
                                                 argument as the value, `-parameters=` for a bare one
                                                 and `-Xlint\\:all=` where the flag holds a : or =,
                                                 refusing one the module's declaration sets already,
-                                                as javac's --release;
+                                                as javac's --release; an --add-exports, --add-reads
+                                                or --patch-module of a JDK module, which javac
+                                                refuses beside --release, has the release passed as
+                                                --source and --target instead, so the module is
+                                                checked against the API of the JDK the build runs on
+                                                rather than of its release;
                                                 process-test.properties targets the test JVM, merged
                                                 over process-java.properties; a linter reads only its
                                                 own configuration file

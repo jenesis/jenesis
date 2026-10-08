@@ -16,6 +16,7 @@ import java.util.jar.Attributes;
 public class Javac extends ProcessBuildStep {
 
     private static final Pattern VERSIONED = Pattern.compile("META-INF/versions/(\\d+)/.+");
+    private static final Set<String> SYSTEM_MODULE_OPTIONS = Set.of("--add-exports", "--add-reads", "--patch-module");
 
     private final boolean includeResources;
     private final PathPlacement pathPlacement;
@@ -177,6 +178,15 @@ public class Javac extends ProcessBuildStep {
                                                  SequencedMap<String, BuildStepArgument> arguments,
                                                  SequencedMap<String, SequencedMap<String, String>> properties)
             throws IOException {
+        if (namesSystemModule(prepended(properties))) {
+            for (SequencedMap<String, String> folder : properties.values()) {
+                String release = folder.remove("--release");
+                if (release != null) {
+                    folder.put("--source", release);
+                    folder.put("--target", release);
+                }
+            }
+        }
         Path target = Files.createDirectory(context.next().resolve(CLASSES));
         List<String> files = new ArrayList<>(),
                 path = new ArrayList<>(),
@@ -300,6 +310,21 @@ public class Javac extends ProcessBuildStep {
         }
         commands.addAll(files);
         return CompletableFuture.completedStage(commands);
+    }
+
+    private static boolean namesSystemModule(List<String> options) {
+        for (int index = 0; index < options.size(); index++) {
+            String option = options.get(index);
+            for (String name : SYSTEM_MODULE_OPTIONS) {
+                String value = option.equals(name) && index + 1 < options.size()
+                        ? options.get(index + 1)
+                        : option.startsWith(name + "=") ? option.substring(name.length() + 1) : null;
+                if (value != null && ModuleFinder.ofSystem().find(value.split("[/=]", 2)[0]).isPresent()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static String processorPath(List<String> processorPath, boolean processorModules) {
@@ -466,9 +491,9 @@ public class Javac extends ProcessBuildStep {
         Path target = Files.createDirectories(context.next()
                 .resolve(CLASSES + "META-INF/versions/" + release));
         List<String> commands = new ArrayList<>(prepended);
-        commands.addAll(List.of(
-                "-d", target.toString(),
-                "--release", Integer.toString(release)));
+        commands.addAll(namesSystemModule(prepended)
+                ? List.of("-d", target.toString(), "--source", Integer.toString(release), "--target", Integer.toString(release))
+                : List.of("-d", target.toString(), "--release", Integer.toString(release)));
         List<String> classPath = new ArrayList<>(), modulePath = new ArrayList<>(), patchModule = new ArrayList<>();
         String patched = versionedModule == null ? moduleName : versionedModule;
         if (patched != null) {
