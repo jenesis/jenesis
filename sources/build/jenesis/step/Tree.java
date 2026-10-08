@@ -96,8 +96,11 @@ public class Tree implements BuildStep {
         SequencedMap<Path, String> prefixes = new LinkedHashMap<>();
         SequencedMap<String, String> locations = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
             Path inventoryFile = argument.folder().resolve(Inventory.INVENTORY);
-            if (argument.removed() || !Files.isRegularFile(inventoryFile)) {
+            if (!Files.isRegularFile(inventoryFile)) {
                 continue;
             }
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);

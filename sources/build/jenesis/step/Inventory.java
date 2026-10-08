@@ -651,8 +651,11 @@ public class Inventory implements BuildStep {
         SequencedMap<Path, SequencedProperties> inventories = new LinkedHashMap<>();
         SequencedSet<String> prefixes = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments) {
+            if (argument.removed()) {
+                continue;
+            }
             Path inventoryFile = argument.folder().resolve(INVENTORY);
-            if (!argument.removed() && Files.isRegularFile(inventoryFile)) {
+            if (Files.isRegularFile(inventoryFile)) {
                 SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
                 inventories.put(argument.folder(), inventory);
                 prefixes.addAll(prefixes(inventory));

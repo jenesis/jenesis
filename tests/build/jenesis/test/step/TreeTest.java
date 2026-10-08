@@ -146,6 +146,29 @@ public class TreeTest {
     }
 
     @Test
+    public void renders_the_inputs_that_remain_when_one_was_removed() throws IOException {
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
+        graph.setProperty("vertex/main/compile/maven/org.foo/bar", "1.0\torg.foo.bar\tfalse");
+        graph.store(argument.resolve("graph.properties"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module.graph.0", "graph.properties");
+        inventory.store(argument.resolve(Inventory.INVENTORY));
+
+        List<String> printed = new ArrayList<>();
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("vanished", new BuildStepArgument(null, Checksum.removed(Set.of(Path.of(Inventory.INVENTORY)))));
+        arguments.put("argument", new BuildStepArgument(
+                argument,
+                Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))));
+        Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                arguments).toCompletableFuture().join();
+        assertThat(String.join(System.lineSeparator(), printed)).contains("maven/org.foo/bar");
+    }
+
+    @Test
     public void names_a_maven_project_by_its_coordinate() throws IOException {
         SequencedProperties graph = new SequencedProperties();
         graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");

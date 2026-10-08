@@ -2028,8 +2028,11 @@ public record Project(
                 throws IOException {
             SequencedMap<String, String> pins = new TreeMap<>();
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
                 Path resolved = argument.folder().resolve(BuildStep.DEPENDENCIES);
-                if (argument.removed() || !Files.isRegularFile(resolved)) {
+                if (!Files.isRegularFile(resolved)) {
                     continue;
                 }
                 SequencedProperties dependencies = SequencedProperties.ofFiles(resolved);
