@@ -2,16 +2,52 @@ package build.jenesis.project;
 
 import module java.base;
 import build.jenesis.BuildStep;
+import build.jenesis.PathPlacement;
 
-public record JUnitPlatform() implements TestFramework {
+public record JUnitPlatform(String console) implements TestFramework {
 
-    private static final String JUNIT4 = "junit",
+    private static final String LAUNCHER = "org/junit/platform/console/ConsoleLauncher.class",
+            JUNIT4 = "junit",
             JUPITER_API = "org.junit.jupiter.api",
             JUPITER_ENGINE = "org.junit.jupiter.engine",
             PLATFORM_COMMONS = "org.junit.platform.commons",
             PLATFORM_CONSOLE = "org.junit.platform.console",
             PLATFORM_ENGINE = "org.junit.platform.engine",
             VINTAGE_ENGINE = "org.junit.vintage.engine";
+    private static final ModuleDescriptor.Version BANNER = ModuleDescriptor.Version.parse("1.5"),
+            SUBCOMMANDS = ModuleDescriptor.Version.parse("1.10");
+
+    public JUnitPlatform() {
+        this(null);
+    }
+
+    public JUnitPlatform console(String console) {
+        return new JUnitPlatform(console);
+    }
+
+    @Override
+    public JUnitPlatform runningOn(List<Path> jars) throws IOException {
+        for (Path jar : jars) {
+            if (!Files.isRegularFile(jar)) {
+                continue;
+            }
+            try (JarFile file = new JarFile(jar.toFile())) {
+                if (file.getEntry(LAUNCHER) == null) {
+                    continue;
+                }
+                Manifest manifest = file.getManifest();
+                String version = manifest == null ? null : manifest.getMainAttributes().getValue("Implementation-Version");
+                if (version == null) {
+                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
+                    version = descriptor == null ? null : descriptor.rawVersion().orElse(null);
+                }
+                return console(version);
+            } catch (ZipException _) {
+                continue;
+            }
+        }
+        return this;
+    }
 
     @Override
     public String runnerModule() {
@@ -69,7 +105,18 @@ public record JUnitPlatform() implements TestFramework {
                                   SequencedMap<String, SequencedSet<String>> methods,
                                   boolean parallel,
                                   boolean reporting) {
-        List<String> commands = new ArrayList<>(List.of("execute", "--disable-banner", "--disable-ansi-colors"));
+        ModuleDescriptor.Version version = console == null ? null : ModuleDescriptor.Version.parse(console);
+        if (version != null && version.compareTo(BANNER) < 0) {
+            throw new IllegalStateException("The JUnit Platform console launcher " + console + " on the test path is older"
+                    + " than " + BANNER + ", the first whose command line the build writes - raise the JUnit Platform to "
+                    + BANNER + " or newer, as by importing a newer org.junit:junit-bom in dependencyManagement,"
+                    + " or by pinning org.junit.platform/junit-platform-console and junit-platform-launcher to one");
+        }
+        List<String> commands = new ArrayList<>();
+        if (version == null || version.compareTo(SUBCOMMANDS) >= 0) {
+            commands.add("execute");
+        }
+        commands.addAll(List.of("--disable-banner", "--disable-ansi-colors"));
         if (parallel) {
             commands.add("--config=junit.jupiter.execution.parallel.enabled=true");
             commands.add("--config=junit.jupiter.execution.parallel.mode.default=concurrent");

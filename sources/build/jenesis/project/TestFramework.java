@@ -27,6 +27,10 @@ public interface TestFramework extends Serializable {
         return Map.of();
     }
 
+    default TestFramework runningOn(List<Path> jars) throws IOException {
+        return this;
+    }
+
     List<String> arguments(Path supplement,
                            Path output,
                            SequencedSet<String> classes,
@@ -64,8 +68,19 @@ public interface TestFramework extends Serializable {
 
     static List<ModuleDescriptor> modules(Iterable<Path> folders) throws IOException {
         List<ModuleDescriptor> modules = new ArrayList<>();
+        for (Path file : jars(folders)) {
+            ModuleDescriptor module = PathPlacement.moduleDescriptor(file);
+            if (module != null) {
+                modules.add(module);
+            }
+        }
+        modules.sort(Comparator.comparing(ModuleDescriptor::name));
+        return modules;
+    }
+
+    static List<Path> jars(Iterable<Path> folders) throws IOException {
+        List<Path> jars = new ArrayList<>();
         for (Path folder : folders) {
-            List<Path> jars = new ArrayList<>();
             Path artifacts = folder.resolve(BuildStep.ARTIFACTS);
             if (Files.exists(artifacts)) {
                 try (DirectoryStream<Path> stream = Files.newDirectoryStream(artifacts)) {
@@ -77,14 +92,7 @@ public interface TestFramework extends Serializable {
                 }
             }
             jars.addAll(Dependencies.all(folder));
-            for (Path file : jars) {
-                ModuleDescriptor module = PathPlacement.moduleDescriptor(file);
-                if (module != null) {
-                    modules.add(module);
-                }
-            }
         }
-        modules.sort(Comparator.comparing(ModuleDescriptor::name));
-        return modules;
+        return jars;
     }
 }
