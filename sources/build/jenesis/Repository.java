@@ -185,6 +185,11 @@ public interface Repository {
                         pause(delay, uri);
                         continue attempts;
                     }
+                    if (status == 429) {
+                        throw new IOException(current + " answered 429 Too Many Requests after " + (attempt + 1)
+                                + " attempt(s): the server limits how often this machine asks, so build again later or"
+                                + " name a mirror, for Maven Central with -Djenesis.maven.uri or MAVEN_REPOSITORY_URI");
+                    }
                     return http.getInputStream();
                 }
                 throw new IOException("Exceeded redirect limit fetching " + uri);
