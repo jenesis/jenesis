@@ -573,24 +573,10 @@ public class MavenPomResolver implements MavenResolver {
             UnresolvedPom pom = paths.get(module);
             SequencedMap<String, String> plugins = new LinkedHashMap<>(pom.plugins());
             SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = new LinkedHashMap<>();
-            SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>();
-            for (Map.Entry<DependencyKey, DependencyValue> entry : pom.managedDependencies().entrySet()) {
-                MavenDependencyKey key = entry.getKey().resolve(pom.properties());
-                MavenDependencyValue value = entry.getValue().resolve(pom.properties());
-                if (value.scope() == MavenDependencyScope.IMPORT) {
-                    flattenImport(executor,
-                            MavenRepository.of(repository),
-                            key.groupId(),
-                            key.artifactId(),
-                            value.version(),
-                            value.checksum(),
-                            managedDependencies,
-                            new HashSet<>(),
-                            unresolved);
-                } else {
-                    managedDependencies.put(key, value);
-                }
-            }
+            SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies = managed(executor,
+                    MavenRepository.of(repository),
+                    pom,
+                    unresolved);
             pom.dependencies().forEach((key, value) -> {
                 MavenDependencyKey resolvedKey = key.resolve(pom.properties());
                 MavenDependencyValue resolved = defaultScope(merge(value.resolve(pom.properties()),
@@ -1080,29 +1066,42 @@ public class MavenPomResolver implements MavenResolver {
                                 MavenRepository repository,
                                 UnresolvedPom pom,
                                 Map<DependencyCoordinate, UnresolvedPom> unresolved) throws IOException {
-        Map<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>();
+        Map<MavenDependencyKey, MavenDependencyValue> managedDependencies = managed(executor, repository, pom, unresolved);
         SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = new LinkedHashMap<>();
-        for (Map.Entry<DependencyKey, DependencyValue> entry : pom.managedDependencies().entrySet()) {
-            MavenDependencyKey key = entry.getKey().resolve(pom.properties());
-            MavenDependencyValue value = entry.getValue().resolve(pom.properties());
-            if (value.scope() == MavenDependencyScope.IMPORT) {
-                flattenImport(executor,
-                        repository,
-                        key.groupId(),
-                        key.artifactId(),
-                        value.version(),
-                        value.checksum(),
-                        managedDependencies,
-                        new HashSet<>(),
-                        unresolved);
-            } else {
-                managedDependencies.put(key, value);
-            }
-        }
         pom.dependencies().forEach((key, value) -> dependencies.put(
                 key.resolve(pom.properties()),
                 value.resolve(pom.properties())));
         return new ResolvedPom(managedDependencies, dependencies, pom.licenses());
+    }
+
+    private SequencedMap<MavenDependencyKey, MavenDependencyValue> managed(Executor executor,
+                                                                         MavenRepository repository,
+                                                                         UnresolvedPom pom,
+                                                                         Map<DependencyCoordinate, UnresolvedPom> unresolved)
+            throws IOException {
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>();
+        List<Map.Entry<MavenDependencyKey, MavenDependencyValue>> imports = new ArrayList<>();
+        for (Map.Entry<DependencyKey, DependencyValue> entry : pom.managedDependencies().entrySet()) {
+            MavenDependencyKey key = entry.getKey().resolve(pom.properties());
+            MavenDependencyValue value = entry.getValue().resolve(pom.properties());
+            if (value.scope() == MavenDependencyScope.IMPORT) {
+                imports.add(Map.entry(key, value));
+            } else {
+                managedDependencies.putIfAbsent(key, value);
+            }
+        }
+        for (Map.Entry<MavenDependencyKey, MavenDependencyValue> imported : imports) {
+            flattenImport(executor,
+                    repository,
+                    imported.getKey().groupId(),
+                    imported.getKey().artifactId(),
+                    imported.getValue().version(),
+                    imported.getValue().checksum(),
+                    managedDependencies,
+                    new HashSet<>(),
+                    unresolved);
+        }
+        return managedDependencies;
     }
 
     private void flattenImport(Executor executor,
