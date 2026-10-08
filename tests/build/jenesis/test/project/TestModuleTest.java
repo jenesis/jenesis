@@ -760,6 +760,45 @@ public class TestModuleTest {
     }
 
     @Test
+    public void filter_with_several_method_selectors_of_one_class_runs_every_named_method() throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "TwoMethodSample", """
+                package sample;
+                public class TwoMethodSample {
+                    @org.junit.jupiter.api.Test
+                    public void first() { System.out.println("Ran first"); }
+                    @org.junit.jupiter.api.Test
+                    public void second() { System.out.println("Ran second"); }
+                    @org.junit.jupiter.api.Test
+                    public void third() { System.out.println("Ran third"); }
+                }
+                """, bootModuleJars());
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnitPlatform())
+                        .isTest((Predicate<String> & Serializable) _ -> false)
+                        .filter("sample\\.TwoMethodSample#first,sample\\.TwoMethodSample#second").jarsOnly(false),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content()
+                .contains("Ran first", "Ran second")
+                .doesNotContain("Ran third");
+        assertThat(supplement.resolve("java.args")).content()
+                .contains("--select-method=sample.TwoMethodSample#first", "--select-method=sample.TwoMethodSample#second");
+    }
+
+    @Test
     public void a_filter_entry_naming_a_module_selects_the_tests_of_that_module() throws IOException {
         Files.writeString(manifests.resolve(BuildStep.MODULE), "path=greeter\n");
         BuildExecutor executor = newExecutor();
