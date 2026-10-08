@@ -108,6 +108,109 @@ public class MavenDefaultRepositoryTest {
     }
 
     @Test
+    public void resolves_a_snapshot_by_the_timestamped_file_its_metadata_names() throws IOException {
+        Path folder = Files.createDirectories(repository.resolve("group/artifact/1.0-SNAPSHOT"));
+        Files.writeString(folder.resolve("maven-metadata.xml"), """
+                <metadata modelVersion="1.1.0">
+                  <groupId>group</groupId>
+                  <artifactId>artifact</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <versioning>
+                    <snapshot>
+                      <timestamp>20261001.194937</timestamp>
+                      <buildNumber>10</buildNumber>
+                    </snapshot>
+                    <snapshotVersions>
+                      <snapshotVersion>
+                        <classifier>sources</classifier>
+                        <extension>jar</extension>
+                        <value>1.0-20261001.194937-9</value>
+                      </snapshotVersion>
+                      <snapshotVersion>
+                        <extension>jar</extension>
+                        <value>1.0-20261001.194937-10</value>
+                      </snapshotVersion>
+                    </snapshotVersions>
+                  </versioning>
+                </metadata>
+                """);
+        Files.writeString(folder.resolve("artifact-1.0-20261001.194937-10.jar"), "binary");
+        Files.writeString(folder.resolve("artifact-1.0-20261001.194937-9-sources.jar"), "sources");
+        MavenDefaultRepository mavenRepository = new MavenDefaultRepository(repository.toUri(), local, Map.of(), null);
+        try (InputStream inputStream = mavenRepository.fetch(Runnable::run, "group", "artifact", "1.0-SNAPSHOT", "jar", null, null)
+                .orElseThrow()
+                .toInputStream()) {
+            assertThat(new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("binary");
+        }
+        try (InputStream inputStream = mavenRepository.fetch(Runnable::run, "group", "artifact", "1.0-SNAPSHOT", "jar", "sources", null)
+                .orElseThrow()
+                .toInputStream()) {
+            assertThat(new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("sources");
+        }
+        assertThat(local.resolve("group/artifact/1.0-SNAPSHOT/artifact-1.0-20261001.194937-10.jar"))
+                .as("a timestamped snapshot never changes, so it is cached under its own name")
+                .content().isEqualTo("binary");
+    }
+
+    @Test
+    public void resolves_a_snapshot_by_the_timestamp_and_build_number_of_its_metadata() throws IOException {
+        Path folder = Files.createDirectories(repository.resolve("group/artifact/1.0-SNAPSHOT"));
+        Files.writeString(folder.resolve("maven-metadata.xml"), """
+                <metadata>
+                  <versioning>
+                    <snapshot>
+                      <timestamp>20261001.194937</timestamp>
+                      <buildNumber>3</buildNumber>
+                    </snapshot>
+                  </versioning>
+                </metadata>
+                """);
+        Files.writeString(folder.resolve("artifact-1.0-20261001.194937-3.pom"), "<project/>");
+        try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)
+                .fetch(Runnable::run, "group", "artifact", "1.0-SNAPSHOT", "pom", null, null)
+                .orElseThrow()
+                .toInputStream()) {
+            assertThat(new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("<project/>");
+        }
+    }
+
+    @Test
+    public void prefers_a_snapshot_the_local_repository_holds() throws IOException {
+        Path folder = Files.createDirectories(repository.resolve("group/artifact/1.0-SNAPSHOT"));
+        Files.writeString(folder.resolve("maven-metadata.xml"), """
+                <metadata>
+                  <versioning>
+                    <snapshot>
+                      <timestamp>20261001.194937</timestamp>
+                      <buildNumber>3</buildNumber>
+                    </snapshot>
+                  </versioning>
+                </metadata>
+                """);
+        Files.writeString(folder.resolve("artifact-1.0-20261001.194937-3.jar"), "remote");
+        Files.writeString(Files.createDirectories(local.resolve("group/artifact/1.0-SNAPSHOT")).resolve("artifact-1.0-SNAPSHOT.jar"),
+                "installed");
+        try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(), local, Map.of(), null)
+                .fetch(Runnable::run, "group", "artifact", "1.0-SNAPSHOT", "jar", null, null)
+                .orElseThrow()
+                .toInputStream()) {
+            assertThat(new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("installed");
+        }
+    }
+
+    @Test
+    public void resolves_a_snapshot_by_its_plain_name_without_metadata() throws IOException {
+        Files.writeString(Files.createDirectories(repository.resolve("group/artifact/1.0-SNAPSHOT")).resolve("artifact-1.0-SNAPSHOT.jar"),
+                "plain");
+        try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)
+                .fetch(Runnable::run, "group", "artifact", "1.0-SNAPSHOT", "jar", null, null)
+                .orElseThrow()
+                .toInputStream()) {
+            assertThat(new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("plain");
+        }
+    }
+
+    @Test
     public void fetches_without_caching_when_local_repository_is_read_only() throws IOException {
         Files.writeString(Files
                 .createDirectories(repository.resolve("group/artifact/1"))

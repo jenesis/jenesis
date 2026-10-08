@@ -1,6 +1,7 @@
 package build.jenesis.maven;
 
 import module java.base;
+import module java.xml;
 import build.jenesis.BuildStep;
 import build.jenesis.Discovery;
 import build.jenesis.Environment;
@@ -316,15 +317,67 @@ public class MavenDefaultRepository implements MavenRepository {
                                           String type,
                                           String classifier,
                                           String checksum) throws IOException {
-        String path = groupId.replace('.', '/')
-                + "/" + artifactId
-                + "/" + version
-                + "/" + artifactId + "-" + version + (classifier == null ? "" : "-" + classifier)
-                + "." + type + (checksum == null ? "" : ("." + checksum));
+        String folder = groupId.replace('.', '/') + "/" + artifactId + "/" + version + "/",
+                suffix = (classifier == null ? "" : "-" + classifier) + "." + type + (checksum == null ? "" : ("." + checksum)),
+                path = folder + artifactId + "-" + version + suffix;
+        if (version.endsWith("-SNAPSHOT") && (local == null || !Files.exists(BuildStep.resolveContained(local, path)))) {
+            String snapshot = snapshot(folder, version, type, classifier);
+            if (snapshot != null) {
+                path = folder + artifactId + "-" + snapshot + suffix;
+            }
+        }
         if (callback != null) {
             callback.accept(path);
         }
         return fetch(repository, local, path, checksum == null).materialize();
+    }
+
+    private String snapshot(String folder, String version, String type, String classifier) throws IOException {
+        if (connection.offline()) {
+            return null;
+        }
+        Optional<RepositoryItem> metadata = fetch(repository, null, folder + "maven-metadata.xml", false).materialize();
+        if (metadata.isEmpty()) {
+            return null;
+        }
+        Document document;
+        try (InputStream inputStream = metadata.get().toInputStream()) {
+            document = MavenDefaultVersionNegotiator.toDocumentBuilderFactory().newDocumentBuilder().parse(inputStream);
+        } catch (SAXException | ParserConfigurationException e) {
+            throw new IllegalStateException("Cannot read the snapshot metadata "
+                    + repository.resolve(folder + "maven-metadata.xml") + " - the repository serves no valid"
+                    + " maven-metadata.xml for " + version, e);
+        }
+        Node versioning = children(document.getDocumentElement(), "versioning").findFirst().orElse(null);
+        if (versioning == null) {
+            return null;
+        }
+        Optional<String> value = children(versioning, "snapshotVersions")
+                .flatMap(snapshotVersions -> children(snapshotVersions, "snapshotVersion"))
+                .filter(snapshotVersion -> type.equals(text(snapshotVersion, "extension"))
+                        && Objects.equals(classifier == null ? "" : classifier, Objects.requireNonNullElse(text(snapshotVersion, "classifier"), "")))
+                .map(snapshotVersion -> text(snapshotVersion, "value"))
+                .filter(Objects::nonNull)
+                .findFirst();
+        if (value.isPresent()) {
+            return value.get();
+        }
+        Node snapshot = children(versioning, "snapshot").findFirst().orElse(null);
+        if (snapshot == null || "true".equals(text(snapshot, "localCopy"))) {
+            return null;
+        }
+        String timestamp = text(snapshot, "timestamp"), buildNumber = text(snapshot, "buildNumber");
+        return timestamp == null || buildNumber == null
+                ? null
+                : version.substring(0, version.length() - "SNAPSHOT".length()) + timestamp + "-" + buildNumber;
+    }
+
+    private static Stream<Node> children(Node node, String name) {
+        return MavenPomResolver.toChildren(node).filter(child -> name.equals(child.getLocalName()));
+    }
+
+    private static String text(Node node, String name) {
+        return children(node, name).findFirst().map(child -> child.getTextContent().strip()).orElse(null);
     }
 
     @Override
