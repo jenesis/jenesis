@@ -32,7 +32,7 @@ public class JaCoCoModule implements BuildExecutorModule {
         this(new Dependencies(repositories, resolvers),
              null,
              "jacoco",
-             true,
+             false,
              ProcessBuildStep.Terms.of("jacoco"));
     }
 
@@ -42,7 +42,7 @@ public class JaCoCoModule implements BuildExecutorModule {
         return new JaCoCoModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "jacoco",
-                true,
+                false,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "jacoco"));
     }
 
