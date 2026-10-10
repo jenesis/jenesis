@@ -1180,6 +1180,10 @@ public record Project(
                                                            naming or the filter
                       argLine, jvmArgs of the tests        process-test.properties
                       environment of the tests             environment-test.properties
+                      mainClass of the jar, shade or exec  a <mainClass> property in <properties>:
+                      plugin                               the jar's Main-Class and what Execute,
+                                                           launcher=true and bundle=true launch,
+                                                           which stage nothing without one
                       manifestEntries,                     a META-INF/MANIFEST.MF among the resources,
                       jar.manifest.attributes              the basis of the jar's manifest; jar takes
                                                            no --manifest in process-jar.properties

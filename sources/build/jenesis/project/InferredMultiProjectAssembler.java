@@ -945,10 +945,14 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 for (Map.Entry<String, SequencedProperties> type : typed.entrySet()) {
                     type.getValue().store(processFolder.resolve("jpackage-" + type.getKey() + ".properties"));
                 }
+            }
+            if (main != null || artifact != null) {
                 SequencedProperties launcher = new SequencedProperties();
-                launcher.setProperty("mainClass", main);
-                if (pathPlacement.modular() && moduleName != null) {
-                    launcher.setProperty("mainModule", moduleName);
+                if (main != null) {
+                    launcher.setProperty("mainClass", main);
+                    if (pathPlacement.modular() && moduleName != null) {
+                        launcher.setProperty("mainModule", moduleName);
+                    }
                 }
                 if (artifact != null) {
                     launcher.setProperty("name", artifact);
