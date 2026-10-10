@@ -1025,6 +1025,69 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void a_transform_replaces_the_compiled_classes_it_writes_and_passes_every_other_one_on() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Path sample = Files.createDirectories(fixture.sources().resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sample.resolve("Sample.java"), "package sample; public class Sample { }");
+        Files.writeString(sample.resolve("Other.java"), "package sample; public class Other { }");
+        Files.writeString(fixture.configuration().resolve("plugin-rewrite.properties"), "");
+        SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("rewrite+binary/transform", (_, _) -> new TransformingStep("rewritten").asModule("rewrite"));
+        Path artifacts = fixture.execute(new InferredMultiProjectAssembler().plugins(plugins), "sub/binary/artifacts")
+                .get("sub/binary/artifacts");
+        try (JarFile jar = new JarFile(jarIn(artifacts).toFile())) {
+            assertThat(new String(jar.getInputStream(jar.getEntry("sample/Sample.class")).readAllBytes(), StandardCharsets.UTF_8))
+                    .as("the jar holds the class the transform wrote in place of the one javac compiled")
+                    .isEqualTo("rewritten");
+            assertThat(jar.getEntry("sample/Other.class"))
+                    .as("a class the transform did not write reaches the jar as javac compiled it")
+                    .isNotNull();
+        }
+    }
+
+    @Test
+    public void transforms_run_in_the_order_they_are_named_each_handed_what_the_one_before_wrote() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(Files.createDirectories(fixture.sources().resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }");
+        Files.writeString(fixture.configuration().resolve("plugin-first.properties"), "");
+        Files.writeString(fixture.configuration().resolve("plugin-second.properties"), "");
+        SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("first+binary/transform", (_, _) -> new TransformingStep("first").asModule("first"));
+        plugins.put("second+binary/transform", (_, _) -> new TransformingStep("+second").asModule("second"));
+        Path artifacts = fixture.execute(new InferredMultiProjectAssembler().plugins(plugins), "sub/binary/artifacts")
+                .get("sub/binary/artifacts");
+        try (JarFile jar = new JarFile(jarIn(artifacts).toFile())) {
+            assertThat(new String(jar.getInputStream(jar.getEntry("sample/Sample.class")).readAllBytes(), StandardCharsets.UTF_8))
+                    .as("the second transform is handed the class the first one wrote")
+                    .isEqualTo("first+second");
+        }
+    }
+
+    private static Path jarIn(Path folder) throws IOException {
+        try (Stream<Path> files = Files.walk(folder)) {
+            return files.filter(file -> file.toString().endsWith(".jar")).findFirst().orElseThrow();
+        }
+    }
+
+    private record TransformingStep(String suffix) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            byte[] handed = Files.readAllBytes(arguments.firstEntry().getValue().folder()
+                    .resolve(BuildStep.CLASSES + "sample/Sample.class"));
+            String base = handed.length > 3 && (handed[0] & 0xFF) == 0xCA && (handed[1] & 0xFF) == 0xFE
+                    ? ""
+                    : new String(handed, StandardCharsets.UTF_8);
+            Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.CLASSES + "sample")).resolve("Sample.class"),
+                    base + suffix);
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    @Test
     public void stages_what_a_packager_writes_into_packages() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("plugin-appimage.properties"), "");
