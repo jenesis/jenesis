@@ -108,6 +108,30 @@ public class ProcessBuildStepTest {
     }
 
     @Test
+    public void a_process_ending_with_the_exit_code_of_sigkill_is_named_as_possibly_killed_for_lack_of_memory() throws IOException {
+        Path source = root.resolve("Killed.java");
+        Files.writeString(source, """
+                public class Killed {
+                    public static void main(String[] args) {
+                        System.exit(137);
+                    }
+                }
+                """);
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        assertThatThrownBy(() -> new Program("java",
+                ProcessHandler.OfProcess.ofJavaHome("bin/java"),
+                List.of(),
+                List.of(source.toString()))
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .as("137 is 128 plus SIGKILL, which the out-of-memory killer sends, so the failure says how to need less")
+                .hasMessageContaining("Unexpected exit code: 137\nThe process was killed with SIGKILL")
+                .hasMessageContaining("jenesis.process.concurrency");
+    }
+
+    @Test
     public void a_failure_prints_the_tail_of_a_long_output_and_names_the_file_that_keeps_all_of_it() throws IOException {
         Path source = root.resolve("Verbose.java");
         Files.writeString(source, """
