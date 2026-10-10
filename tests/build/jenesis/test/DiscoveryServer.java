@@ -51,6 +51,11 @@ public final class DiscoveryServer implements AutoCloseable {
         return this;
     }
 
+    public DiscoveryServer withdraw(String domain) {
+        domains.remove(domain);
+        return this;
+    }
+
     public DiscoveryServer file(String path, String content) {
         return file(path, content.getBytes(StandardCharsets.UTF_8));
     }
@@ -94,7 +99,7 @@ public final class DiscoveryServer implements AutoCloseable {
     }
 
     public Discovery discovery() {
-        return new Discovery().uri(uri()).connection(connection());
+        return new Discovery().uri(uri()).connection(connection()).ttl(Duration.ZERO);
     }
 
     public DiscoveryServer context(String path, String content) {

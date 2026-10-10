@@ -188,7 +188,7 @@ public class DiscoveryTest {
 
     @Test
     public void counts_a_file_that_cannot_be_fetched_as_absent() throws IOException {
-        assertThat(new Discovery().uri("http://localhost:1/{domain}").connection(server.connection())
+        assertThat(server.discovery().uri("http://localhost:1/{domain}")
                 .lookup("net.bytebuddy", "maven", "byte-buddy"))
                 .as("a domain whose host is unknown or unreachable publishes nothing, as one behind a proxy appears")
                 .isEmpty();
@@ -233,13 +233,16 @@ public class DiscoveryTest {
         try {
             Discovery discovery = server.discovery()
                     .uri("https://localhost:" + https.getAddress().getPort() + "/{domain}")
-                    .connection(new Repository.Connection().retries(0));
+                    .connection(new Repository.Connection().retries(0))
+                    .cache(folder.resolve("answers"))
+                    .ttl(Duration.ofHours(1));
 
             assertThatThrownBy(() -> discovery.lookup("net.bytebuddy", "maven", "byte-buddy"))
                     .as("a file served under a certificate nobody signed is neither trusted nor taken for absent")
                     .isInstanceOf(IOException.class)
                     .hasMessageContaining("certificate that does not verify")
                     .hasMessageContaining("jenesis.repository.insecure");
+            assertThat(folder.resolve("answers")).as("a certificate that does not verify is never kept").doesNotExist();
         } finally {
             https.stop(0);
         }
@@ -312,6 +315,128 @@ public class DiscoveryTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("is 0")
                 .hasMessageContaining("positive number of milliseconds");
+    }
+
+    @Test
+    public void keeps_what_a_domain_answered_for_a_later_build_within_its_time_to_live(@TempDir Path folder)
+            throws IOException {
+        server.domain("agent.bytebuddy.net", "maven=https://agent/");
+
+        assertThat(server.discovery().cache(folder).ttl(Duration.ofHours(1))
+                .lookup("net.bytebuddy.agent", "maven", "byte-buddy")
+                .map(DiscoveredLocation::target))
+                .contains("https://agent/");
+        assertThat(server.discovery().cache(folder).ttl(Duration.ofHours(1))
+                .lookup("net.bytebuddy.agent", "maven", "byte-buddy")
+                .map(DiscoveredLocation::target))
+                .contains("https://agent/");
+        assertThat(server.queried())
+                .as("a domain without a file is kept as one just as a domain with one")
+                .containsExactly("bytebuddy.net", "agent.bytebuddy.net");
+    }
+
+    @Test
+    public void asks_a_domain_again_once_its_answer_outlived_the_time_to_live(@TempDir Path folder)
+            throws IOException {
+        server.domain("bytebuddy.net", "maven=https://maven/");
+        server.discovery().cache(folder).ttl(Duration.ofHours(1)).lookup("net.bytebuddy", "maven", "byte-buddy");
+        try (Stream<Path> kept = Files.list(folder)) {
+            for (Path file : kept.toList()) {
+                Files.setLastModifiedTime(file, FileTime.from(Instant.now().minus(Duration.ofHours(2))));
+            }
+        }
+        server.domain("bytebuddy.net", "maven=https://moved/");
+
+        assertThat(server.discovery().cache(folder).ttl(Duration.ofHours(1))
+                .lookup("net.bytebuddy", "maven", "byte-buddy")
+                .map(DiscoveredLocation::target))
+                .contains("https://moved/");
+        assertThat(server.queried()).containsExactly("bytebuddy.net", "bytebuddy.net");
+    }
+
+    @Test
+    public void keeps_what_a_domain_answered_last_where_it_withdrew_its_file(@TempDir Path folder)
+            throws IOException {
+        server.domain("bytebuddy.net", "maven=https://maven/");
+        server.discovery().cache(folder).ttl(Duration.ofHours(1)).lookup("net.bytebuddy", "maven", "byte-buddy");
+        try (Stream<Path> kept = Files.list(folder)) {
+            for (Path file : kept.toList()) {
+                Files.setLastModifiedTime(file, FileTime.from(Instant.now().minus(Duration.ofHours(2))));
+            }
+        }
+        server.withdraw("bytebuddy.net");
+
+        assertThat(server.discovery().cache(folder).ttl(Duration.ofHours(1))
+                .lookup("net.bytebuddy", "maven", "byte-buddy")).isEmpty();
+        assertThat(server.discovery().cache(folder).ttl(Duration.ofHours(1))
+                .lookup("net.bytebuddy", "maven", "byte-buddy")).isEmpty();
+        assertThat(server.queried()).containsExactly("bytebuddy.net", "bytebuddy.net");
+    }
+
+    @Test
+    public void reads_what_was_kept_whatever_its_age_and_asks_nothing_while_offline(@TempDir Path folder)
+            throws IOException {
+        server.domain("agent.bytebuddy.net", "maven=https://agent/");
+        server.discovery().cache(folder).ttl(Duration.ofHours(1)).lookup("net.bytebuddy.agent", "maven", "byte-buddy");
+        try (Stream<Path> kept = Files.list(folder)) {
+            for (Path file : kept.toList()) {
+                Files.setLastModifiedTime(file, FileTime.from(Instant.now().minus(Duration.ofDays(30))));
+            }
+        }
+
+        assertThat(server.discovery().cache(folder).ttl(Duration.ofHours(1))
+                .connection(server.connection().offline(true))
+                .lookup("net.bytebuddy.agent", "maven", "byte-buddy")
+                .map(DiscoveredLocation::target))
+                .contains("https://agent/");
+        assertThat(server.discovery().cache(folder).ttl(Duration.ofHours(1))
+                .connection(server.connection().offline(true))
+                .lookup("com.example", "maven", "byte-buddy"))
+                .as("a domain whose answer was never kept is absent while offline")
+                .isEmpty();
+        assertThat(server.queried()).containsExactly("bytebuddy.net", "agent.bytebuddy.net");
+    }
+
+    @Test
+    public void keeps_no_answer_where_the_time_to_live_is_zero(@TempDir Path folder) throws IOException {
+        server.domain("bytebuddy.net", "maven=https://maven/");
+
+        server.discovery().cache(folder).lookup("net.bytebuddy", "maven", "byte-buddy");
+        server.discovery().cache(folder).lookup("net.bytebuddy", "maven", "byte-buddy");
+
+        assertThat(folder).isEmptyDirectory();
+        assertThat(server.queried()).containsExactly("bytebuddy.net", "bytebuddy.net");
+    }
+
+    @Test
+    public void keeps_no_answer_of_a_domain_that_could_not_be_asked(@TempDir Path folder) throws IOException {
+        assertThat(server.discovery().uri("http://localhost:1/{domain}").cache(folder).ttl(Duration.ofHours(1))
+                .lookup("net.bytebuddy", "maven", "byte-buddy"))
+                .isEmpty();
+        assertThat(folder).as("an unreachable domain may answer next time").isEmptyDirectory();
+    }
+
+    @Test
+    public void validates_a_kept_file_as_it_validates_a_fetched_one(@TempDir Path folder) throws IOException {
+        server.domain("bytebuddy.net", "maven=https://maven/");
+        server.discovery().cache(folder).ttl(Duration.ofHours(1)).lookup("net.bytebuddy", "maven", "byte-buddy");
+        try (Stream<Path> kept = Files.list(folder)) {
+            for (Path file : kept.toList()) {
+                Files.writeString(file, "maven=\n");
+            }
+        }
+
+        assertThatThrownBy(() -> server.discovery().cache(folder).ttl(Duration.ofHours(1))
+                .lookup("net.bytebuddy", "maven", "byte-buddy"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maven without a value");
+    }
+
+    @Test
+    public void refuses_a_time_to_live_that_is_negative() {
+        assertThatThrownBy(() -> server.discovery().ttl(Duration.ofHours(-1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("zero to keep no answer");
     }
 
     @Test
