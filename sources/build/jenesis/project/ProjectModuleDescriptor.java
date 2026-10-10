@@ -25,6 +25,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
     private final PathPlacement pathPlacement;
     private final Path location;
     private final boolean sourceResources;
+    private final Path directory;
 
     public ProjectModuleDescriptor(ProjectModule base) {
         this(base.name(),
@@ -44,7 +45,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 null,
                 PathPlacement.INFERRED,
                 null,
-                true);
+                true,
+                null);
     }
 
     private ProjectModuleDescriptor(String name,
@@ -64,7 +66,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                                     Pinning pinning,
                                     PathPlacement pathPlacement,
                                     Path location,
-                                    boolean sourceResources) {
+                                    boolean sourceResources,
+                                    Path directory) {
         this.name = name;
         this.configuration = configuration;
         this.dependencies = dependencies;
@@ -83,6 +86,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
         this.pathPlacement = pathPlacement;
         this.location = location;
         this.sourceResources = sourceResources;
+        this.directory = directory;
     }
 
     public SequencedSet<Path> configuration() {
@@ -107,7 +111,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public ProjectModuleDescriptor configuration(Path... configuration) {
@@ -132,7 +137,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     @Override
@@ -158,7 +164,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     @Override
@@ -184,7 +191,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public ProjectModuleDescriptor dependencies(String... dependencies) {
@@ -214,7 +222,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public ProjectModuleDescriptor sources(String... sources) {
@@ -244,7 +253,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public ProjectModuleDescriptor resources(String... resources) {
@@ -274,7 +284,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public ProjectModuleDescriptor manifests(String... manifests) {
@@ -304,7 +315,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public ProjectModuleDescriptor coordinates(String... coordinates) {
@@ -339,7 +351,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public ProjectModuleDescriptor artifacts(String... artifacts) {
@@ -368,7 +381,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public ProjectModuleDescriptor content(String... content) {
@@ -397,7 +411,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public ProjectModuleDescriptor synthetics(String... synthetics) {
@@ -426,7 +441,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public boolean source() {
@@ -451,7 +467,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public boolean documentation() {
@@ -476,7 +493,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public Pinning pinning() {
@@ -501,7 +519,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public PathPlacement pathPlacement() {
@@ -530,7 +549,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public ProjectModuleDescriptor pathPlacement(PathPlacement pathPlacement) {
@@ -551,7 +571,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
     }
 
     public boolean sourceResources() {
@@ -576,7 +597,34 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources);
+                sourceResources,
+                directory);
+    }
+
+    public Path directory() {
+        return directory;
+    }
+
+    public ProjectModuleDescriptor directory(Path directory) {
+        return new ProjectModuleDescriptor(name,
+                configuration,
+                dependencies,
+                sources,
+                resources,
+                manifests,
+                coordinates,
+                artifacts,
+                spdx,
+                content,
+                synthetics,
+                test,
+                source,
+                documentation,
+                pinning,
+                pathPlacement,
+                location,
+                sourceResources,
+                directory);
     }
 
     private static <T> SequencedSet<T> immutable(SequencedSet<T> values) {

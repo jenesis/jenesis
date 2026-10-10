@@ -93,6 +93,11 @@ closure, with its checksum) overrides it, so the pinned version always wins - yo
 could pin a higher console version here than the derived default and Jenesis would
 honor it.
 
+The tests of a module run in that module's folder, with the `basedir` property set
+to it, as Maven runs them: `runs_in_the_folder_of_its_module` reads `pom.xml` by a
+relative path and finds `greeter/pom.xml`, so a test reading `src/test/...` the
+same way finds what the module holds.
+
 Sharing test code across modules
 --------------------------------
 
@@ -143,12 +148,12 @@ for across the tree, not how much of each matched module is rebuilt.
 
 Test runs are narrowed with `-Djenesis.test.filter`, a comma-separated list of
 `<class-regex>[#<method>]` patterns; the regex matches the fully-qualified class
-name. `greeter` ships two tests, so this runs only one of them:
+name. `greeter` ships three tests, so this runs only one of them:
 
     java -Djenesis.test.filter='.*GreeterTest#prefix_is_a_greeting' build/jenesis/Make.java
 
 The test step's summary then reports `1 tests successful` instead of the default
-`2`. The `-D` flag must come **before** the source file - anything after it is
+`3`. The `-D` flag must come **before** the source file - anything after it is
 read as a selector.
 
 `-Djenesis.test.exclude` takes the same comma-separated class patterns, without a

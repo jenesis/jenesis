@@ -385,6 +385,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                 .pinning(descriptor.pinning())
                                 .pathPlacement(descriptor.pathPlacement())
                                 .moduleName(described.getProperty("module"))
+                                .directory(descriptor.directory())
                                 .custom(hooks.getOrDefault("observed", none))),
                         Stream.of(descriptor.resources().stream(),
                                         resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"),

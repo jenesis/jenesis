@@ -169,6 +169,47 @@ public class TestModuleTest {
     }
 
     @Test
+    public void runs_the_tests_in_the_directory_it_is_given_so_that_a_relative_path_names_a_file_of_the_module()
+            throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "DirectoryTest", """
+                package sample;
+                public class DirectoryTest {
+                    @org.junit.jupiter.api.Test
+                    public void test() throws Exception {
+                        try (java.io.InputStream input = new java.io.FileInputStream("src/test/fixture.txt")) {
+                            System.out.println("Read " + new String(input.readAllBytes())
+                                    + " below " + System.getProperty("basedir"));
+                        }
+                    }
+                }
+                """, bootModuleJars());
+        Files.writeString(Files.createDirectories(module.resolve("src/test")).resolve("fixture.txt"), "a fixture");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .isTest(candidate -> candidate.endsWith("DirectoryTest"))
+                        .jarsOnly(false)
+                        .directory(module),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content()
+                .as("a test JVM runs in the module's folder, as Surefire runs one in the module's basedir")
+                .contains("Read a fixture below " + module.toAbsolutePath());
+        assertThat(reportedErrors(supplement)).isEmpty();
+    }
+
+    @Test
     public void a_failed_run_names_its_failed_tests_even_when_the_tests_swallow_the_output() throws IOException {
         compileSource(classes.resolve(Javac.CLASSES + "sample"), "SilentTest", """
                 package sample;
