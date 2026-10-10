@@ -1324,15 +1324,21 @@ public class TestModule implements BuildExecutorModule {
             if (matchedClasses.isEmpty() && matchedMethods.isEmpty() && !excludedClasses.isEmpty()) {
                 return CompletableFuture.completedFuture(null);
             } else if (matchedClasses.isEmpty() && matchedMethods.isEmpty() && tags.all()) {
-                throw new IllegalStateException("No tests matched the requested selection"
-                        + (filter != null ? ", filter: " + filter : "")
-                        + (tag != null ? ", tag: " + tag : "")
-                        + " among the " + compiled.get() + " classes compiled"
-                        + (compiledFrom == null ? ". Adjust" : " from " + compiledFrom + ", the one folder compiled for"
+                String unmatched = "among the " + compiled.get() + " classes compiled"
+                        + (compiledFrom == null ? "" : " from " + compiledFrom + ", the one folder compiled for"
                                 + " these tests, so tests kept in another one, such as src/test/groovy, need it named"
-                                + " as the test sources, by testSourceDirectory in a pom.xml. Otherwise adjust")
-                        + " jenesis.test.filter / jenesis.test.tag or the isTest predicate,"
-                        + " or set jenesis.test.skip to skip testing.");
+                                + " as the test sources, by testSourceDirectory in a pom.xml");
+                if (!specs.isEmpty()) {
+                    throw new IllegalStateException("No tests matched the requested selection, filter: " + filter
+                            + ", " + unmatched
+                            + ". Adjust jenesis.test.filter, or set jenesis.test.skip to skip testing.");
+                }
+                Consumer<String> reporting = terms.reporting();
+                if (reporting != null) {
+                    reporting.accept("tests ran no test, as no class " + unmatched
+                            + " is named as a test, which jenesis.test.filter can change");
+                }
+                return CompletableFuture.completedFuture(null);
             }
             SequencedSet<String> selection = matchedClasses;
             if (incrementalDigest != null && filter == null && tags.all() && ran.isEmpty() && !matchedClasses.isEmpty()) {

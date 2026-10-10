@@ -1069,19 +1069,21 @@ public class TestModuleTest {
     }
 
     @Test
-    public void names_the_folder_the_tests_were_compiled_from_when_none_matches() throws IOException {
+    public void reports_rather_than_fails_a_module_whose_test_sources_hold_no_test_naming_their_folder() throws IOException {
         SequencedProperties described = new SequencedProperties();
         described.setProperty("path", "impl");
         described.setProperty("sources", "src/test/java");
         described.setProperty("test", "impl");
         described.store(manifests.resolve(BuildStep.MODULE));
+        List<String> printed = new ArrayList<>();
+        settings.put("palette.colors", "none");
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", dependencies);
         executor.addSource("manifests", manifests);
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings),
+                TestModule.ofEnvironment(new Environment(settings).out(printed::add),
                         Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
@@ -1092,13 +1094,15 @@ public class TestModuleTest {
                         .isTest((Predicate<String> & Serializable) _ -> false)
                         .jarsOnly(false),
                 "dependencies", "manifests", "classes");
+        executor.execute();
 
-        assertThatThrownBy(executor::execute)
-                .rootCause()
-                .as("a test folder the module does not name is not compiled, which the message makes visible")
-                .hasMessageContaining("No tests matched the requested selection among the 1 classes compiled from"
-                        + " impl/src/test/java")
-                .hasMessageContaining("src/test/groovy");
+        assertThat(root.resolve("test").resolve("executed").resolve("supplement").resolve("java.args"))
+                .as("test sources that hold no test run none, as Surefire's failIfNoTests defaults to false")
+                .doesNotExist();
+        assertThat(printed)
+                .as("a test folder the module does not name is not compiled, which the report makes visible")
+                .anyMatch(line -> line.contains("tests ran no test, as no class among the 1 classes compiled from"
+                        + " impl/src/test/java") && line.contains("src/test/groovy"));
     }
 
     @Test
