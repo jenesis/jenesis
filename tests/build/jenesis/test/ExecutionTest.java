@@ -468,6 +468,25 @@ public class ExecutionTest {
     }
 
     @Test
+    public void execute_runs_the_main_half_of_a_folder_whose_tests_share_its_path() throws IOException, InterruptedException {
+        Path target = Files.createDirectory(root.resolve("target"));
+        Path main = Files.createDirectory(root.resolve("main-inventory"));
+        Path classesJar = packageSample(main.resolve("classes.jar"));
+        writeInventoryFile(main, "", Sample.class.getName(), null, main.relativize(classesJar).toString());
+        Path tests = writeInventory("tests", "", null, null, "tests-only.jar");
+        SequencedProperties inventory = SequencedProperties.ofFiles(tests.resolve("inventory.properties"));
+        inventory.setProperty("module.test", "sample");
+        inventory.store(tests.resolve("inventory.properties"));
+        SequencedMap<String, Path> modules = new LinkedHashMap<>();
+        modules.put("module-", main);
+        modules.put("test-module-", tests);
+        Project project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layoutWithModules(modules));
+        assertThat(Execution.ofEnvironment(Environment.NONE, project).execute())
+                .as("the tests of a folder describe it under its own path, and the program runs on what its main half needs")
+                .isEqualTo(0);
+    }
+
+    @Test
     public void execute_honours_explicit_main_class_override() throws IOException, InterruptedException {
         Path target = Files.createDirectory(root.resolve("target"));
         Path alpha = Files.createDirectory(root.resolve("alpha-inventory"));
