@@ -26,6 +26,7 @@ public class MavenPomResolver implements MavenResolver {
     private static final Pattern JDK_RANGE = Pattern.compile(
             "\\s*([\\[(])\\s*([0-9]{1,8}(?:\\.[0-9]{1,8})*)?\\s*(,)?\\s*([0-9]{1,8}(?:\\.[0-9]{1,8})*)?\\s*([\\])])\\s*(,|$)");
     private static final Pattern JDK_UNCLOSED = Pattern.compile(".*[\\[(]\\s*[0-9.]*\\s*,\\s*");
+    private static final Pattern JDK_BOUND = Pattern.compile(".*[\\[(]\\s*[0-9.]+\\s*");
     public static final String CHECKSUM_PREFIX = "Checksum/";
 
     private final Supplier<MavenVersionNegotiator> negotiatorSupplier;
@@ -1354,6 +1355,8 @@ public class MavenPomResolver implements MavenResolver {
         }
         if (JDK_UNCLOSED.matcher(required).matches()) {
             required = required + ")";
+        } else if (JDK_BOUND.matcher(required).matches()) {
+            required = required + ",)";
         }
         Matcher matcher = JDK_RANGE.matcher(required);
         boolean matched = false;
