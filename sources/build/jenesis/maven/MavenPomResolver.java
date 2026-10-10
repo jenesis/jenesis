@@ -513,6 +513,33 @@ public class MavenPomResolver implements MavenResolver {
                 if (resolvedScope == null) {
                     continue;
                 }
+                MavenDependencyKey dependencyKey = entry.getKey();
+                String undefined = Stream.of(dependencyKey.groupId(),
+                                dependencyKey.artifactId(),
+                                dependencyKey.type(),
+                                dependencyKey.classifier(),
+                                value.version())
+                        .filter(Objects::nonNull)
+                        .map(PROPERTY::matcher)
+                        .filter(Matcher::find)
+                        .map(matcher -> matcher.group(2))
+                        .findFirst()
+                        .orElse(null);
+                if (undefined != null) {
+                    MavenDependencyKey origin = current.origin();
+                    throw new IllegalStateException("The dependency " + dependencyKey.groupId() + ":"
+                            + dependencyKey.artifactId()
+                            + (dependencyKey.classifier() == null ? "" : ":" + dependencyKey.classifier())
+                            + ":" + value.version() + (origin == null
+                                    ? ""
+                                    : " of " + origin.groupId() + ":" + origin.artifactId() + ":" + current.originVersion())
+                            + " names the property " + undefined + ", which neither the declaring POM, its parents"
+                            + " nor a profile this build activates defines - a profile is activated by <jdk> or"
+                            + " <activeByDefault> alone, and a property of the JVM or of the environment is never read"
+                            + (origin == null ? "" : ": exclude " + dependencyKey.groupId() + ":"
+                                    + dependencyKey.artifactId() + " from " + origin.groupId() + ":"
+                                    + origin.artifactId() + " and declare the artifact it stands for yourself"));
+                }
                 DependencyResolution resolution = resolutions.computeIfAbsent(
                         entry.getKey(),
                         _ -> new DependencyResolution());
@@ -922,6 +949,7 @@ public class MavenPomResolver implements MavenResolver {
                             String value = node.getTextContent().trim();
                             properties.put(property, value);
                             properties.put("project." + property, value);
+                            properties.put("pom." + property, value);
                         }));
                 List<Node> models = Stream.concat(Stream.of(document.getDocumentElement()),
                         toActiveProfiles(document.getDocumentElement(), path, trusted)).toList();
@@ -1914,9 +1942,6 @@ public class MavenPomResolver implements MavenResolver {
             while (matcher.find()) {
                 String property = matcher.group(2);
                 String replacement = properties.get(property);
-                if (replacement == null) {
-                    replacement = System.getProperty(property);
-                }
                 if (replacement == null) {
                     matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group()));
                 } else {

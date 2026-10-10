@@ -585,7 +585,7 @@ public class MavenPomResolverTest {
         assertThatThrownBy(() -> mavenPomResolver.dependencies(
                 Runnable::run, mavenRepository, "group", "artifact", "1", null))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Failed to resolve other:artifact:${undefined.property}");
+                .hasMessageContaining("The dependency other:artifact:${undefined.property} names the property undefined.property");
     }
 
     @Test
@@ -606,7 +606,7 @@ public class MavenPomResolverTest {
         assertThatThrownBy(() -> mavenPomResolver.dependencies(
                 Runnable::run, mavenRepository, "group", "artifact", "1", null))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Failed to resolve other:artifact:${undefined.property}");
+                .hasMessageContaining("The dependency other:artifact:${undefined.property} names the property undefined.property");
     }
 
     @Test
@@ -2653,6 +2653,37 @@ public class MavenPomResolverTest {
                 .toList();
         assertThat(followed).containsExactly("maven/group/artifact/1", "maven/transitive/artifact/[1,2]");
         assertThat(resolution.vertices().get("maven/transitive/artifact").resolvedVersion()).isEqualTo("2");
+    }
+
+    @Test
+    public void refuses_a_transitive_dependency_naming_a_property_its_pom_does_not_define_whatever_the_jvm_holds() throws IOException {
+        addToRepository("group", "artifact", "1", rootPom("", "middle"));
+        addToRepository("middle", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>shared</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                            <classifier>${jenesis.undefined.platform}</classifier>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        System.setProperty("jenesis.undefined.platform", "linux");
+        try {
+            assertThatThrownBy(() -> mavenPomResolver.dependencies(
+                    Runnable::run, mavenRepository, "group", "artifact", "1", null))
+                    .as("a POM is read from its model alone, so the build JVM's properties never decide a coordinate")
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("The dependency shared:artifact:${jenesis.undefined.platform}:1 of middle:artifact:1")
+                    .hasMessageContaining("names the property jenesis.undefined.platform")
+                    .hasMessageContaining("exclude shared:artifact from middle:artifact");
+        } finally {
+            System.clearProperty("jenesis.undefined.platform");
+        }
     }
 
     @Test

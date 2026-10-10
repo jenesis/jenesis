@@ -863,7 +863,9 @@ public record Project(
                                  it cannot fetch; a -SNAPSHOT from the local repository, or else
                                  as the remote repository's maven-metadata.xml names its newest
                                  timestamped file; <modules>; <properties> and
-                                 ${...}; dependencies of compile, provided, runtime and test scope;
+                                 ${...}, which neither a JVM property nor the environment fills, so
+                                 a dependency naming one no POM defines fails the build naming it;
+                                 dependencies of compile, provided, runtime and test scope;
                                  <optional>, <exclusions> with wildcards, <type> and <classifier>;
                                  <dependencyManagement> with import-scoped BOMs, an entry's
                                  exclusions applied wherever its dependency appears;
