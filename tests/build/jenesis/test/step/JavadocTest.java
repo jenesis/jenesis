@@ -275,8 +275,8 @@ public class JavadocTest {
         assertThat(next.resolve(Javadoc.JAVADOC + "sample/sample/Sample.html")).isNotEmptyFile();
         assertThat(Files.readString(supplement.resolve("javadoc.args")))
                 .as("a jar without a module name is unscannable on the module path, so it goes where it belongs")
-                .contains("--module-path\n\"" + escaped(named))
-                .contains("--class-path\n\"" + escaped(plain))
+                .contains("\"--module-path\"\n\"" + escaped(named))
+                .contains("\"--class-path\"\n\"" + escaped(plain))
                 .doesNotContain("--add-reads");
     }
 
@@ -316,7 +316,7 @@ public class JavadocTest {
         assertThat(next.resolve(Javadoc.JAVADOC + "sample/module-summary.html")).isNotEmptyFile();
         assertThat(Files.readString(supplement.resolve("javadoc.args")))
                 .as("the documented module's own classes are part of it, not a second module of the same name")
-                .contains("--patch-module\n\"sample=" + escaped(classes))
+                .contains("\"--patch-module\"\n\"sample=" + escaped(classes))
                 .doesNotContain("--module-path");
     }
 

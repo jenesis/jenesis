@@ -188,28 +188,21 @@ public class Javadoc extends ProcessBuildStep {
                         ? classPath
                         : descriptor.name().equals(module) ? patched : modulePath).add(entry);
             }
-            StringBuilder args = new StringBuilder();
             for (Map.Entry<String, List<String>> paths : List.of(
                     Map.entry("--module-path", modulePath),
                     Map.entry("--class-path", classPath),
                     Map.entry("--patch-module", patched)
             )) {
                 if (!paths.getValue().isEmpty()) {
-                    args.append(paths.getKey())
-                            .append("\n\"")
-                            .append(paths.getKey().equals("--patch-module") ? module + "=" : "")
-                            .append(String.join(File.pathSeparator, paths.getValue())
-                                    .replace("\\", "\\\\")
-                                    .replace("\"", "\\\""))
-                            .append("\"\n");
+                    commands.add(paths.getKey());
+                    commands.add((paths.getKey().equals("--patch-module") ? module + "=" : "")
+                            + String.join(File.pathSeparator, paths.getValue()));
                 }
             }
-            Path argfile = context.supplement().resolve("javadoc.args");
-            Files.writeString(argfile, args.toString());
-            commands.add("@" + argfile);
         }
         commands.addAll(files);
-        return CompletableFuture.completedStage(commands);
+        return CompletableFuture.completedStage(List.of("@" + argumentFile(context.supplement().resolve("javadoc.args"),
+                commands)));
     }
 
     private static boolean declaresPublicType(List<String> files) throws IOException {

@@ -202,7 +202,7 @@ public class Javac extends ProcessBuildStep {
                 path = new ArrayList<>(),
                 processorPath = new ArrayList<>(),
                 siblingClasses = new ArrayList<>(),
-                commands = new ArrayList<>(List.of("-d", target.toString(), "-s", generated.toString()));
+                options = new ArrayList<>(List.of("-d", target.toString(), "-s", generated.toString()));
         boolean compilerPlugins = false;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -261,11 +261,11 @@ public class Javac extends ProcessBuildStep {
                 .orElse(null);
         boolean module = moduleInfo != null;
         if (module) {
-            List<String> options = prepended(properties);
+            List<String> declared = prepended(properties);
             String release = null;
-            for (int index = 0; index < options.size() - 1; index++) {
-                if (options.get(index).equals("--release") || options.get(index).equals("--target")) {
-                    release = options.get(index + 1);
+            for (int index = 0; index < declared.size() - 1; index++) {
+                if (declared.get(index).equals("--release") || declared.get(index).equals("--target")) {
+                    release = declared.get(index + 1);
                 }
             }
             String feature = release != null && release.startsWith("1.") ? release.substring(2) : release;
@@ -312,31 +312,23 @@ public class Javac extends ProcessBuildStep {
             for (String entry : path) {
                 (pathPlacement.test(Path.of(entry)) ? modulePath : classPath).add(entry);
             }
-            StringBuilder args = new StringBuilder();
             if (!modulePath.isEmpty()) {
-                args.append("--module-path\n\"")
-                        .append(String.join(File.pathSeparator, modulePath).replace("\\", "\\\\").replace("\"", "\\\""))
-                        .append("\"\n");
+                options.add("--module-path");
+                options.add(String.join(File.pathSeparator, modulePath));
             }
             if (!classPath.isEmpty()) {
-                args.append("--class-path\n\"")
-                        .append(String.join(File.pathSeparator, classPath).replace("\\", "\\\\").replace("\"", "\\\""))
-                        .append("\"\n");
+                options.add("--class-path");
+                options.add(String.join(File.pathSeparator, classPath));
             }
             if (patchModule != null) {
-                args.append("--patch-module\n\"")
-                        .append(patchModule)
-                        .append("=")
-                        .append(String.join(File.pathSeparator, siblingClasses).replace("\\", "\\\\").replace("\"", "\\\""))
-                        .append("\"\n");
+                options.add("--patch-module");
+                options.add(patchModule + "=" + String.join(File.pathSeparator, siblingClasses));
             }
-            args.append(processorPath(processorPath, pathPlacement.modular() && !compilerPlugins));
-            Path file = context.supplement().resolve("javac.args");
-            Files.writeString(file, args.toString());
-            commands.add("@" + file);
+            options.addAll(processorPath(processorPath, pathPlacement.modular() && !compilerPlugins));
         }
-        commands.addAll(files);
-        return CompletableFuture.completedStage(commands);
+        options.addAll(files);
+        return CompletableFuture.completedStage(List.of("@" + argumentFile(context.supplement().resolve("javac.args"),
+                options)));
     }
 
     private static boolean names(SequencedMap<String, SequencedMap<String, String>> properties, Set<String> options) {
@@ -358,9 +350,9 @@ public class Javac extends ProcessBuildStep {
         return false;
     }
 
-    private static String processorPath(List<String> processorPath, boolean processorModules) {
+    private static List<String> processorPath(List<String> processorPath, boolean processorModules) {
         if (processorPath.isEmpty()) {
-            return "";
+            return List.of();
         }
         if (processorModules) {
             try {
@@ -369,9 +361,8 @@ public class Javac extends ProcessBuildStep {
                 processorModules = false;
             }
         }
-        return (processorModules ? "--processor-module-path\n\"" : "--processor-path\n\"")
-                + String.join(File.pathSeparator, processorPath).replace("\\", "\\\\").replace("\"", "\\\"")
-                + "\"\n";
+        return List.of(processorModules ? "--processor-module-path" : "--processor-path",
+                String.join(File.pathSeparator, processorPath));
     }
 
     private CompletionStage<Void> compileVersioned(Executor executor,
@@ -539,8 +530,8 @@ public class Javac extends ProcessBuildStep {
                 .resolve(CLASSES + "META-INF/versions/" + release)),
                 generated = Files.createDirectories(context.next()
                         .resolve(GENERATED + "META-INF/versions/" + release));
-        List<String> commands = new ArrayList<>(prepended);
-        commands.addAll(List.of("-d", target.toString(), "-s", generated.toString()));
+        List<String> commands = new ArrayList<>(prepended),
+                options = new ArrayList<>(List.of("-d", target.toString(), "-s", generated.toString()));
         commands.addAll(sourceAndTarget
                 ? List.of("--source", Integer.toString(release), "--target", Integer.toString(release))
                 : List.of("--release", Integer.toString(release)));
@@ -575,41 +566,26 @@ public class Javac extends ProcessBuildStep {
                 }
             }
         }
-        StringBuilder args = new StringBuilder();
         if (!modulePath.isEmpty()) {
-            String escaped = String.join(File.pathSeparator, modulePath)
-                    .replace("\\", "\\\\")
-                    .replace("\"", "\\\"");
-            args.append("--module-path\n\"").append(escaped).append("\"\n");
+            options.add("--module-path");
+            options.add(String.join(File.pathSeparator, modulePath));
         }
         if (!classPath.isEmpty()) {
-            String escaped = String.join(File.pathSeparator, classPath)
-                    .replace("\\", "\\\\")
-                    .replace("\"", "\\\"");
-            args.append("--class-path\n\"").append(escaped).append("\"\n");
+            options.add("--class-path");
+            options.add(String.join(File.pathSeparator, classPath));
         }
         if (!patchModule.isEmpty()) {
-            String escaped = String.join(File.pathSeparator, patchModule)
-                    .replace("\\", "\\\\")
-                    .replace("\"", "\\\"");
-            args.append("--patch-module\n\"")
-                    .append(patched)
-                    .append("=")
-                    .append(escaped)
-                    .append("\"\n");
+            options.add("--patch-module");
+            options.add(patched + "=" + String.join(File.pathSeparator, patchModule));
         }
-        args.append(processorPath(processorPath,
+        options.addAll(processorPath(processorPath,
                 this.pathPlacement.forModuleInfo(patched != null).modular() && !compilerPlugins));
-        if (!args.isEmpty()) {
-            Path argFile = context.supplement().resolve("javac-" + release + ".args");
-            Files.writeString(argFile, args.toString());
-            commands.add("@" + argFile);
-        }
-        commands.addAll(files);
+        options.addAll(files);
+        commands.add("@" + argumentFile(context.supplement().resolve("javac-" + release + ".args"), options));
         Path output = context.supplement().resolve("output-" + release);
         Path error = context.supplement().resolve("error-" + release);
         ProcessHandler handler = factory.apply(commands);
-        Files.writeString(context.supplement().resolve("command-" + release), String.join(" ", handler.commands()));
+        Files.writeString(context.supplement().resolve("command-" + release), shell(handler.commands()));
         ProcessHandler.Tee tee = tee(executor, handler);
         CompletableFuture<Void> future = new CompletableFuture<>();
         executor.execute(() -> {
@@ -621,8 +597,7 @@ public class Javac extends ProcessBuildStep {
                     future.completeExceptionally(new IllegalStateException(
                             "Unexpected exit code: " + exitCode + " (multi-release " + release + ")\n"
                                     + "To reproduce, execute:\n "
-                                    + reproduction(context.supplement().resolve("reproduce-" + release + ".args"),
-                                            handler.commands())
+                                    + shell(handler.commands())
                                     + tail("Output", output)
                                     + tail("Error", error)));
                 }
