@@ -1370,11 +1370,10 @@ public record Project(
                       jmh-maven-plugin / me.champeau.jmh -> @jenesis.plugin and @jenesis.main (39)
                       byte-buddy-maven-plugin / net.bytebuddy.byte-buddy-gradle-plugin -> no built-in:
                           those plugins discover Byte Buddy plugins themselves and take their settings
-                          as XML or DSL, which configures awkwardly; here a plugin of the project uses
-                          Byte Buddy's API in Java, with values from plugin-<name>.properties, to
-                          generate classes at binary/compiled (73). No hook point hands a plugin the
-                          classes javac compiled to enhance, so a net.bytebuddy.build.Plugin that
-                          rewrites them has no place yet
+                          as XML or DSL, which configures awkwardly; here a plugin of the project at
+                          binary/transform constructs the net.bytebuddy.build.Plugin instances in Java,
+                          with values from plugin-<name>.properties, and runs them with Plugin.Engine
+                          over the module's compiled classes and its compile class path (73)
                       japicmp-maven-plugin / me.champeau.gradle.japicmp -> japicmp.properties (40)
 
                     ## Dependencies
@@ -2064,8 +2063,9 @@ public record Project(
                     the file is empty. A key @<input>[/<target>]=<path> binds a file or folder of the
                     project, relative to the module, into an input the plugin reads as ../inputs/<input>,
                     placed at <target> inside it; one input takes a key per target, and @@<key> is the
-                    value @<key>. A path must stay within the project. A plugin adds to its module and replaces nothing; a build that
-                    changes what the stock steps do is an entry point of its own. A plugin runs the
+                    value @<key>. A path must stay within the project. A plugin adds to its module and
+                    replaces nothing but the compiled classes a binary/transform plugin rewrites; a build
+                    that changes what the stock steps do is an entry point of its own. A plugin runs the
                     project's code, as its tests do, so build an untrusted project with
                     -Djenesis.project.docker=true.
 
@@ -2101,7 +2101,7 @@ public record Project(
                     to the stock build and replaces none; skill/plugins wires it in. The smallest
                     whole example is demo-57-internal-module, the same plugin published is
                     demo-58-external-module, demo-59-project-plugins uses every project-wide
-                    hook point, and demo-73-byte-buddy generates classes with a library's API.
+                    hook point, and demo-73-byte-buddy rewrites compiled classes with Byte Buddy.
 
                     ## The shape
 
@@ -2144,6 +2144,11 @@ public record Project(
                     scope, Dependencies.all(folder) every one. What a step at binary/compiled writes
                     as classes/ and a manifest.mf is merged into the module's jar beside what javac
                     compiled, which it never sees or replaces: a class both write fails the build.
+                    A step at binary/transform is handed the module's compiled classes as its first
+                    argument and the module's inputs after it; what it writes below classes/, or as a
+                    manifest.mf, replaces the file of that name, every other one passes on as it was,
+                    and several such plugins run in the order jenesis.plugins.properties names them,
+                    each handed what the one before it wrote.
 
                     ## Pick the hook point by what the step produces
 
@@ -2154,6 +2159,8 @@ public record Project(
                                              formatters
                       compliance             a verdict on the resolved dependencies
                       binary/compiled        a compiler of its own, beside javac and kotlinc
+                      binary/transform       classes/ rewritten from what the compilers wrote, the
+                                             place of a bytecode enhancer
                       binary/validate        a verdict on the compiled classes, beside SpotBugs
                       artifact               a step over the jar, beside japicmp
                       observed               a step over the tests' run, beside JaCoCo and PIT

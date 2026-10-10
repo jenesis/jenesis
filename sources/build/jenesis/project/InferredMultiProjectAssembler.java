@@ -48,6 +48,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             "binary",
             "binary/generated",
             "binary/compiled",
+            "binary/transform",
             "binary/validate",
             "artifact",
             "observed",
@@ -337,6 +338,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             resolvers)
                     .includeResources(descriptor.includeResources())
                     .custom(hooks.getOrDefault("binary/compiled", none)));
+            if (hooks.containsKey("binary/transform")) {
+                toolchainModule = toolchainModule.transformer(new ClassTransformModule(hooks.get("binary/transform")));
+            }
             if (hooks.containsKey("binary/validate")) {
                 toolchainModule = toolchainModule.validatorModule(InferredByteCodeQualityModule.ofEnvironment(environment,
                         descriptor.configuration(),
