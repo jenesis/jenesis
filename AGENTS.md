@@ -258,8 +258,10 @@ fails the build by throwing, and `inspect` fails it as well when
 an inspection changed a file it was handed. The module hook point `package` is the one whose output is staged beyond the
 module: what its plugins write into `packages/` is merged with the stock `jpackage` output, refusing a name written
 twice, and staged in `stage/packages/`. A plugin adds and
-never replaces: a build that changes what the stock steps do is an entry point of its own that wires its
-assembler in code. A plugin runs the project's code, as its tests and annotation processors do, so the project
+never replaces, with one exception: the plugins of the module hook point `binary/transform` rewrite the module's
+compiled classes, in the order they are named, each handed what the one before wrote, and what one writes replaces
+the class file of that name - bytecode enhancement, and nothing else. Any other change to what the stock steps do is
+an entry point of its own that wires its assembler in code. A plugin runs the project's code, as its tests and annotation processors do, so the project
 names it itself; what isolates an untrusted project is `jenesis.project.docker`, under which the host runs no
 build, `watch` included, before the container is up, and `Make.settings` refuses every `jenesis.project.docker*`
 and `jenesis.execute.docker*` key in a file the project provides, so a project can neither switch the isolation
