@@ -71,7 +71,7 @@ public class JaCoCoModuleTest {
                 .exists();
         assertThat(Files.readString(command))
                 .as("a first-party jar is recognised by its coordinate, whatever its file name")
-                .contains("--classfiles " + first)
+                .contains("--classfiles " + shell(first.toString()))
                 .as("a third-party jar is not code under test")
                 .doesNotContain(third.toString());
     }
@@ -103,7 +103,7 @@ public class JaCoCoModuleTest {
 
         assertThat(root.resolve("jacoco").resolve("report").resolve("supplement").resolve("command"))
                 .content()
-                .contains("--classfiles " + first)
+                .contains("--classfiles " + shell(first.toString()))
                 .as("the compiled tests are not counted as covered code")
                 .doesNotContain(project.resolve(BuildStep.CLASSES).toString())
                 .doesNotContain(project.resolve(BuildStep.SOURCES).toString());
@@ -144,7 +144,7 @@ public class JaCoCoModuleTest {
 
         assertThat(root.resolve("jacoco").resolve("report").resolve("supplement").resolve("command"))
                 .content()
-                .contains("--classfiles " + first)
+                .contains("--classfiles " + shell(first.toString()))
                 .as("the classes a test module compiles are its tests, which are no code under test")
                 .doesNotContain(project.resolve(BuildStep.CLASSES).toString());
     }
@@ -194,5 +194,9 @@ public class JaCoCoModuleTest {
                 false,
                 false,
                 0);
+    }
+
+    private static String shell(String word) {
+        return word.matches("[A-Za-z0-9_@%+=:,./-]+") ? word : "'" + word.replace("'", "'\\''") + "'";
     }
 }
