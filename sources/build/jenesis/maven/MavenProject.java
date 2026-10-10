@@ -1102,6 +1102,14 @@ public class MavenProject implements BuildExecutorModule {
                 properties.setProperty("plugins", plugins.entrySet().stream()
                         .map(plugin -> plugin.getKey() + "=" + plugin.getValue())
                         .collect(Collectors.joining("\t")));
+                if (value.pluginExclusions() != null) {
+                    value.pluginExclusions().forEach((plugin, excluded) -> {
+                        if (plugins.containsKey(plugin)) {
+                            properties.setProperty("exclusions." + plugin
+                                    + (plugin.split("/").length == 3 ? "/RELEASE" : ""), excluded);
+                        }
+                    });
+                }
             }
             SequencedMap<String, String> aliases = value.aliases() == null
                     ? new LinkedHashMap<>()

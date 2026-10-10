@@ -20,6 +20,7 @@ public record MavenLocalPom(String groupId,
                             SequencedSet<String> natives,
                             SequencedMap<String, String> plugins,
                             SequencedMap<String, String> testPlugins,
+                            SequencedMap<String, String> pluginExclusions,
                             SequencedMap<String, String> aliases,
                             SequencedMap<String, String> signatures,
                             String mainClass,
@@ -29,28 +30,28 @@ public record MavenLocalPom(String groupId,
     public MavenLocalPom version(String version) {
         return new MavenLocalPom(groupId, artifactId, version, packaging, release, testRelease, sourceDirectory,
                 resourceDirectories, testSourceDirectory, testResourceDirectories, dependencies, managedDependencies, bom,
-                qualifiedDependencies, attachments, natives, plugins, testPlugins, aliases, signatures, mainClass, metadata,
-                expressions);
+                qualifiedDependencies, attachments, natives, plugins, testPlugins, pluginExclusions, aliases, signatures,
+                mainClass, metadata, expressions);
     }
 
     public MavenLocalPom dependencies(SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies) {
         return new MavenLocalPom(groupId, artifactId, version, packaging, release, testRelease, sourceDirectory,
                 resourceDirectories, testSourceDirectory, testResourceDirectories, dependencies, managedDependencies, bom,
-                qualifiedDependencies, attachments, natives, plugins, testPlugins, aliases, signatures, mainClass, metadata,
-                expressions);
+                qualifiedDependencies, attachments, natives, plugins, testPlugins, pluginExclusions, aliases, signatures,
+                mainClass, metadata, expressions);
     }
 
     public MavenLocalPom managedDependencies(SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies) {
         return new MavenLocalPom(groupId, artifactId, version, packaging, release, testRelease, sourceDirectory,
                 resourceDirectories, testSourceDirectory, testResourceDirectories, dependencies, managedDependencies, bom,
-                qualifiedDependencies, attachments, natives, plugins, testPlugins, aliases, signatures, mainClass, metadata,
-                expressions);
+                qualifiedDependencies, attachments, natives, plugins, testPlugins, pluginExclusions, aliases, signatures,
+                mainClass, metadata, expressions);
     }
 
     public MavenLocalPom bom(SequencedMap<MavenDependencyKey, MavenDependencyValue> bom) {
         return new MavenLocalPom(groupId, artifactId, version, packaging, release, testRelease, sourceDirectory,
                 resourceDirectories, testSourceDirectory, testResourceDirectories, dependencies, managedDependencies, bom,
-                qualifiedDependencies, attachments, natives, plugins, testPlugins, aliases, signatures, mainClass, metadata,
-                expressions);
+                qualifiedDependencies, attachments, natives, plugins, testPlugins, pluginExclusions, aliases, signatures,
+                mainClass, metadata, expressions);
     }
 }
