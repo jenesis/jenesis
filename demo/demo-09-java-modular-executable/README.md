@@ -410,7 +410,7 @@ produces (tens of megabytes): because this is a modular application, jpackage's 
 `org.slf4j`, `java.base`), rather than bundling a full runtime.
 
 Producing a native installer needs the platform's packaging tooling on the PATH (Linux:
-`dpkg-deb`/`fakeroot` for `deb`, `rpmbuild` for `rpm`; Windows: the WiX Toolset; macOS:
+`dpkg-deb` for `deb`, with no `fakeroot`, `rpmbuild` for `rpm`; Windows: the WiX Toolset; macOS:
 the bundled `productbuild`/`hdiutil`). For that reason it is run locally rather than in
 CI, where `Demo.java`'s app-image - which needs no native tooling - covers the packaging
 path.

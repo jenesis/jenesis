@@ -17,7 +17,7 @@ import module java.base;
  * reports the produced package instead of running it.
  *
  * Producing a native installer needs the platform's packaging tooling on the PATH
- * (Linux: {@code dpkg-deb}/{@code fakeroot} for {@code deb}, {@code rpmbuild} for
+ * (Linux: {@code dpkg-deb} for {@code deb}, {@code rpmbuild} for
  * {@code rpm}; Windows: the WiX Toolset; macOS: the bundled {@code productbuild}/
  * {@code hdiutil}). Run it from this directory:
  *

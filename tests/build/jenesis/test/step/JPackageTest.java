@@ -165,6 +165,30 @@ public class JPackageTest {
         }
     }
 
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    public void builds_a_debian_package_owned_by_root_without_fakeroot() throws IOException, InterruptedException {
+        assumeTrue(Stream.of(System.getenv().getOrDefault("PATH", "").split(File.pathSeparator))
+                .anyMatch(folder -> Files.isExecutable(Path.of(folder, "dpkg-deb"))), "dpkg-deb builds a Debian package");
+        mainJar();
+        new JPackage(ProcessHandler.Factory.TOOL).type("deb").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
+                        bundle,
+                        Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/jpackage.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        Path deb;
+        try (Stream<Path> files = Files.list(next.resolve(JPackage.PACKAGES))) {
+            deb = files.filter(file -> file.getFileName().toString().endsWith(".deb")).findFirst().orElseThrow();
+        }
+        Process listing = new ProcessBuilder("dpkg-deb", "-c", deb.toString()).redirectErrorStream(true).start();
+        List<String> entries = new String(listing.getInputStream().readAllBytes(), StandardCharsets.UTF_8).lines().toList();
+        assertThat(listing.waitFor()).isZero();
+        assertThat(entries).isNotEmpty().allMatch(entry -> entry.split("\\s+")[1].equals("root/root"));
+        assertThat(supplement.resolve("fakeroot/fakeroot")).isExecutable();
+    }
+
     private void mainJar() throws IOException {
         Path artifacts = Files.createDirectory(bundle.resolve(BuildStep.ARTIFACTS));
         Manifest manifest = new Manifest();
