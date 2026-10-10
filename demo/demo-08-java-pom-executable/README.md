@@ -218,7 +218,10 @@ executable jar** you run with `java -jar foo.jar`, by shading the published
 `build.jenesis:build.jenesis.launcher` into the jar root as its `Main-Class` and
 exploding each dependency into a `jars/<jar>/` subfolder, with `classpath` in the jar's
 `META-INF/jenesis/application.properties` naming them (this app is non-modular, so everything
-is class path). `build/DemoLauncher.java` activates the
+is class path). The application sees what `classpath` names and nothing else of the jar: not
+the launcher's classes, not the descriptor and not the jar's own manifest, so an
+`application.properties` of its own - the file a framework such as Spring Boot reads its
+configuration from - is the one it finds. `build/DemoLauncher.java` activates the
 committed `launcher` profile with `Project.profiles(...)`: the profile's
 `build.jenesis/launcher/packaging.properties` (`launcher=true`) outranks the module's
 own `packaging.properties`, then the demo builds and runs the produced jar:
