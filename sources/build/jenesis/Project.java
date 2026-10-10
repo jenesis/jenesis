@@ -903,7 +903,7 @@ public record Project(
                                  System behaviour stay with the old build until the project moves
                                  to module-info.java
                       a BOM      a module of pom packaging that lists no modules but declares a
-                                 <dependencyManagement>, such as a mockito-bom, is staged, exported
+                                 <dependencyManagement>, as a library's -bom does, is staged, exported
                                  and released as its POM alone: its coordinate, packaging and
                                  metadata, and that <dependencyManagement> with its ${...}
                                  resolved and its parent's left out, since the parent is not
@@ -1075,12 +1075,12 @@ public record Project(
                     the root for every module. A tool resolves in a group named after it, such as
                     checkstyle, pmd or jacoco, and once per module, since each module resolves alone.
                     A pom.xml pins it with a comment that is a child of <project>, one coordinate per
-                    line, `<!--jenesis.pin checkstyle/maven/com.puppycrawl.tools/checkstyle 10.18.2-->`,
+                    line, `<!--jenesis.pin checkstyle/maven/<groupId>/<artifactId> <version>-->`,
                     which `pin` completes with the tool's closure. That comment is the module's own:
                     `pin` writes it into every module's POM and a parent's is not inherited, while a
                     <!--jenesis.plugin--> comment is, from a local parent but never from a POM that only
                     lists the module under <modules>. A module-info.java pins it with
-                    @jenesis.pin checkstyle/maven/com.puppycrawl.tools/checkstyle 10.18.2. JaCoCo's
+                    @jenesis.pin checkstyle/maven/<groupId>/<artifactId> <version>. JaCoCo's
                     agent follows the release its group pins for the CLI. Configuration that lived
                     inside a plugin moves here:
 
@@ -1534,7 +1534,7 @@ public record Project(
                     `<module>` abbreviates `<group>/module/<module>`, `<groupId>/<artifactId>`
                     abbreviates `<group>/maven/<groupId>/<artifactId>`, and `maven/<coordinate>`
                     abbreviates `<group>/maven/<coordinate>` - the form a type or a classifier needs,
-                    as in maven/org.glassfish/jakarta.json/jar/module, because a longer token without
+                    as in maven/<groupId>/<artifactId>/jar/<classifier>, because a longer token without
                     the repository reads its groupId as a group, which is refused. A trailing `(<token>,...)`
                     guard applies a line only on a matching platform, with an unguarded line for the
                     same coordinate as fallback. Parentheses rather than brackets, because a
@@ -1627,8 +1627,8 @@ public record Project(
                           closure already resolves is kept, and only a coordinate nothing else pulls
                           in is negotiated as LATEST. It also names the artifact a `requires` takes,
                           replacing the module index lookup, which is the way to pin down a name
-                          several artifacts declare: alias org.bouncycastle.pg to bcpg-jdk18on and
-                          neither the -debug nor the -lts build can land instead. Aliasing a name the
+                          several artifacts declare: alias it to the one artifact meant and no
+                          other build of the same library can land instead. Aliasing a name the
                           target already declares is allowed and does exactly that, so an alias need
                           not be dropped when its target grows a module name. The jar's manifest
                           hands the alias to its consumers; one for a `requires static` target
@@ -1647,8 +1647,8 @@ public record Project(
                           closure again through the sibling and excludes it there as well.
                       @jenesis.override <module> <carrier>...
                           Replace a module with the modules already carrying its packages, for a
-                          dependency that shades another module (Tomcat Embed shades the Servlet
-                          API). Jenesis substitutes an empty module requiring the carriers
+                          dependency that shades another module, as a server that bundles the API
+                          it implements does. Jenesis substitutes an empty module requiring the carriers
                           transitively and drops every resolved artifact declaring the overridden
                           module, so the packages appear once. Reaches consumers through the
                           Jenesis-Overrides manifest header. A carrier nothing declares is an error.
@@ -1698,7 +1698,7 @@ public record Project(
                           entries, and the last declared BOM wins a conflict.
                           A key in that file is <module>, <groupId>/<artifactId>, or a full
                           <repository>/<coordinate>, which is the form a type or a classifier needs:
-                          maven/io.netty/netty-transport-native-epoll/jar/linux-x86_64, because
+                          maven/<groupId>/<native-library>/jar/linux-x86_64, because
                           without the repository the groupId is read as one. An entry manages a
                           version wherever a closure reaches that coordinate, including modules that
                           never name it, so give every entry the checksum its version resolves to.

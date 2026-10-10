@@ -117,9 +117,9 @@ name, `project=...` / `artifact=...` in `project.properties` override the derive
 values for every module of the project. A module that keeps a coordinate of its own
 declares it in a `project.properties` of its own configuration folder,
 `META-INF/build.jenesis/` beside its sources, which is layered over the root file and
-wins for every key it names - so a module `json.path` can still publish as
-`com.jayway.jsonpath:json-path`, and a sibling that `requires` it lists it in its POM
-under that coordinate. The point here, though, is that you usually do not have to.
+wins for every key it names - so a module keeps the coordinate its library was
+published under before it took a module name, and a sibling that `requires` it lists
+it in its POM under that coordinate. The point here, though, is that you usually do not have to.
 
 Reproducibility
 ---------------
