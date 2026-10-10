@@ -1951,6 +1951,7 @@ public record Project(
                                                 staged as <artifact>.zip and a launcher jar as
                                                 <artifact>.jar in stage/packages,
                                                 jpackage=<type>[,<type>...] packaging and staging each,
+                                                a deb with dpkg-deb alone, no fakeroot,
                                                 docker=<image> with docker.label.<name>=<value> lines,
                                                 docker.jpackage=app-image|deb|rpm to put that jpackage
                                                 package into the image instead of the jars, built
