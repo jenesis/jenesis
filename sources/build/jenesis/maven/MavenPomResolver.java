@@ -500,12 +500,12 @@ public class MavenPomResolver implements MavenResolver {
                 if (current.root()) {
                     value = merge(entry.getValue(), override);
                 } else {
-                    value = override == null ? entry.getValue() : merge(override, entry.getValue());
-                    if (override != null && override.exclusions() != null && entry.getValue().exclusions() != null) {
-                        value = value.exclusions(Stream.concat(entry.getValue().exclusions().stream(),
+                    MavenDependencyValue declared = merge(entry.getValue(), current.pom().managedDependencies().get(entry.getKey()));
+                    value = override == null ? declared : merge(override, declared);
+                    if (override != null && override.exclusions() != null && declared.exclusions() != null) {
+                        value = value.exclusions(Stream.concat(declared.exclusions().stream(),
                                 override.exclusions().stream()).distinct().toList());
                     }
-                    value = merge(value, current.pom().managedDependencies().get(entry.getKey()));
                 }
                 value = defaultScope(value);
                 if (!current.root() && Objects.equals(Boolean.TRUE, value.optional())) {
