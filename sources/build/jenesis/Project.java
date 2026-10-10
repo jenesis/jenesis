@@ -892,14 +892,18 @@ public record Project(
                                  a property, the OS, a file or -P, a profile's <modules>,
                                  <repositories> and settings.xml, a resource's includes,
                                  excludes, targetPath and filtering, system scope, and every
-                                 packaging but jar
-                                 - a pom aggregator is followed for its modules, a war is not built
-                                 at all, a jar with neither sources nor resources is built only
-                                 where its src/main/build.jenesis configures a plugin, and a
-                                 src/test/java/module-info.java is a module of its own rather than
-                                 patched into the main one, compiled as a module but run on the
-                                 class path, so tests of Java Module System behaviour stay with the
-                                 old build until the project moves to module-info.java
+                                 packaging but jar and bundle
+                                 - a pom aggregator is followed for its modules, a bundle
+                                 (maven-bundle-plugin) is built as a jar whose OSGi headers are the
+                                 project's own business, a MANIFEST.MF among the resources or a
+                                 plugin, a war or any other packaging is not built at all and says
+                                 so with a [SKIPPED] line, a jar with neither sources nor
+                                 resources is built only where its src/main/build.jenesis
+                                 configures a plugin, and a src/test/java/module-info.java is a
+                                 module of its own rather than patched into the main one, compiled
+                                 as a module but run on the class path, so tests of Java Module
+                                 System behaviour stay with the old build until the project moves
+                                 to module-info.java
                       a BOM      a module of pom packaging that lists no modules but declares a
                                  <dependencyManagement>, such as a mockito-bom, is staged, exported
                                  and released as its POM alone: its coordinate, packaging and
@@ -1318,11 +1322,13 @@ public record Project(
                     ## No built-in
 
                       resource filtering, ${...} in resources -> none; generate the file in a plugin
-                      war, ear -> none; a war module is skipped
+                      war, ear -> none; a war module is skipped with a [SKIPPED] line
                       git-commit-id, buildnumber -> none; pass -Djenesis.project.revision,
                           project.tag and project.tree, which the POM and SBOM record
                       Spotless beyond Java, Kotlin and Scala -> none
-                      maven-bundle-plugin, bnd / biz.aQute.bnd, an OSGi manifest -> none
+                      maven-bundle-plugin, bnd / biz.aQute.bnd, an OSGi manifest -> none; a pom.xml
+                          of packaging bundle builds a jar, whose headers a MANIFEST.MF among the
+                          resources or a plugin at binary/compiled supplies
                       gradle-module-metadata -> none; the POM is the published metadata
                       maven-release-plugin, axion-release -> none; -Djenesis.project.version,
                           then `release`
