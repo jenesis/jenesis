@@ -695,7 +695,8 @@ public class MavenPomResolver implements MavenResolver {
         for (Path module : modules) {
             UnresolvedPom pom = paths.get(module);
             SequencedMap<String, String> plugins = new LinkedHashMap<>(pom.plugins()),
-                    testPlugins = new LinkedHashMap<>(pom.plugins());
+                    testPlugins = new LinkedHashMap<>(pom.plugins()),
+                    pluginExclusions = new LinkedHashMap<>();
             SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = new LinkedHashMap<>();
             SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies = managed(executor,
                     MavenRepository.of(repository),
@@ -715,11 +716,16 @@ public class MavenPomResolver implements MavenResolver {
                             resolved.checksum());
                 }
                 switch (resolvedKey.type()) {
-                    case "processor", "classpath-processor", "modular-processor" ->
-                            (resolved.scope() == MavenDependencyScope.TEST ? testPlugins : plugins).put("maven/"
-                                    + resolvedKey.groupId() + "/"
-                                    + resolvedKey.artifactId()
-                                    + (resolved.version() == null ? "" : "/" + resolved.version()), "plugin");
+                    case "processor", "classpath-processor", "modular-processor" -> {
+                        String plugin = "maven/" + resolvedKey.groupId() + "/" + resolvedKey.artifactId()
+                                + (resolved.version() == null ? "" : "/" + resolved.version());
+                        (resolved.scope() == MavenDependencyScope.TEST ? testPlugins : plugins).put(plugin, "plugin");
+                        if (resolved.exclusions() != null && !resolved.exclusions().isEmpty()) {
+                            pluginExclusions.put(plugin, resolved.exclusions().stream()
+                                    .map(name -> name.groupId() + "/" + name.artifactId())
+                                    .collect(Collectors.joining(",")));
+                        }
+                    }
                     case "classpath-jar", "modular-jar" -> throw new IllegalArgumentException("The dependency on "
                             + resolvedKey.groupId() + ":" + resolvedKey.artifactId() + " in " + module.resolve("pom.xml")
                             + " is of type " + resolvedKey.type() + ", but Jenesis places a jar by whether it"
@@ -785,6 +791,7 @@ public class MavenPomResolver implements MavenResolver {
                     pom.natives(),
                     plugins,
                     testPlugins,
+                    pluginExclusions,
                     pom.aliases(),
                     pom.signatures(),
                     property(pom.properties().get("mainClass"), pom.properties()),
