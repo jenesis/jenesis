@@ -1729,8 +1729,10 @@ public record Project(
                       environment-<tool>.properties
                                                 variables for a program the build forks (java, test,
                                                 pitest, native-image), which otherwise sees only
-                                                PATH, HOME, LANG and the platform's own; NAME=value
-                                                sets one, a bare NAME passes on the build's own
+                                                PATH, HOME, LANG and the platform's own, and
+                                                TERM=dumb, COLUMNS=80 and LINES=24, with its
+                                                standard input closed; NAME=value sets one, a bare
+                                                NAME passes on the build's own
 
                     In both files a value @<key> or @<key>/<default> is the setting
                     -Djenesis.variable.<key>, part of the key of every step it reaches.
