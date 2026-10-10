@@ -800,11 +800,19 @@ public record Project(
                     A .gitignore line `build` or `build/`, common where Gradle ran, also hides
                     build/jenesis, and git cannot re-include a file below an ignored folder: write
                     `/build/*` and `!/build/jenesis/` instead. Gradle's own output is build/ as well,
-                    so the root project's `clean` deletes build/jenesis, and `git checkout --
-                    build/jenesis` restores it; `mvn` writes into the target/ this build reads. Run
-                    the old build in a second checkout (`git worktree add`) while both exist, and
-                    exclude build/jenesis from a header or licence check the old build runs (Apache
-                    RAT, license-maven-plugin), which would flag the vendored sources.
+                    so the root project's `clean` deletes build/jenesis (`git checkout --
+                    build/jenesis` restores it). Move Gradle's output aside for as long as both
+                    builds run, with one line in the root build.gradle.kts or build.gradle alike:
+
+                      allprojects { layout.buildDirectory = layout.projectDirectory.dir("gradle-build") }
+
+                    Every project of the Gradle build then writes into a gradle-build/ of its own,
+                    which .gitignore lists in place of build/, and `clean` leaves build/jenesis
+                    alone; gradle/ is no such name, since it holds the wrapper. `mvn` writes into
+                    the target/ this build reads, so run a Maven build in a second checkout (`git
+                    worktree add`) while both exist. Exclude build/jenesis from a header or licence
+                    check the old build runs (Apache RAT, license-maven-plugin), which would flag
+                    the vendored sources.
 
                     ## 2. Choose the build declaration
 
