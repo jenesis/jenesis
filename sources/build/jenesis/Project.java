@@ -1568,16 +1568,26 @@ public record Project(
                           support reads; @QuarkusTest runs on the class path only
                       war, ear -> none; a war module is skipped with a [SKIPPED] line
                       git-commit-id, buildnumber -> none; pass -Djenesis.project.revision,
-                          project.tag and project.tree, which the POM and SBOM record
+                          project.tag and project.tree, which the POM and SBOM record and a
+                          plugin reads as scm.revision, scm.tag and scm.tree of the
+                          metadata.properties its hook point is handed
                       Spotless beyond Java, Kotlin and Scala -> none
                       maven-bundle-plugin, bnd / biz.aQute.bnd, an OSGi manifest -> none; a pom.xml
                           of packaging bundle builds a jar, whose headers a MANIFEST.MF among the
-                          resources or a plugin at binary/compiled supplies
+                          resources or a plugin at binary/transform supplies, which is handed the
+                          compiled classes bnd analyses, as binary/compiled is not, and whose
+                          manifest.mf is merged into the compiler's
                       gradle-module-metadata -> none; the POM is the published metadata
                       maven-release-plugin, axion-release -> none; -Djenesis.project.version,
                           then `release`
                       a version a Maven extension supplies (nisse, jgitver) -> none; set
                           jenesis.project.version, which the siblings' dependencies take as well
+                      os-maven-plugin, os.detected.name/arch/classifier -> none; a profile per
+                          platform in the pom.xml, activated by <os> with <family> and <arch>,
+                          sets the three to the values the extension computes, as linux,
+                          x86_64 and linux-x86_64 for <family>linux</family><arch>amd64</arch>,
+                          so Maven, still running the extension, reads the same; a JVM property
+                          or a jenesis.properties line never fills a pom.xml's ${...}
                       any other plugin -> write one: skill/extend
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
@@ -2118,6 +2128,10 @@ public record Project(
                                                        JVMs at once rather than one per processor -
                                                        with many test modules on little memory,
                                                        beside an -Xmx in process-test.properties
+                      -Djenesis.executor.aggregate     name every failed step at the end rather
+                                                       than the first, as Maven's -fae summary
+                                                       does; a step that depends on none of them
+                                                       runs either way
                       -Djenesis.executor.rebuild       wipe target/ - avoid it, see skill/engine
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
