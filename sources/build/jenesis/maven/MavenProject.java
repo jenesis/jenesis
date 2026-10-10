@@ -925,8 +925,17 @@ public class MavenProject implements BuildExecutorModule {
                         .map(plugin -> plugin.getKey() + "=" + plugin.getValue())
                         .collect(Collectors.joining("\t")));
             }
-            if (value.aliases() != null && !value.aliases().isEmpty()) {
-                properties.setProperty("aliases", value.aliases().entrySet().stream()
+            SequencedMap<String, String> aliases = value.aliases() == null
+                    ? new LinkedHashMap<>()
+                    : new LinkedHashMap<>(value.aliases());
+            if (!test && value.dependencies() != null) {
+                Map<Boolean, Set<String>> tokens = value.dependencies().entrySet().stream()
+                        .collect(Collectors.partitioningBy(dep -> dep.getValue().scope() == MavenDependencyScope.TEST,
+                                Collectors.mapping(dep -> dep.getKey().coordinate(null, null), Collectors.toSet())));
+                aliases.values().removeIf(token -> tokens.get(true).contains(token) && !tokens.get(false).contains(token));
+            }
+            if (!aliases.isEmpty()) {
+                properties.setProperty("aliases", aliases.entrySet().stream()
                         .map(alias -> alias.getKey() + "=" + alias.getValue())
                         .collect(Collectors.joining("\t")));
             }
