@@ -16,6 +16,7 @@ public abstract class ProcessBuildStep implements BuildStep {
     private static final SAXParserFactory REPORTS = reports();
     private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
     private static final int TAIL = 200;
+    private static final int KILLED = 128 + 9;
     private static final Pattern UNQUOTED = Pattern.compile("[A-Za-z0-9_@%+=:,./-]+");
 
     static {
@@ -281,6 +282,12 @@ public abstract class ProcessBuildStep implements BuildStep {
                             future.complete(new BuildStepResult(true));
                         } else {
                             throw new IllegalStateException("Unexpected exit code: " + exitCode + "\n"
+                                    + (exitCode == KILLED && handler.external()
+                                            ? "The process was killed with SIGKILL, possibly by the kernel's"
+                                                    + " out-of-memory killer: lower jenesis.process.concurrency, or the"
+                                                    + " heap of the JVM it runs, as -Xmx in process-test.properties for"
+                                                    + " the tests\n"
+                                            : "")
                                     + diagnosis(context).map(diagnosis -> diagnosis + "\n").orElse("")
                                     + "To reproduce, execute:\n "
                                     + executed
