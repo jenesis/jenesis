@@ -13,12 +13,11 @@ import build.jenesis.SequencedProperties;
 public abstract class ProcessBuildStep implements BuildStep {
 
     public static final String PROCESS = "process/", ENVIRONMENT = "environment/";
-    protected static final Charset NATIVE_ENCODING = nativeEncoding();
     private static final SAXParserFactory REPORTS = reports();
     private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
     private static final Set<String> ARGUMENT_FILES = Set.of("jar", "javac", "javadoc", "jdeps", "jlink", "jmod", "jpackage");
     private static final Pattern UNQUOTED = Pattern.compile("[A-Za-z0-9_@%+=:,./-]+");
-    private static final int TAIL_LINES = 200, TAIL_BYTES = 256 * 1024;
+    private static final int TAIL_LINES = 200;
 
     static {
         if (System.getProperty("java.home") == null) {
@@ -99,18 +98,6 @@ public abstract class ProcessBuildStep implements BuildStep {
 
         public Terms reporting(Consumer<String> reporting) {
             return new Terms(printing, permits, announcing, reporting);
-        }
-    }
-
-    private static Charset nativeEncoding() {
-        String name = System.getProperty("native.encoding");
-        if (name == null) {
-            return Charset.defaultCharset();
-        }
-        try {
-            return Charset.forName(name);
-        } catch (IllegalArgumentException _) {
-            return Charset.defaultCharset();
         }
     }
 
@@ -312,27 +299,26 @@ public abstract class ProcessBuildStep implements BuildStep {
         if (!Files.exists(file)) {
             return "";
         }
-        long size = Files.size(file);
-        byte[] bytes;
-        try (InputStream stream = Files.newInputStream(file)) {
-            stream.skipNBytes(Math.max(0, size - TAIL_BYTES));
-            bytes = stream.readNBytes(TAIL_BYTES);
+        Deque<String> lines = new ArrayDeque<>();
+        long total = 0;
+        boolean blank = true;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(Files.newInputStream(file),
+                StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                total++;
+                blank &= line.isBlank();
+                lines.addLast(line);
+                if (lines.size() > TAIL_LINES) {
+                    lines.removeFirst();
+                }
+            }
         }
-        String text = new String(bytes, NATIVE_ENCODING);
-        if (text.isBlank()) {
+        if (blank) {
             return "";
         }
-        List<String> lines = text.lines().toList();
-        boolean cut = size > bytes.length;
-        if (cut && lines.size() > 1) {
-            lines = lines.subList(1, lines.size());
-        }
-        if (lines.size() > TAIL_LINES) {
-            lines = lines.subList(lines.size() - TAIL_LINES, lines.size());
-            cut = true;
-        }
         return "\n\n" + label
-                + (cut ? ", its last " + lines.size() + " lines - " + file + " holds all of it" : "")
+                + (lines.size() < total ? ", its last " + lines.size() + " lines - " + file + " holds all of it" : "")
                 + ":\n" + String.join("\n", lines) + "\n";
     }
 
