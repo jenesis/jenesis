@@ -16,6 +16,7 @@ import build.jenesis.maven.MavenDependencyName;
 import build.jenesis.maven.MavenDependencyScope;
 import build.jenesis.maven.MavenDependencyValue;
 import build.jenesis.maven.MavenLocalPom;
+import build.jenesis.maven.MavenPomEmitter;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.maven.MavenRepository;
 import build.jenesis.maven.MavenResolver;
@@ -4236,29 +4237,30 @@ public class MavenPomResolverTest {
         SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
         assertThat(poms.get(Path.of("inheriting")).metadata())
                 .as("everything but the name is inherited, the url and the scm locations with the artifactId appended")
-                .containsOnly(
-                        Map.entry("description", "The parent."),
-                        Map.entry("url", "https://example.com/project/inheriting-artifact"),
-                        Map.entry("organization.name", "Example Ltd"),
-                        Map.entry("license.apache-2_0.name", "Apache-2.0"),
-                        Map.entry("license.apache-2_0.url", "https://www.apache.org/licenses/LICENSE-2.0.txt"),
-                        Map.entry("developer.google.id", "google"),
-                        Map.entry("scm.connection", "scm:git:https://example.com/project.git"),
-                        Map.entry("scm.developerConnection", "scm:git:git@example.com:project.git/inheriting-artifact"),
-                        Map.entry("scm.tag", "v1"),
-                        Map.entry("scm.url", "https://example.com/project/inheriting-artifact/"));
+                .isEqualTo(new MavenPomEmitter.Metadata(null,
+                        "The parent.",
+                        "https://example.com/project/inheriting-artifact",
+                        List.of(new MavenPomEmitter.Metadata.License("Apache-2.0",
+                                "https://www.apache.org/licenses/LICENSE-2.0.txt")),
+                        List.of(new MavenPomEmitter.Metadata.Developer("google", null, null)),
+                        new MavenPomEmitter.Metadata.Scm("scm:git:https://example.com/project.git",
+                                "scm:git:git@example.com:project.git/inheriting-artifact",
+                                "https://example.com/project/inheriting-artifact/",
+                                "v1"),
+                        new MavenPomEmitter.Metadata.Organization("Example Ltd", null)));
         assertThat(poms.get(Path.of("declaring")).metadata())
                 .as("what a module declares wins, a list replaces the parent's, and a declared scm keeps its own tag")
-                .containsOnly(
-                        Map.entry("description", "Its own."),
-                        Map.entry("url", "https://example.com/declaring"),
-                        Map.entry("organization.name", "Example Ltd"),
-                        Map.entry("license.apache-2_0.name", "Apache-2.0"),
-                        Map.entry("license.apache-2_0.url", "https://www.apache.org/licenses/LICENSE-2.0.txt"),
-                        Map.entry("developer.alice.name", "Alice Example"),
-                        Map.entry("scm.connection", "scm:git:https://example.com/project.git"),
-                        Map.entry("scm.developerConnection", "scm:git:git@example.com:project.git/declaring"),
-                        Map.entry("scm.url", "https://example.com/declaring"));
+                .isEqualTo(new MavenPomEmitter.Metadata(null,
+                        "Its own.",
+                        "https://example.com/declaring",
+                        List.of(new MavenPomEmitter.Metadata.License("Apache-2.0",
+                                "https://www.apache.org/licenses/LICENSE-2.0.txt")),
+                        List.of(new MavenPomEmitter.Metadata.Developer("alice", "Alice Example", null)),
+                        new MavenPomEmitter.Metadata.Scm("scm:git:https://example.com/project.git",
+                                "scm:git:git@example.com:project.git/declaring",
+                                "https://example.com/declaring",
+                                null),
+                        new MavenPomEmitter.Metadata.Organization("Example Ltd", null)));
     }
 
     @Test
@@ -4320,19 +4322,31 @@ public class MavenPomResolverTest {
         SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
         assertThat(poms.get(Path.of("child")).metadata())
                 .as("the developers are inherited as a list, the issue and ci management field by field as Maven merges them")
-                .containsOnly(
-                        Map.entry("developer.alice.name", "Alice Example"),
-                        Map.entry("developer.alice.url", "https://example.com/alice"),
-                        Map.entry("developer.alice.organization", "Example Ltd"),
-                        Map.entry("developer.alice.organizationUrl", "https://example.com"),
-                        Map.entry("developer.alice.roles", "lead,developer"),
-                        Map.entry("developer.alice.timezone", "Europe/Oslo"),
-                        Map.entry("developer.bob.id", "bob"),
-                        Map.entry("developer.bob.url", "https://example.com/bob"),
-                        Map.entry("issueManagement.url", "https://example.com/child/issues"),
-                        Map.entry("issueManagement.system", "GitHub"),
-                        Map.entry("ciManagement.system", "GitHub Actions"),
-                        Map.entry("ciManagement.url", "https://example.com/actions"));
+                .isEqualTo(new MavenPomEmitter.Metadata(null,
+                        null,
+                        null,
+                        List.of(),
+                        List.of(new MavenPomEmitter.Metadata.Developer("alice",
+                                        "Alice Example",
+                                        null,
+                                        "https://example.com/alice",
+                                        "Example Ltd",
+                                        "https://example.com",
+                                        List.of("lead", "developer"),
+                                        "Europe/Oslo"),
+                                new MavenPomEmitter.Metadata.Developer("bob",
+                                        null,
+                                        null,
+                                        "https://example.com/bob",
+                                        null,
+                                        null,
+                                        List.of(),
+                                        null)),
+                        null,
+                        null,
+                        new MavenPomEmitter.Metadata.Management("GitHub", "https://example.com/child/issues"),
+                        new MavenPomEmitter.Metadata.Management("GitHub Actions", "https://example.com/actions"),
+                        null));
     }
 
     @Test
@@ -4392,16 +4406,30 @@ public class MavenPomResolverTest {
         SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
         assertThat(poms.get(Path.of("child")).metadata())
                 .as("the inception year and the licences with their distribution are inherited where a module declares none")
-                .containsOnly(
-                        Map.entry("license.apache_2_0.name", "Apache 2.0"),
-                        Map.entry("license.apache_2_0.url", "https://www.apache.org/licenses/LICENSE-2.0.txt"),
-                        Map.entry("license.apache_2_0.distribution", "repo"),
-                        Map.entry("inceptionYear", "2010"));
+                .isEqualTo(new MavenPomEmitter.Metadata(null,
+                        null,
+                        null,
+                        List.of(new MavenPomEmitter.Metadata.License("Apache 2.0",
+                                "https://www.apache.org/licenses/LICENSE-2.0.txt",
+                                "repo")),
+                        List.of(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        "2010"));
         assertThat(poms.get(Path.of("other")).metadata())
                 .as("a module's own inception year and licences win over its parent's")
-                .containsOnly(
-                        Map.entry("inceptionYear", "2020"),
-                        Map.entry("license.mit.name", "MIT"));
+                .isEqualTo(new MavenPomEmitter.Metadata(null,
+                        null,
+                        null,
+                        List.of(new MavenPomEmitter.Metadata.License("MIT", null)),
+                        List.of(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        "2020"));
     }
 
     @Test
@@ -4451,9 +4479,13 @@ public class MavenPomResolverTest {
         SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
         assertThat(poms.get(Path.of("")).metadata())
                 .as("each generation appends its artifactId to the url it inherits")
-                .containsOnly(
-                        Map.entry("url", "https://example.com/parent/artifact"),
-                        Map.entry("license.mit.name", "MIT"));
+                .isEqualTo(new MavenPomEmitter.Metadata(null,
+                        null,
+                        "https://example.com/parent/artifact",
+                        List.of(new MavenPomEmitter.Metadata.License("MIT", null)),
+                        List.of(),
+                        null,
+                        null));
     }
 
     @Test

@@ -23,7 +23,7 @@ public record MavenLocalPom(String groupId,
                             SequencedMap<String, String> aliases,
                             SequencedMap<String, String> signatures,
                             String mainClass,
-                            SequencedMap<String, String> metadata,
+                            MavenPomEmitter.Metadata metadata,
                             SequencedMap<MavenDependencyKey, MavenDependencyKey.Versioned> expressions) {
 
     public MavenLocalPom version(String version) {

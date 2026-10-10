@@ -872,7 +872,7 @@ public class MavenProject implements BuildExecutorModule {
                     properties.setProperty(prefix + ".optional", managed.getValue().optional().toString());
                 }
             }
-            value.metadata().forEach((key, metadata) -> properties.setProperty(POM_METADATA + key, metadata));
+            value.metadata().properties().forEach((key, metadata) -> properties.setProperty(POM_METADATA + key, metadata));
             properties.store(folder.resolve("module-" + BuildExecutorModule.encodePath(relativePath) + ".properties"));
         }
 
@@ -1097,7 +1097,7 @@ public class MavenProject implements BuildExecutorModule {
             for (int index = 0; index < resources.size(); index++) {
                 properties.setProperty("resources." + index, resources.get(index));
             }
-            value.metadata().forEach((key, metadata) -> properties.setProperty(POM_METADATA + key, metadata));
+            value.metadata().properties().forEach((key, metadata) -> properties.setProperty(POM_METADATA + key, metadata));
             properties.store(maven.resolve((test ? "test-module-" : "module-")
                     + BuildExecutorModule.encodePath(relativePath) + ".properties"));
         }

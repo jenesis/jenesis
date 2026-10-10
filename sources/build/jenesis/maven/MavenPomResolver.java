@@ -788,10 +788,7 @@ public class MavenPomResolver implements MavenResolver {
                     pom.aliases(),
                     pom.signatures(),
                     property(pom.properties().get("mainClass"), pom.properties()),
-                    pom.metadata().entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
-                            entry -> property(entry.getValue(), pom.properties()),
-                            (left, _) -> left,
-                            LinkedHashMap::new)),
+                    pom.metadata().expand(value -> property(value, pom.properties())),
                     expressions));
         }
         return results;
@@ -874,8 +871,8 @@ public class MavenPomResolver implements MavenResolver {
                 SequencedMap<DependencyKey, DependencyValue> dependencies = new LinkedHashMap<>();
                 List<License> parentLicenses = List.of();
                 SequencedMap<String, String> parentPlugins = Collections.emptyNavigableMap(),
-                        parentAliases = Collections.emptyNavigableMap(),
-                        parentMetadata = Collections.emptyNavigableMap();
+                        parentAliases = Collections.emptyNavigableMap();
+                MavenPomEmitter.Metadata parentMetadata = MavenPomEmitter.Metadata.NONE;
                 Set<String> parentVerbatim = Set.of();
                 String groupId = null, artifactId = null, version = null;
                 UnresolvedPom localParent = null;
@@ -1073,10 +1070,7 @@ public class MavenPomResolver implements MavenResolver {
                         .toList();
                 Element project = document.getDocumentElement(),
                         scm = (Element) toElements(project, "scm").findFirst().orElse(null);
-                SequencedMap<String, String> metadata = toMetadata(project);
-                Set<String> verbatim = new HashSet<>(), kinds = metadata.keySet().stream()
-                        .map(key -> key.substring(0, key.indexOf('.') + 1))
-                        .collect(Collectors.toSet());
+                Set<String> verbatim = new HashSet<>();
                 String child = toElementText(project, "artifactId").orElse(artifactId);
                 for (String key : List.of("url", "scm.connection", "scm.developerConnection", "scm.url")) {
                     Element holder = key.equals("url") ? project : scm;
@@ -1087,30 +1081,7 @@ public class MavenPomResolver implements MavenResolver {
                         verbatim.add(key);
                     }
                 }
-                for (Map.Entry<String, String> entry : parentMetadata.entrySet()) {
-                    String key = entry.getKey(), value = entry.getValue();
-                    switch (key) {
-                        case "name" -> {
-                        }
-                        case "description", "inceptionYear", "organization.name", "organization.url",
-                             "issueManagement.system", "issueManagement.url",
-                             "ciManagement.system", "ciManagement.url" -> metadata.putIfAbsent(key, value);
-                        case "url", "scm.connection", "scm.developerConnection", "scm.url" -> metadata.putIfAbsent(key,
-                                parentVerbatim.contains(key) || value.isEmpty() || child == null
-                                        ? value
-                                        : value.endsWith("/") ? value + child + "/" : value + "/" + child);
-                        case "scm.tag" -> {
-                            if (scm == null) {
-                                metadata.putIfAbsent(key, value);
-                            }
-                        }
-                        default -> {
-                            if (!kinds.contains(key.substring(0, key.indexOf('.') + 1))) {
-                                metadata.put(key, value);
-                            }
-                        }
-                    }
-                }
+                MavenPomEmitter.Metadata metadata = toMetadata(project).inherit(parentMetadata, parentVerbatim, child, scm != null);
                 yield new UnresolvedPom(
                         toElementText(document.getDocumentElement(), "groupId").orElse(groupId),
                         toElementText(document.getDocumentElement(), "artifactId").orElse(artifactId),
@@ -1199,7 +1170,7 @@ public class MavenPomResolver implements MavenResolver {
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
                             List.of(),
-                            Collections.emptyNavigableMap(),
+                            MavenPomEmitter.Metadata.NONE,
                             Set.of(),
                             null,
                             true,
@@ -1704,82 +1675,58 @@ public class MavenPomResolver implements MavenResolver {
         return entries;
     }
 
-    private static SequencedMap<String, String> toMetadata(Node node) {
-        SequencedMap<String, String> metadata = new LinkedHashMap<>();
-        toElementText(node, "name").ifPresent(value -> metadata.put("name", value));
-        toElementText(node, "description").ifPresent(value -> metadata.put("description", value));
-        toElementText(node, "url").ifPresent(value -> metadata.put("url", value));
-        toElementText(node, "inceptionYear").ifPresent(value -> metadata.put("inceptionYear", value));
-        toElements(node, "organization").findFirst().ifPresent(organization -> {
-            toElementText(organization, "name").ifPresent(value -> metadata.put("organization.name", value));
-            toElementText(organization, "url").ifPresent(value -> metadata.put("organization.url", value));
-        });
-        toElements(node, "licenses").limit(1).flatMap(licenses -> toElements(licenses, "license")).forEach(license -> {
-            String title = toElementText(license, "name").orElse("");
-            if (!title.isEmpty()) {
-                String id = title.toLowerCase(Locale.ROOT).replace(' ', '_').replace('.', '_');
-                metadata.put("license." + id + ".name", title);
-                for (String property : List.of("url", "distribution")) {
-                    toElementText(license, property).ifPresent(value -> metadata.put("license." + id + "." + property, value));
-                }
-            }
-        });
-        Set<String> ids = new HashSet<>();
-        toElements(node, "developers").limit(1).flatMap(developers -> toElements(developers, "developer")).forEach(developer -> {
-            String id = toElementText(developer, "id").orElse(""),
-                    name = toElementText(developer, "name").orElse(null),
-                    email = toElementText(developer, "email").orElse(null);
-            if (id.isEmpty()) {
-                String label = name == null ? email : name,
-                        derived = label == null ? "" : label.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
-                if (derived.isEmpty()) {
-                    return;
-                }
-                id = derived;
-                for (int suffix = 2; ids.contains(id); suffix++) {
-                    id = derived + "_" + suffix;
-                }
-                metadata.put("developer." + id + ".id", "");
-            }
-            SequencedMap<String, String> details = new LinkedHashMap<>();
-            if (name != null) {
-                details.put("name", name);
-            }
-            if (email != null) {
-                details.put("email", email);
-            }
-            for (String property : List.of("url", "organization", "organizationUrl", "timezone")) {
-                toElementText(developer, property).ifPresent(value -> details.put(property, value));
-            }
-            String roles = toElements(developer, "roles").limit(1)
-                    .flatMap(declared -> toElements(declared, "role"))
-                    .map(role -> role.getTextContent().trim())
-                    .filter(role -> !role.isEmpty())
-                    .collect(Collectors.joining(","));
-            if (!roles.isEmpty()) {
-                details.put("roles", roles);
-            }
-            if (name == null && email == null) {
-                metadata.putIfAbsent("developer." + id + ".id", id);
-            }
-            ids.add(id);
-            for (Map.Entry<String, String> detail : details.entrySet()) {
-                metadata.put("developer." + id + "." + detail.getKey(), detail.getValue());
-            }
-        });
-        for (String management : List.of("issueManagement", "ciManagement")) {
-            toElements(node, management).findFirst().ifPresent(declared -> {
-                for (String property : List.of("system", "url")) {
-                    toElementText(declared, property).ifPresent(value -> metadata.put(management + "." + property, value));
-                }
-            });
-        }
-        toElements(node, "scm").findFirst().ifPresent(scm -> {
-            for (String property : List.of("connection", "developerConnection", "tag", "url")) {
-                toElementText(scm, property).ifPresent(value -> metadata.put("scm." + property, value));
-            }
-        });
-        return metadata;
+    private static MavenPomEmitter.Metadata toMetadata(Node node) {
+        List<MavenPomEmitter.Metadata.License> licenses = toElements(node, "licenses").limit(1)
+                .flatMap(declared -> toElements(declared, "license"))
+                .filter(license -> !toElementText(license, "name").orElse("").isEmpty())
+                .map(license -> new MavenPomEmitter.Metadata.License(toElementText(license, "name").orElseThrow(),
+                        toElementText(license, "url").orElse(null),
+                        toElementText(license, "distribution").orElse(null)))
+                .toList();
+        List<MavenPomEmitter.Metadata.Developer> developers = toElements(node, "developers").limit(1)
+                .flatMap(declared -> toElements(declared, "developer"))
+                .map(developer -> new MavenPomEmitter.Metadata.Developer(toElementText(developer, "id")
+                                .filter(id -> !id.isEmpty())
+                                .orElse(null),
+                        toElementText(developer, "name").orElse(null),
+                        toElementText(developer, "email").orElse(null),
+                        toElementText(developer, "url").orElse(null),
+                        toElementText(developer, "organization").orElse(null),
+                        toElementText(developer, "organizationUrl").orElse(null),
+                        toElements(developer, "roles").limit(1)
+                                .flatMap(roles -> toElements(roles, "role"))
+                                .map(role -> role.getTextContent().trim())
+                                .filter(role -> !role.isEmpty())
+                                .toList(),
+                        toElementText(developer, "timezone").orElse(null)))
+                .filter(developer -> developer.id() != null || !developer.derivedId().isEmpty())
+                .toList();
+        Function<String, MavenPomEmitter.Metadata.Management> management = name -> toElements(node, name)
+                .findFirst()
+                .map(declared -> new MavenPomEmitter.Metadata.Management(toElementText(declared, "system").orElse(null),
+                        toElementText(declared, "url").orElse(null)))
+                .filter(declared -> declared.system() != null || declared.url() != null)
+                .orElse(null);
+        return new MavenPomEmitter.Metadata(toElementText(node, "name").orElse(null),
+                toElementText(node, "description").orElse(null),
+                toElementText(node, "url").orElse(null),
+                licenses,
+                developers,
+                toElements(node, "scm").findFirst()
+                        .map(scm -> new MavenPomEmitter.Metadata.Scm(toElementText(scm, "connection").orElse(null),
+                                toElementText(scm, "developerConnection").orElse(null),
+                                toElementText(scm, "url").orElse(null),
+                                toElementText(scm, "tag").orElse(null)))
+                        .filter(scm -> !scm.equals(new MavenPomEmitter.Metadata.Scm(null, null, null, null)))
+                        .orElse(null),
+                toElements(node, "organization").findFirst()
+                        .map(organization -> new MavenPomEmitter.Metadata.Organization(toElementText(organization, "name").orElse(null),
+                                toElementText(organization, "url").orElse(null)))
+                        .filter(organization -> organization.name() != null || organization.url() != null)
+                        .orElse(null),
+                management.apply("issueManagement"),
+                management.apply("ciManagement"),
+                toElementText(node, "inceptionYear").orElse(null));
     }
 
     private static SequencedMap<String, String> inherited(SequencedMap<String, String> own,
@@ -2121,7 +2068,7 @@ public class MavenPomResolver implements MavenResolver {
                                  SequencedMap<String, String> aliases,
                                  SequencedMap<String, String> signatures,
                                  List<License> licenses,
-                                 SequencedMap<String, String> metadata,
+                                 MavenPomEmitter.Metadata metadata,
                                  Set<String> verbatim,
                                  Map<DependencyKey, DependencyValue> bom,
                                  boolean missing,
