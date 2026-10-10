@@ -2309,7 +2309,7 @@ public record Project(
                                          60 custom-maven, 61 custom-modular,
                                          62 custom-build (no Project at all),
                                          63 tools-api (a build inside another program's JVM),
-                                         73 byte-buddy (a plugin that generates classes)
+                                         73 byte-buddy (Byte Buddy's plugins over the compiled classes)
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;

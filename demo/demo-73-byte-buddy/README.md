@@ -1,12 +1,12 @@
 Byte Buddy demo
 ===============
 
-Write a plugin against a library's own Java API - here Byte Buddy's - and add
-the classes it generates to the module's jar. The plugin is compiled from local
-source, as in the `internal-module` demo, and joins the build at
-`binary/compiled`, beside `javac`: it writes `sample.Greeting`, an implementation
-of `java.util.function.Supplier` that returns the text the plugin's properties
-file configures, and the application loads it and prints what it supplies.
+Rewrite the classes `javac` compiled with Byte Buddy, as its Maven and Gradle plugins
+do, from a plugin of the project. The plugin is compiled from local source, as in the
+`internal-module` demo, and joins the build at `binary/transform`, after the compilers:
+it runs Byte Buddy's `Plugin.Engine` over the module's classes, with two Byte Buddy
+plugins - `ToStringPlugin`, which Byte Buddy ships, and one written for the project -
+and the module's class path, and what it writes replaces the classes it was handed.
 
 Run it
 ------
@@ -15,34 +15,37 @@ From this directory:
 
     java build/jenesis/Execute.java
 
-which builds the project and then launches the built module, printing the text
-of the class the plugin generated:
+which builds the project and then launches the built module:
 
-    Hello from a class that Byte Buddy generated in a build plugin!
+    Hello from a method that Byte Buddy rewrote in a build plugin!
+    Greeting{audience=the build}
 
-`sample.Greeting` has no source anywhere in the project: `javac` never sees it,
-and the module's jar carries `sample/Greeting.class` beside the classes `javac`
-compiled.
+`sample.Greeting` returns `"Hello from javac, " + audience + "!"` in its source and
+declares no `toString()`. The first line is what the rewritten `get()` returns, the
+second the `toString()` that `ToStringPlugin` added for the `@ToStringPlugin.Enhance`
+annotation on the class.
 
 Layout
 ------
 
     demo/demo-73-byte-buddy
-    |-- build/jenesis                 symlink to ../../../sources/build/jenesis
-    |-- jenesis.plugins.properties    greeter+binary/compiled=./plugin
+    |-- build/jenesis                  symlink to ../../../sources/build/jenesis
+    |-- jenesis.plugins.properties     enhance+binary/transform=./plugin
     |-- build.jenesis/
-    |   `-- plugin-greeter.properties  implementation=sample.Greeting
-    |                                  greeting=Hello from a class that ...
+    |   `-- plugin-enhance.properties  type=sample.Greeting
+    |                                  greeting=Hello from a method that ...
     |-- plugin/
-    |   |-- .jenesis.skip       keeps the project's module discovery out of plugin/
-    |   |-- module-info.java     module demo.plugin { requires build.jenesis;
-    |   |                                requires net.bytebuddy;
-    |   |                                provides build.jenesis.BuildExecutorModule
-    |   |                                with demo.plugin.GreeterModule; }
-    |   `-- demo/plugin/GreeterModule.java
+    |   |-- .jenesis.skip              keeps the project's module discovery out of plugin/
+    |   |-- module-info.java           module demo.plugin { requires build.jenesis;
+    |   |                                      requires net.bytebuddy;
+    |   |                                      provides build.jenesis.BuildExecutorModule
+    |   |                                      with demo.plugin.EnhanceModule; }
+    |   `-- demo/plugin/EnhanceModule.java
     `-- sources/
-        |-- module-info.java     module demo.bytebuddy { exports sample; }
-        `-- sample/Sample.java    loads sample.Greeting and prints what it supplies
+        |-- module-info.java           module demo.bytebuddy { requires static net.bytebuddy; ... }
+        `-- sample/
+            |-- Greeting.java          @ToStringPlugin.Enhance, a get() that is rewritten
+            `-- Sample.java            prints what a Greeting supplies, and the Greeting
 
 Naming the plugin
 -----------------
@@ -50,69 +53,97 @@ Naming the plugin
 `jenesis.plugins.properties` names the plugin, the hook point it joins and the
 folder it is compiled from:
 
-    greeter+binary/compiled=./plugin
+    enhance+binary/transform=./plugin
 
-`binary/compiled` is where a compiler of the module's own runs, beside `javac`.
-What a step there writes below `classes/` is merged with what `javac` compiled
-into the module's jar, and the tests and every later step see it as one of the
-module's classes. A plugin adds classes and never replaces one: it is not handed
-what `javac` compiled, and a class that both write fails the build, naming the
-two steps. Rewriting a compiled class in place, as Byte Buddy's `Plugin.Engine`
-does, is therefore not something a plugin can do.
+`binary/transform` runs after the compilers. A plugin there is handed the module's
+compiled classes as its first argument and the module's inputs after it, among them
+its resolved dependencies. What it writes below `classes/` replaces the class of that
+name, every class it does not write passes on as it was, and the jar, the tests and
+every later step see the result. Several such plugins run in the order the file names
+them, each handed the classes the one before it wrote.
 
 Configuring the plugin
 ----------------------
 
-The plugin runs in a module where `plugin-greeter.properties` is found, here in
+The plugin runs in a module where `plugin-enhance.properties` is found, here in
 `build.jenesis/`:
 
-    implementation=sample.Greeting
-    greeting=Hello from a class that Byte Buddy generated in a build plugin!
+    type=sample.Greeting
+    greeting=Hello from a method that Byte Buddy rewrote in a build plugin!
 
 The file's values reach the provider's constructor as a `SequencedMap`, in the
 file's order, and the provider keeps what it needs. `javac` requires a service
 provider to keep a public constructor without arguments as well, which the build
 uses when the file is empty:
 
-    public GreeterModule() {
+    public EnhanceModule() {
         this(Collections.emptyNavigableMap());
     }
 
-    public GreeterModule(SequencedMap<String, String> properties) {
-        implementation = properties.getOrDefault("implementation", "sample.Greeting");
-        greeting = properties.getOrDefault("greeting", "Hello from a generated class!");
+    public EnhanceModule(SequencedMap<String, String> properties) {
+        type = properties.getOrDefault("type", "sample.Greeting");
+        greeting = properties.getOrDefault("greeting", "Hello from a rewritten method!");
     }
 
-`accept` adds one step, a record of those two values:
+`accept` adds one step, a record of those two values, handed everything the hook
+point reads:
 
-    executor.addStep("generate", new Generate(implementation, greeting));
+    executor.addStep("enhance", new Enhance(type, greeting), inherited.sequencedKeySet());
 
 A step's serialised form is part of its cache key, so changing either value in
-`plugin-greeter.properties` runs the step again, and nothing else does. The step
-describes the class with Byte Buddy and saves it below `classes/` in its own
-output folder:
+`plugin-enhance.properties` runs the step again, and so does a change to the classes
+it is handed.
 
-    new ByteBuddy()
-            .subclass(Object.class)
-            .name(implementation)
-            .implement(Supplier.class)
-            .method(named("get"))
-            .intercept(FixedValue.value(greeting))
-            .make()
-            .saveIn(Files.createDirectories(context.next().resolve(BuildStep.CLASSES)).toFile());
+Running Byte Buddy's plugins
+----------------------------
+
+The step collects the jars the module compiles against, which
+`Dependencies.select(folder, "main", "compile")` lists for each argument, as Byte
+Buddy's class path, and runs the engine from the classes it was handed into
+`classes/` of its own output:
+
+    try (ClassFileLocator locator = new ClassFileLocator.Compound(classPath)) {
+        new Plugin.Engine.Default()
+                .with(locator)
+                .apply(arguments.firstEntry().getValue().folder().resolve(BuildStep.CLASSES).toFile(),
+                        Files.createDirectories(context.next().resolve(BuildStep.CLASSES)).toFile(),
+                        new Plugin.Factory.Simple(new ToStringPlugin()),
+                        new Plugin.Factory.Simple(new Greeting(type, greeting)));
+    }
+
+The class path is what lets Byte Buddy read the types a class refers to beyond the
+JDK. `@ToStringPlugin.Enhance` comes from the module's `requires static
+net.bytebuddy`: without the module's jars, Byte Buddy cannot resolve the annotation,
+`ToStringPlugin` matches nothing, and the application prints `sample.Greeting@...`
+instead.
+
+The second plugin is a `net.bytebuddy.build.Plugin` of the project's own, which
+matches the type its properties name and rewrites its `get()` to return the
+configured text:
+
+    public boolean matches(TypeDescription target) {
+        return target.getName().equals(type);
+    }
+
+    public DynamicType.Builder<?> apply(DynamicType.Builder<?> builder,
+                                        TypeDescription typeDescription,
+                                        ClassFileLocator classFileLocator) {
+        return builder.method(named("get")).intercept(FixedValue.value(greeting));
+    }
 
 Byte Buddy's Maven and Gradle plugins run the Byte Buddy plugins they discover in
 `META-INF/net.bytebuddy/build.plugins` or that the build file names in XML or its
-DSL. A Jenesis plugin is plain Java instead: its provider builds and configures
-what Byte Buddy does in code, with the values of its own properties file, and
-runs nothing it did not name.
+DSL. A Jenesis plugin is plain Java instead: its provider constructs the plugins it
+runs, with the values of its own properties file, and runs nothing it did not name.
 
-The plugin's dependencies - `build.jenesis` and `net.bytebuddy` - resolve by
-module name into the plugin's own module layer, and `pin` records them in
-`sources/module-info.java` under the group named after the plugin:
+The plugin's dependencies - `build.jenesis` and `net.bytebuddy` - resolve by module
+name into the plugin's own module layer, and `pin` records them in
+`sources/module-info.java` under the group named after the plugin, beside the
+`net.bytebuddy` the module itself compiles against:
 
-    @jenesis.pin plugin-greeter/module/build.jenesis 0.13.1 SHA-256/...
-    @jenesis.pin plugin-greeter/module/net.bytebuddy 1.18.14 SHA-256/...
+    @jenesis.pin plugin-enhance/module/build.jenesis ...
+    @jenesis.pin plugin-enhance/module/net.bytebuddy ...
 
-Byte Buddy never reaches the application: it is a dependency of the plugin
-alone, and the generated class refers to nothing but `java.base`.
+Byte Buddy never reaches the running application: the module requires it only to
+compile against its annotation, and what the plugin rewrote refers to nothing but
+`java.base`.
