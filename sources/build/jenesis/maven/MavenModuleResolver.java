@@ -100,6 +100,17 @@ public class MavenModuleResolver implements Resolver {
                                             SequencedMap<String, SequencedSet<String>> coordinates,
                                             SequencedMap<String, String> versions,
                                             DependencyScope scope) throws IOException {
+        return dependencies(executor, prefix, repositories, coordinates, versions, new LinkedHashMap<>(), scope);
+    }
+
+    @Override
+    public Resolver.Resolution dependencies(Executor executor,
+                                            String prefix,
+                                            Map<String, Repository> repositories,
+                                            SequencedMap<String, SequencedSet<String>> coordinates,
+                                            SequencedMap<String, String> versions,
+                                            SequencedMap<String, SequencedSet<String>> managedExclusions,
+                                            DependencyScope scope) throws IOException {
         Repository repository = repositories.getOrDefault(Resolver.base(prefix), discovery);
         List<MavenResolver.RootPom> rootPoms = new ArrayList<>();
         SequencedMap<MavenDependencyKey, MavenDependencyValue> mavenPins = new LinkedHashMap<>();
@@ -152,6 +163,16 @@ public class MavenModuleResolver implements Resolver {
                     mavenPins.put(MavenDependencyKey.parseKey(pin.getKey()), managed);
                 }
             }
+            managedExclusions.forEach((coordinate, excludes) -> mavenPins.merge(MavenDependencyKey.parseKey(coordinate),
+                    new MavenDependencyValue(null, null, null, excludes.stream().map(exclude -> {
+                        int separator = exclude.indexOf('/');
+                        if (separator < 1 || separator == exclude.length() - 1) {
+                            throw new IllegalArgumentException("Malformed managed exclusion '" + exclude + "' for "
+                                    + coordinate + ": expected <groupId>/<artifactId>");
+                        }
+                        return new MavenDependencyName(exclude.substring(0, separator), exclude.substring(separator + 1));
+                    }).toList(), null, null),
+                    (pinned, excluded) -> pinned.exclusions(excluded.exclusions())));
         } catch (RuntimeException | IOException e) {
             for (MavenResolver.RootPom opened : rootPoms) {
                 try {

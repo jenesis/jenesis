@@ -865,7 +865,8 @@ public record Project(
                                  timestamped file; <modules>; <properties> and
                                  ${...}; dependencies of compile, provided, runtime and test scope;
                                  <optional>, <exclusions> with wildcards, <type> and <classifier>;
-                                 <dependencyManagement> with import-scoped BOMs;
+                                 <dependencyManagement> with import-scoped BOMs, an entry's
+                                 exclusions applied wherever its dependency appears;
                                  maven.compiler.release, or else maven.compiler.target or its
                                  source, 1.8 read as 8 - with none of them the JDK the build runs
                                  on, which a [RELEASE] line names; maven.compiler.testRelease for

@@ -105,7 +105,7 @@ public class PinPom implements BuildStep {
         SequencedMap<String, String> entries = collectEntries(closure, internal, hashFunction);
         SequencedMap<String, List<String>> exclusions = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
-            Path module = argument.folder().resolve(MODULE), managed = argument.folder().resolve(MavenProject.MANAGED);
+            Path module = argument.folder().resolve(MODULE), managed = argument.folder().resolve(MANAGED);
             if (argument.removed()
                     || !Files.isRegularFile(managed)
                     || !Files.isRegularFile(module)
@@ -114,8 +114,9 @@ public class PinPom implements BuildStep {
             }
             SequencedProperties properties = SequencedProperties.ofFiles(managed);
             for (String key : properties.stringPropertyNames()) {
-                if (key.startsWith(prefix + "/")) {
-                    exclusions.putIfAbsent(key.substring(prefix.length() + 1), properties.entries(key));
+                String coordinate = key.substring(key.indexOf('/') + 1);
+                if (coordinate.startsWith(prefix + "/")) {
+                    exclusions.putIfAbsent(coordinate.substring(prefix.length() + 1), properties.entries(key));
                 }
             }
         }

@@ -44,7 +44,6 @@ import static java.util.Objects.requireNonNull;
 public class MavenProject implements BuildExecutorModule {
 
     public static final String POM = "pom/", MAVEN = "maven/", BOM = "bom/";
-    public static final String MANAGED = "managed.properties";
     private static final String SCAN = "scan", POM_METADATA = "metadata.", BOMS = "boms", SKIPPED = "skipped.properties";
     private static final Set<String> JARS = Set.of("jar", "bundle"), AGGREGATES = Set.of("pom", "bom");
     private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-";
@@ -506,12 +505,12 @@ public class MavenProject implements BuildExecutorModule {
                                 SequencedProperties managedExclusions = new SequencedProperties();
                                 for (String key : properties.stringPropertyNames()) {
                                     if (key.startsWith("managed.exclusions.")) {
-                                        managedExclusions.setProperty(key.substring("managed.exclusions.".length()),
+                                        managedExclusions.setProperty(group + "/" + key.substring("managed.exclusions.".length()),
                                                 properties.getProperty(key));
                                     }
                                 }
                                 if (!managedExclusions.isEmpty()) {
-                                    managedExclusions.store(context.next().resolve(MANAGED));
+                                    managedExclusions.store(context.next().resolve(BuildStep.MANAGED));
                                 }
                                 String optionalDependencies = properties.getProperty("optional");
                                 if (optionalDependencies != null) {

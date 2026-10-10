@@ -10,7 +10,6 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
-import build.jenesis.maven.MavenProject;
 import build.jenesis.maven.PinPom;
 import build.jenesis.step.Inventory;
 
@@ -516,8 +515,8 @@ public class PinPomTest {
         module.setProperty("path", "");
         module.store(input.resolve(BuildStep.MODULE));
         SequencedProperties managed = new SequencedProperties();
-        managed.setProperty("maven/com.mysql/mysql-connector-j", "com.google.protobuf/protobuf-java");
-        managed.store(input.resolve(MavenProject.MANAGED));
+        managed.setProperty("main/maven/com.mysql/mysql-connector-j", "com.google.protobuf/protobuf-java");
+        managed.store(input.resolve(BuildStep.MANAGED));
         String result = run(pom);
         assertThat(result)
                 .as("the project's own entry shadows the bill of materials' one, so it has to exclude what that one excluded")

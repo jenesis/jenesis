@@ -20,4 +20,8 @@ public record MavenDependencyValue(String version,
     public MavenDependencyValue version(String version) {
         return new MavenDependencyValue(version, scope, systemPath, exclusions, optional, checksum);
     }
+
+    public MavenDependencyValue exclusions(List<MavenDependencyName> exclusions) {
+        return new MavenDependencyValue(version, scope, systemPath, exclusions, optional, checksum);
+    }
 }
