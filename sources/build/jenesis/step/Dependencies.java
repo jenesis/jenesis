@@ -34,7 +34,7 @@ public class Dependencies implements BuildExecutorModule {
             UNPINNED = "unpinned.properties";
     public static final String RESOLVED = "resolved/", MODULAR_PATH = "modular/";
     public static final String RESOLVE = "resolve", PINNED = "pinned", SIGNATURES = "signatures";
-    private static final Set<String> PROCESSOR_PATH = Set.of("javac", "plugin");
+    public static final Set<String> PROCESSOR_PATH = Set.of("javac", "plugin");
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

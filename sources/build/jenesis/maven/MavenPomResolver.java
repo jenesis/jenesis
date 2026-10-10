@@ -14,6 +14,7 @@ import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Dependencies;
 
 public class MavenPomResolver implements MavenResolver {
 
@@ -694,14 +695,24 @@ public class MavenPomResolver implements MavenResolver {
         SequencedMap<Path, MavenLocalPom> results = new LinkedHashMap<>();
         for (Path module : modules) {
             UnresolvedPom pom = paths.get(module);
-            SequencedMap<String, String> plugins = new LinkedHashMap<>(pom.plugins()),
-                    testPlugins = new LinkedHashMap<>(pom.plugins()),
-                    pluginExclusions = new LinkedHashMap<>();
             SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = new LinkedHashMap<>();
             SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies = managed(executor,
                     MavenRepository.of(repository),
                     pom,
                     unresolved);
+            SequencedMap<String, String> plugins = new LinkedHashMap<>(), pluginExclusions = new LinkedHashMap<>();
+            pom.plugins().forEach((plugin, group) -> {
+                String[] segments = plugin.split("/");
+                MavenDependencyValue managedPlugin = Dependencies.PROCESSOR_PATH.contains(group)
+                        && segments.length == 3
+                        && segments[0].equals("maven")
+                        ? managedDependencies.get(new MavenDependencyKey(segments[1], segments[2], "jar", null))
+                        : null;
+                plugins.put(managedPlugin == null || managedPlugin.version() == null
+                        ? plugin
+                        : plugin + "/" + managedPlugin.version(), group);
+            });
+            SequencedMap<String, String> testPlugins = new LinkedHashMap<>(plugins);
             pom.dependencies().forEach((key, value) -> {
                 MavenDependencyKey resolvedKey = key.resolve(pom.properties());
                 MavenDependencyValue resolved = defaultScope(merge(value.resolve(pom.properties()),
@@ -717,8 +728,15 @@ public class MavenPomResolver implements MavenResolver {
                 }
                 switch (resolvedKey.type()) {
                     case "processor", "classpath-processor", "modular-processor" -> {
+                        MavenDependencyValue managedJar = resolved.version() == null
+                                ? managedDependencies.get(new MavenDependencyKey(resolvedKey.groupId(),
+                                        resolvedKey.artifactId(),
+                                        "jar",
+                                        resolvedKey.classifier()))
+                                : null;
+                        String version = managedJar == null ? resolved.version() : managedJar.version();
                         String plugin = "maven/" + resolvedKey.groupId() + "/" + resolvedKey.artifactId()
-                                + (resolved.version() == null ? "" : "/" + resolved.version());
+                                + (version == null ? "" : "/" + version);
                         (resolved.scope() == MavenDependencyScope.TEST ? testPlugins : plugins).put(plugin, "plugin");
                         if (resolved.exclusions() != null && !resolved.exclusions().isEmpty()) {
                             pluginExclusions.put(plugin, resolved.exclusions().stream()

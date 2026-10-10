@@ -5809,6 +5809,64 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_takes_the_version_of_a_processor_named_without_one_from_its_dependency_management() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <processor.version>1.5</processor.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.example</groupId>
+                                <artifactId>processor</artifactId>
+                                <version>${processor.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.example</groupId>
+                                <artifactId>typed</artifactId>
+                                <version>2.5</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.jetbrains.kotlin</groupId>
+                                <artifactId>kotlin-serialization</artifactId>
+                                <version>3.0</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>typed</artifactId>
+                            <type>processor</type>
+                        </dependency>
+                    </dependencies>
+                    <!--jenesis.plugin
+                    maven/org.example/processor
+                    maven/org.example/pinned/1.0
+                    maven/org.example/unmanaged
+                    kotlinc maven/org.jetbrains.kotlin/kotlin-serialization
+                    -->
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).plugins())
+                .as("Maven resolves a versionless annotation processor path at the version its dependency management"
+                        + " names, but no plugin of another tool")
+                .containsExactly(
+                        Map.entry("maven/org.example/processor/1.5", "plugin"),
+                        Map.entry("maven/org.example/pinned/1.0", "plugin"),
+                        Map.entry("maven/org.example/unmanaged", "plugin"),
+                        Map.entry("maven/org.jetbrains.kotlin/kotlin-serialization", "kotlinc"),
+                        Map.entry("maven/org.example/typed/2.5", "plugin"));
+    }
+
+    @Test
     public void local_pom_reads_signature_comment_block() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
