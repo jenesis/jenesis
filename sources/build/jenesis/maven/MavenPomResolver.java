@@ -89,6 +89,17 @@ public class MavenPomResolver implements MavenResolver {
                                             SequencedMap<String, SequencedSet<String>> coordinates,
                                             SequencedMap<String, String> versions,
                                             DependencyScope scope) throws IOException {
+        return dependencies(executor, prefix, repositories, coordinates, versions, new LinkedHashMap<>(), scope);
+    }
+
+    @Override
+    public Resolver.Resolution dependencies(Executor executor,
+                                            String prefix,
+                                            Map<String, Repository> repositories,
+                                            SequencedMap<String, SequencedSet<String>> coordinates,
+                                            SequencedMap<String, String> versions,
+                                            SequencedMap<String, SequencedSet<String>> managedExclusions,
+                                            DependencyScope scope) throws IOException {
         Map<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>();
         versions.forEach((coordinate, value) -> {
             MavenDependencyKey key = MavenDependencyKey.parseKey(coordinate);
@@ -101,6 +112,21 @@ public class MavenPomResolver implements MavenResolver {
             String checksum = split < 0 ? null : value.substring(split + 1).trim();
             managedDependencies.put(key, new MavenDependencyValue(
                     version, null, null, null, null, checksum));
+        });
+        managedExclusions.forEach((coordinate, excludes) -> {
+            List<MavenDependencyName> exclusions = excludes.stream()
+                    .map(entry -> {
+                        int separator = entry.indexOf('/');
+                        if (separator < 1 || separator == entry.length() - 1) {
+                            throw new IllegalArgumentException("Malformed managed exclusion '" + entry + "' for "
+                                    + coordinate + ": expected <groupId>/<artifactId>");
+                        }
+                        return new MavenDependencyName(entry.substring(0, separator), entry.substring(separator + 1));
+                    })
+                    .toList();
+            managedDependencies.merge(MavenDependencyKey.parseKey(coordinate),
+                    new MavenDependencyValue(null, null, null, exclusions, null, null),
+                    MavenPomResolver::merge);
         });
         SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = new LinkedHashMap<>();
         coordinates.forEach((coordinate, excludes) -> {
@@ -377,7 +403,8 @@ public class MavenPomResolver implements MavenResolver {
                     key.type(),
                     key.classifier(),
                     resolutions.get(key).currentVersion,
-                    initial.pom().managedDependencies().containsKey(key));
+                    initial.pom().managedDependencies().containsKey(key)
+                            && initial.pom().managedDependencies().get(key).version() != null);
         }
         SequencedMap<MavenDependencyKey, MavenDependencyValue> results = new LinkedHashMap<>();
         dependencies.forEach(key -> {
@@ -461,6 +488,10 @@ public class MavenPomResolver implements MavenResolver {
                     value = merge(entry.getValue(), override);
                 } else {
                     value = override == null ? entry.getValue() : merge(override, entry.getValue());
+                    if (override != null && override.exclusions() != null && entry.getValue().exclusions() != null) {
+                        value = value.exclusions(Stream.concat(entry.getValue().exclusions().stream(),
+                                override.exclusions().stream()).distinct().toList());
+                    }
                     value = merge(value, current.pom().managedDependencies().get(entry.getKey()));
                 }
                 value = defaultScope(value);

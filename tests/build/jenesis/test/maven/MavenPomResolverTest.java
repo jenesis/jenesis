@@ -2656,6 +2656,56 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void applies_a_managed_exclusion_to_the_managed_dependency_where_it_is_reached_transitively() throws IOException {
+        addToRepository("group", "artifact", "1", rootPom("", "middle"));
+        addToRepository("middle", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>shared</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>kept</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                            <exclusions>
+                                <exclusion>
+                                    <groupId>own</groupId>
+                                    <artifactId>artifact</artifactId>
+                                </exclusion>
+                            </exclusions>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("kept", "artifact", "1", rootPom("", "own", "other"));
+        for (String groupId : List.of("shared", "own", "other")) {
+            addToRepository(groupId, "artifact", "1", leafPom());
+        }
+        for (String groupId : List.of("group", "middle", "shared", "kept", "own", "other")) {
+            addJarToRepository(groupId, "artifact", "1");
+        }
+        Resolver.Resolution resolution = mavenPomResolver.dependencies(
+                Runnable::run,
+                "maven",
+                Map.<String, Repository>of("maven", mavenRepository),
+                new LinkedHashMap<>(Map.of("group/artifact/1", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                new LinkedHashMap<>(Map.of(
+                        "middle/artifact", new LinkedHashSet<>(List.of("shared/artifact")),
+                        "kept/artifact", new LinkedHashSet<>(List.of("other/artifact")))),
+                DependencyScope.COMPILE);
+        assertThat(resolution.vertices().keySet())
+                .as("Maven applies the exclusions a <dependencyManagement> entry declares wherever its dependency"
+                        + " appears, in addition to those the depending POM declares")
+                .containsExactlyInAnyOrder("maven/group/artifact", "maven/middle/artifact", "maven/kept/artifact");
+    }
+
+    @Test
     public void draws_no_edge_to_a_test_or_provided_dependency_of_a_library_that_is_resolved_otherwise() throws IOException {
         addToRepository("group", "artifact", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>

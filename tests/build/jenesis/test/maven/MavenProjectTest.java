@@ -915,8 +915,8 @@ public class MavenProjectTest {
                 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
-        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(MavenProject.MANAGED))
-                .getProperty("maven/other/lib"))
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.MANAGED))
+                .getProperty("main/maven/other/lib"))
                 .as("a managed entry's exclusions are what a pinned entry replacing it has to repeat")
                 .isEqualTo("excluded/transitive");
     }

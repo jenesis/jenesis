@@ -177,6 +177,7 @@ public class Dependencies implements BuildExecutorModule {
                     Path.of(ALIASES),
                     Path.of(BOMS),
                     Path.of(EXCLUSIONS),
+                    Path.of(MANAGED),
                     Path.of(OVERRIDES),
                     Path.of(SPDX),
                     Path.of(DEPENDENCIES),
@@ -223,6 +224,7 @@ public class Dependencies implements BuildExecutorModule {
             SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> moduleOverrides = new LinkedHashMap<>();
             SequencedMap<String, String> bomTokens = new LinkedHashMap<>();
             SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedSet<String>>>>> exclusions = new LinkedHashMap<>();
+            SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedSet<String>>>> managedExclusions = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
@@ -338,6 +340,25 @@ public class Dependencies implements BuildExecutorModule {
                                 .put(parts[3], excludes);
                     }
                 }
+                Path managedFile = argument.folder().resolve(MANAGED);
+                if (Files.exists(managedFile)) {
+                    SequencedProperties properties = SequencedProperties.ofFiles(managedFile);
+                    for (String key : properties.stringPropertyNames()) {
+                        int first = key.indexOf('/');
+                        int second = first < 1 ? -1 : key.indexOf('/', first + 1);
+                        if (first < 1 || second <= first || second == key.length() - 1) {
+                            throw new IllegalArgumentException("Malformed managed exclusion '"
+                                    + key
+                                    + "' in "
+                                    + managedFile
+                                    + ": expected <group>/<repository>/<coordinate>");
+                        }
+                        managedExclusions.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashMap<>())
+                                .computeIfAbsent(key.substring(first + 1, second), _ -> new LinkedHashMap<>())
+                                .computeIfAbsent(key.substring(second + 1), _ -> new LinkedHashSet<>())
+                                .addAll(properties.entries(key));
+                    }
+                }
             }
             if (group != null) {
                 requires.keySet().retainAll(Set.of(group));
@@ -348,6 +369,7 @@ public class Dependencies implements BuildExecutorModule {
                     return second < 0 || !group.equals(token.substring(first + 1, second));
                 });
                 exclusions.keySet().retainAll(Set.of(group));
+                managedExclusions.keySet().retainAll(Set.of(group));
                 versions.keySet().retainAll(Set.of(group));
             }
             Path libs = Files.createDirectories(context.next().resolve(RESOLVED));
@@ -612,11 +634,20 @@ public class Dependencies implements BuildExecutorModule {
                                 }
                             }
                         }
+                        SequencedMap<String, SequencedMap<String, SequencedSet<String>>> groupExclusions = managedExclusions
+                                .getOrDefault(group, Collections.emptyNavigableMap());
+                        SequencedMap<String, SequencedSet<String>> managedExcludes = new LinkedHashMap<>(
+                                groupExclusions.getOrDefault(repo, Collections.emptyNavigableMap()));
+                        for (String managedPrefix : resolver.managedPrefixes()) {
+                            groupExclusions.getOrDefault(managedPrefix, Collections.emptyNavigableMap())
+                                    .forEach(managedExcludes::putIfAbsent);
+                        }
                         Resolver.Resolution resolution = resolver.dependencies(executor,
                                 repo,
                                 wrapped,
                                 coordinates,
                                 bom,
+                                managedExcludes,
                                 intent);
                         if (!deferred.isEmpty()) {
                             SequencedMap<String, SequencedSet<String>> absent = new LinkedHashMap<>();
@@ -630,7 +661,7 @@ public class Dependencies implements BuildExecutorModule {
                             }
                             if (!absent.isEmpty()) {
                                 coordinates.putAll(absent);
-                                resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, intent);
+                                resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, managedExcludes, intent);
                             }
                         }
                         if (!overrideTargets.isEmpty() && !coordinates.isEmpty()) {
@@ -649,7 +680,7 @@ public class Dependencies implements BuildExecutorModule {
                                     merged.addAll(overridden);
                                     return merged;
                                 });
-                                resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, intent);
+                                resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, managedExcludes, intent);
                             }
                         }
                         if (pinned && !resolver.managedPrefixes().isEmpty()) {

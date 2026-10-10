@@ -178,6 +178,50 @@ public class DependenciesResolutionTest {
     }
 
     @Test
+    public void routes_managed_exclusions_of_the_group_to_the_resolver() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("main/compile/foo/qux", "");
+        properties.store(dependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties managed = new SequencedProperties();
+        managed.setProperty("main/foo/org.example/transitive", "org.example/wrong,commons-logging/commons-logging");
+        managed.setProperty("tool/foo/org.example/other", "org.example/wrong");
+        managed.store(dependencies.resolve(BuildStep.MANAGED));
+        ManagedRecording resolver = new ManagedRecording(new LinkedHashMap<>());
+        execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", resolver)));
+        assertThat(resolver.received())
+                .as("a managed exclusion applies wherever its dependency appears, so the resolver receives it beside the roots")
+                .containsExactly(Map.entry("org.example/transitive",
+                        new LinkedHashSet<>(List.of("org.example/wrong", "commons-logging/commons-logging"))));
+    }
+
+    record ManagedRecording(SequencedMap<String, SequencedSet<String>> received) implements Resolver {
+
+        @Override
+        public Resolution dependencies(Executor executor,
+                                       String prefix,
+                                       Map<String, Repository> repositories,
+                                       SequencedMap<String, SequencedSet<String>> coordinates,
+                                       SequencedMap<String, String> versions,
+                                       DependencyScope scope) throws IOException {
+            return dependencies(executor, prefix, repositories, coordinates, versions, new LinkedHashMap<>(), scope);
+        }
+
+        @Override
+        public Resolution dependencies(Executor executor,
+                                       String prefix,
+                                       Map<String, Repository> repositories,
+                                       SequencedMap<String, SequencedSet<String>> coordinates,
+                                       SequencedMap<String, String> versions,
+                                       SequencedMap<String, SequencedSet<String>> managedExclusions,
+                                       DependencyScope scope) throws IOException {
+            received.putAll(managedExclusions);
+            SequencedMap<String, String> resolved = new LinkedHashMap<>();
+            coordinates.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
+            return new Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+        }
+    }
+
+    @Test
     public void can_resolve_dependencies_from_streaming_repository() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/qux", "");
