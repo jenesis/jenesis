@@ -1104,6 +1104,15 @@ public record Project(
                                            FindException, and nothing keeps one dependency of a
                                            module on the class path: move the tests that need
                                            it to a test source folder only the old build compiles
+                      a test resource      one that shadows a main resource of the same name puts
+                      overriding           its folder into two modules, which no module path
+                                           allows: move it to a test-only folder whose name is no
+                                           package, as test-config/, and point the tests there
+                      a resource bundle    ResourceBundle.getBundle finds only a bundle of the
+                                           module that calls it, so Spring's MessageSource finds
+                                           none of the application's: read it as a resource of an
+                                           open package or of a folder that is no package, as
+                                           ReloadableResourceBundleMessageSource does
 
                     Each module is the folder whose module-info.java sits at the root of its
                     sources; in a Maven tree that is src/main/java, so the file stays where it is.
@@ -1317,7 +1326,9 @@ public record Project(
                     classifier an OS profile selects stays selectable. A pinned entry outranks a BOM, as any managed version does,
                     so it repeats the exclusions and the <scope> the BOM managed for it: to
                     move to a new BOM version, change it, delete the entries `pin` wrote and pin
-                    again. Then build with -Djenesis.dependency.pin=strict, as CI should. Before retiring the old build, compare what both produce: the jar
+                    again. `pin` resolves what the active profiles build, so run it with every profile
+                    CI builds with, as -Djenesis.make.profiles=release,docker, or a tool only one of
+                    them switches on stays unpinned. Then build with -Djenesis.dependency.pin=strict, as CI should. Before retiring the old build, compare what both produce: the jar
                     contents, the dependency tree (`dependencies` against mvn dependency:tree or
                     gradle dependencies), the number of tests run, and the POM a consumer receives,
                     which is generated and flattened here rather than copied from yours.
@@ -1540,7 +1551,13 @@ public record Project(
 
                     ## No built-in
 
-                      resource filtering, ${...} in resources -> none; generate the file in a plugin
+                      resource filtering, ${...} in resources -> none; move the filtered files out of
+                          the resource folder, which is copied whole, and write them from a plugin at
+                          binary/compiled, as a file in both would fail the jar as a duplicate entry
+                      quarkus-maven-plugin, a framework that transforms the application at build time
+                          -> none; a plugin at the package hook point forks the framework's own
+                          bootstrap over the jar, and the tests are handed the model its test
+                          support reads; @QuarkusTest runs on the class path only
                       war, ear -> none; a war module is skipped with a [SKIPPED] line
                       git-commit-id, buildnumber -> none; pass -Djenesis.project.revision,
                           project.tag and project.tree, which the POM and SBOM record
@@ -1700,6 +1717,15 @@ public record Project(
                                              [RELEASE] line names); <V>-preview also
                                              enables its preview features, to compile and to run
                       @jenesis.main <class>  main class
+                      @jenesis.plugin [<group>] <token>
+                          Resolve a compiler plugin or a tool apart from this module's paths, in the
+                          group named first: plugin, the default, is javac's annotation processor
+                          path, javac its plugins such as Error Prone, kotlinc and scalac those
+                          compilers' plugins, any other name a group a plugin of the project reads.
+                          A version is written into the token, as maven/<groupId>/<artifactId>/<ver>,
+                          or pinned as <group>/maven/<groupId>/<artifactId>; else the newest release
+                          resolves. MAVEN modules declare the same lines in a <!--jenesis.plugin ...-->
+                          comment, where a processor without a version takes <dependencyManagement>'s.
                       @jenesis.test [<module>|abstract]
                           Test variant of <module>. `abstract` supplies infrastructure only: declares
                           no tests, runs none, is staged only with the test modules.
@@ -2300,7 +2326,9 @@ public record Project(
                     which also reads process-<tool>.properties; one that runs a program extends
                     EnvironmentalProcessBuildStep for environment-<tool>.properties. Write nothing
                     outside context.next(): a step that must, as an exporter does, overrides
-                    shouldRun to say it always runs.
+                    shouldRun to say it always runs. context.next() is a temporary folder, renamed
+                    when the step succeeds or filled from the cache, so never write its absolute
+                    path into a file: write a path relative to the folder that reads it.
 
                     A tool that cannot be a module at all, as one with a class in the unnamed
                     package, is forked instead, and the project resolves it rather than the plugin:
