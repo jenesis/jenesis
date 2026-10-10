@@ -155,6 +155,8 @@ public record Project(
                         .forEach(mavenDeps::add);
                 sub.addModule(ProjectPlugins.PREPROCESS, project.plugins().preprocess(project.profiles()));
                 mavenDeps.add(ProjectPlugins.PREPROCESS);
+                Function<List<Path>, SequencedSet<Path>> locations =
+                        locals -> configurations(locals, project.configuration(), project.profiles());
                 sub.addModule("maven",
                               MavenProject.make(project.environment(),
                                                          project.root(),
@@ -164,11 +166,12 @@ public record Project(
                                                          Collections.unmodifiableMap(resolvers),
                                                          project.pinning(),
                                                          project.licenseFiles(Dependencies.SPDX),
+                                                         locations,
                                                          (descriptor, mergedRepos, mergedResolvers) -> pomAware.apply(
                                         new ProjectModuleDescriptor(descriptor)
                                                 .location(descriptor.location())
                                                 .directory(descriptor.location())
-                                                .configuration(configurations(descriptor.configurations(), project.configuration(), project.profiles()))
+                                                .configuration(locations.apply(descriptor.configurations()))
                                                 .test(project.tests())
                                                 .source(project.sources())
                                                 .documentation(project.documentation())
@@ -970,7 +973,8 @@ public record Project(
                                  and released as its POM alone: its coordinate, packaging and
                                  metadata, and that <dependencyManagement> with its ${...}
                                  resolved and its parent's left out, since the parent is not
-                                 published
+                                 published; stage=false in its packaging.properties keeps it out
+                                 of the staged repositories, as it does a module's jar
 
                     A test module-info.java that names the main module itself, the --patch-module
                     idiom Gradle and Maven use for white-box tests, is not supported: compiled as a

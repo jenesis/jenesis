@@ -365,6 +365,7 @@ public class MavenProjectTest {
                 Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)),
                 null,
                 Collections.emptyNavigableSet(),
+                LinkedHashSet::new,
                 (_, _, _) -> new AssemblyDescriptor((buildExecutor, _) -> buildExecutor.addModule("java",
                         new JavaToolchainModule(),
                         "../sources",
@@ -1229,7 +1230,10 @@ public class MavenProjectTest {
                 .noneMatch(key -> key.contains("module-"));
         Path boms = results.get("maven/boms");
         SequencedProperties inventory = SequencedProperties.ofFiles(boms.resolve("inventory.properties"));
-        assertThat(inventory).containsEntry("module-bom.path", "bom").containsEntry("module-bom.packaging", "pom");
+        assertThat(inventory).containsEntry("module-bom.path", "bom")
+                .containsEntry("module-bom.packaging", "pom")
+                .as("a BOM is staged unless its packaging.properties says otherwise")
+                .doesNotContainKey("module-bom.stage");
         String pom = Files.readString(boms.resolve(inventory.getProperty("module-bom.pom")));
         assertThat(pom)
                 .contains("<groupId>group</groupId>", "<artifactId>bom</artifactId>", "<version>1</version>",
@@ -1238,6 +1242,94 @@ public class MavenProjectTest {
                 .doesNotContain("${", "<parent>")
                 .as("the parent's managed versions stay with the parent, which is not published")
                 .doesNotContain("inherited");
+    }
+
+    @Test
+    public void keeps_a_bom_out_of_the_staged_repositories_where_its_packaging_properties_sets_stage_false()
+            throws IOException {
+        writeBom();
+        Files.writeString(Files.createDirectories(project.resolve("bom/build.jenesis")).resolve("packaging.properties"),
+                "stage=false\n");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        SequencedProperties inventory = SequencedProperties.ofFiles(results.get("maven/boms").resolve("inventory.properties"));
+        assertThat(inventory)
+                .containsEntry("module-bom.packaging", "pom")
+                .as("the BOM's POM is still written, and staging leaves it out")
+                .containsEntry("module-bom.stage", "false");
+    }
+
+    @Test
+    public void reads_the_stage_of_a_bom_from_every_configuration_location_a_module_reads() throws IOException {
+        writeBom();
+        Path shared = Files.createDirectory(project.resolve("shared"));
+        Files.writeString(shared.resolve("packaging.properties"), "stage=false\n");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver)
+                .configurations(locals -> {
+                    SequencedSet<Path> locations = new LinkedHashSet<>(locals);
+                    locations.add(shared);
+                    return locations;
+                }));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/boms").resolve("inventory.properties")))
+                .as("a configuration folder the project names reaches a BOM as it reaches any module")
+                .containsEntry("module-bom.stage", "false");
+    }
+
+    private void writeBom() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>bom</module>
+                    </modules>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("bom")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>bom</artifactId>
+                    <packaging>pom</packaging>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>group</groupId>
+                                <artifactId>library</artifactId>
+                                <version>1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
     }
 
     @Test
@@ -1902,6 +1994,7 @@ public class MavenProjectTest {
                 Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)),
                 null,
                 Collections.emptyNavigableSet(),
+                LinkedHashSet::new,
                 (descriptor, _, _) -> {
                     switch (descriptor.name()) {
                         case "module-foo" -> {
