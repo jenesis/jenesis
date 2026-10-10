@@ -673,7 +673,7 @@ public class InferredMultiProjectAssemblerTest {
         assertThatThrownBy(() -> fixture.execute("sub/documentation/archive"))
                 .as("the documentation of a test module is never published unless its artifacts are staged")
                 .rootCause()
-                .hasMessageStartingWith("Unknown selector: documentation/archive - ");
+                .hasMessageStartingWith("Unknown selector: archive - ");
         Files.createDirectory(fixture.sources.resolve(BuildStep.SOURCES));
         Files.writeString(fixture.sources.resolve(BuildStep.SOURCES).resolve("FooTest.java"), "public class FooTest {}");
         Path javadocOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
@@ -714,7 +714,7 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("path=\ntest=\nabstract=true\n", true, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/observed/test/resolved"))
                 .rootCause()
-                .hasMessageStartingWith("Unknown selector: observed/test/resolved - ");
+                .hasMessageStartingWith("Unknown selector: test/resolved - ");
     }
 
     @Test

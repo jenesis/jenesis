@@ -320,6 +320,11 @@ public class InferredTestObservationModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        Path described = BuildStep.locate(new LinkedHashSet<>(inherited.values()), BuildStep.MODULE);
+        SequencedProperties description = described == null ? null : SequencedProperties.ofFiles(described);
+        if (description != null && (description.getProperty("test") == null || description.flag("abstract"))) {
+            return;
+        }
         SequencedMap<String, BuildExecutorModule> reports = new LinkedHashMap<>();
         List<ObservabilityEngine> engines = new ArrayList<>();
         if (jacoco != null && BuildStep.locate(configuration, "jacoco.properties") != null) {
@@ -349,7 +354,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
             TestModule module = testModule.observe(engines)
                     .pinning(pinning)
                     .pathPlacement(pathPlacement)
-                    .moduleName(moduleName)
+                    .moduleName(moduleName == null && description != null ? description.getProperty("module") : moduleName)
                     .directory(directory);
             BuildExecutorModule executed = test.apply(declared(module, BuildStep.locate(configuration, "test.properties")));
             if (executed != null) {

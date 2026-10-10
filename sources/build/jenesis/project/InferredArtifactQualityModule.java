@@ -112,10 +112,11 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        Path described = BuildStep.locate(new LinkedHashSet<>(inherited.values()), BuildStep.MODULE);
         Bind.configuredByProperties(buildExecutor,
                 inherited.sequencedKeySet(),
                 JAPICMP,
-                japicmp,
+                described != null && SequencedProperties.ofFiles(described).getProperty("test") != null ? null : japicmp,
                 BuildStep.locate(configuration, "japicmp.properties"),
                 properties -> {
                     for (String key : properties.stringPropertyNames()) {

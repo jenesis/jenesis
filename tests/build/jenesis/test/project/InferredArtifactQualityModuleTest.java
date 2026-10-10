@@ -48,6 +48,21 @@ public class InferredArtifactQualityModuleTest {
     }
 
     @Test
+    public void compares_no_api_of_a_module_its_description_declares_a_test_module() throws IOException {
+        Files.writeString(project.resolve("japicmp.properties"), "baseline=com.example/library");
+        Files.writeString(project.resolve(BuildStep.MODULE), "test=main_artifact\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("artifact", artifact(), "project");
+        executor.execute();
+
+        assertThat(root.resolve("artifact").resolve("japicmp"))
+                .as("the tests of a module have no release of their own to be compatible with")
+                .doesNotExist();
+    }
+
+    @Test
     public void the_japicmp_override_switches_off_japicmp() throws IOException {
         Files.writeString(project.resolve("japicmp.properties"), "baseline=com.example/library");
 
