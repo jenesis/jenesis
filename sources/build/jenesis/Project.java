@@ -1259,7 +1259,12 @@ public record Project(
                     jenesis.test.filter matches the whole class name and replaces the default naming
                     (Test*, *Test, *Tests, *TestCase, IT*, *IT, *ITCase, never a nested class), which
                     under JUnit 4, as in Surefire, takes a class only where it or a superclass
-                    declares an @Test method, a @RunWith or a suite(), or extends TestCase; a
+                    declares an @Test method, a @RunWith or a suite(), or extends TestCase. A filter
+                    drops that check, unlike Surefire's includes, so under JUnit 4 every class it
+                    matches runs, a nested helper included: where the default naming fits, leave
+                    classes out with jenesis.test.exclude, which keeps the check. A filter, an exclude
+                    and a tag each switch off -Djenesis.test.incremental, so a rerun runs every test
+                    they select rather than those a change reaches. A
                     <module>/<regex> entry reaches that module only, and a module no entry reaches
                     runs no tests. In a pom.xml build <module> is the folder of the module's pom.xml
                     relative to the root, so the root module's entry is written /<regex>, with
@@ -1391,7 +1396,10 @@ public record Project(
                       maven-resources-plugin targetPath, a file outside the resource folders
                           -> -Djenesis.project.resources=<file>:<path in the jar>
                       animal-sniffer with a JDK signature -> maven.compiler.release, as javac
-                          checks the API of the release it compiles for; other signatures: none
+                          checks the API of the release it compiles for, unless the code calls a
+                          newer API behind a runtime check, which the release refuses: then
+                          --source=<release> in process-javac.properties, as below, and nothing
+                          checks the API; other signatures: none
                       maven.compiler.source/target without a release, where the code needs the
                           API of the JDK compiling it, as a guarded call of a newer one does
                           -> --source=<release> in process-javac.properties, since the build
@@ -3982,7 +3990,7 @@ public record Project(
                 cache.read|PT10S|Read timeout for a cache server
                 cache.insecure|false|Permit the cache key over plaintext http off loopback, and over https accept a certificate that does not verify; likewise yours alone to allow
                 test.skip|false|Skip executing tests, still resolving what running them needs
-                test.filter||Comma-separated [<module>/]<classRegex>[#<method>] entries restricting which tests run; an entry naming a module applies to its tests alone, and a test module no entry reaches runs none
+                test.filter||Comma-separated [<module>/]<classRegex>[#<method>] entries restricting which tests run, in place of the default naming and of its JUnit 4 check that a class holds tests; an entry naming a module applies to its tests alone, and a test module no entry reaches runs none
                 test.exclude||Comma-separated [<module>/]<classRegex> entries, each matched against the whole class name, leaving out of a run the test classes they match among those the default naming or jenesis.test.filter selects; an entry naming a module applies to its tests alone, and a test module whose every selected class is left out runs none
                 test.tag||Comma-separated alternatives, a test running when it matches any of them: a tag, several joined by + for the tests carrying all of them, and -<tag> for the tests not carrying it, as -container or release+-soak,-container, with nothing to quote on a command line and translated for the test framework; a run remembers what it covered until the tests' inputs change, so a later selection runs only the tests no earlier one ran
                 test.force|false|Execute tests even where a previous run already covered them
