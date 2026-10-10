@@ -65,7 +65,7 @@ once where the object is built:
 
 - `ofEnvironment(environment, …)` is the static factory that reads every setting from the `Environment` it is
   given (`environment.value("executor.digest", "MD5")`, `environment.number("executor.concurrency", 0)`,
-  `environment.flag("source.pmd", true)`), with a value the object cannot do without following it as a
+  `environment.flag("test.skip")`), with a value the object cannot do without following it as a
   further argument (`Project.ofEnvironment(environment, root)`);
 - the public no-argument or short constructor reads nothing and takes each setting's default, exactly as
   if the environment answered for none of them - that is what `Environment.NONE` is;
@@ -299,7 +299,8 @@ part of the key of `prepare` and of every step reading what it writes; `@@` is a
 **Modules activate on a file.** A build module under `project/` (`CheckstyleModule`, `JaCoCoModule`, …)
 switches itself on when its configuration file is present in a configuration folder
 (`configurationFile(configuration)`), resolves its tool in a dependency group named after the tool, and is
-opted out with its `jenesis.<kind>.<tool>=false` property. The inferred assembler wires the modules; a new
+switched by its `jenesis.<kind>.<tool>` property: `ignore` leaves it out, `warn` (the default) reports its
+findings, `strict` fails the build on them. The inferred assembler wires the modules; a new
 tool is a new module in the same shape, plus a demo.
 
 **A tool reads one folder, the inference fills it.** A generator module (`XjcModule`,
