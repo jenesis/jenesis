@@ -1471,10 +1471,9 @@ public class MavenPomResolver implements MavenResolver {
                             && !osName.contains("netware")
                             && !osName.contains("openvms")
                             && (!osName.contains("mac") || osName.endsWith("x"));
-                    case "os/2", "netware", "openvms", "os/400" -> osName.contains(value);
                     case "tandem" -> osName.contains("nonstop_kernel");
                     case "z/os" -> osName.contains("z/os") || osName.contains("os/390");
-                    default -> false;
+                    default -> osName.contains(value);
                 };
                 case "name" -> osName.equals(value);
                 case "arch" -> osArch.equals(value);
