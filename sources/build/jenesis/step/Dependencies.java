@@ -30,9 +30,10 @@ public class Dependencies implements BuildExecutorModule {
             ARCHIVES = "archives.properties",
             ALIASED = "aliased.properties",
             INTERNAL = "internal.properties",
-            MODULAR = "modular.properties";
+            MODULAR = "modular.properties",
+            UNPINNED = "unpinned.properties";
     public static final String RESOLVED = "resolved/", MODULAR_PATH = "modular/";
-    public static final String RESOLVE = "resolve", SIGNATURES = "signatures";
+    public static final String RESOLVE = "resolve", PINNED = "pinned", SIGNATURES = "signatures";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
@@ -122,8 +123,15 @@ public class Dependencies implements BuildExecutorModule {
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
         buildExecutor.addStep(RESOLVE,
-                new Resolve(repositories, resolvers, pinning, group, printing, palette, timestamp),
+                new Resolve(repositories,
+                        resolvers,
+                        pinning == Pinning.STRICT ? null : pinning,
+                        group,
+                        printing,
+                        palette,
+                        timestamp),
                 inherited.sequencedKeySet());
+        buildExecutor.addStep(PINNED, new Pinned(pinning == Pinning.STRICT), RESOLVE);
         SequencedSet<String> verified = new LinkedHashSet<>();
         verified.add(RESOLVE);
         verified.addAll(inherited.sequencedKeySet());
@@ -380,6 +388,7 @@ public class Dependencies implements BuildExecutorModule {
                 wrapped.put(name, effective.materialized(libs));
             });
             SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> managed = new LinkedHashMap<>();
+            SequencedProperties unpinned = new SequencedProperties();
             if (!bomTokens.isEmpty()) {
                 SequencedMap<String, String> merged = new LinkedHashMap<>();
                 SequencedMap<String, String> covering = new LinkedHashMap<>();
@@ -443,10 +452,8 @@ public class Dependencies implements BuildExecutorModule {
                     } catch (RuntimeException e) {
                         throw new IllegalStateException("Failed to fetch BOM " + reference, e);
                     }
-                    if (pinning == Pinning.STRICT && bom.verifiable() && checksum.isEmpty() && !bom.internal()) {
-                        throw new IllegalStateException("No checksum pinned for BOM "
-                                + reference
-                                + " (strict pinning is enabled)");
+                    if (bom.verifiable() && checksum.isEmpty() && !bom.internal()) {
+                        unpinned.setProperty("bom/" + reference, "");
                     }
                     if (!version.isEmpty() && !bom.version().isEmpty()) {
                         if (bom.verifiable()) {
@@ -892,23 +899,21 @@ public class Dependencies implements BuildExecutorModule {
             if (!produced.isEmpty()) {
                 produced.store(context.next().resolve(INTERNAL));
             }
-            if (pinning == Pinning.STRICT) {
-                Set<Path> pinnedFiles = new HashSet<>();
-                for (Map.Entry<String, String> entry : checksums.entrySet()) {
-                    if (!entry.getValue().isEmpty()) {
-                        pinnedFiles.add(placed.get(entry.getKey()));
-                    }
+            Set<Path> pinnedFiles = new HashSet<>();
+            for (Map.Entry<String, String> entry : checksums.entrySet()) {
+                if (!entry.getValue().isEmpty()) {
+                    pinnedFiles.add(placed.get(entry.getKey()));
                 }
-                for (Map.Entry<String, String> entry : checksums.entrySet()) {
-                    if (entry.getValue().isEmpty()
-                            && !internals.get(entry.getKey())
-                            && !pinnedFiles.contains(placed.get(entry.getKey()))) {
-                        throw new IllegalStateException("No checksum pinned for "
-                                + entry.getKey()
-                                + " (strict pinning is enabled)"
-                                + managing(managed, entry.getKey()));
-                    }
+            }
+            for (Map.Entry<String, String> entry : checksums.entrySet()) {
+                if (entry.getValue().isEmpty()
+                        && !internals.get(entry.getKey())
+                        && !pinnedFiles.contains(placed.get(entry.getKey()))) {
+                    unpinned.setProperty(entry.getKey(), managing(managed, entry.getKey()));
                 }
+            }
+            if (!unpinned.isEmpty()) {
+                unpinned.store(context.next().resolve(UNPINNED));
             }
             Repository locator = repositories.get(DiscoverySources.NAME);
             if (locator != null) {
@@ -937,6 +942,39 @@ public class Dependencies implements BuildExecutorModule {
             index.store(context.next().resolve(DEPENDENCIES));
             graph.store(context.next().resolve(GRAPH));
             licenses.store(context.next().resolve(LICENSES));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    private record Pinned(boolean strict) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            for (BuildStepArgument argument : strict ? arguments.values() : List.<BuildStepArgument>of()) {
+                Path file = argument.removed() ? null : argument.folder().resolve(UNPINNED);
+                if (file == null || !Files.exists(file)) {
+                    continue;
+                }
+                SequencedProperties unpinned = SequencedProperties.ofFiles(file);
+                Optional<String> bom = unpinned.stringPropertyNames().stream()
+                        .filter(key -> key.startsWith("bom/"))
+                        .findFirst();
+                if (bom.isPresent()) {
+                    throw new IllegalStateException("No checksum pinned for BOM "
+                            + bom.get().substring("bom/".length())
+                            + " (strict pinning is enabled)");
+                }
+                Optional<String> dependency = unpinned.stringPropertyNames().stream().findFirst();
+                if (dependency.isPresent()) {
+                    throw new IllegalStateException("No checksum pinned for "
+                            + dependency.get()
+                            + " (strict pinning is enabled)"
+                            + unpinned.getProperty(dependency.get()));
+                }
+            }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }
