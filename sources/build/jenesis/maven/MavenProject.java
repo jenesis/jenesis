@@ -305,6 +305,27 @@ public class MavenProject implements BuildExecutorModule {
                                     .filter(folder -> !folder.isEmpty())
                                     .anyMatch(folder -> Files.exists(base.resolve(folder)));
                         }
+                        if (!active && name.startsWith(SIBLING_MODULE_PREFIX)) {
+                            for (Path configuration : List.of(base.resolve("src/main/build.jenesis"), base.resolve("build.jenesis"))) {
+                                if (Files.isDirectory(configuration)) {
+                                    try (Stream<Path> configured = Files.list(configuration)) {
+                                        active |= configured.map(path -> path.getFileName().toString())
+                                                .anyMatch(entry -> entry.startsWith("plugin-") && entry.endsWith(".properties"));
+                                    }
+                                }
+                            }
+                            if (!active && printing != null) {
+                                printing.accept(("%s%-11s%s %s builds no jar, as %s has neither sources nor resources:"
+                                        + " a plugin that generates them is configured by a plugin-<name>.properties in"
+                                        + " %s, which builds the module")
+                                        .formatted(palette.warning(),
+                                                "[SKIPPED]",
+                                                palette.reset(),
+                                                properties.getProperty("groupId") + ":" + properties.getProperty("artifactId"),
+                                                Path.of(properties.getProperty("path")).resolve("pom.xml"),
+                                                Path.of(properties.getProperty("path")).resolve("src/main/build.jenesis")));
+                            }
+                        }
                         if (active && printing != null && !name.startsWith("test-") && properties.getProperty("release") == null) {
                             printing.accept(("%s%-11s%s %s compiles for release %d, the JDK the build runs on, as %s sets"
                                     + " neither maven.compiler.release nor its target or source - maven.compiler.release sets it")

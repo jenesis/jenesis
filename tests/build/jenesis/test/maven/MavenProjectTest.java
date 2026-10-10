@@ -1389,6 +1389,66 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void builds_a_module_without_sources_that_configures_a_plugin_and_names_one_that_does_not() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <maven.compiler.release>21</maven.compiler.release>
+                    </properties>
+                    <modules>
+                        <module>generated</module>
+                        <module>empty</module>
+                    </modules>
+                </project>
+                """);
+        for (String name : List.of("generated", "empty")) {
+            Files.writeString(Files.createDirectory(project.resolve(name)).resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>group</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>%s</artifactId>
+                    </project>
+                    """.formatted(name));
+        }
+        Files.writeString(Files.createDirectories(project.resolve("generated/src/main/build.jenesis"))
+                .resolve("plugin-generator.properties"), "");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        List<String> printed = new ArrayList<>();
+        executor.addModule("maven", MavenProject.ofEnvironment(new Environment(Map.of("palette.colors", "none")).out(printed::add),
+                project,
+                "maven",
+                mavenRepository,
+                mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results)
+                .as("a plugin the module configures generates what it compiles")
+                .containsKeys("maven/module-generated/manifests", "maven/module-generated/coordinates")
+                .doesNotContainKeys("maven/module-empty/manifests");
+        assertThat(printed).containsExactly("[SKIPPED]   group:empty builds no jar, as empty/pom.xml has neither sources nor"
+                + " resources: a plugin that generates them is configured by a plugin-<name>.properties in"
+                + " empty/src/main/build.jenesis, which builds the module");
+    }
+
+    @Test
     public void can_resolve_test_sources_and_resources_explicit() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
