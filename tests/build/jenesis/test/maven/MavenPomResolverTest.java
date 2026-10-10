@@ -2687,6 +2687,75 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void activates_the_profiles_of_a_dependency_pom_that_the_operating_system_selects() throws IOException {
+        addToRepository("group", "artifact", "1", rootPom("", "openjfx"));
+        addToRepository("openjfx", "javafx", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>openjfx</groupId>
+                    <artifactId>javafx</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <profiles>
+                        <profile>
+                            <activation><os><name>linux</name></os></activation>
+                            <properties><javafx.platform>linux</javafx.platform></properties>
+                        </profile>
+                        <profile>
+                            <activation><os><name>linux</name><arch>aarch64</arch></os></activation>
+                            <properties><javafx.platform>linux-aarch64</javafx.platform></properties>
+                        </profile>
+                        <profile>
+                            <activation><os><family>mac</family><arch>!aarch64</arch></os></activation>
+                            <properties><javafx.platform>mac</javafx.platform></properties>
+                        </profile>
+                        <profile>
+                            <activation><os><family>windows</family></os></activation>
+                            <properties><javafx.platform>win</javafx.platform></properties>
+                        </profile>
+                        <profile>
+                            <activation><os><family>unix</family></os><jdk>[1.8,9)</jdk></activation>
+                            <properties><javafx.platform>legacy</javafx.platform></properties>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        addToRepository("openjfx", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>openjfx</groupId>
+                        <artifactId>javafx</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>artifact</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>openjfx</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                            <classifier>${javafx.platform}</classifier>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Map<List<String>, String> platforms = Map.of(
+                List.of("Linux", "amd64", "6.1"), "linux",
+                List.of("Linux", "aarch64", "6.1"), "linux-aarch64",
+                List.of("Mac OS X", "x86_64", "14.4"), "mac",
+                List.of("Windows 11", "amd64", "10.0"), "win");
+        for (Map.Entry<List<String>, String> platform : platforms.entrySet()) {
+            List<String> os = platform.getKey();
+            assertThat(mavenPomResolver.os(os.get(0), os.get(1), os.get(2)).dependencies(
+                    Runnable::run, mavenRepository, "group", "artifact", "1", null).keySet())
+                    .as("OpenJFX selects its platform's jar by profiles its POM activates on the OS, %s here", os)
+                    .contains(new MavenDependencyKey("openjfx", "artifact", "jar", platform.getValue()));
+        }
+    }
+
+    @Test
     public void applies_a_managed_exclusion_to_the_managed_dependency_where_it_is_reached_transitively() throws IOException {
         addToRepository("group", "artifact", "1", rootPom("", "middle"));
         addToRepository("middle", "artifact", "1", """
@@ -5220,7 +5289,8 @@ public class MavenPomResolverTest {
     }
 
     @Test
-    public void a_profile_activated_by_a_property_an_os_or_a_file_stays_inactive() throws IOException {
+    public void a_profile_activated_by_a_property_or_a_file_stays_inactive_and_one_activated_by_the_os_follows_it()
+            throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0">
@@ -5278,8 +5348,12 @@ public class MavenPomResolverTest {
                     </profiles>
                 </project>
                 """);
-        assertThat(mavenPomResolver.jdk("25.0.4.1").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+        assertThat(mavenPomResolver.jdk("25.0.4.1").os("Windows 11", "amd64", "10.0")
+                .local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
                 .isEqualTo("11");
+        assertThat(mavenPomResolver.jdk("25.0.4.1").os("Linux", "amd64", "6.1")
+                .local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .isEqualTo("21");
     }
 
     @Test
