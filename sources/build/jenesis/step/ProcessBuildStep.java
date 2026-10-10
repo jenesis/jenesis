@@ -16,6 +16,7 @@ public abstract class ProcessBuildStep implements BuildStep {
 
     public static final String PROCESS = "process/", ENVIRONMENT = "environment/";
     protected static final Charset NATIVE_ENCODING = nativeEncoding();
+    private static final SAXParserFactory REPORTS = reports();
     private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
     private static final Set<String> ARGUMENT_FILES = Set.of("jar", "javac", "javadoc", "jdeps", "jlink", "jmod", "jpackage");
     private static final Pattern UNQUOTED = Pattern.compile("[A-Za-z0-9_@%+=:,./-]+");
@@ -212,29 +213,41 @@ public abstract class ProcessBuildStep implements BuildStep {
         return prepended;
     }
 
+    private static SAXParserFactory reports() {
+        SAXParserFactory factory = SAXParserFactory.newDefaultInstance();
+        try {
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        } catch (ParserConfigurationException | SAXException e) {
+            throw new IllegalStateException(e);
+        }
+        return factory;
+    }
+
+    protected static boolean parsed(Path report, DefaultHandler handler) throws IOException {
+        try {
+            REPORTS.newSAXParser().parse(report.toFile(), handler);
+            return true;
+        } catch (SAXException _) {
+            return false;
+        } catch (ParserConfigurationException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     protected static int findings(Path report, String finding) throws IOException {
         if (!Files.isRegularFile(report)) {
             return -1;
         }
-        try {
-            SAXParserFactory factory = SAXParserFactory.newInstance();
-            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-            AtomicInteger findings = new AtomicInteger();
-            factory.newSAXParser().parse(report.toFile(), new DefaultHandler() {
-                @Override
-                public void startElement(String uri, String localName, String qualifiedName, Attributes attributes) {
-                    if (qualifiedName.equals(finding)) {
-                        findings.incrementAndGet();
-                    }
+        AtomicInteger findings = new AtomicInteger();
+        return parsed(report, new DefaultHandler() {
+            @Override
+            public void startElement(String uri, String localName, String qualifiedName, Attributes attributes) {
+                if (qualifiedName.equals(finding)) {
+                    findings.incrementAndGet();
                 }
-            });
-            return findings.get();
-        } catch (SAXException _) {
-            return -1;
-        } catch (ParserConfigurationException e) {
-            throw new IllegalStateException(e);
-        }
+            }
+        }) ? findings.get() : -1;
     }
 
     protected boolean reported(int code,
