@@ -298,6 +298,31 @@ public class ProjectTest {
     }
 
     @Test
+    public void the_dependencies_selector_resolves_and_prints_without_running_the_tests() throws IOException {
+        Files.writeString(root.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>demo</groupId>
+                    <artifactId>tested</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>25</maven.compiler.release>
+                    </properties>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(root.resolve("src/main/java/demo")).resolve("Sample.java"),
+                "package demo; public class Sample { }\n");
+        Files.writeString(Files.createDirectories(root.resolve("src/test/java/demo")).resolve("SampleTest.java"),
+                "package demo; public class SampleTest { }\n");
+        List<String> errors = new ArrayList<>();
+        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString()))
+                        .out(_ -> { })
+                        .err(errors::add), root, new LinkedHashSet<>(), Project.DEPENDENCIES))
+                .as("the tests, which name no framework the build could run them with, are left to a build: %s", errors)
+                .isNotNull();
+    }
+
+    @Test
     public void runs_transform_and_inspect_without_a_plugin_in_each_concrete_layout() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
         Files.writeString(root.resolve("pom.xml"), """
