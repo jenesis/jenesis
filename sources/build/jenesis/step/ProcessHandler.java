@@ -191,6 +191,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
         private final List<String> commands;
         private final SortedMap<String, String> environment;
+        private final Path directory;
 
         private OfProcess(List<String> commands) {
             SortedMap<String, String> environment = new TreeMap<>(WINDOWS ? String.CASE_INSENSITIVE_ORDER : null);
@@ -199,12 +200,13 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     environment.put(name, value);
                 }
             });
-            this(commands, environment);
+            this(commands, environment, null);
         }
 
-        private OfProcess(List<String> commands, SortedMap<String, String> environment) {
+        private OfProcess(List<String> commands, SortedMap<String, String> environment, Path directory) {
             this.commands = commands;
             this.environment = Collections.unmodifiableSortedMap(environment);
+            this.directory = directory;
         }
 
         public static Function<List<String>, OfProcess> ofJavaHome(String command) {
@@ -309,7 +311,15 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess environment(SortedMap<String, String> environment) {
-            return new OfProcess(commands, new TreeMap<>(environment));
+            return new OfProcess(commands, new TreeMap<>(environment), directory);
+        }
+
+        public Path directory() {
+            return directory;
+        }
+
+        public OfProcess directory(Path directory) {
+            return new OfProcess(commands, new TreeMap<>(environment), directory);
         }
 
         @Override
@@ -320,6 +330,9 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         @Override
         public int execute(Path output, Path error, Tee tee) throws IOException {
             ProcessBuilder builder = new ProcessBuilder(commands);
+            if (directory != null) {
+                builder.directory(directory.toFile());
+            }
             if (tee == null) {
                 builder.redirectOutput(output.toFile()).redirectError(error.toFile());
             }

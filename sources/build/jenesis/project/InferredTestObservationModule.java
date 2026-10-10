@@ -22,6 +22,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final PathPlacement pathPlacement;
     private final String moduleName;
+    private final Path directory;
     private final TestModule testModule;
     private final JaCoCoModule jacocoModule;
     private final PiTestModule pitestModule;
@@ -38,6 +39,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         this(configuration,
                 null,
                 PathPlacement.CLASS_PATH,
+                null,
                 null,
                 new TestModule(repositories, resolvers),
                 new JaCoCoModule(repositories, resolvers),
@@ -57,6 +59,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         InferredTestObservationModule module = new InferredTestObservationModule(configuration,
                 null,
                 PathPlacement.CLASS_PATH,
+                null,
                 null,
                 TestModule.ofEnvironment(environment, repositories, resolvers),
                 JaCoCoModule.ofEnvironment(environment, repositories, resolvers),
@@ -105,6 +108,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                                           Pinning pinning,
                                           PathPlacement pathPlacement,
                                           String moduleName,
+                                          Path directory,
                                           TestModule testModule,
                                           JaCoCoModule jacocoModule,
                                           PiTestModule pitestModule,
@@ -118,6 +122,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
         this.moduleName = moduleName;
+        this.directory = directory;
         this.testModule = testModule;
         this.jacocoModule = jacocoModule;
         this.pitestModule = pitestModule;
@@ -134,6 +139,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -150,6 +156,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -166,6 +173,24 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                jfr,
+                pitest,
+                custom);
+    }
+
+    public InferredTestObservationModule directory(Path directory) {
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -182,6 +207,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -198,6 +224,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -214,6 +241,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -230,6 +258,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -246,6 +275,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -262,6 +292,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -318,7 +349,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
             TestModule module = testModule.observe(engines)
                     .pinning(pinning)
                     .pathPlacement(pathPlacement)
-                    .moduleName(moduleName);
+                    .moduleName(moduleName)
+                    .directory(directory);
             BuildExecutorModule executed = test.apply(declared(module, BuildStep.locate(configuration, "test.properties")));
             if (executed != null) {
                 buildExecutor.addModule(TEST, executed, inherited.sequencedKeySet());

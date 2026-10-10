@@ -165,6 +165,7 @@ public record Project(
                                                          (descriptor, mergedRepos, mergedResolvers) -> pomAware.apply(
                                         new ProjectModuleDescriptor(descriptor)
                                                 .location(descriptor.location())
+                                                .directory(descriptor.location())
                                                 .configuration(configurations(descriptor.configurations(), project.configuration(), project.profiles()))
                                                 .test(project.tests())
                                                 .source(project.sources())
@@ -926,6 +927,9 @@ public record Project(
                     child.*.inherit.append.path="false", and licenses or developers only as a whole.
                     What a module declares or inherits wins; project.properties at the root, which
                     skill/target lists the keys of, fills in only what the POMs leave out.
+                    A module's tests run in its own folder, with the basedir property set to it, as
+                    Surefire runs them, so a test that reads src/test/... by a relative path finds
+                    the file with no -Dbasedir in process-test.properties.
 
                     ## 3b. Or declare the build in module-info.java
 

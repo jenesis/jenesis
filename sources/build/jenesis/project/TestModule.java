@@ -36,6 +36,7 @@ public class TestModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final PathPlacement pathPlacement;
     private final String moduleName;
+    private final Path directory;
     private final String filter;
     private final String exclude;
     private final String tag;
@@ -64,6 +65,7 @@ public class TestModule implements BuildExecutorModule {
                 null,
                 null,
                 null,
+                null,
                 false,
                 false,
                 false,
@@ -86,6 +88,7 @@ public class TestModule implements BuildExecutorModule {
                 true,
                 null,
                 PathPlacement.CLASS_PATH,
+                null,
                 null,
                 environment.getProperty("test.filter"),
                 environment.getProperty("test.exclude"),
@@ -133,6 +136,7 @@ public class TestModule implements BuildExecutorModule {
                        Pinning pinning,
                        PathPlacement pathPlacement,
                        String moduleName,
+                       Path directory,
                        String filter,
                        String exclude,
                        String tag,
@@ -156,6 +160,7 @@ public class TestModule implements BuildExecutorModule {
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
         this.moduleName = moduleName;
+        this.directory = directory;
         this.filter = filter;
         this.exclude = exclude;
         this.tag = tag;
@@ -180,6 +185,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -205,6 +211,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -230,6 +237,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -255,6 +263,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -280,6 +289,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -305,6 +315,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -330,6 +341,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -355,6 +367,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -380,6 +393,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -405,6 +419,33 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
+                filter,
+                exclude,
+                tag,
+                engines,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                incrementalDigest,
+                terms,
+                skip);
+    }
+
+    public TestModule directory(Path directory) {
+        return new TestModule(framework,
+                isTest,
+                factory,
+                resolvers,
+                dependencies,
+                jarsOnly,
+                requireFramework,
+                pinning,
+                pathPlacement,
+                moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -430,6 +471,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -455,6 +497,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -480,6 +523,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -505,6 +549,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -530,6 +575,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -555,6 +601,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -584,6 +631,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -609,6 +657,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -634,6 +683,7 @@ public class TestModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 filter,
                 exclude,
                 tag,
@@ -685,6 +735,7 @@ public class TestModule implements BuildExecutorModule {
                         jarsOnly,
                         pathPlacement,
                         moduleName,
+                        directory,
                         filter,
                         exclude,
                         tag,
@@ -858,6 +909,7 @@ public class TestModule implements BuildExecutorModule {
         private final TestFramework framework;
         private final Predicate<String> isTest;
         private final String moduleName;
+        private final transient Path directory;
         private final transient String filter;
         private final String exclude;
         private final transient String tag;
@@ -876,6 +928,7 @@ public class TestModule implements BuildExecutorModule {
                     boolean jarsOnly,
                     PathPlacement pathPlacement,
                     String moduleName,
+                    Path directory,
                     String filter,
                     String exclude,
                     String tag,
@@ -894,6 +947,7 @@ public class TestModule implements BuildExecutorModule {
             this.framework = framework;
             this.isTest = isTest;
             this.moduleName = moduleName;
+            this.directory = directory;
             this.filter = filter;
             this.exclude = exclude;
             this.tag = tag;
@@ -1006,7 +1060,25 @@ public class TestModule implements BuildExecutorModule {
             List<TestTags> covered = new ArrayList<>(ran);
             covered.add(requested);
             new Scope(filter, covered).store(context.next().resolve("testscope.properties"));
-            return super.apply(executor, context, arguments);
+            if (directory == null) {
+                return super.apply(executor, context, arguments);
+            }
+            SequencedMap<String, BuildStepArgument> absolute = new LinkedHashMap<>();
+            arguments.forEach((name, argument) -> absolute.put(name, argument.removed()
+                    ? argument
+                    : new BuildStepArgument(argument.folder().toAbsolutePath(), argument.files())));
+            return super.apply(executor, new BuildStepContext(
+                    context.previous() == null ? null : context.previous().toAbsolutePath(),
+                    context.next().toAbsolutePath(),
+                    context.supplement().toAbsolutePath()), absolute);
+        }
+
+        @Override
+        protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
+            ProcessHandler handler = super.handler(context, commands);
+            return directory != null && handler instanceof ProcessHandler.OfProcess process
+                    ? process.directory(directory.toAbsolutePath())
+                    : handler;
         }
 
         private List<TestTags> ran(BuildStepContext context, SequencedMap<String, BuildStepArgument> arguments)
@@ -1095,6 +1167,9 @@ public class TestModule implements BuildExecutorModule {
                 }
                 commands.add("-javaagent:" + jar.toAbsolutePath()
                         + (attachment.getValue().isEmpty() ? "" : "=" + attachment.getValue()));
+            }
+            if (directory != null) {
+                commands.add("-Dbasedir=" + directory.toAbsolutePath());
             }
             for (Map.Entry<String, String> entry : resolved.systemProperties().entrySet()) {
                 commands.add("-D" + entry.getKey() + "=" + entry.getValue());
