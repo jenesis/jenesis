@@ -284,6 +284,96 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void accepts_a_library_and_its_tests_jar_carrying_one_module_name_as_test_dependencies() throws IOException {
+        SequencedMap<String, Path> results = sharedModuleProject("test").execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results.get("maven/test-module-/dependencies/artifacts").resolve(BuildStep.DEPENDENCIES))
+                .as("the tests of a pom.xml module run on the class path, where a module name means nothing")
+                .content()
+                .contains("maven/org.example/lib/1.0", "maven/org.example/lib/jar/tests/1.0");
+    }
+
+    @Test
+    public void refuses_a_library_and_its_tests_jar_carrying_one_module_name_as_main_dependencies() throws IOException {
+        BuildExecutor executor = sharedModuleProject("compile");
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .as("the main half compiles a module-info.java on the module path, where it resolves only one of them")
+                .hasStackTraceContaining("maven/org.example/lib/1.0 and maven/org.example/lib/jar/tests/1.0"
+                        + " both carry module lib.shared in group main")
+                .hasStackTraceContaining("an <exclusions> entry in pom.xml");
+    }
+
+    private BuildExecutor sharedModuleProject(String scope) throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>lib</artifactId>
+                            <version>1.0</version>
+                            <scope>%1$s</scope>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>lib</artifactId>
+                            <version>1.0</version>
+                            <type>test-jar</type>
+                            <scope>%1$s</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """.formatted(scope));
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java/sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java/sample")).resolve("SampleTest.java"),
+                "package sample; public class SampleTest { }");
+        Path folder = Files.createDirectories(repository.resolve("org/example/lib/1.0"));
+        Files.writeString(folder.resolve("lib-1.0.pom"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.example</groupId>
+                    <artifactId>lib</artifactId>
+                    <version>1.0</version>
+                </project>
+                """);
+        for (String name : List.of("lib-1.0.jar", "lib-1.0-tests.jar")) {
+            Manifest manifest = new Manifest(new ByteArrayInputStream(
+                    "Manifest-Version: 1.0\nAutomatic-Module-Name: lib.shared\n\n".getBytes(StandardCharsets.UTF_8)));
+            try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(folder.resolve(name)), manifest)) {
+                jar.putNextEntry(new JarEntry(name.contains("tests") ? "lib/ValueTest.class" : "lib/Value.class"));
+                jar.closeEntry();
+            }
+        }
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", MavenProject.make(Environment.NONE,
+                project,
+                "main",
+                "maven",
+                Map.of("maven", new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)),
+                null,
+                Collections.emptyNavigableSet(),
+                (_, _, _) -> new AssemblyDescriptor((buildExecutor, _) -> buildExecutor.addModule("java",
+                        new JavaToolchainModule(),
+                        "../sources",
+                        "../manifests",
+                        "../dependencies/artifacts"))));
+        return executor;
+    }
+
+    @Test
     public void native_access_the_project_names_is_recorded_in_its_jar_and_granted_in_its_tests()
             throws IOException {
         Files.writeString(project.resolve("pom.xml"), """

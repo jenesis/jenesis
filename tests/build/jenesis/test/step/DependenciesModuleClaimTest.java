@@ -13,6 +13,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenDefaultVersionNegotiator;
@@ -74,6 +75,34 @@ public class DependenciesModuleClaimTest {
         assertThat(next.resolve(Dependencies.RESOLVED + "lib.two-2.0.jar")).exists();
     }
 
+    @Test
+    public void accepts_two_artifacts_that_carry_one_module_name_where_they_land_on_the_class_path() throws IOException {
+        modularLib("lib", "1.0", "lib.shared", "one");
+        modularLib("lib-tests", "1.0", "lib.shared", "two");
+
+        resolveScoped(dependencies -> dependencies.pathPlacement(PathPlacement.CLASS_PATH),
+                "main/compile/maven/org.example/lib/1.0",
+                "main/compile/maven/org.example/lib-tests/1.0");
+
+        assertThat(next.resolve(Dependencies.RESOLVED + "lib.shared-1.0.jar")).exists();
+        assertThat(next.resolve(Dependencies.RESOLVED + "org.example%2Flib-tests%2F1.0.jar"))
+                .as("a second jar of the module and its version takes the file name of its coordinate")
+                .exists();
+    }
+
+    @Test
+    public void accepts_two_artifacts_that_carry_one_module_name_on_the_processor_path() throws IOException {
+        modularLib("one-lib", "1.0", "lib.shared", "one");
+        modularLib("two-lib", "2.0", "lib.shared", "two");
+
+        resolveScoped(UnaryOperator.identity(),
+                "javac/plugin/maven/org.example/one-lib/1.0",
+                "javac/plugin/maven/org.example/two-lib/2.0");
+
+        assertThat(next.resolve(Dependencies.RESOLVED + "lib.shared-1.0.jar")).exists();
+        assertThat(next.resolve(Dependencies.RESOLVED + "lib.shared-2.0.jar")).exists();
+    }
+
     private void modularLib(String artifactId, String version, String module, String name) throws IOException {
         Path sources = Files.createDirectories(work.resolve(artifactId + "-sources"));
         Path classes = Files.createDirectories(work.resolve(artifactId + "-classes"));
@@ -129,6 +158,10 @@ public class DependenciesModuleClaimTest {
     }
 
     private Path resolveScoped(String... keys) throws IOException {
+        return resolveScoped(UnaryOperator.identity(), keys);
+    }
+
+    private Path resolveScoped(UnaryOperator<Dependencies> configurator, String... keys) throws IOException {
         SequencedProperties requires = new SequencedProperties();
         for (String key : keys) {
             requires.setProperty(key, "");
@@ -144,9 +177,9 @@ public class DependenciesModuleClaimTest {
                 false,
                 0);
         executor.addSource("dependencies", dependencies);
-        executor.addModule("resolved", new Dependencies(
+        executor.addModule("resolved", configurator.apply(new Dependencies(
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
-                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))), "dependencies");
+                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven())))), "dependencies");
         next = executor.execute().get("resolved");
         return next;
     }

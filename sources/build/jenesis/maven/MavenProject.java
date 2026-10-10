@@ -185,7 +185,9 @@ public class MavenProject implements BuildExecutorModule {
                         artifactInputs.add(PREPARE);
                         artifactInputs.addAll(spdxSources);
                         depExec.addModule(ARTIFACTS,
-                                dependencyModule.repositories(mergedRepositories).pinning(pinning),
+                                dependencyModule.repositories(mergedRepositories)
+                                        .pinning(pinning)
+                                        .pathPlacement(name.startsWith("test-") ? PathPlacement.CLASS_PATH : PathPlacement.INFERRED),
                                 artifactInputs);
                     }, dependencyDeps);
                     SequencedMap<String, String> produceDeps = new LinkedHashMap<>();

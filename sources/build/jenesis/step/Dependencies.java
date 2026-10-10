@@ -34,18 +34,28 @@ public class Dependencies implements BuildExecutorModule {
             UNPINNED = "unpinned.properties";
     public static final String RESOLVED = "resolved/", MODULAR_PATH = "modular/";
     public static final String RESOLVE = "resolve", PINNED = "pinned", SIGNATURES = "signatures";
+    private static final Set<String> PROCESSOR_PATH = Set.of("javac", "plugin");
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
     private final Signatures signatures;
     private final Pinning pinning;
     private final String group;
+    private final PathPlacement pathPlacement;
     private final OffsetDateTime timestamp;
     private final Consumer<String> printing;
     private final Palette palette;
 
     public Dependencies(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, new Signatures(repositories), null, null, BuildStep.timestamp(), null, Palette.NONE);
+        this(repositories,
+                resolvers,
+                new Signatures(repositories),
+                null,
+                null,
+                PathPlacement.INFERRED,
+                BuildStep.timestamp(),
+                null,
+                Palette.NONE);
     }
 
     public static Dependencies ofEnvironment(Environment environment,
@@ -56,6 +66,7 @@ public class Dependencies implements BuildExecutorModule {
                 Signatures.ofEnvironment(environment, repositories),
                 null,
                 null,
+                PathPlacement.INFERRED,
                 BuildStep.timestamp(environment),
                 environment.flag("print.aliases") ? environment.out() : null,
                 Palette.ofEnvironment(environment));
@@ -66,6 +77,7 @@ public class Dependencies implements BuildExecutorModule {
                          Signatures signatures,
                          Pinning pinning,
                          String group,
+                         PathPlacement pathPlacement,
                          OffsetDateTime timestamp,
                          Consumer<String> printing,
                          Palette palette) {
@@ -74,6 +86,7 @@ public class Dependencies implements BuildExecutorModule {
         this.signatures = signatures;
         this.pinning = pinning;
         this.group = group;
+        this.pathPlacement = pathPlacement;
         this.timestamp = timestamp;
         this.printing = printing;
         this.palette = palette;
@@ -85,33 +98,38 @@ public class Dependencies implements BuildExecutorModule {
                 signatures.repositories(repositories),
                 pinning,
                 group,
+                pathPlacement,
                 timestamp,
                 printing,
                 palette);
     }
 
     public Dependencies resolvers(Map<String, Resolver> resolvers) {
-        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, pathPlacement, timestamp, printing, palette);
     }
 
     public Dependencies signatures(Signatures signatures) {
-        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, pathPlacement, timestamp, printing, palette);
     }
 
     public Dependencies pinning(Pinning pinning) {
-        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, pathPlacement, timestamp, printing, palette);
     }
 
     public Dependencies group(String group) {
-        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, pathPlacement, timestamp, printing, palette);
+    }
+
+    public Dependencies pathPlacement(PathPlacement pathPlacement) {
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, pathPlacement, timestamp, printing, palette);
     }
 
     public Dependencies timestamp(OffsetDateTime timestamp) {
-        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, pathPlacement, timestamp, printing, palette);
     }
 
     public Dependencies printing(Consumer<String> printing, Palette palette) {
-        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, pathPlacement, timestamp, printing, palette);
     }
 
     public static SequencedMap<String, String> bomEntries(SequencedProperties properties, String group) {
@@ -127,6 +145,7 @@ public class Dependencies implements BuildExecutorModule {
                         resolvers,
                         pinning == Pinning.STRICT ? null : pinning,
                         group,
+                        pathPlacement,
                         printing,
                         palette,
                         timestamp),
@@ -149,6 +168,7 @@ public class Dependencies implements BuildExecutorModule {
         private final Map<String, Resolver> resolvers;
         private final Pinning pinning;
         private final String group;
+        private final PathPlacement pathPlacement;
         private final OffsetDateTime timestamp;
         private final transient Consumer<String> printing;
         private final transient Palette palette;
@@ -157,6 +177,7 @@ public class Dependencies implements BuildExecutorModule {
                         Map<String, Resolver> resolvers,
                         Pinning pinning,
                         String group,
+                        PathPlacement pathPlacement,
                         Consumer<String> printing,
                         Palette palette,
                         OffsetDateTime timestamp) {
@@ -164,6 +185,7 @@ public class Dependencies implements BuildExecutorModule {
             this.resolvers = new LinkedHashMap<>(resolvers);
             this.pinning = pinning;
             this.group = group;
+            this.pathPlacement = pathPlacement;
             this.timestamp = timestamp;
             this.printing = printing;
             this.palette = palette;
@@ -860,7 +882,7 @@ public class Dependencies implements BuildExecutorModule {
                     return left.isEmpty() ? right : left;
                 });
             }
-            SequencedMap<String, String> aliased = rename(placed, grouped, aliasTargets, modules, explicit, libs, printing, palette);
+            SequencedMap<String, String> aliased = rename(placed, grouped, aliasTargets, modules, explicit, pathPlacement, libs, printing, palette);
             for (Map.Entry<String, Overridden> entry : overrideTargets.entrySet()) {
                 for (String carrier : entry.getValue().carriers()) {
                     if (!modules.containsKey(carrier)) {
@@ -1076,6 +1098,7 @@ public class Dependencies implements BuildExecutorModule {
                                                        SequencedMap<String, Alias> declared,
                                                        SequencedMap<String, String> modules,
                                                        SequencedMap<String, Boolean> explicit,
+                                                       PathPlacement pathPlacement,
                                                        Path libs,
                                                        Consumer<String> printing,
                                                        Palette palette) throws IOException {
@@ -1194,11 +1217,20 @@ public class Dependencies implements BuildExecutorModule {
                 ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(source);
                 module = descriptor == null ? null : descriptor.name();
             }
+            List<String> modular = pathPlacement == PathPlacement.CLASS_PATH
+                    ? List.of()
+                    : grouped.getOrDefault(dependency, Collections.emptyNavigableSet()).stream()
+                            .filter(group -> !PROCESSOR_PATH.contains(group))
+                            .toList();
             String name = module == null
                     ? PathPlacement.fileName(coordinate)
                     : PathPlacement.fileName(coordinate, module, alias == null);
+            Claim named = claims.get(name);
+            if (module != null && named != null && !named.file().equals(source)) {
+                name = PathPlacement.fileName(coordinate);
+            }
             if (module != null) {
-                for (String group : grouped.getOrDefault(dependency, Collections.emptyNavigableSet())) {
+                for (String group : modular) {
                     Claim carrier = carriers.putIfAbsent(group + "/" + module, new Claim(dependency, source));
                     if (carrier != null && !carrier.file().equals(source)) {
                         throw new IllegalArgumentException(carrier.dependency()
