@@ -15,6 +15,7 @@ import java.util.jar.Attributes;
 
 public class Javac extends ProcessBuildStep {
 
+    public static final String GENERATED = "generated/";
     private static final Pattern VERSIONED = Pattern.compile("META-INF/versions/(\\d+)/.+");
     private static final Set<String> SYSTEM_MODULE_OPTIONS = Set.of("--add-exports", "--add-reads", "--patch-module");
 
@@ -187,12 +188,13 @@ public class Javac extends ProcessBuildStep {
                 }
             }
         }
-        Path target = Files.createDirectory(context.next().resolve(CLASSES));
+        Path target = Files.createDirectory(context.next().resolve(CLASSES)),
+                generated = Files.createDirectory(context.next().resolve(GENERATED));
         List<String> files = new ArrayList<>(),
                 path = new ArrayList<>(),
                 processorPath = new ArrayList<>(),
                 siblingClasses = new ArrayList<>(),
-                commands = new ArrayList<>(List.of("-d", target.toString()));
+                commands = new ArrayList<>(List.of("-d", target.toString(), "-s", generated.toString()));
         boolean compilerPlugins = false;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -506,11 +508,14 @@ public class Javac extends ProcessBuildStep {
                                                int release,
                                                List<String> files) throws IOException {
         Path target = Files.createDirectories(context.next()
-                .resolve(CLASSES + "META-INF/versions/" + release));
+                .resolve(CLASSES + "META-INF/versions/" + release)),
+                generated = Files.createDirectories(context.next()
+                        .resolve(GENERATED + "META-INF/versions/" + release));
         List<String> commands = new ArrayList<>(prepended);
+        commands.addAll(List.of("-d", target.toString(), "-s", generated.toString()));
         commands.addAll(namesSystemModule(prepended)
-                ? List.of("-d", target.toString(), "--source", Integer.toString(release), "--target", Integer.toString(release))
-                : List.of("-d", target.toString(), "--release", Integer.toString(release)));
+                ? List.of("--source", Integer.toString(release), "--target", Integer.toString(release))
+                : List.of("--release", Integer.toString(release)));
         List<String> classPath = new ArrayList<>(), modulePath = new ArrayList<>(), patchModule = new ArrayList<>();
         String patched = versionedModule == null ? moduleName : versionedModule;
         if (patched != null) {

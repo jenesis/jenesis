@@ -905,6 +905,41 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void writes_the_sources_a_processor_generates_beside_the_classes_rather_than_into_them(boolean process)
+            throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/21/sample"))
+                .resolve("Sample.java"), "package sample; public class Sample { }\n");
+        Path processorRoot = Files.createDirectories(root.resolve("processor"));
+        Path jar = buildProcessorJar(Files.createDirectories(root.resolve("procbuild")), "one", "One", null);
+        Files.copy(jar, Files.createDirectories(processorRoot.resolve("resolved")).resolve("processor.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("plugin/plugin/maven/processor", "resolved/processor.jar");
+        index.store(processorRoot.resolve(BuildStep.DEPENDENCIES));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/META-INF/versions/21/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("processors/artifacts", new BuildStepArgument(processorRoot,
+                Map.of(Path.of("resolved/processor.jar"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "gen/GeneratedOne.class")).isNotEmptyFile();
+        assertThat(next.resolve(Javac.CLASSES + "META-INF/versions/21/gen/GeneratedOne.class")).isNotEmptyFile();
+        try (Stream<Path> classes = Files.walk(next.resolve(Javac.CLASSES))) {
+            assertThat(classes.filter(file -> file.toString().endsWith(".java")))
+                    .as("a generated source is no class of the module and stays out of what is archived")
+                    .isEmpty();
+        }
+        assertThat(next.resolve(Javac.GENERATED + "gen/GeneratedOne.java")).isNotEmptyFile();
+        assertThat(next.resolve(Javac.GENERATED + "META-INF/versions/21/gen/GeneratedOne.java")).isNotEmptyFile();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void runs_modular_and_plain_processors_via_one_processor_module_path(boolean process) throws IOException {
         Files.createDirectories(sources.resolve(BuildStep.SOURCES));
         Files.writeString(sources.resolve(BuildStep.SOURCES).resolve("module-info.java"),
