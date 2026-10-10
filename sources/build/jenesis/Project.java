@@ -3807,6 +3807,10 @@ public record Project(
                     ? cache
                     : new BuildExecutorLayeredCache(cache, configured));
         }
+        if (selectors.length > 0 && Arrays.stream(selectors).allMatch(selector -> selector.equals(PROMPT)
+                || selector.startsWith(PROMPT + "/"))) {
+            configuration = configuration.progress(false).events(false);
+        }
         BuildExecutor executor = configuration.of(target);
         Function<String, String> resolver = layout.apply(executor, this, assembler);
         return executor.execute(Arrays.stream(selectors.length == 0 ? defaultTarget.toArray(String[]::new) : selectors)
