@@ -45,7 +45,8 @@ public class MavenProject implements BuildExecutorModule {
 
     public static final String POM = "pom/", MAVEN = "maven/", BOM = "bom/";
     public static final String MANAGED = "managed.properties";
-    private static final String SCAN = "scan", POM_METADATA = "metadata.", BOMS = "boms";
+    private static final String SCAN = "scan", POM_METADATA = "metadata.", BOMS = "boms", SKIPPED = "skipped.properties";
+    private static final Set<String> JARS = Set.of("jar", "bundle"), AGGREGATES = Set.of("pom", "bom");
     private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-";
     private static final Set<String> COMMANDED = Set.of("version", "scm.tag", "scm.revision", "scm.tree");
     private static final Pattern UNRESOLVED = Pattern.compile("\\$\\{([^}]+)}");
@@ -252,6 +253,18 @@ public class MavenProject implements BuildExecutorModule {
                 Stream.concat(Stream.of(SCAN), inherited.sequencedKeySet().stream()));
         buildExecutor.addStep(BOMS, new Boms(), Stream.concat(Stream.of(PREPARE), inherited.sequencedKeySet().stream()));
         buildExecutor.addModule(MODULE, (modules, paths) -> {
+            Path skipped = paths.get(PREVIOUS + PREPARE).resolve(SKIPPED);
+            if (printing != null && Files.exists(skipped)) {
+                SequencedProperties.ofFiles(skipped).forEachProperty((pom, packaging) -> printing.accept(
+                        ("%s%-11s%s %s builds nothing, as its packaging %s is none of jar and bundle, the packagings"
+                                + " this build builds: where it is a jar with more in it, declare <packaging>jar</packaging>"
+                                + " and let a plugin add the rest")
+                                .formatted(palette.warning(),
+                                        "[SKIPPED]",
+                                        palette.reset(),
+                                        Path.of(pom),
+                                        packaging)));
+            }
             try (DirectoryStream<Path> files = Files.newDirectoryStream(
                     paths.get(PREVIOUS + PREPARE).resolve(MAVEN),
                     "*.properties")) {
@@ -729,6 +742,7 @@ public class MavenProject implements BuildExecutorModule {
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
             Path maven = Files.createDirectory(context.next().resolve(MAVEN));
+            SequencedProperties skipped = new SequencedProperties();
             String version = null;
             for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
                 Path file = argument.getValue().folder().resolve(BuildStep.METADATA);
@@ -772,7 +786,10 @@ public class MavenProject implements BuildExecutorModule {
                 if (value.bom() != null) {
                     writeBom(Files.createDirectories(context.next().resolve(BOM)), value, entry.getKey());
                     continue;
-                } else if (value.packaging() != null && !"jar".equals(value.packaging())) {
+                } else if (value.packaging() != null && !JARS.contains(value.packaging())) {
+                    if (!AGGREGATES.contains(value.packaging())) {
+                        skipped.setProperty(pomFile.toString().replace(File.separatorChar, '/'), value.packaging());
+                    }
                     continue;
                 }
                 String coordinate = new MavenDependencyKey(value.groupId(), value.artifactId(), "jar", null)
@@ -784,6 +801,9 @@ public class MavenProject implements BuildExecutorModule {
                         .collect(Collectors.joining("\t"));
                 writeModule(maven, value, relativePath, coordinate, selfPom, false, qualifiedDependencies, attachments(value, false));
                 writeModule(maven, value, relativePath, coordinate, selfPom, true, qualifiedDependencies, attachments(value, true));
+            }
+            if (!skipped.isEmpty()) {
+                skipped.store(context.next().resolve(SKIPPED));
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }

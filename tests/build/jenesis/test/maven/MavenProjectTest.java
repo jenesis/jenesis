@@ -1522,6 +1522,66 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void builds_a_bundle_as_a_jar_and_names_a_module_whose_packaging_it_does_not_build() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <maven.compiler.release>21</maven.compiler.release>
+                    </properties>
+                    <modules>
+                        <module>bundled</module>
+                        <module>web</module>
+                    </modules>
+                </project>
+                """);
+        for (String name : List.of("bundled", "web")) {
+            Files.writeString(Files.createDirectory(project.resolve(name)).resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>group</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>%s</artifactId>
+                        <packaging>%s</packaging>
+                    </project>
+                    """.formatted(name, name.equals("web") ? "war" : "bundle"));
+            Files.writeString(Files.createDirectories(project.resolve(name + "/src/main/java")).resolve("source"), "foo");
+        }
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        List<String> printed = new ArrayList<>();
+        executor.addModule("maven", MavenProject.ofEnvironment(new Environment(Map.of("palette.colors", "none")).out(printed::add),
+                project,
+                "maven",
+                mavenRepository,
+                mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results)
+                .as("maven-bundle-plugin's packaging produces a jar")
+                .containsKeys("maven/module-bundled/manifests", "maven/module-bundled/coordinates")
+                .doesNotContainKeys("maven/module-web/manifests");
+        assertThat(printed).containsExactly("[SKIPPED]   web/pom.xml builds nothing, as its packaging war is none of jar"
+                + " and bundle, the packagings this build builds: where it is a jar with more in it, declare"
+                + " <packaging>jar</packaging> and let a plugin add the rest");
+    }
+
+    @Test
     public void can_resolve_test_sources_and_resources_explicit() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
