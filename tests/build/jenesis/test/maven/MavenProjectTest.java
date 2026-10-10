@@ -1513,6 +1513,54 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void reads_the_kotlin_and_groovy_folders_of_each_scope_beside_its_source_directory() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <build>
+                        <testSourceDirectory>src/test/groovy</testSourceDirectory>
+                    </build>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java/sample")).resolve("Sample.java"), "java");
+        Files.writeString(Files.createDirectories(project.resolve("src/main/kotlin/sample")).resolve("Other.kt"), "kotlin");
+        Files.writeString(Files.createDirectories(project.resolve("src/main/groovy/sample")).resolve("Third.groovy"), "groovy");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/groovy/sample")).resolve("SampleSpec.groovy"), "spec");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/kotlin/sample")).resolve("SampleTest.kt"), "test");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path main = results.get("maven/module-/sources").resolve(BuildStep.SOURCES + "sample");
+        assertThat(main.resolve("Sample.java")).content().isEqualTo("java");
+        assertThat(main.resolve("Other.kt"))
+                .as("the Kotlin plugin compiles src/main/kotlin beside the source directory")
+                .content()
+                .isEqualTo("kotlin");
+        assertThat(main.resolve("Third.groovy"))
+                .as("GMavenPlus compiles src/main/groovy beside the source directory")
+                .content()
+                .isEqualTo("groovy");
+        Path test = results.get("maven/test-module-/sources").resolve(BuildStep.SOURCES + "sample");
+        assertThat(test.resolve("SampleSpec.groovy"))
+                .as("a folder the pom names as its source directory is read once")
+                .content()
+                .isEqualTo("spec");
+        assertThat(test.resolve("SampleTest.kt")).content().isEqualTo("test");
+    }
+
+    @Test
     public void can_resolve_sources_and_resources_explicit() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

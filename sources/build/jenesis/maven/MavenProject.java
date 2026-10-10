@@ -325,6 +325,18 @@ public class MavenProject implements BuildExecutorModule {
                         if (sources != null && Files.exists(sources)) {
                             active = true;
                         }
+                        SequencedSet<Path> languages = new LinkedHashSet<>();
+                        for (int languageIndex = 0; ; languageIndex++) {
+                            String language = properties.getProperty("sources." + languageIndex);
+                            if (language == null) {
+                                break;
+                            }
+                            Path folder = base.resolve(language).normalize();
+                            if (Files.isDirectory(folder) && (sources == null || !folder.equals(sources.normalize()))) {
+                                languages.add(folder);
+                                active = true;
+                            }
+                        }
                         int index = 0;
                         Set<Path> directories = new HashSet<>();
                         for (int resourceIndex = 0; ; resourceIndex++) {
@@ -366,7 +378,9 @@ public class MavenProject implements BuildExecutorModule {
                         if (!active && name.startsWith(SIBLING_MODULE_PREFIX) && Files.exists(tests)) {
                             SequencedProperties testProperties = SequencedProperties.ofFiles(tests);
                             active = testProperties.stringPropertyNames().stream()
-                                    .filter(key -> key.equals("sources") || key.startsWith("resources."))
+                                    .filter(key -> key.equals("sources")
+                                            || key.startsWith("sources.")
+                                            || key.startsWith("resources."))
                                     .map(testProperties::getProperty)
                                     .filter(folder -> !folder.isEmpty())
                                     .anyMatch(folder -> Files.exists(base.resolve(folder)));
@@ -403,7 +417,10 @@ public class MavenProject implements BuildExecutorModule {
                                             Path.of(properties.getProperty("path")).resolve("pom.xml")));
                         }
                         if (active) {
-                            module.addSource("sources", Bind.asSources(), sources == null ? base : sources);
+                            SequencedSet<Path> folders = new LinkedHashSet<>();
+                            folders.add(sources == null ? base : sources);
+                            folders.addAll(languages);
+                            module.addSource("sources", Bind.asSources(), folders);
                             module.addStep(COORDINATES, (_, context, _) -> {
                                 SequencedProperties coordinates = new SequencedProperties();
                                 coordinates.setProperty(properties.getProperty("coordinate"), "");
@@ -1143,6 +1160,10 @@ public class MavenProject implements BuildExecutorModule {
             properties.setProperty("sources", sourceDirectory == null
                     ? (test ? "src/test/java" : "src/main/java")
                     : sourceDirectory.replace(File.separatorChar, '/'));
+            List<String> languages = List.of("kotlin", "groovy");
+            for (int index = 0; index < languages.size(); index++) {
+                properties.setProperty("sources." + index, "src/" + (test ? "test" : "main") + "/" + languages.get(index));
+            }
             List<String> resourceDirectories = test ? value.testResourceDirectories() : value.resourceDirectories();
             List<String> resources = resourceDirectories == null
                     ? List.of(test ? "src/test/resources" : "src/main/resources")
