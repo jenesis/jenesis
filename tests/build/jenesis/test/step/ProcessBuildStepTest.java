@@ -53,6 +53,29 @@ public class ProcessBuildStepTest {
     }
 
     @Test
+    public void a_tab_in_a_value_separates_the_arguments_of_a_flag_that_takes_more_than_one() throws IOException {
+        Path folder = Files.createDirectories(root.resolve("argument/process")).getParent();
+        Files.writeString(folder.resolve("process/javadoc.properties"),
+                "-linkoffline=https\\://example.com/api/\\toffline/api\\nhttps\\://example.com/other/\\toffline/other\n");
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        AtomicReference<List<String>> captured = new AtomicReference<>();
+        Function<List<String>, ProcessHandler.OfProcess> base = ProcessHandler.OfProcess.ofJavaHome("bin/java");
+        new Program("javadoc", arguments -> {
+            captured.set(arguments);
+            return base.apply(List.of("-version"));
+        }, List.of("javadoc"), List.of())
+                .apply(Runnable::run,
+                        new BuildStepContext(null, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(folder, Map.of()))))
+                .toCompletableFuture()
+                .join();
+        assertThat(captured.get())
+                .as("a newline repeats the flag, a tab hands the same flag a further argument")
+                .containsExactly("-linkoffline", "https://example.com/api/", "offline/api",
+                        "-linkoffline", "https://example.com/other/", "offline/other");
+    }
+
+    @Test
     public void a_forked_program_receives_the_variables_of_each_of_its_configurations() throws IOException {
         Path folder = Files.createDirectories(root.resolve("argument/environment")).getParent();
         Files.writeString(folder.resolve("environment/java.properties"),

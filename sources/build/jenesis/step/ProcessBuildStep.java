@@ -209,7 +209,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                 for (String value : entry.getValue().split("\n")) {
                     prepended.add(entry.getKey());
                     if (!value.isEmpty()) {
-                        prepended.add(value);
+                        prepended.addAll(List.of(value.split("\t")));
                     }
                 }
             }

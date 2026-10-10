@@ -69,7 +69,7 @@ public class Bundle implements BuildStep {
                     for (String value : values.split("\n")) {
                         javaOptions.add(option);
                         if (!value.isEmpty()) {
-                            javaOptions.add(value);
+                            javaOptions.addAll(List.of(value.split("\t")));
                         }
                     }
                 });
