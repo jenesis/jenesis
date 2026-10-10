@@ -36,7 +36,7 @@ public class JApiCmpModule implements BuildExecutorModule {
              "japicmp",
              "main",
              new SequencedProperties(),
-             ProcessBuildStep.Terms.of("japicmp"));
+             new ProcessBuildStep.Terms());
     }
 
     public static JApiCmpModule ofEnvironment(Environment environment,

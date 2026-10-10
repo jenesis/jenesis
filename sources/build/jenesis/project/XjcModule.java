@@ -37,7 +37,7 @@ public class XjcModule implements BuildExecutorModule {
              "xjc",
              null,
              List.of(),
-             ProcessBuildStep.Terms.of("xjc"));
+             new ProcessBuildStep.Terms());
     }
 
     public static XjcModule ofEnvironment(Environment environment,

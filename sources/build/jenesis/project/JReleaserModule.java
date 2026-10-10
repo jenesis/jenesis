@@ -35,7 +35,7 @@ public class JReleaserModule implements BuildExecutorModule {
                 "jreleaser",
                 "full-release",
                 true,
-                ProcessBuildStep.Terms.of("jreleaser", true));
+                new ProcessBuildStep.Terms());
     }
 
     public static JReleaserModule ofEnvironment(Environment environment,

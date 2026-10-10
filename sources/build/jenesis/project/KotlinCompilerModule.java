@@ -48,7 +48,7 @@ public class KotlinCompilerModule implements BuildExecutorModule {
              "kotlinc",
              "main",
              null,
-             ProcessBuildStep.Terms.of("kotlinc"));
+             new ProcessBuildStep.Terms());
     }
 
     public static KotlinCompilerModule ofEnvironment(Environment environment,

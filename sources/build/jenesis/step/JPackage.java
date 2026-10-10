@@ -19,7 +19,7 @@ public class JPackage extends ProcessBuildStep {
         this(factory.apply("jpackage", "bin/jpackage"),
              null,
              "main",
-             Terms.of("jpackage"));
+             new Terms());
     }
 
     public static JPackage ofEnvironment(Environment environment,

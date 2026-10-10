@@ -14,6 +14,7 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -41,7 +42,7 @@ public class PmdModule implements BuildExecutorModule {
              "pmd.xml",
              false,
              5,
-             ProcessBuildStep.Terms.of("pmd"));
+             new ProcessBuildStep.Terms());
     }
 
     public static PmdModule ofEnvironment(Environment environment,
@@ -163,7 +164,8 @@ public class PmdModule implements BuildExecutorModule {
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path report = context.next().resolve(REPORT);
-            return reported(code, context, report, findings(report, "violation"), true, strict, SETTING);
+            return Findings.ofXml("pmd", report, "violation")
+                    .acceptable(code, context, true, strict, SETTING, terms.reporting());
         }
 
         @Override

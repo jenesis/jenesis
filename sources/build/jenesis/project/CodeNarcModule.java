@@ -14,6 +14,7 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -38,7 +39,7 @@ public class CodeNarcModule implements BuildExecutorModule {
              "codenarc",
              "codenarc.xml",
              false,
-             ProcessBuildStep.Terms.of("codenarc"));
+             new ProcessBuildStep.Terms());
     }
 
     public static CodeNarcModule ofEnvironment(Environment environment,
@@ -148,7 +149,8 @@ public class CodeNarcModule implements BuildExecutorModule {
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path report = context.next().resolve(REPORT);
-            return reported(code, context, report, findings(report, "Violation"), false, strict, SETTING);
+            return Findings.ofXml("codenarc", report, "Violation")
+                    .acceptable(code, context, false, strict, SETTING, terms.reporting());
         }
 
         @Override

@@ -21,7 +21,7 @@ public class Jar extends ProcessBuildStep {
         this(factory.apply("jar", "bin/jar"),
              sort,
              BuildStep.timestamp(),
-             Terms.of("jar"));
+             new Terms());
     }
 
     public static Jar ofEnvironment(Environment environment,

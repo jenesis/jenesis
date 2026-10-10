@@ -34,7 +34,7 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
              null,
              "google-java-format",
              false,
-             ProcessBuildStep.Terms.of("google-java-format"));
+             new ProcessBuildStep.Terms());
     }
 
     public static GoogleJavaFormatModule ofEnvironment(Environment environment,

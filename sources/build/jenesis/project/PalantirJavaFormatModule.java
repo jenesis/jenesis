@@ -34,7 +34,7 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
              null,
              "palantir-java-format",
              false,
-             ProcessBuildStep.Terms.of("palantir-java-format"));
+             new ProcessBuildStep.Terms());
     }
 
     public static PalantirJavaFormatModule ofEnvironment(Environment environment,

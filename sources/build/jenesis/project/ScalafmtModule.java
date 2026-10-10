@@ -14,6 +14,7 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -39,7 +40,7 @@ public class ScalafmtModule implements BuildExecutorModule {
              "scalafmt",
              ".scalafmt.conf",
              false,
-             ProcessBuildStep.Terms.of("scalafmt"));
+             new ProcessBuildStep.Terms());
     }
 
     public static ScalafmtModule ofEnvironment(Environment environment,
@@ -157,7 +158,8 @@ public class ScalafmtModule implements BuildExecutorModule {
                     }
                 }
             }
-            return reported(code, context, diff, findings, true, strict, SETTING);
+            return new Findings("scalafmt", diff, findings)
+                    .acceptable(code, context, true, strict, SETTING, terms.reporting());
         }
 
         @Override

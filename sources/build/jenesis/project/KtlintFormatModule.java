@@ -34,7 +34,7 @@ public class KtlintFormatModule implements BuildExecutorModule {
              null,
              "ktlint-format",
              false,
-             ProcessBuildStep.Terms.of("ktlint-format"));
+             new ProcessBuildStep.Terms());
     }
 
     public static KtlintFormatModule ofEnvironment(Environment environment,

@@ -2,7 +2,6 @@ package build.jenesis.step;
 
 import module java.base;
 import module java.xml;
-import build.jenesis.BuildExecutor;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -10,7 +9,6 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.Palette;
 import build.jenesis.SequencedProperties;
-import org.xml.sax.Attributes;
 
 public abstract class ProcessBuildStep implements BuildStep {
 
@@ -37,7 +35,7 @@ public abstract class ProcessBuildStep implements BuildStep {
     protected final transient Terms terms;
 
     protected ProcessBuildStep(String command, Function<List<String>, ? extends ProcessHandler> factory) {
-        this(command, factory, Terms.of(command));
+        this(command, factory, new Terms());
     }
 
     protected ProcessBuildStep(String command,
@@ -53,12 +51,8 @@ public abstract class ProcessBuildStep implements BuildStep {
                         Consumer<String> announcing,
                         Consumer<String> reporting) {
 
-        public static Terms of(String command) {
-            return of(command, false);
-        }
-
-        public static Terms of(String command, boolean printing) {
-            return ofEnvironment(Environment.NONE, command, printing).reporting(null);
+        public Terms() {
+            this(null, PERMITS.computeIfAbsent(Runtime.getRuntime().availableProcessors(), Semaphore::new), null, null);
         }
 
         public static Terms ofEnvironment(Environment environment, String command) {
@@ -92,6 +86,14 @@ public abstract class ProcessBuildStep implements BuildStep {
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {
+            return new Terms(printing, permits, announcing, reporting);
+        }
+
+        public Terms permits(Semaphore permits) {
+            return new Terms(printing, permits, announcing, reporting);
+        }
+
+        public Terms announcing(Consumer<String> announcing) {
             return new Terms(printing, permits, announcing, reporting);
         }
 
@@ -233,52 +235,6 @@ public abstract class ProcessBuildStep implements BuildStep {
         } catch (ParserConfigurationException e) {
             throw new IllegalStateException(e);
         }
-    }
-
-    protected static int findings(Path report, String finding) throws IOException {
-        if (!Files.isRegularFile(report)) {
-            return -1;
-        }
-        AtomicInteger findings = new AtomicInteger();
-        return parsed(report, new DefaultHandler() {
-            @Override
-            public void startElement(String uri, String localName, String qualifiedName, Attributes attributes) {
-                if (qualifiedName.equals(finding)) {
-                    findings.incrementAndGet();
-                }
-            }
-        }) ? findings.get() : -1;
-    }
-
-    protected boolean reported(int code,
-                               BuildStepContext context,
-                               Path report,
-                               int findings,
-                               boolean judged,
-                               boolean strict,
-                               String setting) {
-        if (findings < 0) {
-            return code == 0;
-        }
-        String found = command + " found " + findings + (findings == 1 ? " finding" : " findings");
-        if (strict && findings > 0 && (code != 0 || !judged)) {
-            throw new IllegalStateException(found + ", reported in " + report
-                    + ", and fails the build on them as jenesis." + setting
-                    + "=strict: fix them, or set it to warn to report them without failing");
-        }
-        if (strict && code != 0) {
-            return false;
-        }
-        Consumer<String> reporting = terms.reporting();
-        if (findings > 0 && reporting != null) {
-            Path step = context.next().getParent();
-            String name = step == null ? "" : step.getFileName().toString();
-            reporting.accept(found + ", reported in " + (name.endsWith(BuildExecutor.NEXT)
-                    ? step.resolveSibling(name.substring(0, name.length() - BuildExecutor.NEXT.length()))
-                            .resolve(step.relativize(report))
-                    : report));
-        }
-        return true;
     }
 
     protected String diagnosis(BuildStepContext context) throws IOException {

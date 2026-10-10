@@ -31,7 +31,7 @@ public class Javac extends ProcessBuildStep {
              true,
              PathPlacement.INFERRED,
              "main",
-             Terms.of("javac"));
+             new Terms());
     }
 
     public static Javac ofEnvironment(Environment environment,
