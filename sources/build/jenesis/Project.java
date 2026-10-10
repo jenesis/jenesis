@@ -1174,7 +1174,9 @@ public record Project(
                     inside a plugin moves here:
 
                       compilerArgs, options.compilerArgs   process-javac.properties
-                      annotationProcessorPaths             @jenesis.plugin, or <type>processor</type>
+                      annotationProcessorPaths             @jenesis.plugin, or <type>processor</type>;
+                                                           one named without a version takes
+                                                           it from <dependencyManagement>
                       surefire includes and groups         -Djenesis.test.filter, -Djenesis.test.tag
                       surefire excludes                    -Djenesis.test.exclude=<regex>[,...],
                                                            as .*IntegrationTest, after the default
