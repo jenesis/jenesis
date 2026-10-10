@@ -16,6 +16,7 @@ import build.jenesis.step.JPackage;
 import build.jenesis.step.Launcher;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class LauncherTest {
 
@@ -61,6 +62,30 @@ public class LauncherTest {
                 .as("launcher=true without a main class stages nothing, which the build says rather than keeps quiet about")
                 .startsWith("[SKIPPED]")
                 .contains("app builds no executable jar", "@jenesis.main", "<mainClass>");
+    }
+
+    @Test
+    public void refuses_a_launcher_older_than_the_one_reading_the_descriptor_where_the_jar_holds_it() throws IOException {
+        writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"), "0.5.3");
+        writeJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"), "sample/Sample.class");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("launcher/runtime/maven/build.jenesis/build.jenesis.launcher", "resolved/launcher.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties application = new SequencedProperties();
+        application.setProperty("mainClass", "sample.Sample");
+        application.setProperty("name", "app");
+        application.store(input.resolve("launcher.properties"));
+
+        assertThatThrownBy(() -> Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.INFERRED).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(input, Map.of())))))
+                .as("a launcher reading its descriptor elsewhere would yield a jar that fails only at java -jar")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("version 0.5.3")
+                .hasMessageContaining("0.6.0 or later")
+                .hasMessageContaining("pin launcher/maven/build.jenesis/build.jenesis.launcher");
+        assertThat(next.resolve(Launcher.LAUNCHER)).doesNotExist();
     }
 
     @Test
@@ -361,8 +386,17 @@ public class LauncherTest {
     }
 
     private static void writeLauncherJar(Path path) throws IOException {
+        writeLauncherJar(path, "0.6.0");
+    }
+
+    private static void writeLauncherJar(Path path, String version) throws IOException {
         try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(path))) {
-            entry(jar, "module-info.class");
+            jar.putNextEntry(new JarEntry("module-info.class"));
+            jar.write(ClassFile.of().buildModule(ModuleAttribute.of(
+                    ModuleDesc.of("build.jenesis.launcher"),
+                    builder -> builder.moduleVersion(version)
+                            .requires(ModuleRequireInfo.of(ModuleDesc.of("java.base"), 0, null)))));
+            jar.closeEntry();
             entry(jar, "build/jenesis/launcher/Launcher.class");
             entry(jar, "META-INF/LICENSE");
             entry(jar, "META-INF/NOTICE");

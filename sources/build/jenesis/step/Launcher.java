@@ -16,7 +16,8 @@ public class Launcher implements BuildStep {
     public static final String LAUNCHER = "launcher/";
     private static final String MAIN_CLASS = "build.jenesis.launcher.Launcher",
             LAUNCHER_PREFIX = "build/jenesis/launcher/",
-            DESCRIPTOR = "META-INF/jenesis/application.properties";
+            DESCRIPTOR = "META-INF/jenesis/application.properties",
+            MINIMUM = "0.6.0";
 
     private final String tool;
     private final String group;
@@ -161,6 +162,17 @@ public class Launcher implements BuildStep {
         }
         if (mainClass == null || shaded == null || jars.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+        ModuleDescriptor.Version version = Optional.ofNullable(PathPlacement.moduleDescriptor(shaded))
+                .flatMap(ModuleDescriptor::version)
+                .orElse(null);
+        if (version == null || version.compareTo(ModuleDescriptor.Version.parse(MINIMUM)) < 0) {
+            throw new IllegalStateException("An executable jar needs build.jenesis.launcher " + MINIMUM
+                    + " or later, the first to read the descriptor from " + DESCRIPTOR + " where this build writes it,"
+                    + " but the " + tool + " group resolved "
+                    + (version == null ? shaded.getFileName() + ", which declares no module version" : "version " + version)
+                    + ": pin " + tool + "/maven/build.jenesis/build.jenesis.launcher to " + MINIMUM
+                    + " or later, or resolve it from a repository that serves one");
         }
         if (!dropped.isEmpty() && out != null) {
             out.accept(("%s%-11s%s %s carries no %s of process-java.properties, as those configure the JVM that"

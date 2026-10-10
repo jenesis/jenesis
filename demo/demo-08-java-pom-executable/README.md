@@ -241,7 +241,9 @@ bundle.
 The launcher is shaded into the artifact, so it is pinned like any dependency - the
 `pom.xml` carries a `<!--jenesis.pin launcher/maven/build.jenesis/build.jenesis.launcher
 ... -->` block (its own `launcher` group, kept out of `<dependencyManagement>` because
-it is not an application dependency). The modular sibling keeps each modular
+it is not an application dependency). A launcher older than 0.6.0 reads its descriptor from
+another place in the jar, so the build refuses one, pinned or resolved, rather than writing a
+jar that fails only at `java -jar`. The modular sibling keeps each modular
 dependency in its own subfolder and reconstructs them on the module path at run time.
 
 Fully bundled native installer
