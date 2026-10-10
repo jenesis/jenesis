@@ -45,11 +45,13 @@ public class MavenProject implements BuildExecutorModule {
 
     public static final String POM = "pom/", MAVEN = "maven/", BOM = "bom/";
     public static final String EXPRESSIONS = "expressions.properties";
-    private static final String SCAN = "scan", POM_METADATA = "metadata.", BOMS = "boms", SKIPPED = "skipped.properties";
+    private static final String SCAN = "scan", POM_METADATA = "metadata.", BOMS = "boms", POMS = "poms", SKIPPED = "skipped.properties";
     private static final Set<String> JARS = Set.of("jar", "bundle"), AGGREGATES = Set.of("pom", "bom");
     private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-";
     private static final Set<String> COMMANDED = Set.of("version", "scm.tag", "scm.revision", "scm.tree");
     private static final Pattern UNRESOLVED = Pattern.compile("\\$\\{([^}]+)}");
+    private static final Function<List<Path>, SequencedSet<Path>> OWN_CONFIGURATIONS =
+            locals -> Collections.unmodifiableSequencedSet(new LinkedHashSet<>(locals));
 
     private final Path root;
     private final String group;
@@ -59,12 +61,21 @@ public class MavenProject implements BuildExecutorModule {
     private final Platform platform;
     private final Consumer<String> printing;
     private final Palette palette;
+    private final Function<List<Path>, SequencedSet<Path>> configurations;
 
     public MavenProject(Path root,
                         String prefix,
                         MavenRepository repository,
                         MavenResolver resolver) {
-        this(root, "main", prefix, repository, resolver, new Platform(), null, Palette.NONE);
+        this(root,
+                "main",
+                prefix,
+                repository,
+                resolver,
+                new Platform(),
+                null,
+                Palette.NONE,
+                OWN_CONFIGURATIONS);
     }
 
     public static MavenProject ofEnvironment(Environment environment,
@@ -85,7 +96,8 @@ public class MavenProject implements BuildExecutorModule {
                          MavenResolver resolver,
                          Platform platform,
                          Consumer<String> printing,
-                         Palette palette) {
+                         Palette palette,
+                         Function<List<Path>, SequencedSet<Path>> configurations) {
         this.root = root;
         this.group = group;
         this.prefix = prefix;
@@ -94,18 +106,23 @@ public class MavenProject implements BuildExecutorModule {
         this.platform = platform;
         this.printing = printing;
         this.palette = palette;
+        this.configurations = configurations;
     }
 
     public MavenProject group(String group) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations);
     }
 
     public MavenProject platform(Platform platform) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations);
     }
 
     public MavenProject printing(Consumer<String> printing, Palette palette) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations);
+    }
+
+    public MavenProject configurations(Function<List<Path>, SequencedSet<Path>> configurations) {
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations);
     }
 
     public static BuildExecutorModule make(Environment environment,
@@ -119,6 +136,7 @@ public class MavenProject implements BuildExecutorModule {
                 Map.of("maven", MavenPomResolver.ofEnvironment(environment)),
                 null,
                 Collections.emptyNavigableSet(),
+                OWN_CONFIGURATIONS,
                 assembler);
     }
 
@@ -130,11 +148,14 @@ public class MavenProject implements BuildExecutorModule {
                                            Map<String, Resolver> resolvers,
                                            Pinning pinning,
                                            SequencedSet<Path> spdx,
+                                           Function<List<Path>, SequencedSet<Path>> configurations,
                                            MultiProjectAssembler<? super MavenModuleDescriptor> assembler) {
         MavenRepository repository = MavenRepository.of(requireNonNull(repositories.get(prefix)));
         MavenResolver resolver = MavenResolver.of(resolvers.get(prefix));
         Dependencies dependencyModule = Dependencies.ofEnvironment(environment, repositories, resolvers);
-        return new MultiProjectModule(MavenProject.ofEnvironment(environment, root, prefix, repository, resolver).group(group),
+        return new MultiProjectModule(MavenProject.ofEnvironment(environment, root, prefix, repository, resolver)
+                        .group(group)
+                        .configurations(configurations),
                 identifier -> identifier.indexOf('/') < 0
                         ? Optional.empty()
                         : Optional.of(identifier.substring(0, identifier.indexOf('/'))),
@@ -239,7 +260,7 @@ public class MavenProject implements BuildExecutorModule {
         if (path.startsWith(wrapped)) {
             return Optional.of(path.substring(wrapped.length()));
         }
-        return path.equals(BOMS) ? Optional.of(BOMS) : Optional.empty();
+        return path.equals(BOMS + "/" + POMS) ? Optional.of(BOMS) : Optional.empty();
     }
 
     @Override
@@ -253,7 +274,27 @@ public class MavenProject implements BuildExecutorModule {
         buildExecutor.addStep(PREPARE,
                 new Prepare(prefix, resolver, repository),
                 Stream.concat(Stream.of(SCAN), inherited.sequencedKeySet().stream()));
-        buildExecutor.addStep(BOMS, new Boms(), Stream.concat(Stream.of(PREPARE), inherited.sequencedKeySet().stream()));
+        buildExecutor.addModule(BOMS, (boms, prepared) -> {
+            SortedSet<String> unstaged = new TreeSet<>();
+            Path descriptors = prepared.get(PREVIOUS + PREPARE).resolve(BOM);
+            if (Files.isDirectory(descriptors)) {
+                try (DirectoryStream<Path> files = Files.newDirectoryStream(descriptors, "*.properties")) {
+                    for (Path file : files) {
+                        String name = file.getFileName().toString(), path = SequencedProperties.ofFiles(file).getProperty("path");
+                        Path packaging = BuildStep.locate(configurations.apply(new MavenModuleDescriptor(
+                                name.substring(0, name.length() - ".properties".length()),
+                                Collections.emptyNavigableSet(),
+                                Collections.emptyNavigableSet(),
+                                Collections.emptyNavigableSet(),
+                                root.resolve(path)).configurations()), "packaging.properties");
+                        if (packaging != null && !SequencedProperties.ofFiles(packaging).flag("stage", true)) {
+                            unstaged.add(path);
+                        }
+                    }
+                }
+            }
+            boms.addStep(POMS, new Boms(unstaged), prepared.sequencedKeySet());
+        }, Stream.concat(Stream.of(PREPARE), inherited.sequencedKeySet().stream()));
         buildExecutor.addModule(MODULE, (modules, paths) -> {
             Path skipped = paths.get(PREVIOUS + PREPARE).resolve(SKIPPED);
             if (printing != null && Files.exists(skipped)) {
@@ -635,19 +676,23 @@ public class MavenProject implements BuildExecutorModule {
         return metadata;
     }
 
-    private record Boms() implements BuildStep {
+    private record Boms(SortedSet<String> unstaged) implements BuildStep {
+
+        private Boms {
+            unstaged = new TreeSet<>(unstaged);
+        }
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            Path descriptors = arguments.get(PREPARE).folder().resolve(BOM);
+            Path descriptors = arguments.get(PREVIOUS + PREPARE).folder().resolve(BOM);
             if (!Files.isDirectory(descriptors)) {
                 return CompletableFuture.completedStage(new BuildStepResult(true));
             }
             List<BuildStepArgument> upstream = arguments.entrySet().stream()
-                    .filter(entry -> !entry.getKey().equals(PREPARE))
+                    .filter(entry -> !entry.getKey().equals(PREVIOUS + PREPARE))
                     .map(Map.Entry::getValue)
                     .toList();
             List<Path> files = new ArrayList<>();
@@ -690,6 +735,9 @@ public class MavenProject implements BuildExecutorModule {
                 inventory.setProperty(prefix + "path", path);
                 inventory.setProperty(prefix + "pom", context.next().relativize(pom).toString().replace(File.separatorChar, '/'));
                 inventory.setProperty(prefix + "packaging", "pom");
+                if (unstaged.contains(path)) {
+                    inventory.setProperty(prefix + "stage", "false");
+                }
             }
             if (!inventory.isEmpty()) {
                 inventory.store(context.next().resolve(Inventory.INVENTORY));

@@ -197,8 +197,10 @@ beside its `pom.xml`:
     stage=false
 
 It is built and tested but never staged, so neither `export` nor `release` ships it.
-Maven's `maven.deploy.skip` and `maven.install.skip` are not read: a module that sets
-them states the same with this line.
+The BOM reads the same line, from `bom/build.jenesis/packaging.properties`, and is
+then left out of the staged repositories as well. Maven's `maven.deploy.skip` and
+`maven.install.skip` are not read: a module that sets them states the same with
+this line.
 
 When a test fails
 -----------------
