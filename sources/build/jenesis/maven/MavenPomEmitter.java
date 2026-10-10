@@ -255,6 +255,8 @@ public class MavenPomEmitter {
             String inceptionYear
     ) implements Serializable {
 
+        static final Metadata NONE = new Metadata(null, null, null, List.of(), List.of(), null, null);
+
         public Metadata {
             licenses = licenses == null ? List.of() : List.copyOf(licenses);
             developers = developers == null ? List.of() : List.copyOf(developers);
@@ -268,6 +270,136 @@ public class MavenPomEmitter {
                         Scm scm,
                         Organization organization) {
             this(name, description, url, licenses, developers, scm, organization, null, null, null);
+        }
+
+        Metadata inherit(Metadata parent, Set<String> verbatim, String child, boolean scmDeclared) {
+            BiFunction<String, String, String> appended = (key, value) -> value == null
+                    || value.isEmpty()
+                    || child == null
+                    || verbatim.contains(key) ? value : value.endsWith("/") ? value + child + "/" : value + "/" + child;
+            Scm own = scm == null ? new Scm(null, null, null, null) : scm,
+                    inherited = parent.scm() == null ? new Scm(null, null, null, null) : parent.scm();
+            Scm merged = new Scm(
+                    own.connection() == null ? appended.apply("scm.connection", inherited.connection()) : own.connection(),
+                    own.developerConnection() == null
+                            ? appended.apply("scm.developerConnection", inherited.developerConnection())
+                            : own.developerConnection(),
+                    own.url() == null ? appended.apply("scm.url", inherited.url()) : own.url(),
+                    own.tag() == null && !scmDeclared ? inherited.tag() : own.tag());
+            Organization inheritedOrganization = parent.organization();
+            BinaryOperator<Management> managed = (declared, upper) -> declared == null || upper == null
+                    ? declared == null ? upper : declared
+                    : new Management(declared.system() == null ? upper.system() : declared.system(),
+                            declared.url() == null ? upper.url() : declared.url());
+            return new Metadata(name,
+                    description == null ? parent.description() : description,
+                    url == null ? appended.apply("url", parent.url()) : url,
+                    licenses.isEmpty() ? parent.licenses() : licenses,
+                    developers.isEmpty() ? parent.developers() : developers,
+                    merged.equals(new Scm(null, null, null, null)) ? null : merged,
+                    organization == null || inheritedOrganization == null
+                            ? organization == null ? inheritedOrganization : organization
+                            : new Organization(organization.name() == null ? inheritedOrganization.name() : organization.name(),
+                                    organization.url() == null ? inheritedOrganization.url() : organization.url()),
+                    managed.apply(issueManagement, parent.issueManagement()),
+                    managed.apply(ciManagement, parent.ciManagement()),
+                    inceptionYear == null ? parent.inceptionYear() : inceptionYear);
+        }
+
+        Metadata expand(UnaryOperator<String> expansion) {
+            UnaryOperator<String> expanded = value -> value == null ? null : expansion.apply(value);
+            return new Metadata(expanded.apply(name),
+                    expanded.apply(description),
+                    expanded.apply(url),
+                    licenses.stream()
+                            .map(license -> new License(expanded.apply(license.name()),
+                                    expanded.apply(license.url()),
+                                    expanded.apply(license.distribution())))
+                            .toList(),
+                    developers.stream()
+                            .map(developer -> new Developer(expanded.apply(developer.id()),
+                                    expanded.apply(developer.name()),
+                                    expanded.apply(developer.email()),
+                                    expanded.apply(developer.url()),
+                                    expanded.apply(developer.organization()),
+                                    expanded.apply(developer.organizationUrl()),
+                                    developer.roles().stream().map(expanded).toList(),
+                                    expanded.apply(developer.timezone())))
+                            .toList(),
+                    scm == null ? null : new Scm(expanded.apply(scm.connection()),
+                            expanded.apply(scm.developerConnection()),
+                            expanded.apply(scm.url()),
+                            expanded.apply(scm.tag())),
+                    organization == null ? null : new Organization(expanded.apply(organization.name()),
+                            expanded.apply(organization.url())),
+                    issueManagement == null ? null : new Management(expanded.apply(issueManagement.system()),
+                            expanded.apply(issueManagement.url())),
+                    ciManagement == null ? null : new Management(expanded.apply(ciManagement.system()),
+                            expanded.apply(ciManagement.url())),
+                    expanded.apply(inceptionYear));
+        }
+
+        SequencedMap<String, String> properties() {
+            SequencedMap<String, String> properties = new LinkedHashMap<>();
+            BiConsumer<String, String> put = (key, value) -> {
+                if (value != null) {
+                    properties.put(key, value);
+                }
+            };
+            put.accept("name", name);
+            put.accept("description", description);
+            put.accept("url", url);
+            put.accept("inceptionYear", inceptionYear);
+            if (organization != null) {
+                put.accept("organization.name", organization.name());
+                put.accept("organization.url", organization.url());
+            }
+            for (License license : licenses) {
+                String id = license.name().toLowerCase(Locale.ROOT).replace(' ', '_').replace('.', '_');
+                put.accept("license." + id + ".name", license.name());
+                put.accept("license." + id + ".url", license.url());
+                put.accept("license." + id + ".distribution", license.distribution());
+            }
+            Set<String> ids = new HashSet<>();
+            for (Developer developer : developers) {
+                String id = developer.id();
+                if (id == null) {
+                    String derived = developer.derivedId();
+                    id = derived;
+                    for (int suffix = 2; ids.contains(id); suffix++) {
+                        id = derived + "_" + suffix;
+                    }
+                    properties.put("developer." + id + ".id", "");
+                } else if (developer.name() == null && developer.email() == null) {
+                    properties.putIfAbsent("developer." + id + ".id", id);
+                }
+                ids.add(id);
+                String prefix = "developer." + id + ".";
+                put.accept(prefix + "name", developer.name());
+                put.accept(prefix + "email", developer.email());
+                put.accept(prefix + "url", developer.url());
+                put.accept(prefix + "organization", developer.organization());
+                put.accept(prefix + "organizationUrl", developer.organizationUrl());
+                put.accept(prefix + "timezone", developer.timezone());
+                if (!developer.roles().isEmpty()) {
+                    properties.put(prefix + "roles", String.join(",", developer.roles()));
+                }
+            }
+            if (issueManagement != null) {
+                put.accept("issueManagement.system", issueManagement.system());
+                put.accept("issueManagement.url", issueManagement.url());
+            }
+            if (ciManagement != null) {
+                put.accept("ciManagement.system", ciManagement.system());
+                put.accept("ciManagement.url", ciManagement.url());
+            }
+            if (scm != null) {
+                put.accept("scm.connection", scm.connection());
+                put.accept("scm.developerConnection", scm.developerConnection());
+                put.accept("scm.tag", scm.tag());
+                put.accept("scm.url", scm.url());
+            }
+            return properties;
         }
 
         static Metadata of(SequencedProperties metadata) {
@@ -354,6 +486,11 @@ public class MavenPomEmitter {
 
             public Developer(String id, String name, String email) {
                 this(id, name, email, null, null, null, List.of(), null);
+            }
+
+            String derivedId() {
+                String label = name == null ? email : name;
+                return label == null ? "" : label.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_");
             }
         }
 
