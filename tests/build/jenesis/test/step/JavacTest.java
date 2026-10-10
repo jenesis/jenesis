@@ -845,7 +845,7 @@ public class JavacTest {
         assertThat(thrown).rootCause()
                 .as("the reproduction is the command that ran, its process options on the line and the sources in a file")
                 .hasMessageContaining("To reproduce, execute:\n " + Files.readString(supplement.resolve("command")) + "\n")
-                .hasMessageContaining(" --source-path 'a b (c)' @" + supplement.resolve("javac.args"))
+                .hasMessageContaining(" --source-path 'a b (c)' " + shell("@" + supplement.resolve("javac.args")))
                 .hasMessageContaining("cannot find symbol");
         assertThat(Files.readAllLines(supplement.resolve("javac.args")))
                 .anyMatch(line -> line.endsWith("Main.java\""));
@@ -877,8 +877,8 @@ public class JavacTest {
                 .join())
                 .rootCause()
                 .as("javac refuses a -J option in an argument file, so the launcher options stay on the line")
-                .hasMessageContaining(" -J-Xmx256m -J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED @"
-                        + supplement.resolve("javac.args"));
+                .hasMessageContaining(" -J-Xmx256m -J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED "
+                        + shell("@" + supplement.resolve("javac.args")));
         assertThat(Files.readAllLines(supplement.resolve("javac.args"))).noneMatch(line -> line.contains("-J"));
         Process process = new ProcessBuilder(
                 Path.of(System.getProperty("java.home"), "bin", File.separatorChar == '\\' ? "javac.exe" : "javac").toString(),
@@ -1444,5 +1444,9 @@ public class JavacTest {
         assertThat(next.resolve(Javac.CLASSES + "META-INF/build.jenesis/checkstyle.xml"))
                 .as("the per-module META-INF/build.jenesis configuration is kept out of the classes output")
                 .doesNotExist();
+    }
+
+    private static String shell(String word) {
+        return word.matches("[A-Za-z0-9_@%+=:,./-]+") ? word : "'" + word.replace("'", "'\\''") + "'";
     }
 }
