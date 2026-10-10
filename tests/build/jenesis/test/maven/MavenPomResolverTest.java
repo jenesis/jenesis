@@ -2853,6 +2853,85 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void applies_the_exclusion_a_dependency_inherits_from_its_parents_management_to_its_own_dependency() throws IOException {
+        addToRepository("group", "artifact", "1", rootPom("", "embedder"));
+        addToRepository("managing", "artifact", "1", rootPom("""
+                <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>guava</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>1</version>
+                                <exclusions>
+                                    <exclusion>
+                                        <groupId>other</groupId>
+                                        <artifactId>artifact</artifactId>
+                                    </exclusion>
+                                </exclusions>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                """, "embedder"));
+        addToRepository("parent", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>parent</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>guava</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>1</version>
+                                <exclusions>
+                                    <exclusion>
+                                        <groupId>j2objc</groupId>
+                                        <artifactId>artifact</artifactId>
+                                    </exclusion>
+                                </exclusions>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        addToRepository("embedder", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>parent</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>embedder</groupId>
+                    <artifactId>artifact</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>guava</groupId>
+                            <artifactId>artifact</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("guava", "artifact", "1", rootPom("", "j2objc", "other"));
+        for (String groupId : List.of("j2objc", "other")) {
+            addToRepository(groupId, "artifact", "1", leafPom());
+        }
+        for (String root : List.of("group", "managing")) {
+            assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, root, "artifact", "1", null).keySet())
+                    .as("the management a POM inherits shapes its own dependencies before %s's management adds to it", root)
+                    .contains(new MavenDependencyKey("guava", "artifact", "jar", null))
+                    .doesNotContain(new MavenDependencyKey("j2objc", "artifact", "jar", null));
+        }
+        assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, "managing", "artifact", "1", null).keySet())
+                .as("the exclusion the project manages is applied as well")
+                .doesNotContain(new MavenDependencyKey("other", "artifact", "jar", null));
+    }
+
+    @Test
     public void applies_a_managed_exclusion_to_the_managed_dependency_where_it_is_reached_transitively() throws IOException {
         addToRepository("group", "artifact", "1", rootPom("", "middle"));
         addToRepository("middle", "artifact", "1", """
