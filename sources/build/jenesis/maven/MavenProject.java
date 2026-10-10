@@ -891,6 +891,17 @@ public class MavenProject implements BuildExecutorModule {
                     }
                     continue;
                 }
+                if (value.dependencies() != null) {
+                    for (MavenDependencyKey key : value.dependencies().sequencedKeySet()) {
+                        if (!key.jar() && !key.type().equals("pom")) {
+                            throw new IllegalArgumentException("The dependency " + key.groupId() + ":" + key.artifactId()
+                                    + " in " + pomFile + " is of type " + key.type() + ", which Maven places on no path"
+                                    + " and which Jenesis does not unpack: declare it in a profile that a property"
+                                    + " activates, such as <property><name>!jenesis</name></property>, which Maven"
+                                    + " activates and Jenesis never does");
+                        }
+                    }
+                }
                 String coordinate = new MavenDependencyKey(value.groupId(), value.artifactId(), "jar", null)
                         .coordinate(prefix, value.version());
                 MavenDependencyKey selfPom = new MavenDependencyKey(value.groupId(), value.artifactId(), "pom", null);

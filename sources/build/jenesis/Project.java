@@ -927,7 +927,11 @@ public record Project(
                                  ${...}, which neither a JVM property nor the environment fills, so
                                  a dependency naming one no POM defines fails the build naming it;
                                  dependencies of compile, provided, runtime and test scope;
-                                 <optional>, <exclusions> with wildcards, <type> and <classifier>;
+                                 <optional>, <exclusions> with wildcards, <type> and <classifier> -
+                                 a type other than jar, test-jar, ejb, ejb-client, maven-plugin and
+                                 bundle is followed for its dependencies but placed on no path, as
+                                 Maven places it on none, and refused as a dependency of a module
+                                 the build builds unless it is pom;
                                  <dependencyManagement> with import-scoped BOMs, an entry's
                                  exclusions applied wherever its dependency appears;
                                  maven.compiler.release, or else maven.compiler.target or its
