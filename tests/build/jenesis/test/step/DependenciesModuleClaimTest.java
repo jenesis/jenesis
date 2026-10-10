@@ -103,6 +103,45 @@ public class DependenciesModuleClaimTest {
         assertThat(next.resolve(Dependencies.RESOLVED + "lib.shared-2.0.jar")).exists();
     }
 
+    @Test
+    public void refuses_an_artifact_without_a_module_name_where_every_jar_is_a_module() throws IOException {
+        modularLib("one-lib", "1.0", "lib.one", "one");
+        Files.writeString(mavenRepoFolder.resolve("org/example/one-lib/1.0/one-lib-1.0.pom"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>one-lib</artifactId>
+                    <version>1.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>plain</artifactId>
+                            <version>2.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Path plain = Files.createDirectories(mavenRepoFolder.resolve("org/example/plain/2.0"));
+        Files.writeString(plain.resolve("plain-2.0.pom"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>plain</artifactId>
+                    <version>2.0</version>
+                </project>
+                """);
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(plain.resolve("plain-2.0.jar")))) {
+            output.putNextEntry(new JarEntry("plain/Value.class"));
+            output.closeEntry();
+        }
+
+        assertThatThrownBy(() -> resolveScoped(dependencies -> dependencies.pathPlacement(PathPlacement.MODULE_PATH),
+                "plugin-sample/runtime/maven/org.example/one-lib/1.0"))
+                .hasStackTraceContaining("maven/org.example/plain/2.0 declares no module name, neither by a"
+                        + " module-info.class nor by an Automatic-Module-Name, but every jar of group plugin-sample"
+                        + " loads as a module of its own layer - name it with a @jenesis.alias <module>"
+                        + " org.example/plain line in the module-info.java that requires it, or drop it with"
+                        + " @jenesis.exclude");
+    }
+
     private void modularLib(String artifactId, String version, String module, String name) throws IOException {
         Path sources = Files.createDirectories(work.resolve(artifactId + "-sources"));
         Path classes = Files.createDirectories(work.resolve(artifactId + "-classes"));
