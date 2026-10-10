@@ -693,7 +693,8 @@ public record Project(
                     - Find the demo that matches the task and copy its shape rather than inventing
                       configuration. A number a page cites, as (57), is the demo-57-* folder of
                       https://github.com/jenesis/jenesis/tree/main/demo; skill/demos lists them.
-                    - Moving a Maven or Gradle build here? Follow skill/migrate step by step.
+                    - Moving a Maven or Gradle build here? Follow skill/migrate step by step, and end
+                      with the summary of the migration it asks for.
 
                     ## First moves in a project you do not know
 
@@ -781,7 +782,8 @@ public record Project(
 
                     Move one concern at a time and build after each step, so a failure always has a
                     single cause, and keep the old build working beside this one until what both
-                    produce compares equal.
+                    produce compares equal. The user receives a summary of the migration at the end,
+                    as step 7 describes, so note each decision as it is taken.
 
                     ## 1. Bring the tool in
 
@@ -1168,6 +1170,15 @@ public record Project(
                     `configuration` prints it.
 
                     Shading is not supported: nothing is relocated, and no class file is rewritten.
+                    Convert every use of it, and always name each conversion to the user, with the
+                    reason: a shaded library's classes sit in another jar under another name, where
+                    licence and compliance checks no longer find it, so its licence goes
+                    unattributed and a vulnerability in it unreported, and where the usage
+                    detection an open source project relies on, its downloads and the dependency
+                    graphs that list it, no longer counts it, which can cost that project its
+                    funding. A layer, and packaging with launcher=true or bundle=true, keep each
+                    library a jar of its own under its own coordinate, pinned, verified and
+                    reported like any other dependency, while the application still ships as one.
                     What shading did is answered one way each:
 
                       a dependency kept private, a version that must not meet the consumer's
@@ -1181,7 +1192,10 @@ public record Project(
                                            until phase two; the published POM lists the launcher
                                            and the API module, never what a layer holds (demo
                                            24, 25)
-                      one runnable jar     launcher=true in packaging.properties (demo 08)
+                      one runnable jar     launcher=true in packaging.properties, which stores
+                                           every jar apart inside it (demo 08), or bundle=true,
+                                           a zip of the jars and the argument file that launches
+                                           them (demo 10)
                       fewer dependencies   publish the dependency as a dependency, and make a
                                            `requires static` on it a `requires`
 
@@ -1252,6 +1266,24 @@ public record Project(
                     held: keep it as version=<version> in project.properties at the root, which
                     -Djenesis.project.version overrides for a release, or what is staged is
                     unversioned and its POM 0-SNAPSHOT.
+
+                    ## 7. Summarise the migration
+
+                    Close every migration, a finished one or one stopped at phase one, with a
+                    summary for the user:
+
+                      the layout          the build declaration chosen, and why
+                      the plugins         each plugin of the old build and what replaced it, or
+                                          that nothing does and what was done instead
+                      split packages      the packages that kept the build on pom.xml, and the
+                                          offer of phase two
+                      shading             every shaded dependency and the layer or packaging that
+                                          replaced it, always, with the licensing, compliance and
+                                          funding reason of step 4
+                      differences         what still differs from the old build's output, as the
+                                          comparison of step 5 found it
+                      CI                  the command a CI job now runs, and what of the old build
+                                          is left to retire
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
