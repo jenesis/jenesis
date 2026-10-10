@@ -1445,7 +1445,10 @@ public record Project(
 
                       maven-checkstyle-plugin / checkstyle -> checkstyle.xml (34), with the
                           properties of its propertyExpansion or Gradle's configProperties in a
-                          checkstyle.properties beside it; the build sets ${config_loc} itself
+                          checkstyle.properties beside it; the build sets ${config_loc} itself;
+                          a jar of custom checks among the plugin's dependencies -> @jenesis.plugin
+                          checkstyle maven/<groupId>/<artifactId>, in a pom.xml
+                          <!--jenesis.plugin checkstyle maven/<groupId>/<artifactId>-->
                       maven-pmd-plugin / pmd -> pmd.xml (34); minimumPriority / rulesMinimumPriority
                           -> jenesis.source.pmd.priority
                       spotbugs-maven-plugin / com.github.spotbugs -> spotbugs-exclude.xml (34)
@@ -2066,7 +2069,11 @@ public record Project(
                     fails the build either way. Checkstyle's ${config_loc} is the
                     folder of checkstyle.xml, and a ${config_loc}/<path> it names is handed over with it.
                     Every other ${<property>} it names is a line of a checkstyle.properties beside it,
-                    or Checkstyle fails to load it.
+                    or Checkstyle fails to load it. A jar of custom checks or filters joins Checkstyle's
+                    class path when @jenesis.plugin checkstyle maven/<groupId>/<artifactId> names it,
+                    in a pom.xml <!--jenesis.plugin checkstyle maven/<groupId>/<artifactId>-->, which
+                    a local parent's POM hands to every module; it resolves in the checkstyle group,
+                    where @jenesis.pin checkstyle/maven/<groupId>/<artifactId> <version> pins it.
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
