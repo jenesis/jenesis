@@ -67,7 +67,7 @@ Java formatter runs.
 
 A discovered tool can be switched off without deleting its configuration file
 through its property, so file discovery alone decides until the property says
-otherwise. A linter's property is `warn` by default, and `ignore` skips it; a
+otherwise. A linter's property is `report` by default, and `ignore` skips it; a
 formatter's is `true` by default, and `false` skips it:
 
     jenesis.source.<tool>        Checkstyle, PMD, Detekt, Ktlint, Scalastyle, Scalafmt, CodeNarc
