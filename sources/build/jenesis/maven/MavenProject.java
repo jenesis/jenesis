@@ -307,6 +307,16 @@ public class MavenProject implements BuildExecutorModule {
                                 }
                                 module.addSource("resources-" + ++index, Bind.asResources(), resources);
                                 active = true;
+                            } else if (!Files.exists(resources)
+                                    && !Path.of(resource).normalize().equals(Path.of("src", name.startsWith("test-") ? "test" : "main", "resources"))
+                                    && printing != null) {
+                                printing.accept(("%s%-11s%s %s names the resource directory %s, which does not exist"
+                                        + " beside it, so it adds no resources")
+                                        .formatted(palette.warning(),
+                                                "[RESOURCES]",
+                                                palette.reset(),
+                                                Path.of(properties.getProperty("path")).resolve("pom.xml"),
+                                                resource));
                             }
                         }
                         Path tests = file.resolveSibling("test-" + name);
