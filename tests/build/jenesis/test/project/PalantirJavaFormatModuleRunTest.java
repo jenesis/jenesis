@@ -63,6 +63,9 @@ public class PalantirJavaFormatModuleRunTest {
                 .as("the source is reformatted in place")
                 .contains("class Sample {")
                 .contains("int f() {");
+        assertThat(formatted)
+                .as("the source is formatted in Palantir style, indented by four spaces rather than Google's two")
+                .contains("\n    int f() {");
         Path command = root.resolve("palantir-java-format").resolve("format").resolve("supplement").resolve("command");
         assertThat(command).as("the first run forks the formatter").exists();
         Path hashes = root.resolve("palantir-java-format").resolve("format").resolve("output").resolve("formatted.properties");
