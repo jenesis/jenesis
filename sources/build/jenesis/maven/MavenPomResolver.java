@@ -873,8 +873,7 @@ public class MavenPomResolver implements MavenResolver {
                 Map<DependencyKey, DependencyValue> inheritedManagedDependencies = new LinkedHashMap<>();
                 SequencedMap<DependencyKey, DependencyValue> dependencies = new LinkedHashMap<>();
                 List<License> parentLicenses = List.of();
-                SequencedMap<String, String> parentQualified = Collections.emptyNavigableMap(),
-                        parentPlugins = Collections.emptyNavigableMap(),
+                SequencedMap<String, String> parentPlugins = Collections.emptyNavigableMap(),
                         parentAliases = Collections.emptyNavigableMap(),
                         parentMetadata = Collections.emptyNavigableMap();
                 Set<String> parentVerbatim = Set.of();
@@ -914,7 +913,6 @@ public class MavenPomResolver implements MavenResolver {
                                     || !parent.version().equals(version)) {
                                 resolution = null;
                             } else {
-                                parentQualified = resolution.qualifiedDependencies();
                                 parentPlugins = resolution.plugins();
                                 parentAliases = resolution.aliases();
                                 localParent = resolution;
@@ -1126,8 +1124,8 @@ public class MavenPomResolver implements MavenResolver {
                         properties,
                         managedDependencies,
                         dependencies,
-                        extended || trusted && path != null
-                                ? inherited(toQualifiedDependencies(document.getDocumentElement()), parentQualified)
+                        extended
+                                ? toQualifiedDependencies(document.getDocumentElement())
                                 : Collections.emptyNavigableMap(),
                         extended
                                 ? toAttachments(document.getDocumentElement())

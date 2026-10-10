@@ -873,10 +873,10 @@ public record Project(
                                  sourceDirectory, testSourceDirectory and the <directory> of each
                                  resource, a local parent's where the module names none - one
                                  folder per scope, so .groovy tests in src/test/groovy are found
-                                 once testSourceDirectory names it; the <!--jenesis.plugin-->,
-                                 <!--jenesis.pin--> and <!--jenesis.alias--> comments of the
-                                 module's POM and of a local parent, where the module's own pin
-                                 wins and `pin` writes into the module's POM;
+                                 once testSourceDirectory names it; the <!--jenesis.plugin--> and
+                                 <!--jenesis.alias--> comments of the module's POM and of a local
+                                 parent; the <!--jenesis.pin--> comment of the module's own POM,
+                                 where `pin` writes it, and never a parent's;
                                  a profile of any POM - the module's, a parent's, a BOM's or a
                                  dependency's - that Maven activates by <jdk>, matched against the
                                  JDK the build runs on (an unclosed [9, or [9 reads as [9,); a
@@ -1076,9 +1076,10 @@ public record Project(
                     checkstyle, pmd or jacoco, and once per module, since each module resolves alone.
                     A pom.xml pins it with a comment that is a child of <project>, one coordinate per
                     line, `<!--jenesis.pin checkstyle/maven/com.puppycrawl.tools/checkstyle 10.18.2-->`,
-                    which `pin` completes with the tool's closure; a module inherits the comments of
-                    its local parent, never of a POM that only lists it under <modules>, so a module
-                    outside the parent chain pins its tools itself. A module-info.java pins it with
+                    which `pin` completes with the tool's closure. That comment is the module's own:
+                    `pin` writes it into every module's POM and a parent's is not inherited, while a
+                    <!--jenesis.plugin--> comment is, from a local parent but never from a POM that only
+                    lists the module under <modules>. A module-info.java pins it with
                     @jenesis.pin checkstyle/maven/com.puppycrawl.tools/checkstyle 10.18.2. JaCoCo's
                     agent follows the release its group pins for the CLI. Configuration that lived
                     inside a plugin moves here:

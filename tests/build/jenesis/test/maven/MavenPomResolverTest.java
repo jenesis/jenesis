@@ -5538,7 +5538,7 @@ public class MavenPomResolverTest {
     }
 
     @Test
-    public void local_pom_inherits_the_plugin_and_pin_comments_of_its_local_parent() throws IOException {
+    public void local_pom_inherits_the_plugin_comment_of_its_local_parent_but_not_its_pins() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0">
@@ -5586,9 +5586,8 @@ public class MavenPomResolverTest {
                 .containsEntry("maven/org.example/processor/1.0", "plugin")
                 .containsEntry("maven/org.example/other/2.0", "plugin");
         assertThat(child.qualifiedDependencies())
-                .as("a pin the module declares itself wins over its parent's")
-                .containsEntry("javac/maven/com.google.errorprone/error_prone_core", "2.50.0")
-                .containsEntry("javac/maven/com.google.guava/guava", "33.5.0-jre");
+                .as("pin writes a module's pins into its own POM, so a parent's would only be shadowed there")
+                .containsExactly(Map.entry("javac/maven/com.google.guava/guava", "33.5.0-jre"));
         assertThat(poms.get(Path.of("")).qualifiedDependencies())
                 .containsEntry("javac/maven/com.google.guava/guava", "33.0.0-jre");
     }
