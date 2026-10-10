@@ -67,6 +67,31 @@ public class BundleTest {
     }
 
     @Test
+    public void names_the_module_and_how_to_declare_a_main_class_when_it_has_none() throws IOException {
+        writePlainJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"));
+        SequencedProperties launcher = new SequencedProperties();
+        launcher.setProperty("name", "app");
+        launcher.store(input.resolve("launcher.properties"));
+        List<String> printed = new ArrayList<>();
+
+        BuildStepResult result = Bundle.ofEnvironment(new Environment(Map.of("palette.colors", "none")).out(printed::add)).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Bundle.BUNDLE)).doesNotExist();
+        assertThat(printed).hasSize(1);
+        assertThat(printed.getFirst())
+                .as("bundle=true without a main class stages nothing, which the build says rather than keeps quiet about")
+                .startsWith("[SKIPPED]")
+                .contains("app builds no bundle", "@jenesis.main", "<mainClass>");
+    }
+
+    @Test
     public void carries_the_java_options_of_the_module_and_offers_itself_as_a_package_named_after_it() throws IOException {
         writePlainJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"));
         SequencedProperties launcher = new SequencedProperties();

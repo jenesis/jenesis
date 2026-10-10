@@ -6,6 +6,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import java.util.jar.Attributes;
@@ -20,35 +21,59 @@ public class Launcher implements BuildStep {
     private final String group;
     private final PathPlacement pathPlacement;
     private final OffsetDateTime timestamp;
+    private final transient Consumer<String> out;
+    private final transient Palette palette;
 
     public Launcher(String tool,
                     PathPlacement pathPlacement) {
         this(tool,
              "main",
              pathPlacement,
-             BuildStep.timestamp());
+             BuildStep.timestamp(),
+             null,
+             Palette.NONE);
     }
 
     public static Launcher ofEnvironment(Environment environment,
                                          String tool,
                                          PathPlacement pathPlacement) {
         return new Launcher(tool, pathPlacement)
-                .timestamp(BuildStep.timestamp(environment));
+                .timestamp(BuildStep.timestamp(environment))
+                .printing(environment.out(), Palette.ofEnvironment(environment));
     }
 
-    private Launcher(String tool, String group, PathPlacement pathPlacement, OffsetDateTime timestamp) {
+    private Launcher(String tool,
+                     String group,
+                     PathPlacement pathPlacement,
+                     OffsetDateTime timestamp,
+                     Consumer<String> out,
+                     Palette palette) {
         this.tool = tool;
         this.group = group;
         this.pathPlacement = pathPlacement;
         this.timestamp = timestamp;
+        this.out = out;
+        this.palette = palette;
+    }
+
+    public Launcher tool(String tool) {
+        return new Launcher(tool, group, pathPlacement, timestamp, out, palette);
     }
 
     public Launcher group(String group) {
-        return new Launcher(tool, group, pathPlacement, timestamp);
+        return new Launcher(tool, group, pathPlacement, timestamp, out, palette);
+    }
+
+    public Launcher pathPlacement(PathPlacement pathPlacement) {
+        return new Launcher(tool, group, pathPlacement, timestamp, out, palette);
     }
 
     public Launcher timestamp(OffsetDateTime timestamp) {
-        return new Launcher(tool, group, pathPlacement, timestamp);
+        return new Launcher(tool, group, pathPlacement, timestamp, out, palette);
+    }
+
+    public Launcher printing(Consumer<String> out, Palette palette) {
+        return new Launcher(tool, group, pathPlacement, timestamp, out, palette);
     }
 
     @Override
@@ -103,6 +128,14 @@ public class Launcher implements BuildStep {
                 jars.putIfAbsent(file.getFileName().toString(), file);
             }
             granted.addAll(Inventory.nativeAccess(argument.folder()));
+        }
+        if (mainClass == null && out != null) {
+            out.accept(("%s%-11s%s %s builds no executable jar, as it names no main class: name one with"
+                    + " @jenesis.main <class> in its module-info.java, or with a <mainClass> property in its pom.xml")
+                    .formatted(palette.warning(),
+                            "[SKIPPED]",
+                            palette.reset(),
+                            name == null ? "The module" : name));
         }
         if (mainClass == null || shaded == null || jars.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));

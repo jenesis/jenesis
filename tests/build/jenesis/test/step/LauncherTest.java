@@ -32,6 +32,38 @@ public class LauncherTest {
     }
 
     @Test
+    public void names_the_module_and_how_to_declare_a_main_class_when_it_has_none() throws IOException {
+        writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"));
+        writeJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"), "sample/Sample.class");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("launcher/runtime/maven/build.jenesis/build.jenesis.launcher", "resolved/launcher.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties application = new SequencedProperties();
+        application.setProperty("name", "app");
+        application.store(input.resolve("launcher.properties"));
+        List<String> printed = new ArrayList<>();
+
+        BuildStepResult result = Launcher.ofEnvironment(new Environment(Map.of("palette.colors", "none")).out(printed::add),
+                "launcher",
+                PathPlacement.INFERRED).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("resolved/launcher.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Launcher.LAUNCHER)).doesNotExist();
+        assertThat(printed).hasSize(1);
+        assertThat(printed.getFirst())
+                .as("launcher=true without a main class stages nothing, which the build says rather than keeps quiet about")
+                .startsWith("[SKIPPED]")
+                .contains("app builds no executable jar", "@jenesis.main", "<mainClass>");
+    }
+
+    @Test
     public void shades_the_launcher_and_explodes_the_class_path() throws IOException {
         writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"));
         writeJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"), "sample/Sample.class");

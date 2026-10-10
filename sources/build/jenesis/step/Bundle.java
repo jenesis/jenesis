@@ -7,6 +7,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.ModuleGraph;
+import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 
@@ -16,28 +17,39 @@ public class Bundle implements BuildStep {
 
     private final String group;
     private final OffsetDateTime timestamp;
+    private final transient Consumer<String> out;
+    private final transient Palette palette;
 
     public Bundle() {
         this("main",
-             BuildStep.timestamp());
+             BuildStep.timestamp(),
+             null,
+             Palette.NONE);
     }
 
     public static Bundle ofEnvironment(Environment environment) {
         return new Bundle()
-                .timestamp(BuildStep.timestamp(environment));
+                .timestamp(BuildStep.timestamp(environment))
+                .printing(environment.out(), Palette.ofEnvironment(environment));
     }
 
-    private Bundle(String group, OffsetDateTime timestamp) {
+    private Bundle(String group, OffsetDateTime timestamp, Consumer<String> out, Palette palette) {
         this.group = group;
         this.timestamp = timestamp;
+        this.out = out;
+        this.palette = palette;
     }
 
     public Bundle group(String group) {
-        return new Bundle(group, timestamp);
+        return new Bundle(group, timestamp, out, palette);
     }
 
     public Bundle timestamp(OffsetDateTime timestamp) {
-        return new Bundle(group, timestamp);
+        return new Bundle(group, timestamp, out, palette);
+    }
+
+    public Bundle printing(Consumer<String> out, Palette palette) {
+        return new Bundle(group, timestamp, out, palette);
     }
 
     @Override
@@ -78,6 +90,14 @@ public class Bundle implements BuildStep {
             }
         }
         if (mainClass == null) {
+            if (out != null) {
+                out.accept(("%s%-11s%s %s builds no bundle, as it names no main class: name one with @jenesis.main"
+                        + " <class> in its module-info.java, or with a <mainClass> property in its pom.xml")
+                        .formatted(palette.warning(),
+                                "[SKIPPED]",
+                                palette.reset(),
+                                artifact == null ? "The module" : artifact));
+            }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         SequencedMap<String, Path> jars = new TreeMap<>();
