@@ -2286,10 +2286,14 @@ public record Project(
                     as classes/ and a manifest.mf is merged into the module's jar beside what javac
                     compiled, which it never sees or replaces: a class both write fails the build.
                     A step at binary/transform is handed the module's compiled classes as its first
-                    argument and the module's inputs after it; what it writes below classes/, or as a
-                    manifest.mf, replaces the file of that name, every other one passes on as it was,
-                    and several such plugins run in the order jenesis.plugins.properties names them,
-                    each handed what the one before it wrote.
+                    argument and the module's inputs after it; what it writes below classes/ replaces
+                    the file of that name, every other one passes on as it was, and several such
+                    plugins run in the order jenesis.plugins.properties names them, each handed what
+                    the one before it wrote. A manifest.mf, or a classes/META-INF/MANIFEST.MF, is
+                    merged into the one it was handed instead, its own value winning for an attribute
+                    it sets, so the compiler's Multi-Release and Jenesis-Aliases stay - which makes a
+                    binary/transform plugin the place of an OSGi manifest, since bnd analyses the
+                    classes as the jar holds them, and binary/compiled sees none of them.
 
                     ## Pick the hook point by what the step produces
 
