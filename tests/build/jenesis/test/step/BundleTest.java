@@ -12,6 +12,8 @@ import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bundle;
+import build.jenesis.step.JPackage;
+import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -62,6 +64,37 @@ public class BundleTest {
                 .as("a bundle is unpacked wherever, so it carries a file per path separator"
                         + " rather than the separator of whoever built it")
                 .containsExactly("--class-path", "jars/app.jar;jars/lib.jar", "sample.Sample");
+    }
+
+    @Test
+    public void carries_the_java_options_of_the_module_and_offers_itself_as_a_package_named_after_it() throws IOException {
+        writePlainJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"));
+        SequencedProperties launcher = new SequencedProperties();
+        launcher.setProperty("mainClass", "sample.Sample");
+        launcher.setProperty("name", "app");
+        launcher.store(input.resolve("launcher.properties"));
+        SequencedProperties java = new SequencedProperties();
+        java.setProperty("--add-reads", "org.hibernate.validator=org.apache.tomcat.embed.el");
+        java.setProperty("-Dsample=true", "");
+        java.store(Files.createDirectory(input.resolve(ProcessBuildStep.PROCESS)).resolve("java.properties"));
+
+        Bundle.ofEnvironment(Environment.NONE).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(input, Map.of())))).toCompletableFuture().join();
+
+        Path zip = next.resolve(Bundle.BUNDLE).resolve("bundle.zip");
+        assertThat(application(zip))
+                .as("the options every JVM of the module runs with are part of its launch")
+                .containsExactly("--add-reads",
+                        "org.hibernate.validator=org.apache.tomcat.embed.el",
+                        "-Dsample=true",
+                        "--class-path",
+                        "jars/app.jar",
+                        "sample.Sample");
+        assertThat(next.resolve(JPackage.PACKAGES).resolve("app.zip"))
+                .as("the bundle is a deliverable, staged with the packages under the application's name")
+                .hasSameBinaryContentAs(zip);
     }
 
     @Test

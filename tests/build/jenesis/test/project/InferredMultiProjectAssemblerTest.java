@@ -984,6 +984,24 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void stages_a_bundle_among_the_packages() throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"), "bundle=true\n");
+        Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "project=sample\nartifact=app\nversion=1\n");
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(
+                Files.createDirectories(fixture.artifacts().resolve(BuildStep.ARTIFACTS)).resolve("app.jar")))) {
+            jar.putNextEntry(new JarEntry("com/example/Entry.class"));
+            jar.write(new byte[]{1, 2, 3});
+            jar.closeEntry();
+        }
+        SequencedMap<String, Path> outputs = fixture.execute("package");
+        assertThat(outputs.get("package/packaged").resolve(JPackage.PACKAGES + "app.zip")).exists();
+        assertThat(SequencedProperties.ofFiles(outputs.get("package/inventory").resolve(Inventory.INVENTORY)).stringPropertyNames())
+                .as("the bundle reaches the stage, and so export and release, through the module's inventory")
+                .anyMatch(key -> key.endsWith(".package"));
+    }
+
+    @Test
     public void refuses_two_packagers_that_write_the_same_package() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("plugin-first.properties"), "");

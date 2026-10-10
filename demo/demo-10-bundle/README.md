@@ -80,9 +80,14 @@ directory, `build.jenesis/` under the project root by default; the first match w
 overrides a project-wide one). When `bundle=true`, the build writes a
 `bundle.zip` after every module has been built, one for every module declaring a main
 class (a `@jenesis.main` Javadoc tag, or a `<mainClass>` POM property); modules
-without one are skipped. Like the `launcher` jar, the archive is a per-module
-artifact left in the build tree (`.../package/bundle/output/bundle/bundle.zip`)
-rather than collected into `stage/`, so `Demo.java` locates it by walking `target/`.
+without one are skipped. The archive is written per module into the build tree
+(`.../package/bundle/output/bundle/bundle.zip`), where `Demo.java` locates it by walking
+`target/`, and `stage` collects it into `stage/packages/` as `<artifact>.zip`, beside the
+`launcher` jar and what jpackage writes, so `export` and `release` ship it.
+
+The options a `process-java.properties` gives the module's JVM - an `--add-reads` that a
+module path needs, a system property - lead the argument files, as they lead the JVM that
+`Execute` starts, so the launch the bundle carries is the one the build ran.
 
 Layout
 ------

@@ -112,6 +112,10 @@ Every jar is stored once under `jars/`, and the argument file is the launch itse
     "jars/build.jenesis.demo%2Fjava-pom-executable%2F1.0.0.jar:jars/org.apache.commons.lang3-3.14.0.jar"
     "sample.Sample"
 
+What `process-java.properties` gives the program's JVM leads both argument files, as it
+leads the JVM `Execute` starts, and `stage` collects the zip into `stage/packages/` as
+`<artifact>.zip`, so `export` and `release` ship it like any other package.
+
 Unzipped onto a JRE base, it needs no JDK, no jpackage and no descriptor reader:
 
     FROM gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
@@ -219,6 +223,12 @@ committed `launcher` profile with `Project.profiles(...)`: the profile's
 own `packaging.properties`, then the demo builds and runs the produced jar:
 
     java build/DemoLauncher.java ada lovelace
+
+`stage` collects the jar into `stage/packages/` as `<artifact>.jar`. Every jar it stores
+keeps its directory entries, so a scan of a package on the class path finds them as it
+would in the original jar. A JVM option of `process-java.properties` does not travel with
+it, because `java -jar` reads none from the jar it runs; an application that needs one
+ships as a bundle.
 
 The launcher is shaded into the artifact, so it is pinned like any dependency - the
 `pom.xml` carries a `<!--jenesis.pin launcher/maven/build.jenesis/build.jenesis.launcher

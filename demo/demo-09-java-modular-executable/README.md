@@ -213,6 +213,11 @@ jar adds `--add-modules ALL-MODULE-PATH,ALL-DEFAULT` to root the whole
 module path and the default platform set,
 exactly as the jpackage section above describes. Here the closure is
 `demo.modular.executable` + `org.slf4j`, both explicit modules, so those lines are absent.
+
+What `process-java.properties` gives the JVM of the module - an `--add-reads` its module
+path needs, a system property - leads both argument files, as it leads the JVM `Execute`
+starts. `stage` collects the zip into `stage/packages/` as `<artifact>.zip`, beside what
+jpackage writes there, so `export` and `release` ship it like any other package.
 Unzipped onto a JRE base, the bundle needs no JDK and no jpackage:
 
     FROM gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
@@ -353,7 +358,9 @@ build is reproducible, and `pin` refreshes it the same way it pins everything el
 
 Unlike `jpackage` and `bundle`, this carries no JVM and no `jlink` runtime - it is a
 plain jar that runs on any JDK 25 - and unlike the `bundle.zip` it needs no launch
-script. (A bundle with no `mainClass` is instead a self-contained Java agent; see the
+script. `stage` collects it into `stage/packages/` as `<artifact>.jar`. What
+`process-java.properties` names does not travel with it, because `java -jar` reads no
+JVM option from the jar it runs: an application that needs one ships as a bundle. (A bundle with no `mainClass` is instead a self-contained Java agent; see the
 launcher's own documentation.)
 
 Fully bundled native installer
