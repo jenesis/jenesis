@@ -1204,6 +1204,10 @@ public record Project(
                           -> -Djenesis.project.resources=<file>:<path in the jar>
                       animal-sniffer with a JDK signature -> maven.compiler.release, as javac
                           checks the API of the release it compiles for; other signatures: none
+                      maven.compiler.source/target without a release, where the code needs the
+                          API of the JDK compiling it, as a guarded call of a newer one does
+                          -> --source=<release> in process-javac.properties, since the build
+                          otherwise reads them as --release
 
                     ## Check and test
 
@@ -1722,12 +1726,16 @@ public record Project(
                                                 argument as the value, `-parameters=` for a bare one
                                                 and `-Xlint\\:all=` where the flag holds a : or =,
                                                 refusing one the module's declaration sets already,
-                                                as javac's --release; an --add-exports, --add-reads
-                                                or --patch-module of a JDK module, which javac
+                                                as javac's --release; a --source or --target of
+                                                javac's, or an --add-exports, --add-reads or
+                                                --patch-module of a JDK module, all of which javac
                                                 refuses beside --release, has the release passed as
-                                                --source and --target instead, so the module is
-                                                checked against the API of the JDK the build runs on
-                                                rather than of its release;
+                                                --source and --target instead, where the file names
+                                                neither, so the module is checked against the API of
+                                                the JDK the build runs on rather than of its release,
+                                                as Maven compiles a source and target without a
+                                                release - a guarded call of a newer API compiles
+                                                for an older release this way;
                                                 process-test.properties targets the test JVM, merged
                                                 over process-java.properties, which Execute and a
                                                 bundle's argument files carry as well; a linter reads

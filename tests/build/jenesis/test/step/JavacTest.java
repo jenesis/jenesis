@@ -307,6 +307,58 @@ public class JavacTest {
     }
 
     @ParameterizedTest
+    @CsvSource({"true,--source", "false,--source", "true,-source", "true,--target", "false,-target"})
+    public void compiles_against_the_api_of_the_running_jdk_when_process_javac_properties_names_a_source_or_target(
+            boolean process, String option) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"), """
+                package sample;
+                public class Sample {
+                    public boolean blank(String value) { return value.isBlank(); }
+                }
+                """);
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/21/sample"))
+                .resolve("Sample.java"), """
+                package sample;
+                public class Sample {
+                    public boolean blank(String value) { return value.isBlank(); }
+                }
+                """);
+        Javac.writeRelease(sources, "8", Runtime.version().feature());
+        Path configuration = Files.createDirectories(root.resolve("configuration"));
+        Files.createDirectories(configuration.resolve("process"));
+        SequencedProperties options = new SequencedProperties();
+        options.setProperty(option, "8");
+        options.store(configuration.resolve("process/javac.properties"));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/META-INF/versions/21/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("configuration", new BuildStepArgument(configuration, Map.of(
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        assertThat(Files.readString(supplement.resolve("command")))
+                .as("javac refuses --source and --target beside --release, so the release fills the one not named")
+                .doesNotContain("--release")
+                .containsAnyOf("--source 8", "-source 8")
+                .containsAnyOf("--target 8", "-target 8");
+        assertThat(ClassFile.of().parse(next.resolve(Javac.CLASSES + "sample/Sample.class")).majorVersion())
+                .isEqualTo(ClassFile.JAVA_8_VERSION);
+        assertThat(Files.readString(supplement.resolve("command-21")))
+                .as("an overlay is compiled for its own release, still as source and target")
+                .doesNotContain("--release", " 8 ")
+                .contains("--source 21", "--target 21");
+        assertThat(ClassFile.of()
+                .parse(next.resolve(Javac.CLASSES + "META-INF/versions/21/sample/Sample.class"))
+                .majorVersion())
+                .isEqualTo(ClassFile.JAVA_21_VERSION);
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void stamps_module_version_when_javac_properties_contains_module_version(boolean process) throws IOException {
         Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES));
