@@ -215,6 +215,8 @@ public class Launcher implements BuildStep {
                 explode(out, entry.getValue(), "jars/" + entry.getKey() + "/", _ -> true);
             }
         }
+        BuildStep.linkOrCopy(Files.createDirectory(context.next().resolve(JPackage.PACKAGES))
+                .resolve(jar.getFileName().toString()), jar);
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 

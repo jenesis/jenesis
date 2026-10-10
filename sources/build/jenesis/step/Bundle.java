@@ -45,10 +45,22 @@ public class Bundle implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        String mainClass = null, mainModule = null;
+        String mainClass = null, mainModule = null, artifact = null;
+        List<String> javaOptions = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
+            }
+            Path process = argument.folder().resolve(ProcessBuildStep.PROCESS + "java.properties");
+            if (Files.isRegularFile(process)) {
+                SequencedProperties.ofFiles(process).forEachProperty((option, values) -> {
+                    for (String value : values.split("\n")) {
+                        javaOptions.add(option);
+                        if (!value.isEmpty()) {
+                            javaOptions.add(value);
+                        }
+                    }
+                });
             }
             Path properties = argument.folder().resolve("launcher.properties");
             if (!Files.isRegularFile(properties)) {
@@ -60,6 +72,9 @@ public class Bundle implements BuildStep {
             }
             if (mainModule == null) {
                 mainModule = launcher.getProperty("mainModule");
+            }
+            if (artifact == null) {
+                artifact = launcher.getProperty("name");
             }
         }
         if (mainClass == null) {
@@ -130,7 +145,8 @@ public class Bundle implements BuildStep {
         )) {
             descriptors.put("application." + platform.getKey() + ".args", ProcessBuildStep.argumentFile(
                     context.supplement().resolve("application." + platform.getKey() + ".args"),
-                    command(mainClass,
+                    command(javaOptions,
+                            mainClass,
                             mainModule,
                             graph.arguments(),
                             classpath.sequencedKeySet(),
@@ -160,10 +176,13 @@ public class Bundle implements BuildStep {
                 writeEntry(out, "jars/" + entry.getKey(), entry.getValue());
             }
         }
+        BuildStep.linkOrCopy(Files.createDirectory(context.next().resolve(JPackage.PACKAGES))
+                .resolve((artifact == null ? "application" : artifact) + ".zip"), zip);
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
-    private static List<String> command(String mainClass,
+    private static List<String> command(List<String> javaOptions,
+                                        String mainClass,
                                         String mainModule,
                                         List<String> relaxations,
                                         SequencedSet<String> classpath,
@@ -171,7 +190,7 @@ public class Bundle implements BuildStep {
                                         SequencedMap<String, Layers.Membership> layers,
                                         SequencedMap<String, String> agents,
                                         String separator) {
-        List<String> command = new ArrayList<>();
+        List<String> command = new ArrayList<>(javaOptions);
         agents.forEach((jar, options) -> command.add("-javaagent:jars/" + jar
                 + (options.isEmpty() ? "" : "=" + options)));
         layers.forEach((name, membership) -> {

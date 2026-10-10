@@ -12,6 +12,7 @@ import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.JPackage;
 import build.jenesis.step.Launcher;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,6 +58,9 @@ public class LauncherTest {
         assertThat(result.next()).isTrue();
         Path jar = next.resolve(Launcher.LAUNCHER).resolve("app.jar");
         assertThat(jar).isRegularFile();
+        assertThat(next.resolve(JPackage.PACKAGES).resolve("app.jar"))
+                .as("the executable jar is a deliverable, staged with the packages")
+                .hasSameBinaryContentAs(jar);
         SequencedSet<String> entries = entries(jar);
         assertThat(entries)
                 .as("the launcher classes are shaded into the root, without its module-info or manifest")

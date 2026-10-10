@@ -1633,7 +1633,9 @@ public record Project(
                     only the file kinds it compiles. In the maven layout only a resource directory
                     ships what such a folder holds.
 
-                      packaging.properties      jmod/jlink/bundle/launcher/native booleans,
+                      packaging.properties      jmod/jlink/bundle/launcher/native booleans, a bundle
+                                                staged as <artifact>.zip and a launcher jar as
+                                                <artifact>.jar in stage/packages,
                                                 jpackage=<type>[,<type>...] packaging and staging each,
                                                 docker=<image> with docker.label.<name>=<value> lines,
                                                 docker.jpackage=app-image|deb|rpm to put that jpackage
@@ -1702,8 +1704,9 @@ public record Project(
                                                 checked against the API of the JDK the build runs on
                                                 rather than of its release;
                                                 process-test.properties targets the test JVM, merged
-                                                over process-java.properties; a linter reads only its
-                                                own configuration file
+                                                over process-java.properties, which Execute and a
+                                                bundle's argument files carry as well; a linter reads
+                                                only its own configuration file
                       environment-<tool>.properties
                                                 variables for a program the build forks (java, test,
                                                 pitest, native-image), which otherwise sees only
