@@ -2197,6 +2197,12 @@ public record Project(
                       build.jenesis/plugin-tool.properties
                                                  switches it on in a module, and carries its values
 
+                    `requires build.jenesis` resolves a published build.jenesis, as any module the
+                    plugin requires, pinned as plugin-<name>/module/build.jenesis: not the vendored
+                    build/jenesis that runs the build, which reaches the plugin's own copy through a
+                    bridge. Read the API of the version that pin names, from its sources jar, and pin
+                    a newer one where the plugin needs what only that one has.
+
                     The provider implements BuildExecutorModule and adds its steps in accept, with
                     executor.addStep("<name>", step, inherited.sequencedKeySet()) to be handed what
                     the hook point reads. It needs a public no-argument constructor, and one taking a
