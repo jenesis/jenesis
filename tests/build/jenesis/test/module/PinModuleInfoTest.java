@@ -326,6 +326,58 @@ public class PinModuleInfoTest {
         assertInsideJavadoc(result, "@jenesis.pin b 2.0");
     }
 
+    @Test
+    public void continues_a_doc_comment_whose_text_starts_on_its_opening_line() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /** The module, described on the opening line.
+                 *
+                 * @jenesis.release 11
+                 * @jenesis.pin bar 1.0
+                 */
+                module foo {
+                  requires bar;
+                  requires qux;
+                }
+                """);
+        writeResolved(Map.of(
+                "module/bar", "1.0 SHA-256/cafebabe",
+                "module/qux", "2.0 SHA-256/beef"));
+        assertThat(run(file)).isEqualTo("""
+                /** The module, described on the opening line.
+                 *
+                 * @jenesis.release 11
+                 * @jenesis.pin bar 1.0 SHA-256/cafebabe
+                 * @jenesis.pin qux 2.0 SHA-256/beef
+                 */
+                module foo {
+                  requires bar;
+                  requires qux;
+                }
+                """);
+    }
+
+    @Test
+    public void keeps_the_opening_of_a_doc_comment_whose_first_line_is_a_pin() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /** @jenesis.pin bar 1.0
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        writeResolved(Map.of("module/bar", "1.0 SHA-256/cafebabe"));
+        assertThat(run(file)).isEqualTo("""
+                /**
+                 * @jenesis.pin bar 1.0 SHA-256/cafebabe
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+    }
+
     private static void assertInsideJavadoc(String content, String needle) {
         int needleIdx = content.indexOf(needle);
         assertThat(needleIdx).as("needle '%s' is present", needle).isNotNegative();
