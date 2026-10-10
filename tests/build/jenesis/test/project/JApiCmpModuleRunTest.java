@@ -14,6 +14,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.JApiCmpModule;
+import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -113,6 +114,27 @@ public class JApiCmpModuleRunTest {
                 .hasRootCauseInstanceOf(IllegalStateException.class)
                 .rootCause()
                 .hasMessageContaining("Unexpected exit code");
+    }
+
+    @Test
+    public void hands_the_lines_of_its_process_file_to_japicmp_rather_than_to_its_jvm() throws IOException {
+        writeProject(COMPATIBLE);
+        SequencedProperties process = new SequencedProperties();
+        process.setProperty("--include-synthetic", "");
+        process.setProperty("-J-Xmx256m", "");
+        process.store(Files.createDirectories(project.resolve(ProcessBuildStep.PROCESS)).resolve("japicmp.properties"));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("japicmp", module(new SequencedProperties()), "project");
+        executor.execute();
+
+        String command = Files.readString(root.resolve("japicmp").resolve("compare").resolve("supplement").resolve("command"));
+        assertThat(command.substring(command.indexOf("japicmp.JApiCmp")))
+                .as("an option japicmp takes follows its main class, and a -J option is the JVM's")
+                .contains(" --include-synthetic")
+                .doesNotContain("Xmx256m");
+        assertThat(command.substring(0, command.indexOf("japicmp.JApiCmp"))).contains(" -Xmx256m ");
     }
 
     private JApiCmpModule module(SequencedProperties config) {
