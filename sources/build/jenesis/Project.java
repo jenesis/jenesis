@@ -941,6 +941,14 @@ public record Project(
                                            a package only a sibling uses
                       a dependency         exclude the jar that holds the package, or move the
                                            project's classes out of it
+                      two dependencies     no module path holds a package two jars share; after a
+                                           build of the pom.xml, this prints each package two jars
+                                           of a test closure hold - exclude one of them, or drop
+                                           the test that needs both:
+                        for jar in $(find target/build -path '*/test-module-*/resolved/*.jar'); do
+                            unzip -Z1 "$jar" '*.class' 2>/dev/null | grep / | grep -v '^META-INF/' \\
+                                | sed "s|/[^/]*$| ${jar##*/}|"
+                        done | sort -u | cut -d' ' -f1 | uniq -d
 
                     The tests then run on the module path, which breaks what read the class path:
 
@@ -1256,8 +1264,10 @@ public record Project(
                           and fails the build on an error, -Werror= making a warning one;
                           excludePackageNames -> -exclude=<package>[:<package>...] there, which
                           leaves those packages and their subpackages undocumented
-                      maven-shade-plugin, Spring Boot repackage / shadow, bootJar
-                          -> launcher=true, one executable jar (08)
+                      maven-shade-plugin / shadow -> launcher=true, one executable jar (08)
+                      Spring Boot repackage / bootJar -> bundle=true, its jars and the argument
+                          file that launches them (10); not launcher=true, whose descriptor at the
+                          jar's root, application.properties, Spring Boot reads as its own
                       maven-assembly-plugin / application, distZip -> bundle=true (10)
                       exec-maven-plugin / application, run -> java build/jenesis/Execute.java
                       maven-jlink-plugin / org.beryx.jlink -> jmod=true, jlink=true (09)
