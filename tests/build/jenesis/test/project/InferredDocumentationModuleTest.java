@@ -68,6 +68,26 @@ public class InferredDocumentationModuleTest {
     }
 
     @Test
+    public void documents_java_sources_that_declare_a_module_as_that_module() throws IOException {
+        Path sources = Files.createDirectories(project.resolve(BuildStep.SOURCES));
+        Files.writeString(sources.resolve("module-info.java"), "module sample {\n    exports sample;\n}\n");
+        Files.writeString(Files.createDirectories(sources.resolve("sample")).resolve("Greeter.java"),
+                "package sample; /** Greets. */ public class Greeter {}");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("doc",
+                new InferredDocumentationChainModule(Map.of(), Map.of("maven", Resolver.identity())),
+                "project");
+        Path javadoc = executor.execute().get("doc/document/aggregate").resolve("javadoc");
+
+        assertThat(javadoc.resolve("sample/module-summary.html"))
+                .as("a module's documentation carries its module page and its packages below its name")
+                .isNotEmptyFile();
+        assertThat(javadoc.resolve("sample/sample/Greeter.html")).isNotEmptyFile();
+    }
+
+    @Test
     public void archives_an_intentionally_empty_javadoc_jar_without_rendering_the_documentation() throws IOException {
         Path sample = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(sample.resolve("Greeter.java"), "package sample; class Greeter {}");

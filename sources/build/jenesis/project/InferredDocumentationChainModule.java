@@ -328,7 +328,7 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                          sourceInputs,
                          outputs,
                          JAVADOC,
-                         javadoc.apply(javadocStep.classpath(true)));
+                         javadoc.apply(javadocStep));
             } else {
                 if (hasJava) {
                     document(buildExecutor,

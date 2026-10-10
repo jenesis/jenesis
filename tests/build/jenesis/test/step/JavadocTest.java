@@ -1,6 +1,7 @@
 package build.jenesis.test.step;
 
 import module java.base;
+import module org.junit.jupiter.api;
 import module org.junit.jupiter.params;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
@@ -130,6 +131,41 @@ public class JavadocTest {
                 .doesNotExist();
     }
 
+    @Test
+    public void an_excluded_package_a_module_exports_is_left_out_of_its_documentation() throws IOException {
+        Path folder = Files.createDirectory(sources.resolve(Javac.SOURCES));
+        Files.writeString(folder.resolve("module-info.java"),
+                "module sample {\n    exports sample;\n    exports sample.internal;\n}\n");
+        Files.writeString(Files.createDirectories(folder.resolve("sample")).resolve("Sample.java"),
+                "package sample; /** Documented. */ public class Sample { }\n");
+        Files.writeString(Files.createDirectories(folder.resolve("sample/internal")).resolve("Hidden.java"),
+                "package sample.internal; /** Hidden. */ public class Hidden { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javadoc.properties"),
+                "-exclude=sample.internal\n");
+        Path classes = Files.createDirectories(sources.resolve(BuildStep.CLASSES));
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(
+                new PrintWriter(Writer.nullWriter()),
+                new PrintWriter(Writer.nullWriter()),
+                "-d",
+                classes.toString(),
+                folder.resolve("module-info.java").toString(),
+                folder.resolve("sample/Sample.java").toString(),
+                folder.resolve("sample/internal/Hidden.java").toString())).isZero();
+
+        BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("module-info.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javadoc.JAVADOC + "sample/sample/Sample.html")).exists();
+        assertThat(next.resolve(Javadoc.JAVADOC + "sample/sample/internal/Hidden.html"))
+                .as("the compiled classes patched into the module keep its exports resolvable without documenting them")
+                .doesNotExist();
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void fails_where_javadoc_reports_an_error(boolean process) throws IOException {
@@ -242,6 +278,46 @@ public class JavadocTest {
                 .contains("--module-path\n\"" + escaped(named))
                 .contains("--class-path\n\"" + escaped(plain))
                 .doesNotContain("--add-reads");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void a_module_reads_its_own_compiled_classes_by_patching_them_into_it(boolean process)
+            throws IOException {
+        Path classes = Files.createDirectories(sources.resolve(BuildStep.CLASSES));
+        Path generated = compile(root.resolve("generated-classes"), "module-info.java", "module sample {\n}\n");
+        Files.copy(generated.resolve("module-info.class"), classes.resolve("module-info.class"));
+        Path helper = compile(root.resolve("helper-classes"), "sample/Helper.java", """
+                package sample;
+                public class Helper { }
+                """);
+        Files.copy(helper.resolve("sample/Helper.class"),
+                Files.createDirectories(classes.resolve("sample")).resolve("Helper.class"));
+        Path folder = Files.createDirectory(sources.resolve(Javac.SOURCES));
+        Files.writeString(folder.resolve("module-info.java"), "module sample {\n    exports sample;\n}\n");
+        Files.writeString(Files.createDirectory(folder.resolve("sample")).resolve("Sample.java"), """
+                package sample;
+                /** Documented. */
+                public class Sample {
+                    /** @return a helper compiled beside the sources. */
+                    public Helper helper() { return null; }
+                }
+                """);
+
+        BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javadoc.JAVADOC + "sample/module-summary.html")).isNotEmptyFile();
+        assertThat(Files.readString(supplement.resolve("javadoc.args")))
+                .as("the documented module's own classes are part of it, not a second module of the same name")
+                .contains("--patch-module\n\"sample=" + escaped(classes))
+                .doesNotContain("--module-path");
     }
 
     @Test

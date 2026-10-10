@@ -1306,7 +1306,9 @@ public record Project(
                       maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (48, 66)
                       maven-javadoc-plugin / withJavadocJar(), Dokka
                           -> -Djenesis.project.documentation=true (48, 66), which documents
-                          the main modules, a test module only under jenesis.stage.tests; javadoc runs with
+                          the main modules, a test module only under jenesis.stage.tests, one with a
+                          module-info.java as that module (module-summary.html, its pages below the
+                          module's name), as maven-javadoc-plugin and Gradle do; javadoc runs with
                           -Xdoclint:none unless process-javadoc.properties names an -Xdoclint flag,
                           and fails the build on an error, -Werror= making a warning one;
                           excludePackageNames -> -exclude=<package>[:<package>...] there, which
