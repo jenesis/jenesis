@@ -4320,6 +4320,48 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void names_a_dependency_a_published_pom_declares_twice_once_and_as_needing_no_action() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>2</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("other", "artifact", "2", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>other</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>2</version>
+                </project>
+                """);
+        List<String> printed = new ArrayList<>();
+        MavenPomResolver resolver = mavenPomResolver.printing(printed::add, Palette.NONE);
+        for (int index = 0; index < 2; index++) {
+            resolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null);
+        }
+        assertThat(printed)
+                .as("a POM read again by every resolution of a build is named once, as one its artifact was published with")
+                .containsExactly("[DUPLICATE] The pom.xml of artifact declares other:artifact:jar twice,"
+                        + " at version 1 and 2: the second declaration replaces the first, as in Maven, which warns as well"
+                        + " - it is the artifact's own published POM, so this needs no action");
+    }
+
+    @Test
     public void local_pom_inherits_the_metadata_of_its_parent_in_the_project_as_maven_does() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
