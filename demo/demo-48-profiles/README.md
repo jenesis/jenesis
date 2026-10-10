@@ -49,11 +49,12 @@ Layout
 
     demo/demo-48-profiles
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
-    |-- pom.xml                          pins commons-lang3
+    |-- project.properties               the version, 1.0.0
     |-- jenesis-release.properties       the release profile (sources + chains to supply-chain)
     |-- jenesis-supply-chain.properties  a profile that enforces strict dependency pinning
     |-- release.args                     the release run as an argument file
     `-- sources
+        |-- module-info.java             requires and pins commons-lang3
         `-- profiles
             `-- Sample.java
 
@@ -103,9 +104,9 @@ the build is configured, by the `main` launcher:
 What the release build produces
 -------------------------------
 
-    target/stage/maven/output/.../profiles-demo/1.0.0/profiles-demo-1.0.0.jar
-    target/stage/maven/output/.../profiles-demo/1.0.0/profiles-demo-1.0.0-cyclonedx.json   (emitted by default)
-    target/stage/maven/output/.../profiles-demo/1.0.0/profiles-demo-1.0.0-sources.jar      (release only)
+    target/stage/maven/output/.../demo.profiles/1.0.0/demo.profiles-1.0.0.jar
+    target/stage/maven/output/.../demo.profiles/1.0.0/demo.profiles-1.0.0-cyclonedx.json   (emitted by default)
+    target/stage/maven/output/.../demo.profiles/1.0.0/demo.profiles-1.0.0-sources.jar      (release only)
 
 The plain build produces the jar and its SBOM (the SBOM is on by default); the
 `release` profile adds the source jar and enforces strict dependency pinning, without
