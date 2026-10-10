@@ -264,7 +264,7 @@ public abstract class ProcessBuildStep implements BuildStep {
         if (strict && findings > 0 && (code != 0 || !judged)) {
             throw new IllegalStateException(found + ", reported in " + report
                     + ", and fails the build on them as jenesis." + setting
-                    + " is set: fix them, or set it to false to report them without failing");
+                    + "=strict: fix them, or set it to warn to report them without failing");
         }
         if (strict && code != 0) {
             return false;

@@ -21,7 +21,7 @@ public class PmdModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-    private static final String STRICT = "source.pmd.strict", PRIORITY = "source.pmd.priority";
+    private static final String SETTING = "source.pmd", PRIORITY = "source.pmd.priority";
     private static final String REPORT = BuildStep.REPORTS + "pmd/pmd-report.xml";
     private static final String MAVEN_GROUP = "net.sourceforge.pmd", MAVEN_ARTIFACT = "pmd-dist";
 
@@ -51,7 +51,7 @@ public class PmdModule implements BuildExecutorModule {
                 null,
                 "pmd",
                 "pmd.xml",
-                environment.flag(STRICT, false),
+                Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
                 environment.number(PRIORITY, 5),
                 ProcessBuildStep.Terms.ofEnvironment(environment, "pmd"));
     }
@@ -163,7 +163,7 @@ public class PmdModule implements BuildExecutorModule {
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path report = context.next().resolve(REPORT);
-            return reported(code, context, report, findings(report, "violation"), true, strict, STRICT);
+            return reported(code, context, report, findings(report, "violation"), true, strict, SETTING);
         }
 
         @Override

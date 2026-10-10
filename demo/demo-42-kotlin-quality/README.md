@@ -44,7 +44,7 @@ detekt runs with `--config detekt.yml`; ktlint receives `.editorconfig` as
 configuration folder it lives in (an `.editorconfig` beside the sources still
 wins for the properties it sets, per editorconfig layering). Both lint the `.kt` sources in parallel with compilation and write an XML
 report under their step's output folder. By default they are report-only;
-`-Djenesis.source.detekt.strict=true` and `-Djenesis.source.ktlint.strict=true`
+`-Djenesis.source.detekt=strict` and `-Djenesis.source.ktlint=strict`
 fail the build on their violations instead, as in the Java code-quality demo.
 
 Formatting: verify, and how to reformat

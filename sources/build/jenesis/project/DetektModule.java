@@ -21,7 +21,7 @@ public class DetektModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-    private static final String STRICT = "source.detekt.strict";
+    private static final String SETTING = "source.detekt";
     private static final String REPORT = BuildStep.REPORTS + "detekt/detekt-report.xml";
     private static final String MAVEN_GROUP = "io.gitlab.arturbosch.detekt", MAVEN_ARTIFACT = "detekt-cli";
 
@@ -49,7 +49,7 @@ public class DetektModule implements BuildExecutorModule {
                 null,
                 "detekt",
                 "detekt.yml",
-                environment.flag(STRICT, false),
+                Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "detekt"));
     }
 
@@ -147,7 +147,7 @@ public class DetektModule implements BuildExecutorModule {
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path report = context.next().resolve(REPORT);
-            return reported(code, context, report, findings(report, "error"), true, strict, STRICT);
+            return reported(code, context, report, findings(report, "error"), true, strict, SETTING);
         }
 
         @Override

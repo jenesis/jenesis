@@ -65,15 +65,16 @@ naming the formatter:
 `formatter=palantir` selects the Palantir formatter instead; without the file, no
 Java formatter runs.
 
-A discovered tool can be switched off without deleting its configuration file by
-setting its property to `false`. By default every property is `true`, so file
-discovery alone decides; the property is an opt-out:
+A discovered tool can be switched off without deleting its configuration file
+through its property, so file discovery alone decides until the property says
+otherwise. A linter's property is `warn` by default, and `ignore` skips it; a
+formatter's is `true` by default, and `false` skips it:
 
     jenesis.source.<tool>        Checkstyle, PMD, Detekt, Ktlint, Scalastyle, Scalafmt, CodeNarc
     jenesis.validator.spotbugs   SpotBugs
     jenesis.format.<tool>        the Java / Ktlint / Scalafmt formatters
 
-For example `-Djenesis.source.checkstyle=false` keeps `checkstyle.xml` in place
+For example `-Djenesis.source.checkstyle=ignore` keeps `checkstyle.xml` in place
 but skips Checkstyle, while PMD and SpotBugs still run.
 
 Per-module configuration
@@ -119,14 +120,10 @@ with the number of findings and where its report is:
     [FINDINGS] checkstyle found 2 findings, reported in target/build/.../checkstyle/check/output/reports/checkstyle/checkstyle-report.xml
 
 `-Djenesis.print.findings=false` leaves that line out. To turn findings into a
-build failure, set the tool's strict switch, on the command line or in
-`jenesis.properties`:
-
-    jenesis.source.<tool>.strict       Checkstyle, PMD, Detekt, Ktlint, Scalastyle, Scalafmt, CodeNarc
-    jenesis.validator.spotbugs.strict  SpotBugs
-
-For example `-Djenesis.source.checkstyle.strict=true` fails the build when
-Checkstyle reports a violation, naming the number of findings and the report.
+build failure, set the tool's property to `strict`, on the command line or in
+`jenesis.properties`. For example `-Djenesis.source.checkstyle=strict` fails the
+build when Checkstyle reports a violation, naming the number of findings and the
+report.
 Checkstyle, PMD, detekt, ktlint, Scalastyle and scalafmt fail as their own exit
 code decides, so a Checkstyle finding at severity `warning` is reported but does
 not fail the build; SpotBugs and CodeNarc fail on any finding their report holds.

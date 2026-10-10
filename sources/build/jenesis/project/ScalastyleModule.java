@@ -21,7 +21,7 @@ public class ScalastyleModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-    private static final String STRICT = "source.scalastyle.strict";
+    private static final String SETTING = "source.scalastyle";
     private static final String REPORT = BuildStep.REPORTS + "scalastyle/scalastyle-report.xml";
     private static final String MAVEN_GROUP = "com.beautiful-scala", MAVEN_ARTIFACT = "scalastyle_2.13";
 
@@ -49,7 +49,7 @@ public class ScalastyleModule implements BuildExecutorModule {
                 null,
                 "scalastyle",
                 "scalastyle-config.xml",
-                environment.flag(STRICT, false),
+                Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "scalastyle"));
     }
 
@@ -147,7 +147,7 @@ public class ScalastyleModule implements BuildExecutorModule {
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path report = context.next().resolve(REPORT);
-            return reported(code, context, report, findings(report, "error"), true, strict, STRICT);
+            return reported(code, context, report, findings(report, "error"), true, strict, SETTING);
         }
 
         @Override

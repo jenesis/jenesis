@@ -114,7 +114,7 @@ public class InferredSourceCodeQualityModuleTest {
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("quality", InferredSourceCodeQualityModule.ofEnvironment(new Environment(Map.of("source.checkstyle", "false")),
+        executor.addModule("quality", InferredSourceCodeQualityModule.ofEnvironment(new Environment(Map.of("source.checkstyle", "ignore")),
                 new LinkedHashSet<>(List.of(project)),
                 Map.of(),
                 Map.of()), "project");
@@ -126,9 +126,21 @@ public class InferredSourceCodeQualityModuleTest {
     }
 
     @Test
+    public void refuses_a_setting_that_is_neither_ignore_warn_nor_strict() {
+        assertThatThrownBy(() -> InferredSourceCodeQualityModule.ofEnvironment(
+                new Environment(Map.of("source.checkstyle", "false")),
+                new LinkedHashSet<>(List.of(project)),
+                Map.of(),
+                Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.source.checkstyle 'false'")
+                .hasMessageContaining("ignore, warn, strict");
+    }
+
+    @Test
     public void wires_every_tool_when_it_is_given_no_provider() throws IOException {
         Files.writeString(project.resolve("checkstyle.xml"), "<module name=\"Checker\"/>");
-        settings.put("source.checkstyle", "false");
+        settings.put("source.checkstyle", "ignore");
         try {
             BuildExecutor executor = newExecutor();
             executor.addSource("project", project);
