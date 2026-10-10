@@ -222,7 +222,7 @@ public class Launcher implements BuildStep {
             throws IOException {
         try (JarFile jar = new JarFile(file.toFile())) {
             for (JarEntry entry : (Iterable<JarEntry>) jar.stream()::iterator) {
-                if (entry.isDirectory() || !include.test(entry.getName())) {
+                if (!include.test(entry.getName())) {
                     continue;
                 }
                 JarEntry copy = new JarEntry(prefix + entry.getName());
