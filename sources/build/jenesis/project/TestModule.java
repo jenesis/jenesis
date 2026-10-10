@@ -1327,9 +1327,10 @@ public class TestModule implements BuildExecutorModule {
                 return CompletableFuture.completedFuture(null);
             } else if (matchedClasses.isEmpty() && matchedMethods.isEmpty() && tags.all()) {
                 String unmatched = "among the " + compiled.get() + " classes compiled"
-                        + (compiledFrom == null ? "" : " from " + compiledFrom + ", the one folder compiled for"
-                                + " these tests, so tests kept in another one, such as src/test/groovy, need it named"
-                                + " as the test sources, by testSourceDirectory in a pom.xml");
+                        + (compiledFrom == null ? "" : " from " + compiledFrom + ", the folder compiled for"
+                                + " these tests beside src/test/kotlin and src/test/groovy of a pom.xml, so tests kept"
+                                + " in another one need it named as the test sources, by testSourceDirectory in a"
+                                + " pom.xml");
                 if (!specs.isEmpty()) {
                     throw new IllegalStateException("No tests matched the requested selection, filter: " + filter
                             + ", " + unmatched

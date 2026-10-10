@@ -937,9 +937,10 @@ public record Project(
                                  module's own POM, and all of them but the name from its parents,
                                  local or fetched, where it declares none;
                                  sourceDirectory, testSourceDirectory and the <directory> of each
-                                 resource, a local parent's where the module names none - one
-                                 folder per scope, so .groovy tests in src/test/groovy are found
-                                 once testSourceDirectory names it; the <!--jenesis.plugin--> and
+                                 resource, a local parent's where the module names none, and
+                                 beside them src/main/kotlin, src/test/kotlin, src/main/groovy and
+                                 src/test/groovy where they exist, as the Kotlin and GMavenPlus
+                                 plugins read them by default; the <!--jenesis.plugin--> and
                                  <!--jenesis.alias--> comments of the module's POM and of a local
                                  parent; the <!--jenesis.pin--> comment of the module's own POM,
                                  where `pin` writes it, and never a parent's;
