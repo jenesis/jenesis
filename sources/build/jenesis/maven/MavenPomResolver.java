@@ -41,22 +41,19 @@ public class MavenPomResolver implements MavenResolver {
     }
 
     public static MavenPomResolver ofEnvironment(Environment environment) {
-        String property = environment.getProperty("resolver.maven");
-        MavenPomResolver resolver = property == null
-                ? new MavenPomResolver()
-                : new MavenPomResolver(switch (property.toLowerCase(Locale.ROOT)) {
-                    case "maven" -> MavenDefaultVersionNegotiator.maven();
-                    case "latest" -> MavenDefaultVersionNegotiator.latest();
-                    case "release" -> MavenDefaultVersionNegotiator.release();
-                    case "stable" -> MavenDefaultVersionNegotiator.stable();
-                    case "closest" -> MavenDefaultVersionNegotiator.closest();
-                    case "fail" -> MavenDefaultVersionNegotiator.fail();
-                    case "managed" -> MavenDefaultVersionNegotiator.managed();
-                    default -> throw new IllegalArgumentException("Unknown jenesis.resolver.maven '"
-                            + property
-                            + "', expected one of: maven, latest, release, stable, closest, fail, managed");
-                });
-        return resolver.printing(environment.flag("print.progress", true) ? environment.out() : null,
+        String property = environment.value("resolver.maven", "maven");
+        return new MavenPomResolver(switch (property.toLowerCase(Locale.ROOT)) {
+            case "maven" -> MavenDefaultVersionNegotiator.maven();
+            case "latest" -> MavenDefaultVersionNegotiator.latest();
+            case "release" -> MavenDefaultVersionNegotiator.release();
+            case "stable" -> MavenDefaultVersionNegotiator.stable();
+            case "closest" -> MavenDefaultVersionNegotiator.closest();
+            case "fail" -> MavenDefaultVersionNegotiator.fail();
+            case "managed" -> MavenDefaultVersionNegotiator.managed();
+            default -> throw new IllegalArgumentException("Unknown jenesis.resolver.maven '"
+                    + property
+                    + "', expected one of: maven, latest, release, stable, closest, fail, managed");
+        }).printing(environment.flag("print.progress", true) ? environment.out() : null,
                 Palette.ofEnvironment(environment));
     }
 
