@@ -9,9 +9,9 @@ import module java.base;
  * The launcher target (selected by a {@code launcher=true} packaging.properties)
  * resolves {@code build.jenesis:build.jenesis.launcher} from Maven Central and shades
  * it into an executable jar: the launcher's classes sit in the jar root as its
- * {@code Main-Class}, every dependency is exploded into its own {@code classpath/<name>/}
- * or {@code modulepath/<name>/} subfolder, and {@code application.properties} names the
- * entry point - so {@code java -jar foo.jar} reconstructs the module graph and runs the
+ * {@code Main-Class}, every dependency is exploded into its own {@code jars/<name>/}
+ * subfolder, and {@code META-INF/jenesis/application.properties} names the entry point
+ * and which of those jars each path holds - so {@code java -jar foo.jar} reconstructs the module graph and runs the
  * application while keeping full modularity.
  *
  *     java build/DemoLauncher.java Ada Lovelace
