@@ -35,6 +35,7 @@ public class MavenPomResolver implements MavenResolver {
     private final String jdk, osName, osArch, osVersion;
     private final transient Consumer<String> printing;
     private final transient Palette palette;
+    private final transient Set<String> printed;
     private final transient DocumentBuilderFactory factory = MavenDefaultVersionNegotiator.toDocumentBuilderFactory(false);
 
     public MavenPomResolver() {
@@ -65,7 +66,8 @@ public class MavenPomResolver implements MavenResolver {
                 System.getProperty("os.arch"),
                 System.getProperty("os.version"),
                 null,
-                Palette.NONE);
+                Palette.NONE,
+                ConcurrentHashMap.newKeySet());
     }
 
     private MavenPomResolver(Supplier<MavenVersionNegotiator> negotiatorSupplier,
@@ -74,7 +76,8 @@ public class MavenPomResolver implements MavenResolver {
                              String osArch,
                              String osVersion,
                              Consumer<String> printing,
-                             Palette palette) {
+                             Palette palette,
+                             Set<String> printed) {
         this.negotiatorSupplier = negotiatorSupplier;
         this.jdk = jdk;
         this.osName = osName.toLowerCase(Locale.ENGLISH);
@@ -82,18 +85,26 @@ public class MavenPomResolver implements MavenResolver {
         this.osVersion = osVersion.toLowerCase(Locale.ENGLISH);
         this.printing = printing;
         this.palette = palette;
+        this.printed = printed;
     }
 
     public MavenPomResolver jdk(String jdk) {
-        return new MavenPomResolver(negotiatorSupplier, jdk, osName, osArch, osVersion, printing, palette);
+        return new MavenPomResolver(negotiatorSupplier, jdk, osName, osArch, osVersion, printing, palette, printed);
     }
 
     public MavenPomResolver os(String osName, String osArch, String osVersion) {
-        return new MavenPomResolver(negotiatorSupplier, jdk, osName, osArch, osVersion, printing, palette);
+        return new MavenPomResolver(negotiatorSupplier, jdk, osName, osArch, osVersion, printing, palette, printed);
     }
 
     public MavenPomResolver printing(Consumer<String> printing, Palette palette) {
-        return new MavenPomResolver(negotiatorSupplier, jdk, osName, osArch, osVersion, printing, palette);
+        return new MavenPomResolver(negotiatorSupplier,
+                jdk,
+                osName,
+                osArch,
+                osVersion,
+                printing,
+                palette,
+                ConcurrentHashMap.newKeySet());
     }
 
     @Override
@@ -467,7 +478,7 @@ public class MavenPomResolver implements MavenResolver {
                 if (!target.equals(origin)) {
                     dependencies.remove(origin);
                     if (printing != null) {
-                        printing.accept("%s%-11s%s %s:%s:%s is relocated to %s:%s:%s, which is resolved in its place"
+                        print("%s%-11s%s %s:%s:%s is relocated to %s:%s:%s, which is resolved in its place"
                                 .formatted(palette.warning(),
                                         "[RELOCATED]",
                                         palette.reset(),
@@ -1008,9 +1019,12 @@ public class MavenPomResolver implements MavenResolver {
                             toElements(declarations, "dependency").map(node -> toDependency(node, false)).forEach(entry -> {
                                 DependencyValue previous = listed.put(entry.getKey(), entry.getValue());
                                 if (previous != null && path != null && printing != null) {
-                                    printing.accept(("%s%-11s%s The pom.xml of %s declares %s:%s:%s%s twice, at version %s"
+                                    print(("%s%-11s%s The pom.xml of %s declares %s:%s:%s%s twice, at version %s"
                                             + " and %s: the second declaration replaces the first, as in Maven, which warns"
-                                            + " as well - remove one")
+                                            + (trusted
+                                                    ? " as well - remove one"
+                                                    : " as well - it is the artifact's own published POM, so this"
+                                                            + " needs no action"))
                                             .formatted(palette.warning(),
                                                     "[DUPLICATE]",
                                                     palette.reset(),
@@ -1770,6 +1784,12 @@ public class MavenPomResolver implements MavenResolver {
                 management.apply("issueManagement"),
                 management.apply("ciManagement"),
                 toElementText(node, "inceptionYear").orElse(null));
+    }
+
+    private void print(String line) {
+        if (printed.add(line)) {
+            printing.accept(line);
+        }
     }
 
     private static SequencedMap<String, String> inherited(SequencedMap<String, String> own,
