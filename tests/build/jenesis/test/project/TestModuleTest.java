@@ -1210,6 +1210,59 @@ public class TestModuleTest {
     }
 
     @Test
+    public void resolves_the_closure_of_tests_on_the_class_path_where_two_jars_carry_one_module_name() throws IOException {
+        Path repository = Files.createDirectory(root.resolve("repository"));
+        for (String artifact : List.of("lib", "lib-native")) {
+            Path folder = repository.resolve("org/example/" + artifact + "/1.0");
+            writeModuleJar(folder, artifact + "-1.0.jar", "lib.shared", "1.0");
+            Files.writeString(folder.resolve(artifact + "-1.0.pom"), """
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <groupId>org.example</groupId>
+                        <artifactId>%s</artifactId>
+                        <version>1.0</version>
+                    </project>
+                    """.formatted(artifact));
+        }
+        Path console = repository.resolve("org/junit/platform/junit-platform-console/1.0");
+        writeModuleJar(console, "junit-platform-console-1.0.jar", "org.junit.platform.console", "1.0");
+        Files.writeString(console.resolve("junit-platform-console-1.0.pom"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.junit.platform</groupId>
+                    <artifactId>junit-platform-console</artifactId>
+                    <version>1.0</version>
+                </project>
+                """);
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/runtime/maven/org.example/lib/1.0", "");
+        requires.setProperty("main/runtime/maven/org.example/lib-native/1.0", "");
+        requires.store(emptyDependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("main/maven/org.junit.platform/junit-platform-console", "1.0");
+        versions.store(emptyDependencies.resolve(BuildStep.VERSIONS));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", emptyDependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                                Map.of("maven", new MavenDefaultRepository(repository.toUri(), repository, Map.of(), null)),
+                                Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnitPlatform())
+                        .pathPlacement(PathPlacement.CLASS_PATH)
+                        .isTest(candidate -> candidate.endsWith("TestSample"))
+                        .jarsOnly(false)
+                        .skip(true),
+                "dependencies", "classes");
+
+        SequencedMap<String, Path> outputs = executor.execute();
+
+        assertThat(outputs.get("test/artifacts").resolve(BuildStep.DEPENDENCIES))
+                .as("tests on the class path load both jars, as Maven's would, so no module name settles one of them")
+                .content()
+                .contains("maven/org.example/lib/1.0", "maven/org.example/lib-native/1.0");
+    }
+
+    @Test
     public void requires_step_emits_runner_coordinate_when_missing() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", emptyDependencies);
