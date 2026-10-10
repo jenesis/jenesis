@@ -4161,6 +4161,43 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void names_a_dependency_a_local_pom_declares_twice_and_keeps_the_second_as_maven_does() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>project</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>2</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        List<String> printed = new ArrayList<>();
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver
+                .printing(printed::add, Palette.NONE)
+                .local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).dependencies())
+                .as("the second declaration replaces the first, as in Maven")
+                .containsExactly(Map.entry(new MavenDependencyKey("group", "artifact", "jar", null),
+                        new MavenDependencyValue("2", MavenDependencyScope.TEST, null, null, null)));
+        assertThat(printed).containsExactly("[DUPLICATE] The pom.xml of project declares group:artifact:jar twice,"
+                + " at version 1 and 2: the second declaration replaces the first, as in Maven, which warns as well"
+                + " - remove one");
+    }
+
+    @Test
     public void local_pom_inherits_the_metadata_of_its_parent_in_the_project_as_maven_does() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

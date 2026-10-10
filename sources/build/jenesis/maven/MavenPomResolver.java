@@ -985,9 +985,28 @@ public class MavenPomResolver implements MavenResolver {
                 SequencedMap<DependencyKey, DependencyValue> declaredDependencies = new LinkedHashMap<>();
                 models.stream()
                         .flatMap(model -> toElements(model, "dependencies").limit(1))
-                        .flatMap(node -> toElements(node, "dependency"))
-                        .map(node -> toDependency(node, false))
-                        .forEach(entry -> declaredDependencies.put(entry.getKey(), entry.getValue()));
+                        .forEach(declarations -> {
+                            SequencedMap<DependencyKey, DependencyValue> listed = new LinkedHashMap<>();
+                            toElements(declarations, "dependency").map(node -> toDependency(node, false)).forEach(entry -> {
+                                DependencyValue previous = listed.put(entry.getKey(), entry.getValue());
+                                if (previous != null && path != null && printing != null) {
+                                    printing.accept(("%s%-11s%s The pom.xml of %s declares %s:%s:%s%s twice, at version %s"
+                                            + " and %s: the second declaration replaces the first, as in Maven, which warns"
+                                            + " as well - remove one")
+                                            .formatted(palette.warning(),
+                                                    "[DUPLICATE]",
+                                                    palette.reset(),
+                                                    toElementText(document.getDocumentElement(), "artifactId").orElse(""),
+                                                    entry.getKey().groupId(),
+                                                    entry.getKey().artifactId(),
+                                                    entry.getKey().type() == null ? "jar" : entry.getKey().type(),
+                                                    entry.getKey().classifier() == null ? "" : ":" + entry.getKey().classifier(),
+                                                    previous.version() == null ? "none" : previous.version(),
+                                                    entry.getValue().version() == null ? "none" : entry.getValue().version()));
+                                }
+                            });
+                            declaredDependencies.putAll(listed);
+                        });
                 declaredDependencies.forEach(dependencies::putLast);
                 Node build = extended || trusted && path != null
                         ? toElements(document.getDocumentElement(), "build").findFirst().orElse(null)
