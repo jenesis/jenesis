@@ -21,7 +21,7 @@ public class KtlintModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-    private static final String STRICT = "source.ktlint.strict";
+    private static final String SETTING = "source.ktlint";
     private static final String REPORT = BuildStep.REPORTS + "ktlint/ktlint-report.xml";
     private static final String MAVEN_GROUP = "com.pinterest.ktlint", MAVEN_ARTIFACT = "ktlint-cli";
 
@@ -46,7 +46,7 @@ public class KtlintModule implements BuildExecutorModule {
         return new KtlintModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "ktlint",
-                environment.flag(STRICT, false),
+                Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "ktlint"));
     }
 
@@ -135,7 +135,7 @@ public class KtlintModule implements BuildExecutorModule {
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path report = context.next().resolve(REPORT);
-            return reported(code, context, report, findings(report, "error"), true, strict, STRICT);
+            return reported(code, context, report, findings(report, "error"), true, strict, SETTING);
         }
 
         @Override

@@ -20,7 +20,7 @@ public class SpotBugsModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-    private static final String STRICT = "validator.spotbugs.strict";
+    private static final String SETTING = "validator.spotbugs";
     private static final String REPORT = BuildStep.REPORTS + "spotbugs/spotbugs-report.xml";
     private static final String MAVEN_GROUP = "com.github.spotbugs", MAVEN_ARTIFACT = "spotbugs";
 
@@ -51,7 +51,7 @@ public class SpotBugsModule implements BuildExecutorModule {
                 "spotbugs",
                 "main",
                 "spotbugs-exclude.xml",
-                environment.flag(STRICT, false),
+                Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "spotbugs"));
     }
 
@@ -158,7 +158,7 @@ public class SpotBugsModule implements BuildExecutorModule {
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path report = context.next().resolve(REPORT);
-            return reported(code, context, report, findings(report, "BugInstance"), false, strict, STRICT);
+            return reported(code, context, report, findings(report, "BugInstance"), false, strict, SETTING);
         }
 
         @Override

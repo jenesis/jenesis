@@ -40,9 +40,8 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 SpotBugsModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
                 Collections.emptyNavigableMap());
-        Boolean spotbugs = environment.flagOrNull("validator.spotbugs");
-        if (spotbugs != null) {
-            module = module.spotbugs(spotbugs ? value -> value : null);
+        if (Enforcement.ofEnvironment(environment, "validator.spotbugs") == Enforcement.IGNORE) {
+            module = module.spotbugs(null);
         }
         return module;
     }

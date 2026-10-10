@@ -21,7 +21,7 @@ public class CodeNarcModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-    private static final String STRICT = "source.codenarc.strict";
+    private static final String SETTING = "source.codenarc";
     private static final String REPORT = BuildStep.REPORTS + "codenarc/codenarc-report.xml";
 
     private final Dependencies dependencies;
@@ -48,7 +48,7 @@ public class CodeNarcModule implements BuildExecutorModule {
                 null,
                 "codenarc",
                 "codenarc.xml",
-                environment.flag(STRICT, false),
+                Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "codenarc"));
     }
 
@@ -148,7 +148,7 @@ public class CodeNarcModule implements BuildExecutorModule {
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path report = context.next().resolve(REPORT);
-            return reported(code, context, report, findings(report, "Violation"), false, strict, STRICT);
+            return reported(code, context, report, findings(report, "Violation"), false, strict, SETTING);
         }
 
         @Override

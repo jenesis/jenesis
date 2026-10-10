@@ -41,8 +41,8 @@ Scalastyle runs with `-c scalastyle-config.xml`; scalafmt runs against
 compilation and write a report under their step's output folder. The
 `.scalafmt.conf` pins the formatter's own `version`, so the formatting is
 reproducible no matter which scalafmt release resolves. Both linters are
-report-only by default; `-Djenesis.source.scalastyle.strict=true` and
-`-Djenesis.source.scalafmt.strict=true` fail the build on their findings instead,
+report-only by default; `-Djenesis.source.scalastyle=strict` and
+`-Djenesis.source.scalafmt=strict` fail the build on their findings instead,
 as in the Java code-quality demo.
 
 Formatting: verify, and how to reformat
