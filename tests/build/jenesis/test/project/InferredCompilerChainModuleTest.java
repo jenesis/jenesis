@@ -312,6 +312,34 @@ public class InferredCompilerChainModuleTest {
     }
 
     @Test
+    public void javac_runs_in_a_process_of_its_own_when_the_process_factory_is_fork() throws IOException {
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("OnlyJava.java"), "package sample; public class OnlyJava { }\n");
+        Path process = Files.createDirectories(project.resolve("process"));
+        Files.writeString(process.resolve("javac.properties"), "-J-Xss4M=\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "chain",
+                InferredCompilerChainModule.ofEnvironment(
+                        new Environment(Map.of("process.factory", "fork")),
+                        Collections.emptyNavigableSet(),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
+                "project");
+        executor.execute();
+
+        assertThat(chainCompile()
+                .resolve(InferredCompilerChainModule.JAVAC)
+                .resolve("output")
+                .resolve(BuildStep.CLASSES)
+                .resolve("sample/OnlyJava.class"))
+                .as("a -J option reaches only a forked javac, which the process factory selects")
+                .isNotEmptyFile();
+    }
+
+    @Test
     public void javac_copies_no_file_beside_the_sources_when_resources_are_not_included() throws IOException {
         Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(sampleDir.resolve("OnlyJava.java"), "package sample; public class OnlyJava { }\n");

@@ -70,7 +70,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 value -> value,
                 value -> value,
                 null,
-                Jar.ofEnvironment(environment, ProcessHandler.Factory.of(), Jar.Sort.CLASSES).asModule("jar"),
+                Jar.ofEnvironment(environment, ProcessHandler.Factory.ofEnvironment(environment), Jar.Sort.CLASSES).asModule("jar"),
                 step -> step.configured() ? step : null,
                 value -> value,
                 Collections.emptyNavigableMap());
