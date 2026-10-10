@@ -267,14 +267,14 @@ public class MavenProject implements BuildExecutorModule {
                             active = true;
                         }
                         int index = 0;
+                        Set<Path> directories = new HashSet<>();
                         for (int resourceIndex = 0; ; resourceIndex++) {
                             String resource = properties.getProperty("resources." + resourceIndex);
                             if (resource == null) {
                                 break;
                             }
-                            Path resources = base.resolve(resource);
-                            if (Files.exists(resources)) {
-                                Path directory = resources.toAbsolutePath().normalize();
+                            Path resources = base.resolve(resource), directory = resources.toAbsolutePath().normalize();
+                            if (Files.exists(resources) && directories.add(directory)) {
                                 for (Path owned : List.of(paths.get(PREVIOUS + PREPARE), root.resolve(".jenesis"))) {
                                     Path normalized = owned.toAbsolutePath().normalize();
                                     if (normalized.startsWith(directory)) {
