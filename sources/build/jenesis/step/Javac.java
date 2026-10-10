@@ -439,6 +439,14 @@ public class Javac extends ProcessBuildStep {
                 || SOURCE_OPTIONS.contains(option)
                 || TARGET_OPTIONS.contains(option)));
         List<String> prepended = prepended(properties);
+        SequencedMap<String, SequencedMap<String, String>> unprocessed = new LinkedHashMap<>();
+        properties.forEach((folder, options) -> {
+            SequencedMap<String, String> kept = new LinkedHashMap<>(options);
+            kept.keySet().removeIf(option -> option.startsWith("-A") || option.startsWith("-proc:"));
+            unprocessed.put(folder, kept);
+        });
+        List<String> descriptorOptions = new ArrayList<>(prepended(unprocessed));
+        descriptorOptions.add("-proc:none");
         boolean sourceAndTarget = named || namesSystemModule(prepended);
         Path mainTarget = context.next().resolve(CLASSES);
         Path moduleInfo = mainTarget.resolve("module-info.class");
@@ -460,7 +468,9 @@ public class Javac extends ProcessBuildStep {
                 try {
                     return runVersioned(executor,
                             context,
-                            prepended,
+                            files.stream().allMatch(file -> Path.of(file).getFileName().toString().equals("module-info.java"))
+                                    ? descriptorOptions
+                                    : prepended,
                             sourceAndTarget,
                             dependencyPath,
                             processorPath,

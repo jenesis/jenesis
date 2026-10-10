@@ -574,6 +574,67 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void compiles_an_overlay_descriptor_without_the_processor_options_of_the_main_compilation(boolean process)
+            throws IOException {
+        Path main = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(main.resolve("Marked.java"), "package sample; public @interface Marked { }\n");
+        Files.writeString(main.resolve("Sample.java"), "package sample; @Marked public class Sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/17"))
+                .resolve("module-info.java"), "module sample { exports sample; }\n");
+        Javac.writeRelease(sources, "11", Runtime.version().feature());
+        SequencedProperties javac = SequencedProperties.ofFiles(sources.resolve("process/javac.properties"));
+        javac.setProperty("-Werror", "");
+        javac.setProperty("-Aclaimed=yes", "");
+        javac.store(sources.resolve("process/javac.properties"));
+        Path classes = compile(root.resolve("claiming").resolve("classes"), "claiming/Claiming.java", """
+                package claiming;
+                import javax.annotation.processing.AbstractProcessor;
+                import javax.annotation.processing.RoundEnvironment;
+                import javax.annotation.processing.SupportedAnnotationTypes;
+                import javax.annotation.processing.SupportedOptions;
+                import javax.lang.model.SourceVersion;
+                import javax.lang.model.element.TypeElement;
+                import java.util.Set;
+                @SupportedAnnotationTypes("sample.Marked")
+                @SupportedOptions("claimed")
+                public class Claiming extends AbstractProcessor {
+                    public SourceVersion getSupportedSourceVersion() { return SourceVersion.latestSupported(); }
+                    public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+                        return false;
+                    }
+                }
+                """);
+        Files.writeString(Files.createDirectories(classes.resolve("META-INF/services"))
+                .resolve("javax.annotation.processing.Processor"), "claiming.Claiming\n");
+        Path processorRoot = Files.createDirectories(root.resolve("processor"));
+        jarOf(Files.createDirectories(processorRoot.resolve("resolved")).resolve("processor.jar"), classes);
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("plugin/plugin/maven/processor", "resolved/processor.jar");
+        index.store(processorRoot.resolve(BuildStep.DEPENDENCIES));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/Marked.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/META-INF/versions/17/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("processors/artifacts", new BuildStepArgument(processorRoot,
+                Map.of(Path.of("resolved/processor.jar"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .pathPlacement(PathPlacement.CLASS_PATH)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "META-INF/versions/17/module-info.class"))
+                .as("a descriptor alone is compiled without processing, so no processor is left to claim -Aclaimed under -Werror")
+                .isNotEmptyFile();
+        assertThat(Files.readString(supplement.resolve("command-17")))
+                .contains("-proc:none")
+                .doesNotContain("-Aclaimed");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void versioned_compilation_mixes_overlay_and_additional_files(boolean process) throws IOException {
         Path main = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(main.resolve("Sample.java"), """
