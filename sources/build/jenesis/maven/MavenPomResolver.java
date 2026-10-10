@@ -692,13 +692,13 @@ public class MavenPomResolver implements MavenResolver {
                     property(pom.packaging(), pom.properties()),
                     release,
                     testRelease == null ? release : testRelease,
-                    property(pom.sourceDirectory(), pom.properties()),
+                    directory(pom.sourceDirectory(), pom.properties()),
                     pom.resourceDirectories() == null ? null : pom.resourceDirectories().stream()
-                            .map(resource -> property(resource, pom.properties()))
+                            .map(resource -> directory(resource, pom.properties()))
                             .toList(),
-                    property(pom.testSourceDirectory(), pom.properties()),
+                    directory(pom.testSourceDirectory(), pom.properties()),
                     pom.testResourceDirectories() == null ? null : pom.testResourceDirectories().stream()
-                            .map(resource -> property(resource, pom.properties()))
+                            .map(resource -> directory(resource, pom.properties()))
                             .toList(),
                     dependencies,
                     managedDependencies,
@@ -1867,6 +1867,13 @@ public class MavenPomResolver implements MavenResolver {
 
     private static String property(String text, Map<String, String> properties) {
         return property(text, properties, Set.of());
+    }
+
+    private static String directory(String text, Map<String, String> properties) {
+        Map<String, String> located = new HashMap<>(properties);
+        located.put("basedir", ".");
+        located.put("project.basedir", ".");
+        return property(text, located);
     }
 
     private static String property(String text, Map<String, String> properties, Set<String> previous) {

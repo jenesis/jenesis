@@ -1327,6 +1327,72 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void resolves_the_basedir_of_an_inherited_resource_directory_in_the_inheriting_module() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <build>
+                       <resources>
+                         <resource>
+                           <directory>${project.basedir}/src/main/resources</directory>
+                         </resource>
+                         <resource>
+                           <directory>${basedir}/src/main/missing</directory>
+                         </resource>
+                       </resources>
+                    </build>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("child")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                        <maven.compiler.release>21</maven.compiler.release>
+                    </properties>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("child/src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("child/src/main/resources")).resolve("resource"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        List<String> printed = new ArrayList<>();
+        executor.addModule("maven", MavenProject.ofEnvironment(new Environment(Map.of("palette.colors", "none")).out(printed::add),
+                project,
+                "maven",
+                mavenRepository,
+                mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results.get("maven/module-child/resources-1").resolve(BuildStep.RESOURCES + "resource"))
+                .as("Maven interpolates project.basedir in the module that inherits the resource directory")
+                .content()
+                .isEqualTo("bar");
+        assertThat(printed).contains("[RESOURCES] " + Path.of("child", "pom.xml")
+                + " names the resource directory ./src/main/missing, which does not exist beside it, so it adds no resources");
+    }
+
+    @Test
     public void refuses_a_resource_directory_that_contains_the_build_output() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

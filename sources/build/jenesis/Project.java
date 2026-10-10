@@ -923,6 +923,8 @@ public record Project(
                     repositories before deleting anything: each needs an answer in step 4. A
                     resource directory is copied whole, so one that holds target/ or .jenesis/,
                     as ./ does, fails the build and its file moves to jenesis.project.resources.
+                    ${project.basedir} in an inherited directory is the inheriting module's folder,
+                    as in Maven, and a named directory that does not exist gets a [RESOURCES] line.
                     A source directory gives the jar only what its compilers read - .java, .kt,
                     .scala, .groovy - as Maven's does, so a template beside the sources stays
                     out of it, and a file that must ship moves to a resource directory.
