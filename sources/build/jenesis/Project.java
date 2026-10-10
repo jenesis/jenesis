@@ -1535,7 +1535,8 @@ public record Project(
                           applies only to a consumer that resolves that target. MAVEN modules declare
                           the same lines in a project-level <!--jenesis.alias <module>
                           <groupId>/<artifactId>--> comment, a local parent's included, which names
-                          the jar for a module-info.java the build compiles in META-INF/versions/<N>.
+                          the jar for a module-info.java the build compiles in META-INF/versions/<N>;
+                          one naming a dependency of test scope reaches the tests alone.
                       @jenesis.exclude <module> <groupId>/<artifactId>...
                           Drop transitive dependencies of <module>, each with the subtree it pulled
                           in, from the compile path, runtime path and generated pom alike. Repeated

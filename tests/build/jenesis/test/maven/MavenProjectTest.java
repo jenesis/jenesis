@@ -530,6 +530,48 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void a_module_alias_of_a_test_dependency_reaches_only_the_test_module() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.alias truth com.google.truth/truth-->
+                    <!--jenesis.alias jline jline/jline-->
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.truth</groupId>
+                            <artifactId>truth</artifactId>
+                            <version>1.4.5</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.ALIASES)))
+                .as("the main module does not resolve a test dependency, so an alias of one is no alias of it")
+                .containsOnly(Map.entry("main/module/jline", "jline/jline"));
+        assertThat(SequencedProperties.ofFiles(results.get("maven/test-module-/manifests").resolve(BuildStep.ALIASES)))
+                .containsOnly(Map.entry("main/module/truth", "com.google.truth/truth"),
+                        Map.entry("main/module/jline", "jline/jline"));
+    }
+
+    @Test
     public void test_scoped_attach_is_routed_to_test_module_only() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
