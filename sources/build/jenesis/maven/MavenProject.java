@@ -783,12 +783,21 @@ public class MavenProject implements BuildExecutorModule {
                 }
                 if (value.dependencies() != null) {
                     for (Map.Entry<MavenDependencyKey, MavenDependencyValue> dependency : value.dependencies().entrySet()) {
-                        String property = unresolved(dependency.getValue().version());
-                        if (property != null) {
-                            throw new IllegalArgumentException("The version " + dependency.getValue().version()
-                                    + " of the dependency " + dependency.getKey().groupId() + ":"
-                                    + dependency.getKey().artifactId() + " in " + pomFile + " names the property "
-                                    + property + ", which no pom.xml defines: define it in the pom.xml");
+                        MavenDependencyKey key = dependency.getKey();
+                        SequencedMap<String, String> components = new LinkedHashMap<>();
+                        components.put("groupId", key.groupId());
+                        components.put("artifactId", key.artifactId());
+                        components.put("type", key.type());
+                        components.put("classifier", key.classifier());
+                        components.put("version", dependency.getValue().version());
+                        for (Map.Entry<String, String> component : components.entrySet()) {
+                            String property = unresolved(component.getValue());
+                            if (property != null) {
+                                throw new IllegalArgumentException("The " + component.getKey() + " "
+                                        + component.getValue() + " of the dependency " + key.groupId() + ":"
+                                        + key.artifactId() + " in " + pomFile + " names the property " + property
+                                        + ", which no pom.xml defines: define it in the pom.xml");
+                            }
                         }
                     }
                 }
@@ -832,8 +841,8 @@ public class MavenProject implements BuildExecutorModule {
             return versioned;
         }
 
-        private static String unresolved(String version) {
-            Matcher matcher = UNRESOLVED.matcher(version == null ? "" : version);
+        private static String unresolved(String text) {
+            Matcher matcher = UNRESOLVED.matcher(text == null ? "" : text);
             return matcher.find() ? matcher.group(1) : null;
         }
 
