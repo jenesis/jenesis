@@ -1376,8 +1376,9 @@ public record Project(
                           setting on the command line
                       deploy to Maven Central, central-publishing, maven-gpg-plugin / maven-publish
                           to Central, signing
-                          -> `release` with a jreleaser.yml, handed JRELEASER_PROJECT_VERSION: the
-                          version setting, or the version every staged POM carries (66). JReleaser
+                          -> `release` with a jreleaser.yml, handed JRELEASER_PROJECT_VERSION from
+                          jenesis.project.version, which a pom.xml build sets for a release whose
+                          configuration names no version (66). JReleaser
                           is not resolved like the other tools but run as the `jreleaser` program
                           on the PATH, or the one jenesis.jreleaser.executable names, so it is
                           installed apart from the build. It runs with --dry-run, publishing

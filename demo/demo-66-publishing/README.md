@@ -270,15 +270,15 @@ was uploaded. It is environmental setup, like the JDK or `git`.
 
 The goal also contributes one thing to a release run by somebody else. Its
 `release/jreleaser/environment` step writes a `jreleaser.properties` carrying
-`JRELEASER_PROJECT_VERSION`, the version this build stamped - `jenesis.project.version`,
-or where no setting names one, the version every staged POM carries, as a `pom.xml`
-build declares it in `<version>` - which a configuration
+`JRELEASER_PROJECT_VERSION`, the version `jenesis.project.version` stamped, which a configuration
 picks up with a single `environment: { variables: ... }` line - so the version is
 stated once, by the build, instead of being passed separately to the build and to
 the release tool and drifting. That step runs no process and has no side effect,
 which makes it safe for a CI job that then hands off to a dedicated release action.
 Note it only applies to a configuration that leaves `project.version` unset: a
 version written in the `jreleaser.yml` wins outright and the file is ignored.
+The build infers no version of its own: a `pom.xml` build whose configuration names
+none releases with `-Djenesis.project.version` naming the version it publishes.
 
 For a release driven by CI, prefer a dedicated release step where your platform
 offers one - JReleaser's own GitHub Action pins the tool version and wires the
