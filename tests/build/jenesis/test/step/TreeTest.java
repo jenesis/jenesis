@@ -333,7 +333,7 @@ public class TreeTest {
 
     @Test
     public void leaves_a_group_the_build_resolves_for_itself_out_of_the_module_tree() throws IOException {
-        List<String> printed = tooled(Map.of());
+        List<String> printed = tooled(Map.of(), tree -> tree);
         assertThat(printed).contains("module/foo 1.0 [compile] (local ./)", "└─ maven/org.foo/bar 1.0 [compile]");
         assertThat(printed)
                 .as("a linter's closure is no dependency of the module, so neither its tree nor the summary shows it")
@@ -342,7 +342,7 @@ public class TreeTest {
 
     @Test
     public void shows_a_group_the_build_resolves_for_itself_apart_from_the_module_when_asked() throws IOException {
-        List<String> printed = tooled(Map.of("tree.tools", "true"));
+        List<String> printed = tooled(Map.of("tree.tools", "true"), tree -> tree);
         assertThat(printed).containsSequence(
                 "Group checkstyle, resolved to build module/foo 1.0:",
                 "maven/com.puppycrawl.tools/checkstyle 10.0 [runtime]");
@@ -351,7 +351,17 @@ public class TreeTest {
                 .doesNotContain("module/foo 1.0 [compile, runtime] (local ./)", "module/foo 1.0 [runtime] (local ./)");
     }
 
-    private List<String> tooled(Map<String, String> keys) throws IOException {
+    @Test
+    public void renders_the_group_it_is_told_is_the_module_s_own_as_the_module_tree() throws IOException {
+        List<String> printed = tooled(Map.of(), tree -> tree.group("checkstyle"));
+        assertThat(printed).contains("module/foo 1.0 [runtime] (local ./)",
+                "└─ maven/com.puppycrawl.tools/checkstyle 10.0 [runtime]");
+        assertThat(printed)
+                .as("the main group is then one the build resolves for itself")
+                .noneMatch(line -> line.contains("org.foo/bar") || line.contains("Group "));
+    }
+
+    private List<String> tooled(Map<String, String> keys, UnaryOperator<Tree> configured) throws IOException {
         SequencedProperties graph = new SequencedProperties();
         graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
         graph.setProperty("edge/1", "checkstyle\truntime\tmaven\ttrue\truntime\t10.0\t\tmaven/com.puppycrawl.tools/checkstyle/10.0");
@@ -365,7 +375,7 @@ public class TreeTest {
         inventory.store(argument.resolve(Inventory.INVENTORY));
 
         List<String> printed = new ArrayList<>();
-        Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
+        configured.apply(Tree.ofEnvironment(new Environment(keys, printed::add, printed::add))).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
