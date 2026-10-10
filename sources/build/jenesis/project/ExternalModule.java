@@ -8,6 +8,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
@@ -171,7 +172,7 @@ public class ExternalModule implements BuildExecutorModule {
                     new WriteCoordinates(group, coordinates),
                     inherited.sequencedKeySet().stream());
             buildExecutor.addModule(DEPENDENCIES,
-                    dependencyModule.pinning(pinning),
+                    dependencyModule.pinning(pinning).pathPlacement(PathPlacement.MODULE_PATH),
                     COORDINATE);
         };
     }

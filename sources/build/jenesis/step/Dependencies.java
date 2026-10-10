@@ -1222,6 +1222,15 @@ public class Dependencies implements BuildExecutorModule {
                     : grouped.getOrDefault(dependency, Collections.emptyNavigableSet()).stream()
                             .filter(group -> !PROCESSOR_PATH.contains(group))
                             .toList();
+            if (module == null && pathPlacement == PathPlacement.MODULE_PATH && !modular.isEmpty()) {
+                throw new IllegalArgumentException(dependency
+                        + " declares no module name, neither by a module-info.class nor by an Automatic-Module-Name,"
+                        + " but every jar of group "
+                        + String.join(" and ", modular)
+                        + " loads as a module of its own layer - name it with a @jenesis.alias <module> "
+                        + coordinate.substring(0, coordinate.lastIndexOf('/'))
+                        + " line in the module-info.java that requires it, or drop it with @jenesis.exclude");
+            }
             String name = module == null
                     ? PathPlacement.fileName(coordinate)
                     : PathPlacement.fileName(coordinate, module, alias == null);

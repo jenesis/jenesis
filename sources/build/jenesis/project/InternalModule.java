@@ -8,6 +8,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Platform;
 import build.jenesis.Repository;
@@ -288,7 +289,7 @@ public class InternalModule implements BuildExecutorModule {
                     new ParseModuleInfo(group, prefix, additionalDependencies, platform),
                     Stream.concat(Stream.of(SOURCE), inherited.sequencedKeySet().stream()));
             buildExecutor.addModule(DEPENDENCIES,
-                    dependencyModule.pinning(pinning),
+                    dependencyModule.pinning(pinning).pathPlacement(PathPlacement.MODULE_PATH),
                     REQUIRES);
         };
     }

@@ -2086,7 +2086,8 @@ public record Project(
                     @jenesis.alias <module> <groupId>/<artifactId>, with @jenesis.exclude and
                     @jenesis.pin as in a project. Every jar of that layer is a module of its own, so a
                     dependency without a module name, or two jars sharing a package, cannot load:
-                    exclude it, or pin a version of it that names its module. Configure the tool in that code, too: where a Maven
+                    name it with @jenesis.alias, exclude it, or pin a version of it that names its
+                    module. Configure the tool in that code, too: where a Maven
                     or Gradle plugin discovers the tool's own extensions and takes their settings as XML,
                     as Byte Buddy's build plugin does, the provider constructs them in Java and reads
                     only plain values from plugin-<name>.properties, as demo-73 does with Byte Buddy. A JDK tool is forked by extending ProcessBuildStep,
