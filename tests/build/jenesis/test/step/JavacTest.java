@@ -18,6 +18,7 @@ import java.lang.classfile.ClassFile;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 public class JavacTest {
 
@@ -822,7 +823,8 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    public void a_failure_is_reproduced_from_an_argument_file(boolean process) throws IOException {
+    public void a_failure_is_reproduced_by_the_command_that_ran_with_its_argument_file(boolean process)
+            throws IOException {
         Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javac.properties"),
                 "--source-path=a b (c)\n");
         Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Main.java"), """
@@ -832,24 +834,25 @@ public class JavacTest {
                 }
                 """);
 
-        assertThatThrownBy(() -> new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+        Throwable thrown = catchThrowable(() -> new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Main.java"), Checksum.of(ChecksumStatus.ADDED))))))
                 .toCompletableFuture()
-                .join())
-                .rootCause()
-                .as("the sources and options go into a file, so the line stays short and the errors readable")
-                .hasMessageContaining("@" + supplement.resolve("reproduce.args"))
-                .hasMessageNotContaining("a b (c)")
+                .join());
+        assertThat(thrown).rootCause()
+                .as("the reproduction is the command that ran, its process options on the line and the sources in a file")
+                .hasMessageContaining("To reproduce, execute:\n " + Files.readString(supplement.resolve("command")) + "\n")
+                .hasMessageContaining(" --source-path 'a b (c)' @" + supplement.resolve("javac.args"))
                 .hasMessageContaining("cannot find symbol");
-        assertThat(Files.readAllLines(supplement.resolve("reproduce.args"))).contains("\"a b (c)\"");
+        assertThat(Files.readAllLines(supplement.resolve("javac.args")))
+                .anyMatch(line -> line.endsWith("Main.java\""));
         StringWriter errors = new StringWriter();
         int code = ToolProvider.findFirst("javac").orElseThrow().run(new PrintWriter(Writer.nullWriter()),
                 new PrintWriter(errors),
-                "@" + supplement.resolve("reproduce.args"));
+                "--source-path", "a b (c)", "@" + supplement.resolve("javac.args"));
         assertThat(code).isNotZero();
         assertThat(errors.toString()).contains("Main.java:3: error: cannot find symbol");
     }
@@ -874,14 +877,14 @@ public class JavacTest {
                 .join())
                 .rootCause()
                 .as("javac refuses a -J option in an argument file, so the launcher options stay on the line")
-                .hasMessageContaining(" -J-Xmx256m -J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED ")
-                .hasMessageContaining("@" + supplement.resolve("reproduce.args"));
-        assertThat(Files.readAllLines(supplement.resolve("reproduce.args"))).noneMatch(line -> line.contains("-J"));
+                .hasMessageContaining(" -J-Xmx256m -J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED @"
+                        + supplement.resolve("javac.args"));
+        assertThat(Files.readAllLines(supplement.resolve("javac.args"))).noneMatch(line -> line.contains("-J"));
         Process process = new ProcessBuilder(
                 Path.of(System.getProperty("java.home"), "bin", File.separatorChar == '\\' ? "javac.exe" : "javac").toString(),
                 "-J-Xmx256m",
                 "-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
-                "@" + supplement.resolve("reproduce.args"))
+                "@" + supplement.resolve("javac.args"))
                 .redirectErrorStream(true)
                 .start();
         String output = new String(process.getInputStream().readAllBytes());
@@ -891,7 +894,8 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    public void a_failure_of_an_overlay_is_reproduced_from_an_argument_file(boolean process) throws IOException {
+    public void a_failure_of_an_overlay_is_reproduced_with_the_argument_file_of_its_release(boolean process)
+            throws IOException {
         Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
                 "package sample; public class Sample { }\n");
         Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/21/sample"))
@@ -910,9 +914,9 @@ public class JavacTest {
                 .rootCause()
                 .as("the overlay's sources and options go into a file of its release, as the main compilation's do")
                 .hasMessageContaining("(multi-release 21)")
-                .hasMessageContaining("@" + supplement.resolve("reproduce-21.args"))
+                .hasMessageContaining("@" + supplement.resolve("javac-21.args"))
                 .hasMessageContaining("cannot find symbol");
-        assertThat(Files.readAllLines(supplement.resolve("reproduce-21.args")))
+        assertThat(Files.readAllLines(supplement.resolve("javac-21.args")))
                 .anyMatch(line -> line.contains("META-INF") && line.endsWith("Sample.java\""));
     }
 

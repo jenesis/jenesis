@@ -16,7 +16,6 @@ public abstract class ProcessBuildStep implements BuildStep {
     private static final SAXParserFactory REPORTS = reports();
     private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
     private static final int TAIL = 200;
-    private static final Set<String> ARGUMENT_FILES = Set.of("jar", "javac", "javadoc", "jdeps", "jlink", "jmod", "jpackage");
     private static final Pattern UNQUOTED = Pattern.compile("[A-Za-z0-9_@%+=:,./-]+");
 
     static {
@@ -171,7 +170,7 @@ public abstract class ProcessBuildStep implements BuildStep {
         if (printing == null) {
             return null;
         }
-        printing.accept(false, String.join(" ", handler.commands()));
+        printing.accept(false, shell(handler.commands()));
         return new ProcessHandler.Tee(executor,
                 line -> printing.accept(false, line),
                 line -> printing.accept(true, line));
@@ -267,11 +266,12 @@ public abstract class ProcessBuildStep implements BuildStep {
                 commands.addAll(processed);
                 Path output = context.supplement().resolve("output"), error = context.supplement().resolve("error");
                 ProcessHandler handler = environment(handler(context, commands), arguments);
-                Files.writeString(context.supplement().resolve("command"), String.join(" ", handler.commands()));
+                String executed = shell(handler.commands());
+                Files.writeString(context.supplement().resolve("command"), executed);
                 ProcessHandler.Tee tee = tee(executor, handler);
                 Consumer<String> announcing = terms.announcing();
                 if (announcing != null) {
-                    announcing.accept(String.join(" ", handler.commands()));
+                    announcing.accept(executed);
                 }
                 executor.execute(() -> {
                     worker.set(Thread.currentThread());
@@ -283,7 +283,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                             throw new IllegalStateException("Unexpected exit code: " + exitCode + "\n"
                                     + diagnosis(context)
                                     + "To reproduce, execute:\n "
-                                    + reproduction(context.supplement().resolve("reproduce.args"), handler.commands())
+                                    + executed
                                     + tail("Output", output)
                                     + tail("Error", error));
                         }
@@ -337,22 +337,6 @@ public abstract class ProcessBuildStep implements BuildStep {
                         ? ", the last " + lines.size() + " out of " + total + " lines - " + file + " holds all of them"
                         : "")
                 + ":\n" + String.join("\n", lines) + "\n";
-    }
-
-    protected String reproduction(Path file, List<String> commands) throws IOException {
-        List<String> launcher = new ArrayList<>(), moved = new ArrayList<>(), kept = new ArrayList<>();
-        for (String argument : commands.subList(1, commands.size())) {
-            (argument.startsWith("-J") ? launcher : argument.startsWith("@") ? kept : moved).add(argument);
-        }
-        if (!ARGUMENT_FILES.contains(command) || moved.isEmpty()) {
-            return shell(commands);
-        }
-        List<String> line = new ArrayList<>();
-        line.add(commands.getFirst());
-        line.addAll(launcher);
-        line.add("@" + argumentFile(file, moved));
-        line.addAll(kept);
-        return shell(line);
     }
 
     protected static String shell(List<String> words) {
