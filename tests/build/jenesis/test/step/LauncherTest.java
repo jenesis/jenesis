@@ -79,6 +79,35 @@ public class LauncherTest {
     }
 
     @Test
+    public void keeps_the_directory_entries_of_the_jars_it_explodes() throws IOException {
+        writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"));
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(
+                Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar")))) {
+            jar.putNextEntry(new JarEntry("sample/"));
+            jar.closeEntry();
+            entry(jar, "sample/Sample.class");
+            jar.putNextEntry(new JarEntry("templates/"));
+            jar.closeEntry();
+            entry(jar, "templates/welcome.html");
+        }
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("launcher/runtime/maven/build.jenesis/build.jenesis.launcher", "resolved/launcher.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties application = new SequencedProperties();
+        application.setProperty("mainClass", "sample.Sample");
+        application.setProperty("name", "app");
+        application.store(input.resolve("launcher.properties"));
+        Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.INFERRED).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(input, Map.of())))).toCompletableFuture().join();
+        assertThat(entries(next.resolve(Launcher.LAUNCHER).resolve("app.jar")))
+                .as("a class path scan asks for a package as a directory, so a stored jar keeps the directories it holds")
+                .contains("jars/app.jar/sample/", "jars/app.jar/templates/", "jars/app.jar/templates/welcome.html")
+                .doesNotContain("build/", "build/jenesis/launcher/");
+    }
+
+    @Test
     public void embeds_the_first_bill_of_materials_it_is_handed() throws IOException {
         writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"));
         writeJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"), "sample/Sample.class");
