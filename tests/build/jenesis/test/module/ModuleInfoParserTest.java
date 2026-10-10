@@ -401,6 +401,23 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_plugin_refuses_a_version_written_after_the_coordinate() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.plugin maven/org.jboss.logging/jboss-logging-processor 3.6.1.Final
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("a version beside the coordinate would otherwise become part of a file name to fetch")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.plugin declaration"
+                        + " 'maven/org.jboss.logging/jboss-logging-processor 3.6.1.Final'")
+                .hasMessageContaining("maven/<groupId>/<artifactId>/<version>");
+    }
+
+    @Test
     public void a_java_prefixed_module_the_jdk_does_not_hold_is_a_dependency_and_can_be_aliased() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**

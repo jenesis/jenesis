@@ -233,6 +233,13 @@ public class ModuleInfoParser {
                                 if (token.isEmpty()) {
                                     continue;
                                 }
+                                if (token.indexOf(' ') >= 0) {
+                                    throw new IllegalArgumentException("Malformed @jenesis.plugin declaration '"
+                                            + content
+                                            + "': expected [<group>] <module> or [<group>] maven/<groupId>/<artifactId>,"
+                                            + " with a version written into the coordinate, as"
+                                            + " maven/<groupId>/<artifactId>/<version>, or left to pin");
+                                }
                                 plugins.put(token.indexOf('/') < 0 ? "module/" + token : token, group);
                             }
                             case "jenesis.layer" -> {

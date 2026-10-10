@@ -390,7 +390,7 @@ public class TestFrameworkTest {
                 Collections.emptyNavigableMap(),
                 false,
                 true))
-                .containsExactly("-d", root.resolve(BuildStep.REPORTS + "tests").toString());
+                .containsExactly("-verbose", "2", "-d", root.resolve(BuildStep.REPORTS + "tests").toString());
     }
 
     @Test

@@ -32,7 +32,7 @@ public record TestNG() implements TestFramework {
                                   SequencedMap<String, SequencedSet<String>> methods,
                                   boolean parallel,
                                   boolean reporting) {
-        List<String> commands = new ArrayList<>(List.of("-d", (reporting
+        List<String> commands = new ArrayList<>(List.of("-verbose", "2", "-d", (reporting
                 ? output.resolve(BuildStep.REPORTS + "tests")
                 : supplement.resolve("test-output")).toString()));
         if (parallel) {

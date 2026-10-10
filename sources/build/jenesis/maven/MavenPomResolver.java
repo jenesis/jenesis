@@ -1792,6 +1792,14 @@ public class MavenPomResolver implements MavenResolver {
                         if (token.isEmpty()) {
                             continue;
                         }
+                        if (token.indexOf(' ') >= 0) {
+                            throw new IllegalArgumentException("Malformed jenesis.plugin declaration '"
+                                    + trimmed
+                                    + "': expected [<group>] <module> or [<group>] maven/<groupId>/<artifactId>,"
+                                    + " with a version written into the coordinate, as"
+                                    + " maven/<groupId>/<artifactId>/<version>, or left to pin."
+                                    + " Every line inside a jenesis.plugin comment is a declaration of its own");
+                        }
                         entries.put(token.indexOf('/') < 0 ? "module/" + token : token, group);
                     }
                 });
