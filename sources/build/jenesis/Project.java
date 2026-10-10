@@ -2186,9 +2186,15 @@ public record Project(
                     adding +<module>. A pom.xml's main and test halves share one <dependencyManagement>,
                     so where they resolve a coordinate at different versions its entry takes the
                     version the pom declares itself, which the other half then resolves as well.
-                    -Djenesis.pin.file=<path> writes the project's whole closure to that properties
-                    file instead of the declarations, in the grammar @jenesis.bom reads, which is how
-                    a local bill of materials is refreshed rather than hand-edited. Each
+                    -Djenesis.pin.file=<path> writes the closure of every module's main group to that
+                    properties file instead of the declarations, in the grammar @jenesis.bom reads,
+                    which is how a local bill of materials is refreshed rather than hand-edited. Only
+                    a module-info.java reads it back, by @jenesis.bom
+                    pin-<name>.properties: a tool's closure, as Checkstyle's with the jars
+                    @jenesis.plugin checkstyle adds, stays a @jenesis.pin <tool>/... line that `pin`
+                    without the file writes, and a pom.xml build keeps every pin in its POMs, a
+                    -SNAPSHOT from the local repository among them, whose checksum strict pinning
+                    then holds until that snapshot is installed anew. Each
                     module resolves alone, so nothing makes them agree: pin/divergence reports every
                     coordinate the tree pins at more than one version, which is the signal that a
                     shared version table is overdue. Enforce
@@ -4041,7 +4047,7 @@ public record Project(
                 dependency.native|ignore|ignore|warn|strict: what to do when a module runs a jar whose Jenesis-Native-Access names a module it does not grant with @jenesis.native; warn reports it, strict fails the build
                 resolver.maven|maven|maven|closest|latest|release|stable|fail|managed: which version a Maven coordinate resolves to; stable skips pre-release qualifiers, fail rejects a coordinate two dependencies require at different versions, managed rejects that and any version only a dependency's POM names
                 resolver.module|first|first|ignore|fail|managed: what to do with the versions a module-info records; fail rejects two requires that record different versions, managed rejects that and any module only another module's requires names
-                pin.file||Write the whole project's pins to this properties file instead of the module declarations; a file a project provides names only a folder inside the project
+                pin.file||Write the whole project's pins of the main group to this properties file instead of the module declarations, which a module-info.java imports with @jenesis.bom and a pom.xml never reads; a file a project provides names only a folder inside the project
                 pin.provided||Comma-separated pin files whose entries this one leaves out, where the version and hash are the same
                 pin.concurrency|(processor count)|Rewrite at most this many modules' pins at once; 0 is unbounded
                 pin.checksum|true|Record content checksums in the pins that the pin selector writes
