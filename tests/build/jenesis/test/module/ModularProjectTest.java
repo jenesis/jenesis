@@ -913,6 +913,49 @@ public class ModularProjectTest {
     }
 
     @Test
+    public void names_a_module_that_declares_no_release() throws IOException {
+        Files.writeString(Files.createDirectory(project.resolve("released")).resolve("module-info.java"), """
+                /**
+                 * @jenesis.release 21
+                 */
+                module released { }
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("unset")).resolve("module-info.java"), """
+                module unset { }
+                """);
+        BuildExecutor root = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        List<String> printed = new ArrayList<>();
+        root.addModule("modules", ModularProject.make(new Environment(Map.of("palette.colors", "none")).out(printed::add),
+                project,
+                "main",
+                "module",
+                _ -> true,
+                Map.of(),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, false)),
+                null,
+                true,
+                true,
+                Collections.emptyNavigableSet(),
+                Collections.emptyNavigableSet(),
+                Collections.emptyNavigableSet(),
+                (_, _, _) -> new AssemblyDescriptor((buildExecutor, _) -> buildExecutor.addModule("java",
+                        new JavaToolchainModule(),
+                        "../sources", "../manifests", "../dependencies/artifacts"))));
+        root.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(printed).containsExactly("[RELEASE]   unset compiles for release " + Runtime.version().feature()
+                + ", the JDK the build runs on, as unset" + File.separator + "module-info.java declares no"
+                + " @jenesis.release - @jenesis.release sets it");
+    }
+
+    @Test
     public void can_resolve_multi_module() throws IOException {
         Files.writeString(Files.createDirectory(project.resolve("foo")).resolve("module-info.java"), """
                 module foo {

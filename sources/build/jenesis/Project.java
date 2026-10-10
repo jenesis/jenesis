@@ -1541,7 +1541,8 @@ public record Project(
                     bracketed word is a link in a Markdown documentation comment and javadoc fails
                     on one it cannot resolve. exclude and override are MODULAR_TO_MAVEN only.
 
-                      @jenesis.release <V>   Java release target (default: the running JDK's); <V>-preview also
+                      @jenesis.release <V>   Java release target (default: the running JDK's, which a
+                                             [RELEASE] line names); <V>-preview also
                                              enables its preview features, to compile and to run
                       @jenesis.main <class>  main class
                       @jenesis.test [<module>|abstract]

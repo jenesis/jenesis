@@ -3,6 +3,7 @@
  * {@code module-info.java}, so Jenesis auto-detects the MODULAR_TO_MAVEN layout.
  * The {@code @jenesis.main} tag makes the module runnable through {@code Execute}.
  *
+ * @jenesis.release 25
  * @jenesis.main sample.Sample
  */
 module demo.dockerisolation {
