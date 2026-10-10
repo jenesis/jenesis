@@ -185,9 +185,11 @@ public class MavenModuleResolver implements Resolver {
                 executor, mavenRepo, rootPoms, mavenPins, MavenDependencyScope.COMPILE, mavenPrefix);
         SequencedMap<MavenDependencyKey, MavenDependencyValue> closure = resolution.dependencies();
         SequencedMap<String, String> result = new LinkedHashMap<>();
-        closure.forEach((key, value) -> result.put(
-                key.coordinate(mavenPrefix, value.version()),
-                value.checksum() == null ? "" : value.checksum()));
+        closure.forEach((key, value) -> {
+            if (key.jar()) {
+                result.put(key.coordinate(mavenPrefix, value.version()), value.checksum() == null ? "" : value.checksum());
+            }
+        });
         SequencedMap<String, Resolver.Resolved> materialized = new LinkedHashMap<>(
                 Resolver.materializeAll(executor, repositories, mavenPrefix, result));
         Map<String, ModuleDescriptor> descriptors = new ConcurrentHashMap<>();

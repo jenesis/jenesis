@@ -3031,6 +3031,89 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void fetches_no_artifact_of_a_type_maven_places_on_no_path_but_follows_its_dependencies() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>native</groupId>
+                            <artifactId>archive</artifactId>
+                            <version>1</version>
+                            <type>tar.gz</type>
+                        </dependency>
+                        <dependency>
+                            <groupId>plugin</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                            <type>maven-plugin</type>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("native", "archive", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>leaf</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("plugin", "artifact", "1", leafPom());
+        addToRepository("leaf", "artifact", "1", leafPom());
+        addToRepository("grouping", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <packaging>pom</packaging>
+                    <dependencies>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        for (String groupId : List.of("group", "plugin", "leaf")) {
+            addJarToRepository(groupId, "artifact", "1");
+        }
+        Resolver.Resolution resolution = mavenPomResolver.dependencies(
+                Runnable::run,
+                "maven",
+                Map.<String, Repository>of("maven", mavenRepository),
+                new LinkedHashMap<>(Map.of("grouping/artifact/pom/1", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE);
+        assertThat(resolution.artifacts().keySet())
+                .as("Maven adds a jar, and a maven-plugin as one, to a path, but neither a POM nor an archive of"
+                        + " another type, whose dependencies it still follows")
+                .containsExactlyInAnyOrder("maven/group/artifact/1", "maven/plugin/artifact/1", "maven/leaf/artifact/1");
+        assertThat(resolution.vertices()).containsKeys("maven/grouping/artifact/pom", "maven/native/archive/tar.gz");
+    }
+
+    @Test
+    public void fetches_an_artifact_of_another_type_that_the_build_names_itself() throws IOException {
+        addToRepository("tool", "executable", "1", leafPom());
+        Files.writeString(Files.createDirectories(repository.resolve("tool/executable/1")).resolve("executable-1-linux.exe"),
+                "executable");
+        Resolver.Resolution resolution = mavenPomResolver.dependencies(
+                Runnable::run,
+                "maven",
+                Map.<String, Repository>of("maven", mavenRepository),
+                new LinkedHashMap<>(Map.of("tool/executable/exe/linux/1", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.RUNTIME);
+        assertThat(resolution.artifacts().keySet()).containsExactly("maven/tool/executable/exe/linux/1");
+    }
+
+    @Test
     public void can_resolve_open_range_version() throws IOException {
         addToRepository("group", "artifact", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>

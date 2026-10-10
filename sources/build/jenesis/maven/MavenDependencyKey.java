@@ -24,6 +24,10 @@ public record MavenDependencyKey(String groupId, String artifactId, String type,
         }
     }
 
+    public boolean jar() {
+        return type == null || type.equals("jar");
+    }
+
     public String coordinate(String prefix, String version) {
         StringBuilder sb = new StringBuilder();
         if (prefix != null) {

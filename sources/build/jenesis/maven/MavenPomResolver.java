@@ -200,9 +200,11 @@ public class MavenPomResolver implements MavenResolver {
                 new ConcurrentHashMap<>(),
                 prefix);
         SequencedMap<String, String> resolved = new LinkedHashMap<>();
-        traversal.dependencies().forEach((key, value) -> resolved.put(
-                key.coordinate(prefix, value.version()),
-                value.checksum() == null ? "" : value.checksum()));
+        traversal.dependencies().forEach((key, value) -> {
+            if (key.jar() || dependencies.containsKey(key) && !key.type().equals("pom")) {
+                resolved.put(key.coordinate(prefix, value.version()), value.checksum() == null ? "" : value.checksum());
+            }
+        });
         SequencedMap<String, Resolver.Resolved> artifacts = Resolver.materializeAll(executor, repositories, prefix, resolved);
         Map<String, ModuleDescriptor> descriptors = new ConcurrentHashMap<>();
         List<CompletableFuture<?>> pending = new ArrayList<>();
@@ -1538,13 +1540,12 @@ public class MavenPomResolver implements MavenResolver {
         String aliased = switch (type) {
             case "test-jar" -> "tests";
             case "ejb-client" -> "client";
-            case "javadoc" -> "javadoc";
-            case "java-source" -> "sources";
+            case "ejb", "maven-plugin", "bundle" -> "";
             default -> null;
         };
         if (aliased != null) {
             type = "jar";
-            if (classifier == null) {
+            if (classifier == null && !aliased.isEmpty()) {
                 classifier = aliased;
             }
         }

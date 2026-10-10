@@ -167,6 +167,42 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void refuses_a_dependency_of_a_type_maven_places_on_no_path_in_a_module_it_builds() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>archive</artifactId>
+                            <version>1</version>
+                            <type>zip</type>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("other:archive")
+                .hasMessageContaining("is of type zip")
+                .hasMessageContaining("<property><name>!jenesis</name></property>");
+    }
+
+    @Test
     public void can_resolve_pom() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
