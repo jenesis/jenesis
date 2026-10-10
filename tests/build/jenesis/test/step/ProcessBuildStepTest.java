@@ -131,6 +131,8 @@ public class ProcessBuildStepTest {
                 .join())
                 .rootCause()
                 .as("a failing step prints a bounded tail of what it wrote, and where the rest of it is")
+                .hasMessageContaining("Output, the last 200 out of 5000 lines - " + supplement.resolve("output")
+                        + " holds all of them:\n")
                 .hasMessageContaining("printed line 5000\n")
                 .hasMessageContaining("printed line 4801\n")
                 .hasMessageNotContaining("printed line 4800\n")
@@ -140,6 +142,64 @@ public class ProcessBuildStepTest {
         assertThat(Files.readAllLines(supplement.resolve("output")))
                 .as("the supplement keeps the whole output")
                 .hasSize(5000);
+    }
+
+    @Test
+    public void a_failure_prints_as_many_lines_as_the_setting_names() throws IOException {
+        Path source = verbose(5);
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        assertThatThrownBy(() -> new Program("java",
+                ProcessHandler.OfProcess.ofJavaHome("bin/java"),
+                List.of(),
+                List.of(source.toString()),
+                ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.tail", "2")), "java"))
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .hasMessageContaining("Output, the last 2 out of 5 lines - " + supplement.resolve("output")
+                        + " holds all of them:\nprinted line 4\nprinted line 5\n")
+                .hasMessageNotContaining("printed line 3");
+    }
+
+    @Test
+    public void a_failure_prints_every_line_when_the_setting_is_0() throws IOException {
+        Path source = verbose(300);
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        assertThatThrownBy(() -> new Program("java",
+                ProcessHandler.OfProcess.ofJavaHome("bin/java"),
+                List.of(),
+                List.of(source.toString()),
+                ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.tail", "0")), "java"))
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .hasMessageContaining("Output:\nprinted line 1\n")
+                .hasMessageContaining("printed line 300\n")
+                .hasMessageNotContaining("out of");
+    }
+
+    @Test
+    public void refuses_a_negative_number_of_lines_to_print() {
+        assertThatThrownBy(() -> ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.tail", "-1")), "java"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.process.tail is -1");
+    }
+
+    private Path verbose(int lines) throws IOException {
+        Path source = root.resolve("Verbose.java");
+        Files.writeString(source, """
+                public class Verbose {
+                    public static void main(String[] args) {
+                        for (int line = 1; line <= %d; line++) {
+                            System.out.println("printed line " + line);
+                        }
+                        System.exit(1);
+                    }
+                }
+                """.formatted(lines));
+        return source;
     }
 
     @Test
@@ -524,7 +584,15 @@ public class ProcessBuildStepTest {
                         Function<List<String>, ? extends ProcessHandler> factory,
                         List<String> configurations,
                         List<String> processed) {
-            super(command, factory);
+            this(command, factory, configurations, processed, new Terms());
+        }
+
+        private Program(String command,
+                        Function<List<String>, ? extends ProcessHandler> factory,
+                        List<String> configurations,
+                        List<String> processed,
+                        Terms terms) {
+            super(command, factory, terms);
             this.configurations = configurations;
             this.processed = processed;
         }

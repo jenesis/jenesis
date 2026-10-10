@@ -15,9 +15,9 @@ public abstract class ProcessBuildStep implements BuildStep {
     public static final String PROCESS = "process/", ENVIRONMENT = "environment/";
     private static final SAXParserFactory REPORTS = reports();
     private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
+    private static final int TAIL = 200;
     private static final Set<String> ARGUMENT_FILES = Set.of("jar", "javac", "javadoc", "jdeps", "jlink", "jmod", "jpackage");
     private static final Pattern UNQUOTED = Pattern.compile("[A-Za-z0-9_@%+=:,./-]+");
-    private static final int TAIL_LINES = 200;
 
     static {
         if (System.getProperty("java.home") == null) {
@@ -48,10 +48,15 @@ public abstract class ProcessBuildStep implements BuildStep {
     public record Terms(BiConsumer<Boolean, String> printing,
                         Semaphore permits,
                         Consumer<String> announcing,
-                        Consumer<String> reporting) {
+                        Consumer<String> reporting,
+                        int tail) {
 
         public Terms() {
-            this(null, PERMITS.computeIfAbsent(Runtime.getRuntime().availableProcessors(), Semaphore::new), null, null);
+            this(null,
+                    PERMITS.computeIfAbsent(Runtime.getRuntime().availableProcessors(), Semaphore::new),
+                    null,
+                    null,
+                    TAIL);
         }
 
         public static Terms ofEnvironment(Environment environment, String command) {
@@ -64,6 +69,11 @@ public abstract class ProcessBuildStep implements BuildStep {
             int concurrency = environment.number("process.concurrency", Runtime.getRuntime().availableProcessors());
             if (concurrency < 0) {
                 throw new IllegalArgumentException("Process concurrency must not be negative: " + concurrency);
+            }
+            int tail = environment.number("process.tail", TAIL);
+            if (tail < 0) {
+                throw new IllegalArgumentException("jenesis.process.tail is " + tail
+                        + ", but names how many lines of a failed tool's output to print: 0 or more, 0 printing all");
             }
             boolean streamed = environment.flag("print." + command,
                     environment.flag("print.process", printing));
@@ -81,23 +91,28 @@ public abstract class ProcessBuildStep implements BuildStep {
                     environment.flag("print.findings", true)
                             ? found -> out.accept("%s%-11s%s %s".formatted(
                                     palette.warning(), "[FINDINGS]", palette.reset(), found))
-                            : null);
+                            : null,
+                    tail);
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {
-            return new Terms(printing, permits, announcing, reporting);
+            return new Terms(printing, permits, announcing, reporting, tail);
         }
 
         public Terms permits(Semaphore permits) {
-            return new Terms(printing, permits, announcing, reporting);
+            return new Terms(printing, permits, announcing, reporting, tail);
         }
 
         public Terms announcing(Consumer<String> announcing) {
-            return new Terms(printing, permits, announcing, reporting);
+            return new Terms(printing, permits, announcing, reporting, tail);
         }
 
         public Terms reporting(Consumer<String> reporting) {
-            return new Terms(printing, permits, announcing, reporting);
+            return new Terms(printing, permits, announcing, reporting, tail);
+        }
+
+        public Terms tail(int tail) {
+            return new Terms(printing, permits, announcing, reporting, tail);
         }
     }
 
@@ -295,7 +310,7 @@ public abstract class ProcessBuildStep implements BuildStep {
         return result;
     }
 
-    protected static String tail(String label, Path file) throws IOException {
+    protected String tail(String label, Path file) throws IOException {
         if (!Files.exists(file)) {
             return "";
         }
@@ -309,7 +324,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                 total++;
                 blank &= line.isBlank();
                 lines.addLast(line);
-                if (lines.size() > TAIL_LINES) {
+                if (terms.tail() > 0 && lines.size() > terms.tail()) {
                     lines.removeFirst();
                 }
             }
@@ -318,7 +333,9 @@ public abstract class ProcessBuildStep implements BuildStep {
             return "";
         }
         return "\n\n" + label
-                + (lines.size() < total ? ", its last " + lines.size() + " lines - " + file + " holds all of it" : "")
+                + (lines.size() < total
+                        ? ", the last " + lines.size() + " out of " + total + " lines - " + file + " holds all of them"
+                        : "")
                 + ":\n" + String.join("\n", lines) + "\n";
     }
 

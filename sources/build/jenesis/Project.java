@@ -1420,12 +1420,12 @@ public record Project(
                     staging area, renamed into place on success. When the step fails, it stays with
                     what the step wrote and a .jenesis.failed marker beside its output/ and
                     supplement/, until the step runs again. A tool that fails prints the last 200
-                    lines of its output and of its error, naming the file under supplement/ that
-                    holds the rest; a failed test run first names its failed tests, read from the
-                    reports the runner writes under supplement/ (or reports/tests with
-                    jenesis.test.reporting), so a test that swallows the console still says which
-                    failed. One build at a time per target: the root
-                    holds an exclusive .jenesis.lock and a second process fails fast.
+                    lines of its output and of its error (jenesis.process.tail), out of how many,
+                    naming the file under supplement/ that holds all of them; a failed test run
+                    first names its failed tests, read from the reports the runner writes under
+                    supplement/ (or reports/tests with jenesis.test.reporting), so a test that
+                    swallows the console still says which failed. One build at a time per target:
+                    the root holds an exclusive .jenesis.lock and a second process fails fast.
 
                     Read the outcome of the latest build from %{target}/.jenesis.events.jsonl rather
                     than from the progress lines, whose [EVENTS] line names the file: one JSON object
@@ -3759,6 +3759,7 @@ public record Project(
                 executor.events|true|Write each step's outcome of the latest build as one JSON object per line to .jenesis.events.jsonl in the target folder, replaced by every build
                 process.concurrency|(processor count)|Run at most this many tool runs at once - a compiler, a JDK tool, a forked JVM such as a test run; 0 is unbounded
                 process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
+                process.tail|200|Lines of a failed tool's output and of its error printed with the failure, the last ones, beside how many there were and the file under supplement/ that holds all of them; 0 prints every line
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
                 archive.timestamp|1980-02-01T00:00:00Z|ISO-8601 date-time with an offset recorded on every entry of the jars, jmods and zips the build writes; empty keeps the times the tools record and makes the archives unreproducible; set explicitly, it is also the creation time a generated Docker image is labelled with
                 palette.colors|ansi|ansi colours what the build prints with ANSI escape sequences; none prints plain text
