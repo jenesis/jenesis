@@ -922,6 +922,56 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void the_property_expressions_of_a_dependency_are_recorded_for_the_pin_that_rewrites_its_entry() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <javafx.platform>linux</javafx.platform>
+                        <javafx.version>17</javafx.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.openjfx</groupId>
+                                <artifactId>javafx-base</artifactId>
+                                <version>${javafx.version}</version>
+                                <classifier>${javafx.platform}</classifier>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.openjfx</groupId>
+                            <artifactId>javafx-base</artifactId>
+                            <classifier>${javafx.platform}</classifier>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(MavenProject.EXPRESSIONS)))
+                .as("pin writes the entry with the expressions the POM wrote, and the version only where it still is the property's")
+                .containsExactly(Map.entry("org.openjfx/javafx-base/jar/linux",
+                        "org.openjfx/javafx-base/jar/${javafx.platform} ${javafx.version} 17"));
+    }
+
+    @Test
     public void exclusions_are_written_for_both_main_and_test_modules() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

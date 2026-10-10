@@ -10,6 +10,7 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
+import build.jenesis.maven.MavenProject;
 import build.jenesis.maven.PinPom;
 import build.jenesis.step.Inventory;
 
@@ -495,6 +496,78 @@ public class PinPomTest {
                                 </dependency>
                     """)
                 .doesNotContain("9.6.0", "stale");
+        assertThat(run(pom)).isEqualTo(result);
+    }
+
+    @Test
+    public void keeps_the_property_expressions_of_an_entry_and_writes_only_the_version_it_owns() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.openjfx</groupId>
+                                <artifactId>javafx-base</artifactId>
+                                <version>${javafx.version}</version>
+                                <classifier>${javafx.platform}</classifier>
+                                <exclusions>
+                                    <exclusion>
+                                        <groupId>org.openjfx</groupId>
+                                        <artifactId>javafx-base</artifactId>
+                                    </exclusion>
+                                </exclusions>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        writeResolved(Map.of(
+                "maven/org.openjfx/javafx-base/jar/linux", "17.0.20 SHA-256/cafebabe",
+                "maven/org.openjfx/javafx-graphics/jar/linux", "17.0.21 SHA-256/deadbeef"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "");
+        module.store(input.resolve(BuildStep.MODULE));
+        SequencedProperties expressions = new SequencedProperties();
+        expressions.setProperty("org.openjfx/javafx-base/jar/linux",
+                "org.openjfx/javafx-base//${javafx.platform} ${javafx.version} 17.0.20");
+        expressions.setProperty("org.openjfx/javafx-graphics/jar/linux",
+                "org.openjfx/javafx-graphics//${javafx.platform} ${javafx.version} 17.0.20");
+        expressions.store(input.resolve(MavenProject.EXPRESSIONS));
+        String result = run(pom);
+        assertThat(result)
+                .as("the classifier a property selects stays that property, so another platform's build still finds"
+                        + " its managed entry, and so does a version the property still names")
+                .contains("""
+                                <dependency>
+                                    <groupId>org.openjfx</groupId>
+                                    <artifactId>javafx-base</artifactId>
+                                    <version>${javafx.version}</version>
+                                    <classifier>${javafx.platform}</classifier>
+                                    <exclusions>
+                                        <exclusion>
+                                            <groupId>org.openjfx</groupId>
+                                            <artifactId>javafx-base</artifactId>
+                                        </exclusion>
+                                    </exclusions>
+                                    <!--Checksum/SHA-256/cafebabe-->
+                                </dependency>
+                    """)
+                .as("a version resolved to another than the property names is written as the version pinned")
+                .contains("""
+                                <dependency>
+                                    <groupId>org.openjfx</groupId>
+                                    <artifactId>javafx-graphics</artifactId>
+                                    <version>17.0.21</version>
+                                    <classifier>${javafx.platform}</classifier>
+                                    <!--Checksum/SHA-256/deadbeef-->
+                                </dependency>
+                    """);
         assertThat(run(pom)).isEqualTo(result);
     }
 

@@ -744,6 +744,27 @@ public class MavenPomResolver implements MavenResolver {
                 default -> throw new IllegalArgumentException("maven.install.skip is '" + installSkip + "' in "
                         + root.relativize(module).resolve("pom.xml") + ", where Maven's install plugin reads true or false");
             };
+            SequencedMap<MavenDependencyKey, MavenDependencyKey.Versioned> expressions = new LinkedHashMap<>();
+            Stream.concat(pom.managedDependencies().entrySet().stream(), pom.dependencies().entrySet().stream())
+                    .filter(entry -> Stream.of(entry.getKey().groupId(),
+                                    entry.getKey().artifactId(),
+                                    entry.getKey().type(),
+                                    entry.getKey().classifier(),
+                                    entry.getValue().version())
+                            .anyMatch(text -> text != null && text.contains("${")))
+                    .forEach(entry -> {
+                        DependencyKey raw = entry.getKey();
+                        String rawVersion = entry.getValue().version() != null && entry.getValue().version().contains("${")
+                                ? entry.getValue().version()
+                                : null;
+                        expressions.merge(raw.resolve(pom.properties()),
+                                new MavenDependencyKey.Versioned(new MavenDependencyKey(raw.groupId(),
+                                        raw.artifactId(),
+                                        raw.type(),
+                                        raw.classifier()), rawVersion),
+                                (previous, next) -> new MavenDependencyKey.Versioned(previous.key(),
+                                        previous.version() == null ? next.version() : previous.version()));
+                    });
             results.put(root.relativize(module), new MavenLocalPom(property(pom.groupId(), pom.properties()),
                     property(pom.artifactId(), pom.properties()),
                     version,
@@ -778,7 +799,8 @@ public class MavenPomResolver implements MavenResolver {
                             (left, _) -> left,
                             LinkedHashMap::new)),
                     deploy,
-                    install));
+                    install,
+                    expressions));
         }
         return results;
     }
