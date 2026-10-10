@@ -574,7 +574,8 @@ public record Project(
                       %{name}build%{reset}         Resolve, compile, package, and test every module
                       %{name}stage%{reset}         Stage produced artifacts into a local repository
                       %{name}export%{reset}        Export the staged repository as the build deliverable
-                      %{name}release%{reset}       Release the staged tree: into jenesis.release.uri, and by a jreleaser.yml
+                      %{name}release%{reset}       Release the staged trees: into jenesis.release.uri and
+                                    jenesis.release.maven.uri, and by a jreleaser.yml
                       %{name}plugin/<name>%{reset} Run a plugin the project names under the hook point plugin, on demand
                       %{name}pin%{reset}           Rewrite version/checksum pins into pom.xml or module-info.java
                       %{name}dependencies%{reset}  Print each module's resolved dependency graph
@@ -1215,7 +1216,9 @@ public record Project(
                     root, JReleaser installed on the runner, the version as
                     -Djenesis.project.version and -Djenesis.jreleaser.dry=false. The job's
                     credentials become the JRELEASER_* variables JReleaser reads, which the release
-                    is handed (66). Then let `ide` write the IntelliJ, VS Code or Eclipse
+                    is handed (66). A job that deployed to a repository of its own rather than to
+                    Maven Central names it in MAVEN_RELEASE_URI and its key in MAVEN_RELEASE_TOKEN
+                    instead (66). Then let `ide` write the IntelliJ, VS Code or Eclipse
                     project so no IDE depends on the old build: one IDE module per module, its
                     tests in its test sources. The IDE files it writes into a source folder never
                     reach a jar. A Maven layout keeps its pom.xml files, which are now its build
@@ -1365,7 +1368,14 @@ public record Project(
                           -> native=true, graal.properties (71)
                       maven-jarsigner-plugin / jar signing -> jenesis.jarsigner.* (64)
                       maven-install-plugin / publishToMavenLocal -> `export` (65)
-                      deploy, central-publishing, maven-gpg-plugin / maven-publish, signing
+                      maven-deploy-plugin, distributionManagement to a repository of your own /
+                          maven-publish to one -> `release` with jenesis.release.maven.uri and
+                          jenesis.release.maven.token, which puts the staged Maven tree there
+                          with its checksums and maven-metadata.xml, unsigned, a SNAPSHOT under
+                          a unique timestamped name (66); altDeploymentRepository -> the same
+                          setting on the command line
+                      deploy to Maven Central, central-publishing, maven-gpg-plugin / maven-publish
+                          to Central, signing
                           -> `release` with a jreleaser.yml, handed JRELEASER_PROJECT_VERSION: the
                           version setting, or the version every staged POM carries (66). JReleaser
                           is not resolved like the other tools but run as the `jreleaser` program
@@ -3871,6 +3881,8 @@ public record Project(
                 jarsigner.arguments||Further jarsigner arguments, whitespace separated; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 release.uri||Jenesis module repository a release puts each staged module's jar into, one put per module at module/<module>/<version>/<module>.jar, so every module needs a version; the https address of a Jenesis Repository's jenesis repository, as jenesis.module.uri names it; a java repository takes Maven publishes only and refuses the put (env JENESIS_RELEASE_URI)
                 release.token||Authorization header value for that repository, sent as given (env JENESIS_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named
+                release.maven.uri||Maven repository a release puts the staged Maven tree into, every file at <group path>/<artifactId>/<version>/<file> with its .md5, .sha1, .sha256 and .sha512, then the artifact's maven-metadata.xml merged with the one the repository holds; a SNAPSHOT version is put under a unique timestamped name beside its own maven-metadata.xml, as Maven deploys one; nothing is signed, and Maven Central is refused, as a jreleaser.yml releases there (env MAVEN_RELEASE_URI)
+                release.maven.token||Authorization header value for that repository, sent as given, so it names its scheme, as Bearer <token> or Basic <credentials> (env MAVEN_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named
                 jreleaser.executable|jreleaser|The JReleaser executable a release runs; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jreleaser.command|full-release|The JReleaser command a release runs
                 jreleaser.config||JReleaser configuration file

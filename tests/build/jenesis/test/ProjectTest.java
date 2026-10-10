@@ -893,6 +893,52 @@ public class ProjectTest {
     }
 
     @Test
+    public void releases_the_staged_maven_tree_into_the_maven_repository_it_names() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
+        List<String> requests = new CopyOnWriteArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            requests.add(exchange.getRequestMethod() + " " + exchange.getRequestURI().getPath());
+            exchange.sendResponseHeaders(exchange.getRequestMethod().equals("GET") ? 404 : 201, -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            settings.put("release.maven.uri", "http://localhost:" + server.getAddress().getPort() + "/repository/");
+            settings.put("repository.insecure", "true");
+            List<String> printed = new ArrayList<>();
+            Project.ofEnvironment(new Environment(settings).out(printed::add), root)
+                    .target(root.resolve("target"))
+                    .version("1.0.0")
+                    .layout(Project.Layout.MODULAR_TO_MAVEN)
+                    .build(Project.RELEASE);
+            assertThat(requests)
+                    .contains("PUT /repository/demo/empty/demo.empty/1.0.0/demo.empty-1.0.0.jar",
+                            "PUT /repository/demo/empty/demo.empty/1.0.0/demo.empty-1.0.0.jar.sha1",
+                            "PUT /repository/demo/empty/demo.empty/1.0.0/demo.empty-1.0.0.pom",
+                            "GET /repository/demo/empty/demo.empty/maven-metadata.xml",
+                            "PUT /repository/demo/empty/demo.empty/maven-metadata.xml");
+            assertThat(printed).anyMatch(line -> line.contains("[RELEASED]"));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void refuses_to_release_into_a_maven_repository_from_a_layout_that_stages_no_maven_tree() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
+        settings.put("release.maven.uri", "https://repository.invalid/repository/");
+        Project project = Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .version("1.0.0")
+                .layout(Project.Layout.MODULAR);
+        assertThatThrownBy(() -> project.build(Project.RELEASE))
+                .rootCause()
+                .hasMessageContaining("jenesis.release.maven.uri");
+    }
+
+    @Test
     public void modular_layout_registers_export_step() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
         Project project = Project.ofEnvironment(new Environment(settings), root).target(target);
@@ -1518,6 +1564,14 @@ public class ProjectTest {
         assertThatThrownBy(() -> Make.settings(root, settings))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.release.token cannot be set in");
+    }
+
+    @Test
+    public void the_layered_settings_rejects_the_maven_release_token_in_a_file_the_project_provides() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.release.maven.token=Basic c2VjcmV0\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.release.maven.token cannot be set in");
     }
 
     @Test
