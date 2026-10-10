@@ -822,8 +822,11 @@ public class MavenProject implements BuildExecutorModule {
             SequencedProperties skipped = new SequencedProperties();
             String version = null;
             for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
+                if (argument.getKey().equals(SCAN) || argument.getValue().removed()) {
+                    continue;
+                }
                 Path file = argument.getValue().folder().resolve(BuildStep.METADATA);
-                if (!argument.getKey().equals(SCAN) && !argument.getValue().removed() && Files.isRegularFile(file)) {
+                if (Files.isRegularFile(file)) {
                     version = SequencedProperties.ofFiles(file).value("version", version);
                 }
             }

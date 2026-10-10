@@ -2742,6 +2742,51 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void returns_to_the_declared_version_once_the_commanded_one_is_no_longer_given() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor commanded = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        commanded.addStep("command", (_, context, _) -> {
+            SequencedProperties values = new SequencedProperties();
+            values.setProperty("version", "2");
+            values.store(context.next().resolve(BuildStep.METADATA));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        commanded.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "command");
+        commanded.execute(Runnable::run).toCompletableFuture().join();
+        BuildExecutor declared = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        declared.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = declared.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/coordinates").resolve(BuildStep.IDENTITY)).stringPropertyNames())
+                .as("a build without the version setting is handed the step that stamped it as removed, and builds the declared version")
+                .contains("maven/group/artifact/1");
+    }
+
+    @Test
     public void keeps_a_developer_that_names_no_id_under_a_key_derived_from_its_name() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
