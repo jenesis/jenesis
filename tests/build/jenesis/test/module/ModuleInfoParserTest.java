@@ -162,6 +162,51 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_pin_of_an_aliased_module_name_pins_the_coordinate_of_its_alias() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin toolkit.lib 1.2.3 SHA-256/abc
+                 * @jenesis.alias toolkit.lib org.example/plain-lib
+                 * @jenesis.pin natives.lib 2.0 (linux-x86_64)
+                 * @jenesis.alias natives.lib org.example/plain-lib/jar/natives-linux
+                 * @jenesis.pin other.lib 3.0
+                 */
+                module foo {
+                    requires toolkit.lib;
+                    requires natives.lib;
+                    requires other.lib;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.versions())
+                .as("an aliased module resolves as the coordinate its alias names, which is what its pin must name")
+                .containsEntry("main/maven/org.example/plain-lib", "1.2.3 SHA-256/abc")
+                .containsEntry("main/module/other.lib", "3.0")
+                .doesNotContainKey("main/module/toolkit.lib");
+        assertThat(info.variants())
+                .containsKey("main/maven/org.example/plain-lib/jar/natives-linux")
+                .doesNotContainKey("main/module/natives.lib");
+    }
+
+    @Test
+    public void jenesis_pin_refuses_an_aliased_module_name_and_its_coordinate_pinned_apart() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias toolkit.lib org.example/plain-lib
+                 * @jenesis.pin toolkit.lib 1.2.3
+                 * @jenesis.pin org.example/plain-lib 1.2.4
+                 */
+                module foo {
+                    requires toolkit.lib;
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("toolkit.lib at 1.2.3")
+                .hasMessageContaining("org.example/plain-lib, at 1.2.4");
+    }
+
+    @Test
     public void jenesis_exclude_lists_several_targets_on_one_line() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
