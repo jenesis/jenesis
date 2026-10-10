@@ -1488,7 +1488,7 @@ public class MavenPomResolver implements MavenResolver {
             boolean negated = required.startsWith("!");
             String value = negated ? required.substring(1).trim() : required;
             boolean windows = osName.contains("windows");
-            boolean matched = switch (condition.getLocalName()) {
+            boolean matched = switch (condition.getNodeName()) {
                 case "family" -> switch (value) {
                     case "windows" -> windows;
                     case "win9x", "winnt" -> windows && Stream.of("95", "98", "me", "ce").anyMatch(osName::contains)
