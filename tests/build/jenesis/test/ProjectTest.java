@@ -1599,6 +1599,15 @@ public class ProjectTest {
     }
 
     @Test
+    public void the_layered_settings_rejects_the_time_discovery_keeps_an_answer_in_the_project_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.repository.discovery.ttl=100000\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .as("what a domain answered is kept for every project of the machine, which a project cannot prolong")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.repository.discovery.ttl cannot be set in");
+    }
+
+    @Test
     public void the_layered_settings_rejects_a_signing_setting_in_a_profile() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=release\n");
         Files.writeString(root.resolve("jenesis-release.properties"), "jenesis.jarsigner.alias=release\n");
