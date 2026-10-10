@@ -28,7 +28,7 @@ annotation on the class.
 Layout
 ------
 
-    demo/demo-73-byte-buddy
+    demo/demo-59-byte-buddy
     |-- build/jenesis                  symlink to ../../../sources/build/jenesis
     |-- jenesis.plugins.properties     enhance+binary/transform=./plugin
     |-- build.jenesis/

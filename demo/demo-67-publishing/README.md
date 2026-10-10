@@ -77,7 +77,7 @@ from a `module-info.java` and a `project.properties`.
 Layout
 ------
 
-    demo/demo-66-publishing
+    demo/demo-67-publishing
     |-- build/jenesis            symlink to ../../../sources/build/jenesis
     |-- build/Demo.java          stages the release bundle, then resolves it back to prove it is consumable
     |-- build/Repository.java    a Maven repository on this machine that takes a release into a folder

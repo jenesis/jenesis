@@ -14,7 +14,7 @@ repository consume the module from there as well.
 Layout
 ------
 
-    demo/demo-65-export
+    demo/demo-66-export
     |-- library                       the project that is exported
     |   |-- build/jenesis             symlink to ../../../../sources/build/jenesis
     |   `-- sources
