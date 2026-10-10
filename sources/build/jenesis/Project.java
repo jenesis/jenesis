@@ -815,15 +815,30 @@ public record Project(
 
                     Check first whether the code can be modules as it stands. It cannot while a
                     package is split: held by the tests and the main code of one project, as
-                    white-box tests are, or by two projects of the build. Per project, and across
-                    the main sources of all of them:
+                    white-box tests are, or by two projects of the build. This program prints each
+                    split package and where it is held, per project and across the main sources of
+                    all of them. Write it to a file outside the sources, and run it from the root as
+                    `java SplitPackages.java`: the JDK the build runs on runs a source file as it
+                    stands, on any operating system, so no shell tool is needed.
 
-                      comm -12 <(cd src/main/java && find . -name '*.java' ! -name module-info.java \\
-                                     | sed 's|/[^/]*$||' | sort -u) \\
-                               <(cd src/test/java && find . -name '*.java' ! -name module-info.java \\
-                                     | sed 's|/[^/]*$||' | sort -u)
-                      find . -path '*/src/main/java/*.java' | sed 's|/src/main/java/| |; s|/[^/]*$||' \\
-                          | sort -u | cut -d' ' -f2 | sort | uniq -d
+                      void main() throws IOException {
+                          var source = Pattern.compile("(.*)src/(main|test)/java/(.+)/[^/]+[.]java");
+                          var owners = new TreeMap<String, Set<String>>();
+                          try (var files = Files.walk(Path.of("."))) {
+                              files.map(file -> file.toString().replace(File.separatorChar, '/'))
+                                      .map(source::matcher)
+                                      .filter(Matcher::matches)
+                                      .forEach(match -> owners.computeIfAbsent(match.group(3), _ -> new TreeSet<>())
+                                              .add(match.group(2) + " " + match.group(1)));
+                          }
+                          owners.forEach((folder, held) -> {
+                              if (held.stream().filter(owner -> owner.startsWith("main ")).count() > 1
+                                      || held.stream().anyMatch(owner -> owner.startsWith("test ")
+                                              && held.contains("main " + owner.substring(5)))) {
+                                  IO.println(folder.replace('/', '.') + " " + held);
+                              }
+                          });
+                      }
 
                     First, though, the release: code compiled for Java 8 or older, as
                     maven.compiler.release or target, a toolchain or a Gradle release of 8 or below
@@ -838,10 +853,10 @@ public record Project(
                     name the descriptor requires. The old build follows the move: ModiTect's
                     moduleInfoFile, and maven-javadoc-plugin's sourcepath and excludePackageNames.
 
-                    Otherwise a package either line prints, or one that a dependency holds as well,
-                    rules modules out for now: migrate to pom.xml first, whichever declaration was asked
-                    for, and say so - which packages are split and where. That is phase one; it
-                    changes the build and nothing of the code. Phase two moves the result to
+                    Otherwise a package that SplitPackages.java prints, or one that a dependency
+                    holds as well, rules modules out for now: migrate to pom.xml first, whichever
+                    declaration was asked for, and say so - which packages are split and where.
+                    That is phase one; it changes the build and nothing of the code. Phase two moves the result to
                     module-info.java as a change of its own, once the pom.xml build compares equal
                     with the old one, so close phase one by naming the split packages and offering
                     phase two, as step 3b describes. A Gradle build has no counterpart, since no
@@ -966,13 +981,33 @@ public record Project(
                       a dependency         exclude the jar that holds the package, or move the
                                            project's classes out of it
                       two dependencies     no module path holds a package two jars share; after a
-                                           build of the pom.xml, this prints each package two jars
-                                           of a test closure hold - exclude one of them, or drop
-                                           the test that needs both:
-                        for jar in $(find target/build -path '*/test-module-*/resolved/*.jar'); do
-                            unzip -Z1 "$jar" '*.class' 2>/dev/null | grep / | grep -v '^META-INF/' \\
-                                | sed "s|/[^/]*$| ${jar##*/}|"
-                        done | sort -u | cut -d' ' -f1 | uniq -d
+                                           build of the pom.xml, SharedPackages.java below prints
+                                           each package two jars of a test closure hold - exclude
+                                           one of them, or drop the test that needs both
+
+                      void main() throws IOException {
+                          var holders = new TreeMap<String, Set<String>>();
+                          try (var files = Files.walk(Path.of("target/build"))) {
+                              for (var jar : files.filter(file -> file.toString().endsWith(".jar")
+                                      && file.getParent().endsWith("resolved")
+                                      && file.toString().contains("test-module-")).toList()) {
+                                  try (var zip = new ZipFile(jar.toFile())) {
+                                      zip.stream().map(ZipEntry::getName)
+                                              .filter(name -> name.endsWith(".class") && name.contains("/")
+                                                      && !name.startsWith("META-INF/"))
+                                              .forEach(name -> holders.computeIfAbsent(
+                                                      name.substring(0, name.lastIndexOf('/')),
+                                                      _ -> new TreeSet<>()).add(jar.getFileName().toString()));
+                                  } catch (ZipException _) {
+                                  }
+                              }
+                          }
+                          holders.forEach((folder, jars) -> {
+                              if (jars.size() > 1) {
+                                  IO.println(folder.replace('/', '.') + " " + jars);
+                              }
+                          });
+                      }
 
                     The tests then run on the module path, which breaks what read the class path:
 
