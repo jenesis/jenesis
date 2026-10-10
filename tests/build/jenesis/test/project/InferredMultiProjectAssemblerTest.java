@@ -1062,6 +1062,10 @@ public class InferredMultiProjectAssemblerTest {
                     .as("the second transform is handed the class the first one wrote")
                     .isEqualTo("first+second");
         }
+        assertThat(SequencedProperties.ofFiles(fixture.build()
+                .resolve("sub/binary/transform/second/classes/output/transformed.properties")).stringPropertyNames())
+                .as("what a transform writes beside its classes, as the dependencies it resolved, passes on with them")
+                .containsExactlyInAnyOrder("first", "+second");
     }
 
     private static Path jarIn(Path folder) throws IOException {
@@ -1083,6 +1087,7 @@ public class InferredMultiProjectAssemblerTest {
                     : new String(handed, StandardCharsets.UTF_8);
             Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.CLASSES + "sample")).resolve("Sample.class"),
                     base + suffix);
+            Files.writeString(context.next().resolve("transformed.properties"), suffix + "=\n");
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }
