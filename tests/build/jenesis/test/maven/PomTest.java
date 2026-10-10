@@ -14,6 +14,7 @@ import build.jenesis.maven.Pom;
 import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class PomTest {
 
@@ -170,6 +171,79 @@ public class PomTest {
                 .doesNotContain("<optional>");
     }
 
+    @Test
+    public void names_a_required_module_by_the_maven_artifact_it_resolved_to_where_the_pom_is_not_flattened()
+            throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/module/org.example.lib", "");
+        requires.setProperty("main/runtime/module/org.example.lib", "");
+        requires.setProperty("main/compile/module/org.example.annotations", "");
+        requires.setProperty("main/compile/maven/org.example/aliased", "");
+        requires.setProperty("main/runtime/maven/org.example/aliased", "");
+        requires.store(argument.resolve(BuildStep.REQUIRES));
+        SequencedProperties exclusions = new SequencedProperties();
+        exclusions.setProperty("main/compile/module/org.example.lib", "org.example/unwanted");
+        exclusions.store(argument.resolve(BuildStep.EXCLUSIONS));
+        SequencedProperties graph = new SequencedProperties();
+        for (String scope : List.of("compile", "runtime")) {
+            graph.setProperty("vertex/main/" + scope + "/maven/org.example/lib", "1.2.3\torg.example.lib\tfalse\tfalse");
+            graph.setProperty("vertex/main/" + scope + "/maven/org.example/transitive", "4.5.6\torg.example.transitive\tfalse\tfalse");
+            graph.setProperty("vertex/main/" + scope + "/maven/org.example/aliased", "7.8.9\t\tfalse\tfalse");
+        }
+        graph.setProperty("vertex/main/compile/maven/org.example/annotations", "2.0\torg.example.annotations\tfalse\tfalse");
+        graph.store(argument.resolve(Dependencies.GRAPH));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(argument, Map.of(
+                                Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.EXCLUSIONS), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(Dependencies.GRAPH), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        String pom = Files.readString(next.resolve(Pom.POM));
+        assertThat(pom)
+                .as("each module the declaration requires is named by its artifact, at the version resolved")
+                .contains("<artifactId>lib</artifactId>", "<version>1.2.3</version>",
+                        "<artifactId>annotations</artifactId>", "<version>2.0</version>",
+                        "<artifactId>aliased</artifactId>", "<version>7.8.9</version>")
+                .as("an exclusion the declaration names is kept for the consumer's resolution")
+                .contains("<artifactId>unwanted</artifactId>")
+                .as("what a required module brings is left to its own POM")
+                .doesNotContain("<artifactId>transitive</artifactId>", "<groupId>*</groupId>");
+        assertThat(pom.indexOf("<scope>provided</scope>"))
+                .as("a requires static is needed to compile alone, so it is provided")
+                .isGreaterThan(pom.indexOf("<artifactId>annotations</artifactId>"))
+                .isLessThan(pom.indexOf("<artifactId>aliased</artifactId>"));
+    }
+
+    @Test
+    public void refuses_a_pom_that_is_not_flattened_where_a_required_module_resolved_to_no_maven_artifact()
+            throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/module/org.example.lib", "");
+        requires.setProperty("main/runtime/module/org.example.lib", "");
+        requires.store(argument.resolve(BuildStep.REQUIRES));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        assertThatThrownBy(() -> new Pom().apply(Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(argument, Map.of(
+                        Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
+                        Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED)))))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("org.example.lib")
+                .hasMessageContaining("flatten=true");
+    }
+
     private static String edge(String group, String scope, String edge) {
         int tab = edge.indexOf('\t');
         String parent = edge.substring(0, tab), child = edge.substring(tab + 1);
@@ -252,8 +326,6 @@ public class PomTest {
         dependencies.setProperty("main/runtime/maven/org.example/other/jar/4.5.6", "");
         dependencies.setProperty("main/compile/maven/org.example/zip/zip/7.8.9", "");
         dependencies.setProperty("main/runtime/maven/org.example/zip/zip/7.8.9", "");
-        dependencies.setProperty("main/compile/module/com.example.foo", "");
-        dependencies.setProperty("main/runtime/module/com.example.foo", "");
         dependencies.store(argument.resolve(BuildStep.REQUIRES));
         SequencedProperties metadata = new SequencedProperties();
         metadata.setProperty("project", "build.jenesis");

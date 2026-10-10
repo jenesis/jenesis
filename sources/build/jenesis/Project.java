@@ -1494,6 +1494,9 @@ public record Project(
                       maven.deploy.skip, maven.install.skip / a skipped publication task
                           -> stage=false in the module's packaging.properties, which keeps it out of
                           `export` and `release` alike
+                      flatten-maven-plugin with flattenDependencyMode=all / a published POM of
+                          the resolved closure -> flatten=true in the module's packaging.properties
+                          (04); its other modes are what a published POM is without it
                       maven-toolchains-plugin / java toolchains -> jenesis.toolchain.version (07)
                       <profiles> chosen with -P or a property / properties and conventions
                           -> jenesis-<profile>.properties; those activated by <jdk> or
@@ -1760,8 +1763,9 @@ public record Project(
                           lines add up. Excluding from a module that is not required is an error.
                           It is scoped to the path through <module>, as in Maven, so a coordinate
                           reached by two paths needs an exclusion on each. A sibling project module
-                          is one such path: its generated pom is flat, so a consumer meets that
-                          closure again through the sibling and excludes it there as well.
+                          is one such path: its generated pom is flat unless its packaging.properties
+                          sets flatten=false, so a consumer meets that closure again through the
+                          sibling and excludes it there as well.
                       @jenesis.override <module> <carrier>...
                           Replace a module with the modules already carrying its packages, for a
                           dependency that shades another module, as a server that bundles the API
@@ -1872,7 +1876,15 @@ public record Project(
                                                 stage=false to build and test the module but keep
                                                 its jar, POM, sources and documentation out of the
                                                 staged repositories, so neither export nor release
-                                                ships them
+                                                ships them,
+                                                flatten=true for a published POM that names the
+                                                resolved closure, each entry excluding what it would
+                                                bring, as the module-info.java layouts do by default,
+                                                and flatten=false for one that names what the module
+                                                declares, at the versions resolved, as a pom.xml does
+                                                by default; what only an optional dependency brings
+                                                is left out of a flattened POM, as Maven leaves it to
+                                                a consumer that declares that dependency itself
                       test.properties           framework=junit-platform|junit4|testng, naming what
                                                 this module's tests are written against; absent, it is
                                                 inferred from the resolved dependencies;
@@ -2631,13 +2643,15 @@ public record Project(
     private record PomAwareAssembler(MultiProjectAssembler<? super ProjectModuleDescriptor> base,
                                      String manifests,
                                      String prefix,
-                                     boolean resolved,
+                                     boolean flatten,
                                      boolean embed) implements MultiProjectAssembler<ProjectModuleDescriptor> {
 
         @Override
         public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
                                         Map<String, Repository> repositories,
                                         Map<String, Resolver> resolvers) throws IOException {
+            Path packaging = BuildStep.locate(descriptor.configuration(), "packaging.properties");
+            boolean flattened = packaging == null ? flatten : SequencedProperties.ofFiles(packaging).flag("flatten", flatten);
             ProjectModuleDescriptor nested = descriptor.toInherited();
             SequencedSet<String> synthetics = new LinkedHashSet<>(nested.synthetics());
             if (embed) {
@@ -2650,7 +2664,7 @@ public record Project(
                 sub.addModule("describe",
                         (describe, describeInherited) -> {
                             describe.addStep("pom",
-                                    new Pom().resolved(resolved).embedded(embed),
+                                    new Pom().resolved(flattened).embedded(embed),
                                     describeInherited.sequencedKeySet().stream());
                             if (manifests != null) {
                                 describe.addStep("identity", new MavenIdentity(prefix, manifests), "pom", manifests);

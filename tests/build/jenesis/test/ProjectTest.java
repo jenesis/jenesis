@@ -1779,6 +1779,63 @@ public class ProjectTest {
     }
     @Test
     public void the_pom_of_a_maven_module_lists_its_own_dependencies_and_not_those_of_a_sibling_it_depends_on() throws IOException {
+        writeMavenProjectWithSibling();
+        String pom = publishedPom(Project.Layout.MAVEN);
+        assertThat(pom)
+                .contains("<artifactId>base</artifactId>")
+                .as("what only the sibling declares reaches a consumer through the sibling's own POM")
+                .doesNotContain("<artifactId>library</artifactId>", "<groupId>*</groupId>");
+    }
+
+    @Test
+    public void the_pom_of_a_maven_module_lists_its_resolved_closure_where_its_packaging_properties_sets_flatten()
+            throws IOException {
+        writeMavenProjectWithSibling();
+        Files.writeString(Files.createDirectories(root.resolve("user/build.jenesis")).resolve("packaging.properties"),
+                "flatten=true\n");
+        assertThat(publishedPom(Project.Layout.MAVEN))
+                .as("a flattened POM names the whole closure and excludes what each entry would bring")
+                .contains("<artifactId>base</artifactId>", "<artifactId>library</artifactId>", "<groupId>*</groupId>");
+    }
+
+    @Test
+    public void the_pom_of_a_modular_module_lists_its_resolved_closure_unless_its_packaging_properties_sets_flatten_false()
+            throws IOException {
+        writeLibrary();
+        Files.writeString(Files.createDirectories(root.resolve("base/base")).resolve("Type.java"),
+                "package base; public class Type { }\n");
+        Files.writeString(root.resolve("base/module-info.java"), """
+                /**
+                 * @jenesis.alias library external/library
+                 * @jenesis.pin external/library 1
+                 */
+                module base {
+                    requires transitive library;
+                    exports base;
+                }
+                """);
+        Files.writeString(Files.createDirectories(root.resolve("user/user")).resolve("Type.java"),
+                "package user; public class Type { }\n");
+        Files.writeString(root.resolve("user/module-info.java"), """
+                module user {
+                    requires base;
+                    exports user;
+                }
+                """);
+        settings.put("maven.uri", elsewhere.resolve("repository").toUri().toString());
+        settings.put("maven.local", Files.createDirectories(elsewhere.resolve("local")).toString());
+        assertThat(publishedPom(Project.Layout.MODULAR_TO_MAVEN))
+                .as("a module declaration publishes the flattened closure by default")
+                .contains("<artifactId>base</artifactId>", "<artifactId>library</artifactId>", "<groupId>*</groupId>");
+        Files.writeString(Files.createDirectories(root.resolve("user/META-INF/build.jenesis")).resolve("packaging.properties"),
+                "flatten=false\n");
+        assertThat(publishedPom(Project.Layout.MODULAR_TO_MAVEN))
+                .as("flatten=false publishes what the module requires, named by the artifact it resolved to")
+                .contains("<artifactId>base</artifactId>")
+                .doesNotContain("<artifactId>library</artifactId>", "<groupId>*</groupId>");
+    }
+
+    private void writeLibrary() throws IOException {
         Path repository = Files.createDirectories(elsewhere.resolve("repository/external/library/1"));
         Files.writeString(repository.resolve("library-1.pom"), """
                 <project>
@@ -1790,6 +1847,10 @@ public class ProjectTest {
                 """);
         try (JarOutputStream _ = new JarOutputStream(Files.newOutputStream(repository.resolve("library-1.jar")))) {
         }
+    }
+
+    private void writeMavenProjectWithSibling() throws IOException {
+        writeLibrary();
         Files.writeString(root.resolve("pom.xml"), """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -1845,20 +1906,19 @@ public class ProjectTest {
                 </project>
                 """);
         settings.put("maven.uri", elsewhere.resolve("repository").toUri().toString());
-        settings.put("maven.local", Files.createDirectory(elsewhere.resolve("local")).toString());
+        settings.put("maven.local", Files.createDirectories(elsewhere.resolve("local")).toString());
+    }
+
+    private String publishedPom(Project.Layout layout) throws IOException {
         SequencedMap<String, Path> outputs = Project.ofEnvironment(new Environment(settings), root)
                 .target(root.resolve("target"))
-                .layout(Project.Layout.MAVEN)
+                .layout(layout)
                 .build(Project.BUILD);
-        String pom = Files.readString(outputs.entrySet().stream()
+        return Files.readString(outputs.entrySet().stream()
                 .filter(entry -> entry.getKey().endsWith("/module-user/produce/describe/pom"))
                 .map(Map.Entry::getValue)
                 .findFirst()
                 .orElseThrow()
                 .resolve("pom.xml"));
-        assertThat(pom)
-                .contains("<artifactId>base</artifactId>")
-                .as("what only the sibling declares reaches a consumer through the sibling's own POM")
-                .doesNotContain("<artifactId>library</artifactId>");
     }
 }

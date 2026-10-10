@@ -59,6 +59,20 @@ repository (`target/stage/maven/output`, keyed by the generated coordinate), and
 `greeter`'s generated POM, so the published `app` POM declares a dependency on
 the published `greeter` artifact.
 
+The published POM names the module's resolved closure rather than its `requires`
+alone: the `app` POM lists `demo.greeter` and the `slf4j-api` that `greeter` brings,
+each excluding everything it would bring itself, so a Maven consumer resolves
+exactly the versions this build resolved. A module whose POM should name only what
+its declaration requires says so in `app/META-INF/build.jenesis/packaging.properties`:
+
+    flatten=false
+
+The `app` POM then lists `demo.greeter` alone, at the version the build resolved,
+and a consumer finds `slf4j-api` through `greeter`'s own POM. A `requires static`
+is published with `provided` scope either way. A `pom.xml` module, as in
+`java-pom-multi`, publishes its declared dependencies by default, and `flatten=true`
+in its `packaging.properties` publishes the resolved closure instead.
+
 Packaging a resource
 --------------------
 
