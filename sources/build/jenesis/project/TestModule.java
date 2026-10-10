@@ -93,7 +93,7 @@ public class TestModule implements BuildExecutorModule {
                 environment.getProperty("test.filter"),
                 environment.getProperty("test.exclude"),
                 environment.getProperty("test.tag"),
-                environment.value("test.engines"),
+                null,
                 environment.flag("test.force"),
                 environment.flag("test.parallel"),
                 environment.flag("test.reporting"),

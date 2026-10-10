@@ -160,7 +160,7 @@ public record JUnitPlatform(String console) implements TestFramework {
         for (String entry : engines.split(",")) {
             String engine = entry.strip(), id = engine.startsWith("-") ? engine.substring(1).strip() : engine;
             if (id.isEmpty() || id.chars().anyMatch(Character::isWhitespace)) {
-                throw new IllegalArgumentException("jenesis.test.engines names JUnit Platform engines by their id,"
+                throw new IllegalArgumentException("The engines key of test.properties names JUnit Platform engines by their id,"
                         + " comma-separated, a leading - leaving one out, as junit-jupiter,-junit-vintage: "
                         + engines);
             }
