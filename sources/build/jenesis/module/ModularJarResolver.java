@@ -6,6 +6,7 @@ import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.Json;
 import build.jenesis.License;
+import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -238,7 +239,7 @@ public class ModularJarResolver implements Resolver {
                 descriptor.requires().stream()
                         .filter(requires -> !requires.accessFlags().contains(AccessFlag.STATIC_PHASE)
                                 || scope == DependencyScope.COMPILE && requires.accessFlags().contains(AccessFlag.TRANSITIVE))
-                        .filter(requires -> !requires.name().startsWith("java.") && !requires.name().startsWith("jdk."))
+                        .filter(requires -> !ModuleGraph.isSystemModule(requires.name()))
                         .sorted(Comparator.comparing(ModuleDescriptor.Requires::name))
                         .forEach(requires -> {
                             String name = requires.name();

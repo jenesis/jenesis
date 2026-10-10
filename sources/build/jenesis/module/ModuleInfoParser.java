@@ -2,6 +2,7 @@ package build.jenesis.module;
 
 import module java.base;
 import module jdk.compiler;
+import build.jenesis.ModuleGraph;
 import build.jenesis.Platform;
 import com.sun.source.doctree.LiteralTree;
 import javax.lang.model.SourceVersion;
@@ -46,7 +47,7 @@ public class ModuleInfoParser {
             for (DirectiveTree directive : module.getDirectives()) {
                 if (directive instanceof RequiresTree requires) {
                     String name = requires.getModuleName().toString();
-                    if (!name.startsWith("java.") && !name.startsWith("jdk.")) {
+                    if (!ModuleGraph.isSystemModule(name)) {
                         dependencies.add(name);
                         if (!requires.isStatic()) {
                             runtimeDependencies.add(name);
@@ -131,7 +132,7 @@ public class ModuleInfoParser {
                                     }
                                 }
                                 if (token.isEmpty() || version.isEmpty()
-                                        || token.startsWith("java.") || token.startsWith("jdk.")) {
+                                        || ModuleGraph.isSystemModule(token)) {
                                     continue;
                                 }
                                 String[] words = version.split(" ");
@@ -273,7 +274,7 @@ public class ModuleInfoParser {
                                             + " <groupId>/<artifactId>[/<type>[/<classifier>]]");
                                 }
                                 String alias = words[0];
-                                if (alias.startsWith("java.") || alias.startsWith("jdk.")) {
+                                if (ModuleGraph.isSystemModule(alias)) {
                                     throw new IllegalArgumentException("Illegal @jenesis.alias name '"
                                             + alias
                                             + "': platform modules cannot be aliased");
@@ -309,7 +310,7 @@ public class ModuleInfoParser {
                                             + "': expected <module-name> <groupId>/<artifactId>...");
                                 }
                                 String excluded = words[0];
-                                if (excluded.startsWith("java.") || excluded.startsWith("jdk.")) {
+                                if (ModuleGraph.isSystemModule(excluded)) {
                                     throw new IllegalArgumentException("Illegal @jenesis.exclude module '"
                                             + excluded
                                             + "': platform modules resolve no dependencies");
@@ -339,7 +340,7 @@ public class ModuleInfoParser {
                                             + "': expected <module-name> <module-name>...");
                                 }
                                 for (String word : words) {
-                                    if (word.startsWith("java.") || word.startsWith("jdk.")) {
+                                    if (ModuleGraph.isSystemModule(word)) {
                                         throw new IllegalArgumentException("Illegal @jenesis.override module '"
                                                 + word
                                                 + "': platform modules cannot be overridden or carry an override");
@@ -368,7 +369,7 @@ public class ModuleInfoParser {
                                 int split = content.indexOf(' ');
                                 String token = split < 0 ? content : content.substring(0, split);
                                 String arguments = split < 0 ? "" : content.substring(split + 1).trim();
-                                if (token.startsWith("java.") || token.startsWith("jdk.")) {
+                                if (ModuleGraph.isSystemModule(token)) {
                                     throw new IllegalArgumentException("Illegal @jenesis.attach token '"
                                             + token
                                             + "': platform modules cannot be attached");
@@ -394,7 +395,7 @@ public class ModuleInfoParser {
                                             + module.getName());
                                 }
                                 for (String token : content.split(" ")) {
-                                    if (token.startsWith("java.") || token.startsWith("jdk.")) {
+                                    if (ModuleGraph.isSystemModule(token)) {
                                         throw new IllegalArgumentException("Illegal @jenesis.native token '"
                                                 + token
                                                 + "': platform modules cannot be granted native access");

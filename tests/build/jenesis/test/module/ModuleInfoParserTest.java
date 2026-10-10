@@ -401,6 +401,27 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void a_java_prefixed_module_the_jdk_does_not_hold_is_a_dependency_and_can_be_aliased() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias java.money javax.money/money-api
+                 */
+                module foo {
+                    requires java.sql;
+                    requires static java.money;
+                    requires jdk.unsupported;
+                    requires jdk.example.library;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.requires())
+                .as("only a module of the running JDK is a platform module, whatever its name starts with")
+                .containsExactly("java.money", "jdk.example.library");
+        assertThat(info.runtimeRequires()).containsExactly("jdk.example.library");
+        assertThat(info.aliases()).containsEntry("java.money", "javax.money/money-api");
+    }
+
+    @Test
     public void jenesis_alias_rejects_conflicting_duplicates() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**

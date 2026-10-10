@@ -4652,6 +4652,27 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void aliases_a_java_prefixed_module_the_jdk_does_not_hold_and_refuses_one_it_does() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.alias java.money javax.money/money-api-->
+                </project>
+                """);
+        assertThat(mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of("")).aliases())
+                .containsExactly(Map.entry("java.money", "javax.money/money-api"));
+        Files.writeString(project.resolve("pom.xml"), Files.readString(project.resolve("pom.xml"))
+                .replace("java.money", "java.sql"));
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Illegal jenesis.alias name 'java.sql'");
+    }
+
+    @Test
     public void refuses_a_module_alias_comment_that_names_no_coordinate() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
