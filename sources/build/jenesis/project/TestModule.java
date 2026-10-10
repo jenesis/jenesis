@@ -1002,43 +1002,34 @@ public class TestModule implements BuildExecutorModule {
 
         private static boolean failures(Path report, SequencedSet<String> failed) throws IOException {
             int before = failed.size();
-            try {
-                SAXParserFactory factory = SAXParserFactory.newInstance();
-                factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-                factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-                factory.newSAXParser().parse(report.toFile(), new DefaultHandler() {
+            parsed(report, new DefaultHandler() {
 
-                    private String testcase;
+                private String testcase;
 
-                    @Override
-                    public void startElement(String uri, String localName, String qualifiedName, Attributes attributes) {
-                        switch (qualifiedName) {
-                            case "testcase" -> {
-                                String type = attributes.getValue("classname"), name = attributes.getValue("name");
-                                testcase = type == null || type.isEmpty() ? name : name == null ? type : type + "#" + name;
-                            }
-                            case "failure", "error" -> {
-                                if (testcase != null) {
-                                    failed.add(testcase);
-                                }
-                            }
-                            default -> {
+                @Override
+                public void startElement(String uri, String localName, String qualifiedName, Attributes attributes) {
+                    switch (qualifiedName) {
+                        case "testcase" -> {
+                            String type = attributes.getValue("classname"), name = attributes.getValue("name");
+                            testcase = type == null || type.isEmpty() ? name : name == null ? type : type + "#" + name;
+                        }
+                        case "failure", "error" -> {
+                            if (testcase != null) {
+                                failed.add(testcase);
                             }
                         }
-                    }
-
-                    @Override
-                    public void endElement(String uri, String localName, String qualifiedName) {
-                        if (qualifiedName.equals("testcase")) {
-                            testcase = null;
+                        default -> {
                         }
                     }
-                });
-            } catch (SAXException _) {
-                return failed.size() > before;
-            } catch (ParserConfigurationException e) {
-                throw new IllegalStateException(e);
-            }
+                }
+
+                @Override
+                public void endElement(String uri, String localName, String qualifiedName) {
+                    if (qualifiedName.equals("testcase")) {
+                        testcase = null;
+                    }
+                }
+            });
             return failed.size() > before;
         }
 
