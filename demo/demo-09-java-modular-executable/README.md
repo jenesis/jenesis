@@ -358,9 +358,12 @@ build is reproducible, and `pin` refreshes it the same way it pins everything el
 
 Unlike `jpackage` and `bundle`, this carries no JVM and no `jlink` runtime - it is a
 plain jar that runs on any JDK 25 - and unlike the `bundle.zip` it needs no launch
-script. `stage` collects it into `stage/packages/` as `<artifact>.jar`. What
-`process-java.properties` names does not travel with it, because `java -jar` reads no
-JVM option from the jar it runs: an application that needs one ships as a bundle. (A bundle with no `mainClass` is instead a self-contained Java agent; see the
+script. `stage` collects it into `stage/packages/` as `<artifact>.jar`. It carries the
+`--add-reads`, `--add-exports`, `--add-opens` and `--enable-native-access` lines of
+`process-java.properties`, which the launcher applies to the modules it defines. Any other
+JVM option does not travel with it, because `java -jar` reads none from the jar it runs:
+the build names each one it leaves out, and an application that needs one passes it to
+`java -jar` or ships as a bundle. (A bundle with no `mainClass` is instead a self-contained Java agent; see the
 launcher's own documentation.)
 
 Fully bundled native installer
