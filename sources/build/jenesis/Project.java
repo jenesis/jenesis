@@ -889,11 +889,13 @@ public record Project(
                                  dependency's - that Maven activates by <jdk>, matched against the
                                  JDK the build runs on (an unclosed [9, or [9 reads as [9,); a
                                  fetched POM's range that is none leaves its profile inactive, the
-                                 project's own is refused), or by <activeByDefault> when no
+                                 project's own is refused), by <os>, its family, name, arch and
+                                 version matched against the machine the build runs on as Maven
+                                 matches them, or by <activeByDefault> when no
                                  other profile of that POM is active, with its <properties>,
                                  dependencies, <dependencyManagement> and resource directories
                       ignored    <build><plugins> and <pluginManagement>, a profile activated by
-                                 a property, the OS, a file or -P, a profile's <modules>,
+                                 a property, a file or -P, a profile's <modules>,
                                  <repositories> and settings.xml, a resource's includes,
                                  excludes, targetPath and filtering, system scope, and every
                                  packaging but jar and bundle

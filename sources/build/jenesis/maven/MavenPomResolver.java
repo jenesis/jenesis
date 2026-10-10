@@ -20,7 +20,7 @@ public class MavenPomResolver implements MavenResolver {
     private static final String NAMESPACE_4_0_0 = "http://maven.apache.org/POM/4.0.0",
             NAMESPACE_4_1_0 = "http://maven.apache.org/POM/4.1.0";
     private static final Set<String> IMPLICITS = Set.of("groupId", "artifactId", "version", "packaging");
-    private static final Set<String> JDK_ACTIVATIONS = Set.of("jdk", "activeByDefault");
+    private static final Set<String> ACTIVATIONS = Set.of("jdk", "os", "activeByDefault");
     private static final Set<String> PROCESSORS = Set.of("processor", "classpath-processor", "modular-processor");
     private static final Pattern PROPERTY = Pattern.compile("(\\$\\{([^}]+)})");
     private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
@@ -31,7 +31,7 @@ public class MavenPomResolver implements MavenResolver {
     public static final String CHECKSUM_PREFIX = "Checksum/";
 
     private final Supplier<MavenVersionNegotiator> negotiatorSupplier;
-    private final String jdk;
+    private final String jdk, osName, osArch, osVersion;
     private final transient Consumer<String> printing;
     private final transient Palette palette;
     private final transient DocumentBuilderFactory factory = MavenDefaultVersionNegotiator.toDocumentBuilderFactory();
@@ -61,25 +61,41 @@ public class MavenPomResolver implements MavenResolver {
     }
 
     public <S extends Supplier<MavenVersionNegotiator> & Serializable> MavenPomResolver(S negotiatorSupplier) {
-        this(negotiatorSupplier, System.getProperty("java.version"), null, Palette.NONE);
+        this(negotiatorSupplier,
+                System.getProperty("java.version"),
+                System.getProperty("os.name"),
+                System.getProperty("os.arch"),
+                System.getProperty("os.version"),
+                null,
+                Palette.NONE);
     }
 
     private MavenPomResolver(Supplier<MavenVersionNegotiator> negotiatorSupplier,
                              String jdk,
+                             String osName,
+                             String osArch,
+                             String osVersion,
                              Consumer<String> printing,
                              Palette palette) {
         this.negotiatorSupplier = negotiatorSupplier;
         this.jdk = jdk;
+        this.osName = osName.toLowerCase(Locale.ENGLISH);
+        this.osArch = osArch.toLowerCase(Locale.ENGLISH);
+        this.osVersion = osVersion.toLowerCase(Locale.ENGLISH);
         this.printing = printing;
         this.palette = palette;
     }
 
     public MavenPomResolver jdk(String jdk) {
-        return new MavenPomResolver(negotiatorSupplier, jdk, printing, palette);
+        return new MavenPomResolver(negotiatorSupplier, jdk, osName, osArch, osVersion, printing, palette);
+    }
+
+    public MavenPomResolver os(String osName, String osArch, String osVersion) {
+        return new MavenPomResolver(negotiatorSupplier, jdk, osName, osArch, osVersion, printing, palette);
     }
 
     public MavenPomResolver printing(Consumer<String> printing, Palette palette) {
-        return new MavenPomResolver(negotiatorSupplier, jdk, printing, palette);
+        return new MavenPomResolver(negotiatorSupplier, jdk, osName, osArch, osVersion, printing, palette);
     }
 
     @Override
@@ -534,8 +550,8 @@ public class MavenPomResolver implements MavenResolver {
                                     ? ""
                                     : " of " + origin.groupId() + ":" + origin.artifactId() + ":" + current.originVersion())
                             + " names the property " + undefined + ", which neither the declaring POM, its parents"
-                            + " nor a profile this build activates defines - a profile is activated by <jdk> or"
-                            + " <activeByDefault> alone, and a property of the JVM or of the environment is never read"
+                            + " nor a profile this build activates defines - a profile is activated by <jdk>, <os>"
+                            + " or <activeByDefault> alone, and a property of the JVM or of the environment is never read"
                             + (origin == null ? "" : ": exclude " + dependencyKey.groupId() + ":"
                                     + dependencyKey.artifactId() + " from " + origin.groupId() + ":"
                                     + origin.artifactId() + " and declare the artifact it stands for yourself"));
@@ -1416,9 +1432,11 @@ public class MavenPomResolver implements MavenResolver {
                 .findFirst()
                 .filter(activation -> toChildren(activation)
                         .filter(condition -> condition.getNodeType() == Node.ELEMENT_NODE)
-                        .allMatch(condition -> JDK_ACTIVATIONS.contains(condition.getLocalName())))
-                .flatMap(activation -> toElementText(activation, "jdk"))
-                .filter(range -> isJdk(range, path, trusted))
+                        .allMatch(condition -> ACTIVATIONS.contains(condition.getLocalName())))
+                .filter(activation -> toElements(activation, "jdk").findFirst().isPresent()
+                        || toElements(activation, "os").findFirst().isPresent())
+                .filter(activation -> toElementText(activation, "jdk").map(range -> isJdk(range, path, trusted)).orElse(true))
+                .filter(activation -> toElements(activation, "os").findFirst().map(this::isOs).orElse(true))
                 .isPresent()).toList();
         return activated.isEmpty()
                 ? profiles.stream().filter(profile -> toElements(profile, "activation")
@@ -1464,6 +1482,38 @@ public class MavenPomResolver implements MavenResolver {
                     + " or [11,12),[16,)");
         }
         return matched != negated;
+    }
+
+    private boolean isOs(Node os) {
+        return toChildren(os).filter(condition -> condition.getNodeType() == Node.ELEMENT_NODE).allMatch(condition -> {
+            String required = condition.getTextContent().trim().toLowerCase(Locale.ENGLISH);
+            boolean negated = required.startsWith("!");
+            String value = negated ? required.substring(1).trim() : required;
+            boolean windows = osName.contains("windows");
+            boolean matched = switch (condition.getLocalName()) {
+                case "family" -> switch (value) {
+                    case "windows" -> windows;
+                    case "win9x", "winnt" -> windows && Stream.of("95", "98", "me", "ce").anyMatch(osName::contains)
+                            == value.equals("win9x");
+                    case "dos" -> windows || osName.contains("os/2");
+                    case "mac" -> osName.contains("mac");
+                    case "unix" -> !windows
+                            && !osName.contains("os/2")
+                            && !osName.contains("netware")
+                            && !osName.contains("openvms")
+                            && (!osName.contains("mac") || osName.endsWith("x"));
+                    case "os/2", "netware", "openvms", "os/400" -> osName.contains(value);
+                    case "tandem" -> osName.contains("nonstop_kernel");
+                    case "z/os" -> osName.contains("z/os") || osName.contains("os/390");
+                    default -> false;
+                };
+                case "name" -> osName.equals(value);
+                case "arch" -> osArch.equals(value);
+                case "version" -> osVersion.equals(value);
+                default -> true;
+            };
+            return matched != negated;
+        });
     }
 
     private int compareJdk(String bound) {
