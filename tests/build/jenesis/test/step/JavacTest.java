@@ -95,6 +95,23 @@ public class JavacTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"8", "1.8"})
+    public void refuses_a_module_descriptor_at_a_release_below_9_naming_the_multi_release_folder(String release) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES)).resolve("module-info.java"),
+                "module sample { }\n");
+        Javac.writeRelease(sources, release, Runtime.version().feature());
+        assertThatThrownBy(() -> new Javac(ProcessHandler.Factory.TOOL).apply(Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("release " + release + ", below 9")
+                .hasMessageContaining("META-INF/versions/9/");
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void compiles_a_module_that_declares_no_release_for_the_running_one(boolean process) throws IOException {
         Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES)).resolve("module-info.java"),

@@ -250,6 +250,23 @@ public class Javac extends ProcessBuildStep {
                 .findFirst()
                 .orElse(null);
         boolean module = moduleInfo != null;
+        if (module) {
+            List<String> options = prepended(properties);
+            String release = null;
+            for (int index = 0; index < options.size() - 1; index++) {
+                if (options.get(index).equals("--release") || options.get(index).equals("--target")) {
+                    release = options.get(index + 1);
+                }
+            }
+            String feature = release != null && release.startsWith("1.") ? release.substring(2) : release;
+            if (feature != null && feature.matches("[0-9]+") && Integer.parseInt(feature) < 9) {
+                throw new IllegalArgumentException("A module-info.java at the root of the sources is compiled at release "
+                        + release + ", below 9, the first release of the Java Module System, so javac cannot compile"
+                        + " the descriptor there: move it into META-INF/versions/9/ of the same source folder, as"
+                        + " src/main/java/META-INF/versions/9/module-info.java, where it is compiled at release 9 into"
+                        + " a multi-release jar, or raise the release to 9 or above");
+            }
+        }
         PathPlacement pathPlacement = this.pathPlacement.forModuleInfo(module);
         String patchModule = null;
         if (module && !siblingClasses.isEmpty()) {
