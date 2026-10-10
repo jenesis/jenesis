@@ -1206,7 +1206,9 @@ public record Project(
                     A process-<tool>.properties line is a flag and its argument, `-Xmaxwarns=500`, and a
                     bare flag has an empty value, `-parameters=`. A flag given more than once, as --add-opens
                     is, takes one argument per line of its value:
-                    `--add-opens=java.base/java.lang=ALL-UNNAMED\\njava.base/java.util=ALL-UNNAMED`.
+                    `--add-opens=java.base/java.lang=ALL-UNNAMED\\njava.base/java.util=ALL-UNNAMED`,
+                    and a flag that takes two arguments has them parted by a tab,
+                    `-linkoffline=https\\://example.com/api/\\toffline/api` for javadoc's.
                     A flag that holds a `:` or `=` escapes
                     it, since a properties file splits there: `-Xlint\\:all=`. A system property is the
                     one exception and is written as on a command line, `-Dkey=value`, its value a
@@ -1951,6 +1953,9 @@ public record Project(
                                                 jar, jlink, jpackage, ...), one flag per key and its
                                                 argument as the value, `-parameters=` for a bare one
                                                 and `-Xlint\\:all=` where the flag holds a : or =,
+                                                a line of the value per repetition of the flag and
+                                                a tab between the arguments of one that takes
+                                                several, `-linkoffline=<url>\\t<folder>`,
                                                 but `-Dkey=value` for a system property,
                                                 refusing one the module's declaration sets already,
                                                 as javac's --release; a --source or --target of

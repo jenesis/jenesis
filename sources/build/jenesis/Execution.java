@@ -152,7 +152,7 @@ public record Execution(Project project, String mainClass, String module, Contai
                 for (String value : values.split("\n")) {
                     javaArgs.add(option);
                     if (!value.isEmpty()) {
-                        javaArgs.add(value);
+                        javaArgs.addAll(List.of(value.split("\t")));
                     }
                 }
             });
