@@ -73,7 +73,7 @@ public class Jar extends ProcessBuildStep {
         List<String> commands = new ArrayList<>(List.of(
                 "--create",
                 "--file",
-                Files.createDirectory(context.next().resolve(sort.folder()))
+                Files.createDirectory(context.next().resolve(sort.folder))
                         .resolve(sort.file(arguments))
                         .toString()));
         if (timestamp != null) {
@@ -84,7 +84,7 @@ public class Jar extends ProcessBuildStep {
             if (argument.removed()) {
                 continue;
             }
-            for (String name : sort.folders()) {
+            for (String name : sort.folders) {
                 Path candidate = argument.folder().resolve(name).resolve(JarFile.MANIFEST_NAME);
                 if (Files.isRegularFile(candidate)) {
                     manifestFiles.add(candidate);
@@ -124,7 +124,7 @@ public class Jar extends ProcessBuildStep {
             if (argument.removed()) {
                 continue;
             }
-            for (String name : sort.folders()) {
+            for (String name : sort.folders) {
                 Path folder = argument.folder().resolve(name);
                 if (!Files.exists(folder)) {
                     continue;
@@ -179,32 +179,16 @@ public class Jar extends ProcessBuildStep {
         SOURCES("sources", "-sources", BuildStep.SOURCES, BuildStep.SOURCES, BuildStep.RESOURCES),
         JAVADOC("javadoc", "-javadoc", BuildStep.DOCUMENTATION, Javadoc.JAVADOC);
 
-        private final String kind;
-        private final String suffix;
-        private final String folder;
-        private final List<String> folders;
+        final String kind;
+        final String suffix;
+        final String folder;
+        final List<String> folders;
 
         Sort(String kind, String suffix, String folder, String... folders) {
             this.kind = kind;
             this.suffix = suffix;
             this.folder = folder;
             this.folders = List.of(folders);
-        }
-
-        public String kind() {
-            return kind;
-        }
-
-        public String suffix() {
-            return suffix;
-        }
-
-        public String folder() {
-            return folder;
-        }
-
-        public List<String> folders() {
-            return folders;
         }
 
         public String file(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
