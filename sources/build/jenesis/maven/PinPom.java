@@ -104,31 +104,44 @@ public class PinPom implements BuildStep {
         Set<String> internal = collectInternal(Inventory.identities(arguments.values()));
         SequencedMap<String, String> entries = collectEntries(closure, internal, hashFunction);
         SequencedMap<String, List<String>> exclusions = new LinkedHashMap<>();
+        SequencedMap<String, String> expressions = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
-            Path module = argument.folder().resolve(MODULE), managed = argument.folder().resolve(MANAGED);
+            Path module = argument.folder().resolve(MODULE),
+                    managed = argument.folder().resolve(MANAGED),
+                    expressed = argument.folder().resolve(MavenProject.EXPRESSIONS);
             if (argument.removed()
-                    || !Files.isRegularFile(managed)
                     || !Files.isRegularFile(module)
                     || !path.equals(SequencedProperties.ofFiles(module).getProperty("path"))) {
                 continue;
             }
-            SequencedProperties properties = SequencedProperties.ofFiles(managed);
-            for (String key : properties.stringPropertyNames()) {
-                String coordinate = key.substring(key.indexOf('/') + 1);
-                if (coordinate.startsWith(prefix + "/")) {
-                    exclusions.putIfAbsent(coordinate.substring(prefix.length() + 1), properties.entries(key));
+            if (Files.isRegularFile(managed)) {
+                SequencedProperties properties = SequencedProperties.ofFiles(managed);
+                for (String key : properties.stringPropertyNames()) {
+                    String coordinate = key.substring(key.indexOf('/') + 1);
+                    if (coordinate.startsWith(prefix + "/")) {
+                        exclusions.putIfAbsent(coordinate.substring(prefix.length() + 1), properties.entries(key));
+                    }
                 }
+            }
+            if (Files.isRegularFile(expressed)) {
+                SequencedProperties.ofFiles(expressed).forEachProperty(expressions::putIfAbsent);
             }
         }
         for (Path pomFile : pomFiles) {
-            updatePom(pomFile, entries, exclusions);
+            updatePom(pomFile, entries, exclusions, expressions);
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
     private void updatePom(Path pomFile,
                            SequencedMap<String, String> entries,
-                           SequencedMap<String, List<String>> exclusions) throws IOException {
+                           SequencedMap<String, List<String>> exclusions,
+                           SequencedMap<String, String> expressions) throws IOException {
+        Map<String, String> expressed = new HashMap<>();
+        expressions.forEach((coordinate, expression) -> {
+            String[] raw = expression.split(" ")[0].split("/", -1);
+            expressed.put(new MavenDependencyKey(raw[0], raw[1], raw[2], raw[3]).coordinate(null, null), coordinate);
+        });
         String existing = Files.readString(pomFile);
         Matcher dependencyManagementMatcher = DEPENDENCY_MANAGEMENT.matcher(existing);
         String indent;
@@ -166,10 +179,11 @@ public class PinPom implements BuildStep {
                 String children = retaining.substring(retaining.indexOf("\n") + 1);
                 children = children.substring(0, children.lastIndexOf('\n') + 1);
                 if (coordinate.containsKey("groupId") && coordinate.containsKey("artifactId") && !children.isBlank()) {
-                    retained.putIfAbsent(new MavenDependencyKey(coordinate.get("groupId"),
+                    String written = new MavenDependencyKey(coordinate.get("groupId"),
                             coordinate.get("artifactId"),
                             coordinate.get("type"),
-                            coordinate.get("classifier")).coordinate(null, null), children);
+                            coordinate.get("classifier")).coordinate(null, null);
+                    retained.putIfAbsent(expressed.getOrDefault(written, written), children);
                 }
             }
         } else {
@@ -198,7 +212,9 @@ public class PinPom implements BuildStep {
         List<String> preserved = pinned.isEmpty()
                 ? List.of()
                 : preserveGuarded(pinned.toString(), qualified, managed);
-        String block = managed.isEmpty() && imports.isEmpty() ? "" : renderBlock(imports, managed, retained, exclusions, indent);
+        String block = managed.isEmpty() && imports.isEmpty()
+                ? ""
+                : renderBlock(imports, managed, retained, exclusions, expressions, indent);
         String updated;
         if (dependencyManagementMatcher.find(0)) {
             updated = dependencyManagementMatcher.replaceFirst(Matcher.quoteReplacement(block));
@@ -398,6 +414,7 @@ public class PinPom implements BuildStep {
                                       SequencedMap<String, String> entries,
                                       SequencedMap<String, String> retained,
                                       SequencedMap<String, List<String>> exclusions,
+                                      SequencedMap<String, String> expressions,
                                       String indent) {
         StringBuilder sb = new StringBuilder();
         sb.append(indent).append("<dependencyManagement>\n");
@@ -416,6 +433,18 @@ public class PinPom implements BuildStep {
             int space = value.indexOf(' ');
             String version = space < 0 ? value : value.substring(0, space);
             String checksum = space < 0 ? null : value.substring(space + 1).trim();
+            String expression = expressions.get(entry.getKey());
+            if (expression != null) {
+                String[] words = expression.split(" ");
+                String[] raw = words[0].split("/", -1);
+                groupId = raw[0];
+                artifactId = raw[1];
+                type = raw[2].isEmpty() ? type : raw[2];
+                classifier = raw[3].isEmpty() ? classifier : raw[3];
+                if (words.length == 3 && words[2].equals(version)) {
+                    version = words[1];
+                }
+            }
             String prefix = indent + indent + indent;
             sb.append(prefix).append("<dependency>\n");
             sb.append(prefix).append(indent).append("<groupId>").append(groupId).append("</groupId>\n");

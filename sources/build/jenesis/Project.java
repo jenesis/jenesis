@@ -1184,7 +1184,9 @@ public record Project(
                     again; -Djenesis.test.skip=true leaves the tests to the next build.
                     Commit before the first `pin`. It rewrites each pom.xml's <dependencyManagement>
                     with the versions and checksums it resolved, keeping only the imported BOMs, so
-                    review that diff. A pinned entry outranks a BOM, as any managed version does: to
+                    review that diff. An entry keeps the ${...} its coordinate was written with, and
+                    its version property where that still names the version resolved, so a
+                    classifier an OS profile selects stays selectable. A pinned entry outranks a BOM, as any managed version does: to
                     move to a new BOM version, change it, delete the entries `pin` wrote and pin
                     again. Then build with -Djenesis.dependency.pin=strict, as CI should. Before retiring the old build, compare what both produce: the jar
                     contents, the dependency tree (`dependencies` against mvn dependency:tree or
