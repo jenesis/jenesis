@@ -288,6 +288,20 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void a_system_property_in_a_process_file_is_one_argument_whose_value_may_be_a_variable() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("process-test.properties"),
+                "-Dplain=value\n-DshardCount=@shards\n-DshardIndex=@shard/0\n-Descaped\\=kept=\n-Dflag=\n");
+        Path prepareOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
+                new Environment(Map.of("variable.shards", "40"))), "sub/prepare").get("sub/prepare");
+        SequencedProperties arguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("test.properties"));
+        assertThat(arguments.stringPropertyNames())
+                .as("a -D line is the one argument -Dkey=value the JVM reads, not -Dkey followed by value")
+                .containsExactlyInAnyOrder("-Dplain=value", "-DshardCount=40", "-DshardIndex=0", "-Descaped=kept", "-Dflag");
+        assertThat(arguments.stringPropertyNames()).allSatisfy(key -> assertThat(arguments.getProperty(key)).isEmpty());
+    }
+
+    @Test
     public void a_variable_that_is_not_set_and_has_no_default_names_the_setting() throws IOException {
         Fixture fixture = setUp("main=\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("environment-test.properties"), "GREETING=@greeting\n");

@@ -1124,7 +1124,9 @@ public record Project(
                     is, takes one argument per line of its value:
                     `--add-opens=java.base/java.lang=ALL-UNNAMED\\njava.base/java.util=ALL-UNNAMED`.
                     A flag that holds a `:` or `=` escapes
-                    it, since a properties file splits there: `-Xlint\\:all=`. The release is not such a
+                    it, since a properties file splits there: `-Xlint\\:all=`. A system property is the
+                    one exception and is written as on a command line, `-Dkey=value`, its value a
+                    variable where it differs per run, `-DshardIndex=@shard/0`. The release is not such a
                     flag: a `--release` there is refused, since maven.compiler.release, its testRelease
                     or @jenesis.release declares it for every tool. javac runs without -g, where
                     Maven and Gradle pass it, so a test reading parameter or local names needs `-g=`
@@ -1805,6 +1807,7 @@ public record Project(
                                                 jar, jlink, jpackage, ...), one flag per key and its
                                                 argument as the value, `-parameters=` for a bare one
                                                 and `-Xlint\\:all=` where the flag holds a : or =,
+                                                but `-Dkey=value` for a system property,
                                                 refusing one the module's declaration sets already,
                                                 as javac's --release; a --source or --target of
                                                 javac's, or an --add-exports, --add-reads or
