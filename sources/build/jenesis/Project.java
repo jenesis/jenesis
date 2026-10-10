@@ -698,7 +698,8 @@ public record Project(
                       output is reused.
                     - Whenever you add or change a dependency, offer to run `pin`.
                     - Find the demo that matches the task and copy its shape rather than inventing
-                      configuration.
+                      configuration. A number a page cites, as (57), is the demo-57-* folder of
+                      https://github.com/jenesis/jenesis/tree/main/demo; skill/demos lists them.
                     - Moving a Maven or Gradle build here? Follow skill/migrate step by step.
 
                     ## First moves in a project you do not know
