@@ -833,7 +833,7 @@ public record Project(
                     module-info.java lives in META-INF/versions/9/ of its sources and the pom.xml build
                     compiles it there, with no annotation processing and so none of the main
                     compilation's -A options, against the dependencies that carry a module name; one whose
-                    jar declares none, as jline 2 or groovy-all 2 do, is named by a
+                    jar declares none is named by a
                     <!--jenesis.alias <module> <groupId>/<artifactId>--> comment in the pom.xml, the
                     name the descriptor requires. The old build follows the move: ModiTect's
                     moduleInfoFile, and maven-javadoc-plugin's sourcepath and excludePackageNames.
@@ -990,12 +990,12 @@ public record Project(
                                            or append that property to java.class.path before the
                                            tests run, from a LauncherSessionListener the test
                                            module provides
-                      Mockito              mocking an interface of a JDK module, as java.compiler's
-                                           Element, needs org.mockito to read that module:
-                                           `--add-reads=org.mockito=java.compiler` in
-                                           process-test.properties, naming the module concerned
-                      a jar that is no     a dependency with a class in the unnamed package, as
-                      module               JavaCC 8's, fails the tests' module path with a
+                      mocking, proxying    a library that mocks or proxies an interface of a JDK
+                                           module, as java.compiler's Element, needs to read that
+                                           module: `--add-reads=<library module>=java.compiler`
+                                           in process-test.properties, naming the module concerned
+                      a jar that is no     a dependency with a class in the unnamed package
+                      module               fails the tests' module path with a
                                            FindException, and nothing keeps one dependency of a
                                            module on the class path: move the tests that need
                                            it to a test source folder only the old build compiles
@@ -1123,7 +1123,7 @@ public record Project(
                     or @jenesis.release declares it for every tool. javac runs without -g, where
                     Maven and Gradle pass it, so a test reading parameter or local names needs `-g=`
                     or `-parameters=`. A plugin may pass flags its configuration never shows, as
-                    Palantir Baseline adds -parameters and Error Prone's -Xep flags, so compare the
+                    a convention plugin adds -parameters or a compiler plugin its own, so compare the
                     old build's effective javac arguments: `mvn -X compile` prints them after
                     "Command line options:", `gradle compileJava --debug` on its "Compiler
                     arguments:" line. Checkstyle reads a copy of the sources below target/build/,
@@ -2111,7 +2111,7 @@ public record Project(
                     outside context.next(): a step that must, as an exporter does, overrides
                     shouldRun to say it always runs.
 
-                    A tool that cannot be a module at all, as JavaCC 8 with a class in the unnamed
+                    A tool that cannot be a module at all, as one with a class in the unnamed
                     package, is forked instead, and the project resolves it rather than the plugin:
                     @jenesis.plugin <group> maven/<groupId>/<artifactId> in its module-info.java, or
                     <!--jenesis.plugin <group> maven/<groupId>/<artifactId>--> in its pom.xml, pinned
