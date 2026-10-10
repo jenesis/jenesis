@@ -1846,10 +1846,11 @@ public record Project(
 
                     Linters and the ktlint/scalafmt formatters activate from their own native config
                     files instead (checkstyle.xml, pmd.xml, spotbugs-exclude.xml, .editorconfig,
-                    .scalafmt.conf, ...). A linter is report-only for its findings: it prints a
-                    [FINDINGS] line with their number and its report, as its setting
-                    jenesis.source.<tool> (jenesis.validator.spotbugs for SpotBugs) is warn by default;
-                    strict fails the build on them instead, and ignore skips the linter.
+                    .scalafmt.conf, ...). A linter reports its findings, as its setting
+                    jenesis.source.<tool> (jenesis.validator.spotbugs for SpotBugs) is report by default;
+                    strict fails the build on them instead, and ignore skips the linter. Whether a
+                    [FINDINGS] line with their number and its report is printed is
+                    jenesis.print.findings, true by default.
                     A linter that cannot load its configuration
                     fails the build either way. Checkstyle's ${config_loc} is the
                     folder of checkstyle.xml, and a ${config_loc}/<path> it names is handed over with it.
@@ -3838,15 +3839,15 @@ public record Project(
                 sbom.cyclonedx|true|Emit a CycloneDX SBOM; sbom.properties selects its format
                 graalvm.license||Licence the SBOM beside a native image records for the GraalVM that compiled it, as an SPDX identifier or a name; empty records none
                 compliance|true|Run the license and vulnerability checks their configuration files activate
-                source.checkstyle|warn|ignore|warn|strict: Checkstyle, activated by a checkstyle.xml; ignore skips it, warn reports its findings, strict fails the build when it exits reporting a violation
-                source.pmd|warn|ignore|warn|strict: PMD, activated by a pmd.xml; ignore skips it, warn reports its findings, strict fails the build when it exits reporting a violation
+                source.checkstyle|report|ignore|report|strict: Checkstyle, activated by a checkstyle.xml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
+                source.pmd|report|ignore|report|strict: PMD, activated by a pmd.xml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
                 source.pmd.priority|5|The lowest rule priority PMD runs, from 1, the highest, to 5, the lowest, as maven-pmd-plugin's minimumPriority
-                validator.spotbugs|warn|ignore|warn|strict: SpotBugs, activated by a spotbugs-exclude.xml; ignore skips it, warn reports its findings, strict fails the build on any of them
-                source.detekt|warn|ignore|warn|strict: detekt, activated by a detekt.yml; ignore skips it, warn reports its findings, strict fails the build when it exits reporting a violation
-                source.ktlint|warn|ignore|warn|strict: ktlint linting, activated by an .editorconfig; ignore skips it, warn reports its findings, strict fails the build when it exits reporting a violation
-                source.scalastyle|warn|ignore|warn|strict: Scalastyle, activated by a scalastyle-config.xml; ignore skips it, warn reports its findings, strict fails the build when it exits reporting a violation
-                source.scalafmt|warn|ignore|warn|strict: scalafmt checking, activated by a .scalafmt.conf; ignore skips it, warn lists a source it would format differently, strict fails the build on one
-                source.codenarc|warn|ignore|warn|strict: CodeNarc, activated by a codenarc.xml; ignore skips it, warn reports its findings, strict fails the build on any of them
+                validator.spotbugs|report|ignore|report|strict: SpotBugs, activated by a spotbugs-exclude.xml; ignore skips it, report records its findings, strict fails the build on any of them
+                source.detekt|report|ignore|report|strict: detekt, activated by a detekt.yml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
+                source.ktlint|report|ignore|report|strict: ktlint linting, activated by an .editorconfig; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
+                source.scalastyle|report|ignore|report|strict: Scalastyle, activated by a scalastyle-config.xml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
+                source.scalafmt|report|ignore|report|strict: scalafmt checking, activated by a .scalafmt.conf; ignore skips it, report lists a source it would format differently, strict fails the build on one
+                source.codenarc|report|ignore|report|strict: CodeNarc, activated by a codenarc.xml; ignore skips it, report records its findings, strict fails the build on any of them
                 compile.errorprone|true|Error Prone over the javac plugin declared with @jenesis.plugin javac, activated by an errorprone.properties; javac forks to grant it the compiler internals it reads
                 format.java|true|The Java formatter a javaformat.properties selects
                 format.ktlint|true|ktlint formatting

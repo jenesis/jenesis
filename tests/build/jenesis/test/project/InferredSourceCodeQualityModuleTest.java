@@ -134,7 +134,7 @@ public class InferredSourceCodeQualityModuleTest {
                 Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("jenesis.source.checkstyle 'false'")
-                .hasMessageContaining("ignore, warn, strict");
+                .hasMessageContaining("ignore, report, strict");
     }
 
     @Test
