@@ -840,7 +840,8 @@ public record Project(
                     compiles it there, against the dependencies that carry a module name; one whose
                     jar declares none, as jline 2 or groovy-all 2 do, is named by a
                     <!--jenesis.alias <module> <groupId>/<artifactId>--> comment in the pom.xml, the
-                    name the descriptor requires.
+                    name the descriptor requires. The old build follows the move: ModiTect's
+                    moduleInfoFile, and maven-javadoc-plugin's sourcepath and excludePackageNames.
 
                     Otherwise a package either line prints, or one that a dependency holds as well,
                     rules modules out for now: migrate to pom.xml first, whichever declaration was asked
