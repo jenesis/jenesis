@@ -94,11 +94,6 @@ public record JUnitPlatform(String console) implements TestFramework {
     }
 
     @Override
-    public Map<String, String> systemProperties() {
-        return Map.of("org.jline.terminal.dumb", "true");
-    }
-
-    @Override
     public List<String> arguments(Path supplement,
                                   Path output,
                                   SequencedSet<String> classes,
