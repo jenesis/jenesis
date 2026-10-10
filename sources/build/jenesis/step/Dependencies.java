@@ -645,6 +645,43 @@ public class Dependencies implements BuildExecutorModule {
                                 resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, intent);
                             }
                         }
+                        if (pinned && !resolver.managedPrefixes().isEmpty()) {
+                            SequencedMap<String, String> modulePins = groupVersions
+                                    .getOrDefault(repo, Collections.emptyNavigableMap());
+                            for (Map.Entry<String, Resolver.Vertex> entry : resolution.vertices().entrySet()) {
+                                String module = entry.getValue().module();
+                                String pin = module == null ? null : modulePins.get(module);
+                                if (pin == null || coordinates.containsKey(module) || pin.startsWith(":")) {
+                                    continue;
+                                }
+                                int space = pin.indexOf(' ');
+                                String version = space < 0 ? pin : pin.substring(0, space);
+                                if (version.equals(entry.getValue().resolvedVersion())) {
+                                    continue;
+                                }
+                                String coordinate = entry.getKey().substring(entry.getKey().indexOf('/') + 1);
+                                String token = group.equals("main") ? module : group + "/" + repo + "/" + module;
+                                String placed = group.equals("main") && entry.getKey().startsWith("maven/")
+                                        ? coordinate
+                                        : group + "/" + entry.getKey();
+                                throw new IllegalArgumentException("@jenesis.pin "
+                                        + token
+                                        + " "
+                                        + version
+                                        + " matches no dependency: no module requires "
+                                        + module
+                                        + ", which the closure reaches through a POM as the Maven artifact "
+                                        + coordinate
+                                        + " in version "
+                                        + entry.getValue().resolvedVersion()
+                                        + ", and a pin by module name reaches only a module that is required by"
+                                        + " that name. Pin the artifact as @jenesis.pin "
+                                        + placed
+                                        + " "
+                                        + version
+                                        + " instead");
+                            }
+                        }
                         for (Map.Entry<String, Resolver.Resolved> entry : resolution.artifacts().entrySet()) {
                             String coordinate = entry.getKey().substring(entry.getKey().indexOf('/') + 1);
                             String declared = repoEntry.getValue().get(coordinate);
