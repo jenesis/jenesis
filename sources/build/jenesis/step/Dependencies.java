@@ -1168,16 +1168,26 @@ public class Dependencies implements BuildExecutorModule {
                         + " - require it directly");
             }
             if (descriptor != null) {
+                String version = coordinate.substring(coordinate.lastIndexOf('/') + 1);
                 throw new IllegalArgumentException("Target of module alias "
                         + alias
-                        + " is already the "
+                        + ", "
+                        + token
+                        + " "
+                        + version
+                        + ", is already the "
                         + (descriptor.isAutomatic() ? "automatic" : "named")
                         + " module "
                         + descriptor.name()
                         + " - require "
                         + descriptor.name()
                         + " instead of aliasing "
-                        + token);
+                        + token
+                        + ", or, if a version of "
+                        + token
+                        + " other than "
+                        + version
+                        + " is meant, pin that one, since the alias names no version of its own");
             }
             String previous = owners.putIfAbsent(coordinate, alias);
             if (previous != null) {
