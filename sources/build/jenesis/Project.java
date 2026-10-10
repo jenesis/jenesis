@@ -78,6 +78,7 @@ public record Project(
             METADATA = "metadata",
             HELP = "help",
             SKILL = "skill",
+            PROMPT = "prompt",
             PROPERTIES = "properties",
             CONFIGURATION = "configuration";
     private static final Pattern INPUT_NAME = Pattern.compile("[A-Za-z0-9._-]+");
@@ -126,6 +127,7 @@ public record Project(
                     project.environment().out(),
                     Palette.ofEnvironment(project.environment())));
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
+            executor.addModule(PROMPT, new PromptModule(project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
             MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler,
                     null,
@@ -218,6 +220,7 @@ public record Project(
                     project.environment().out(),
                     Palette.ofEnvironment(project.environment())));
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
+            executor.addModule(PROMPT, new PromptModule(project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
             MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(assembler, project.hashFunction());
             executor.addModule(BUILD, (sub, inherited) -> {
@@ -316,6 +319,7 @@ public record Project(
                     project.environment().out(),
                     Palette.ofEnvironment(project.environment())));
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
+            executor.addModule(PROMPT, new PromptModule(project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
             MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler,
                     BuildExecutorModule.PREVIOUS.repeat(2) + MultiProjectModule.MANIFESTS,
@@ -424,6 +428,7 @@ public record Project(
                     project.environment().out(),
                     Palette.ofEnvironment(project.environment())));
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
+            executor.addModule(PROMPT, new PromptModule(project.environment().out()));
             for (String name : List.of(BUILD, STAGE, EXPORT, RELEASE, PLUGIN, PIN, DEPENDENCIES, IDE, METADATA)) {
                 executor.addModule(name, (_, _) -> {
                     throw new IllegalStateException("No build descriptor found under "
@@ -544,6 +549,8 @@ public record Project(
                     %{title}Jenesis%{reset} - a Java build tool, written and configured in Java.
 
                     A coding agent runs %{name}java build/jenesis/Make.java skill/start%{reset} first, the briefing written for it.
+                    To have one move a Maven or Gradle build here, enter %{name}! java build/jenesis/Make.java prompt/migrate%{reset}
+                    in its prompt, or paste what that command prints.
 
                     %{header}Active configuration:%{reset}
                       layout      %{name}%{layout}%{reset}
@@ -576,6 +583,7 @@ public record Project(
                       %{name}properties%{reset}    Print only the %{name}-Djenesis.*%{reset} properties that are set
                       %{name}help%{reset}          Print this message
                       %{name}skill%{reset}         Print the briefing for a coding agent; %{name}skill/start%{reset} where to begin
+                      %{name}prompt%{reset}        Print a task to hand a coding agent; %{name}prompt/migrate%{reset} moves a build here
 
                       %{name}+<module>%{reset} narrows %{name}build%{reset} to one module, not %{name}stage%{reset}, %{name}export%{reset} or
                       %{name}pin%{reset}, and %{name}+<module>/<step>%{reset} narrows it to a single step inside that
@@ -649,6 +657,34 @@ public record Project(
         }
     }
 
+    private record PromptModule(Consumer<String> out) implements BuildExecutorModule {
+
+        @Override
+        public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
+            buildExecutor.addModule("migrate", (_, _) -> out.accept("""
+                    Migrate the build of this project to Jenesis, which is vendored in build/jenesis
+                    and needs nothing but the JDK. First run `java build/jenesis/Make.java skill/start`,
+                    then follow the briefing of `java build/jenesis/Make.java skill/migrate` step by
+                    step:
+
+                    - Keep the existing build working beside the new one until what both produce
+                      compares equal, and commit after every step that builds.
+                    - Move the build to pom.xml first. Where the briefing finds that the code can be
+                      modules, carry out the move to module-info.java afterwards, as a second phase
+                      of its own.
+                    - Replace every use of shading with a layer or with packaging, as the briefing
+                      describes, rather than with a relocated copy of a library.
+
+                    When you are done, give me a summary of the migration: what replaced each part of
+                    the old build, what was dropped and why, how the two builds compare - the tests
+                    run, the jar contents, the dependency tree and the published POM - and where a
+                    layer or packaging replaced shading, which keeps each library visible to licence
+                    and compliance checks and to the usage detection open source projects rely on for
+                    their funding.
+                    """));
+        }
+    }
+
     private record SkillModule(Path target, Consumer<String> out) implements BuildExecutorModule {
 
         private static final List<String> PAGES = List.of(
@@ -694,7 +730,9 @@ public record Project(
                       configuration. A number a page cites, as (57), is the demo-57-* folder of
                       https://github.com/jenesis/jenesis/tree/main/demo; skill/demos lists them.
                     - Moving a Maven or Gradle build here? Follow skill/migrate step by step, and end
-                      with the summary of the migration it asks for.
+                      with the summary of the migration it asks for. A user hands an agent that task by
+                      entering `! java build/jenesis/Make.java prompt/migrate` in its prompt, or by
+                      pasting what the command prints.
 
                     ## First moves in a project you do not know
 
@@ -1578,9 +1616,10 @@ public record Project(
                 case "selectors" -> """
                     # Jenesis - Address the graph
 
-                      build stage export pin dependencies ide metadata configuration properties help skill
+                      build stage export pin dependencies ide metadata configuration properties help skill prompt
                           Top-level entry points; ide[/idea|/vscode|/eclipse] drills into one tool,
-                          and skill/<page> prints one page of this briefing.
+                          skill/<page> prints one page of this briefing, and prompt/migrate the
+                          task a user hands an agent to move a build here.
                       +<module>         module subgraph inside `build` (not stage/export/pin).
                                         <module> is the source folder holding its pom.xml or
                                         module-info.java; nested, foo/bar is written +foo+bar.
