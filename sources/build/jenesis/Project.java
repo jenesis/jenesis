@@ -891,8 +891,10 @@ public record Project(
                                  excludes, targetPath and filtering, system scope, and every
                                  packaging but jar
                                  - a pom aggregator is followed for its modules, a war is not built
-                                 at all, and a src/test/java/module-info.java is a module of its own
-                                 rather than patched into the main one
+                                 at all, a jar with neither sources nor resources only where its
+                                 src/main/build.jenesis configures a plugin, and a
+                                 src/test/java/module-info.java is a module of its own rather than
+                                 patched into the main one
                       a BOM      a module of pom packaging that lists no modules but declares a
                                  <dependencyManagement>, such as a mockito-bom, is staged, exported
                                  and released as its POM alone: its coordinate, packaging and
