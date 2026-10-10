@@ -21,7 +21,7 @@ public class PmdModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-    private static final String STRICT = "source.pmd.strict";
+    private static final String STRICT = "source.pmd.strict", PRIORITY = "source.pmd.priority";
     private static final String REPORT = BuildStep.REPORTS + "pmd/pmd-report.xml";
     private static final String MAVEN_GROUP = "net.sourceforge.pmd", MAVEN_ARTIFACT = "pmd-dist";
 
@@ -30,6 +30,7 @@ public class PmdModule implements BuildExecutorModule {
     private final String tool;
     private final String configFile;
     private final boolean strict;
+    private final int priority;
     private final ProcessBuildStep.Terms terms;
 
     public PmdModule(Map<String, Repository> repositories,
@@ -39,6 +40,7 @@ public class PmdModule implements BuildExecutorModule {
              "pmd",
              "pmd.xml",
              false,
+             5,
              ProcessBuildStep.Terms.of("pmd"));
     }
 
@@ -50,6 +52,7 @@ public class PmdModule implements BuildExecutorModule {
                 "pmd",
                 "pmd.xml",
                 environment.flag(STRICT, false),
+                environment.number(PRIORITY, 5),
                 ProcessBuildStep.Terms.ofEnvironment(environment, "pmd"));
     }
 
@@ -58,12 +61,18 @@ public class PmdModule implements BuildExecutorModule {
                       String tool,
                       String configFile,
                       boolean strict,
+                      int priority,
                       ProcessBuildStep.Terms terms) {
+        if (priority < 1 || priority > 5) {
+            throw new IllegalArgumentException("The PMD rule priority " + priority + " of jenesis." + PRIORITY
+                    + " is none of PMD's priorities: name one from 1, the highest, to 5, the lowest");
+        }
         this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.configFile = configFile;
         this.strict = strict;
+        this.priority = priority;
         this.terms = terms;
     }
 
@@ -72,23 +81,27 @@ public class PmdModule implements BuildExecutorModule {
     }
 
     public PmdModule pinning(Pinning pinning) {
-        return new PmdModule(dependencies, pinning, tool, configFile, strict, terms);
+        return new PmdModule(dependencies, pinning, tool, configFile, strict, priority, terms);
     }
 
     public PmdModule tool(String tool) {
-        return new PmdModule(dependencies, pinning, tool, configFile, strict, terms);
+        return new PmdModule(dependencies, pinning, tool, configFile, strict, priority, terms);
     }
 
     public PmdModule configFile(String configFile) {
-        return new PmdModule(dependencies, pinning, tool, configFile, strict, terms);
+        return new PmdModule(dependencies, pinning, tool, configFile, strict, priority, terms);
     }
 
     public PmdModule strict(boolean strict) {
-        return new PmdModule(dependencies, pinning, tool, configFile, strict, terms);
+        return new PmdModule(dependencies, pinning, tool, configFile, strict, priority, terms);
+    }
+
+    public PmdModule priority(int priority) {
+        return new PmdModule(dependencies, pinning, tool, configFile, strict, priority, terms);
     }
 
     public PmdModule printing(BiConsumer<Boolean, String> printing) {
-        return new PmdModule(dependencies, pinning, tool, configFile, strict, terms.printing(printing));
+        return new PmdModule(dependencies, pinning, tool, configFile, strict, priority, terms.printing(printing));
     }
 
     @Override
@@ -103,7 +116,7 @@ public class PmdModule implements BuildExecutorModule {
         SequencedSet<String> checkInputs = new LinkedHashSet<>();
         checkInputs.add(DEPENDENCIES);
         checkInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(CHECK, new Check(terms, tool, configFile, strict), checkInputs);
+        buildExecutor.addStep(CHECK, new Check(terms, tool, configFile, strict, priority), checkInputs);
     }
 
     private record Requires(String tool) implements BuildStep {
@@ -130,15 +143,18 @@ public class PmdModule implements BuildExecutorModule {
         private final String tool;
         private final String configFile;
         private final boolean strict;
+        private final int priority;
 
         private Check(ProcessBuildStep.Terms terms,
                       String tool,
                       String configFile,
-                      boolean strict) {
+                      boolean strict,
+                      int priority) {
             super("pmd", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.configFile = configFile;
             this.strict = strict;
+            this.priority = priority;
         }
 
         @Override
@@ -194,6 +210,7 @@ public class PmdModule implements BuildExecutorModule {
                     "net.sourceforge.pmd.cli.PmdCli", "check",
                     "--no-cache",
                     "-R", config.toString(),
+                    "--minimum-priority", Integer.toString(priority),
                     "-f", "xml",
                     "-r", report.toString()));
             for (String root : roots) {

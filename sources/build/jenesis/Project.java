@@ -1229,7 +1229,8 @@ public record Project(
                       maven-checkstyle-plugin / checkstyle -> checkstyle.xml (34), with the
                           properties of its propertyExpansion or Gradle's configProperties in a
                           checkstyle.properties beside it; the build sets ${config_loc} itself
-                      maven-pmd-plugin / pmd -> pmd.xml (34)
+                      maven-pmd-plugin / pmd -> pmd.xml (34); minimumPriority / rulesMinimumPriority
+                          -> jenesis.source.pmd.priority
                       spotbugs-maven-plugin / com.github.spotbugs -> spotbugs-exclude.xml (34)
                       fmt-maven-plugin, Spotless for Java / Spotless, com.palantir.java-format
                           -> javaformat.properties; -Djenesis.format.rewrite=true rewrites (34)
@@ -3755,6 +3756,7 @@ public record Project(
                 source.checkstyle.strict|false|Fail the build when Checkstyle exits reporting a violation, instead of only reporting its findings
                 source.pmd|true|PMD, activated by a pmd.xml
                 source.pmd.strict|false|Fail the build when PMD exits reporting a violation, instead of only reporting its findings
+                source.pmd.priority|5|The lowest rule priority PMD runs, from 1, the highest, to 5, the lowest, as maven-pmd-plugin's minimumPriority
                 validator.spotbugs|true|SpotBugs, activated by a spotbugs-exclude.xml
                 validator.spotbugs.strict|false|Fail the build on any finding SpotBugs reports instead of only reporting it
                 source.detekt|true|detekt, activated by a detekt.yml

@@ -7,11 +7,13 @@ import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.PmdModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class PmdModuleTest {
 
@@ -29,6 +31,14 @@ public class PmdModuleTest {
         SequencedProperties requires = SequencedProperties.ofFiles(requiredOutput.resolve(BuildStep.REQUIRES));
         assertThat(requires.stringPropertyNames())
                 .containsExactly("pmd/runtime/maven/net.sourceforge.pmd/pmd-dist/RELEASE");
+    }
+
+    @Test
+    public void refuses_a_rule_priority_that_pmd_does_not_know() {
+        assertThatThrownBy(() -> PmdModule.ofEnvironment(new Environment(Map.of("source.pmd.priority", "6")), Map.of(), Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.source.pmd.priority")
+                .hasMessageContaining("from 1, the highest, to 5, the lowest");
     }
 
     private BuildExecutor newExecutor() throws IOException {
