@@ -399,7 +399,11 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         module.addStep("archive",
                                 Jar.ofEnvironment(environment, factory, Jar.Sort.SOURCES),
                                 inherited.sequencedKeySet()),
-                        Stream.of(descriptor.sources().stream(), descriptor.manifests().stream(), Stream.of("binary"))
+                        Stream.of(descriptor.sources().stream(),
+                                        descriptor.resources().stream(),
+                                        resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"),
+                                        descriptor.manifests().stream(),
+                                        Stream.of("binary"))
                                 .flatMap(Function.identity()));
             }
             if (descriptor.documentation() && (!tests || environment.flag("stage.tests"))) {

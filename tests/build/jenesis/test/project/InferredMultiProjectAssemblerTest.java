@@ -561,6 +561,31 @@ public class InferredMultiProjectAssemblerTest {
         }
     }
 
+    @Test
+    public void sources_jar_holds_the_resources_and_the_project_resources_of_the_module() throws IOException {
+        Fixture base = setUp("path=\n", false, true, false);
+        Fixture fixture = new Fixture(base.descriptor().resources(BuildExecutorModule.PREVIOUS + "artifacts"),
+                base.build(),
+                base.manifests(),
+                base.sources(),
+                base.artifacts(),
+                base.configuration(),
+                base.profile());
+        Files.writeString(Files.createDirectories(fixture.sources().resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }");
+        Files.writeString(Files.createDirectories(fixture.artifacts().resolve(BuildStep.RESOURCES + "META-INF/services"))
+                .resolve("java.lang.Runnable"), "sample.Sample\n");
+        SequencedMap<Path, Path> resources = new LinkedHashMap<>();
+        resources.put(Path.of("META-INF/LICENSE.md"), Files.writeString(root.resolve("LICENSE.md"), "licence"));
+        Path sourcesOutput = fixture.execute(new InferredMultiProjectAssembler().resources(resources), "sub/sources/archive")
+                .get("sub/sources/archive");
+        try (JarFile jar = new JarFile(sourcesOutput.resolve("sources").resolve("sources.jar").toFile())) {
+            assertThat(jar.stream().map(JarEntry::getName))
+                    .as("a sources jar holds the resources and the project resources the module's jar holds, as Maven's and Gradle's do")
+                    .contains("sample/Sample.java", "META-INF/services/java.lang.Runnable", "META-INF/LICENSE.md");
+        }
+    }
+
     private record GeneratingStep() implements BuildStep {
 
         @Override
