@@ -169,7 +169,9 @@ public class RepositoryTest {
             assertThatThrownBy(() -> Repository.open(connection().retries(1).backoff(Duration.ofMillis(1)), uri, null).close())
                     .isInstanceOf(IOException.class)
                     .hasMessageContaining("429 Too Many Requests after 2 attempt(s)")
-                    .hasMessageContaining("-Djenesis.maven.uri");
+                    .hasMessageContaining("configure a mirror of this repository")
+                    .as("a repository of any kind answers this way, so the advice names no repository's setting")
+                    .hasMessageNotContaining("jenesis.maven.uri");
             assertThat(hits.get()).isEqualTo(2);
         } finally {
             server.stop(0);

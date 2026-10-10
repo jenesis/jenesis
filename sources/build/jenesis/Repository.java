@@ -188,7 +188,7 @@ public interface Repository {
                     if (status == 429) {
                         throw new IOException(current + " answered 429 Too Many Requests after " + (attempt + 1)
                                 + " attempt(s): the server limits how often this machine asks, so build again later or"
-                                + " name a mirror, for Maven Central with -Djenesis.maven.uri or MAVEN_REPOSITORY_URI");
+                                + " configure a mirror of this repository in its place");
                     }
                     return http.getInputStream();
                 }
