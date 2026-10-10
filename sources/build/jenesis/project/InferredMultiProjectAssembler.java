@@ -334,7 +334,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             descriptor.configuration(),
                             repositories,
                             resolvers)
-                    .includeResources(descriptor.sourceResources())
+                    .includeResources(descriptor.includeResources())
                     .custom(hooks.getOrDefault("binary/compiled", none)));
             if (hooks.containsKey("binary/validate")) {
                 toolchainModule = toolchainModule.validatorModule(InferredByteCodeQualityModule.ofEnvironment(environment,

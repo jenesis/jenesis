@@ -24,7 +24,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
     private final Pinning pinning;
     private final PathPlacement pathPlacement;
     private final Path location;
-    private final boolean sourceResources;
+    private final boolean includeResources;
     private final Path directory;
 
     public ProjectModuleDescriptor(ProjectModule base) {
@@ -66,7 +66,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                                     Pinning pinning,
                                     PathPlacement pathPlacement,
                                     Path location,
-                                    boolean sourceResources,
+                                    boolean includeResources,
                                     Path directory) {
         this.name = name;
         this.configuration = configuration;
@@ -85,7 +85,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
         this.location = location;
-        this.sourceResources = sourceResources;
+        this.includeResources = includeResources;
         this.directory = directory;
     }
 
@@ -111,7 +111,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -137,7 +137,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -164,7 +164,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -191,7 +191,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -222,7 +222,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -253,7 +253,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -284,7 +284,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -315,7 +315,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -351,7 +351,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -381,7 +381,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -411,7 +411,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -441,7 +441,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -467,7 +467,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -493,7 +493,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -519,7 +519,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -549,7 +549,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -571,15 +571,15 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
-    public boolean sourceResources() {
-        return sourceResources;
+    public boolean includeResources() {
+        return includeResources;
     }
 
-    public ProjectModuleDescriptor sourceResources(boolean sourceResources) {
+    public ProjectModuleDescriptor includeResources(boolean includeResources) {
         return new ProjectModuleDescriptor(name,
                 configuration,
                 dependencies,
@@ -597,7 +597,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 
@@ -623,7 +623,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pinning,
                 pathPlacement,
                 location,
-                sourceResources,
+                includeResources,
                 directory);
     }
 

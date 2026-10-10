@@ -12,36 +12,36 @@ import build.jenesis.SequencedProperties;
 public class Bind implements BuildStep {
 
     private static final String BOUND = "bound";
-    private static final Set<String> EDITOR_FILES = Set.of(".classpath", ".project", ".settings", ".factorypath", ".eclipse");
+    private static final Set<String> IDE_FILES = Set.of(".classpath", ".project", ".settings", ".factorypath", ".eclipse");
 
     private final Map<Path, Path> paths;
     private final Set<String> extensions;
-    private final boolean editorFiles;
+    private final boolean ide;
 
     public Bind(Map<Path, Path> paths) {
         this(paths, null, true);
     }
 
-    private Bind(Map<Path, Path> paths, Set<String> extensions, boolean editorFiles) {
+    private Bind(Map<Path, Path> paths, Set<String> extensions, boolean ide) {
         this.paths = paths;
         this.extensions = extensions;
-        this.editorFiles = editorFiles;
+        this.ide = ide;
     }
 
     public Bind extensions(Set<String> extensions) {
-        return new Bind(paths, extensions, editorFiles);
+        return new Bind(paths, extensions, ide);
     }
 
-    public Bind editorFiles(boolean editorFiles) {
-        return new Bind(paths, extensions, editorFiles);
+    public Bind ide(boolean ide) {
+        return new Bind(paths, extensions, ide);
     }
 
     public static Bind asSources() {
-        return new Bind(Map.of(Path.of("."), Path.of(SOURCES))).editorFiles(false);
+        return new Bind(Map.of(Path.of("."), Path.of(SOURCES))).ide(false);
     }
 
     public static Bind asResources() {
-        return new Bind(Map.of(Path.of("."), Path.of(RESOURCES))).editorFiles(false);
+        return new Bind(Map.of(Path.of("."), Path.of(RESOURCES))).ide(false);
     }
 
     public static Bind asIdentity(String name) {
@@ -173,8 +173,8 @@ public class Bind implements BuildStep {
                                 @Override
                                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
                                         throws IOException {
-                                    if (!editorFiles && source.equals(dir.getParent())
-                                            && EDITOR_FILES.contains(dir.getFileName().toString())) {
+                                    if (!ide && source.equals(dir.getParent())
+                                            && IDE_FILES.contains(dir.getFileName().toString())) {
                                         return FileVisitResult.SKIP_SUBTREE;
                                     }
                                     if (!filtered) {
@@ -188,8 +188,8 @@ public class Bind implements BuildStep {
                                         throws IOException {
                                     String name = file.getFileName().toString();
                                     if (filtered && extensions.stream().noneMatch(name::endsWith)
-                                            || !editorFiles && source.equals(file.getParent())
-                                            && (EDITOR_FILES.contains(name) || name.endsWith(".iml"))) {
+                                            || !ide && source.equals(file.getParent())
+                                            && (IDE_FILES.contains(name) || name.endsWith(".iml"))) {
                                         return FileVisitResult.CONTINUE;
                                     }
                                     Path resolved = target.resolve(source.relativize(file));
