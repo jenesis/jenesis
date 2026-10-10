@@ -33,7 +33,7 @@ public class JaCoCoModule implements BuildExecutorModule {
              null,
              "jacoco",
              false,
-             ProcessBuildStep.Terms.of("jacoco"));
+             new ProcessBuildStep.Terms());
     }
 
     public static JaCoCoModule ofEnvironment(Environment environment,

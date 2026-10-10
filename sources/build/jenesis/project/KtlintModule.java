@@ -14,6 +14,7 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -37,7 +38,7 @@ public class KtlintModule implements BuildExecutorModule {
              null,
              "ktlint",
              false,
-             ProcessBuildStep.Terms.of("ktlint"));
+             new ProcessBuildStep.Terms());
     }
 
     public static KtlintModule ofEnvironment(Environment environment,
@@ -135,7 +136,8 @@ public class KtlintModule implements BuildExecutorModule {
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path report = context.next().resolve(REPORT);
-            return reported(code, context, report, findings(report, "error"), true, strict, SETTING);
+            return Findings.ofXml("ktlint", report, "error")
+                    .acceptable(code, context, true, strict, SETTING, terms.reporting());
         }
 
         @Override

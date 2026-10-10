@@ -41,7 +41,7 @@ public class ProtocModule implements BuildExecutorModule {
              classifier(),
              new LinkedHashMap<>(),
              List.of(),
-             ProcessBuildStep.Terms.of("protoc"));
+             new ProcessBuildStep.Terms());
     }
 
     public static ProtocModule ofEnvironment(Environment environment,

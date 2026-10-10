@@ -14,6 +14,7 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -41,7 +42,7 @@ public class CheckstyleModule implements BuildExecutorModule {
              "checkstyle",
              "checkstyle.xml",
              false,
-             ProcessBuildStep.Terms.of("checkstyle"));
+             new ProcessBuildStep.Terms());
     }
 
     public static CheckstyleModule ofEnvironment(Environment environment,
@@ -173,7 +174,8 @@ public class CheckstyleModule implements BuildExecutorModule {
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path report = context.next().resolve(REPORT);
-            return reported(code, context, report, findings(report, "error"), true, strict, SETTING);
+            return Findings.ofXml("checkstyle", report, "error")
+                    .acceptable(code, context, true, strict, SETTING, terms.reporting());
         }
 
         @Override

@@ -15,7 +15,7 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
     private final boolean verify;
 
     protected FormatBuildStep(String command, String tool, boolean verify) {
-        this(command, tool, verify, ProcessBuildStep.Terms.of(command));
+        this(command, tool, verify, new Terms());
     }
 
     protected FormatBuildStep(String command,

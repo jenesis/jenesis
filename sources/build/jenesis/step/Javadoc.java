@@ -28,7 +28,7 @@ public class Javadoc extends ProcessBuildStep {
     private final boolean timestamped;
 
     public Javadoc(ProcessHandler.Factory factory) {
-        this(factory.apply("javadoc", "bin/javadoc"), null, "main", false, false, Terms.of("javadoc"));
+        this(factory.apply("javadoc", "bin/javadoc"), null, "main", false, false, new Terms());
     }
 
     public static Javadoc ofEnvironment(Environment environment,

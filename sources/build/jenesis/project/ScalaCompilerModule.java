@@ -48,7 +48,7 @@ public class ScalaCompilerModule implements BuildExecutorModule {
              "scalac",
              "main",
              null,
-             ProcessBuildStep.Terms.of("scalac"));
+             new ProcessBuildStep.Terms());
     }
 
     public static ScalaCompilerModule ofEnvironment(Environment environment,

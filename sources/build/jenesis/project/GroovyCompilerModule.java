@@ -48,7 +48,7 @@ public class GroovyCompilerModule implements BuildExecutorModule {
              "groovyc",
              "main",
              null,
-             ProcessBuildStep.Terms.of("groovyc"));
+             new ProcessBuildStep.Terms());
     }
 
     public static GroovyCompilerModule ofEnvironment(Environment environment,

@@ -14,6 +14,7 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -39,7 +40,7 @@ public class DetektModule implements BuildExecutorModule {
              "detekt",
              "detekt.yml",
              false,
-             ProcessBuildStep.Terms.of("detekt"));
+             new ProcessBuildStep.Terms());
     }
 
     public static DetektModule ofEnvironment(Environment environment,
@@ -147,7 +148,8 @@ public class DetektModule implements BuildExecutorModule {
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path report = context.next().resolve(REPORT);
-            return reported(code, context, report, findings(report, "error"), true, strict, SETTING);
+            return Findings.ofXml("detekt", report, "error")
+                    .acceptable(code, context, true, strict, SETTING, terms.reporting());
         }
 
         @Override

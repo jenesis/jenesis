@@ -13,6 +13,7 @@ import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -40,7 +41,7 @@ public class SpotBugsModule implements BuildExecutorModule {
              "main",
              "spotbugs-exclude.xml",
              false,
-             ProcessBuildStep.Terms.of("spotbugs"));
+             new ProcessBuildStep.Terms());
     }
 
     public static SpotBugsModule ofEnvironment(Environment environment,
@@ -158,7 +159,8 @@ public class SpotBugsModule implements BuildExecutorModule {
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path report = context.next().resolve(REPORT);
-            return reported(code, context, report, findings(report, "BugInstance"), false, strict, SETTING);
+            return Findings.ofXml("spotbugs", report, "BugInstance")
+                    .acceptable(code, context, false, strict, SETTING, terms.reporting());
         }
 
         @Override

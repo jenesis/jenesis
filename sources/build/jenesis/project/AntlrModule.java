@@ -37,7 +37,7 @@ public class AntlrModule implements BuildExecutorModule {
              "antlr",
              null,
              List.of(),
-             ProcessBuildStep.Terms.of("antlr"));
+             new ProcessBuildStep.Terms());
     }
 
     public static AntlrModule ofEnvironment(Environment environment,

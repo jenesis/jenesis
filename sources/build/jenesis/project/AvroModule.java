@@ -36,7 +36,7 @@ public class AvroModule implements BuildExecutorModule {
              null,
              "avro",
              List.of(),
-             ProcessBuildStep.Terms.of("avro"));
+             new ProcessBuildStep.Terms());
     }
 
     public static AvroModule ofEnvironment(Environment environment,

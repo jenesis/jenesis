@@ -72,7 +72,7 @@ public class TestModule implements BuildExecutorModule {
                 "main",
                 List.of(),
                 null,
-                ProcessBuildStep.Terms.of("tests"),
+                new ProcessBuildStep.Terms(),
                 false);
     }
 

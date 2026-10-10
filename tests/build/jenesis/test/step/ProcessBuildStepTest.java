@@ -6,6 +6,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.step.EnvironmentalProcessBuildStep;
+import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -355,7 +356,7 @@ public class ProcessBuildStepTest {
         assertThat(lint(new Linter(new Environment(Map.of("print.findings", "false")).out(printed::add), 0, false, false)).next())
                 .isTrue();
         assertThat(printed).isEmpty();
-        assertThat(ProcessBuildStep.Terms.of("linter").reporting())
+        assertThat(new ProcessBuildStep.Terms().reporting())
                 .as("a step built without an environment prints nothing")
                 .isNull();
     }
@@ -452,7 +453,8 @@ public class ProcessBuildStepTest {
                                           BuildStepContext context,
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path report = context.next().resolve("report.xml");
-            return reported(code, context, report, findings(report, "error"), judged, strict, "source.linter");
+            return Findings.ofXml("linter", report, "error")
+                    .acceptable(code, context, judged, strict, "source.linter", terms.reporting());
         }
     }
 
@@ -467,7 +469,7 @@ public class ProcessBuildStepTest {
         }
 
         private Gated(ToolProvider provider, Semaphore permits) {
-            super("gated", ProcessHandler.OfTool.of(provider), new Terms(null, permits, null, null));
+            super("gated", ProcessHandler.OfTool.of(provider), new Terms().permits(permits));
         }
 
         @Override
@@ -498,7 +500,7 @@ public class ProcessBuildStepTest {
         }
 
         private Probe(BiConsumer<Boolean, String> printing) {
-            super("probe", arguments -> HANDLER, Terms.of("probe").printing(printing));
+            super("probe", arguments -> HANDLER, new Terms().printing(printing));
         }
 
         private boolean streams() {

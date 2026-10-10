@@ -36,7 +36,7 @@ public class ScalafmtFormatModule implements BuildExecutorModule {
              "scalafmt-format",
              ".scalafmt.conf",
              false,
-             ProcessBuildStep.Terms.of("scalafmt-format"));
+             new ProcessBuildStep.Terms());
     }
 
     public static ScalafmtFormatModule ofEnvironment(Environment environment,

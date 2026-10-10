@@ -36,7 +36,7 @@ public class PiTestModule implements BuildExecutorModule {
              "pitest",
              "main",
              new SequencedProperties(),
-             ProcessBuildStep.Terms.of("pitest"));
+             new ProcessBuildStep.Terms());
     }
 
     public static PiTestModule ofEnvironment(Environment environment,
