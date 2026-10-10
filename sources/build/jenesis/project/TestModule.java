@@ -722,7 +722,7 @@ public class TestModule implements BuildExecutorModule {
         SequencedSet<String> resolveInputs = new LinkedHashSet<>(upstream);
         resolveInputs.add(RESOLVED);
         buildExecutor.addModule(DEPENDENCIES,
-                dependencies.pinning(pinning),
+                dependencies.pinning(pinning).pathPlacement(pathPlacement),
                 resolveInputs);
         if (skip) {
             return;
