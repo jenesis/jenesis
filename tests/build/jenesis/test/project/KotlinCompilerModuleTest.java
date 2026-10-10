@@ -17,6 +17,7 @@ import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.KotlinCompilerModule;
 import build.jenesis.step.Dependencies;
+import java.lang.classfile.Attributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -222,6 +223,64 @@ public class KotlinCompilerModuleTest {
         assertThat(((bytes[6] & 0xFF) << 8) | (bytes[7] & 0xFF))
                 .as("kotlinc refuses the target 8 and takes Java 8 as 1.8, which emits major version 52")
                 .isEqualTo(52);
+    }
+
+    @Test
+    public void hands_the_lines_of_process_kotlinc_properties_to_kotlinc_and_its_j_lines_to_the_jvm() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
+        properties.store(project.resolve(BuildStep.VERSIONS));
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Sample.kt"), """
+                package sample
+                class Sample {
+                    fun greet(name: String): String = "Hello " + name
+                }
+                """);
+        SequencedProperties kotlincProperties = new SequencedProperties();
+        kotlincProperties.setProperty("-module-name", "custom-name");
+        kotlincProperties.setProperty("-java-parameters", "");
+        kotlincProperties.setProperty("-api-version", "2.0");
+        kotlincProperties.setProperty("-language-version", "2.0");
+        kotlincProperties.setProperty("-J-Xss4m", "");
+        kotlincProperties.store(Files.createDirectories(project.resolve("process")).resolve("kotlinc.properties"));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "kotlin",
+                new KotlinCompilerModule(
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
+                "project");
+        executor.execute();
+
+        Path classes = root
+                .resolve("kotlin")
+                .resolve(KotlinCompilerModule.CLASSES)
+                .resolve("output")
+                .resolve(BuildStep.CLASSES);
+        assertThat(classes.resolve("META-INF/custom-name.kotlin_module"))
+                .as("-module-name reached kotlinc, which names the module file after it")
+                .isNotEmptyFile();
+        ClassModel sample = ClassFile.of().parse(classes.resolve("sample/Sample.class"));
+        assertThat(sample.methods().stream()
+                .filter(method -> method.methodName().equalsString("greet"))
+                .flatMap(method -> method.findAttribute(Attributes.methodParameters()).stream()))
+                .as("-java-parameters reached kotlinc, which then writes the MethodParameters attribute")
+                .isNotEmpty();
+        List<String> command = Arrays.asList(Files.readString(root
+                .resolve("kotlin")
+                .resolve("compiled")
+                .resolve("supplement")
+                .resolve("command")).split(" "));
+        assertThat(command.indexOf("-Xss4m"))
+                .as("a -J line goes to the JVM that runs kotlinc, ahead of its main class")
+                .isNotNegative()
+                .isLessThan(command.indexOf("org.jetbrains.kotlin.cli.jvm.K2JVMCompiler"));
+        assertThat(command.indexOf("-api-version"))
+                .as("a compiler argument follows kotlinc's main class")
+                .isGreaterThan(command.indexOf("org.jetbrains.kotlin.cli.jvm.K2JVMCompiler"));
     }
 
     @Test

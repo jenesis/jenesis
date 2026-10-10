@@ -1958,6 +1958,10 @@ public record Project(
                                                 as Maven compiles a source and target without a
                                                 release - a guarded call of a newer API compiles
                                                 for an older release this way;
+                                                process-kotlinc.properties hands its lines to
+                                                kotlinc, as -api-version=2.0 or -java-parameters=,
+                                                and a -J<option> or -D line to the JVM running it,
+                                                as the kotlinc command does;
                                                 process-test.properties targets the test JVM, merged
                                                 over process-java.properties, which Execute and a
                                                 bundle's argument files carry as well; a linter reads
