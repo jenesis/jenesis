@@ -2018,6 +2018,38 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void builds_the_tests_of_a_module_whose_test_half_only_configures_a_plugin() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>21</maven.compiler.release>
+                    </properties>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/test/build.jenesis"))
+                .resolve("plugin-generator.properties"), "");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results)
+                .as("a plugin the test half configures generates the tests it compiles, against the main half")
+                .containsKeys("maven/test-module-/manifests", "maven/module-/manifests");
+    }
+
+    @Test
     public void builds_a_bundle_as_a_jar_and_names_a_module_whose_packaging_it_does_not_build() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

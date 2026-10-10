@@ -383,17 +383,15 @@ public class MavenProject implements BuildExecutorModule {
                                             || key.startsWith("resources."))
                                     .map(testProperties::getProperty)
                                     .filter(folder -> !folder.isEmpty())
-                                    .anyMatch(folder -> Files.exists(base.resolve(folder)));
+                                    .anyMatch(folder -> Files.exists(base.resolve(folder)))
+                                    || configuresPlugin(base.resolve("src/test/build.jenesis"));
+                        }
+                        if (!active && name.startsWith("test-" + SIBLING_MODULE_PREFIX)) {
+                            active = configuresPlugin(base.resolve("src/test/build.jenesis"));
                         }
                         if (!active && name.startsWith(SIBLING_MODULE_PREFIX)) {
-                            for (Path configuration : List.of(base.resolve("src/main/build.jenesis"), base.resolve("build.jenesis"))) {
-                                if (Files.isDirectory(configuration)) {
-                                    try (Stream<Path> configured = Files.list(configuration)) {
-                                        active |= configured.map(path -> path.getFileName().toString())
-                                                .anyMatch(entry -> entry.startsWith("plugin-") && entry.endsWith(".properties"));
-                                    }
-                                }
-                            }
+                            active = configuresPlugin(base.resolve("src/main/build.jenesis"))
+                                    || configuresPlugin(base.resolve("build.jenesis"));
                             if (!active && printing != null) {
                                 printing.accept(("%s%-11s%s %s builds no jar, as %s has neither sources nor resources:"
                                         + " a plugin that generates them is configured by a plugin-<name>.properties in"
@@ -701,6 +699,16 @@ public class MavenProject implements BuildExecutorModule {
             }
         }
         return metadata;
+    }
+
+    private static boolean configuresPlugin(Path configuration) throws IOException {
+        if (!Files.isDirectory(configuration)) {
+            return false;
+        }
+        try (Stream<Path> configured = Files.list(configuration)) {
+            return configured.map(path -> path.getFileName().toString())
+                    .anyMatch(entry -> entry.startsWith("plugin-") && entry.endsWith(".properties"));
+        }
     }
 
     private record Boms(SortedSet<String> unstaged) implements BuildStep {
