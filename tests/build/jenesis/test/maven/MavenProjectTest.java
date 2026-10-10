@@ -805,6 +805,79 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void reads_a_version_range_of_the_project_s_own_pom_whole() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <tool.version>[8.1,)</tool.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>range</groupId>
+                                <artifactId>managed-dep</artifactId>
+                                <version>[3.0,4.0)</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>range</groupId>
+                            <artifactId>compile-dep</artifactId>
+                            <version>[1.0,2.0)</version>
+                            <optional>true</optional>
+                        </dependency>
+                        <dependency>
+                            <groupId>range</groupId>
+                            <artifactId>test-dep</artifactId>
+                            <version>${tool.version}</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+
+        Path module = results.get("maven/module-/manifests");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES)).stringPropertyNames())
+                .containsExactlyInAnyOrder(
+                        "main/compile/maven/range/compile-dep/[1.0,2.0)",
+                        "main/runtime/maven/range/compile-dep/[1.0,2.0)");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.OPTIONALS)).stringPropertyNames())
+                .containsExactlyInAnyOrder(
+                        "main/compile/maven/range/compile-dep/[1.0,2.0)",
+                        "main/runtime/maven/range/compile-dep/[1.0,2.0)");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.VERSIONS)))
+                .containsOnly(Map.entry("main/maven/range/managed-dep", "[3.0,4.0)"));
+        assertThat(SequencedProperties.ofFiles(results.get("maven/test-module-/manifests").resolve(BuildStep.REQUIRES))
+                .stringPropertyNames())
+                .containsExactlyInAnyOrder(
+                        "main/compile/maven/range/compile-dep/[1.0,2.0)",
+                        "main/runtime/maven/range/compile-dep/[1.0,2.0)",
+                        "main/compile/maven/range/test-dep/[8.1,)",
+                        "main/runtime/maven/range/test-dep/[8.1,)",
+                        "main/compile/maven/group/artifact/1",
+                        "main/runtime/maven/group/artifact/1");
+    }
+
+    @Test
     public void the_exclusions_of_a_managed_dependency_are_recorded_for_the_pin_that_replaces_its_entry() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
