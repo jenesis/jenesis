@@ -21,6 +21,7 @@ public class CheckstyleModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
+    private static final String PROPERTIES = "checkstyle.properties", CONFIG_LOC_KEY = "config_loc";
     private static final String STRICT = "source.checkstyle.strict";
     private static final String REPORT = BuildStep.REPORTS + "checkstyle/checkstyle-report.xml";
     private static final String MAVEN_GROUP = "com.puppycrawl.tools", MAVEN_ARTIFACT = "checkstyle";
@@ -89,6 +90,9 @@ public class CheckstyleModule implements BuildExecutorModule {
                     && Files.isRegularFile(configurationFile.resolveSibling(sibling))) {
                 siblings.add(sibling);
             }
+        }
+        if (Files.isRegularFile(configurationFile.resolveSibling(PROPERTIES))) {
+            siblings.add(Path.of(PROPERTIES));
         }
         return siblings;
     }
@@ -218,8 +222,17 @@ public class CheckstyleModule implements BuildExecutorModule {
             Path report = context.next().resolve(REPORT);
             Files.createDirectories(report.getParent());
             SequencedProperties expansions = new SequencedProperties();
-            expansions.setProperty("config_loc", config.getParent().toString());
-            Path expanded = context.supplement().resolve("checkstyle.properties");
+            Path declared = config.resolveSibling(PROPERTIES);
+            if (Files.isRegularFile(declared)) {
+                expansions = SequencedProperties.ofFiles(declared);
+                if (expansions.containsKey(CONFIG_LOC_KEY)) {
+                    throw new IllegalArgumentException(PROPERTIES + " beside " + configFile + " sets "
+                            + CONFIG_LOC_KEY + ", which the build sets to the folder of " + configFile
+                            + " - remove the line");
+                }
+            }
+            expansions.setProperty(CONFIG_LOC_KEY, config.getParent().toString());
+            Path expanded = context.supplement().resolve(PROPERTIES);
             expansions.store(expanded);
             List<String> commands = new ArrayList<>(List.of(
                     "-cp", String.join(File.pathSeparator, jars),

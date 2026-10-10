@@ -34,6 +34,7 @@ The configuration files sit in the *configuration directory*, which defaults to
     demo/demo-34-java-quality
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
     |-- checkstyle.xml             activates Checkstyle (lints sources)
+    |-- checkstyle.properties      the ${...} properties checkstyle.xml names
     |-- pmd.xml                    activates PMD (lints sources)
     |-- spotbugs-exclude.xml       activates SpotBugs (analyses classes)
     |-- javaformat.properties      selects the Java formatter (google)
@@ -138,7 +139,12 @@ Checkstyle reads `${config_loc}` as the folder of `checkstyle.xml`, as the Maven
 and Gradle plugins define it. A file the configuration names as
 `${config_loc}/<path>`, such as a suppressions file beside it, is handed to
 Checkstyle with it and re-runs the check when it changes; any other file of the
-configuration directory is not.
+configuration directory is not. Every other `${<property>}` the configuration
+names is a line of a `checkstyle.properties` beside it, which takes the place of
+the Maven plugin's `propertyExpansion` and Gradle's `configProperties`; without
+one Checkstyle fails to load the configuration. Here `checkstyle.xml` sets its
+severity to `${checkstyle.severity}`, which the file names as `warning`.
+`config_loc` is the one property the file cannot set.
 
 Formatting: verify, and how to reformat
 ---------------------------------------
