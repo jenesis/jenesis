@@ -13,30 +13,43 @@ public final class Discovery {
 
     private final String uri;
     private final Repository.Connection connection;
+    private final int timeout;
     private final Map<String, FutureTask<Optional<Properties>>> files = new ConcurrentHashMap<>();
 
     public Discovery() {
-        this(LOCATION, new Repository.Connection());
+        this(LOCATION, new Repository.Connection(), 5_000);
     }
 
     public static Discovery ofEnvironment(Environment environment) {
-        return new Discovery(LOCATION, Repository.Connection.ofEnvironment(environment));
+        return new Discovery(LOCATION,
+                Repository.Connection.ofEnvironment(environment),
+                environment.number("repository.discovery.timeout", 5_000));
     }
 
-    public Discovery(String uri, Repository.Connection connection) {
+    public Discovery(String uri, Repository.Connection connection, int timeout) {
         if (!uri.contains("{domain}")) {
             throw new IllegalArgumentException("The location of a domain's file must name {domain}: " + uri);
         }
+        if (timeout <= 0) {
+            throw new IllegalArgumentException("The timeout for a domain's file is " + timeout + ", where it is a"
+                    + " positive number of milliseconds within which the domain connects and answers each read,"
+                    + " such as 5000, the default, as a domain that never answers would otherwise stall the build");
+        }
         this.uri = uri;
         this.connection = connection;
+        this.timeout = timeout;
     }
 
     public Discovery uri(String uri) {
-        return new Discovery(uri, connection);
+        return new Discovery(uri, connection, timeout);
     }
 
     public Discovery connection(Repository.Connection connection) {
-        return new Discovery(uri, connection);
+        return new Discovery(uri, connection, timeout);
+    }
+
+    public Discovery timeout(int timeout) {
+        return new Discovery(uri, connection, timeout);
     }
 
     public static String domain(String namespace) {
@@ -56,7 +69,8 @@ public final class Discovery {
             URI source = URI.create(uri.replace("{domain}", domain));
             FutureTask<Optional<Properties>> task = new FutureTask<>(() -> {
                 Properties properties = new Properties();
-                try (InputStream inputStream = Repository.open(connection, source, null);
+                Repository.Connection once = connection.retries(0).connectTimeout(timeout).readTimeout(timeout);
+                try (InputStream inputStream = Repository.open(once, source, null);
                      Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8)) {
                     properties.load(reader);
                 } catch (IOException e) {

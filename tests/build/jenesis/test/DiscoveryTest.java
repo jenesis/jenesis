@@ -273,6 +273,48 @@ public class DiscoveryTest {
     }
 
     @Test
+    public void asks_a_domain_once_and_counts_it_as_absent_where_it_does_not_answer_in_time() throws IOException {
+        AtomicInteger connections = new AtomicInteger();
+        List<Socket> held = new CopyOnWriteArrayList<>();
+        try (ServerSocket socket = new ServerSocket()) {
+            socket.bind(new InetSocketAddress("localhost", 0));
+            Thread.ofVirtual().start(() -> {
+                while (true) {
+                    try {
+                        held.add(socket.accept());
+                        connections.incrementAndGet();
+                    } catch (IOException _) {
+                        return;
+                    }
+                }
+            });
+            long started = System.nanoTime();
+
+            assertThat(server.discovery()
+                    .uri("http://localhost:" + socket.getLocalPort() + "/{domain}")
+                    .connection(server.connection().retries(2).backoff(Duration.ofMillis(1)))
+                    .timeout(250)
+                    .lookup("net.bytebuddy", "maven", "byte-buddy")).isEmpty();
+            assertThat(Duration.ofNanos(System.nanoTime() - started))
+                    .as("the domain is given its own timeout rather than the 30 seconds a repository is given")
+                    .isLessThan(Duration.ofSeconds(10));
+            assertThat(connections).as("a domain that did not answer is not asked again").hasValue(1);
+        } finally {
+            for (Socket accepted : held) {
+                accepted.close();
+            }
+        }
+    }
+
+    @Test
+    public void refuses_a_timeout_that_is_not_positive() {
+        assertThatThrownBy(() -> server.discovery().timeout(0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("is 0")
+                .hasMessageContaining("positive number of milliseconds");
+    }
+
+    @Test
     public void refuses_a_location_of_files_that_does_not_name_the_domain() {
         assertThatThrownBy(() -> new Discovery().uri("https://mirror.example.com/java-repository.properties"))
                 .isInstanceOf(IllegalArgumentException.class)
