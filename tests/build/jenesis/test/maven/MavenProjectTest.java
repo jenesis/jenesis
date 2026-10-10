@@ -506,7 +506,7 @@ public class MavenProjectTest {
         assertThat(SequencedProperties.ofFiles(results.get("maven/module-unset/manifests").resolve("process/javac.properties"))
                 .getProperty("--release")).isEqualTo(Integer.toString(Runtime.version().feature()));
         assertThat(printed).containsExactly("[RELEASE]   group:unset compiles for release " + Runtime.version().feature()
-                + ", the JDK the build runs on, as unset/pom.xml sets neither maven.compiler.release nor its target or source"
+                + ", the JDK the build runs on, as " + Path.of("unset", "pom.xml") + " sets neither maven.compiler.release nor its target or source"
                 + " - maven.compiler.release sets it");
     }
 
@@ -1722,9 +1722,9 @@ public class MavenProjectTest {
                 .as("a plugin the module configures generates what it compiles")
                 .containsKeys("maven/module-generated/manifests", "maven/module-generated/coordinates")
                 .doesNotContainKeys("maven/module-empty/manifests");
-        assertThat(printed).containsExactly("[SKIPPED]   group:empty builds no jar, as empty/pom.xml has neither sources nor"
-                + " resources: a plugin that generates them is configured by a plugin-<name>.properties in"
-                + " empty/src/main/build.jenesis, which builds the module");
+        assertThat(printed).containsExactly("[SKIPPED]   group:empty builds no jar, as " + Path.of("empty", "pom.xml") + " has neither sources nor"
+                + " resources: a plugin that generates them is configured by a plugin-<name>.properties in "
+                + Path.of("empty", "src", "main", "build.jenesis") + ", which builds the module");
     }
 
     @Test
@@ -1782,7 +1782,7 @@ public class MavenProjectTest {
                 .as("maven-bundle-plugin's packaging produces a jar")
                 .containsKeys("maven/module-bundled/manifests", "maven/module-bundled/coordinates")
                 .doesNotContainKeys("maven/module-web/manifests");
-        assertThat(printed).containsExactly("[SKIPPED]   web/pom.xml builds nothing, as its packaging war is none of jar"
+        assertThat(printed).containsExactly("[SKIPPED]   " + Path.of("web", "pom.xml") + " builds nothing, as its packaging war is none of jar"
                 + " and bundle, the packagings this build builds: where it is a jar with more in it, declare"
                 + " <packaging>jar</packaging> and let a plugin add the rest");
     }
