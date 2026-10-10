@@ -1160,6 +1160,58 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void reads_a_resource_directory_the_pom_names_twice_once() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <build>
+                       <resources>
+                         <resource>
+                           <directory>src/main/resources</directory>
+                           <filtering>true</filtering>
+                           <includes>
+                             <include>**/*.properties</include>
+                           </includes>
+                         </resource>
+                         <resource>
+                           <directory>src/main/resources/</directory>
+                           <filtering>false</filtering>
+                           <excludes>
+                             <exclude>**/*.properties</exclude>
+                           </excludes>
+                         </resource>
+                         <resource>
+                           <directory>${project.basedir}/src/main/resources</directory>
+                         </resource>
+                       </resources>
+                    </build>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/main/resources")).resolve("resource"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results).containsKey("maven/module-/resources-1");
+        assertThat(results.keySet())
+                .as("a directory named twice is copied once, so that the jar holds each of its files once")
+                .noneMatch(key -> key.startsWith("maven/module-/resources-") && !key.equals("maven/module-/resources-1"));
+        assertThat(results.get("maven/module-/resources-1").resolve(BuildStep.RESOURCES + "resource")).content().isEqualTo("bar");
+    }
+
+    @Test
     public void refuses_a_resource_directory_that_contains_the_build_output() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
