@@ -228,8 +228,12 @@ so a file can carry more than this demo shows.
 
 A file that cannot be fetched counts as absent - a domain without the file, a host
 that does not exist, one a proxy cannot reach, or one that resets or refuses the
-TLS handshake - so the build carries on with the module repository. A certificate
-that does not verify, or that names another host, fails the build instead.
+TLS handshake - so the build carries on with the module repository. A domain is
+asked once, without the retries a repository is given, and has five seconds to
+connect and to answer each read, which `jenesis.repository.discovery.timeout` sets in
+milliseconds; one that does not answer in time counts as absent as well. A
+certificate that does not verify, or that names another host, fails the build
+instead.
 
 Trusting the file
 -----------------
