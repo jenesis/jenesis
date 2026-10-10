@@ -5,7 +5,9 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Dependencies;
 
 public class Pom implements BuildStep {
 
@@ -56,6 +58,7 @@ public class Pom implements BuildStep {
                 Path.of(resolved ? DEPENDENCIES : REQUIRES),
                 Path.of(EXCLUSIONS),
                 Path.of(OPTIONALS),
+                Path.of(Dependencies.GRAPH),
                 Path.of(METADATA)));
     }
 
@@ -72,27 +75,64 @@ public class Pom implements BuildStep {
         SequencedProperties exclusions = SequencedProperties.ofFolders(folders, EXCLUSIONS);
         SequencedProperties optionals = SequencedProperties.ofFolders(folders, OPTIONALS);
         SequencedProperties metadata = SequencedProperties.ofFolders(folders, METADATA);
+        SequencedMap<String, Resolver.Resolution> graph = Dependencies.graph(folders.stream()
+                .map(folder -> folder.resolve(Dependencies.GRAPH))
+                .toList(), List.of());
+        Set<String> vertices = new HashSet<>();
+        graph.forEach((groupScope, resolution) -> {
+            if (groupScope.startsWith(group + "/")) {
+                vertices.addAll(resolution.vertices().keySet());
+            }
+        });
+        Set<String> coordinateOptionals = new HashSet<>(), unversionedOptionals = new HashSet<>();
+        for (String key : optionals.stringPropertyNames()) {
+            if (key.startsWith(group + "/")) {
+                String coordinate = key.substring(key.indexOf('/', key.indexOf('/') + 1) + 1);
+                coordinateOptionals.add(coordinate);
+                unversionedOptionals.add(unversioned(coordinate, vertices));
+            }
+        }
+        Map<String, Set<String>> beneathOptionals = new HashMap<>(), required = new HashMap<>();
+        if (resolved && !unversionedOptionals.isEmpty()) {
+            graph.forEach((groupScope, resolution) -> {
+                if (!groupScope.startsWith(group + "/")) {
+                    return;
+                }
+                Set<String> optionalRoots = new HashSet<>(), requiredRoots = new HashSet<>();
+                Map<String, Set<String>> children = new HashMap<>();
+                for (Resolver.Edge edge : resolution.edges()) {
+                    String coordinate = unversioned(edge.coordinate(), vertices);
+                    if (edge.parent() != null) {
+                        children.computeIfAbsent(unversioned(edge.parent(), vertices), _ -> new HashSet<>()).add(coordinate);
+                    } else if (unversionedOptionals.contains(coordinate)) {
+                        optionalRoots.add(coordinate);
+                    } else {
+                        requiredRoots.add(coordinate);
+                    }
+                }
+                Set<String> beneath = reached(children, optionalRoots), delivered = reached(children, requiredRoots);
+                beneath.removeAll(delivered);
+                beneath.removeAll(optionalRoots);
+                beneathOptionals.put(groupScope.substring(group.length() + 1), beneath);
+                required.put(groupScope.substring(group.length() + 1), delivered);
+            });
+        }
         SequencedMap<String, SequencedSet<String>> coordinateScopes = new LinkedHashMap<>();
         for (String key : requires.stringPropertyNames()) {
             int first = key.indexOf('/');
             int second = key.indexOf('/', first + 1);
-            String coordinate = key.substring(second + 1);
-            if (!key.startsWith(group + "/")) {
+            String coordinate = key.substring(second + 1), scope = key.substring(first + 1, second);
+            if (!key.startsWith(group + "/") || beneathOptionals
+                    .getOrDefault(scope, Set.of())
+                    .contains(unversioned(coordinate, vertices))) {
                 continue;
             }
-            coordinateScopes.computeIfAbsent(coordinate, _ -> new LinkedHashSet<>())
-                    .add(key.substring(first + 1, second));
+            coordinateScopes.computeIfAbsent(coordinate, _ -> new LinkedHashSet<>()).add(scope);
         }
         SequencedMap<String, String> coordinateExclusions = new LinkedHashMap<>();
         for (String key : exclusions.stringPropertyNames()) {
             int second = key.indexOf('/', key.indexOf('/') + 1);
             coordinateExclusions.putIfAbsent(key.substring(second + 1), exclusions.getProperty(key));
-        }
-        Set<String> coordinateOptionals = new HashSet<>();
-        for (String key : optionals.stringPropertyNames()) {
-            if (key.startsWith(group + "/")) {
-                coordinateOptionals.add(key.substring(key.indexOf('/', key.indexOf('/') + 1) + 1));
-            }
         }
         shared.forEach(metadata::setProperty);
         String groupId = metadata.getProperty("project");
@@ -144,7 +184,10 @@ public class Pom implements BuildStep {
                     scope,
                     null,
                     excludes,
-                    coordinateOptionals.contains(name) ? Boolean.TRUE : null));
+                    (resolved
+                            ? unversionedOptionals.contains(unversioned(name, vertices))
+                                    && !required.getOrDefault("runtime", Set.of()).contains(unversioned(name, vertices))
+                            : coordinateOptionals.contains(name)) ? Boolean.TRUE : null));
         }
         try (Writer writer = Files.newBufferedWriter(context.next().resolve(POM))) {
             emitter.emit(
@@ -167,5 +210,24 @@ public class Pom implements BuildStep {
             coordinate.store(folder.resolve("pom.properties"));
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    private static String unversioned(String coordinate, Set<String> vertices) {
+        return vertices.contains(coordinate) || coordinate.indexOf('/') == coordinate.lastIndexOf('/')
+                ? coordinate
+                : coordinate.substring(0, coordinate.lastIndexOf('/'));
+    }
+
+    private static Set<String> reached(Map<String, Set<String>> children, Set<String> roots) {
+        Set<String> reached = new HashSet<>(roots);
+        Queue<String> pending = new ArrayDeque<>(roots);
+        while (!pending.isEmpty()) {
+            for (String child : children.getOrDefault(pending.remove(), Set.of())) {
+                if (reached.add(child)) {
+                    pending.add(child);
+                }
+            }
+        }
+        return reached;
     }
 }
