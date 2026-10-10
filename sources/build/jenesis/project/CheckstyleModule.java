@@ -190,8 +190,10 @@ public class CheckstyleModule implements BuildExecutorModule {
                 if (argument.removed()) {
                     continue;
                 }
-                for (Path jar : Dependencies.select(argument.folder(), tool, "runtime")) {
-                    jars.add(jar.toString());
+                for (String scope : List.of("runtime", "plugin")) {
+                    for (Path jar : Dependencies.select(argument.folder(), tool, scope)) {
+                        jars.add(jar.toString());
+                    }
                 }
                 Path candidate = argument.folder().resolve(configFile);
                 if (Files.isRegularFile(candidate)) {
