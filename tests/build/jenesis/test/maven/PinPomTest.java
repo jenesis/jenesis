@@ -611,6 +611,50 @@ public class PinPomTest {
     }
 
     @Test
+    public void carries_the_scope_an_imported_bom_manages_into_the_entry_that_pins_its_coordinate() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        writeResolved(Map.of("maven/io.netty/netty-tcnative-boringssl-static/jar/linux-x86_64", "2.0.70.Final SHA-256/deadbeef",
+                "maven/io.netty/netty-common", "4.1.115.Final SHA-256/cafebabe"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "");
+        module.store(input.resolve(BuildStep.MODULE));
+        SequencedProperties scopes = new SequencedProperties();
+        scopes.setProperty("main/maven/io.netty/netty-tcnative-boringssl-static/jar/linux-x86_64", "runtime");
+        scopes.store(input.resolve(MavenProject.SCOPES));
+        String result = run(pom);
+        assertThat(result)
+                .as("the project's own entry shadows the bill of materials' one, so it has to state the scope that one managed")
+                .contains("""
+                                <dependency>
+                                    <groupId>io.netty</groupId>
+                                    <artifactId>netty-tcnative-boringssl-static</artifactId>
+                                    <version>2.0.70.Final</version>
+                                    <classifier>linux-x86_64</classifier>
+                                    <scope>runtime</scope>
+                                    <!--Checksum/SHA-256/deadbeef-->
+                                </dependency>
+                    """)
+                .contains("""
+                                <dependency>
+                                    <groupId>io.netty</groupId>
+                                    <artifactId>netty-common</artifactId>
+                                    <version>4.1.115.Final</version>
+                                    <!--Checksum/SHA-256/cafebabe-->
+                                </dependency>
+                    """);
+        assertThat(run(pom)).isEqualTo(result);
+    }
+
+    @Test
     public void keeps_an_imported_bom_when_nothing_is_left_to_pin() throws IOException {
         Path pom = root.resolve("pom.xml");
         String content = """
