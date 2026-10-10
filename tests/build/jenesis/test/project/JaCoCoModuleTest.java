@@ -77,7 +77,7 @@ public class JaCoCoModuleTest {
     }
 
     @Test
-    public void report_leaves_out_the_classes_of_the_tests_when_told_they_are_no_code_under_test() throws IOException {
+    public void report_leaves_out_the_classes_and_sources_it_is_handed_as_they_are_the_tests() throws IOException {
         Path resolved = Files.createDirectory(project.resolve(Dependencies.RESOLVED));
         Path first = Files.write(resolved.resolve("maven%2Forg.example%2Flibrary%2F1.0.jar"), new byte[0]);
         Files.write(project.resolve("jacoco.exec"), new byte[0]);
@@ -97,7 +97,7 @@ public class JaCoCoModuleTest {
         executor.addSource("project", project);
         executor.addModule(
                 "jacoco",
-                new JaCoCoModule(Map.of("maven", serving(cli())), Map.of("maven", Resolver.identity())).classes(false),
+                new JaCoCoModule(Map.of("maven", serving(cli())), Map.of("maven", Resolver.identity())),
                 "project");
         executor.execute("jacoco/report");
 

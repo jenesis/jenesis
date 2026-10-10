@@ -110,7 +110,7 @@ public class JaCoCoModuleRunTest {
                 "dependencies", "classes");
         executor.addModule(
                 "coverage",
-                new JaCoCoModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                new JaCoCoModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT).classes(true),
                 "test", "classes", "sources", "dependencies");
         executor.execute();
 
