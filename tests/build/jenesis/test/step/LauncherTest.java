@@ -218,6 +218,53 @@ public class LauncherTest {
     }
 
     @Test
+    public void carries_the_module_options_of_the_java_process_and_names_those_it_cannot() throws IOException {
+        writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"));
+        compileModularJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("sample.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("launcher/runtime/maven/build.jenesis/build.jenesis.launcher", "resolved/launcher.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties application = new SequencedProperties();
+        application.setProperty("mainClass", "sample.Sample");
+        application.setProperty("mainModule", "sample");
+        application.setProperty("name", "sample");
+        application.store(input.resolve("launcher.properties"));
+        Files.createDirectory(input.resolve("process"));
+        Files.writeString(input.resolve("process/java.properties"), """
+                --add-reads=sample=java.sql
+                --add-exports=sample/sample=ALL-UNNAMED
+                --add-opens sample/sample=java.base
+                --enable-native-access=sample,ALL-UNNAMED
+                -Xmx1g
+                """);
+        List<String> printed = new ArrayList<>();
+
+        BuildStepResult result = Launcher.ofEnvironment(Environment.NONE.out(printed::add), "launcher", PathPlacement.INFERRED).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("resolved/launcher.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/java.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        Path jar = next.resolve(Launcher.LAUNCHER).resolve("sample.jar");
+        Properties descriptor = application(jar);
+        assertThat(descriptor.getProperty("addReads")).isEqualTo("sample=java.sql");
+        assertThat(descriptor.getProperty("addExports")).isEqualTo("sample/sample=ALL-UNNAMED");
+        assertThat(descriptor.getProperty("addOpens")).isEqualTo("sample/sample=java.base");
+        assertThat(descriptor.getProperty("enableNativeAccess")).isEqualTo("sample");
+        try (JarFile file = new JarFile(jar.toFile())) {
+            assertThat(file.getManifest().getMainAttributes().getValue("Enable-Native-Access")).isEqualTo("ALL-UNNAMED");
+        }
+        assertThat(printed).singleElement().asString()
+                .contains("sample.jar carries no -Xmx1g of process-java.properties")
+                .contains("bundle=true");
+    }
+
+    @Test
     public void honours_a_class_path_placement_for_a_modular_main() throws IOException {
         writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"));
         compileModularJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("sample.jar"));

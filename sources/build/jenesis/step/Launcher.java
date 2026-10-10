@@ -87,9 +87,30 @@ public class Launcher implements BuildStep {
         Manifest fragment = null;
         SequencedMap<String, Path> jars = new TreeMap<>();
         SequencedSet<Path> granted = new LinkedHashSet<>();
+        SequencedMap<String, SequencedSet<String>> access = new LinkedHashMap<>();
+        SequencedSet<String> dropped = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
+            }
+            Path process = argument.folder().resolve(ProcessBuildStep.PROCESS + "java.properties");
+            if (Files.isRegularFile(process)) {
+                SequencedProperties.ofFiles(process).forEachProperty((option, values) -> {
+                    String key = switch (option) {
+                        case "--add-reads" -> "addReads";
+                        case "--add-exports" -> "addExports";
+                        case "--add-opens" -> "addOpens";
+                        case "--enable-native-access" -> "enableNativeAccess";
+                        default -> null;
+                    };
+                    for (String value : values.split("\n")) {
+                        if (key == null || value.isBlank()) {
+                            dropped.add(option);
+                        } else {
+                            access.computeIfAbsent(key, _ -> new LinkedHashSet<>()).add(value.strip());
+                        }
+                    }
+                });
             }
             Path properties = argument.folder().resolve("launcher.properties");
             if (Files.isRegularFile(properties)) {
@@ -141,6 +162,27 @@ public class Launcher implements BuildStep {
         if (mainClass == null || shaded == null || jars.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
+        if (!dropped.isEmpty() && out != null) {
+            out.accept(("%s%-11s%s %s carries no %s of process-java.properties, as those configure the JVM that"
+                    + " java -jar starts: pass them to that command, or package with bundle=true, whose argument"
+                    + " file carries them")
+                    .formatted(palette.warning(),
+                            "[OPTIONS]",
+                            palette.reset(),
+                            name == null ? "The executable jar" : name + ".jar",
+                            String.join(", ", dropped)));
+        }
+        boolean unnamedNativeAccess = false;
+        SequencedSet<String> nativeAccess = new LinkedHashSet<>();
+        for (String modules : access.getOrDefault("enableNativeAccess", new LinkedHashSet<>())) {
+            for (String module : modules.split(",")) {
+                if (module.strip().equals("ALL-UNNAMED")) {
+                    unnamedNativeAccess = true;
+                } else if (!module.isBlank()) {
+                    nativeAccess.add(module.strip());
+                }
+            }
+        }
         SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -162,7 +204,6 @@ public class Launcher implements BuildStep {
             }
         }
         SequencedMap<String, Path> classpath = new LinkedHashMap<>(), modulepath = new LinkedHashMap<>();
-        SequencedSet<String> nativeAccess = new LinkedHashSet<>();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
             boolean onModulePath = mainModule != null && pathPlacement.test(entry.getValue());
             (onModulePath ? modulepath : classpath).put(entry.getKey(), entry.getValue());
@@ -185,6 +226,11 @@ public class Launcher implements BuildStep {
         application.setProperty("modulepath", String.join(",", modulepath.sequencedKeySet()));
         if (!nativeAccess.isEmpty()) {
             application.setProperty("enableNativeAccess", String.join(",", nativeAccess));
+        }
+        for (String key : List.of("addReads", "addExports", "addOpens")) {
+            if (access.containsKey(key)) {
+                application.setProperty(key, String.join(";", access.get(key)));
+            }
         }
         for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
             application.setProperty("modulepath." + layer.getKey(),
@@ -231,7 +277,8 @@ public class Launcher implements BuildStep {
         }
         manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         manifest.getMainAttributes().put(Attributes.Name.MAIN_CLASS, MAIN_CLASS);
-        if (jars.values().stream().anyMatch(jar -> granted.contains(jar.toAbsolutePath().normalize()))) {
+        if (unnamedNativeAccess
+                || jars.values().stream().anyMatch(jar -> granted.contains(jar.toAbsolutePath().normalize()))) {
             manifest.getMainAttributes().putValue("Enable-Native-Access", "ALL-UNNAMED");
         }
         Path jar = Files.createDirectory(context.next().resolve(LAUNCHER))

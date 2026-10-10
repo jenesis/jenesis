@@ -1478,9 +1478,8 @@ public record Project(
                           excludePackageNames -> -exclude=<package>[:<package>...] there, which
                           leaves those packages and their subpackages undocumented
                       maven-shade-plugin / shadow -> launcher=true, one executable jar (08)
-                      Spring Boot repackage / bootJar -> bundle=true, its jars and the argument
-                          file that launches them (10); not launcher=true, whose descriptor at the
-                          jar's root, application.properties, Spring Boot reads as its own
+                      Spring Boot repackage / bootJar -> launcher=true, one executable jar (08), or
+                          bundle=true, its jars and the argument file that launches them (10)
                       maven-assembly-plugin / application, distZip -> bundle=true (10)
                       exec-maven-plugin / application, run -> java build/jenesis/Execute.java
                       maven-jlink-plugin / org.beryx.jlink -> jmod=true, jlink=true (09)
@@ -1983,8 +1982,10 @@ public record Project(
                                                 as the kotlinc command does;
                                                 process-test.properties targets the test JVM, merged
                                                 over process-java.properties, which Execute and a
-                                                bundle's argument files carry as well; a linter reads
-                                                only its own configuration file
+                                                bundle's argument files carry as well, and an
+                                                executable jar its --add-reads, --add-exports,
+                                                --add-opens and --enable-native-access lines alone;
+                                                a linter reads only its own configuration file
                       environment-<tool>.properties
                                                 variables for a program the build forks (java, test,
                                                 pitest, native-image), which otherwise sees only

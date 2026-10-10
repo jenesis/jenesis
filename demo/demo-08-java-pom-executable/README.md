@@ -230,9 +230,12 @@ own `packaging.properties`, then the demo builds and runs the produced jar:
 
 `stage` collects the jar into `stage/packages/` as `<artifact>.jar`. Every jar it stores
 keeps its directory entries, so a scan of a package on the class path finds them as it
-would in the original jar. A JVM option of `process-java.properties` does not travel with
-it, because `java -jar` reads none from the jar it runs; an application that needs one
-ships as a bundle.
+would in the original jar. Of `process-java.properties`, the jar carries the
+`--add-reads`, `--add-exports`, `--add-opens` and `--enable-native-access` lines, which the
+launcher applies as it builds the module graph. Any other JVM option does not travel with
+it, because `java -jar` reads none from the jar it runs: the build names each one it
+leaves out, and an application that needs one passes it to `java -jar` or ships as a
+bundle.
 
 The launcher is shaded into the artifact, so it is pinned like any dependency - the
 `pom.xml` carries a `<!--jenesis.pin launcher/maven/build.jenesis/build.jenesis.launcher
