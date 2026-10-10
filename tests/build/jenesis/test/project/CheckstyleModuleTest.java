@@ -56,6 +56,16 @@ public class CheckstyleModuleTest {
                 .containsExactly("custom/runtime/maven/com.puppycrawl.tools/checkstyle/RELEASE");
     }
 
+    @Test
+    public void hands_over_a_checkstyle_properties_beside_the_configuration() throws IOException {
+        Path configuration = Files.writeString(project.resolve("checkstyle.xml"), "<module name=\"Checker\"/>");
+        assertThat(CheckstyleModule.siblings(configuration)).isEmpty();
+        Files.writeString(project.resolve("checkstyle.properties"), "type.format=^[a-z]+$\n");
+        assertThat(CheckstyleModule.siblings(configuration))
+                .as("the properties a configuration expands are an input of the check")
+                .containsExactly(Path.of("checkstyle.properties"));
+    }
+
     private BuildExecutor newExecutor() throws IOException {
         return BuildExecutor.of(root,
                 Duration.ZERO,

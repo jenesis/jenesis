@@ -1215,7 +1215,9 @@ public record Project(
 
                     ## Check and test
 
-                      maven-checkstyle-plugin / checkstyle -> checkstyle.xml (34)
+                      maven-checkstyle-plugin / checkstyle -> checkstyle.xml (34), with the
+                          properties of its propertyExpansion or Gradle's configProperties in a
+                          checkstyle.properties beside it; the build sets ${config_loc} itself
                       maven-pmd-plugin / pmd -> pmd.xml (34)
                       spotbugs-maven-plugin / com.github.spotbugs -> spotbugs-exclude.xml (34)
                       fmt-maven-plugin, Spotless for Java / Spotless, com.palantir.java-format
@@ -1763,6 +1765,8 @@ public record Project(
                     fails the build on them instead. A linter that cannot load its configuration
                     fails the build either way. Checkstyle's ${config_loc} is the
                     folder of checkstyle.xml, and a ${config_loc}/<path> it names is handed over with it.
+                    Every other ${<property>} it names is a line of a checkstyle.properties beside it,
+                    or Checkstyle fails to load it.
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
