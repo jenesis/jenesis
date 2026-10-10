@@ -1303,7 +1303,9 @@ public record Project(
                       maven-jar-plugin manifestEntries, addDefaultImplementationEntries /
                           jar.manifest.attributes -> a META-INF/MANIFEST.MF among the resources,
                           the basis of the jar's manifest (12)
-                      maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (48, 66)
+                      maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (48, 66),
+                          whose jar holds the sources and, as Maven's and Gradle's do, the resources,
+                          including those of -Djenesis.project.resources
                       maven-javadoc-plugin / withJavadocJar(), Dokka
                           -> -Djenesis.project.documentation=true (48, 66), which documents
                           the main modules, a test module only under jenesis.stage.tests, one with a
