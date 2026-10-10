@@ -1559,6 +1559,27 @@ public class TestModuleTest {
     }
 
     @Test
+    public void a_changed_exclusion_reruns_the_tests_the_scope_it_recorded_left_out() throws IOException {
+        settings.put("test.exclude", ".*UnrelatedTest");
+        try {
+            assertThat(executeTests(null, null)).contains(EXECUTED);
+            assertThat(executeTests(null, null))
+                    .as("an unchanged exclusion reuses the cached test result")
+                    .doesNotContain(EXECUTED);
+            assertThat(SequencedProperties.ofFiles(root.resolve("test")
+                    .resolve(TestModule.EXECUTED)
+                    .resolve("output")
+                    .resolve("testscope.properties")))
+                    .containsEntry("exclude", ".*UnrelatedTest");
+        } finally {
+            settings.remove("test.exclude");
+        }
+        assertThat(executeTests(null, null))
+                .as("a run that left classes out covers no run that includes them")
+                .contains(EXECUTED);
+    }
+
+    @Test
     public void a_tag_expression_is_recorded_with_the_test_output() throws IOException {
         executeTests(".*TestSample", "-npm");
         assertThat(SequencedProperties.ofFiles(root.resolve("test")

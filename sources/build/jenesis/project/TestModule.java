@@ -852,13 +852,18 @@ public class TestModule implements BuildExecutorModule {
         }
     }
 
-    public record Scope(String filter, List<TestTags> covered) {
+    public record Scope(String filter, String exclude, List<TestTags> covered) {
 
-        private static final String FILTER = "filter", COVERED = "covered.";
+        private static final String FILTER = "filter", EXCLUDE = "exclude", COVERED = "covered.";
 
         public Scope {
             filter = filter == null || filter.isBlank() ? null : filter;
+            exclude = exclude == null || exclude.isBlank() ? null : exclude;
             covered = List.copyOf(covered);
+        }
+
+        public Scope(String filter, List<TestTags> covered) {
+            this(filter, null, covered);
         }
 
         public static Scope ofFile(Path file) throws IOException {
@@ -871,13 +876,16 @@ public class TestModule implements BuildExecutorModule {
             } catch (IllegalArgumentException _) {
                 covered.clear();
             }
-            return new Scope(recorded.getProperty(FILTER), covered);
+            return new Scope(recorded.getProperty(FILTER), recorded.getProperty(EXCLUDE), covered);
         }
 
         public void store(Path file) throws IOException {
             SequencedProperties recorded = new SequencedProperties();
             if (filter != null) {
                 recorded.setProperty(FILTER, filter);
+            }
+            if (exclude != null) {
+                recorded.setProperty(EXCLUDE, exclude);
             }
             for (int index = 0; index < covered.size(); index++) {
                 recorded.setProperty(COVERED + index, covered.get(index).toString());
@@ -887,6 +895,10 @@ public class TestModule implements BuildExecutorModule {
 
         public boolean filters(String requested) {
             return entries(filter).equals(entries(requested));
+        }
+
+        public boolean excludes(String requested) {
+            return entries(exclude).equals(entries(requested));
         }
 
         private static List<String> entries(String expression) {
@@ -911,7 +923,7 @@ public class TestModule implements BuildExecutorModule {
         private final String moduleName;
         private final transient Path directory;
         private final transient String filter;
-        private final String exclude;
+        private final transient String exclude;
         private final transient String tag;
         private final String engines;
         private final transient boolean force;
@@ -1050,7 +1062,7 @@ public class TestModule implements BuildExecutorModule {
             }
             List<TestTags> covered = new ArrayList<>(ran);
             covered.add(requested);
-            new Scope(filter, covered).store(context.next().resolve("testscope.properties"));
+            new Scope(filter, exclude, covered).store(context.next().resolve("testscope.properties"));
             if (directory == null) {
                 return super.apply(executor, context, arguments);
             }
@@ -1082,7 +1094,7 @@ public class TestModule implements BuildExecutorModule {
                 return List.of();
             }
             Scope scope = Scope.ofFile(recorded);
-            return scope.filters(filter) ? scope.covered() : List.of();
+            return scope.filters(filter) && scope.excludes(exclude) ? scope.covered() : List.of();
         }
 
         @Override
@@ -1332,7 +1344,7 @@ public class TestModule implements BuildExecutorModule {
                 return CompletableFuture.completedFuture(null);
             }
             SequencedSet<String> selection = matchedClasses;
-            if (incrementalDigest != null && filter == null && tags.all() && ran.isEmpty() && !matchedClasses.isEmpty()) {
+            if (incrementalDigest != null && filter == null && exclude == null && tags.all() && ran.isEmpty() && !matchedClasses.isEmpty()) {
                 SequencedSet<String> narrowed = selected(arguments, context, matchedClasses);
                 if (narrowed != null && narrowed.isEmpty()) {
                     return CompletableFuture.completedFuture(null);
