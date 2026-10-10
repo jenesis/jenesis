@@ -1842,7 +1842,10 @@ public record Project(
                                                 NAME passes on the build's own
 
                     In both files a value @<key> or @<key>/<default> is the setting
-                    -Djenesis.variable.<key>, part of the key of every step it reaches.
+                    -Djenesis.variable.<key>, part of the key of every step it reaches. What a tool
+                    prints is kept in supplement/ as UTF-8, and a forked JVM is told to print in it
+                    (-Dstdout.encoding and -Dstderr.encoding) unless process-<tool>.properties names
+                    another.
 
                     Linters and the ktlint/scalafmt formatters activate from their own native config
                     files instead (checkstyle.xml, pmd.xml, spotbugs-exclude.xml, .editorconfig,
