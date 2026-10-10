@@ -147,10 +147,10 @@ tree reads the way the layers load:
        │  ├─ maven/demo.layers/demo.layers.nested 0-SNAPSHOT [layer:inner]
        │  │  ├─ maven/com.fasterxml.jackson.core/jackson-core 2.13.5 [layer:inner]
        │  │  └─ maven/demo.layers/demo.layers.spi 0-SNAPSHOT [layer:inner]
-       │  ├─ maven/build.jenesis/build.jenesis.launcher 0.5.3 [layer:render]
+       │  ├─ maven/build.jenesis/build.jenesis.launcher 0.6.0 [layer:render]
        │  ├─ maven/com.fasterxml.jackson.core/jackson-core 2.15.4 [layer:render]
        │  └─ maven/demo.layers/demo.layers.spi 0-SNAPSHOT [layer:render]
-       ├─ maven/build.jenesis/build.jenesis.launcher 0.5.3 [compile, runtime]
+       ├─ maven/build.jenesis/build.jenesis.launcher 0.6.0 [compile, runtime]
        └─ maven/demo.layers/demo.layers.spi 0-SNAPSHOT [compile, runtime]
 
 No `pom.xml` names what a layer holds, because Maven cannot resolve a layer: `demo.layers.library`
