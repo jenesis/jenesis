@@ -118,10 +118,8 @@ public record JUnitPlatform(String console) implements TestFramework {
         }
         Path reports = reporting ? output.resolve(BuildStep.REPORTS + "tests") : supplement.resolve("reports");
         commands.add("--reports-dir=" + reports);
-        if (reporting) {
-            commands.add("--config=junit.platform.reporting.open.xml.enabled=true");
-            commands.add("--config=junit.platform.reporting.output.dir=" + reports);
-        }
+        commands.add("--config=junit.platform.reporting.open.xml.enabled=true");
+        commands.add("--config=junit.platform.reporting.output.dir=" + reports);
         for (String className : classes) {
             commands.add("--select-class=" + className);
         }

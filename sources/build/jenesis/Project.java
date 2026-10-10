@@ -3825,7 +3825,7 @@ public record Project(
                 test.jars|true|Run the tests against the packaged test jar; false runs them against the module's classes and resources folders ahead of it, as Maven and Gradle do, so a test can read its own resources as files, while the modules it depends on stay jars; a module tested on the module path refuses false
                 test.incremental||Run only the tests a change can reach: true, or the setting named with no value, detects changes with MD5, the name of another message digest with that one, and false runs every test
                 test.parallel|false|Let the engine execute the matched tests concurrently
-                test.reporting|false|Write test reports into the module's reports/tests folder
+                test.reporting|false|Keep the reports every test run writes - the legacy JUnit XML and the open-test-reporting XML - in the module's reports/tests folder rather than under the step's supplement/reports
                 stage.tests|false|Stage test-variant artifacts alongside the main ones
                 tree.format|full|full|compact: what the dependencies selector prints
                 tree.merge|true|One tree per module whose every node names the scopes it applies to; false prints one tree per module and scope

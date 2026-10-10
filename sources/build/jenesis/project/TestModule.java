@@ -978,7 +978,7 @@ public class TestModule implements BuildExecutorModule {
         }
 
         @Override
-        protected String diagnosis(BuildStepContext context) throws IOException {
+        protected Optional<String> diagnosis(BuildStepContext context) throws IOException {
             SequencedSet<String> failed = new LinkedHashSet<>();
             SequencedSet<Path> reported = new LinkedHashSet<>();
             for (Path folder : List.of(context.next().resolve(BuildStep.REPORTS + "tests"), context.supplement())) {
@@ -999,17 +999,16 @@ public class TestModule implements BuildExecutorModule {
                 }
             }
             if (failed.isEmpty()) {
-                return "";
+                return Optional.empty();
             }
             List<String> named = failed.stream().limit(NAMED_FAILURES).map(test -> "  " + test).toList();
-            return failed.size()
+            return Optional.of(failed.size()
                     + (failed.size() == 1 ? " test failed" : " tests failed")
                     + ", as reported in "
                     + reported.stream().map(Path::toString).collect(Collectors.joining(", "))
                     + ":\n"
                     + String.join("\n", named)
-                    + (failed.size() > named.size() ? "\n  ... and " + (failed.size() - named.size()) + " more" : "")
-                    + "\n";
+                    + (failed.size() > named.size() ? "\n  ... and " + (failed.size() - named.size()) + " more" : ""));
         }
 
         private static boolean failures(Path report, SequencedSet<String> failed) throws IOException {
