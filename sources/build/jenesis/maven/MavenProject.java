@@ -48,6 +48,7 @@ public class MavenProject implements BuildExecutorModule {
     private static final String SCAN = "scan", POM_METADATA = "metadata.", BOMS = "boms";
     private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-";
     private static final Set<String> COMMANDED = Set.of("version", "scm.tag", "scm.revision", "scm.tree");
+    private static final Pattern UNRESOLVED = Pattern.compile("\\$\\{([^}]+)}");
 
     private final Path root;
     private final String group;
@@ -246,7 +247,9 @@ public class MavenProject implements BuildExecutorModule {
         String group = this.group;
         Platform platform = this.platform;
         buildExecutor.addStep(SCAN, new Scan(root));
-        buildExecutor.addStep(PREPARE, new Prepare(prefix, resolver, repository), SCAN);
+        buildExecutor.addStep(PREPARE,
+                new Prepare(prefix, resolver, repository),
+                Stream.concat(Stream.of(SCAN), inherited.sequencedKeySet().stream()));
         buildExecutor.addStep(BOMS, new Boms(), Stream.concat(Stream.of(PREPARE), inherited.sequencedKeySet().stream()));
         buildExecutor.addModule(MODULE, (modules, paths) -> {
             try (DirectoryStream<Path> files = Files.newDirectoryStream(
@@ -704,12 +707,46 @@ public class MavenProject implements BuildExecutorModule {
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
             Path maven = Files.createDirectory(context.next().resolve(MAVEN));
-            for (Map.Entry<Path, MavenLocalPom> entry : resolver.local(executor,
+            String version = null;
+            for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
+                Path file = argument.getValue().folder().resolve(BuildStep.METADATA);
+                if (!argument.getKey().equals(SCAN) && !argument.getValue().removed() && Files.isRegularFile(file)) {
+                    version = SequencedProperties.ofFiles(file).value("version", version);
+                }
+            }
+            SequencedMap<Path, MavenLocalPom> poms = resolver.local(executor,
                     repository,
-                    arguments.get(SCAN)
-                            .folder()
-                            .resolve(POM)).entrySet()) {
+                    arguments.get(SCAN).folder().resolve(POM));
+            Map<String, String> siblings = new HashMap<>();
+            poms.values().forEach(pom -> siblings.put(pom.groupId() + "/" + pom.artifactId(), pom.version()));
+            for (Map.Entry<Path, MavenLocalPom> entry : poms.entrySet()) {
                 MavenLocalPom value = entry.getValue();
+                if (version != null) {
+                    value = value.version(version)
+                            .dependencies(versioned(value.dependencies(), siblings, version))
+                            .managedDependencies(versioned(value.managedDependencies(), siblings, version))
+                            .bom(versioned(value.bom(), siblings, version));
+                }
+                Path pomFile = entry.getKey().resolve("pom.xml");
+                String unresolved = unresolved(value.version());
+                if (unresolved != null) {
+                    throw new IllegalArgumentException("The version " + value.version() + " of " + value.groupId() + ":"
+                            + value.artifactId() + " in " + pomFile + " names the property " + unresolved + ", which no"
+                            + " pom.xml defines and which this build does not take from a Maven extension: define it in"
+                            + " the pom.xml, or set the version as jenesis.project.version, on the command line or in"
+                            + " jenesis.properties");
+                }
+                if (value.dependencies() != null) {
+                    for (Map.Entry<MavenDependencyKey, MavenDependencyValue> dependency : value.dependencies().entrySet()) {
+                        String property = unresolved(dependency.getValue().version());
+                        if (property != null) {
+                            throw new IllegalArgumentException("The version " + dependency.getValue().version()
+                                    + " of the dependency " + dependency.getKey().groupId() + ":"
+                                    + dependency.getKey().artifactId() + " in " + pomFile + " names the property "
+                                    + property + ", which no pom.xml defines: define it in the pom.xml");
+                        }
+                    }
+                }
                 if (value.bom() != null) {
                     writeBom(Files.createDirectories(context.next().resolve(BOM)), value, entry.getKey());
                     continue;
@@ -727,6 +764,26 @@ public class MavenProject implements BuildExecutorModule {
                 writeModule(maven, value, relativePath, coordinate, selfPom, true, qualifiedDependencies, attachments(value, true));
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+
+        private static SequencedMap<MavenDependencyKey, MavenDependencyValue> versioned(
+                SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies,
+                Map<String, String> siblings,
+                String version) {
+            if (dependencies == null) {
+                return null;
+            }
+            SequencedMap<MavenDependencyKey, MavenDependencyValue> versioned = new LinkedHashMap<>();
+            dependencies.forEach((key, value) -> versioned.put(key,
+                    Objects.equals(siblings.get(key.groupId() + "/" + key.artifactId()), value.version())
+                            ? value.version(version)
+                            : value));
+            return versioned;
+        }
+
+        private static String unresolved(String version) {
+            Matcher matcher = UNRESOLVED.matcher(version == null ? "" : version);
+            return matcher.find() ? matcher.group(1) : null;
         }
 
         private static void writeBom(Path folder, MavenLocalPom value, Path path) throws IOException {

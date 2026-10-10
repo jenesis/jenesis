@@ -26,4 +26,32 @@ public record MavenLocalPom(String groupId,
                             SequencedMap<String, String> metadata,
                             boolean deploy,
                             boolean install) {
+
+    public MavenLocalPom version(String version) {
+        return new MavenLocalPom(groupId, artifactId, version, packaging, release, testRelease, sourceDirectory,
+                resourceDirectories, testSourceDirectory, testResourceDirectories, dependencies, managedDependencies, bom,
+                qualifiedDependencies, attachments, natives, plugins, testPlugins, aliases, signatures, mainClass, metadata,
+                deploy, install);
+    }
+
+    public MavenLocalPom dependencies(SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies) {
+        return new MavenLocalPom(groupId, artifactId, version, packaging, release, testRelease, sourceDirectory,
+                resourceDirectories, testSourceDirectory, testResourceDirectories, dependencies, managedDependencies, bom,
+                qualifiedDependencies, attachments, natives, plugins, testPlugins, aliases, signatures, mainClass, metadata,
+                deploy, install);
+    }
+
+    public MavenLocalPom managedDependencies(SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies) {
+        return new MavenLocalPom(groupId, artifactId, version, packaging, release, testRelease, sourceDirectory,
+                resourceDirectories, testSourceDirectory, testResourceDirectories, dependencies, managedDependencies, bom,
+                qualifiedDependencies, attachments, natives, plugins, testPlugins, aliases, signatures, mainClass, metadata,
+                deploy, install);
+    }
+
+    public MavenLocalPom bom(SequencedMap<MavenDependencyKey, MavenDependencyValue> bom) {
+        return new MavenLocalPom(groupId, artifactId, version, packaging, release, testRelease, sourceDirectory,
+                resourceDirectories, testSourceDirectory, testResourceDirectories, dependencies, managedDependencies, bom,
+                qualifiedDependencies, attachments, natives, plugins, testPlugins, aliases, signatures, mainClass, metadata,
+                deploy, install);
+    }
 }

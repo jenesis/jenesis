@@ -1303,6 +1303,8 @@ public record Project(
                       gradle-module-metadata -> none; the POM is the published metadata
                       maven-release-plugin, axion-release -> none; -Djenesis.project.version,
                           then `release`
+                      a version a Maven extension supplies (nisse, jgitver) -> none; set
+                          jenesis.project.version, which the siblings' dependencies take as well
                       any other plugin -> write one: skill/extend
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start

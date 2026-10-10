@@ -2021,6 +2021,99 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void refuses_a_version_that_names_a_property_no_pom_defines_naming_the_property() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>${nisse.jgit.dynamicVersion}</version>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names the property nisse.jgit.dynamicVersion")
+                .hasMessageContaining("jenesis.project.version");
+    }
+
+    @Test
+    public void a_commanded_version_replaces_an_undefined_one_in_the_project_and_its_sibling_dependencies() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>${nisse.jgit.dynamicVersion}</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>foo</module>
+                        <module>bar</module>
+                    </modules>
+                </project>
+                """);
+        for (String name : List.of("foo", "bar")) {
+            Files.writeString(Files.createDirectory(project.resolve(name)).resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>group</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>${nisse.jgit.dynamicVersion}</version>
+                        </parent>
+                        <artifactId>%s</artifactId>
+                        %s
+                    </project>
+                    """.formatted(name, name.equals("bar") ? """
+                    <dependencies>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>foo</artifactId>
+                            <version>${project.version}</version>
+                        </dependency>
+                    </dependencies>
+                    """ : ""));
+            Files.writeString(Files.createDirectories(project.resolve(name + "/src/main/java")).resolve("source"), name);
+        }
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addStep("command", (_, context, _) -> {
+            SequencedProperties values = new SequencedProperties();
+            values.setProperty("version", "2");
+            values.store(context.next().resolve(BuildStep.METADATA));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "command");
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-bar/manifests").resolve(BuildStep.REQUIRES)).stringPropertyNames())
+                .as("a sibling is required at the version the build stamps on it, which is what its POM and SBOM then name")
+                .contains("main/runtime/maven/group/foo/2");
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-foo/coordinates").resolve(BuildStep.IDENTITY)).stringPropertyNames())
+                .contains("maven/group/foo/2");
+    }
+
+    @Test
     public void keeps_a_developer_that_names_no_id_under_a_key_derived_from_its_name() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
