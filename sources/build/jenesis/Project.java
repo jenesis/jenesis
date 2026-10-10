@@ -894,7 +894,9 @@ public record Project(
                                  at all, a jar with neither sources nor resources only where its
                                  src/main/build.jenesis configures a plugin, and a
                                  src/test/java/module-info.java is a module of its own rather than
-                                 patched into the main one
+                                 patched into the main one, compiled as a module but run on the
+                                 class path, so tests of Java Module System behaviour stay with the
+                                 old build until the project moves to module-info.java
                       a BOM      a module of pom packaging that lists no modules but declares a
                                  <dependencyManagement>, such as a mockito-bom, is staged, exported
                                  and released as its POM alone: its coordinate, packaging and
