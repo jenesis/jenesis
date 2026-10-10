@@ -1759,7 +1759,8 @@ public record Project(
                       @jenesis.alias <module> <groupId>/<artifactId>[/<type>[/<classifier>]]
                           Require a Maven artifact under a stable module name, so a non-modular jar
                           needs no derived automatic name. Carries no version: a pin or BOM entry
-                          states it and is the place for a checksum; failing that the version the
+                          states it and is the place for a checksum, a pin naming the module or the
+                          coordinate alike, the one `pin` writes; failing that the version the
                           closure already resolves is kept, and only a coordinate nothing else pulls
                           in is negotiated as LATEST. It also names the artifact a `requires` takes,
                           replacing the module index lookup, which is the way to pin down a name

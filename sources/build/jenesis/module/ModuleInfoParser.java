@@ -508,6 +508,11 @@ public class ModuleInfoParser {
                     }
                 }
             }
+            for (Map.Entry<String, String> alias : aliases.entrySet()) {
+                String named = group + "/module/" + alias.getKey(), coordinate = group + "/maven/" + alias.getValue();
+                aliased(versions, named, coordinate);
+                aliased(variants, named, coordinate);
+            }
             return new ModuleInfo(module.getName().toString(),
                     release,
                     name,
@@ -569,6 +574,20 @@ public class ModuleInfoParser {
                     + "': expected <module> or <repository>/<coordinate>");
         }
         return slash < 0 ? "module/" + token : token;
+    }
+
+    private static <V> void aliased(SequencedMap<String, V> pins, String named, String coordinate) {
+        V pinned = pins.remove(named);
+        if (pinned == null) {
+            return;
+        }
+        V previous = pins.putIfAbsent(coordinate, pinned);
+        if (previous != null && !previous.equals(pinned)) {
+            throw new IllegalArgumentException("@jenesis.pin pins " + named.substring(named.lastIndexOf('/') + 1)
+                    + " at " + pinned + " and the artifact its @jenesis.alias names, "
+                    + coordinate.substring(coordinate.indexOf("/maven/") + 7) + ", at " + previous
+                    + " - keep one of the two lines");
+        }
     }
 
     private String expand(String tag, String token) {

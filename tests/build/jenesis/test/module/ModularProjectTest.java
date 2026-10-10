@@ -343,6 +343,37 @@ public class ModularProjectTest {
     }
 
     @Test
+    public void requires_an_alias_at_the_version_pinned_under_its_module_name() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias toolkit.lib org.example/plain-lib
+                 * @jenesis.pin toolkit.lib 1.0 SHA-256/cafebabe
+                 */
+                module foo {
+                  requires toolkit.lib;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path module = results.get("module/module-/manifests");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.VERSIONS)))
+                .containsOnly(Map.entry("main/maven/org.example/plain-lib", "1.0 SHA-256/cafebabe"));
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES)))
+                .as("a pin naming the module requires the coordinate its alias names at that version")
+                .containsOnly(Map.entry("main/compile/maven/org.example/plain-lib/1.0", ""),
+                        Map.entry("main/runtime/maven/org.example/plain-lib/1.0", ""));
+    }
+
+    @Test
     public void emits_exclusions_properties_from_javadoc_declarations() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
