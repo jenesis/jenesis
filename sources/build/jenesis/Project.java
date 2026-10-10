@@ -979,6 +979,11 @@ public record Project(
                                            Element, needs org.mockito to read that module:
                                            `--add-reads=org.mockito=java.compiler` in
                                            process-test.properties, naming the module concerned
+                      a jar that is no     a dependency with a class in the unnamed package, as
+                      module               JavaCC 8's, fails the tests' module path with a
+                                           FindException, and nothing keeps one dependency of a
+                                           module on the class path: move the tests that need
+                                           it to a test source folder only the old build compiles
 
                     Each module is the folder whose module-info.java sits at the root of its
                     sources; in a Maven tree that is src/main/java, so the file stays where it is.
