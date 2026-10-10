@@ -7,7 +7,7 @@ discovery switched on Jenesis reads a small file that the domain publishes befor
 it asks any module repository. This demo requires Jenesis itself and builds on the
 module path alone: `jenesis.build` says where the module's jar is - the Jenesis
 release on GitHub - so the module resolves without the module repository
-`../demo-67-module-convention` resolved from, and without Maven. The demo names no
+`../demo-68-module-convention` resolved from, and without Maven. The demo names no
 repository at all, so nothing but the domain can answer.
 
 Build and run it
@@ -36,7 +36,7 @@ that folder and `target/` to watch the download again.
 Layout
 ------
 
-    demo/demo-68-discovery-module
+    demo/demo-69-discovery-module
     |-- build/jenesis          symlink to ../../../sources/build/jenesis
     |-- jenesis.properties     discovery on, the modular layout, and no repository
     `-- sources
@@ -109,7 +109,7 @@ writes one, without its version. `{module}` is the module's name, so this one li
 maps every module below `jenesis.build`: `build.jenesis` is
 `build.jenesis:build.jenesis`. That artifact is then resolved as any Maven dependency
 is, which is where the `maven` key comes in: it names where the group
-`build.jenesis` is published, as `../demo-69-discovery-maven` shows. Without one,
+`build.jenesis` is published, as `../demo-70-discovery-maven` shows. Without one,
 the artifact comes from the Maven remotes, Maven Central by default, and a missing
 version is the newest release its Maven metadata names.
 

@@ -1,7 +1,7 @@
 Maven discovery demo
 ====================
 
-The same lookup as `../demo-68-discovery-module`, for a Maven dependency. A groupId
+The same lookup as `../demo-69-discovery-module`, for a Maven dependency. A groupId
 is a reversed domain as well, so `build.jenesis:build.jenesis` belongs to
 `jenesis.build`, whose file names a Maven location for the group before any Maven
 remote is asked. This demo depends on Jenesis itself through its `pom.xml` and
@@ -32,7 +32,7 @@ once downloaded; delete that folder and `target/` to watch the download again.
 Layout
 ------
 
-    demo/demo-69-discovery-maven
+    demo/demo-70-discovery-maven
     |-- build/jenesis          symlink to ../../../sources/build/jenesis
     |-- jenesis.properties     discovery on, and no repository
     |-- pom.xml                depends on build.jenesis:build.jenesis:0.15.4, pinned
