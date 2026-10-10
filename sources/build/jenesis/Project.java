@@ -1163,7 +1163,9 @@ public record Project(
                     relative to the root, so the root module's entry is written /<regex>, with
                     nothing before the slash. jenesis.test.exclude takes the same entries, without a #method,
                     and leaves out what they match, so excluding one class keeps the default naming;
-                    a module whose every test it leaves out runs none.
+                    a module whose every test it leaves out runs none. Test sources that hold no class
+                    the default naming takes run none either, as with Surefire, and a [FINDINGS] line
+                    says so, where a jenesis.test.filter entry that matches nothing fails the build.
                     The tests run against the module's jar, so a test that turns
                     getResource into a java.io.File fails with "URI is not hierarchical";
                     -Djenesis.test.jars=false runs them against its classes and resources folders
