@@ -11,6 +11,7 @@ import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.Pom;
+import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -102,6 +103,96 @@ public class PomTest {
         assertThat(pom)
                 .as("what only the layer holds stays out: Maven cannot resolve a layer")
                 .doesNotContain("<artifactId>impl</artifactId>");
+    }
+
+    @Test
+    public void leaves_out_of_a_flattened_pom_what_only_an_optional_dependency_brings() throws IOException {
+        SequencedProperties dependencies = new SequencedProperties(), graph = new SequencedProperties();
+        int index = 0;
+        for (String scope : List.of("compile", "runtime")) {
+            for (String coordinate : List.of("lib/1", "lib-child/1", "other/2", "other-child/2", "shared/3")) {
+                dependencies.setProperty("main/" + scope + "/maven/org.example/" + coordinate, "");
+                graph.setProperty("vertex/main/" + scope + "/maven/org.example/" + coordinate.substring(0, coordinate.indexOf('/')),
+                        coordinate.substring(coordinate.indexOf('/') + 1) + "\t\tfalse\tfalse");
+            }
+            for (String edge : List.of("\tlib/1", "\tother/2", "lib/1\tlib-child/1", "lib/1\tshared/3",
+                    "other/2\tother-child/2", "other/2\tshared/3")) {
+                graph.setProperty("edge/" + index++, edge("main", scope, edge));
+            }
+        }
+        dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+        graph.store(argument.resolve(Dependencies.GRAPH));
+        SequencedProperties optionals = new SequencedProperties();
+        optionals.setProperty("main/compile/maven/org.example/lib/1", "");
+        optionals.setProperty("main/runtime/maven/org.example/lib/1", "");
+        optionals.store(argument.resolve(BuildStep.OPTIONALS));
+        String pom = flattened();
+        assertThat(pom.indexOf("<optional>true</optional>"))
+                .as("the optional dependency stays in the POM, optional")
+                .isGreaterThan(pom.indexOf("<artifactId>lib</artifactId>"))
+                .isLessThan(pom.indexOf("<artifactId>other</artifactId>"));
+        assertThat(pom)
+                .as("what only the optional dependency brings reaches a consumer only through that dependency,"
+                        + " which then declares it itself, as Maven resolves it")
+                .doesNotContain("<artifactId>lib-child</artifactId>")
+                .as("what a required dependency brings as well stays")
+                .contains("<artifactId>other</artifactId>", "<artifactId>other-child</artifactId>", "<artifactId>shared</artifactId>");
+        assertThat(pom.indexOf("<optional>", pom.indexOf("<artifactId>other</artifactId>")))
+                .as("nothing but the optional dependency is optional")
+                .isNegative();
+    }
+
+    @Test
+    public void keeps_an_optional_dependency_in_a_flattened_pom_required_where_a_required_dependency_brings_it()
+            throws IOException {
+        SequencedProperties dependencies = new SequencedProperties(), graph = new SequencedProperties();
+        int index = 0;
+        for (String scope : List.of("compile", "runtime")) {
+            for (String coordinate : List.of("lib/1", "lib-child/1", "other/2")) {
+                dependencies.setProperty("main/" + scope + "/maven/org.example/" + coordinate, "");
+                graph.setProperty("vertex/main/" + scope + "/maven/org.example/" + coordinate.substring(0, coordinate.indexOf('/')),
+                        coordinate.substring(coordinate.indexOf('/') + 1) + "\t\tfalse\tfalse");
+            }
+            for (String edge : List.of("\tlib/1", "\tother/2", "lib/1\tlib-child/1", "other/2\tlib/1")) {
+                graph.setProperty("edge/" + index++, edge("main", scope, edge));
+            }
+        }
+        dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+        graph.store(argument.resolve(Dependencies.GRAPH));
+        SequencedProperties optionals = new SequencedProperties();
+        optionals.setProperty("main/compile/maven/org.example/lib/1", "");
+        optionals.setProperty("main/runtime/maven/org.example/lib/1", "");
+        optionals.store(argument.resolve(BuildStep.OPTIONALS));
+        assertThat(flattened())
+                .as("a consumer receives the optional dependency through the required one, so the flattened POM,"
+                        + " which excludes what each entry brings, names it as required, with what it brings")
+                .contains("<artifactId>lib</artifactId>", "<artifactId>lib-child</artifactId>")
+                .doesNotContain("<optional>");
+    }
+
+    private static String edge(String group, String scope, String edge) {
+        int tab = edge.indexOf('\t');
+        String parent = edge.substring(0, tab), child = edge.substring(tab + 1);
+        return String.join("\t", group, scope, "maven", "true", "compile", child.substring(child.indexOf('/') + 1),
+                parent.isEmpty() ? "" : "maven/org.example/" + parent, "maven/org.example/" + child);
+    }
+
+    private String flattened() throws IOException {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        new Pom().resolved(true).apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(argument, Map.of(
+                                Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.OPTIONALS), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(Dependencies.GRAPH), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        return Files.readString(next.resolve(Pom.POM));
     }
 
     @Test
