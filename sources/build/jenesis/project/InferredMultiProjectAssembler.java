@@ -770,20 +770,24 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         for (String tool : new TreeSet<>(files.keySet())) {
             SequencedMap<String, String> values = new LinkedHashMap<>();
             SequencedProperties.ofFiles(files.get(tool)).forEachProperty((key, value) -> {
+                String resolved;
                 if (!value.startsWith("@") || value.startsWith("@@")) {
-                    values.put(key, value.startsWith("@") ? value.substring(1) : value);
-                    return;
+                    resolved = value.startsWith("@") ? value.substring(1) : value;
+                } else {
+                    int slash = value.indexOf('/');
+                    String name = value.substring(1, slash == -1 ? value.length() : slash);
+                    resolved = environment.value("variable." + name, slash == -1 ? null : value.substring(slash + 1));
+                    if (resolved == null) {
+                        throw new IllegalArgumentException(files.get(tool) + " sets " + key + " to " + value
+                                + ", but jenesis.variable." + name + " is not set - set it, or give a default as @"
+                                + name + "/<default>");
+                    }
                 }
-                int slash = value.indexOf('/');
-                String name = value.substring(1, slash == -1 ? value.length() : slash),
-                        fallback = slash == -1 ? null : value.substring(slash + 1),
-                        resolved = environment.value("variable." + name, fallback);
-                if (resolved == null) {
-                    throw new IllegalArgumentException(files.get(tool) + " sets " + key + " to " + value
-                            + ", but jenesis.variable." + name + " is not set - set it, or give a default as @"
-                            + name + "/<default>");
+                if (prefix.equals("process-") && key.startsWith("-D") && key.indexOf('=') < 0 && !resolved.isEmpty()) {
+                    values.put(key + "=" + resolved, "");
+                } else {
+                    values.put(key, resolved);
                 }
-                values.put(key, resolved);
             });
             perTool.put(tool, values);
         }
