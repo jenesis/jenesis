@@ -22,6 +22,7 @@ Layout
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- build.jenesis/explicit/test.properties   framework=junit-platform, under a profile
     |-- build.jenesis/legacy/test.properties     framework=junit4, under a profile
+    |-- build.jenesis/jupiter/test.properties    engines=-junit-vintage, under a profile
     |-- greeter/
     |   |-- module-info.java     module demo.greeter; ships pinned
     |   `-- sample/greeter/Greeter.java
@@ -116,15 +117,16 @@ Choosing the engines
 --------------------
 
 On the JUnit Platform every engine on the path discovers tests, including one a
-library or the test resources register for a test of their own. Name the engines
-a run uses by their ids, a leading `-` leaving one out, so this runs the Jupiter
-tests alone:
+library or the test resources register for a test of their own. The key `engines`
+of a module's `test.properties` names the engines its tests run on by their ids,
+a leading `-` leaving one out. The `jupiter` profile declares
+`engines=-junit-vintage`, so this runs the Jupiter tests alone:
 
-    java -Djenesis.test.engines=-junit-vintage -Djenesis.print.tests=true build/jenesis/Make.java
+    java -Djenesis.make.profiles=jupiter -Djenesis.print.tests=true build/jenesis/Make.java
 
-The same list under the key `engines` in a module's `test.properties` applies to
-that module alone and wins over the setting. JUnit 4 and TestNG run no platform
-engine, so they refuse it.
+Which engines a module's tests need does not change from one run to the next, so
+the choice is a file of the module rather than a setting of the command line.
+JUnit 4 and TestNG run no platform engine, so they refuse the key.
 
 Selecting by category
 ---------------------

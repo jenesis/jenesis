@@ -321,7 +321,7 @@ public class TestFrameworkTest {
     public void a_framework_off_the_junit_platform_refuses_an_engine_selection() {
         assertThatThrownBy(() -> new JUnit4().engines(List.of(), "junit-jupiter"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("jenesis.test.engines");
+                .hasMessageContaining("engines key of test.properties");
         assertThat(new TestNG().engines(List.of("-d"), null)).containsExactly("-d");
     }
 

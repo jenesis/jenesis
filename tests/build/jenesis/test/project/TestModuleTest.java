@@ -109,7 +109,6 @@ public class TestModuleTest {
 
     @Test
     public void runs_only_the_engines_the_selection_leaves_in() throws IOException {
-        settings.put("test.engines", "-junit-jupiter");
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", dependencies);
         executor.addSource("classes", classes);
@@ -122,7 +121,8 @@ public class TestModuleTest {
                                 Map.of(),
                                 null)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
-                        .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
+                        .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false)
+                        .engines("-junit-jupiter"),
                 "dependencies", "classes");
         executor.execute();
 
