@@ -335,12 +335,12 @@ jar, so modularity survives. The target resolves the published
     java build/jenesis/Make.java
 
     demo.modular.executable.jar
-    |-- META-INF/MANIFEST.MF                  Main-Class: build.jenesis.launcher.Launcher
-    |-- build/jenesis/launcher/*.class        the launcher (the jar's own unnamed module at run time)
-    |-- application.properties                mainClass, mainModule, modulepath, classpath
-    `-- jars/<dep>.jar/...                    each dependency, exploded
+    |-- META-INF/MANIFEST.MF                      Main-Class: build.jenesis.launcher.Launcher
+    |-- META-INF/jenesis/application.properties   mainClass, mainModule, modulepath, classpath
+    |-- build/jenesis/launcher/*.class            the launcher (the jar's own unnamed module at run time)
+    `-- jars/<dep>.jar/...                        each dependency, exploded
 
-The launcher's `Main-Class` reads `application.properties`, resolves the jars `modulepath`
+The launcher's `Main-Class` reads `META-INF/jenesis/application.properties`, resolves the jars `modulepath`
 names into a fresh `ModuleLayer` and the ones `classpath` names into the unnamed module
 of the same loader, and invokes the entry point - reconstructing what
 `java -p modulepath -cp classpath -m demo.modular.executable/sample.Sample` would do,

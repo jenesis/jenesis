@@ -15,7 +15,8 @@ public class Launcher implements BuildStep {
 
     public static final String LAUNCHER = "launcher/";
     private static final String MAIN_CLASS = "build.jenesis.launcher.Launcher",
-            LAUNCHER_PREFIX = "build/jenesis/launcher/";
+            LAUNCHER_PREFIX = "build/jenesis/launcher/",
+            DESCRIPTOR = "META-INF/jenesis/application.properties";
 
     private final String tool;
     private final String group;
@@ -240,7 +241,7 @@ public class Launcher implements BuildStep {
             explode(out, shaded, "", entry -> entry.startsWith(LAUNCHER_PREFIX) && entry.endsWith(".class")
                     || entry.equals("META-INF/LICENSE")
                     || entry.equals("META-INF/NOTICE"));
-            writeEntry(out, "application.properties", descriptor);
+            writeEntry(out, DESCRIPTOR, descriptor);
             if (sbom != null) {
                 writeEntry(out, location, sbom);
             }

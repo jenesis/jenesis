@@ -216,8 +216,9 @@ A single executable jar with the launcher
 A `launcher=true` line in `packaging.properties` turns the bundle into a **single
 executable jar** you run with `java -jar foo.jar`, by shading the published
 `build.jenesis:build.jenesis.launcher` into the jar root as its `Main-Class` and
-exploding each dependency into a `jars/<jar>/` subfolder, with `classpath` naming them
-(this app is non-modular, so everything is class path). `build/DemoLauncher.java` activates the
+exploding each dependency into a `jars/<jar>/` subfolder, with `classpath` in the jar's
+`META-INF/jenesis/application.properties` naming them (this app is non-modular, so everything
+is class path). `build/DemoLauncher.java` activates the
 committed `launcher` profile with `Project.profiles(...)`: the profile's
 `build.jenesis/launcher/packaging.properties` (`launcher=true`) outranks the module's
 own `packaging.properties`, then the demo builds and runs the produced jar:

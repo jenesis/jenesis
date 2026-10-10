@@ -103,9 +103,12 @@ public class LauncherTest {
                 .contains("META-INF/LICENSE", "META-INF/NOTICE")
                 .doesNotContain("META-INF/sbom/build.jenesis.launcher.cdx.json");
         assertThat(entries).contains(
-                "application.properties",
+                "META-INF/jenesis/application.properties",
                 "jars/app.jar/sample/Sample.class",
                 "jars/lib.jar/lib/Lib.class");
+        assertThat(entries)
+                .as("the descriptor leaves the root to a file of the application's own name")
+                .doesNotContain("application.properties");
         assertThat(mainClass(jar)).isEqualTo("build.jenesis.launcher.Launcher");
         Properties descriptor = application(jar);
         assertThat(descriptor.getProperty("mainClass")).isEqualTo("sample.Sample");
@@ -368,7 +371,7 @@ public class LauncherTest {
     private static Properties application(Path zip) throws IOException {
         try (ZipFile file = new ZipFile(zip.toFile())) {
             Properties properties = new Properties();
-            try (InputStream in = file.getInputStream(file.getEntry("application.properties"))) {
+            try (InputStream in = file.getInputStream(file.getEntry("META-INF/jenesis/application.properties"))) {
                 properties.load(in);
             }
             return properties;
