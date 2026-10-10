@@ -2087,7 +2087,9 @@ public record Project(
                     and a <!--jenesis.pin ... --> comment) or module-info.java (@jenesis.pin tags),
                     idempotently, refreshing only the lines matching the local platform. It covers the
                     whole project; to pin one module, name its step (pin/module-foo+bar) rather than
-                    adding +<module>.
+                    adding +<module>. A pom.xml's main and test halves share one <dependencyManagement>,
+                    so where they resolve a coordinate at different versions its entry takes the
+                    version the pom declares itself, which the other half then resolves as well.
                     -Djenesis.pin.file=<path> writes the project's whole closure to that properties
                     file instead of the declarations, in the grammar @jenesis.bom reads, which is how
                     a local bill of materials is refreshed rather than hand-edited. Each

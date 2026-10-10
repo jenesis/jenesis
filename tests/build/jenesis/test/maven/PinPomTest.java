@@ -831,6 +831,42 @@ public class PinPomTest {
     }
 
     @Test
+    public void manages_a_coordinate_at_the_version_the_pom_declares_inline_rather_than_at_another_halfs() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.slf4j</groupId>
+                            <artifactId>slf4j-api</artifactId>
+                            <version>2.0.19</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        writeResolved(Map.of("maven/org.slf4j/slf4j-api", "1.7.36 SHA-256/main"));
+        writeResolved(Map.of("maven/org.slf4j/slf4j-api", "2.0.19 SHA-256/test"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "");
+        module.store(input.resolve(BuildStep.MODULE));
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.slf4j/slf4j-api/2.0.19", "");
+        requires.setProperty("main/runtime/maven/org.slf4j/slf4j-api/2.0.19", "");
+        requires.store(input.resolve(BuildStep.REQUIRES));
+        String result = run(pom);
+        assertThat(result)
+                .as("the version the pom declares itself is the one its resolution keeps, so a managed entry may not override it")
+                .contains("<version>2.0.19</version>\n                <!--Checksum/SHA-256/test-->")
+                .doesNotContain("1.7.36");
+    }
+
+    @Test
     public void skips_internal_coordinates_from_identity() throws IOException {
         Path pom = root.resolve("pom.xml");
         Files.writeString(pom, """

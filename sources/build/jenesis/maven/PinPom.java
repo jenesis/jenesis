@@ -102,17 +102,26 @@ public class PinPom implements BuildStep {
             throws IOException {
         SequencedMap<String, Inventory.Dependency> closure = Inventory.closure(arguments.values(), path);
         Set<String> internal = collectInternal(Inventory.identities(arguments.values()));
-        SequencedMap<String, String> entries = collectEntries(closure, internal, hashFunction);
         SequencedMap<String, List<String>> exclusions = new LinkedHashMap<>();
         SequencedMap<String, String> expressions = new LinkedHashMap<>();
+        Set<String> declared = new HashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             Path module = argument.folder().resolve(MODULE),
                     managed = argument.folder().resolve(MANAGED),
-                    expressed = argument.folder().resolve(MavenProject.EXPRESSIONS);
+                    expressed = argument.folder().resolve(MavenProject.EXPRESSIONS),
+                    requires = argument.folder().resolve(REQUIRES);
             if (argument.removed()
                     || !Files.isRegularFile(module)
                     || !path.equals(SequencedProperties.ofFiles(module).getProperty("path"))) {
                 continue;
+            }
+            if (Files.isRegularFile(requires)) {
+                for (String key : SequencedProperties.ofFiles(requires).stringPropertyNames()) {
+                    int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+                    if (first > 0 && second > first) {
+                        declared.add(key.substring(0, first) + key.substring(second));
+                    }
+                }
             }
             if (Files.isRegularFile(managed)) {
                 SequencedProperties properties = SequencedProperties.ofFiles(managed);
@@ -127,6 +136,7 @@ public class PinPom implements BuildStep {
                 SequencedProperties.ofFiles(expressed).forEachProperty(expressions::putIfAbsent);
             }
         }
+        SequencedMap<String, String> entries = collectEntries(closure, internal, declared, hashFunction);
         for (Path pomFile : pomFiles) {
             updatePom(pomFile, entries, exclusions, expressions);
         }
@@ -264,6 +274,7 @@ public class PinPom implements BuildStep {
 
     static SequencedMap<String, String> collectEntries(SequencedMap<String, Inventory.Dependency> closure,
                                                        Set<String> internal,
+                                                       Set<String> declared,
                                                        HashDigestFunction hashFunction) throws IOException {
         SequencedMap<String, String> entries = new TreeMap<>();
         for (Map.Entry<String, Inventory.Dependency> dependency : closure.entrySet()) {
@@ -281,7 +292,11 @@ public class PinPom implements BuildStep {
             String version = key.substring(lastSlash + 1);
             String checksum = dependency.getValue().checksum(hashFunction);
             String value = checksum == null ? version : version + " " + checksum;
-            entries.putIfAbsent(group + "/" + coordinate, value);
+            if (declared.contains(dependency.getKey())) {
+                entries.put(group + "/" + coordinate, value);
+            } else {
+                entries.putIfAbsent(group + "/" + coordinate, value);
+            }
         }
         return entries;
     }
