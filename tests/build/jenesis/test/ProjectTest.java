@@ -1038,6 +1038,13 @@ public class ProjectTest {
     }
 
     @Test
+    public void refuses_an_empty_project_version() {
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.version", "")), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.project.version is set but empty");
+    }
+
+    @Test
     public void reads_the_plugins_named_beside_jenesis_properties() throws IOException {
         Files.writeString(root.resolve("jenesis.plugins.properties"), """
                 lint+check=./lint@lint

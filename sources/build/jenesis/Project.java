@@ -2883,15 +2883,17 @@ public record Project(
         }
         String version = environment.getProperty("project.version");
         if (version != null) {
-            if (!version.isEmpty()) {
-                try {
-                    ModuleDescriptor.Version.parse(version);
-                } catch (IllegalArgumentException e) {
-                    throw new IllegalArgumentException("jenesis.project.version is " + version + ", which is no module"
-                            + " version, but javac stamps it into what it compiles as --module-version: a module"
-                            + " version starts with a digit, as 1.2.0 or 1.2.0-3-gbd7698f do - set one of that form",
-                            e);
-                }
+            if (version.isBlank()) {
+                throw new IllegalArgumentException("jenesis.project.version is set but empty: leave the setting out"
+                        + " for an unversioned build, or name a module version such as 1.2.0");
+            }
+            try {
+                ModuleDescriptor.Version.parse(version);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("jenesis.project.version is " + version + ", which is no module"
+                        + " version, but javac stamps it into what it compiles as --module-version: a module"
+                        + " version starts with a digit, as 1.2.0 or 1.2.0-3-gbd7698f do - set one of that form",
+                        e);
             }
             project = project.version(version);
         }
@@ -3712,7 +3714,7 @@ public record Project(
                 project.sources|false|Assemble a sources jar for every module
                 project.documentation|false|Assemble a javadoc jar for every module, a test module only where jenesis.stage.tests stages it
                 documentation.empty|false|Archive that javadoc jar holding nothing but an INTENTIONALLY_EMPTY file instead of rendering the documentation, for a repository such as Maven Central that requires the jar but not its content
-                project.version||Version stamped onto every produced artifact, a module version that starts with a digit; empty leaves modules unversioned and POMs at 0-SNAPSHOT
+                project.version||Version stamped onto every produced artifact, a module version that starts with a digit; unset leaves modules unversioned and POMs at 0-SNAPSHOT, and an empty value is refused
                 project.tag||SCM tag recorded in the generated POM and SBOM; empty for none
                 project.revision||Source revision, such as a commit id, recorded in the SBOM; empty for none
                 project.tree||Git tree id of the release, recorded in the SBOM as a SWHID; empty for none
