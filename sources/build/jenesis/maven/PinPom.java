@@ -103,11 +103,12 @@ public class PinPom implements BuildStep {
         SequencedMap<String, Inventory.Dependency> closure = Inventory.closure(arguments.values(), path);
         Set<String> internal = collectInternal(Inventory.identities(arguments.values()));
         SequencedMap<String, List<String>> exclusions = new LinkedHashMap<>();
-        SequencedMap<String, String> expressions = new LinkedHashMap<>();
+        SequencedMap<String, String> scopes = new LinkedHashMap<>(), expressions = new LinkedHashMap<>();
         Set<String> declared = new HashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             Path module = argument.folder().resolve(MODULE),
                     managed = argument.folder().resolve(MANAGED),
+                    scoped = argument.folder().resolve(MavenProject.SCOPES),
                     expressed = argument.folder().resolve(MavenProject.EXPRESSIONS),
                     requires = argument.folder().resolve(REQUIRES);
             if (argument.removed()
@@ -132,13 +133,21 @@ public class PinPom implements BuildStep {
                     }
                 }
             }
+            if (Files.isRegularFile(scoped)) {
+                SequencedProperties.ofFiles(scoped).forEachProperty((key, scope) -> {
+                    String coordinate = key.substring(key.indexOf('/') + 1);
+                    if (coordinate.startsWith(prefix + "/")) {
+                        scopes.putIfAbsent(coordinate.substring(prefix.length() + 1), scope);
+                    }
+                });
+            }
             if (Files.isRegularFile(expressed)) {
                 SequencedProperties.ofFiles(expressed).forEachProperty(expressions::putIfAbsent);
             }
         }
         SequencedMap<String, String> entries = collectEntries(closure, internal, declared, hashFunction);
         for (Path pomFile : pomFiles) {
-            updatePom(pomFile, entries, exclusions, expressions);
+            updatePom(pomFile, entries, exclusions, scopes, expressions);
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
@@ -146,6 +155,7 @@ public class PinPom implements BuildStep {
     private void updatePom(Path pomFile,
                            SequencedMap<String, String> entries,
                            SequencedMap<String, List<String>> exclusions,
+                           SequencedMap<String, String> scopes,
                            SequencedMap<String, String> expressions) throws IOException {
         Map<String, String> expressed = new HashMap<>();
         expressions.forEach((coordinate, expression) -> {
@@ -224,7 +234,7 @@ public class PinPom implements BuildStep {
                 : preserveGuarded(pinned.toString(), qualified, managed);
         String block = managed.isEmpty() && imports.isEmpty()
                 ? ""
-                : renderBlock(imports, managed, retained, exclusions, expressions, indent);
+                : renderBlock(imports, managed, retained, exclusions, scopes, expressions, indent);
         String updated;
         if (dependencyManagementMatcher.find(0)) {
             updated = dependencyManagementMatcher.replaceFirst(Matcher.quoteReplacement(block));
@@ -429,6 +439,7 @@ public class PinPom implements BuildStep {
                                       SequencedMap<String, String> entries,
                                       SequencedMap<String, String> retained,
                                       SequencedMap<String, List<String>> exclusions,
+                                      SequencedMap<String, String> scopes,
                                       SequencedMap<String, String> expressions,
                                       String indent) {
         StringBuilder sb = new StringBuilder();
@@ -473,6 +484,10 @@ public class PinPom implements BuildStep {
             }
             String children = retained.get(entry.getKey());
             List<String> excluded = exclusions.get(entry.getKey());
+            String scope = scopes.get(entry.getKey());
+            if (children == null && scope != null) {
+                sb.append(prefix).append(indent).append("<scope>").append(scope).append("</scope>\n");
+            }
             if (children != null) {
                 sb.append(children);
             } else if (excluded != null && !excluded.isEmpty()) {
