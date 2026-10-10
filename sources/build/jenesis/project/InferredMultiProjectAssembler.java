@@ -286,6 +286,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             }
             sub.addStep("prepare",
                     new Prepare(descriptor.pathPlacement(),
+                            packaging.stage(),
                             List.copyOf(packaging.formats()),
                             List.copyOf(descriptor.manifests()),
                             overrides,
@@ -647,7 +648,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         }
     }
 
-    private record Packaging(boolean jmod,
+    private record Packaging(boolean stage,
+                            boolean jmod,
                             boolean jlink,
                             boolean bundle,
                             boolean launcher,
@@ -677,7 +679,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
 
         private static Packaging configured(Path properties) throws IOException {
             if (properties == null) {
-                return new Packaging(false,
+                return new Packaging(true,
+                        false,
                         false,
                         false,
                         false,
@@ -712,7 +715,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 throw new IllegalArgumentException(properties + " sets docker.jpackage=" + dockerJPackage
                         + ", which a Linux image cannot run - name one of " + Docker.FORMATS);
             }
-            return new Packaging(configuration.flag("jmod"),
+            return new Packaging(configuration.flag("stage", true),
+                    configuration.flag("jmod"),
                     configuration.flag("jlink"),
                     configuration.flag("bundle"),
                     configuration.flag("launcher"),
@@ -782,6 +786,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
     }
 
     private record Prepare(PathPlacement pathPlacement,
+                           boolean staged,
                            List<String> packageTypes,
                            List<String> manifests,
                            SequencedMap<String, SequencedMap<String, String>> overrides,
@@ -980,6 +985,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     tool.getValue().forEach(variables::setProperty);
                     variables.store(environmentFolder.resolve(tool.getKey() + ".properties"));
                 }
+            }
+            if (!staged) {
+                Files.createFile(context.next().resolve(Inventory.UNSTAGED));
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }

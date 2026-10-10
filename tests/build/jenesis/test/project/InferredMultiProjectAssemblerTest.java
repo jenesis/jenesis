@@ -47,6 +47,21 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void marks_a_module_unstaged_where_packaging_properties_stages_none() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"), "stage=false\n");
+        assertThat(fixture.execute("sub/prepare").get("sub/prepare").resolve(Inventory.UNSTAGED))
+                .as("the inventory reads the marker and the staged repositories leave the module out")
+                .exists();
+    }
+
+    @Test
+    public void marks_no_module_unstaged_by_default() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        assertThat(fixture.execute("sub/prepare").get("sub/prepare").resolve(Inventory.UNSTAGED)).doesNotExist();
+    }
+
+    @Test
     public void absent_main_in_module_properties_yields_no_jar_arguments() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");

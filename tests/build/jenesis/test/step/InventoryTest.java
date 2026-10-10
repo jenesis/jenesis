@@ -735,6 +735,24 @@ public class InventoryTest {
     }
 
     @Test
+    public void marks_a_module_unstaged_where_an_input_carries_the_marker() throws IOException {
+        Path manifests = manifests();
+        Path prepared = Files.createDirectory(root.resolve("prepared"));
+        Files.createFile(prepared.resolve(Inventory.UNSTAGED));
+
+        run(args("manifests", manifests, "prepared", prepared));
+
+        assertThat(read(next.resolve(Inventory.INVENTORY)).getProperty("module-foo.stage")).isEqualTo("false");
+    }
+
+    @Test
+    public void leaves_a_module_staged_by_default() throws IOException {
+        run(args("manifests", manifests()));
+
+        assertThat(read(next.resolve(Inventory.INVENTORY)).getProperty("module-foo.stage")).isNull();
+    }
+
+    @Test
     public void skips_writing_when_no_data() throws IOException {
         Path empty = Files.createDirectory(root.resolve("empty"));
         BuildStepResult result = run(args("empty", empty));

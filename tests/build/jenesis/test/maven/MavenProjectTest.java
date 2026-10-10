@@ -1195,9 +1195,6 @@ public class MavenProjectTest {
                     </parent>
                     <artifactId>bom</artifactId>
                     <packaging>pom</packaging>
-                    <properties>
-                        <maven.deploy.skip>false</maven.deploy.skip>
-                    </properties>
                     <dependencyManagement>
                         <dependencies>
                             <dependency>
