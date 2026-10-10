@@ -89,6 +89,20 @@ public class JReleaserModuleTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
+    public void hands_the_project_version_to_jreleaser_in_its_environment() throws IOException {
+        Files.writeString(root.resolve("jreleaser.yml"), "");
+        Path received = root.resolve("received"), shim = root.resolve("jreleaser-shim");
+        Files.writeString(shim, "#!/bin/sh\nprintf '%s' \"$JRELEASER_PROJECT_VERSION\" > '" + received + "'\n");
+        shim.toFile().setExecutable(true);
+        settings.put("jreleaser.executable", shim.toString());
+        release("release/jreleaser/execute");
+        assertThat(received)
+                .as("JReleaser reads the project version from the variable JRELEASER_PROJECT_VERSION of its process")
+                .hasContent("1.2.3");
+    }
+
+    @Test
     public void reports_a_missing_executable_by_name() throws IOException {
         Files.writeString(root.resolve("jreleaser.yml"), "");
         settings.put("jreleaser.executable", "jreleaser-is-not-installed");
