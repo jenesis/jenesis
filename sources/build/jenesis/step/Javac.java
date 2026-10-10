@@ -20,6 +20,7 @@ public class Javac extends ProcessBuildStep {
     private static final Set<String> SYSTEM_MODULE_OPTIONS = Set.of("--add-exports", "--add-reads", "--patch-module");
     private static final Set<String> SOURCE_OPTIONS = Set.of("--source", "-source");
     private static final Set<String> TARGET_OPTIONS = Set.of("--target", "-target");
+    private static final ModuleInfoParser MODULE_INFO_PARSER = new ModuleInfoParser();
 
     private final boolean includeResources;
     private final PathPlacement pathPlacement;
@@ -279,7 +280,7 @@ public class Javac extends ProcessBuildStep {
         PathPlacement pathPlacement = this.pathPlacement.forModuleInfo(module);
         String patchModule = null;
         if (module && !siblingClasses.isEmpty()) {
-            patchModule = new ModuleInfoParser().identify(Path.of(moduleInfo)).coordinate();
+            patchModule = MODULE_INFO_PARSER.identify(Path.of(moduleInfo)).coordinate();
         } else {
             path.addAll(siblingClasses);
         }
@@ -379,7 +380,7 @@ public class Javac extends ProcessBuildStep {
             throws IOException {
         SequencedMap<Integer, List<String>> versionedFiles = new TreeMap<>();
         SequencedMap<Integer, List<String>> versionedRoots = new TreeMap<>();
-        SequencedMap<Integer, String> versionedModules = new TreeMap<>();
+        Map<Integer, String> versionedModules = new HashMap<>();
         List<String> dependencyPath = new ArrayList<>(), processorPath = new ArrayList<>();
         boolean compilerPlugins = false;
         for (BuildStepArgument argument : arguments.values()) {
@@ -414,7 +415,7 @@ public class Javac extends ProcessBuildStep {
                             versionedFiles.computeIfAbsent(release, _ -> new ArrayList<>()).add(name);
                             Path versions = sources.resolve("META-INF/versions/" + release);
                             if (versions.relativize(file).equals(Path.of("module-info.java"))) {
-                                versionedModules.put(release, new ModuleInfoParser().identify(file).coordinate());
+                                versionedModules.put(release, MODULE_INFO_PARSER.identify(file).coordinate());
                             }
                             String root = versions.toString();
                             List<String> roots = versionedRoots.computeIfAbsent(release, _ -> new ArrayList<>());

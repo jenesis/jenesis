@@ -20,6 +20,7 @@ import javax.tools.ToolProvider;
 public class Javadoc extends ProcessBuildStep {
 
     public static final String JAVADOC = "javadoc/";
+    private static final ModuleInfoParser MODULE_INFO_PARSER = new ModuleInfoParser();
 
     private final String within;
     private final String group;
@@ -172,7 +173,7 @@ public class Javadoc extends ProcessBuildStep {
                 .filter(file -> file.endsWith(File.separator + "module-info.java"))
                 .findFirst()
                 .orElse(null);
-        String module = moduleInfo == null ? null : new ModuleInfoParser().identify(Path.of(moduleInfo)).coordinate();
+        String module = moduleInfo == null ? null : MODULE_INFO_PARSER.identify(Path.of(moduleInfo)).coordinate();
         if (!path.isEmpty()) {
             for (String entry : path) {
                 if (entry.indexOf(File.pathSeparatorChar) != -1) {
