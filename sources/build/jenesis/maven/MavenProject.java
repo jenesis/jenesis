@@ -363,24 +363,24 @@ public class MavenProject implements BuildExecutorModule {
                                 String test = properties.getProperty("dependencies.test", "");
                                 String checksums = properties.getProperty("checksums", "");
                                 Map<String, String> checksumByCoordinate = new LinkedHashMap<>();
-                                for (String entry : checksums.isEmpty() ? new String[0] : checksums.split(",")) {
+                                for (String entry : checksums.isEmpty() ? new String[0] : checksums.split("\t")) {
                                     int split = entry.indexOf('=');
                                     if (split > 0) {
                                         checksumByCoordinate.put(entry.substring(0, split), entry.substring(split + 1));
                                     }
                                 }
-                                for (String dependency : compile.isEmpty() ? new String[0] : compile.split(",")) {
+                                for (String dependency : compile.isEmpty() ? new String[0] : compile.split("\t")) {
                                     String value = checksumByCoordinate.getOrDefault(dependency, "");
                                     requires.setProperty(group + "/compile/" + dependency, value);
                                     requires.setProperty(group + "/runtime/" + dependency, value);
                                 }
-                                for (String dependency : provided.isEmpty() ? new String[0] : provided.split(",")) {
+                                for (String dependency : provided.isEmpty() ? new String[0] : provided.split("\t")) {
                                     requires.setProperty(group + "/compile/" + dependency, checksumByCoordinate.getOrDefault(dependency, ""));
                                 }
-                                for (String dependency : runtime.isEmpty() ? new String[0] : runtime.split(",")) {
+                                for (String dependency : runtime.isEmpty() ? new String[0] : runtime.split("\t")) {
                                     requires.setProperty(group + "/runtime/" + dependency, checksumByCoordinate.getOrDefault(dependency, ""));
                                 }
-                                for (String dependency : test.isEmpty() ? new String[0] : test.split(",")) {
+                                for (String dependency : test.isEmpty() ? new String[0] : test.split("\t")) {
                                     String value = checksumByCoordinate.getOrDefault(dependency, "");
                                     requires.setProperty(group + "/compile/" + dependency, value);
                                     requires.setProperty(group + "/runtime/" + dependency, value);
@@ -490,8 +490,9 @@ public class MavenProject implements BuildExecutorModule {
                                 if (!managedExclusions.isEmpty()) {
                                     managedExclusions.store(context.next().resolve(MANAGED));
                                 }
-                                List<String> optional = properties.entries("optional");
-                                if (optional != null) {
+                                String optionalDependencies = properties.getProperty("optional");
+                                if (optionalDependencies != null) {
+                                    List<String> optional = List.of(optionalDependencies.split("\t"));
                                     SequencedProperties optionals = new SequencedProperties();
                                     for (String key : requires.stringPropertyNames()) {
                                         int scopeSlash = key.indexOf('/', key.indexOf('/') + 1);
@@ -504,7 +505,7 @@ public class MavenProject implements BuildExecutorModule {
                                 SequencedProperties versions = new SequencedProperties();
                                 String managed = properties.getProperty("managedDependencies", "");
                                 if (!managed.isEmpty()) {
-                                    for (String entry : managed.split(",")) {
+                                    for (String entry : managed.split("\t")) {
                                         int split = entry.indexOf('=');
                                         String coord = entry.substring(0, split), version = entry.substring(split + 1);
                                         versions.setProperty(group + "/" + coord, version);
@@ -916,10 +917,10 @@ public class MavenProject implements BuildExecutorModule {
                                         || dep.getValue().scope() == MavenDependencyScope.PROVIDED
                                         || dep.getValue().scope() == MavenDependencyScope.TEST)
                                 .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version()))
-                                .collect(Collectors.joining(","));
+                                .collect(Collectors.joining("\t"));
                 properties.setProperty("dependencies.test", testDependencies.isEmpty()
                         ? coordinate
-                        : testDependencies + "," + coordinate);
+                        : testDependencies + "\t" + coordinate);
             } else {
                 for (MavenDependencyScope scope : List.of(
                         MavenDependencyScope.COMPILE,
@@ -929,7 +930,7 @@ public class MavenProject implements BuildExecutorModule {
                             value.dependencies() == null ? "" : value.dependencies().entrySet().stream()
                                     .filter(dep -> dep.getValue().scope() == scope)
                                     .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version()))
-                                    .collect(Collectors.joining(",")));
+                                    .collect(Collectors.joining("\t")));
                 }
             }
             if (!test && value.dependencies() != null) {
@@ -937,7 +938,7 @@ public class MavenProject implements BuildExecutorModule {
                         .filter(dep -> dep.getValue().scope() != MavenDependencyScope.TEST
                                 && Boolean.TRUE.equals(dep.getValue().optional()))
                         .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version()))
-                        .collect(Collectors.joining(","));
+                        .collect(Collectors.joining("\t"));
                 if (!optional.isEmpty()) {
                     properties.setProperty("optional", optional);
                 }
@@ -968,7 +969,7 @@ public class MavenProject implements BuildExecutorModule {
                     .map(dep -> dep.getKey().coordinate(prefix, null)
                             + "=" + dep.getValue().version()
                             + (dep.getValue().checksum() == null ? "" : " " + dep.getValue().checksum()))
-                    .collect(Collectors.joining(","));
+                    .collect(Collectors.joining("\t"));
             properties.setProperty("managedDependencies", managed);
             if (!qualifiedDependencies.isEmpty()) {
                 properties.setProperty("qualifiedDependencies", qualifiedDependencies);
@@ -1030,7 +1031,7 @@ public class MavenProject implements BuildExecutorModule {
                                             : dep.getValue().scope() != MavenDependencyScope.TEST))
                             .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version())
                                     + "=" + dep.getValue().checksum())
-                            .collect(Collectors.joining(",")));
+                            .collect(Collectors.joining("\t")));
             String sourceDirectory = test ? value.testSourceDirectory() : value.sourceDirectory();
             properties.setProperty("sources", sourceDirectory == null
                     ? (test ? "src/test/java" : "src/main/java")
