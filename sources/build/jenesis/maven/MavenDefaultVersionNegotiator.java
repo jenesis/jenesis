@@ -16,8 +16,12 @@ public class MavenDefaultVersionNegotiator implements MavenVersionNegotiator {
     }
 
     static DocumentBuilderFactory toDocumentBuilderFactory() {
+        return toDocumentBuilderFactory(true);
+    }
+
+    static DocumentBuilderFactory toDocumentBuilderFactory(boolean namespaceAware) {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        factory.setNamespaceAware(true);
+        factory.setNamespaceAware(namespaceAware);
         try {
             factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);

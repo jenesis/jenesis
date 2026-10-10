@@ -34,7 +34,7 @@ public class MavenPomResolver implements MavenResolver {
     private final String jdk, osName, osArch, osVersion;
     private final transient Consumer<String> printing;
     private final transient Palette palette;
-    private final transient DocumentBuilderFactory factory = MavenDefaultVersionNegotiator.toDocumentBuilderFactory();
+    private final transient DocumentBuilderFactory factory = MavenDefaultVersionNegotiator.toDocumentBuilderFactory(false);
 
     public MavenPomResolver() {
         this(MavenDefaultVersionNegotiator.maven());
@@ -839,8 +839,8 @@ public class MavenPomResolver implements MavenResolver {
             }
             document = builder.parse(inputStream);
         }
-        String namespace = document.getDocumentElement().getNamespaceURI();
-        return switch (namespace == null ? NAMESPACE_4_0_0 : namespace) {
+        String namespace = document.getDocumentElement().getAttribute("xmlns");
+        return switch (namespace.isEmpty() ? NAMESPACE_4_0_0 : namespace) {
             case NAMESPACE_4_0_0, NAMESPACE_4_1_0 -> {
                 boolean inferring = NAMESPACE_4_1_0.equals(namespace);
                 ParentCoordinate parent = null;
@@ -995,7 +995,7 @@ public class MavenPomResolver implements MavenResolver {
                         .flatMap(model -> toElements(model, "properties").limit(1))
                         .flatMap(MavenPomResolver::toChildren)
                         .filter(node -> node.getNodeType() == Node.ELEMENT_NODE)
-                        .forEach(node -> properties.put(node.getLocalName(), node.getTextContent().trim()));
+                        .forEach(node -> properties.put(node.getNodeName(), node.getTextContent().trim()));
                 models.stream()
                         .flatMap(model -> toElements(model, "dependencyManagement").limit(1))
                         .flatMap(node -> toElements(node, "dependencies").limit(1))
@@ -1407,11 +1407,9 @@ public class MavenPomResolver implements MavenResolver {
                 index -> index + 1).mapToObj(children::item);
     }
 
-    private static Stream<Node> toElements(Node node, String localName) {
-        return toChildren(node).filter(child -> Objects.equals(child.getLocalName(), localName)
-                && (child.getNamespaceURI() == null
-                        || NAMESPACE_4_0_0.equals(child.getNamespaceURI())
-                        || NAMESPACE_4_1_0.equals(child.getNamespaceURI())));
+    private static Stream<Node> toElements(Node node, String name) {
+        return toChildren(node).filter(child -> child.getNodeType() == Node.ELEMENT_NODE
+                && child.getNodeName().equals(name));
     }
 
     private static List<String> toDirectories(List<Node> builds, String list, String element) {
@@ -1432,7 +1430,7 @@ public class MavenPomResolver implements MavenResolver {
                 .findFirst()
                 .filter(activation -> toChildren(activation)
                         .filter(condition -> condition.getNodeType() == Node.ELEMENT_NODE)
-                        .allMatch(condition -> ACTIVATIONS.contains(condition.getLocalName())))
+                        .allMatch(condition -> ACTIVATIONS.contains(condition.getNodeName())))
                 .filter(activation -> toElements(activation, "jdk").findFirst().isPresent()
                         || toElements(activation, "os").findFirst().isPresent())
                 .filter(activation -> toElementText(activation, "jdk").map(range -> isJdk(range, path, trusted)).orElse(true))

@@ -57,7 +57,7 @@ public class MavenModuleResolver implements Resolver {
     private static String pomVersion(InputStream stream, String coordinate) throws IOException {
         Document document;
         try (stream) {
-            document = MavenDefaultVersionNegotiator.toDocumentBuilderFactory().newDocumentBuilder().parse(stream);
+            document = MavenDefaultVersionNegotiator.toDocumentBuilderFactory(false).newDocumentBuilder().parse(stream);
         } catch (SAXException | ParserConfigurationException e) {
             throw new IllegalStateException("Failed to parse discovery POM for " + coordinate, e);
         }
@@ -68,7 +68,7 @@ public class MavenModuleResolver implements Resolver {
             if (node.getNodeType() != Node.ELEMENT_NODE) {
                 continue;
             }
-            String name = node.getLocalName() == null ? node.getNodeName() : node.getLocalName();
+            String name = node.getNodeName();
             if (name.equals("version")) {
                 return node.getTextContent().trim();
             } else if (name.equals("parent")) {
@@ -78,10 +78,7 @@ public class MavenModuleResolver implements Resolver {
                     if (candidate.getNodeType() != Node.ELEMENT_NODE) {
                         continue;
                     }
-                    String nestedName = candidate.getLocalName() == null
-                            ? candidate.getNodeName()
-                            : candidate.getLocalName();
-                    if (nestedName.equals("version")) {
+                    if (candidate.getNodeName().equals("version")) {
                         parent = candidate.getTextContent().trim();
                     }
                 }
