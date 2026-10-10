@@ -367,7 +367,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             InferredArtifactQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
                                     .pinning(descriptor.pinning())
                                     .custom(hooks.getOrDefault("artifact", none))),
-                    Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
+                    Stream.concat(Stream.of("prepare", "binary"), inputs(descriptor, closure)));
             sub.addStep("layers",
                     new Layers(),
                     Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
