@@ -7,6 +7,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
+import build.jenesis.module.ModuleInfoParser;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.Tree;
@@ -167,8 +168,11 @@ public class Javadoc extends ProcessBuildStep {
             return CompletableFuture.completedStage(null);
         }
         path.sort(null);
-        boolean module = !classpath
-                && files.stream().anyMatch(file -> file.endsWith(File.separator + "module-info.java"));
+        String moduleInfo = classpath ? null : files.stream()
+                .filter(file -> file.endsWith(File.separator + "module-info.java"))
+                .findFirst()
+                .orElse(null);
+        String module = moduleInfo == null ? null : new ModuleInfoParser().identify(Path.of(moduleInfo)).coordinate();
         if (!path.isEmpty()) {
             for (String entry : path) {
                 if (entry.indexOf(File.pathSeparatorChar) != -1) {
@@ -176,20 +180,23 @@ public class Javadoc extends ProcessBuildStep {
                             "Path entry contains separator '" + File.pathSeparator + "': " + entry);
                 }
             }
-            List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
+            List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>(), patched = new ArrayList<>();
             for (String entry : path) {
-                (module && PathPlacement.moduleDescriptor(Path.of(entry)) != null
-                        ? modulePath
-                        : classPath).add(entry);
+                ModuleDescriptor descriptor = module == null ? null : PathPlacement.moduleDescriptor(Path.of(entry));
+                (descriptor == null
+                        ? classPath
+                        : descriptor.name().equals(module) ? patched : modulePath).add(entry);
             }
             StringBuilder args = new StringBuilder();
             for (Map.Entry<String, List<String>> paths : List.of(
                     Map.entry("--module-path", modulePath),
-                    Map.entry("--class-path", classPath)
+                    Map.entry("--class-path", classPath),
+                    Map.entry("--patch-module", patched)
             )) {
                 if (!paths.getValue().isEmpty()) {
                     args.append(paths.getKey())
                             .append("\n\"")
+                            .append(paths.getKey().equals("--patch-module") ? module + "=" : "")
                             .append(String.join(File.pathSeparator, paths.getValue())
                                     .replace("\\", "\\\\")
                                     .replace("\"", "\\\""))
