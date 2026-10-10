@@ -2810,6 +2810,49 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void matches_a_family_that_maven_does_not_name_against_the_operating_system_name() throws IOException {
+        addToRepository("group", "artifact", "1", rootPom("", "brotli"));
+        addToRepository("brotli", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>brotli</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <profiles>
+                        <profile>
+                            <activation><os><family>Linux</family><arch>amd64</arch></os></activation>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>brotli</groupId>
+                                    <artifactId>native-linux-x86_64</artifactId>
+                                    <version>1</version>
+                                </dependency>
+                            </dependencies>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        addToRepository("brotli", "native-linux-x86_64", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>brotli</groupId>
+                    <artifactId>native-linux-x86_64</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        MavenDependencyKey linux = new MavenDependencyKey("brotli", "native-linux-x86_64", "jar", null);
+        assertThat(mavenPomResolver.os("Linux", "amd64", "6.1").dependencies(
+                Runnable::run, mavenRepository, "group", "artifact", "1", null).keySet())
+                .as("Maven matches a family it has no name for as a part of os.name, ignoring case")
+                .contains(linux);
+        assertThat(mavenPomResolver.os("Mac OS X", "amd64", "14.4").dependencies(
+                Runnable::run, mavenRepository, "group", "artifact", "1", null).keySet())
+                .doesNotContain(linux);
+    }
+
+    @Test
     public void applies_a_managed_exclusion_to_the_managed_dependency_where_it_is_reached_transitively() throws IOException {
         addToRepository("group", "artifact", "1", rootPom("", "middle"));
         addToRepository("middle", "artifact", "1", """
