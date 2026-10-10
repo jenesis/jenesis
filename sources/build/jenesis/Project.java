@@ -839,7 +839,8 @@ public record Project(
                     migrates to pom.xml and stays there, whichever declaration was asked for: say so,
                     and attempt no phase two. Where it ships a descriptor for Java 9 and later, the
                     module-info.java lives in META-INF/versions/9/ of its sources and the pom.xml build
-                    compiles it there, against the dependencies that carry a module name; one whose
+                    compiles it there, with no annotation processing and so none of the main
+                    compilation's -A options, against the dependencies that carry a module name; one whose
                     jar declares none, as jline 2 or groovy-all 2 do, is named by a
                     <!--jenesis.alias <module> <groupId>/<artifactId>--> comment in the pom.xml, the
                     name the descriptor requires. The old build follows the move: ModiTect's
