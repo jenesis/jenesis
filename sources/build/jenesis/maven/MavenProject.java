@@ -44,6 +44,7 @@ import static java.util.Objects.requireNonNull;
 public class MavenProject implements BuildExecutorModule {
 
     public static final String POM = "pom/", MAVEN = "maven/", BOM = "bom/";
+    public static final String MANAGED = "managed.properties";
     private static final String SCAN = "scan", POM_METADATA = "metadata.", BOMS = "boms";
     private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-";
     private static final Set<String> COMMANDED = Set.of("version", "scm.tag", "scm.revision", "scm.tree");
@@ -455,6 +456,16 @@ public class MavenProject implements BuildExecutorModule {
                                 if (!exclusionsProperties.isEmpty()) {
                                     exclusionsProperties.store(context.next().resolve(BuildStep.EXCLUSIONS));
                                 }
+                                SequencedProperties managedExclusions = new SequencedProperties();
+                                for (String key : properties.stringPropertyNames()) {
+                                    if (key.startsWith("managed.exclusions.")) {
+                                        managedExclusions.setProperty(key.substring("managed.exclusions.".length()),
+                                                properties.getProperty(key));
+                                    }
+                                }
+                                if (!managedExclusions.isEmpty()) {
+                                    managedExclusions.store(context.next().resolve(MANAGED));
+                                }
                                 List<String> optional = properties.entries("optional");
                                 if (optional != null) {
                                     SequencedProperties optionals = new SequencedProperties();
@@ -858,6 +869,17 @@ public class MavenProject implements BuildExecutorModule {
                     if (depValue.exclusions() != null && !depValue.exclusions().isEmpty()) {
                         properties.setProperty(
                                 "exclusions." + depKey.coordinate(prefix, depValue.version()),
+                                depValue.exclusions().stream()
+                                        .map(name -> name.groupId() + "/" + name.artifactId())
+                                        .collect(Collectors.joining(",")));
+                    }
+                });
+            }
+            if (value.managedDependencies() != null) {
+                value.managedDependencies().forEach((depKey, depValue) -> {
+                    if (depValue.exclusions() != null && !depValue.exclusions().isEmpty()) {
+                        properties.setProperty(
+                                "managed.exclusions." + depKey.coordinate(prefix, null),
                                 depValue.exclusions().stream()
                                         .map(name -> name.groupId() + "/" + name.artifactId())
                                         .collect(Collectors.joining(",")));

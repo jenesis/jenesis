@@ -2,6 +2,7 @@ package build.jenesis.test.maven;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Checksum;
@@ -9,6 +10,7 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
+import build.jenesis.maven.MavenProject;
 import build.jenesis.maven.PinPom;
 import build.jenesis.step.Inventory;
 
@@ -442,6 +444,97 @@ public class PinPomTest {
                 .contains("<artifactId>fresh</artifactId>")
                 .doesNotContain("<artifactId>old</artifactId>");
         assertThat(result.indexOf("<artifactId>bom</artifactId>")).isLessThan(result.indexOf("<artifactId>fresh</artifactId>"));
+        assertThat(run(pom)).isEqualTo(result);
+    }
+
+    @Test
+    public void keeps_the_exclusions_and_scope_of_a_managed_entry_it_rewrites() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.mysql</groupId>
+                                <artifactId>mysql-connector-j</artifactId>
+                                <version>9.6.0</version>
+                                <scope>runtime</scope>
+                                <exclusions>
+                                    <exclusion>
+                                        <groupId>com.google.protobuf</groupId>
+                                        <artifactId>protobuf-java</artifactId>
+                                    </exclusion>
+                                </exclusions>
+                                <!--Checksum/SHA-256/stale-->
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        writeResolved(Map.of("maven/com.mysql/mysql-connector-j", "9.7.0 SHA-256/deadbeef"));
+        String result = run(pom);
+        assertThat(result)
+                .as("a pin replaces the version and the checksum of an entry, and what else it says still holds")
+                .contains("""
+                                <dependency>
+                                    <groupId>com.mysql</groupId>
+                                    <artifactId>mysql-connector-j</artifactId>
+                                    <version>9.7.0</version>
+                                    <scope>runtime</scope>
+                                    <exclusions>
+                                        <exclusion>
+                                            <groupId>com.google.protobuf</groupId>
+                                            <artifactId>protobuf-java</artifactId>
+                                        </exclusion>
+                                    </exclusions>
+                                    <!--Checksum/SHA-256/deadbeef-->
+                                </dependency>
+                    """)
+                .doesNotContain("9.6.0", "stale");
+        assertThat(run(pom)).isEqualTo(result);
+    }
+
+    @Test
+    public void carries_the_exclusions_of_an_imported_bom_into_the_entry_that_pins_its_coordinate() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        writeResolved(Map.of("maven/com.mysql/mysql-connector-j", "9.7.0 SHA-256/deadbeef"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "");
+        module.store(input.resolve(BuildStep.MODULE));
+        SequencedProperties managed = new SequencedProperties();
+        managed.setProperty("maven/com.mysql/mysql-connector-j", "com.google.protobuf/protobuf-java");
+        managed.store(input.resolve(MavenProject.MANAGED));
+        String result = run(pom);
+        assertThat(result)
+                .as("the project's own entry shadows the bill of materials' one, so it has to exclude what that one excluded")
+                .contains("""
+                                <dependency>
+                                    <groupId>com.mysql</groupId>
+                                    <artifactId>mysql-connector-j</artifactId>
+                                    <version>9.7.0</version>
+                                    <exclusions>
+                                        <exclusion>
+                                            <groupId>com.google.protobuf</groupId>
+                                            <artifactId>protobuf-java</artifactId>
+                                        </exclusion>
+                                    </exclusions>
+                                    <!--Checksum/SHA-256/deadbeef-->
+                                </dependency>
+                    """);
         assertThat(run(pom)).isEqualTo(result);
     }
 
