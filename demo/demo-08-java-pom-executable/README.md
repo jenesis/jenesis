@@ -152,7 +152,8 @@ its `Digest`.
     `-- jars/                      the app jar and commons-lang3
 
 The generated file is the one written by hand above, with the entry point taken from the
-module's main class. Every jar of the application is named rather than globbed, and the command
+module's main class, and `process-java.properties` leads its argument file as it leads the
+bundle's. Every jar of the application is named rather than globbed, and the command
 travels in the argument file, so the `ENTRYPOINT` stays this size however many jars the
 application resolves. The class path ends with one glob, `/app/extensions/classpath/*`, and the
 module path is `/app/extensions/modulepath`. The build creates neither folder, and `java` skips a
