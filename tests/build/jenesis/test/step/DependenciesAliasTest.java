@@ -167,8 +167,9 @@ public class DependenciesAliasTest {
                 "org.example/amn-lib/1.0"))
                 .as("a target that already names itself is required under that name")
                 .hasStackTraceContaining(IllegalArgumentException.class.getName())
-                .hasStackTraceContaining("Target of module alias toolkit.amn is already the automatic module lib.target"
-                        + " - require lib.target instead of aliasing org.example/amn-lib");
+                .hasStackTraceContaining("Target of module alias toolkit.amn, org.example/amn-lib 1.0, is already the"
+                        + " automatic module lib.target - require lib.target instead of aliasing org.example/amn-lib,"
+                        + " or, if a version of org.example/amn-lib other than 1.0 is meant, pin that one");
     }
 
     @Test
@@ -184,7 +185,9 @@ public class DependenciesAliasTest {
         assertThatThrownBy(() -> resolve(Map.of("toolkit.named", "org.example/named-lib"),
                 "org.example/named-lib/1.0"))
                 .hasStackTraceContaining(IllegalArgumentException.class.getName())
-                .hasStackTraceContaining("Target of module alias toolkit.named is already the named module lib.named");
+                .as("the version that declares the name is named, as the alias states none and another may not")
+                .hasStackTraceContaining("Target of module alias toolkit.named, org.example/named-lib 1.0, is already"
+                        + " the named module lib.named");
     }
 
     @Test
