@@ -237,6 +237,8 @@ public class TestFrameworkTest {
                 false))
                 .containsExactly("execute", "--disable-banner", "--disable-ansi-colors",
                         "--reports-dir=" + root.resolve("reports"),
+                        "--config=junit.platform.reporting.open.xml.enabled=true",
+                        "--config=junit.platform.reporting.output.dir=" + root.resolve("reports"),
                         "--select-class=sample.BetaTest",
                         "--select-method=sample.AlphaTest#first",
                         "--select-method=sample.AlphaTest#second");
@@ -252,6 +254,8 @@ public class TestFrameworkTest {
                 false))
                 .as("the execute command exists from JUnit Platform 1.10 on, and an older launcher rejects it")
                 .containsExactly("--disable-banner", "--disable-ansi-colors", "--reports-dir=" + root.resolve("reports"),
+                        "--config=junit.platform.reporting.open.xml.enabled=true",
+                        "--config=junit.platform.reporting.output.dir=" + root.resolve("reports"),
                         "--select-class=sample.BetaTest");
     }
 
@@ -266,7 +270,10 @@ public class TestFrameworkTest {
                     false))
                     .as("version %s", version)
                     .containsExactly("execute", "--disable-banner", "--disable-ansi-colors",
-                            "--reports-dir=" + root.resolve("reports"), "--select-class=sample.BetaTest");
+                            "--reports-dir=" + root.resolve("reports"),
+                            "--config=junit.platform.reporting.open.xml.enabled=true",
+                            "--config=junit.platform.reporting.output.dir=" + root.resolve("reports"),
+                            "--select-class=sample.BetaTest");
         }
     }
 
@@ -362,7 +369,7 @@ public class TestFrameworkTest {
     }
 
     @Test
-    public void junit_platform_commands_add_both_report_formats_when_enabled() {
+    public void junit_platform_writes_both_report_formats_into_the_reports_folder_or_else_the_supplement() {
         assertThat(new JUnitPlatform().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
@@ -378,8 +385,10 @@ public class TestFrameworkTest {
                 Collections.emptyNavigableMap(),
                 false,
                 false))
-                .contains("--reports-dir=" + root.resolve("reports"))
-                .noneMatch(command -> command.startsWith("--config=junit.platform.reporting."));
+                .as("the same reports are written whether or not they are kept, so a failure can always be read from them")
+                .contains("--reports-dir=" + root.resolve("reports"),
+                        "--config=junit.platform.reporting.open.xml.enabled=true",
+                        "--config=junit.platform.reporting.output.dir=" + root.resolve("reports"));
     }
 
     @Test

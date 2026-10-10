@@ -238,8 +238,8 @@ public abstract class ProcessBuildStep implements BuildStep {
         }
     }
 
-    protected String diagnosis(BuildStepContext context) throws IOException {
-        return "";
+    protected Optional<String> diagnosis(BuildStepContext context) throws IOException {
+        return Optional.empty();
     }
 
     public boolean acceptableExitCode(int code,
@@ -281,7 +281,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                             future.complete(new BuildStepResult(true));
                         } else {
                             throw new IllegalStateException("Unexpected exit code: " + exitCode + "\n"
-                                    + diagnosis(context)
+                                    + diagnosis(context).map(diagnosis -> diagnosis + "\n").orElse("")
                                     + "To reproduce, execute:\n "
                                     + executed
                                     + tail("Output", output)
