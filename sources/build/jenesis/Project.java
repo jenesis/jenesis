@@ -1961,7 +1961,12 @@ public record Project(
 
                     Prefer a tool's Java API to a process: require it in the plugin's module-info.java
                     and it resolves by module name into the plugin's own layer, pinned as
-                    plugin-<name>/module/<module>. Configure the tool in that code, too: where a Maven
+                    plugin-<name>/module/<module>. A tool the module index does not serve, as one
+                    named by an Automatic-Module-Name alone, is required through
+                    @jenesis.alias <module> <groupId>/<artifactId>, with @jenesis.exclude and
+                    @jenesis.pin as in a project. Every jar of that layer is a module of its own, so a
+                    dependency without a module name, or two jars sharing a package, cannot load:
+                    exclude it, or pin a version of it that names its module. Configure the tool in that code, too: where a Maven
                     or Gradle plugin discovers the tool's own extensions and takes their settings as XML,
                     as Byte Buddy's build plugin does, the provider constructs them in Java and reads
                     only plain values from plugin-<name>.properties, as demo-73 does with Byte Buddy. A JDK tool is forked by extending ProcessBuildStep,
