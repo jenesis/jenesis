@@ -869,12 +869,13 @@ public record Project(
                     package is split: held by the tests and the main code of one project, as
                     white-box tests are, or by two projects of the build. This program prints each
                     split package and where it is held, per project and across the main sources of
-                    all of them. Write it to a file outside the sources, and run it from the root as
+                    all of them, counting Java, Kotlin, Groovy and Scala sources. Write it to a file outside the sources, and run it from the root as
                     `java SplitPackages.java`: the JDK the build runs on runs a source file as it
                     stands, on any operating system, so no shell tool is needed.
 
                       void main() throws IOException {
-                          var source = Pattern.compile("(.*)src/(main|test)/java/(.+)/[^/]+[.]java");
+                          var source = Pattern.compile(
+                                  "(.*)src/(main|test)/(?:java|kotlin|groovy|scala)/(.+)/[^/]+[.](?:java|kt|groovy|scala)");
                           var owners = new TreeMap<String, Set<String>>();
                           try (var files = Files.walk(Path.of("."))) {
                               files.map(file -> file.toString().replace(File.separatorChar, '/'))
@@ -1036,24 +1037,39 @@ public record Project(
                                            project's classes out of it
                       two dependencies     no module path holds a package two jars share; after a
                                            build of the pom.xml, SharedPackages.java below prints
-                                           each package two jars of a test closure hold - exclude
-                                           one of them, or drop the test that needs both
+                                           each package two jars of a test closure hold, of the
+                                           groups main and test that the module path takes and
+                                           not of a processor's or a tool's - exclude one of
+                                           them, or drop the test that needs both
 
                       void main() throws IOException {
-                          var holders = new TreeMap<String, Set<String>>();
+                          var placed = Pattern.compile("(main|test)/(compile|runtime)/.+");
+                          var closure = new TreeSet<Path>();
                           try (var files = Files.walk(Path.of("target/build"))) {
-                              for (var jar : files.filter(file -> file.toString().endsWith(".jar")
-                                      && file.getParent().endsWith("resolved")
-                                      && file.toString().contains("test-module-")).toList()) {
-                                  try (var zip = new ZipFile(jar.toFile())) {
-                                      zip.stream().map(ZipEntry::getName)
-                                              .filter(name -> name.endsWith(".class") && name.contains("/")
-                                                      && !name.startsWith("META-INF/"))
-                                              .forEach(name -> holders.computeIfAbsent(
-                                                      name.substring(0, name.lastIndexOf('/')),
-                                                      _ -> new TreeSet<>()).add(jar.getFileName().toString()));
-                                  } catch (ZipException _) {
+                              for (var index : files.filter(file -> file.toString().contains("test-module-")
+                                      && file.getFileName().toString().equals("dependencies.properties")).toList()) {
+                                  var dependencies = new Properties();
+                                  try (var reader = Files.newBufferedReader(index)) {
+                                      dependencies.load(reader);
                                   }
+                                  for (var key : dependencies.stringPropertyNames()) {
+                                      var jar = index.resolveSibling(dependencies.getProperty(key).split(" ")[0]);
+                                      if (placed.matcher(key).matches() && Files.isRegularFile(jar)) {
+                                          closure.add(jar.normalize());
+                                      }
+                                  }
+                              }
+                          }
+                          var holders = new TreeMap<String, Set<String>>();
+                          for (var jar : closure) {
+                              try (var zip = new ZipFile(jar.toFile())) {
+                                  zip.stream().map(ZipEntry::getName)
+                                          .filter(name -> name.endsWith(".class") && name.contains("/")
+                                                  && !name.startsWith("META-INF/"))
+                                          .forEach(name -> holders.computeIfAbsent(
+                                                  name.substring(0, name.lastIndexOf('/')),
+                                                  _ -> new TreeSet<>()).add(jar.getFileName().toString()));
+                              } catch (ZipException _) {
                               }
                           }
                           holders.forEach((folder, jars) -> {
