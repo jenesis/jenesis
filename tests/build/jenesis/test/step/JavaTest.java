@@ -196,9 +196,9 @@ public class JavaTest {
                 .as("a jar resolved by two predecessors is one jar, and naming it twice doubles every resource it holds")
                 .content()
                 .contains("\"--class-path\"\n\""
-                        + root.resolve("module/resolved/first-1.0.jar")
-                        + File.pathSeparator
-                        + root.resolve("module/resolved/second-1.0.jar")
+                        + (root.resolve("module/resolved/first-1.0.jar")
+                                + File.pathSeparator
+                                + root.resolve("module/resolved/second-1.0.jar")).replace("\\", "\\\\")
                         + "\"\n")
                 .doesNotContain("observed");
     }

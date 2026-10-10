@@ -51,7 +51,7 @@ public class HashFunctionTest {
         assertThatThrownBy(() -> HashFunction.read(folder, _ -> new byte[]{1, 2, 3}, Runnable::run))
                 .isInstanceOf(NoSuchFileException.class)
                 .hasMessageContaining("foo")
-                .hasMessageContaining("../missing")
+                .hasMessageContaining(Path.of("..", "missing").toString())
                 .hasMessageContaining("symbolic link");
     }
 }
