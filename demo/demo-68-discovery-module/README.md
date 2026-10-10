@@ -227,8 +227,9 @@ with the file named. Of a key named twice the last one counts, as
 so a file can carry more than this demo shows.
 
 A file that cannot be fetched counts as absent - a domain without the file, a host
-that does not exist, or one a proxy cannot reach - so the build carries on with the
-module repository. A certificate that does not verify fails the build instead.
+that does not exist, one a proxy cannot reach, or one that resets or refuses the
+TLS handshake - so the build carries on with the module repository. A certificate
+that does not verify, or that names another host, fails the build instead.
 
 Trusting the file
 -----------------
