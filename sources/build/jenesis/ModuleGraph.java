@@ -12,10 +12,17 @@ public class ModuleGraph {
             ALL_UNNAMED = "ALL-UNNAMED",
             LAYER_NATIVE_ACCESS = "-Djlayer.enableNativeAccess.",
             ENABLE_PREVIEW = "--enable-preview";
+    private static final Set<String> SYSTEM_MODULES = ModuleFinder.ofSystem().findAll().stream()
+            .map(reference -> reference.descriptor().name())
+            .collect(Collectors.toUnmodifiableSet());
 
     private final SequencedSet<String> nativeAccess = new LinkedHashSet<>();
     private final SequencedMap<String, SequencedSet<String>> layerAccess = new TreeMap<>();
     private boolean modular, automatic, unnamed, preview;
+
+    public static boolean isSystemModule(String name) {
+        return SYSTEM_MODULES.contains(name);
+    }
 
     public void place(PathPlacement placement, Path file, List<String> modulePath, List<String> classPath)
             throws IOException {

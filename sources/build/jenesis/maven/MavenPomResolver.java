@@ -6,6 +6,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.License;
+import build.jenesis.ModuleGraph;
 import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.Platform;
@@ -1738,7 +1739,7 @@ public class MavenPomResolver implements MavenResolver {
                                     + " Every line inside a jenesis.alias comment is a declaration of its own,"
                                     + " so prose written among them is read as one; move it outside the comment");
                         }
-                        if (words[0].startsWith("java.") || words[0].startsWith("jdk.") || words[0].indexOf('/') >= 0) {
+                        if (ModuleGraph.isSystemModule(words[0]) || words[0].indexOf('/') >= 0) {
                             throw new IllegalArgumentException("Illegal jenesis.alias name '"
                                     + words[0]
                                     + "': expected the name of a module that is not a platform module");
@@ -1782,7 +1783,7 @@ public class MavenPomResolver implements MavenResolver {
                         int space = trimmed.indexOf(' ');
                         String token = space < 0 ? trimmed : trimmed.substring(0, space);
                         String arguments = space < 0 ? "" : trimmed.substring(space + 1).trim();
-                        if (token.startsWith("java.") || token.startsWith("jdk.")) {
+                        if (ModuleGraph.isSystemModule(token)) {
                             throw new IllegalArgumentException("Illegal jenesis.attach token '"
                                     + token
                                     + "': platform modules cannot be attached");
@@ -1840,7 +1841,7 @@ public class MavenPomResolver implements MavenResolver {
                                 + " the project's own included");
                     }
                     for (String token : declaration.split("\\s+")) {
-                        if (token.startsWith("java.") || token.startsWith("jdk.")) {
+                        if (ModuleGraph.isSystemModule(token)) {
                             throw new IllegalArgumentException("Illegal jenesis.native token '"
                                     + token
                                     + "': platform modules cannot be granted native access");
