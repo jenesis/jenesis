@@ -5066,6 +5066,11 @@ public class MavenPomResolverTest {
                 List.of("[17]", "21", "false"),
                 List.of("[9,", "25.0.4.1", "true"),
                 List.of("[9,", "1.8.0_402", "false"),
+                List.of("[11", "25.0.4.1", "true"),
+                List.of("[11", "11.0.2", "true"),
+                List.of("[11", "1.8.0_402", "false"),
+                List.of("(11", "11", "false"),
+                List.of("(11", "17", "true"),
                 List.of("[11,12),[16,", "25.0.4.1", "true"));
         for (List<String> entry : cases) {
             Files.writeString(project.resolve("pom.xml"), """
