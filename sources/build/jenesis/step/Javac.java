@@ -18,6 +18,8 @@ public class Javac extends ProcessBuildStep {
     public static final String GENERATED = "generated/";
     private static final Pattern VERSIONED = Pattern.compile("META-INF/versions/(\\d+)/.+");
     private static final Set<String> SYSTEM_MODULE_OPTIONS = Set.of("--add-exports", "--add-reads", "--patch-module");
+    private static final Set<String> SOURCE_OPTIONS = Set.of("--source", "-source");
+    private static final Set<String> TARGET_OPTIONS = Set.of("--target", "-target");
 
     private final boolean includeResources;
     private final PathPlacement pathPlacement;
@@ -179,12 +181,17 @@ public class Javac extends ProcessBuildStep {
                                                  SequencedMap<String, BuildStepArgument> arguments,
                                                  SequencedMap<String, SequencedMap<String, String>> properties)
             throws IOException {
-        if (namesSystemModule(prepended(properties))) {
+        boolean sourceNamed = names(properties, SOURCE_OPTIONS), targetNamed = names(properties, TARGET_OPTIONS);
+        if (sourceNamed || targetNamed || namesSystemModule(prepended(properties))) {
             for (SequencedMap<String, String> folder : properties.values()) {
                 String release = folder.remove("--release");
                 if (release != null) {
-                    folder.put("--source", release);
-                    folder.put("--target", release);
+                    if (!sourceNamed) {
+                        folder.put("--source", release);
+                    }
+                    if (!targetNamed) {
+                        folder.put("--target", release);
+                    }
                 }
             }
         }
@@ -331,6 +338,10 @@ public class Javac extends ProcessBuildStep {
         return CompletableFuture.completedStage(commands);
     }
 
+    private static boolean names(SequencedMap<String, SequencedMap<String, String>> properties, Set<String> options) {
+        return properties.values().stream().anyMatch(folder -> folder.keySet().stream().anyMatch(options::contains));
+    }
+
     private static boolean namesSystemModule(List<String> options) {
         for (int index = 0; index < options.size(); index++) {
             String option = options.get(index);
@@ -423,8 +434,12 @@ public class Javac extends ProcessBuildStep {
             return CompletableFuture.completedStage(null);
         }
         SequencedMap<String, SequencedMap<String, String>> properties = properties(arguments);
-        properties.values().forEach(folder -> folder.remove("--release"));
+        boolean named = names(properties, SOURCE_OPTIONS) || names(properties, TARGET_OPTIONS);
+        properties.values().forEach(folder -> folder.keySet().removeIf(option -> option.equals("--release")
+                || SOURCE_OPTIONS.contains(option)
+                || TARGET_OPTIONS.contains(option)));
         List<String> prepended = prepended(properties);
+        boolean sourceAndTarget = named || namesSystemModule(prepended);
         Path mainTarget = context.next().resolve(CLASSES);
         Path moduleInfo = mainTarget.resolve("module-info.class");
         String moduleName;
@@ -446,6 +461,7 @@ public class Javac extends ProcessBuildStep {
                     return runVersioned(executor,
                             context,
                             prepended,
+                            sourceAndTarget,
                             dependencyPath,
                             processorPath,
                             plugins,
@@ -498,6 +514,7 @@ public class Javac extends ProcessBuildStep {
     private CompletionStage<Void> runVersioned(Executor executor,
                                                BuildStepContext context,
                                                List<String> prepended,
+                                               boolean sourceAndTarget,
                                                List<String> dependencyPath,
                                                List<String> processorPath,
                                                boolean compilerPlugins,
@@ -513,7 +530,7 @@ public class Javac extends ProcessBuildStep {
                         .resolve(GENERATED + "META-INF/versions/" + release));
         List<String> commands = new ArrayList<>(prepended);
         commands.addAll(List.of("-d", target.toString(), "-s", generated.toString()));
-        commands.addAll(namesSystemModule(prepended)
+        commands.addAll(sourceAndTarget
                 ? List.of("--source", Integer.toString(release), "--target", Integer.toString(release))
                 : List.of("--release", Integer.toString(release)));
         List<String> classPath = new ArrayList<>(), modulePath = new ArrayList<>(), patchModule = new ArrayList<>();

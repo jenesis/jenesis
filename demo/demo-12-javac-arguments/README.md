@@ -55,7 +55,12 @@ The release is the one flag the file cannot set: the module's declaration names 
 for every tool that reads it, so a `--release` (or `--enable-preview`) line fails the
 build and names where to declare it instead - `@jenesis.release` in `module-info.java`,
 or `maven.compiler.release` and, for the tests, `maven.compiler.testRelease` in a
-`pom.xml`.
+`pom.xml`. The file decides how `javac` applies that release, though: a
+`--source=<release>` or `--target=<release>` line has it passed as `--source` and
+`--target` rather than as `--release`, so the module compiles against the API of
+the JDK the build runs on. That is how Maven compiles a `pom.xml` that sets
+`maven.compiler.source` and `target` without a release, and what code needs that
+calls a newer API behind a check of the running version.
 
 This is the general, profile-aware way to give a tool an argument the inferred
 build does not set for you - for instance compiling a single module with extra
