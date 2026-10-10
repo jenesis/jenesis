@@ -9,6 +9,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Versions;
+import java.util.jar.Attributes;
 
 public record ClassTransformModule(SequencedMap<String, BuildExecutorModule> transforms) implements BuildExecutorModule {
 
@@ -77,6 +78,25 @@ public record ClassTransformModule(SequencedMap<String, BuildExecutorModule> tra
                                     throw new IllegalStateException(relative.toString().replace(File.separatorChar, '/')
                                             + " is written by both " + previous + " and " + entry.getKey()
                                             + " - a transform writes each file once, so let one of its steps write it");
+                                }
+                                if (Files.exists(destination) && (relative.equals(Path.of(Versions.MANIFEST))
+                                        || relative.equals(Path.of(BuildStep.CLASSES, JarFile.MANIFEST_NAME)))) {
+                                    Manifest merged, written;
+                                    try (InputStream in = Files.newInputStream(destination)) {
+                                        merged = new Manifest(in);
+                                    }
+                                    try (InputStream in = Files.newInputStream(file)) {
+                                        written = new Manifest(in);
+                                    }
+                                    merged.getMainAttributes().putAll(written.getMainAttributes());
+                                    written.getEntries().forEach((name, attributes) -> merged.getEntries()
+                                            .computeIfAbsent(name, _ -> new Attributes())
+                                            .putAll(attributes));
+                                    Files.delete(destination);
+                                    try (OutputStream out = Files.newOutputStream(destination)) {
+                                        merged.write(out);
+                                    }
+                                    return FileVisitResult.CONTINUE;
                                 }
                                 Files.deleteIfExists(destination);
                             }

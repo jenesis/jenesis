@@ -59,8 +59,10 @@ folder it is compiled from:
 compiled classes as its first argument and the module's inputs after it, among them
 its resolved dependencies. What it writes below `classes/` replaces the class of that
 name, every class it does not write passes on as it was, and the jar, the tests and
-every later step see the result. Several such plugins run in the order the file names
-them, each handed the classes the one before it wrote.
+every later step see the result. A `manifest.mf` it writes is merged into the one it
+was handed rather than replacing it, its own value winning for an attribute it sets.
+Several such plugins run in the order the file names them, each handed the classes the
+one before it wrote.
 
 Configuring the plugin
 ----------------------
