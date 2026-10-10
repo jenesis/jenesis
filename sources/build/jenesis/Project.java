@@ -187,18 +187,9 @@ public record Project(
             trees.put(ProjectPlugins.PROJECT, new ProjectFiles());
             executor.addModule(STAGE, project.plugins().stage(project.profiles(), trees), BUILD);
             executor.addModule(EXPORT, (export, inherited) -> {
-                SequencedMap<String, Path> staged = new LinkedHashMap<>(inherited);
-                staged.keySet().removeIf(key -> key.startsWith(BuildExecutorModule.PREVIOUS + BUILD + "/"));
-                export.addStep("uninstalled",
-                        new MavenRepositoryExport.Uninstalled(),
-                        inherited.sequencedKeySet().stream()
-                                .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + BUILD + "/")));
-                export.addStep("maven",
-                        MavenRepositoryExport.ofEnvironment(project.environment()),
-                        BuildExecutorModule.PREVIOUS + STAGE + "/maven",
-                        "uninstalled");
-                project.plugins().export(project.profiles()).accept(export, staged);
-            }, STAGE, BUILD);
+                export.addStep("maven", MavenRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/maven");
+                project.plugins().export(project.profiles()).accept(export, inherited);
+            }, STAGE);
             String prefix = BUILD + "/maven/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
             executor.addModule(PIN, PinModule.ofEnvironment(project.environment(),
                     project.root(),
@@ -1113,12 +1104,11 @@ public record Project(
                                                            in a file the project provides
                       a toolchain                          -Djenesis.toolchain.version
                       a -tests jar (test-jar goal)         -Djenesis.stage.tests=true
-                      maven.deploy.skip, as for a module   read from the pom's properties as the
-                      of tests alone                       deploy plugin does (true, releases,
-                                                           snapshots): built and tested, never
-                                                           staged, so neither released nor exported
-                      maven.install.skip                   read the same way: staged, but `export`
-                                                           leaves it out of the local repository
+                      maven.deploy.skip, maven.install.skip
+                      as for a module of tests alone       stage=false in packaging.properties: built
+                                                           and tested, never staged, so neither
+                                                           exported nor released; the pom.xml
+                                                           property itself is not read
 
                     A process-<tool>.properties line is a flag and its argument, `-Xmaxwarns=500`, and a
                     bare flag has an empty value, `-parameters=`. A flag given more than once, as --add-opens
@@ -1384,6 +1374,9 @@ public record Project(
                           installed apart from the build. It runs with --dry-run, publishing
                           nothing, unless -Djenesis.jreleaser.dry=false, as jenesis.jreleaser.dry
                           defaults to true
+                      maven.deploy.skip, maven.install.skip / a skipped publication task
+                          -> stage=false in the module's packaging.properties, which keeps it out of
+                          `export` and `release` alike
                       maven-toolchains-plugin / java toolchains -> jenesis.toolchain.version (07)
                       <profiles> chosen with -P or a property / properties and conventions
                           -> jenesis-<profile>.properties; those activated by <jdk> or
@@ -1756,7 +1749,11 @@ public record Project(
                                                 docker=<image> with docker.label.<name>=<value> lines,
                                                 docker.jpackage=app-image|deb|rpm to put that jpackage
                                                 package into the image instead of the jars, built
-                                                and staged only if jpackage lists it too
+                                                and staged only if jpackage lists it too,
+                                                stage=false to build and test the module but keep
+                                                its jar, POM, sources and documentation out of the
+                                                staged repositories, so neither export nor release
+                                                ships them
                       test.properties           framework=junit-platform|junit4|testng, naming what
                                                 this module's tests are written against; absent, it is
                                                 inferred from the resolved dependencies;

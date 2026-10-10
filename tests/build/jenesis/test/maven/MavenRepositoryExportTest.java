@@ -8,9 +8,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
-import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenRepositoryExport;
-import build.jenesis.step.Inventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,47 +37,6 @@ public class MavenRepositoryExportTest {
         assertThat(result.next()).isTrue();
         assertThat(target.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).hasContent("jar bytes");
         assertThat(target.resolve("com/example/foo/1.2.3/foo-1.2.3.pom")).exists();
-    }
-
-    @Test
-    public void leaves_out_a_staged_module_whose_pom_skips_installation() throws IOException {
-        stageArtifact("com.example", "foo", "1.2.3", "jar bytes");
-        stageArtifact("com.example", "bar", "1.2.3", "jar bytes");
-        Path inventories = Files.createDirectory(root.resolve("inventories"));
-        Files.writeString(inventories.resolve("pom.xml"), """
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>com.example</groupId>
-                    <artifactId>bar</artifactId>
-                    <version>1.2.3</version>
-                </project>
-                """);
-        SequencedProperties inventory = new SequencedProperties();
-        inventory.setProperty("module-bar.path", "bar");
-        inventory.setProperty("module-bar.pom", "pom.xml");
-        inventory.setProperty("module-bar.install", "false");
-        inventory.store(inventories.resolve(Inventory.INVENTORY));
-        Path uninstalled = Files.createDirectory(root.resolve("uninstalled"));
-        new MavenRepositoryExport.Uninstalled().apply(Runnable::run,
-                        new BuildStepContext(previous, uninstalled, supplement),
-                        new LinkedHashMap<>(Map.of("inventories", new BuildStepArgument(
-                                inventories,
-                                Map.of(Path.of("."), Checksum.of(ChecksumStatus.ADDED))))))
-                .toCompletableFuture()
-                .join();
-
-        new MavenRepositoryExport(target).apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
-                        new LinkedHashMap<>(Map.of(
-                                "source", new BuildStepArgument(source, Map.of(Path.of("."), Checksum.of(ChecksumStatus.ADDED))),
-                                "uninstalled", new BuildStepArgument(uninstalled, Map.of(Path.of("."), Checksum.of(ChecksumStatus.ADDED))))))
-                .toCompletableFuture()
-                .join();
-
-        assertThat(target.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).exists();
-        assertThat(target.resolve("com/example/bar"))
-                .as("a module that maven.install.skip keeps out of the local repository is staged, never exported")
-                .doesNotExist();
     }
 
     @Test

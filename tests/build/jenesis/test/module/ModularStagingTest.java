@@ -61,6 +61,22 @@ public class ModularStagingTest {
     }
 
     @Test
+    public void leaves_out_a_module_whose_packaging_stages_none() throws IOException {
+        Path staged = inventory("staged", "demo.staged", null, null, "classes.jar");
+        writeArtifact(staged, "classes.jar", "jar");
+        Path unstaged = inventory("unstaged", "demo.unstaged", null, null, "classes.jar");
+        writeArtifact(unstaged, "classes.jar", "jar");
+        SequencedProperties inventory = SequencedProperties.ofFiles(unstaged.resolve(Inventory.INVENTORY));
+        inventory.setProperty("module-unstaged.stage", "false");
+        inventory.store(unstaged.resolve(Inventory.INVENTORY));
+
+        run(false, staged, unstaged);
+
+        assertThat(next.resolve("demo.staged/demo.staged.jar")).hasContent("jar");
+        assertThat(next.resolve("demo.unstaged")).doesNotExist();
+    }
+
+    @Test
     public void stages_jmod_alongside_module_jar() throws IOException {
         Path folder = Files.createDirectory(source.resolve("foo"));
         SequencedProperties inventory = new SequencedProperties();

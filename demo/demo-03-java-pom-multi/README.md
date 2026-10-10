@@ -191,9 +191,14 @@ open-test-reporting XML. `-Djenesis.test.skip=true` skips the test step entirely
 And on a `stage` build, `-Djenesis.stage.tests=true` also stages the module's
 `tests`-classifier variant beside the main jar, so the test artifact is published
 too (by default only the main artifact is staged). A module that holds nothing to
-publish, such as one of integration tests, sets `maven.deploy.skip` in its
-`<properties>`, as Maven's deploy plugin reads it: it is built and tested but never
-staged, while `maven.install.skip` keeps a staged module out of `export` alone.
+publish, such as one of integration tests, says so in a `build.jenesis/packaging.properties`
+beside its `pom.xml`:
+
+    stage=false
+
+It is built and tested but never staged, so neither `export` nor `release` ships it.
+Maven's `maven.deploy.skip` and `maven.install.skip` are not read: a module that sets
+them states the same with this line.
 
 When a test fails
 -----------------

@@ -43,6 +43,7 @@ public class MavenRepositoryStaging implements BuildStep {
     private Collected collectModules(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
         SequencedMap<String, Module> stagedByArtifactId = new LinkedHashMap<>();
         List<Module> testModules = new ArrayList<>();
+        Set<String> unstaged = new HashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -54,10 +55,16 @@ public class MavenRepositoryStaging implements BuildStep {
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
             for (String prefix : Inventory.prefixes(inventory)) {
                 Path pom = resolve(argument.folder(), inventory.getProperty(prefix + ".pom"));
-                if (pom == null || !inventory.flag(prefix + ".deploy", true)) {
+                if (pom == null) {
                     continue;
                 }
                 Coordinates coordinates = parseCoordinates(pom);
+                if (!inventory.flag(prefix + ".stage", true)) {
+                    if (inventory.getProperty(prefix + ".test") == null) {
+                        unstaged.add(coordinates.artifactId());
+                    }
+                    continue;
+                }
                 boolean abstractTest = inventory.flag(prefix + ".abstract");
                 if (abstractTest && !includeTests) {
                     continue;
@@ -109,6 +116,7 @@ public class MavenRepositoryStaging implements BuildStep {
                 }
             }
         }
+        testModules.removeIf(test -> unstaged.contains(test.testsOf()));
         return new Collected(stagedByArtifactId, testModules);
     }
 

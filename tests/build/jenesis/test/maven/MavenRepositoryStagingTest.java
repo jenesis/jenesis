@@ -65,20 +65,37 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
-    public void leaves_out_a_module_whose_pom_skips_deployment() throws IOException {
+    public void leaves_out_a_module_whose_packaging_stages_none() throws IOException {
         Path published = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(published, "classes.jar", "classes-bytes");
         Path skipped = mainInventory("bar", "com.example", "bar", "1.2.3", "classes.jar");
         writeArtifact(skipped, "classes.jar", "classes-bytes");
         SequencedProperties inventory = SequencedProperties.ofFiles(skipped.resolve(Inventory.INVENTORY));
-        inventory.setProperty("module-bar.deploy", "false");
+        inventory.setProperty("module-bar.stage", "false");
         inventory.store(skipped.resolve(Inventory.INVENTORY));
 
         run(true, published, skipped);
 
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).exists();
         assertThat(next.resolve("com/example/bar"))
-                .as("a module built and tested only, as maven.deploy.skip declares, is never published")
+                .as("a module built and tested only, as stage=false in packaging.properties declares, is never published")
+                .doesNotExist();
+    }
+
+    @Test
+    public void leaves_out_the_tests_of_a_module_whose_packaging_stages_none() throws IOException {
+        Path main = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(main, "classes.jar", "classes-bytes");
+        SequencedProperties inventory = SequencedProperties.ofFiles(main.resolve(Inventory.INVENTORY));
+        inventory.setProperty("module-foo.stage", "false");
+        inventory.store(main.resolve(Inventory.INVENTORY));
+        Path test = testInventory("foo-test", "com.example", "foo.test", "1.2.3", "foo", List.of(), "classes.jar");
+        writeArtifact(test, "classes.jar", "test-bytes");
+
+        run(true, main, test);
+
+        assertThat(next.resolve("com/example/foo"))
+                .as("the tests of a module that is not staged have no artifact to be staged beside")
                 .doesNotExist();
     }
 

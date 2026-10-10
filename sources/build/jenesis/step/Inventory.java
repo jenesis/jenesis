@@ -12,7 +12,7 @@ import build.jenesis.SequencedProperties;
 
 public class Inventory implements BuildStep {
 
-    public static final String INVENTORY = "inventory.properties";
+    public static final String INVENTORY = "inventory.properties", UNSTAGED = "unstaged";
 
     public static SequencedMap<String, String> agents(Path folder) throws IOException {
         Path file = folder.resolve(INVENTORY);
@@ -98,6 +98,7 @@ public class Inventory implements BuildStep {
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(MODULE),
+                Path.of(UNSTAGED),
                 Path.of(ProcessBuildStep.PROCESS + "javac.properties"),
                 Path.of(ProcessBuildStep.PROCESS + "java.properties"),
                 Path.of(METADATA),
@@ -134,7 +135,7 @@ public class Inventory implements BuildStep {
         String module = null;
         String tests = null;
         String release = null;
-        boolean abstractTest = false, deploy = true, install = true;
+        boolean abstractTest = false, staged = true;
         String version = null;
         String artifact = null;
         Path pomFile = null;
@@ -185,11 +186,10 @@ public class Inventory implements BuildStep {
                     tests = properties.getProperty("test");
                 }
                 abstractTest |= properties.flag("abstract");
-                deploy &= properties.flag("deploy", true);
-                install &= properties.flag("install", true);
                 self |= properties.flag("native");
                 modular |= properties.flag("modular");
             }
+            staged &= !Files.exists(folder.resolve(UNSTAGED));
             Path javacProperties = folder.resolve(ProcessBuildStep.PROCESS + "javac.properties");
             if (release == null && Files.isRegularFile(javacProperties)) {
                 release = SequencedProperties.ofFiles(javacProperties).value("--release");
@@ -503,11 +503,8 @@ public class Inventory implements BuildStep {
         if (abstractTest) {
             inventory.setProperty(prefix + "abstract", "true");
         }
-        if (!deploy) {
-            inventory.setProperty(prefix + "deploy", "false");
-        }
-        if (!install) {
-            inventory.setProperty(prefix + "install", "false");
+        if (!staged) {
+            inventory.setProperty(prefix + "stage", "false");
         }
         if (mainClass != null) {
             inventory.setProperty(prefix + "mainClass", mainClass);

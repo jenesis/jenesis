@@ -9,11 +9,9 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;
-import build.jenesis.step.Inventory;
 
 public class MavenRepositoryExport implements BuildStep {
 
-    public static final String UNINSTALLED = "uninstalled.properties";
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter
             .ofPattern("yyyyMMddHHmmss")
@@ -45,13 +43,6 @@ public class MavenRepositoryExport implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         SequencedMap<Path, Coordinates> stagedByVersionDir = new LinkedHashMap<>();
-        Set<String> uninstalled = new HashSet<>();
-        for (BuildStepArgument argument : arguments.values()) {
-            Path file = argument.folder().resolve(UNINSTALLED);
-            if (!argument.removed() && Files.isRegularFile(file)) {
-                uninstalled.addAll(SequencedProperties.ofFiles(file).stringPropertyNames());
-            }
-        }
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -75,9 +66,7 @@ public class MavenRepositoryExport implements BuildStep {
                     if (parsed == null) {
                         throw new IOException("Cannot parse maven coordinates from " + file);
                     }
-                    if (!uninstalled.contains(parsed.key())) {
-                        stagedByVersionDir.put(versionDir, parsed);
-                    }
+                    stagedByVersionDir.put(versionDir, parsed);
                     return FileVisitResult.CONTINUE;
                 }
             });
@@ -294,41 +283,7 @@ public class MavenRepositoryExport implements BuildStep {
         }
     }
 
-    public record Uninstalled() implements BuildStep {
-
-        @Override
-        public CompletionStage<BuildStepResult> apply(Executor executor,
-                                                      BuildStepContext context,
-                                                      SequencedMap<String, BuildStepArgument> arguments)
-                throws IOException {
-            SequencedProperties uninstalled = new SequencedProperties();
-            for (BuildStepArgument argument : arguments.values()) {
-                Path file = argument.folder().resolve(Inventory.INVENTORY);
-                if (argument.removed() || !Files.isRegularFile(file)) {
-                    continue;
-                }
-                SequencedProperties inventory = SequencedProperties.ofFiles(file);
-                for (String prefix : Inventory.prefixes(inventory)) {
-                    String pom = inventory.getProperty(prefix + ".pom");
-                    if (pom == null || inventory.flag(prefix + ".install", true)) {
-                        continue;
-                    }
-                    Coordinates coordinates = Coordinates.parse(argument.folder().resolve(pom).normalize());
-                    if (coordinates != null) {
-                        uninstalled.setProperty(coordinates.key(), "");
-                    }
-                }
-            }
-            uninstalled.store(context.next().resolve(UNINSTALLED));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
-        }
-    }
-
     private record Coordinates(String groupId, String artifactId, String version) {
-
-        private String key() {
-            return groupId + "/" + artifactId + "/" + version;
-        }
 
         private static Coordinates parse(Path pom) {
             String groupId = null, artifactId = null, version = null;
