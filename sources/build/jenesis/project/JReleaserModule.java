@@ -15,7 +15,7 @@ import build.jenesis.step.ProcessHandler;
 
 public class JReleaserModule implements BuildExecutorModule {
 
-    public static final String VARIABLES = "jreleaser.properties";
+    public static final String VARIABLES = ProcessBuildStep.ENVIRONMENT + "jreleaser.properties";
     private static final String ENVIRONMENT = "environment", EXECUTE = "execute";
     private static final List<String> CONFIGURATIONS = List.of(
             "jreleaser.yml", "jreleaser.yaml", "jreleaser.toml", "jreleaser.json");
@@ -137,7 +137,9 @@ public class JReleaserModule implements BuildExecutorModule {
             if (version != null && !version.isEmpty()) {
                 variables.setProperty("JRELEASER_PROJECT_VERSION", version);
             }
-            variables.store(context.next().resolve(VARIABLES));
+            Path file = context.next().resolve(VARIABLES);
+            Files.createDirectories(file.getParent());
+            variables.store(file);
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }

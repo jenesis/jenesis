@@ -269,12 +269,13 @@ is already finished, so its version changes how the upload happens and never wha
 was uploaded. It is environmental setup, like the JDK or `git`.
 
 The goal also contributes one thing to a release run by somebody else. Its
-`release/jreleaser/environment` step writes a `jreleaser.properties` carrying
-`JRELEASER_PROJECT_VERSION`, the version `jenesis.project.version` stamped, which a configuration
-picks up with a single `environment: { variables: ... }` line - so the version is
+`release/jreleaser/environment` step writes `environment/jreleaser.properties` carrying
+`JRELEASER_PROJECT_VERSION`, the version `jenesis.project.version` stamped, and the `release`
+goal hands that variable to the JReleaser process it starts - so the version is
 stated once, by the build, instead of being passed separately to the build and to
 the release tool and drifting. That step runs no process and has no side effect,
-which makes it safe for a CI job that then hands off to a dedicated release action.
+which makes it safe for a CI job that then hands off to a dedicated release action
+and reads the version from the file.
 Note it only applies to a configuration that leaves `project.version` unset: a
 version written in the `jreleaser.yml` wins outright and the file is ignored.
 The build infers no version of its own: a `pom.xml` build whose configuration names
