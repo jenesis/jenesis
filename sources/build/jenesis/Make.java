@@ -8,6 +8,7 @@ public final class Make {
     private static final List<String> CREDENTIALS = List.of("jenesis.maven.token",
             "jenesis.module.token",
             "jenesis.release.token",
+            "jenesis.release.maven.token",
             "jenesis.cache.key");
     private static final List<String> PLAINTEXT = List.of("jenesis.repository.insecure", "jenesis.cache.insecure");
     private static final List<String> PROGRAMS = List.of("jenesis.daemon.options",
