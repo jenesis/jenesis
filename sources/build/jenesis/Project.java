@@ -1002,6 +1002,12 @@ public record Project(
                     `tags("jenesis.pin:X")` among the javadoc options, a
                     <tag><name>jenesis.pin</name><placement>X</placement></tag> in the <tags> of
                     maven-javadoc-plugin.
+                    Maven's compiler plugin compiles a src/test/java/module-info.java whatever its
+                    testExcludes or useModulePath say, and fails on the modules it requires, so
+                    Maven compiles a copy of the tests instead: a copy-resources execution of
+                    maven-resources-plugin at generate-test-sources copies src/test/java's *.java
+                    but module-info.java into a folder of target, which default-testCompile names
+                    as its only compileSourceRoots.
 
                       a dependency         `requires <module>`, `requires static` where it is only
                                            compiled against; a jar that declares no module name
@@ -1213,6 +1219,10 @@ public record Project(
                       openapi-generator-maven-plugin / org.openapi.generator
                           -> openapi.properties (17)
                       antlr4-maven-plugin / antlr -> antlr.properties (18)
+                      javacc-maven-plugin, JJTree / org.javacc.javacc -> no built-in; a plugin at
+                          binary/generated that forks JavaCC, which the project resolves with
+                          @jenesis.plugin javacc maven/<groupId>/<artifactId>, in a pom.xml
+                          <!--jenesis.plugin javacc maven/<groupId>/<artifactId>-->, skill/extend
                       build-helper add-source / sourceSets
                           -> sourceDirectory in pom.xml, or a plugin at binary/generated
                       multi-release jar configuration -> sources/META-INF/versions/<N>/ (11)
@@ -2036,6 +2046,18 @@ public record Project(
                     EnvironmentalProcessBuildStep for environment-<tool>.properties. Write nothing
                     outside context.next(): a step that must, as an exporter does, overrides
                     shouldRun to say it always runs.
+
+                    A tool that cannot be a module at all, as JavaCC 8 with a class in the unnamed
+                    package, is forked instead, and the project resolves it rather than the plugin:
+                    @jenesis.plugin <group> maven/<groupId>/<artifactId> in its module-info.java, or
+                    <!--jenesis.plugin <group> maven/<groupId>/<artifactId>--> in its pom.xml, pinned
+                    as <group>/maven/<groupId>/<artifactId>. A module's hook point hands it over
+                    among the resolved dependencies, the input whose key ends in
+                    /dependencies/artifacts, where Dependencies.select(folder, "<group>", "plugin")
+                    lists the jars for a java -cp. Hand a step only the inputs it reads, since each
+                    is part of its key: a generator handed sources/ runs again on every edit. The
+                    keys are relative paths, as ../../../../../../../dependencies/artifacts, so
+                    filter inherited.sequencedKeySet() with endsWith.
 
                     ## Prove it
 
