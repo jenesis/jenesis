@@ -943,13 +943,23 @@ public record Project(
 
                       white-box tests      move them into packages of the test module's own, such
                                            as <package>.test, testing the public API where they
-                                           can; what a test still needs becomes public in a
-                                           package the module exports to the tests alone,
-                                           `exports <package> to <test module>`, and `opens
-                                           <package> to <test module>` where it reflects; javac
-                                           warns that the test module is not found when it
-                                           compiles the main one, so -Werror needs
+                                           can; a package the module does not export is made
+                                           readable to the tests by
+                                           `--add-exports=<module>/<package>=<test module>` in
+                                           both process-javac.properties and
+                                           process-test.properties of the test module, which
+                                           leaves the published module-info.java as it is, where
+                                           `exports <package> to <test module>` would publish it
+                                           and make javac warn that the test module is not found
+                                           when it compiles the main one, so -Werror would need
                                            `-Xlint\\:-module=` beside it
+                      package-private      a member a test reaches in a package the module
+                                           exports already is called by reflection rather than
+                                           made public, which would widen the published API:
+                                           JUnit's ReflectionSupport finds and invokes it, given
+                                           `--add-opens=<module>/<package>=org.junit.platform.commons`
+                                           in process-test.properties, since the package opens to
+                                           the module that makes the member accessible
                       two projects         move the classes so each package lives in one module,
                                            or merge the projects, keeping a qualified export for
                                            a package only a sibling uses
@@ -966,6 +976,11 @@ public record Project(
 
                     The tests then run on the module path, which breaks what read the class path:
 
+                      an internal package  a test module reads only what the tested module
+                                           exports, at compile time and when the tests run, so
+                                           the --add-exports of white-box tests above goes into
+                                           both files, or javac passes and the tests fail with
+                                           IllegalAccessError
                       the unnamed package  a module holds none, so a test class there fails to
                                            load: move it into a package, and have a test that
                                            needs such a class compile it at run time
@@ -1172,14 +1187,21 @@ public record Project(
                     A pom.xml resolves a conflict as Maven does, the version nearest the root
                     winning, where Gradle takes the highest version requested. No setting of
                     jenesis.resolver.maven does the latter: latest takes the newest version the
-                    repository lists for every dependency, whatever was requested. Manage each
-                    version Gradle resolved higher in <dependencyManagement>; comparing the
-                    dependency trees lists them.
+                    repository lists for every dependency, whatever was requested, and a
+                    module-info.java build resolves as a pom.xml does. Compare the dependency trees
+                    and pin each version Gradle resolved higher - in <dependencyManagement>, or as
+                    @jenesis.pin <groupId>/<artifactId> <version> for one only a POM brings in.
 
                     ## 6. Retire the old build
 
                     Remove what Jenesis now replaces - the plugin configuration, the wrapper and the CI
-                    steps that called it - and let `ide` write the IntelliJ, VS Code or Eclipse
+                    steps that called it. A CI job that built runs `java
+                    -Djenesis.dependency.pin=strict build/jenesis/Make.java`; one that published
+                    runs the `release` selector, which stages first, with a jreleaser.yml at the
+                    root, JReleaser installed on the runner, the version as
+                    -Djenesis.project.version and -Djenesis.jreleaser.dry=false. The job's
+                    credentials become the JRELEASER_* variables JReleaser reads, which the release
+                    is handed (66). Then let `ide` write the IntelliJ, VS Code or Eclipse
                     project so no IDE depends on the old build: one IDE module per module, its
                     tests in its test sources. The IDE files it writes into a source folder never
                     reach a jar. A Maven layout keeps its pom.xml files, which are now its build
