@@ -121,7 +121,7 @@ Quick index
 | 70 | [`reproducible`](demo-70-reproducible/README.md)                  | Build the same bytes on every machine, checked against a recorded digest     | `java build/Demo.java`            |
 | 71 | [`native-image`](demo-71-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
 | 72 | [`jpx`](demo-72-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
-| 73 | [`byte-buddy`](demo-73-byte-buddy/README.md)                      | Generate classes in a plugin written against Byte Buddy's API                | `java build/jenesis/Execute.java` |
+| 73 | [`byte-buddy`](demo-73-byte-buddy/README.md)                      | Rewrite the compiled classes with Byte Buddy's plugins, from a project plugin | `java build/jenesis/Execute.java` |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1110,16 +1110,18 @@ installation directed at its own `target/` so your home directory is left alone.
 ## 55. A plugin on a library's API - [`byte-buddy`](demo-73-byte-buddy/README.md)
 
 The plugins of the `internal-module` demo write sources. A plugin of
-`binary/compiled` runs beside `javac` instead, and what it writes below `classes/`
-joins the module's jar:
+`binary/transform` runs after the compilers instead and rewrites the classes they
+wrote:
 
-    greeter+binary/compiled=./plugin
+    enhance+binary/transform=./plugin
 
-This one requires `net.bytebuddy` and generates `sample.Greeting`, a `Supplier`
-returning the text its properties file names. Byte Buddy resolves into the
-plugin's own module layer and never reaches the application. The plugin adds
-classes and never replaces one `javac` compiled: a class both write fails the
-build.
+This one runs Byte Buddy's `Plugin.Engine` over the module's classes with two Byte
+Buddy plugins, `ToStringPlugin` and one of the project's own that its properties
+file configures, and hands the engine the jars the module compiles against as its
+class path. What the plugin writes replaces the class of that name, and every
+class it leaves alone reaches the jar as `javac` compiled it. Byte Buddy resolves
+into the plugin's own module layer, and the application only compiles against its
+annotations.
 
 Cross-cutting concepts
 ----------------------
