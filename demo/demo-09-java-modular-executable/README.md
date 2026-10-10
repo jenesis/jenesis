@@ -247,8 +247,9 @@ That Dockerfile does not have to be written by hand either: a `docker` key in
 
 Because the module declares `mainModule`, the jars carrying a module descriptor are named
 on the module path and the entry point launches the module, not a class - and the whole
-command travels in the argument file, so the `ENTRYPOINT` is the same three words however
-large the closure grows:
+command travels in the argument file, led by what `process-java.properties` gives the JVM
+of the module as in the bundle, so the `ENTRYPOINT` is the same three words however large
+the closure grows:
 
     FROM gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
     LABEL ...                      the metadata, as in ../demo-08-java-pom-executable

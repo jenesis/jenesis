@@ -1983,8 +1983,9 @@ public record Project(
                                                 and a -J<option> or -D line to the JVM running it,
                                                 as the kotlinc command does;
                                                 process-test.properties targets the test JVM, merged
-                                                over process-java.properties, which Execute and a
-                                                bundle's argument files carry as well, and an
+                                                over process-java.properties, which Execute, a
+                                                bundle's and a Docker context's argument files
+                                                carry as well, and an
                                                 executable jar its --add-reads, --add-exports,
                                                 --add-opens and --enable-native-access lines alone;
                                                 a linter reads only its own configuration file

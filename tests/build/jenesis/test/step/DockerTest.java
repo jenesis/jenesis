@@ -12,6 +12,7 @@ import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Docker;
 import build.jenesis.step.JPackage;
+import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -102,6 +103,34 @@ public class DockerTest {
         assertThat(arguments(folder))
                 .as("an image built from this one adds a jar by copying it into a folder under /app/extensions")
                 .containsExactly(
+                        "--class-path", "/app/extensions/classpath/*",
+                        "--module-path", "/app/jars/sample.jar:/app/extensions/modulepath",
+                        "--module", "sample/sample.Sample");
+    }
+
+    @Test
+    public void carries_the_java_options_of_the_module_into_the_argument_file_of_the_image() throws IOException {
+        writeModularJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("sample.jar"));
+        SequencedProperties launcher = new SequencedProperties();
+        launcher.setProperty("mainClass", "sample.Sample");
+        launcher.setProperty("mainModule", "sample");
+        launcher.store(input.resolve("launcher.properties"));
+        SequencedProperties java = new SequencedProperties();
+        java.setProperty("--add-reads", "org.hibernate.validator=org.apache.tomcat.embed.el");
+        java.setProperty("-Dsample=true", "");
+        java.store(Files.createDirectory(input.resolve(ProcessBuildStep.PROCESS)).resolve("java.properties"));
+
+        BuildStepResult result = new Docker("example:latest").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(input, Map.of())))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        assertThat(arguments(next.resolve(Docker.DOCKER)))
+                .as("the options every JVM of the module runs with are part of the image's launch, as of a bundle's")
+                .containsExactly(
+                        "--add-reads", "org.hibernate.validator=org.apache.tomcat.embed.el",
+                        "-Dsample=true",
                         "--class-path", "/app/extensions/classpath/*",
                         "--module-path", "/app/jars/sample.jar:/app/extensions/modulepath",
                         "--module", "sample/sample.Sample");

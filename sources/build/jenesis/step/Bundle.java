@@ -58,21 +58,9 @@ public class Bundle implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         String mainClass = null, mainModule = null, artifact = null;
-        List<String> javaOptions = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
-            }
-            Path process = argument.folder().resolve(ProcessBuildStep.PROCESS + "java.properties");
-            if (Files.isRegularFile(process)) {
-                SequencedProperties.ofFiles(process).forEachProperty((option, values) -> {
-                    for (String value : values.split("\n")) {
-                        javaOptions.add(option);
-                        if (!value.isEmpty()) {
-                            javaOptions.addAll(List.of(value.split("\t")));
-                        }
-                    }
-                });
             }
             Path properties = argument.folder().resolve("launcher.properties");
             if (!Files.isRegularFile(properties)) {
@@ -158,6 +146,7 @@ public class Bundle implements BuildStep {
         layers.forEach((layer, membership) -> membership.nativeAccess(jars, granted)
                 .forEach((jar, module) -> graph.enableNativeAccess(layer, jar, module)));
         agents.keySet().retainAll(jars.sequencedKeySet());
+        List<String> javaOptions = javaOptions(arguments);
         SequencedMap<String, Path> descriptors = new LinkedHashMap<>();
         for (Map.Entry<String, String> platform : List.of(
                 Map.entry("unix", ":"),
@@ -199,6 +188,24 @@ public class Bundle implements BuildStep {
         BuildStep.linkOrCopy(Files.createDirectory(context.next().resolve(JPackage.PACKAGES))
                 .resolve((artifact == null ? "application" : artifact) + ".zip"), zip);
         return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    static List<String> javaOptions(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+        List<String> javaOptions = new ArrayList<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            Path process = argument.folder().resolve(ProcessBuildStep.PROCESS + "java.properties");
+            if (!argument.removed() && Files.isRegularFile(process)) {
+                SequencedProperties.ofFiles(process).forEachProperty((option, values) -> {
+                    for (String value : values.split("\n")) {
+                        javaOptions.add(option);
+                        if (!value.isEmpty()) {
+                            javaOptions.addAll(List.of(value.split("\t")));
+                        }
+                    }
+                });
+            }
+        }
+        return javaOptions;
     }
 
     private static List<String> command(List<String> javaOptions,
