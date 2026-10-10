@@ -357,34 +357,21 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             sbom == null ? Stream.<String>empty() : Stream.of("sbom"),
                             resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"))
                             .flatMap(Function.identity()));
-            SequencedProperties described = null;
-            for (String manifest : descriptor.manifests()) {
-                Path candidate = outerInherited.get(manifest);
-                if (candidate != null && Files.isRegularFile(candidate.resolve(BuildStep.MODULE))) {
-                    described = SequencedProperties.ofFiles(candidate.resolve(BuildStep.MODULE));
-                    break;
-                }
-            }
-            boolean tests = described != null && described.getProperty("test") != null;
-            InferredArtifactQualityModule artifactModule = InferredArtifactQualityModule.ofEnvironment(environment,
-                            descriptor.configuration(),
-                            repositories,
-                            resolvers)
-                    .pinning(descriptor.pinning())
-                    .custom(hooks.getOrDefault("artifact", none));
             sub.addModule("artifact",
-                    artifact.apply(tests ? artifactModule.japicmp(null) : artifactModule),
+                    artifact.apply(
+                            InferredArtifactQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
+                                    .pinning(descriptor.pinning())
+                                    .custom(hooks.getOrDefault("artifact", none))),
                     Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             sub.addStep("layers",
                     new Layers(),
                     Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
-            if (descriptor.test() && tests && !described.flag("abstract")) {
+            if (descriptor.test()) {
                 sub.addModule("observed",
                         observe.apply(
                         InferredTestObservationModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
                                 .pinning(descriptor.pinning())
                                 .pathPlacement(descriptor.pathPlacement())
-                                .moduleName(described.getProperty("module"))
                                 .directory(descriptor.directory())
                                 .custom(hooks.getOrDefault("observed", none))),
                         Stream.of(descriptor.resources().stream(),
@@ -406,7 +393,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                         Stream.of("binary"))
                                 .flatMap(Function.identity()));
             }
-            if (descriptor.documentation() && (!tests || environment.flag("stage.tests"))) {
+            if (descriptor.documentation()) {
                 InferredDocumentationModule documentationModule = InferredDocumentationModule.ofEnvironment(environment,
                                 repositories,
                                 resolvers)

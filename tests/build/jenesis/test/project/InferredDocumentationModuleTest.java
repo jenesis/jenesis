@@ -114,6 +114,32 @@ public class InferredDocumentationModuleTest {
     }
 
     @Test
+    public void documents_a_module_its_description_declares_a_test_module_only_where_its_tests_are_staged()
+            throws IOException {
+        Files.writeString(project.resolve(BuildStep.MODULE), "test=main_artifact\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("documentation",
+                InferredDocumentationModule.ofEnvironment(new Environment(Map.of("documentation.empty", "true")),
+                        Map.of(),
+                        Map.of("maven", Resolver.identity())),
+                "project");
+        executor.addModule("staged",
+                InferredDocumentationModule.ofEnvironment(new Environment(Map.of("documentation.empty", "true",
+                                "stage.tests", "true")),
+                        Map.of(),
+                        Map.of("maven", Resolver.identity())),
+                "project");
+        SequencedMap<String, Path> steps = executor.execute();
+
+        assertThat(steps.keySet())
+                .as("the documentation of a test module is published only with its staged tests")
+                .noneMatch(step -> step.startsWith("documentation/"))
+                .contains("staged/archive");
+    }
+
+    @Test
     public void dokka_requires_the_cli_and_plugin_coordinates_under_a_qualified_trail() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
