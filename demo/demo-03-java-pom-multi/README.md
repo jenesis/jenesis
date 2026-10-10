@@ -158,8 +158,8 @@ read as a selector.
 
 `-Djenesis.test.exclude` takes the same comma-separated class patterns, without a
 `#<method>`, and leaves out the classes they match while the default naming stays
-in force, as surefire's `<excludes>` does. A module whose every test is left out
-runs none, so this builds both modules and runs no test at all:
+in force. A module whose every test is left out runs none, so this builds both
+modules and runs no test at all:
 
     java -Djenesis.test.exclude='.*GreeterTest' build/jenesis/Make.java
 
