@@ -1139,7 +1139,10 @@ public record Project(
                     Until it is pinned, a tool the build resolves itself - JUnit's launcher, Error
                     Prone, Checkstyle, a code generator - takes its newest release, skipping one
                     with a pre-release qualifier such as -rc-1 or -M2 while a version without one
-                    is published, so the first pin also settles those. Commit before the first `pin`. It rewrites each pom.xml's <dependencyManagement>
+                    is published, so the first pin also settles those. `pin` runs the build it
+                    pins, so whatever the changed versions reach, a module's tests included, runs
+                    again; -Djenesis.test.skip=true leaves the tests to the next build.
+                    Commit before the first `pin`. It rewrites each pom.xml's <dependencyManagement>
                     with the versions and checksums it resolved, keeping only the imported BOMs, so
                     review that diff. A pinned entry outranks a BOM, as any managed version does: to
                     move to a new BOM version, change it, delete the entries `pin` wrote and pin
