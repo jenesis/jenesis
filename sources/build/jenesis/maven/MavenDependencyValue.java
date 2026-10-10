@@ -16,4 +16,8 @@ public record MavenDependencyValue(String version,
                                 Boolean optional) {
         this(version, scope, systemPath, exclusions, optional, null);
     }
+
+    public MavenDependencyValue version(String version) {
+        return new MavenDependencyValue(version, scope, systemPath, exclusions, optional, checksum);
+    }
 }
