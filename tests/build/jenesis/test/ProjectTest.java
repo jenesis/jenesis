@@ -22,6 +22,7 @@ import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.ProjectModuleDescriptor;
 import build.jenesis.project.ProjectPlugins;
+import org.assertj.core.api.InstanceOfAssertFactories;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -191,6 +192,26 @@ public class ProjectTest {
         assertThat(String.join("\n", printed))
                 .contains("Migrate a Maven or Gradle build")
                 .contains("no pom.xml or module-info.java yet");
+    }
+
+    @Test
+    public void prints_the_migration_task_a_user_hands_an_agent_apart_from_the_briefing() throws IOException {
+        List<String> prompt = new ArrayList<>();
+        Project.ofEnvironment(new Environment(settings).out(prompt::add), root)
+                .target(root.resolve("target"))
+                .build(Project.PROMPT + "/migrate");
+        assertThat(prompt.stream().filter(line -> line.startsWith("Migrate the build of this project to Jenesis")))
+                .as("the task names the briefing to follow and the summary to give, as plain text")
+                .singleElement(InstanceOfAssertFactories.STRING)
+                .contains("java build/jenesis/Make.java skill/migrate", "summary of the migration", "shading")
+                .doesNotContain("\u001B");
+        List<String> briefing = new ArrayList<>();
+        Project.ofEnvironment(new Environment(settings).out(briefing::add), root)
+                .target(root.resolve("target"))
+                .build(Project.SKILL);
+        assertThat(briefing)
+                .as("an agent reading the briefing is not handed the task")
+                .noneMatch(page -> page.startsWith("Migrate the build of this project"));
     }
 
     @Test

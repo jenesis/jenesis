@@ -27,7 +27,7 @@ public final class Make {
             "jenesis.make.classes",
             "jenesis.pin.file",
             "jenesis.aot.file");
-    private static final Set<String> PRINTING = Set.of("help", "skill", "configuration", "properties", "--stop");
+    private static final Set<String> PRINTING = Set.of("help", "skill", "prompt", "configuration", "properties", "--stop");
 
     private final String mainClass;
     private final Map<String, String> ambient;
