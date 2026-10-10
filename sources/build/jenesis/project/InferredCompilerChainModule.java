@@ -73,7 +73,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 null,
                 PathPlacement.INFERRED,
                 true,
-                Javac.ofEnvironment(environment, ProcessHandler.Factory.of()),
+                Javac.ofEnvironment(environment, ProcessHandler.Factory.ofEnvironment(environment)),
                 KotlinCompilerModule.ofEnvironment(environment, repositories, resolvers),
                 ScalaCompilerModule.ofEnvironment(environment, repositories, resolvers),
                 GroovyCompilerModule.ofEnvironment(environment, repositories, resolvers),

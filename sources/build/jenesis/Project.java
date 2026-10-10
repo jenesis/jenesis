@@ -1186,6 +1186,10 @@ public record Project(
                       maven-compiler-plugin testRelease, a test-compile execution's release
                           -> maven.compiler.testRelease in pom.xml, the test module's @jenesis.release
                       compilerArgs / options.compilerArgs -> process-javac.properties (12)
+                      maven-compiler-plugin fork with -J options, meminitial, maxmem
+                          -> jenesis.process.factory=fork in jenesis.properties and -J<option>= in
+                          process-javac.properties; javac otherwise runs in the build's JVM, which
+                          refuses a -J option
                       annotationProcessorPaths / annotationProcessor -> @jenesis.plugin (13, 39)
                       Error Prone / net.ltgt.errorprone
                           -> errorprone.properties with @jenesis.plugin javac <coordinate> (14), in

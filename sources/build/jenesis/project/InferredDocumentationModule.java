@@ -42,7 +42,7 @@ public class InferredDocumentationModule implements BuildExecutorModule {
         return new InferredDocumentationModule(null,
                 InferredDocumentationChainModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
-                Jar.ofEnvironment(environment, ProcessHandler.Factory.of(), Jar.Sort.JAVADOC),
+                Jar.ofEnvironment(environment, ProcessHandler.Factory.ofEnvironment(environment), Jar.Sort.JAVADOC),
                 environment.flag("documentation.empty", false),
                 Collections.emptyNavigableMap());
     }
