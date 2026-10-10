@@ -9,6 +9,7 @@ import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Pinning;
 import build.jenesis.Platform;
+import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
 
 public class PinPom implements BuildStep {
@@ -22,6 +23,9 @@ public class PinPom implements BuildStep {
     private static final Pattern PIN_COMMENT = Pattern.compile("(?s)([ \\t]*)<!--\\s*jenesis\\.pin\\b(.*?)-->\\s*\\n");
     private static final Pattern MANAGED_DEPENDENCY = Pattern.compile("(?s)[ \\t]*<dependency>.*?</dependency>[ \\t]*\\n");
     private static final Pattern IMPORT_SCOPE = Pattern.compile("<scope>\\s*import\\s*</scope>");
+    private static final Pattern EXCLUSIONS = Pattern.compile("(?s)<exclusions>.*?</exclusions>");
+    private static final Pattern COORDINATE_ELEMENT = Pattern.compile(
+            "[ \\t]*<(groupId|artifactId|version|type|classifier)>\\s*([^<]*?)\\s*</\\1>[ \\t]*\\n?");
 
     private final transient Semaphore permits;
 
@@ -99,23 +103,72 @@ public class PinPom implements BuildStep {
         SequencedMap<String, Inventory.Dependency> closure = Inventory.closure(arguments.values(), path);
         Set<String> internal = collectInternal(Inventory.identities(arguments.values()));
         SequencedMap<String, String> entries = collectEntries(closure, internal, hashFunction);
+        SequencedMap<String, List<String>> exclusions = new LinkedHashMap<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            Path module = argument.folder().resolve(MODULE), managed = argument.folder().resolve(MavenProject.MANAGED);
+            if (argument.removed()
+                    || !Files.isRegularFile(managed)
+                    || !Files.isRegularFile(module)
+                    || !path.equals(SequencedProperties.ofFiles(module).getProperty("path"))) {
+                continue;
+            }
+            SequencedProperties properties = SequencedProperties.ofFiles(managed);
+            for (String key : properties.stringPropertyNames()) {
+                if (key.startsWith(prefix + "/")) {
+                    exclusions.putIfAbsent(key.substring(prefix.length() + 1), properties.entries(key));
+                }
+            }
+        }
         for (Path pomFile : pomFiles) {
-            updatePom(pomFile, entries);
+            updatePom(pomFile, entries, exclusions);
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
-    private void updatePom(Path pomFile, SequencedMap<String, String> entries) throws IOException {
+    private void updatePom(Path pomFile,
+                           SequencedMap<String, String> entries,
+                           SequencedMap<String, List<String>> exclusions) throws IOException {
         String existing = Files.readString(pomFile);
         Matcher dependencyManagementMatcher = DEPENDENCY_MANAGEMENT.matcher(existing);
         String indent;
         List<String> imports = new ArrayList<>();
+        SequencedMap<String, String> retained = new LinkedHashMap<>();
         if (dependencyManagementMatcher.find()) {
             indent = dependencyManagementMatcher.group(1);
             Matcher dependencyMatcher = MANAGED_DEPENDENCY.matcher(dependencyManagementMatcher.group());
             while (dependencyMatcher.find()) {
-                if (IMPORT_SCOPE.matcher(dependencyMatcher.group()).find()) {
-                    imports.add(dependencyMatcher.group());
+                String dependency = dependencyMatcher.group();
+                if (IMPORT_SCOPE.matcher(dependency).find()) {
+                    imports.add(dependency);
+                    continue;
+                }
+                String inner = dependency.substring(dependency.indexOf("<dependency>") + "<dependency>".length(),
+                        dependency.lastIndexOf("</dependency>"));
+                Map<String, String> coordinate = new HashMap<>();
+                StringBuilder retaining = new StringBuilder();
+                Matcher exclusionsMatcher = EXCLUSIONS.matcher(inner);
+                int from = 0;
+                boolean nested;
+                do {
+                    nested = exclusionsMatcher.find();
+                    Matcher elementMatcher = COORDINATE_ELEMENT.matcher(
+                            inner.substring(from, nested ? exclusionsMatcher.start() : inner.length()));
+                    while (elementMatcher.find()) {
+                        coordinate.putIfAbsent(elementMatcher.group(1), elementMatcher.group(2));
+                    }
+                    retaining.append(CHECKSUM_COMMENT.matcher(elementMatcher.replaceAll("")).replaceAll(""));
+                    if (nested) {
+                        retaining.append(exclusionsMatcher.group());
+                        from = exclusionsMatcher.end();
+                    }
+                } while (nested);
+                String children = retaining.substring(retaining.indexOf("\n") + 1);
+                children = children.substring(0, children.lastIndexOf('\n') + 1);
+                if (coordinate.containsKey("groupId") && coordinate.containsKey("artifactId") && !children.isBlank()) {
+                    retained.putIfAbsent(new MavenDependencyKey(coordinate.get("groupId"),
+                            coordinate.get("artifactId"),
+                            coordinate.get("type"),
+                            coordinate.get("classifier")).coordinate(null, null), children);
                 }
             }
         } else {
@@ -144,7 +197,7 @@ public class PinPom implements BuildStep {
         List<String> preserved = pinned.isEmpty()
                 ? List.of()
                 : preserveGuarded(pinned.toString(), qualified, managed);
-        String block = managed.isEmpty() && imports.isEmpty() ? "" : renderBlock(imports, managed, indent);
+        String block = managed.isEmpty() && imports.isEmpty() ? "" : renderBlock(imports, managed, retained, exclusions, indent);
         String updated;
         if (dependencyManagementMatcher.find(0)) {
             updated = dependencyManagementMatcher.replaceFirst(Matcher.quoteReplacement(block));
@@ -340,7 +393,11 @@ public class PinPom implements BuildStep {
         return result.toString();
     }
 
-    private static String renderBlock(List<String> imports, SequencedMap<String, String> entries, String indent) {
+    private static String renderBlock(List<String> imports,
+                                      SequencedMap<String, String> entries,
+                                      SequencedMap<String, String> retained,
+                                      SequencedMap<String, List<String>> exclusions,
+                                      String indent) {
         StringBuilder sb = new StringBuilder();
         sb.append(indent).append("<dependencyManagement>\n");
         sb.append(indent).append(indent).append("<dependencies>\n");
@@ -368,6 +425,23 @@ public class PinPom implements BuildStep {
             }
             if (classifier != null) {
                 sb.append(prefix).append(indent).append("<classifier>").append(classifier).append("</classifier>\n");
+            }
+            String children = retained.get(entry.getKey());
+            List<String> excluded = exclusions.get(entry.getKey());
+            if (children != null) {
+                sb.append(children);
+            } else if (excluded != null && !excluded.isEmpty()) {
+                sb.append(prefix).append(indent).append("<exclusions>\n");
+                for (String exclusion : excluded) {
+                    int slash = exclusion.indexOf('/');
+                    sb.append(prefix).append(indent).append(indent).append("<exclusion>\n");
+                    sb.append(prefix).append(indent).append(indent).append(indent)
+                            .append("<groupId>").append(exclusion, 0, slash).append("</groupId>\n");
+                    sb.append(prefix).append(indent).append(indent).append(indent)
+                            .append("<artifactId>").append(exclusion.substring(slash + 1)).append("</artifactId>\n");
+                    sb.append(prefix).append(indent).append(indent).append("</exclusion>\n");
+                }
+                sb.append(prefix).append(indent).append("</exclusions>\n");
             }
             if (checksum != null) {
                 sb.append(prefix).append(indent).append("<!--Checksum/").append(checksum).append("-->\n");
