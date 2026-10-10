@@ -26,6 +26,7 @@ public class ProtocModule implements BuildExecutorModule {
     private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
+    private final String group;
     private final String classifier;
     private final SequencedMap<String, String> plugins;
     private final List<String> arguments;
@@ -36,6 +37,7 @@ public class ProtocModule implements BuildExecutorModule {
         this(new Dependencies(repositories, resolvers),
              null,
              "protoc",
+             "main",
              classifier(),
              new LinkedHashMap<>(),
              List.of(),
@@ -48,6 +50,7 @@ public class ProtocModule implements BuildExecutorModule {
         return new ProtocModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "protoc",
+                "main",
                 classifier(),
                 new LinkedHashMap<>(),
                 List.of(),
@@ -57,6 +60,7 @@ public class ProtocModule implements BuildExecutorModule {
     private ProtocModule(Dependencies dependencies,
                          Pinning pinning,
                          String tool,
+                         String group,
                          String classifier,
                          SequencedMap<String, String> plugins,
                          List<String> arguments,
@@ -64,6 +68,7 @@ public class ProtocModule implements BuildExecutorModule {
         this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
+        this.group = group;
         this.classifier = classifier;
         this.plugins = plugins;
         this.arguments = arguments;
@@ -95,27 +100,31 @@ public class ProtocModule implements BuildExecutorModule {
     }
 
     public ProtocModule pinning(Pinning pinning) {
-        return new ProtocModule(dependencies, pinning, tool, classifier, plugins, arguments, terms);
+        return new ProtocModule(dependencies, pinning, tool, group, classifier, plugins, arguments, terms);
     }
 
     public ProtocModule tool(String tool) {
-        return new ProtocModule(dependencies, pinning, tool, classifier, plugins, arguments, terms);
+        return new ProtocModule(dependencies, pinning, tool, group, classifier, plugins, arguments, terms);
+    }
+
+    public ProtocModule group(String group) {
+        return new ProtocModule(dependencies, pinning, tool, group, classifier, plugins, arguments, terms);
     }
 
     public ProtocModule classifier(String classifier) {
-        return new ProtocModule(dependencies, pinning, tool, classifier, plugins, arguments, terms);
+        return new ProtocModule(dependencies, pinning, tool, group, classifier, plugins, arguments, terms);
     }
 
     public ProtocModule plugins(SequencedMap<String, String> plugins) {
-        return new ProtocModule(dependencies, pinning, tool, classifier, plugins, arguments, terms);
+        return new ProtocModule(dependencies, pinning, tool, group, classifier, plugins, arguments, terms);
     }
 
     public ProtocModule arguments(List<String> arguments) {
-        return new ProtocModule(dependencies, pinning, tool, classifier, plugins, arguments, terms);
+        return new ProtocModule(dependencies, pinning, tool, group, classifier, plugins, arguments, terms);
     }
 
     public ProtocModule printing(BiConsumer<Boolean, String> printing) {
-        return new ProtocModule(dependencies, pinning, tool, classifier, plugins, arguments, terms.printing(printing));
+        return new ProtocModule(dependencies, pinning, tool, group, classifier, plugins, arguments, terms.printing(printing));
     }
 
     @Override
@@ -138,7 +147,7 @@ public class ProtocModule implements BuildExecutorModule {
         }
         generateInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addStep(GENERATE,
-                new Generate(terms, tool, List.copyOf(plugins.sequencedKeySet()), arguments),
+                new Generate(terms, tool, group, List.copyOf(plugins.sequencedKeySet()), arguments),
                 generateInputs);
     }
 
@@ -173,15 +182,18 @@ public class ProtocModule implements BuildExecutorModule {
     private static class Generate extends ProcessBuildStep {
 
         private final String tool;
+        private final String group;
         private final List<String> plugins;
         private final List<String> arguments;
 
         private Generate(ProcessBuildStep.Terms terms,
                          String tool,
+                         String group,
                          List<String> plugins,
                          List<String> arguments) {
             super("protoc", ProcessHandler.OfProcess.ofStaged(), terms);
             this.tool = tool;
+            this.group = group;
             this.plugins = plugins;
             this.arguments = arguments;
         }
@@ -194,11 +206,12 @@ public class ProtocModule implements BuildExecutorModule {
                 throws IOException {
             Path executable = null;
             SequencedMap<String, Path> located = new LinkedHashMap<>();
-            List<Path> roots = new ArrayList<>();
+            List<Path> roots = new ArrayList<>(), libraries = new ArrayList<>();
             for (BuildStepArgument input : inputs.values()) {
                 if (input.removed()) {
                     continue;
                 }
+                libraries.addAll(Dependencies.select(input.folder(), group, "compile"));
                 for (Path resolved : Dependencies.select(input.folder(), tool, "runtime")) {
                     if (executable != null) {
                         throw new IllegalStateException("Resolved more than one protoc executable: "
@@ -240,6 +253,30 @@ public class ProtocModule implements BuildExecutorModule {
             }
             for (Path root : roots) {
                 commands.add("-I" + root);
+            }
+            Path included = context.supplement().resolve("include");
+            for (Path library : libraries) {
+                if (Files.isDirectory(library)) {
+                    commands.add("-I" + library);
+                    continue;
+                }
+                try (ZipFile zip = new ZipFile(library.toFile())) {
+                    for (ZipEntry entry : Collections.list(zip.entries())) {
+                        Path file = included.resolve(entry.getName()).normalize();
+                        if (entry.isDirectory()
+                                || !entry.getName().endsWith(DEFINITION)
+                                || !file.startsWith(included)
+                                || Files.exists(file)) {
+                            continue;
+                        }
+                        try (InputStream input = zip.getInputStream(entry)) {
+                            Files.copy(input, Files.createDirectories(file.getParent()).resolve(file.getFileName()));
+                        }
+                    }
+                }
+            }
+            if (Files.isDirectory(included)) {
+                commands.add("-I" + included);
             }
             commands.addAll(arguments);
             commands.addAll(files);
