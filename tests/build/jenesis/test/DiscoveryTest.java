@@ -1,9 +1,11 @@
 package build.jenesis.test;
 
 import module java.base;
+import module jdk.httpserver;
 import module org.junit.jupiter.api;
 import build.jenesis.DiscoveredLocation;
 import build.jenesis.Discovery;
+import build.jenesis.Repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -190,6 +192,84 @@ public class DiscoveryTest {
                 .lookup("net.bytebuddy", "maven", "byte-buddy"))
                 .as("a domain whose host is unknown or unreachable publishes nothing, as one behind a proxy appears")
                 .isEmpty();
+    }
+
+    @Test
+    public void refuses_a_file_whose_certificate_does_not_verify(@TempDir Path folder) throws Exception {
+        char[] password = "test-store-password".toCharArray();
+        Path store = folder.resolve("server.p12");
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        int code = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", windows ? "keytool.exe" : "keytool").toString(),
+                "-genkeypair",
+                "-alias", "server",
+                "-keyalg", "RSA",
+                "-keysize", "2048",
+                "-validity", "1",
+                "-dname", "CN=localhost",
+                "-keystore", store.toString(),
+                "-storetype", "PKCS12",
+                "-storepass", new String(password))
+                .redirectErrorStream(true)
+                .start()
+                .waitFor();
+        assertThat(code).as("keytool generated a throwaway key store").isZero();
+        KeyStore keys = KeyStore.getInstance("PKCS12");
+        try (InputStream in = Files.newInputStream(store)) {
+            keys.load(in, password);
+        }
+        KeyManagerFactory managers = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        managers.init(keys, password);
+        SSLContext context = SSLContext.getInstance("TLS");
+        context.init(managers.getKeyManagers(), null, null);
+        HttpsServer https = HttpsServer.create(new InetSocketAddress("localhost", 0), 0);
+        https.setHttpsConfigurator(new HttpsConfigurator(context));
+        https.createContext("/", exchange -> {
+            byte[] body = "maven=https://example.com/".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        https.start();
+        try {
+            Discovery discovery = server.discovery()
+                    .uri("https://localhost:" + https.getAddress().getPort() + "/{domain}")
+                    .connection(new Repository.Connection().retries(0));
+
+            assertThatThrownBy(() -> discovery.lookup("net.bytebuddy", "maven", "byte-buddy"))
+                    .as("a file served under a certificate nobody signed is neither trusted nor taken for absent")
+                    .isInstanceOf(IOException.class)
+                    .hasMessageContaining("certificate that does not verify")
+                    .hasMessageContaining("jenesis.repository.insecure");
+        } finally {
+            https.stop(0);
+        }
+    }
+
+    @Test
+    public void counts_a_file_whose_handshake_the_server_cuts_short_as_absent() throws IOException {
+        AtomicInteger handshakes = new AtomicInteger();
+        try (ServerSocket socket = new ServerSocket()) {
+            socket.bind(new InetSocketAddress("localhost", 0));
+            Thread.ofVirtual().start(() -> {
+                while (true) {
+                    try (Socket accepted = socket.accept()) {
+                        if (accepted.getInputStream().read(new byte[16]) > 0) {
+                            handshakes.incrementAndGet();
+                        }
+                    } catch (IOException _) {
+                        return;
+                    }
+                }
+            });
+
+            assertThat(server.discovery()
+                    .uri("https://localhost:" + socket.getLocalPort() + "/{domain}")
+                    .connection(new Repository.Connection().retries(0))
+                    .lookup("net.bytebuddy", "maven", "byte-buddy"))
+                    .as("a handshake that ends without a word on the certificate says nothing about the file")
+                    .isEmpty();
+        }
+        assertThat(handshakes).as("the domain was asked and began a handshake").hasPositiveValue();
     }
 
     @Test

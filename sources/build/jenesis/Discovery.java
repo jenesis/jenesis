@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import java.security.cert.CertificateException;
 
 public final class Discovery {
 
@@ -59,8 +60,18 @@ public final class Discovery {
                      Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8)) {
                     properties.load(reader);
                 } catch (IOException e) {
-                    if (e instanceof SSLException || e.getCause() instanceof SSLException) {
-                        throw e;
+                    boolean handshake = false;
+                    for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+                        handshake |= cause instanceof SSLHandshakeException;
+                        if (cause instanceof SSLPeerUnverifiedException
+                                || handshake && (cause instanceof CertificateException
+                                || cause instanceof CertPathValidatorException
+                                || cause instanceof CertPathBuilderException)) {
+                            throw new IOException(source + " is served with a certificate that does not verify, so"
+                                    + " what " + domain + " publishes can neither be trusted nor taken for absent"
+                                    + " (set -Djenesis.repository.insecure=true to accept such a certificate,"
+                                    + " or -Djenesis.repository.discovery=false to ask no domain)", e);
+                        }
                     }
                     return Optional.empty();
                 }
