@@ -27,8 +27,8 @@ of being built again, and because the cache sits outside `target/`, it survives 
 Build it
 --------
 
-This is the smallest possible project - a `pom.xml` and one dependency-free
-source - so the only thing of interest is *who* produced the output. Run it from
+This is the smallest possible project - a `module-info.java` and one
+dependency-free source - so the only thing of interest is *who* produced the output. Run it from
 this directory.
 
 **1. Bootstrap the cache.** A normal build populates `.jenesis/cache` while it
@@ -133,8 +133,9 @@ Layout
 
     demo/demo-49-build-cache
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
-    |-- pom.xml              Maven coordinates and <sourceDirectory>, no dependencies
-    `-- sources/sample/Sample.java
+    `-- sources
+        |-- module-info.java     module demo.cache, no dependencies
+        `-- sample/Sample.java
 
 There is nothing build-cache-specific in the project itself: the cache is an
 engine capability you switch on from the command line, so any project gains it
