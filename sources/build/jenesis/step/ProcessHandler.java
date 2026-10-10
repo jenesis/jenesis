@@ -31,6 +31,10 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
     }
 
+    private static Writer writer(Path file) throws IOException {
+        return new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(file), StandardCharsets.UTF_8));
+    }
+
     enum Factory {
         TOOL {
             @Override
@@ -132,10 +136,6 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                  PrintWriter err = new PrintWriter(new LineTee(writer(error), tee.err()), true)) {
                 return toolProvider.run(out, err, commands.toArray(String[]::new));
             }
-        }
-
-        private static Writer writer(Path file) throws IOException {
-            return new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(file), encoding()));
         }
 
         private static final class LineTee extends Writer {
@@ -333,9 +333,6 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             if (directory != null) {
                 builder.directory(directory.toFile());
             }
-            if (tee == null) {
-                builder.redirectOutput(output.toFile()).redirectError(error.toFile());
-            }
             builder.environment().clear();
             builder.environment().putAll(environment);
             builder.environment().putIfAbsent("COLUMNS", "80");
@@ -343,27 +340,23 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             builder.environment().putIfAbsent("TERM", "dumb");
             Process process = builder.start();
             process.getOutputStream().close();
-            CompletableFuture<Void> errored = null;
-            if (tee != null) {
-                CompletableFuture<Void> target = new CompletableFuture<>();
-                errored = target;
-                tee.executor().execute(() -> {
-                    try {
-                        drain(process.getErrorStream(), error, tee.err());
-                        target.complete(null);
-                    } catch (Throwable t) {
-                        target.completeExceptionally(t);
-                    }
-                });
+            CompletableFuture<Void> errored, printed;
+            if (tee == null) {
+                errored = drain(Thread.ofVirtual()::start, process.getErrorStream(), error, null);
+                printed = drain(Thread.ofVirtual()::start, process.getInputStream(), output, null);
+            } else {
+                errored = drain(tee.executor(), process.getErrorStream(), error, tee.err());
+                printed = null;
             }
             try {
                 if (tee != null) {
                     drain(process.getInputStream(), output, tee.out());
                 }
                 int code = process.waitFor();
-                if (errored != null) {
-                    errored.join();
+                if (printed != null) {
+                    printed.join();
                 }
+                errored.join();
                 return code;
             } catch (InterruptedException e) {
                 process.destroyForcibly();
@@ -376,31 +369,46 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             }
         }
 
+        private static CompletableFuture<Void> drain(Executor executor,
+                                                     InputStream stream,
+                                                     Path file,
+                                                     Consumer<String> consumer) {
+            CompletableFuture<Void> drained = new CompletableFuture<>();
+            executor.execute(() -> {
+                try {
+                    drain(stream, file, consumer);
+                    drained.complete(null);
+                } catch (Throwable t) {
+                    drained.completeExceptionally(t);
+                }
+            });
+            return drained;
+        }
+
         private static void drain(InputStream stream, Path file, Consumer<String> consumer) throws IOException {
-            try (OutputStream out = Files.newOutputStream(file)) {
-                ByteArrayOutputStream line = new ByteArrayOutputStream();
-                byte[] buffer = new byte[8192];
+            try (Reader reader = new InputStreamReader(stream, encoding());
+                 Writer writer = writer(file)) {
+                StringBuilder line = new StringBuilder();
+                char[] buffer = new char[8192];
                 int read;
-                while ((read = stream.read(buffer)) != -1) {
-                    out.write(buffer, 0, read);
+                while ((read = reader.read(buffer)) != -1) {
+                    writer.write(buffer, 0, read);
+                    if (consumer == null) {
+                        continue;
+                    }
                     for (int index = 0; index < read; index++) {
                         if (buffer[index] == '\n') {
-                            consumer.accept(line(line));
-                        } else {
-                            line.write(buffer[index]);
+                            consumer.accept(line.toString());
+                            line.setLength(0);
+                        } else if (buffer[index] != '\r') {
+                            line.append(buffer[index]);
                         }
                     }
                 }
-                if (line.size() > 0) {
-                    consumer.accept(line(line));
+                if (consumer != null && !line.isEmpty()) {
+                    consumer.accept(line.toString());
                 }
             }
-        }
-
-        private static String line(ByteArrayOutputStream bytes) {
-            String line = bytes.toString(encoding());
-            bytes.reset();
-            return line.endsWith("\r") ? line.substring(0, line.length() - 1) : line;
         }
     }
 }

@@ -144,7 +144,7 @@ public class ProcessHandlerTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    public void a_tool_writing_what_the_native_encoding_cannot_hold_keeps_every_line(boolean teed) throws Exception {
+    public void a_tool_writes_its_output_in_utf_8_whatever_the_native_encoding(boolean teed) throws Exception {
         ToolProvider tool = new ToolProvider() {
             @Override
             public String name() {
@@ -166,22 +166,51 @@ public class ProcessHandlerTest {
         assertThat(handler.execute(output,
                 error,
                 teed ? new ProcessHandler.Tee(Runnable::run, _ -> { }, errLines::add) : null)).isEqualTo(1);
-        List<String> lines = new String(Files.readAllBytes(error), nativeEncoding()).lines().toList();
-        assertThat(lines)
-                .as("a character the platform cannot encode is replaced, as the tool would print it, rather than"
-                        + " stalling the capture")
+        assertThat(Files.readAllLines(error, StandardCharsets.UTF_8))
+                .as("every character the tool prints is kept, as UTF-8 holds them all")
                 .hasSize(201)
+                .startsWith("@Foo(\"\u201Cx\u201D\")")
                 .endsWith("line 199");
-        assertThat(lines.getFirst()).startsWith("@Foo(\"").endsWith("\")").hasSize(11);
     }
 
-    @Test
-    public void a_forked_process_writing_what_the_native_encoding_cannot_decode_is_teed_as_written() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void a_forked_process_is_captured_in_utf_8_from_the_native_encoding_it_prints_in(boolean teed)
+            throws Exception {
+        Path source = root.resolve("Accented.java");
+        Files.writeString(source, """
+                public class Accented {
+                    public static void main(String[] args) {
+                        System.out.println("caf\\u00e9");
+                    }
+                }
+                """);
+        Path output = root.resolve("output"), error = root.resolve("error");
+        List<String> outLines = new CopyOnWriteArrayList<>();
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            ProcessHandler handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(List.of(source.toString()));
+            assertThat(handler.execute(output,
+                    error,
+                    teed ? new ProcessHandler.Tee(executor, outLines::add, _ -> { }) : null)).isZero();
+        } finally {
+            executor.shutdown();
+        }
+        Charset encoding = Charset.forName(System.getProperty("native.encoding"));
+        assertThat(Files.readAllLines(output, StandardCharsets.UTF_8))
+                .as("what the process printed in the platform's encoding is kept as UTF-8")
+                .containsExactly(new String("caf\u00e9".getBytes(encoding), encoding));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void a_forked_process_writing_what_the_native_encoding_cannot_decode_is_still_captured(boolean teed)
+            throws Exception {
         Path source = root.resolve("Raw.java");
         Files.writeString(source, """
                 public class Raw {
                     public static void main(String[] args) throws Exception {
-                        System.out.write(new byte[] {(byte) 0xE2, (byte) 0x9C, (byte) 0x94, ' ', 'o', 'k', '\\n'});
+                        System.out.write(new byte[] {(byte) 0xFF, (byte) 0xFE, ' ', 'o', 'k', '\\n'});
                         System.out.write("after\\n".getBytes());
                         System.out.flush();
                     }
@@ -192,21 +221,22 @@ public class ProcessHandlerTest {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
             ProcessHandler handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(List.of(source.toString()));
-            assertThat(handler.execute(output, error, new ProcessHandler.Tee(executor, outLines::add, _ -> { })))
+            assertThat(handler.execute(output,
+                    error,
+                    teed ? new ProcessHandler.Tee(executor, outLines::add, _ -> { }) : null))
                     .as("output in a charset the build does not read never fails the build")
                     .isZero();
         } finally {
             executor.shutdown();
         }
-        assertThat(Files.readAllBytes(output))
-                .as("the file holds what the process wrote")
-                .startsWith((byte) 0xE2, (byte) 0x9C, (byte) 0x94);
-        assertThat(outLines).hasSize(2).last().isEqualTo("after");
-        assertThat(outLines.getFirst()).endsWith(" ok");
-    }
-
-    private static Charset nativeEncoding() {
-        return Charset.forName(System.getProperty("native.encoding"));
+        assertThat(Files.readAllLines(output, StandardCharsets.UTF_8))
+                .as("a byte the platform's encoding cannot decode is replaced, and the file stays UTF-8")
+                .hasSize(2)
+                .endsWith("after");
+        if (teed) {
+            assertThat(outLines).hasSize(2).last().isEqualTo("after");
+            assertThat(outLines.getFirst()).endsWith(" ok");
+        }
     }
 
     @Test

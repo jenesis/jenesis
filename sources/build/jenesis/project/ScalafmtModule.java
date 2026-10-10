@@ -150,7 +150,7 @@ public class ScalafmtModule implements BuildExecutorModule {
             Path diff = context.supplement().resolve("error");
             int findings = code == 0 ? 0 : -1;
             if (code == TEST_ERROR && Files.isRegularFile(diff)) {
-                List<String> lines = Files.readAllLines(diff, NATIVE_ENCODING);
+                List<String> lines = Files.readAllLines(diff, StandardCharsets.UTF_8);
                 findings = 0;
                 for (int index = 1; index < lines.size(); index++) {
                     if (lines.get(index - 1).startsWith("--- a") && lines.get(index).startsWith("+++ b")) {
