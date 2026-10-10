@@ -192,21 +192,32 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         private final List<String> commands;
         private final SortedMap<String, String> environment;
         private final Path directory;
+        private final Charset output, error;
 
         private OfProcess(List<String> commands) {
+            this(commands, encoding(), encoding());
+        }
+
+        private OfProcess(List<String> commands, Charset output, Charset error) {
             SortedMap<String, String> environment = new TreeMap<>(WINDOWS ? String.CASE_INSENSITIVE_ORDER : null);
             System.getenv().forEach((name, value) -> {
                 if (name.startsWith("LC_") || PLATFORM.contains(WINDOWS ? name.toUpperCase(Locale.ROOT) : name)) {
                     environment.put(name, value);
                 }
             });
-            this(commands, environment, null);
+            this(commands, environment, null, output, error);
         }
 
-        private OfProcess(List<String> commands, SortedMap<String, String> environment, Path directory) {
+        private OfProcess(List<String> commands,
+                          SortedMap<String, String> environment,
+                          Path directory,
+                          Charset output,
+                          Charset error) {
             this.commands = commands;
             this.environment = Collections.unmodifiableSortedMap(environment);
             this.directory = directory;
+            this.output = output;
+            this.error = error;
         }
 
         public static Function<List<String>, OfProcess> ofJavaHome(String command) {
@@ -219,7 +230,14 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             } else {
                 File program = new File(home, command + (WINDOWS ? ".exe" : ""));
                 if (program.isFile()) {
-                    return of(List.of(program.getPath()));
+                    String option = command.equals("bin/java") ? "-D" : "-J-D";
+                    return arguments -> {
+                        List<String> commands = new ArrayList<>(List.of(program.getPath()));
+                        Charset output = printing(arguments, option + "stdout.encoding=", commands),
+                                error = printing(arguments, option + "stderr.encoding=", commands);
+                        commands.addAll(arguments);
+                        return new OfProcess(List.copyOf(commands), output, error);
+                    };
                 } else {
                     throw new IllegalStateException("Could not find command " + program.getPath() + " in " + home);
                 }
@@ -234,6 +252,22 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                         : Stream.of(located);
                 return new OfProcess(Stream.concat(program, arguments.stream()).toList());
             };
+        }
+
+        private static Charset printing(List<String> arguments, String option, List<String> commands) {
+            for (String argument : arguments) {
+                if (argument.startsWith(option)) {
+                    String name = argument.substring(option.length());
+                    try {
+                        return Charset.forName(name);
+                    } catch (IllegalArgumentException e) {
+                        throw new IllegalArgumentException(argument + " names no charset this JVM knows,"
+                                + " so what the tool prints cannot be read: name one such as UTF-8, the default", e);
+                    }
+                }
+            }
+            commands.add(option + "UTF-8");
+            return StandardCharsets.UTF_8;
         }
 
         private static String locate(String command) {
@@ -311,7 +345,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess environment(SortedMap<String, String> environment) {
-            return new OfProcess(commands, new TreeMap<>(environment), directory);
+            return new OfProcess(commands, new TreeMap<>(environment), directory, output, error);
         }
 
         public Path directory() {
@@ -319,7 +353,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess directory(Path directory) {
-            return new OfProcess(commands, new TreeMap<>(environment), directory);
+            return new OfProcess(commands, new TreeMap<>(environment), directory, output, error);
         }
 
         @Override
@@ -342,15 +376,15 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             process.getOutputStream().close();
             CompletableFuture<Void> errored, printed;
             if (tee == null) {
-                errored = drain(Thread.ofVirtual()::start, process.getErrorStream(), error, null);
-                printed = drain(Thread.ofVirtual()::start, process.getInputStream(), output, null);
+                errored = drain(Thread.ofVirtual()::start, process.getErrorStream(), this.error, error, null);
+                printed = drain(Thread.ofVirtual()::start, process.getInputStream(), this.output, output, null);
             } else {
-                errored = drain(tee.executor(), process.getErrorStream(), error, tee.err());
+                errored = drain(tee.executor(), process.getErrorStream(), this.error, error, tee.err());
                 printed = null;
             }
             try {
                 if (tee != null) {
-                    drain(process.getInputStream(), output, tee.out());
+                    drain(process.getInputStream(), this.output, output, tee.out());
                 }
                 int code = process.waitFor();
                 if (printed != null) {
@@ -371,12 +405,13 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
         private static CompletableFuture<Void> drain(Executor executor,
                                                      InputStream stream,
+                                                     Charset encoding,
                                                      Path file,
                                                      Consumer<String> consumer) {
             CompletableFuture<Void> drained = new CompletableFuture<>();
             executor.execute(() -> {
                 try {
-                    drain(stream, file, consumer);
+                    drain(stream, encoding, file, consumer);
                     drained.complete(null);
                 } catch (Throwable t) {
                     drained.completeExceptionally(t);
@@ -385,8 +420,9 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             return drained;
         }
 
-        private static void drain(InputStream stream, Path file, Consumer<String> consumer) throws IOException {
-            try (Reader reader = new InputStreamReader(stream, encoding());
+        private static void drain(InputStream stream, Charset encoding, Path file, Consumer<String> consumer)
+                throws IOException {
+            try (Reader reader = new InputStreamReader(stream, encoding);
                  Writer writer = writer(file)) {
                 StringBuilder line = new StringBuilder();
                 char[] buffer = new char[8192];

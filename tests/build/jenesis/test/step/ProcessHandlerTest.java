@@ -175,8 +175,20 @@ public class ProcessHandlerTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    public void a_forked_process_is_captured_in_utf_8_from_the_native_encoding_it_prints_in(boolean teed)
-            throws Exception {
+    public void a_forked_jvm_is_told_to_print_in_utf_8_and_captured_exactly(boolean teed) throws Exception {
+        assertThat(accented(List.of(), teed))
+                .as("whatever the platform's encoding, a JVM the build forks prints every character")
+                .containsExactly("caf\u00e9");
+    }
+
+    @Test
+    public void a_forked_jvm_printing_in_an_encoding_of_its_own_is_read_in_that_one() throws Exception {
+        assertThat(accented(List.of("-Dstdout.encoding=ISO-8859-1"), false))
+                .as("an encoding a process file names is the one the output is read in")
+                .containsExactly("caf\u00e9");
+    }
+
+    private List<String> accented(List<String> options, boolean teed) throws Exception {
         Path source = root.resolve("Accented.java");
         Files.writeString(source, """
                 public class Accented {
@@ -186,25 +198,23 @@ public class ProcessHandlerTest {
                 }
                 """);
         Path output = root.resolve("output"), error = root.resolve("error");
-        List<String> outLines = new CopyOnWriteArrayList<>();
+        List<String> arguments = new ArrayList<>(options);
+        arguments.add(source.toString());
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
-            ProcessHandler handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(List.of(source.toString()));
+            ProcessHandler handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(arguments);
             assertThat(handler.execute(output,
                     error,
-                    teed ? new ProcessHandler.Tee(executor, outLines::add, _ -> { }) : null)).isZero();
+                    teed ? new ProcessHandler.Tee(executor, _ -> { }, _ -> { }) : null)).isZero();
         } finally {
             executor.shutdown();
         }
-        Charset encoding = Charset.forName(System.getProperty("native.encoding"));
-        assertThat(Files.readAllLines(output, StandardCharsets.UTF_8))
-                .as("what the process printed in the platform's encoding is kept as UTF-8")
-                .containsExactly(new String("caf\u00e9".getBytes(encoding), encoding));
+        return Files.readAllLines(output, StandardCharsets.UTF_8);
     }
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    public void a_forked_process_writing_what_the_native_encoding_cannot_decode_is_still_captured(boolean teed)
+    public void a_forked_program_writing_what_the_native_encoding_cannot_decode_is_still_captured(boolean teed)
             throws Exception {
         Path source = root.resolve("Raw.java");
         Files.writeString(source, """
@@ -220,11 +230,14 @@ public class ProcessHandlerTest {
         List<String> outLines = new CopyOnWriteArrayList<>();
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
-            ProcessHandler handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(List.of(source.toString()));
+            ProcessHandler handler = ProcessHandler.OfProcess.of(List.of(Path.of(System.getProperty("java.home"),
+                    "bin",
+                    File.separatorChar == '\\' ? "java.exe" : "java").toString())).apply(List.of(source.toString()));
             assertThat(handler.execute(output,
                     error,
                     teed ? new ProcessHandler.Tee(executor, outLines::add, _ -> { }) : null))
-                    .as("output in a charset the build does not read never fails the build")
+                    .as("a program not known to be a JVM is read in the platform's encoding, and what that cannot"
+                            + " decode never fails the build")
                     .isZero();
         } finally {
             executor.shutdown();
