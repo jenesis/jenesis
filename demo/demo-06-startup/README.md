@@ -68,8 +68,8 @@ two calls with different flags cannot contaminate each other:
     java -Djenesis.make.daemon=true -Djenesis.project.layout=modular build/jenesis/Make.java help
     java -Djenesis.make.daemon=true build/jenesis/Make.java help
 
-The second call reports `maven`, the layout this demo's `pom.xml` infers, rather
-than the `modular` the first call asked for.
+The second call reports `modular_to_maven`, the layout this demo's `module-info.java`
+infers, rather than the `modular` the first call asked for.
 
 Everything a running JVM cannot change - the build sources, the environment, the
 JVM arguments, and any `-D` that is not a `jenesis.` one - replaces the daemon
