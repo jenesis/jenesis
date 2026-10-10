@@ -674,20 +674,7 @@ public class TestModuleTest {
 
     @Test
     public void can_execute_testng() throws Exception {
-        Path testngJar = downloadJar(testngDependencies.resolve("testng-7.10.2.jar"),
-                "https://repo1.maven.org/maven2/org/testng/testng/7.10.2/testng-7.10.2.jar",
-                "225fd56447f2e5e439db3b483a79cd9f294fad9f357f8352b12ee6a3411ebb15");
-        Path jcommanderJar = downloadJar(testngDependencies.resolve("jcommander-1.82.jar"),
-                "https://repo1.maven.org/maven2/com/beust/jcommander/1.82/jcommander-1.82.jar",
-                "deeac157c8de6822878d85d0c7bc8467a19cc8484d37788f7804f039dde280b1");
-        Path slf4jJar = downloadJar(testngDependencies.resolve("slf4j-api-1.7.36.jar"),
-                "https://repo1.maven.org/maven2/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar",
-                "d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0");
-        Path jqueryJar = downloadJar(testngDependencies.resolve("jquery-3.7.1.jar"),
-                "https://repo1.maven.org/maven2/org/webjars/jquery/3.7.1/jquery-3.7.1.jar",
-                "262016dd3a559df87aefbe392804e9bf620787c9204c0ab8522d4c231ea65097");
-        populateFilteredArtifacts(testngDependencies, Set.of(
-                "testng-7.10.2.jar", "jcommander-1.82.jar", "slf4j-api-1.7.36.jar", "jquery-3.7.1.jar"));
+        Path testngJar = testngDependencies();
         Path sampleClasses = classes.resolve(Javac.CLASSES + "sample");
         compileSource(sampleClasses, "TestNGTestSample", """
                 package sample;
@@ -696,20 +683,6 @@ public class TestModuleTest {
                     public void test() { System.out.println("Hello world!"); }
                 }
                 """, List.of(testngJar));
-        SequencedProperties versions = new SequencedProperties();
-        versions.setProperty("main/maven/org.testng/testng",
-                "7.10.2 SHA-256/225fd56447f2e5e439db3b483a79cd9f294fad9f357f8352b12ee6a3411ebb15");
-        versions.setProperty("main/maven/com.beust/jcommander",
-                "1.82 SHA-256/deeac157c8de6822878d85d0c7bc8467a19cc8484d37788f7804f039dde280b1");
-        versions.setProperty("main/maven/org.slf4j/slf4j-api",
-                "1.7.36 SHA-256/d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0");
-        versions.setProperty("main/maven/org.webjars/jquery",
-                "3.7.1 SHA-256/262016dd3a559df87aefbe392804e9bf620787c9204c0ab8522d4c231ea65097");
-        versions.store(testngDependencies.resolve(BuildStep.VERSIONS));
-        SequencedProperties requires = new SequencedProperties();
-        requires.setProperty("main/runtime/maven/org.testng/testng", "");
-        requires.store(testngDependencies.resolve(BuildStep.REQUIRES));
-
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", testngDependencies);
         executor.addSource("classes", classes);
@@ -729,6 +702,72 @@ public class TestModuleTest {
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
+    }
+
+    @Test
+    public void names_the_test_class_testng_cannot_instantiate() throws Exception {
+        Path testngJar = testngDependencies();
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "BrokenTestNGSample", """
+                package sample;
+                public class BrokenTestNGSample {
+                    private static final Object LOG = log();
+                    private static Object log() { throw new IllegalStateException("Invalid logger interface"); }
+                    @org.testng.annotations.Test
+                    public void test() { }
+                }
+                """, List.of(testngJar));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", testngDependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new TestNG())
+                        .isTest(candidate -> candidate.endsWith("BrokenTestNGSample")).jarsOnly(false).pathPlacement(PathPlacement.CLASS_PATH),
+                "dependencies", "classes");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .as("TestNG exits with 8 and says nothing below -verbose 2 when it cannot create a test class")
+                .hasMessageContaining("An error occurred while instantiating class sample.BrokenTestNGSample")
+                .hasMessageContaining("Invalid logger interface");
+    }
+
+    private Path testngDependencies() throws Exception {
+        Path testngJar = downloadJar(testngDependencies.resolve("testng-7.10.2.jar"),
+                "https://repo1.maven.org/maven2/org/testng/testng/7.10.2/testng-7.10.2.jar",
+                "225fd56447f2e5e439db3b483a79cd9f294fad9f357f8352b12ee6a3411ebb15");
+        downloadJar(testngDependencies.resolve("jcommander-1.82.jar"),
+                "https://repo1.maven.org/maven2/com/beust/jcommander/1.82/jcommander-1.82.jar",
+                "deeac157c8de6822878d85d0c7bc8467a19cc8484d37788f7804f039dde280b1");
+        downloadJar(testngDependencies.resolve("slf4j-api-1.7.36.jar"),
+                "https://repo1.maven.org/maven2/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar",
+                "d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0");
+        downloadJar(testngDependencies.resolve("jquery-3.7.1.jar"),
+                "https://repo1.maven.org/maven2/org/webjars/jquery/3.7.1/jquery-3.7.1.jar",
+                "262016dd3a559df87aefbe392804e9bf620787c9204c0ab8522d4c231ea65097");
+        populateFilteredArtifacts(testngDependencies, Set.of(
+                "testng-7.10.2.jar", "jcommander-1.82.jar", "slf4j-api-1.7.36.jar", "jquery-3.7.1.jar"));
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("main/maven/org.testng/testng",
+                "7.10.2 SHA-256/225fd56447f2e5e439db3b483a79cd9f294fad9f357f8352b12ee6a3411ebb15");
+        versions.setProperty("main/maven/com.beust/jcommander",
+                "1.82 SHA-256/deeac157c8de6822878d85d0c7bc8467a19cc8484d37788f7804f039dde280b1");
+        versions.setProperty("main/maven/org.slf4j/slf4j-api",
+                "1.7.36 SHA-256/d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0");
+        versions.setProperty("main/maven/org.webjars/jquery",
+                "3.7.1 SHA-256/262016dd3a559df87aefbe392804e9bf620787c9204c0ab8522d4c231ea65097");
+        versions.store(testngDependencies.resolve(BuildStep.VERSIONS));
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/runtime/maven/org.testng/testng", "");
+        requires.store(testngDependencies.resolve(BuildStep.REQUIRES));
+        return testngJar;
     }
 
     @Test

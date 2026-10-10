@@ -110,7 +110,7 @@ public class TestFrameworkAdapterTest {
                 Collections.emptyNavigableMap(),
                 false,
                 false))
-                .containsExactly("-d", root.resolve("test-output").toString());
+                .containsExactly("-verbose", "2", "-d", root.resolve("test-output").toString());
     }
 
     @Test
@@ -124,6 +124,7 @@ public class TestFrameworkAdapterTest {
                 true,
                 false))
                 .containsExactly(
+                        "-verbose", "2",
                         "-d", root.resolve("test-output").toString(),
                         "-parallel", "methods",
                         "-testclass", "sample.AlphaTest,sample.BetaTest",

@@ -4754,6 +4754,25 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void refuses_a_plugin_comment_that_writes_a_version_after_the_coordinate() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.plugin javac maven/com.google.errorprone/error_prone_core 2.36.0-->
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed jenesis.plugin declaration"
+                        + " 'javac maven/com.google.errorprone/error_prone_core 2.36.0'")
+                .hasMessageContaining("maven/<groupId>/<artifactId>/<version>");
+    }
+
+    @Test
     public void refuses_a_module_alias_comment_that_names_no_coordinate() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
