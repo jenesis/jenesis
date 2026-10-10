@@ -1476,7 +1476,8 @@ public record Project(
                           -Xdoclint:none unless process-javadoc.properties names an -Xdoclint flag,
                           and fails the build on an error, -Werror= making a warning one;
                           excludePackageNames -> -exclude=<package>[:<package>...] there, which
-                          leaves those packages and their subpackages undocumented
+                          leaves those packages and their subpackages undocumented; Dokka, which
+                          documents Kotlin sources, fails the build as javadoc does when it fails
                       maven-shade-plugin / shadow -> launcher=true, one executable jar (08)
                       Spring Boot repackage / bootJar -> launcher=true, one executable jar (08), or
                           bundle=true, its jars and the argument file that launches them (10)
