@@ -1817,12 +1817,14 @@ public record Project(
                           other build of the same library can land instead. Aliasing a name the
                           target already declares is allowed and does exactly that, so an alias need
                           not be dropped when its target grows a module name. The jar's manifest
-                          hands the alias to its consumers; one for a `requires static` target
-                          applies only to a consumer that resolves that target. MAVEN modules declare
-                          the same lines in a project-level <!--jenesis.alias <module>
+                          hands the alias to its consumers. An alias applies only where its target
+                          is resolved, so one for an optional, a `requires static` or an excluded
+                          target asks nothing of a module without it. MAVEN modules declare the
+                          same lines in a project-level <!--jenesis.alias <module>
                           <groupId>/<artifactId>--> comment, a local parent's included, which names
-                          the jar for a module-info.java the build compiles in META-INF/versions/<N>;
-                          one naming a dependency of test scope reaches the tests alone.
+                          the jar for a module-info.java the build compiles in META-INF/versions/<N>
+                          in each module that resolves the target; one naming a dependency of test
+                          scope reaches the tests alone.
                       @jenesis.exclude <module> <groupId>/<artifactId>...
                           Drop transitive dependencies of <module>, each with the subtree it pulled
                           in, from the compile path, runtime path and generated pom alike. Repeated
