@@ -172,7 +172,7 @@ public record Project(
                                                 .documentation(project.documentation())
                                                 .pinning(project.pinning())
                                                 .pathPlacement(PathPlacement.CLASS_PATH)
-                                                .sourceResources(false),
+                                                .includeResources(false),
                                         mergedRepos,
                                         mergedResolvers)),
                               mavenDeps);
