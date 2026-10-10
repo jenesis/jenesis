@@ -148,16 +148,39 @@ public class Pom implements BuildStep {
         SequencedMap<MavenDependencyKey, MavenDependencyValue> deps = new LinkedHashMap<>();
         for (Map.Entry<String, SequencedSet<String>> scopedEntry : coordinateScopes.entrySet()) {
             String name = scopedEntry.getKey();
-            int separator = name.indexOf('/');
-            if (separator == -1 || !prefixes.contains(name.substring(0, separator))) {
-                continue;
-            }
             boolean inCompile = scopedEntry.getValue().contains("compile");
             boolean inRuntime = scopedEntry.getValue().contains("runtime");
-            if (!inCompile && !inRuntime) {
+            int separator = name.indexOf('/');
+            if (separator == -1 || !inCompile && !inRuntime) {
                 continue;
             }
-            MavenDependencyKey.Versioned parsed = MavenDependencyKey.parse(name.substring(separator + 1));
+            String coordinate = name;
+            if (!resolved) {
+                boolean maven = prefixes.contains(name.substring(0, separator));
+                String module = name.substring(separator + 1);
+                coordinate = scopedEntry.getValue().stream()
+                        .map(scope -> graph.get(group + "/" + scope))
+                        .filter(Objects::nonNull)
+                        .flatMap(resolution -> resolution.vertices().entrySet().stream())
+                        .filter(vertex -> vertex.getValue().resolvedVersion() != null && (maven
+                                ? vertex.getKey().equals(name)
+                                : module.equals(vertex.getValue().module())
+                                        && prefixes.contains(vertex.getKey().substring(0, vertex.getKey().indexOf('/')))))
+                        .findFirst()
+                        .map(vertex -> vertex.getKey() + "/" + vertex.getValue().resolvedVersion())
+                        .orElse(maven ? name : null);
+                if (coordinate == null) {
+                    throw new IllegalStateException("The POM of " + groupId + ":" + artifactId
+                            + " names what its module requires, and " + module
+                            + " resolved to no Maven artifact it could name: set flatten=true in packaging.properties"
+                            + " to publish the resolved closure instead");
+                }
+                separator = coordinate.indexOf('/');
+            }
+            if (!prefixes.contains(coordinate.substring(0, separator))) {
+                continue;
+            }
+            MavenDependencyKey.Versioned parsed = MavenDependencyKey.parse(coordinate.substring(separator + 1));
             MavenDependencyScope scope = inCompile && inRuntime
                     ? MavenDependencyScope.COMPILE
                     : inCompile ? MavenDependencyScope.PROVIDED : MavenDependencyScope.RUNTIME;
