@@ -1692,8 +1692,14 @@ public record Project(
                                                 generated package is compiled into the module
                                                 (folders, package, catalog, arguments)
                       protoc.properties         every .proto compiled, the folders are the include
-                                                path; protoc is a per-platform native executable, so
-                                                each platform needs its own checksum pin
+                                                path, and so is every .proto of a compile dependency,
+                                                as the well-known types protobuf-java carries;
+                                                protoc is a per-platform native executable, so
+                                                each platform needs its own checksum pin, a line
+                                                guarded as (macos,aarch64) per classifier, which `pin`
+                                                refreshes only on that platform: elsewhere, write the
+                                                SHA-256 of protoc-<version>-<classifier>.exe from
+                                                Maven Central
                                                 (folders, classifier, plugins=<name>=<g>/<a>, arguments)
                       avro.properties           .avsc and .avpr, each in its own step (folders, arguments)
                       antlr.properties          ANTLR: every .g4 compiled into package=<name>, which
