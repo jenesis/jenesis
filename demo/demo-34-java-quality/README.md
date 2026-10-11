@@ -197,26 +197,21 @@ License headers
 
 A `license-header.txt` holds the header every source starts with, as text:
 
-    Copyright $YEAR the Jenesis demo authors.
+    Copyright 2026 the Jenesis demo authors.
 
     Licensed under the Apache License, Version 2.0.
 
 Every Java source, `module-info.java` and `package-info.java` included, and
 every Kotlin, Scala and Groovy source must start with it as a block comment, or
-as the file stands where it is written as a comment already. `$YEAR` stands for
-any year or range of years, such as `2016-2026`. A source without the header, or
-with a different one, fails the build, naming the file. Generated sources are not
-checked.
+as the file stands where it is written as a comment already. The header is taken
+exactly as it stands, year included: a source without it, or with a different
+one, fails the build, naming the file. Generated sources are not checked.
 
-The rewrite switch writes the header: it replaces a leading comment that is a
-license header, keeping the year it names, and inserts one where there is none:
+The rewrite switch writes the header as it stands: it replaces a leading comment
+that is a license header, and inserts one where there is none, so a rewrite gives
+the same sources on every day it runs:
 
     java -Djenesis.format.rewrite=true build/jenesis/Make.java
-
-The build writes no year of its own, so that a rewrite gives the same sources on
-every day it runs. A header whose `$YEAR` it would have to choose - one inserted
-where no license comment names a year - fails the rewrite, naming the file: write
-the year into `license-header.txt`, or the header into that file.
 
 `-Djenesis.format.license=false` skips the check, as `jenesis.format.java=false`
 skips the formatter.
