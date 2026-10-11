@@ -348,6 +348,60 @@ public class JarTest {
         assertThat(mainAttributes().getValue("Created-By")).isEqualTo("Something Else");
     }
 
+    @Test
+    public void names_the_implementation_by_the_project_metadata() throws IOException {
+        Files.createDirectory(classes.resolve(Javac.CLASSES));
+        Files.writeString(classes.resolve(BuildStep.METADATA), """
+                artifact=sample
+                name=Sample Library
+                version=1.2.3
+                organization.name=Example Corp.
+                """);
+        jar();
+
+        Attributes attributes = mainAttributes();
+        assertThat(attributes.getValue(Attributes.Name.IMPLEMENTATION_TITLE)).isEqualTo("Sample Library");
+        assertThat(attributes.getValue(Attributes.Name.IMPLEMENTATION_VERSION)).isEqualTo("1.2.3");
+        assertThat(attributes.getValue(Attributes.Name.IMPLEMENTATION_VENDOR)).isEqualTo("Example Corp.");
+    }
+
+    @Test
+    public void names_no_implementation_version_where_the_project_names_none() throws IOException {
+        Files.createDirectory(classes.resolve(Javac.CLASSES));
+        Files.writeString(classes.resolve(BuildStep.METADATA), "artifact=sample\n");
+        jar();
+
+        Attributes attributes = mainAttributes();
+        assertThat(attributes.getValue(Attributes.Name.IMPLEMENTATION_TITLE))
+                .as("a module without a name is titled by its artifact")
+                .isEqualTo("sample");
+        assertThat(attributes.getValue(Attributes.Name.IMPLEMENTATION_VERSION))
+                .as("a version the project does not name is not invented")
+                .isNull();
+        assertThat(attributes.getValue(Attributes.Name.IMPLEMENTATION_VENDOR)).isNull();
+    }
+
+    @Test
+    public void leaves_an_implementation_entry_of_the_project_manifest_alone() throws IOException {
+        Files.createDirectory(classes.resolve(Javac.CLASSES));
+        Files.writeString(classes.resolve(BuildStep.METADATA), "artifact=sample\nversion=1.2.3\n");
+        Files.writeString(Files.createDirectories(classes.resolve("resources/META-INF")).resolve("MANIFEST.MF"), """
+                Manifest-Version: 1.0
+                Implementation-Version: 1.2
+                """);
+        jar();
+
+        assertThat(mainAttributes().getValue(Attributes.Name.IMPLEMENTATION_VERSION)).isEqualTo("1.2");
+    }
+
+    private void jar() throws IOException {
+        Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
+                .toCompletableFuture().join();
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void a_manifest_among_the_resources_is_the_basis_of_the_jar_manifest(boolean process) throws IOException {
@@ -415,7 +469,12 @@ public class JarTest {
     }
 
     private Attributes mainAttributes() throws IOException {
-        try (JarFile jar = new JarFile(next.resolve(BuildStep.ARTIFACTS + "classes.jar").toFile())) {
+        List<Path> jars;
+        try (Stream<Path> files = Files.list(next.resolve(BuildStep.ARTIFACTS))) {
+            jars = files.toList();
+        }
+        assertThat(jars).hasSize(1);
+        try (JarFile jar = new JarFile(jars.getFirst().toFile())) {
             return jar.getManifest().getMainAttributes();
         }
     }

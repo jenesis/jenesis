@@ -82,12 +82,18 @@ that manifest instead - `sources/META-INF/MANIFEST.MF` here, or
 
 After a build, the jar's `META-INF/MANIFEST.MF` holds these lines and, merged over
 them, the ones the build writes, such as the location of the bill of materials.
-This is where the attributes of Maven's `<manifestEntries>` and
-`addDefaultImplementationEntries`, or Gradle's `jar.manifest.attributes`, go - an
-`Automatic-Module-Name` for a library without a `module-info` among them. Values are
-written as they are, since resources are not filtered, and a `Created-By` of the
-file is kept. An attribute the build writes with another value, such as
-`Multi-Release`, fails the build rather than being replaced.
+This is where the attributes of Maven's `<manifestEntries>` or Gradle's
+`jar.manifest.attributes` go - an `Automatic-Module-Name` for a library without a
+`module-info` among them. Values are written as they are, since resources are not
+filtered, and a `Created-By` of the file is kept. An attribute the build writes with
+another value, such as `Multi-Release`, fails the build rather than being replaced.
+
+What Maven's `addDefaultImplementationEntries` adds, the build writes without being
+asked: `Implementation-Title` from the project's name, or its artifact without one,
+`Implementation-Vendor` from its organisation, and `Implementation-Version` where a
+`pom.xml`, a `project.properties` or `-Djenesis.project.version` names a version -
+never an invented one. A value in the file wins, as the title and the vendor above
+do.
 
 Layout
 ------
