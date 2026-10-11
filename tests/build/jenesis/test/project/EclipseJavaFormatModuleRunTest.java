@@ -92,7 +92,7 @@ public class EclipseJavaFormatModuleRunTest {
                 .rootCause()
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Unexpected exit code")
-                .hasMessageContaining("Sample.java");
+                .hasMessageContaining("Sample.java is not formatted as the profile says");
         assertThat(sample).as("verify mode never rewrites the source")
                 .content()
                 .contains("\n   int f() {");

@@ -82,7 +82,7 @@ Quick index
 | 31 | [`sbom`](demo-31-sbom/README.md)                                  | The CycloneDX bill of materials every build emits                            | `java build/jenesis/Make.java`    |
 | 32 | [`compliance`](demo-32-compliance/README.md)                      | Fail the build on a dependency license the policy denies                     | `java build/Demo.java`            |
 | 33 | [`vulnerabilities`](demo-33-vulnerabilities/README.md)            | Fail the build on a known vulnerability, queried from OSV                    | `java build/Demo.java`            |
-| 34 | [`java-quality`](demo-34-java-quality/README.md)                  | Checkstyle, PMD, SpotBugs and a formatter, each on by its config file        | `java build/jenesis/Make.java`    |
+| 34 | [`java-quality`](demo-34-java-quality/README.md)                  | Checkstyle, PMD, SpotBugs, formatters and license headers, by config file    | `java build/jenesis/Make.java`    |
 | 35 | [`test-framework`](demo-35-test-framework/README.md)              | Run tests whose module names no engine, inferred or declared                 | `java build/jenesis/Make.java`    |
 | 36 | [`code-coverage`](demo-36-code-coverage/README.md)                | Record coverage with JaCoCo and render a report                              | `java build/jenesis/Make.java`    |
 | 37 | [`test-selection`](demo-37-test-selection/README.md)              | Re-run only the tests a change can reach                                     | `java build/Demo.java`            |
@@ -90,7 +90,7 @@ Quick index
 | 39 | [`jmh`](demo-39-jmh/README.md)                                    | Generate, compile and run a JMH benchmark                                    | `java build/jenesis/Execute.java` |
 | 40 | [`api-compatibility`](demo-40-api-compatibility/README.md)        | Compare the jar against the last release with japicmp                        | `java build/Demo.java`            |
 | 41 | [`kotlin`](demo-41-kotlin/README.md)                              | Java and Kotlin in one module                                                | `java build/jenesis/Make.java`    |
-| 42 | [`kotlin-quality`](demo-42-kotlin-quality/README.md)              | detekt and ktlint, inferred from their config files                          | `java build/jenesis/Make.java`    |
+| 42 | [`kotlin-quality`](demo-42-kotlin-quality/README.md)              | detekt, ktlint and ktfmt, inferred from their config files                   | `java build/jenesis/Make.java`    |
 | 43 | [`kotlin-plugin`](demo-43-kotlin-plugin/README.md)                | Run a Kotlin compiler plugin declared with `@jenesis.plugin`                 | `java build/jenesis/Make.java`    |
 | 44 | [`scala`](demo-44-scala/README.md)                                | Java and Scala 3 in one module                                               | `java build/jenesis/Make.java`    |
 | 45 | [`scala-quality`](demo-45-scala-quality/README.md)                | Scalastyle and scalafmt, inferred from their config files                    | `java build/jenesis/Make.java`    |
@@ -612,8 +612,11 @@ reaches OSV unless you ask it to.
 `java-quality` turns a set of tools on without a build script: each runs because
 its configuration file is there. A `checkstyle.xml` and a `pmd.xml` lint the
 sources, a `spotbugs-exclude.xml` brings in SpotBugs over the compiled classes,
-and a `javaformat.properties` selects `google-java-format`. Each tool resolves in
-a group of its own, so its dependencies never mix with yours.
+a `javaformat.properties` selects `google-java-format` with its options, and a
+`license-header.txt` holds the header every source must start with. Each tool
+resolves in a group of its own, so its dependencies never mix with yours; its
+`eclipse` profile formats with the Eclipse formatter and an exported profile
+instead.
 
 The linters report; the formatter fails the build when a source is not already
 formatted, and one switch flips it to rewriting in place:
@@ -695,7 +698,8 @@ module name, Markdown includes, source links, external links and the footer.
 
 `kotlin-quality` infers detekt (`detekt.yml`) and ktlint (`.editorconfig`) from
 their configuration files, with ktlint doubling as the formatter and sharing the
-`-Djenesis.format.rewrite=true` switch.
+`-Djenesis.format.rewrite=true` switch. Its `ktfmt` profile formats with ktfmt
+instead, which a `ktfmt.properties` turns on with its style.
 
 `kotlin-plugin` adds a compiler plugin, declared with the compiler named first:
 

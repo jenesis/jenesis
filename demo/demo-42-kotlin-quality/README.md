@@ -25,6 +25,8 @@ Layout
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
     |-- detekt.yml                 activates detekt
     |-- .editorconfig              activates ktlint (lint and format)
+    |-- ktfmt/ktfmt.properties     activates ktfmt, under a profile
+    |-- jenesis-ktfmt.properties   that profile's settings: no ktlint formatting
     `-- sources
         |-- module-info.java
         `-- sample
@@ -61,11 +63,34 @@ This is the Kotlin equivalent of the `google-java-format` rewrite shown in
 `../demo-34-java-quality`. The formatters for the other JVM languages work the
 same way.
 
+Formatting with ktfmt instead
+-----------------------------
+
+A `ktfmt.properties` formats the Kotlin sources with ktfmt rather than ktlint.
+It may be empty, which formats in ktfmt's default Meta style, or name ktfmt's
+options:
+
+    style=kotlinlang      meta, google or kotlinlang
+    imports=sort          keeps unused imports; sort,remove, the default,
+                          removes them as well
+
+Two formatters would fight over the same sources, so a `ktfmt.properties` beside
+an `.editorconfig` that still drives ktlint's formatting fails the build, naming
+`-Djenesis.format.ktlint=false`. The `ktfmt` profile does exactly that: its
+`build.jenesis/ktfmt/` folder adds the `ktfmt.properties`, and
+`jenesis-ktfmt.properties` switches ktlint's formatting off, while ktlint still
+lints:
+
+    java -Djenesis.make.profiles=ktfmt build/jenesis/Make.java
+
+ktfmt verifies like the other formatters and rewrites under the same switch.
+`-Djenesis.format.ktfmt=false` leaves it out.
+
 Pinning
 -------
 
 The Kotlin compiler is pinned in its own `kotlinc` group, locked independently of
-the `kotlin.stdlib` the module ships against (see `../demo-41-kotlin`). detekt and
-ktlint each resolve a floating `RELEASE` in their own group; run
+the `kotlin.stdlib` the module ships against (see `../demo-41-kotlin`). detekt,
+ktlint and ktfmt each resolve a floating `RELEASE` in their own group; run
 `java build/jenesis/Make.java pin` to record them with checksums when you want
 a fully reproducible tool chain.
