@@ -1590,6 +1590,9 @@ public record Project(
                           the resolved closure -> flatten=true in the module's packaging.properties
                           (04); its other modes are what a published POM is without it
                       maven-toolchains-plugin / java toolchains -> jenesis.toolchain.version (07)
+                      a test run on another JDK, as Surefire's jvm or a Test task's javaLauncher
+                          -> the whole build again with -Djenesis.toolchain.version=<feature>, as a
+                          CI matrix leg; the module's release stays what it declares
                       <profiles> chosen with -P or a property / properties and conventions
                           -> jenesis-<profile>.properties; those activated by <jdk> or
                           <activeByDefault> are read from the POM (48)
