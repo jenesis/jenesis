@@ -48,9 +48,7 @@ tool involved. It is placed three ways, each for a different consumer:
   `META-INF/sbom/<module>.cdx.json` where a module has no group, so the bill of
   materials travels inside the artifact. The jar's `MANIFEST.MF` records
   `Sbom-Format: CycloneDX` and `Sbom-Location` so a consumer can find it. No two jars
-  share a name, so every jar on a class path or module path keeps its own; an
-  application points a reader at its own, as Spring Boot's actuator is with
-  `management.endpoint.sbom.application.location=classpath:META-INF/sbom/build.jenesis.demo/sbom-demo.cdx.json`.
+  share a name, so every jar on a class path or module path keeps its own.
 - **As a report**, collected on `stage` into `target/stage/reports/sbom/<module>/`
   alongside the other build reports.
 - **As a Maven attachment**, when a Maven repository is staged (the `MAVEN` and
