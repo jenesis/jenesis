@@ -19,11 +19,12 @@ on a pin, the operating system family as a platform token, bytecode transforms a
 `tar.gz` dependencies, Docker arguments, reusing a dependency resolution whose inputs did not change, and classifier
 variants (`classifiers.properties`, `@jenesis.pin <module> :<classifier>`).
 
-29 more are answered by the migration briefing (`skill/migrate`, `skill/registry`) rather than by the tool, because a
+30 more are answered by the migration briefing (`skill/migrate`, `skill/registry`) rather than by the tool, because a
 plugin or a small change to the project covers them: OSGi manifests from a `binary/transform` plugin, resource
 filtering and extra source roots from a plugin at `binary/compiled` or `binary/generated`, a tool whose packages split
-across a plugin layer forked instead, `os-maven-plugin`, the git revision, pinning every profile, and `test-jpms`
-suites that run on the class path.
+across a plugin layer forked instead, `os-maven-plugin`, the git revision, pinning every profile, `test-jpms`
+suites that run on the class path, and pointing Spring Boot's actuator at the SBOM each jar embeds under
+`META-INF/sbom/<groupId>/<artifactId>.cdx.json`.
 
 What follows is what remains.
 
@@ -57,7 +58,6 @@ Compile avoidance matters most: it is the largest share of the difference to Gra
 |---|---|---|
 | Documentation is switched on or off for the whole project; `packaging.properties` has no key for one module. | S | netty |
 | No development-only scope, for a dependency the application runs with locally but never ships. | S | spring-petclinic (DevTools kept in a Maven profile) |
-| The SBOM is always staged at `META-INF/sbom/<file>`, where Spring Boot's actuator does not look. | S | spring-petclinic |
 | A relocation POM is followed when read but cannot be published. | S | mapstruct (`mapstruct-jdk8`), picocli |
 | `ide` leaves out generated sources. | S | spring-boot-realworld-example-app |
 
@@ -117,7 +117,7 @@ These are decisions rather than gaps. The briefing says so and names the change 
 ## Suggested order
 
 1. **The small items, in one change.** Version-stamped manifest entries, a per-module coordinate variable, a
-   per-module documentation switch, a configurable SBOM location, and failing on a class-less Kotlin Multiplatform
+   per-module documentation switch, and failing on a class-less Kotlin Multiplatform
    root.
 2. **Test JDK and test runs.** Choosing the JDK a test run uses, and declaring more than one run per module, belong
    together: a second run on another Java version is the most common reason for a second run. About eight

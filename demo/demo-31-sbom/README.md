@@ -44,9 +44,13 @@ Every build writes a CycloneDX document per module from the dependencies it
 resolved, their content hashes and the licenses it captured, with no external
 tool involved. It is placed three ways, each for a different consumer:
 
-- **Embedded in the jar**, at `META-INF/sbom/<artifact>.cdx.json`, so the bill of
+- **Embedded in the jar**, at `META-INF/sbom/<group>/<artifact>.cdx.json`, or at
+  `META-INF/sbom/<module>.cdx.json` where a module has no group, so the bill of
   materials travels inside the artifact. The jar's `MANIFEST.MF` records
-  `Sbom-Format: CycloneDX` and `Sbom-Location` so a consumer can find it.
+  `Sbom-Format: CycloneDX` and `Sbom-Location` so a consumer can find it. No two jars
+  share a name, so every jar on a class path or module path keeps its own; an
+  application points a reader at its own, as Spring Boot's actuator is with
+  `management.endpoint.sbom.application.location=classpath:META-INF/sbom/build.jenesis.demo/sbom-demo.cdx.json`.
 - **As a report**, collected on `stage` into `target/stage/reports/sbom/<module>/`
   alongside the other build reports.
 - **As a Maven attachment**, when a Maven repository is staged (the `MAVEN` and
@@ -82,8 +86,8 @@ reproduces the exact same SBOM, serial number included. No creation `timestamp`
 is written, because that cannot be made deterministic.
 
 The single executable jar of `demo-08-java-pom-executable` and
-`demo-09-java-modular-executable` carries a document of its own at the same
-`META-INF/sbom/<artifact>.cdx.json`, named by its own `MANIFEST.MF`. It lists what
+`demo-09-java-modular-executable` carries a document of its own at the same path
+in `META-INF/sbom/`, named by its own `MANIFEST.MF`. It lists what
 the module's document lists and adds the launcher the jar shades, as a dependency
 of the project, which it describes as an `application` rather than a `library`. A
 launcher the module already depends on at the same version is listed once; at another

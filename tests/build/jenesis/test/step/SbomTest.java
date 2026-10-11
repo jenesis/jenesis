@@ -88,7 +88,7 @@ public class SbomTest {
                 .join();
         assertThat(result.next()).isTrue();
 
-        Path embedded = next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("demo.cdx.json");
+        Path embedded = next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("build.jenesis").resolve("demo.cdx.json");
         assertThat(embedded).isNotEmptyFile();
         String sbom = Files.readString(embedded);
         assertThat(sbom)
@@ -110,7 +110,7 @@ public class SbomTest {
 
         SequencedProperties manifest = SequencedProperties.ofFiles(next.resolve("manifest.mf"));
         assertThat(manifest.getProperty("Sbom-Format")).isEqualTo("CycloneDX");
-        assertThat(manifest.getProperty("Sbom-Location")).isEqualTo("META-INF/sbom/demo.cdx.json");
+        assertThat(manifest.getProperty("Sbom-Location")).isEqualTo("META-INF/sbom/build.jenesis/demo.cdx.json");
 
         assertThat(next.resolve("reports").resolve("sbom").resolve("demo-1.0.0.cdx.json")).isNotEmptyFile();
     }
@@ -388,7 +388,7 @@ public class SbomTest {
                 .toCompletableFuture()
                 .join();
         assertThat(result.next()).isTrue();
-        return Files.readString(next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("demo.cdx.json"));
+        return Files.readString(next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("build.jenesis").resolve("demo.cdx.json"));
     }
 
     @Test
@@ -407,7 +407,7 @@ public class SbomTest {
                 .join();
         assertThat(result.next()).isTrue();
 
-        Path embedded = next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("demo.cdx.json");
+        Path embedded = next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("build.jenesis").resolve("demo.cdx.json");
         assertThat(embedded).isNotEmptyFile();
         assertThat(Files.readString(embedded))
                 .as("a module that declares no version reports none")
@@ -418,5 +418,26 @@ public class SbomTest {
         assertThat(next.resolve("reports").resolve("sbom").resolve("demo.cdx.json"))
                 .as("the standalone report is named without a version suffix")
                 .isNotEmptyFile();
+    }
+
+    @Test
+    public void embeds_under_the_module_name_where_a_project_names_no_group() throws Exception {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("artifact", "build.jenesis.demo");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+
+        BuildStepResult result = new Sbom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+
+        assertThat(next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("build.jenesis.demo.cdx.json"))
+                .isNotEmptyFile();
+        assertThat(SequencedProperties.ofFiles(next.resolve("manifest.mf")).getProperty("Sbom-Location"))
+                .isEqualTo("META-INF/sbom/build.jenesis.demo.cdx.json");
     }
 }

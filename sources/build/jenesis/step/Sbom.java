@@ -259,15 +259,15 @@ public class Sbom implements BuildStep {
         List<CycloneDx.Dependency> dependencies = relationships(projectRef, components.keySet(), platforms, graphFiles);
         String document = new CycloneDx().emit(format, project, new ArrayList<>(components.values()), dependencies);
 
-        Path embedded = Files.createDirectories(context.next()
-                .resolve(RESOURCES).resolve("META-INF").resolve("sbom"));
-        String base = artifactId == null ? "bom" : artifactId;
-        String fileName = base + "." + format.extension();
-        Files.writeString(embedded.resolve(fileName), document);
+        String base = artifactId == null ? "bom" : artifactId,
+                location = "META-INF/sbom/" + (groupId == null ? "" : groupId + "/") + base + "." + format.extension();
+        Path embedded = context.next().resolve(RESOURCES).resolve(location);
+        Files.createDirectories(embedded.getParent());
+        Files.writeString(embedded, document);
         Manifest manifest = new Manifest();
         manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         manifest.getMainAttributes().putValue("Sbom-Format", "CycloneDX");
-        manifest.getMainAttributes().putValue("Sbom-Location", "META-INF/sbom/" + fileName);
+        manifest.getMainAttributes().putValue("Sbom-Location", location);
         try (OutputStream out = Files.newOutputStream(context.next().resolve(Versions.MANIFEST))) {
             manifest.write(out);
         }
