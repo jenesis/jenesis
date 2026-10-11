@@ -1551,6 +1551,23 @@ public record Project(
                           excludePackageNames -> -exclude=<package>[:<package>...] there, which
                           leaves those packages and their subpackages undocumented; Dokka, which
                           documents Kotlin sources, fails the build as javadoc does when it fails
+                      dokka-maven-plugin / org.jetbrains.dokka -> dokka.properties (41), whose
+                          files are resolved against the module's folder and are inputs of the
+                          build: moduleName -> module-name (documentation by default), includes ->
+                          includes=<file>[,<file>...], documentedVisibilities ->
+                          documented-visibilities=public,internal,..., suppressObviousFunctions,
+                          suppressInheritedMembers, skipEmptyPackages, skipDeprecated,
+                          reportUndocumented and failOnWarning -> the same names in kebab case,
+                          perPackageOption suppress -> suppressed-packages=<regex>[,<regex>...],
+                          jdkVersion -> jdk-version, sourceLink -> source-link=<the URL of the
+                          source folder> and source-link-suffix (#L by default), one URL for every
+                          source folder of the module, externalDocumentationLink ->
+                          external-link.<name>=<url> and external-link.<name>.package-list,
+                          dokkaJavadoc / the javadoc format -> format=javadoc, the DokkaBase
+                          plugin's customAssets, customStyleSheets and footerMessage ->
+                          custom-assets, custom-styles and footer-message; an unknown key fails
+                          the build, and a Gradle source set or a multi-module aggregate has no
+                          counterpart: each module is documented on its own
                       maven-shade-plugin / shadow -> launcher=true, one executable jar (08)
                       Spring Boot repackage / bootJar -> launcher=true, one executable jar (08), or
                           bundle=true, its jars and the argument file that launches them (10)
@@ -2032,6 +2049,19 @@ public record Project(
                                                 (access, include, exclude, format, ignore-missing-classes,
                                                 only-incompatible, only-modified, semantic-versioning,
                                                 error-on-binary-incompatibility, ...)
+                      dokka.properties          configures Dokka, which documents a module's Kotlin
+                                                sources under -Djenesis.project.documentation=true;
+                                                the files it names are resolved against the
+                                                module's folder and are inputs of the build, and
+                                                an unknown key fails it
+                                                (module-name, includes, format=html|javadoc,
+                                                documented-visibilities, suppress-obvious-functions,
+                                                suppress-inherited-members, skip-empty-packages,
+                                                skip-deprecated, report-undocumented,
+                                                suppressed-packages, fail-on-warning, jdk-version,
+                                                source-link, source-link-suffix,
+                                                external-link.<name>[.package-list], custom-assets,
+                                                custom-styles, footer-message)
                       errorprone.properties     turns on the Error Prone declared with
                                                 @jenesis.plugin javac <coordinate>; javac forks so the
                                                 compiler internals it reads can be exported to it
