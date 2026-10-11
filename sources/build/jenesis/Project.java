@@ -1483,6 +1483,15 @@ public record Project(
                       maven-pmd-plugin / pmd -> pmd.xml (34); minimumPriority / rulesMinimumPriority
                           -> jenesis.source.pmd.priority
                       spotbugs-maven-plugin / com.github.spotbugs -> spotbugs-exclude.xml (34)
+                      forbiddenapis (de.thetaphi) check and testCheck / the same
+                          -> forbiddenapis.properties (34), checking main and test classes alike:
+                          bundledSignatures -> bundled=jdk-unsafe,jdk-deprecated,..., a JDK
+                          version appended from the classes' release as targetVersion would;
+                          signaturesFiles -> signatures=<files beside or below it>;
+                          suppressAnnotations -> suppress; includes, excludes;
+                          signaturesWithSeverityWarn -> warn; failOnMissingClasses=false ->
+                          allowmissingclasses; ignoreSignaturesOfMissingClasses ->
+                          ignoresignaturesofmissingclasses
                       fmt-maven-plugin, Spotless googleJavaFormat() / the same
                           -> javaformat.properties with formatter=google (34), which verifies and
                           fails the build on an unformatted source; -Djenesis.format.rewrite=true
@@ -2140,6 +2149,10 @@ public record Project(
                       ktfmt.properties          ktfmt formats Kotlin in place of ktlint
                                                 (style=meta|google|kotlinlang,
                                                 imports=sort,remove|sort)
+                      forbiddenapis.properties  forbiddenapis over the compiled classes (bundled,
+                                                signatures, suppress, includes, excludes, warn,
+                                                allowmissingclasses,
+                                                ignoresignaturesofmissingclasses)
                       licenseheader.properties  text=<the license header every source starts
                                                 with>, as a block comment, matched and written
                                                 exactly as it stands; without text, SPDX lines
@@ -2222,9 +2235,9 @@ public record Project(
                     another.
 
                     Linters and the ktlint/scalafmt formatters activate from their own native config
-                    files instead (checkstyle.xml, pmd.xml, spotbugs-exclude.xml, .editorconfig,
+                    files instead (checkstyle.xml, pmd.xml, spotbugs-exclude.xml, forbiddenapis.properties, .editorconfig,
                     .scalafmt.conf, ...). A linter reports its findings, as its setting
-                    jenesis.source.<tool> (jenesis.validator.spotbugs for SpotBugs) is report by default;
+                    jenesis.source.<tool> (jenesis.validator.<tool> for SpotBugs and forbiddenapis) is report by default;
                     strict fails the build on them instead, and ignore skips the linter. Whether a
                     [FINDINGS] line with their number and its report is printed is
                     jenesis.print.findings, true by default.
@@ -4269,6 +4282,7 @@ public record Project(
                 source.pmd|report|ignore|report|strict: PMD, activated by a pmd.xml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
                 source.pmd.priority|5|The lowest rule priority PMD runs, from 1, the highest, to 5, the lowest, as maven-pmd-plugin's minimumPriority
                 validator.spotbugs|report|ignore|report|strict: SpotBugs, activated by a spotbugs-exclude.xml; ignore skips it, report records its findings, strict fails the build on any of them
+                validator.forbiddenapis|report|ignore|report|strict: forbiddenapis, activated by a forbiddenapis.properties; ignore skips it, report records its findings, strict fails the build on any of them
                 source.detekt|report|ignore|report|strict: detekt, activated by a detekt.yml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
                 source.ktlint|report|ignore|report|strict: ktlint linting, activated by an .editorconfig; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
                 source.scalastyle|report|ignore|report|strict: Scalastyle, activated by a scalastyle-config.xml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation

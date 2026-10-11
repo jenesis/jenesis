@@ -3,8 +3,9 @@ Java code-quality demo
 
 Wire the inferred code-quality tools into a single modular Java project. There
 is no build script and no plugin to configure: a tool turns itself on when its
-configuration file is present in the `build.jenesis/` configuration directory. This demo ships five of them,
+configuration file is present in the `build.jenesis/` configuration directory. This demo ships six of them,
 so Checkstyle and PMD lint the sources, SpotBugs analyses the compiled classes,
+forbiddenapis looks for calls the project forbids in them,
 `google-java-format` verifies the source layout, and every source is checked
 for the project's license header. Each tool resolves in its own group,
 independently of the module's own dependencies (here, none).
@@ -38,6 +39,8 @@ The configuration files sit in the *configuration directory*, which defaults to
     |-- checkstyle.properties      the ${...} properties checkstyle.xml names
     |-- pmd.xml                    activates PMD (lints sources)
     |-- spotbugs-exclude.xml       activates SpotBugs (analyses classes)
+    |-- forbiddenapis.properties   activates forbiddenapis (checks classes for forbidden calls)
+    |-- forbidden-signatures.txt   the project's own forbidden calls
     |-- javaformat.properties      selects the Java formatter (google) and its options
     |-- licenseheader.properties   the license header every source starts with
     |-- eclipse/
@@ -60,6 +63,7 @@ build script:
     checkstyle.xml          -> Checkstyle
     pmd.xml                 -> PMD
     spotbugs-exclude.xml    -> SpotBugs
+    forbiddenapis.properties -> forbiddenapis
     scalastyle-config.xml   -> Scalastyle, and so on for the other languages
 
 Jenesis binds the matched file from the configuration directory into the build
@@ -93,7 +97,7 @@ otherwise. A linter's property is `report` by default, and `ignore` skips it; a
 formatter's is `true` by default, and `false` skips it:
 
     jenesis.source.<tool>        Checkstyle, PMD, Detekt, Ktlint, Scalastyle, Scalafmt, CodeNarc
-    jenesis.validator.spotbugs   SpotBugs
+    jenesis.validator.<tool>     SpotBugs, forbiddenapis
     jenesis.format.<tool>        the Java / Ktlint / Ktfmt / Scalafmt formatters
     jenesis.format.license       the license header check
 
@@ -123,14 +127,15 @@ module purely from its own location.
 Where the tools run and what they produce
 -----------------------------------------
 
-Checkstyle and PMD run on the sources, in parallel with compilation. SpotBugs is
-a *validator* in the Java toolchain: it runs once the classes exist. Each tool
+Checkstyle and PMD run on the sources, in parallel with compilation. SpotBugs and
+forbiddenapis are *validators* in the Java toolchain: they run once the classes exist. Each tool
 writes an XML report into a `reports/<tool>/` subfolder of its step's output, for
 example:
 
     target/build/.../assemble/check/checkstyle/check/output/reports/checkstyle/checkstyle-report.xml
     target/build/.../assemble/check/pmd/check/output/reports/pmd/pmd-report.xml
     target/build/.../assemble/binary/validate/spotbugs/check/output/reports/spotbugs/spotbugs-report.xml
+    target/build/.../assemble/binary/validate/forbiddenapis/tool/check/output/reports/forbiddenapis/forbiddenapis.txt
 
 A `stage` build collects every report from every module into one place, each kind
 in its own subfolder: `target/stage/reports/<kind>/<module>/`, for example
@@ -149,7 +154,7 @@ build when Checkstyle reports a violation, naming the number of findings and the
 report.
 Checkstyle, PMD, detekt, ktlint, Scalastyle and scalafmt fail as their own exit
 code decides, so a Checkstyle finding at severity `warning` is reported but does
-not fail the build; SpotBugs and CodeNarc fail on any finding their report holds.
+not fail the build; SpotBugs, CodeNarc and forbiddenapis fail on any finding their report holds.
 When wiring a tool yourself, `.strict(true)` on its module does the same.
 Report-only covers findings, not a tool that never ran: a linter that fails on
 its own configuration, and so writes no complete report, fails its step either
@@ -195,8 +200,34 @@ level an exported profile names. Moving the profile file changes nothing, as
 long as `profile=` follows it; editing a setting in it verifies every source
 again.
 
-License headers
----------------
+Forbidden APIs
+--------------
+
+A `forbiddenapis.properties` checks the compiled classes, the tests' included,
+for calls the project forbids:
+
+    bundled=jdk-unsafe,jdk-deprecated,jdk-non-portable,jdk-system-out
+    signatures=forbidden-signatures.txt
+
+`bundled` names signatures forbiddenapis ships: `jdk-unsafe` forbids calls that
+depend on the default locale, charset or time zone, `jdk-deprecated` deprecated
+APIs, `jdk-non-portable` the JDK's internals and `jdk-system-out` printing to
+the console. `jdk-unsafe`, `jdk-deprecated` and `jdk-internal` take the Java
+release the classes are compiled for, as `jdk-unsafe-25`; the build appends it
+where the name leaves it out. `signatures` names files of the project's own
+signatures, beside or below the properties file, written as forbiddenapis reads
+them:
+
+    @defaultMessage Name a thread: an unnamed one is hard to tell apart in a thread dump
+    java.lang.Thread#<init>(java.lang.Runnable)
+
+The other keys are `suppress` (annotations that silence a finding, as
+`**.SuppressForbidden`), `includes` and `excludes` (patterns of class files),
+`warn` (signatures reported without counting as a finding),
+`allowmissingclasses` and `ignoresignaturesofmissingclasses`; any other key
+fails the build. Each finding is one line of the report, naming the call, the
+reason and where it was made.
+
 
 A `licenseheader.properties` holds the header every source starts with, as the
 text of its `text` key, `\n` separating the lines and a trailing `\` continuing
@@ -246,7 +277,7 @@ Pinning
 -------
 
 Each tool resolves in its own group (`checkstyle`, `pmd`, `spotbugs`,
-`google-java-format`, and `eclipse-java-format` under the `eclipse` profile),
+`forbiddenapis`, `google-java-format`, and `eclipse-java-format` under the `eclipse` profile),
 kept separate from the module's `main`-group dependencies, and floats a
 `RELEASE` version until pinned. The license header check needs no tool. The `dependencies`
 selector therefore shows none of them as a dependency of the module;
