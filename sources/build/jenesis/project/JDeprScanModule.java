@@ -83,7 +83,10 @@ public class JDeprScanModule implements BuildExecutorModule {
             for (String line : Files.readAllLines(context.supplement().resolve("output"))) {
                 if (line.startsWith("class ") && line.contains(" deprecated ")) {
                     findings.add(line.substring("class ".length()));
-                } else if (line.startsWith("error: ")) {
+                }
+            }
+            for (String line : Files.readAllLines(context.supplement().resolve("error"))) {
+                if (line.startsWith("error: ")) {
                     unresolved.add(line.substring("error: ".length()));
                 }
             }

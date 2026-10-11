@@ -69,6 +69,26 @@ public class JDeprScanModuleTest {
                 .hasMessageContaining("names the release latest");
     }
 
+    @Test
+    public void fails_rather_than_leave_a_class_unscanned_whose_dependency_is_missing() throws IOException {
+        Files.writeString(project.resolve(JDeprScanModule.CONFIGURATION), "");
+        Path library = Files.createDirectories(sources.resolve("library")).resolve("Library.java");
+        Files.writeString(library, "package library;\npublic class Library {}\n");
+        Path source = Files.createDirectories(sources.resolve("sample")).resolve("Sample.java");
+        Files.writeString(source, "package sample;\npublic class Sample extends library.Library {}\n");
+        Path classes = Files.createDirectories(project.resolve(BuildStep.CLASSES));
+        int rc = javax.tools.ToolProvider.getSystemJavaCompiler()
+                .run(null, null, null, "-d", classes.toString(), library.toString(), source.toString());
+        assertThat(rc).as("the sample compiles").isZero();
+        Files.delete(classes.resolve("library").resolve("Library.class"));
+
+        assertThatThrownBy(newExecutor(new JDeprScanModule())::execute)
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jdeprscan cannot scan every class")
+                .hasMessageContaining("library/Library");
+    }
+
     private void compile(String configuration) throws IOException {
         Files.writeString(project.resolve(JDeprScanModule.CONFIGURATION), configuration);
         Path source = Files.createDirectories(sources.resolve("sample")).resolve("Sample.java");
