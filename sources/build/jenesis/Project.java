@@ -1212,6 +1212,12 @@ public record Project(
                                                            as .*IntegrationTest, after the default
                                                            naming or the filter
                       argLine, jvmArgs of the tests        process-test.properties
+                      surefire dependenciesToScan,         read from the pom.xml, or the scan key of
+                      testClassesDirs += zipTree(<jar>)    test.properties: the jar's test classes
+                                                           run among the module's own
+                      a second surefire <execution>, an    a sibling module that requires the tests,
+                      extra Test task with other flags     scans them and carries its own
+                                                           process-test.properties
                       environment of the tests             environment-test.properties
                       mainClass of the jar, shade or exec  a <mainClass> property in <properties>:
                       plugin                               the jar's Main-Class and what Execute,
@@ -1322,7 +1328,9 @@ public record Project(
                     relative to the root, so the root module's entry is written /<regex>, with
                     nothing before the slash. jenesis.test.exclude takes the same entries, without a #method,
                     and leaves out what they match, so excluding one class keeps the default naming;
-                    a module whose every test it leaves out runs none. Test sources that hold no class
+                    a module whose every test it leaves out runs none. The test classes of a jar the
+                    scan key of test.properties names are taken by the same naming, filter, exclude
+                    and tag, among the module's own. Test sources that hold no class
                     the default naming takes run none either, as with Surefire, and a [FINDINGS] line
                     says so, where a jenesis.test.filter entry that matches nothing fails the build.
                     The tests run against the module's jar, so a test that turns
@@ -1521,6 +1529,15 @@ public record Project(
                           rerunner-jupiter or TestNG's IRetryAnalyzer, declared as a test dependency
                       surefire forkCount with reuseForks=false / forkEvery -> one JVM per test
                           module: a test that needs a JVM of its own goes to a module of its own
+                      maven-surefire-plugin dependenciesToScan / testClassesDirs += zipTree(<jar>)
+                          -> read from the pom.xml as it stands; scan=<module>|<groupId>/<artifactId>
+                          in the module's test.properties, which replaces it, runs the test
+                          classes of those dependencies of the tests among the module's own (74)
+                      a second surefire <execution> with another argLine / an extra Test task
+                          -> a sibling module that requires the first one's tests, by a
+                          <type>test-jar</type> dependency in a pom.xml, and scans them, with
+                          its argLine in a process-test.properties of its own; a run is a
+                          module (74)
                       maven-failsafe-plugin / an integration test task
                           -> no phase of its own: -Djenesis.test.tag, or a @jenesis.test module
                       jacoco-maven-plugin / jacoco -> jacoco.properties, a report (36); the check
@@ -1766,7 +1783,7 @@ public record Project(
                                             developers as a whole, and the version, tag, revision
                                             and tree of the command line win over both.
                       module.properties     graph state: path, sources (below path, in a pom.xml build),
-                                            module, test, main
+                                            module, test, main, scan (a pom.xml's dependenciesToScan)
                       identity.properties   <repository>/<coordinate> -> path or empty
                       requires.properties   <group>/<scope>/<repository>/<coordinate> -> empty, or
                                             <algo>/<hex> when pinned
@@ -2074,7 +2091,11 @@ public record Project(
                                                 inferred from the resolved dependencies;
                                                 engines=<id>,-<id> runs the JUnit Platform on those
                                                 engines alone, or without one, such as an engine the
-                                                test resources register for a test of their own
+                                                test resources register for a test of their own;
+                                                scan=<module>|<groupId>/<artifactId>,... runs the test
+                                                classes of those jars on the test path as well,
+                                                chosen by the module's naming rules and filters,
+                                                in place of a pom.xml's Surefire dependenciesToScan
                       sbom.properties           CycloneDX format=json|xml|none; the SBOM is on by
                                                 default, -Djenesis.sbom.cyclonedx=false disables it
                       bom.properties            publish the resolved closure as a repository BOM
