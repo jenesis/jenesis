@@ -1,3 +1,9 @@
+/*
+ * Copyright 2026 the Jenesis demo authors.
+ *
+ * Licensed under the Apache License, Version 2.0.
+ */
+
 /**
  * A single modular Java project wired to the inferred code-quality tools.
  * There is no build script: dropping a tool's configuration file into the
@@ -40,6 +46,25 @@
  * @jenesis.pin checkstyle/maven/org.slf4j/slf4j-simple 2.0.18 SHA-256/8268bd018a5709b07209e0d8ca6221a37584ba1bc12ba985b8335a82c648bdd0
  * @jenesis.pin checkstyle/maven/org.xmlresolver/xmlresolver 5.3.3 SHA-256/1fe4d5b92f708dcdb82dbce12919e0171e6b5ca62c6dca6220483625098feb5f
  * @jenesis.pin checkstyle/maven/org.xmlresolver/xmlresolver/jar/data 5.3.3 SHA-256/b0c487ad2f3e558be8d829c916d2458d10aca6a5bafa7a4d0524b70845e48a5c
+ * @jenesis.pin eclipse-java-format/maven/net.java.dev.jna/jna 5.19.1 SHA-256/4fb141dd8ef6b0585ffceea4bc49602fbc6312fa977e2c488794ea3e6aafecae
+ * @jenesis.pin eclipse-java-format/maven/net.java.dev.jna/jna-platform 5.19.1 SHA-256/3b3864f5b449e9c3c24b16861524b622b086563f44e0cd8384c8efc5a6052f82
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.jdt/ecj 3.46.100 SHA-256/74c93172475fee0cd4e6eefb44233516dd40525642da35d009146d97ea598229
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.jdt/org.eclipse.jdt.core 3.47.0 SHA-256/723e30be1e841516c388ebb32017cb8b36662808f46be5265b78cc06bd4fe71c
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.platform/org.eclipse.core.commands 3.13.0 SHA-256/fe916979793d364fcd0a71c15c3fa803d60a8566cff8c64b0eef04918b5b6a65
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.platform/org.eclipse.core.contenttype 3.9.900 SHA-256/6c57132740523b5c5de125c0041ca43c1606da6563214c1bae3999fa21ead893
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.platform/org.eclipse.core.expressions 3.9.700 SHA-256/06a18236ae181659e1e5499d912d68de527720686f1f51dab632d3e298e32b78
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.platform/org.eclipse.core.filesystem 1.11.500 SHA-256/bf9ad56f6bee0044829bcbbe0ac5b9df28bb354beb0a4bdf0fe9a489ded12d36
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.platform/org.eclipse.core.jobs 3.15.900 SHA-256/941b3c5feeba4ec0a949a8a94ff10283b2505813fa736c9e6345f146ae1b7e8a
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.platform/org.eclipse.core.resources 3.24.100 SHA-256/946851cf5902cd3b002920063a30b169e5710088b6c1ad7dd05bdd3be4fbfff4
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.platform/org.eclipse.core.runtime 3.35.0 SHA-256/5b0c2794e9fe1785360dec920cc802f3388a0eb72ee25b89054b79ff3e2f07c9
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.platform/org.eclipse.equinox.app 1.7.600 SHA-256/fd353398835107608f554779a6e91891725efb94e0f57559d0ab3cea4b6156c7
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.platform/org.eclipse.equinox.common 3.21.0 SHA-256/2545ed27d408f19882695703097e5998bf25652bd0dac76a8e6d1391ec228ab7
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.platform/org.eclipse.equinox.preferences 3.12.100 SHA-256/fd04e81a28ab32b6bb073286eb293c44b760176fcf1e35ef15614d62df820f86
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.platform/org.eclipse.equinox.registry 3.12.600 SHA-256/4f8cd72681446b598390a8c24ee9b9996f6e4c5fabed022b50bd26f6f5a0bf6c
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.platform/org.eclipse.osgi 3.24.300 SHA-256/4a770aa4a78df653af871073c8b4ddd56884895f5fc71d10c40b4289ac7c8b9f
+ * @jenesis.pin eclipse-java-format/maven/org.eclipse.platform/org.eclipse.text 3.14.800 SHA-256/14814c1f1a737fde0a2d56c47a2f02cf4c8c5dee748756c4763e674cae214250
+ * @jenesis.pin eclipse-java-format/maven/org.osgi/org.osgi.service.prefs 1.1.2 SHA-256/43c7c870710e363405d422da653cce0d798a4537f76e4930f79bceadd3a55345
+ * @jenesis.pin eclipse-java-format/maven/org.osgi/osgi.annotation 8.0.1 SHA-256/a0e8a4c362bd3600812f37b0ea45fba966c7bc049d01fed56a09ecc74082759e
  * @jenesis.pin google-java-format/maven/com.google.code.findbugs/jsr305 3.0.2 SHA-256/766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7
  * @jenesis.pin google-java-format/maven/com.google.errorprone/error_prone_annotations 2.21.1 SHA-256/d1f3c66aa91ac52549e00ae3b208ba4b9af7d72d68f230643553beb38e6118ac
  * @jenesis.pin google-java-format/maven/com.google.googlejavaformat/google-java-format 1.35.0 SHA-256/b2a52e363d51dd86b3b38d1a8dd51538541b42ff1048769684681c676550f043

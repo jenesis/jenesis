@@ -150,8 +150,8 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                         : formatted);
             }
             if (!deviations.isEmpty()) {
-                throw new IllegalStateException(deviations.size() + " of the sources do not start with the license"
-                        + " header of " + HEADER + " - run with -Djenesis.format.rewrite=true to write it:\n"
+                throw new IllegalStateException("Not every source starts with the license header of " + HEADER
+                        + " - run with -Djenesis.format.rewrite=true to write it:\n"
                         + deviations.entrySet().stream()
                                 .map(entry -> "  " + entry.getKey() + ": " + entry.getValue())
                                 .collect(Collectors.joining("\n")));

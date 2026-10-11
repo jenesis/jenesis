@@ -50,7 +50,7 @@ public class LicenseHeaderModuleTest {
         assertThatThrownBy(newExecutor(new LicenseHeaderModule().verify(true))::execute)
                 .rootCause()
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("2 of the sources")
+                .hasMessageContaining("Not every source starts with the license header")
                 .hasMessageContaining(Path.of("sample", "Missing.java") + ": no license header")
                 .hasMessageContaining(Path.of("sample", "Different.scala") + ": a different license header")
                 .hasMessageNotContaining("Present.groovy");

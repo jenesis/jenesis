@@ -1475,8 +1475,38 @@ public record Project(
                       maven-pmd-plugin / pmd -> pmd.xml (34); minimumPriority / rulesMinimumPriority
                           -> jenesis.source.pmd.priority
                       spotbugs-maven-plugin / com.github.spotbugs -> spotbugs-exclude.xml (34)
-                      fmt-maven-plugin, Spotless for Java / Spotless, com.palantir.java-format
-                          -> javaformat.properties; -Djenesis.format.rewrite=true rewrites (34)
+                      fmt-maven-plugin, Spotless googleJavaFormat() / the same
+                          -> javaformat.properties with formatter=google (34), which verifies and
+                          fails the build on an unformatted source; -Djenesis.format.rewrite=true
+                          rewrites. style AOSP, googleJavaFormat().aosp() -> style=aosp;
+                          formatJavadoc(false) -> javadoc=false; skipReflowingLongStrings ->
+                          reflow=false, which a Spotless googleJavaFormat() without
+                          reflowLongStrings() needs as well, as Spotless leaves a long string as it
+                          is where the formatter's own command line reflows it; skipSortingImports
+                          and skipRemovingUnusedImports -> imports=remove, imports=sort, or
+                          imports=none for both. A key the formatter does not take is refused
+                      Spotless palantirJavaFormat() / com.palantir.java-format, the same
+                          -> formatter=palantir, which takes reflow and imports alike
+                      Spotless eclipse().configFile(...), formatter-maven-plugin (net.revelc)
+                          configFile -> formatter=eclipse and profile=<file>, the profile Eclipse
+                          exports, beside or below javaformat.properties (34); the formatter
+                          reads the newest Java its release knows, whatever compiler level the
+                          profile names, and Spotless's importOrder and the formatter plugin's
+                          import and cache settings have no counterpart
+                      Spotless ktfmt() / the same -> ktfmt.properties, in place of ktlint's
+                          formatting (42): style=google for googleStyle(), kotlinlang for
+                          kotlinlangStyle(), meta, the default, otherwise; removeUnusedImports
+                          false -> imports=sort; maxWidth and the indents have no counterpart, as
+                          ktfmt's command line takes none
+                      Spotless licenseHeader(), licenseHeaderFile() / the same,
+                          license-maven-plugin (com.mycila) check and format -> license-header.txt
+                          (34), the header as text, which every Java, Kotlin, Scala and Groovy
+                          source starts with as a block comment, or as written where the file is a
+                          comment already, as Spotless's file is; $YEAR matches any year or range,
+                          a rewrite keeps the year a replaced header names and writes
+                          -Djenesis.format.year=<year> where there is none, never the current one;
+                          mycila's year property becomes $YEAR, and its other ${...} properties are
+                          written out
                       detekt, ktlint / the same -> detekt.yml, .editorconfig (42)
                       scalastyle, scalafmt / the same -> scalastyle-config.xml, .scalafmt.conf (45)
                       codenarc / codenarc -> codenarc.xml (47)
@@ -1533,7 +1563,8 @@ public record Project(
                           and embedded in every jar, not only an application's, at
                           META-INF/sbom/<groupId>/<artifactId>.cdx.json (<module>.cdx.json without
                           a group), which the manifest's Sbom-Location names
-                      license-maven-plugin / a license report plugin -> licensing.properties (32)
+                      license-maven-plugin (org.codehaus.mojo) / a license report plugin
+                          -> licensing.properties (32)
                       dependency-check-maven / org.owasp.dependencycheck
                           -> vulnerability.properties, checked against OSV (33)
 
@@ -1637,7 +1668,8 @@ public record Project(
                           project.tag and project.tree, which the POM and SBOM record and a
                           plugin reads as scm.revision, scm.tag and scm.tree of the
                           metadata.properties its hook point is handed
-                      Spotless beyond Java, Kotlin and Scala -> none
+                      Spotless beyond formatting Java, Kotlin and Scala and a license header,
+                          as misc, markdown or kotlinGradle -> none
                       maven-bundle-plugin, bnd / biz.aQute.bnd, an OSGi manifest -> none; a pom.xml
                           of packaging bundle builds a jar, whose headers a MANIFEST.MF among the
                           resources or a plugin at binary/transform supplies, which is handed the
@@ -2074,7 +2106,19 @@ public record Project(
                                                 @jenesis.plugin javac <coordinate>; javac forks so the
                                                 compiler internals it reads can be exported to it
                                                 (arguments, appended to -Xplugin:ErrorProne)
-                      javaformat.properties     formatter=google|palantir
+                      javaformat.properties     the Java formatter, verifying unless
+                                                -Djenesis.format.rewrite=true: formatter=google
+                                                (style=google|aosp, reflow, javadoc,
+                                                imports=sort,remove|sort|remove|none),
+                                                formatter=palantir (reflow, imports), or
+                                                formatter=eclipse (profile=<file> beside or below,
+                                                the formatter profile Eclipse exports)
+                      ktfmt.properties          ktfmt formats Kotlin in place of ktlint
+                                                (style=meta|google|kotlinlang,
+                                                imports=sort,remove|sort)
+                      license-header.txt        the license header every source starts with, as a
+                                                block comment, $YEAR matching any year or range;
+                                                -Djenesis.format.year names the one a rewrite writes
                       xjc.properties            JAXB: every .xsd compiled, every .xjb a binding; the
                                                 generated package is compiled into the module
                                                 (folders, package, catalog, arguments)
@@ -2133,7 +2177,11 @@ public record Project(
                                                 carry as well, and an
                                                 executable jar its --add-reads, --add-exports,
                                                 --add-opens and --enable-native-access lines alone;
-                                                a linter reads only its own configuration file
+                                                a linter reads only its own configuration file, and
+                                                a formatter takes its options from
+                                                javaformat.properties or ktfmt.properties, the lines
+                                                of its process-<tool>.properties being options of
+                                                the JVM it runs in
                       environment-<tool>.properties
                                                 variables for a program the build forks (java, test,
                                                 pitest, native-image), which otherwise sees only

@@ -79,7 +79,7 @@ public class EclipseJavaFormatModule implements BuildExecutorModule {
                     }
                 }
                 if (verify && !unformatted.isEmpty()) {
-                    unformatted.forEach(System.out::println);
+                    unformatted.forEach(name -> System.out.println(name + " is not formatted as the profile says"));
                     System.exit(1);
                 }
             }

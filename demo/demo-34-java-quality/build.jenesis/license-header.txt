@@ -1,0 +1,3 @@
+Copyright $YEAR the Jenesis demo authors.
+
+Licensed under the Apache License, Version 2.0.

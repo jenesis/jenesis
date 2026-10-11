@@ -3,10 +3,11 @@ Java code-quality demo
 
 Wire the inferred code-quality tools into a single modular Java project. There
 is no build script and no plugin to configure: a tool turns itself on when its
-configuration file is present in the `build.jenesis/` configuration directory. This demo ships four of them,
+configuration file is present in the `build.jenesis/` configuration directory. This demo ships five of them,
 so Checkstyle and PMD lint the sources, SpotBugs analyses the compiled classes,
-and `google-java-format` verifies the source layout. Each tool resolves in its
-own group, independently of the module's own dependencies (here, none).
+`google-java-format` verifies the source layout, and every source is checked
+for the project's license header. Each tool resolves in its own group,
+independently of the module's own dependencies (here, none).
 
 This is the code-quality counterpart to the plain Java demos that precede it;
 the same config-file inference applies to the other JVM languages, whose quality
@@ -37,7 +38,11 @@ The configuration files sit in the *configuration directory*, which defaults to
     |-- checkstyle.properties      the ${...} properties checkstyle.xml names
     |-- pmd.xml                    activates PMD (lints sources)
     |-- spotbugs-exclude.xml       activates SpotBugs (analyses classes)
-    |-- javaformat.properties      selects the Java formatter (google)
+    |-- javaformat.properties      selects the Java formatter (google) and its options
+    |-- license-header.txt         the license header every source starts with
+    |-- eclipse/
+    |   |-- javaformat.properties  selects the Eclipse formatter, under a profile
+    |   `-- eclipse-formatter.xml  the formatter profile Eclipse exports
     `-- sources
         |-- module-info.java
         `-- sample
@@ -58,12 +63,26 @@ Jenesis binds the matched file from the configuration directory into the build
 graph so the tool finds it. That binding is what lets a root-level filter reach
 SpotBugs, which runs *after* `javac` and so only ever sees compiled classes, not
 the configuration directory. The Java formatter is selected by a `javaformat.properties` file
-naming the formatter:
+naming the formatter, with its options beside it:
 
     formatter=google
+    reflow=false
 
-`formatter=palantir` selects the Palantir formatter instead; without the file, no
-Java formatter runs.
+`formatter=palantir` selects the Palantir formatter instead, and
+`formatter=eclipse` the Eclipse formatter; without the file, no Java formatter
+runs. The options are the formatter's own, handed to it as it expects them:
+
+    style=google|aosp     google-java-format's style, AOSP indenting by four
+    reflow=false          leaves a string past the line limit as it is, as
+                          Spotless's googleJavaFormat() does unless told otherwise
+    javadoc=false         leaves Javadoc as it is (google-java-format only)
+    imports=sort,remove   what is done to the imports: sort, remove the unused
+                          ones, both (the default), or none
+    profile=<file>        the formatter profile Eclipse exports (eclipse only),
+                          beside or below javaformat.properties
+
+A key the selected formatter does not take fails the build, naming the keys it
+does take, and a changed option verifies every source again.
 
 A discovered tool can be switched off without deleting its configuration file
 through its property, so file discovery alone decides until the property says
@@ -72,7 +91,8 @@ formatter's is `true` by default, and `false` skips it:
 
     jenesis.source.<tool>        Checkstyle, PMD, Detekt, Ktlint, Scalastyle, Scalafmt, CodeNarc
     jenesis.validator.spotbugs   SpotBugs
-    jenesis.format.<tool>        the Java / Ktlint / Scalafmt formatters
+    jenesis.format.<tool>        the Java / Ktlint / Ktfmt / Scalafmt formatters
+    jenesis.format.license       the license header check
 
 For example `-Djenesis.source.checkstyle=ignore` keeps `checkstyle.xml` in place
 but skips Checkstyle, while PMD and SpotBugs still run.
@@ -159,18 +179,59 @@ rewrite switch:
 The same switch drives `ktlint` and `scalafmt` in the language demos. After a
 rewrite, a plain `java build/jenesis/Make.java` passes the verify gate again.
 
+The `eclipse` profile formats with the Eclipse formatter instead: its
+`build.jenesis/eclipse/` folder holds a `javaformat.properties` naming
+`formatter=eclipse` and the formatter profile, which here indents by two spaces,
+so the same source passes it:
+
+    java -Djenesis.make.profiles=eclipse build/jenesis/Make.java
+
+The formatter runs from `org.eclipse.jdt.core` in a plain JVM, with no Eclipse
+installation. It reads the newest Java its release knows, whatever compiler
+level an exported profile names. Moving the profile file changes nothing, as
+long as `profile=` follows it; editing a setting in it verifies every source
+again.
+
+License headers
+---------------
+
+A `license-header.txt` holds the header every source starts with, as text:
+
+    Copyright $YEAR the Jenesis demo authors.
+
+    Licensed under the Apache License, Version 2.0.
+
+Every Java source, `module-info.java` and `package-info.java` included, and
+every Kotlin, Scala and Groovy source must start with it as a block comment, or
+as the file stands where it is written as a comment already. `$YEAR` stands for
+any year or range of years, such as `2016-2026`. A source without the header, or
+with a different one, fails the build, naming the file. Generated sources are not
+checked.
+
+The rewrite switch writes the header: it replaces a leading comment that is a
+license header, keeping the year it names, and inserts one where there is none.
+An inserted header takes its year from `-Djenesis.format.year`, never from the
+day the build runs:
+
+    java -Djenesis.format.rewrite=true -Djenesis.format.year=2026 build/jenesis/Make.java
+
+`-Djenesis.format.license=false` skips the check, as `jenesis.format.java=false`
+skips the formatter.
+
 Pinning
 -------
 
 Each tool resolves in its own group (`checkstyle`, `pmd`, `spotbugs`,
-`google-java-format`), kept separate from the module's `main`-group
-dependencies, and floats a `RELEASE` version until pinned. The `dependencies`
+`google-java-format`, and `eclipse-java-format` under the `eclipse` profile),
+kept separate from the module's `main`-group dependencies, and floats a
+`RELEASE` version until pinned. The license header check needs no tool. The `dependencies`
 selector therefore shows none of them as a dependency of the module;
 `-Djenesis.tree.tools=true` prints each tool's closure apart, under a heading
 naming its group. Running
 `java build/jenesis/Make.java pin` records every resolved tool jar with its
 `SHA-256` into `@jenesis.pin` tags, exactly as the other demos pin their
-compilers. These closures are large (PMD's CLI bundle alone pulls in well over a
+compilers; a tool only a profile turns on is pinned by running `pin` with that
+profile active. These closures are large (PMD's CLI bundle alone pulls in well over a
 hundred artifacts), which is why the `module-info.java` here carries so many pin
 lines: the demo builds under strict pinning, so the whole tool chain is
 checksum-verified.
