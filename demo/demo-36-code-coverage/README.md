@@ -16,7 +16,7 @@ From this directory:
 
     java build/jenesis/Make.java
 
-The project ships a `jacoco.properties` marker file, so a plain build collects
+The project ships a `jacoco.properties` file, so a plain build collects
 coverage. Jenesis compiles the project, runs the test
 under the JaCoCo agent, and renders the report. The first build downloads JUnit
 and the JaCoCo tooling, so it takes a while.
@@ -27,7 +27,7 @@ Layout
     demo/demo-36-code-coverage
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
     |-- pom.xml                    pins JUnit; sources in sources/, tests in test/
-    |-- build.jenesis/jacoco.properties         marker file; presence enables JaCoCo
+    |-- build.jenesis/jacoco.properties         enables JaCoCo; minimum.method=0.6
     |-- build.jenesis/profiling/jfr.properties  settings=profile, under a profile
     |-- sources
     |   `-- coverage
@@ -84,6 +84,27 @@ the group pins: pinning only the CLI by hand, as
     -->
 
 runs the tests under the 0.8.14 agent as well, until `pin` records both.
+
+Failing the build on too little coverage
+----------------------------------------
+
+`jacoco.properties` may set limits on the module's coverage, as the `check` goal of
+jacoco-maven-plugin does for a bundle. `minimum.<counter>` is the least covered
+ratio, from 0 to 1, and `maximum.missed.<counter>` the most items left uncovered,
+for each of JaCoCo's counters `instruction`, `branch`, `line`, `complexity`,
+`method` and `class`. The demo's tests cover `add(...)` and not `subtract(...)`, so
+two of the three methods of `Calculator` are covered, and the file's
+
+    minimum.method=0.6
+
+holds. Raise it to `0.9` and the build fails after rendering the report, naming the
+limit and what the tests reached:
+
+    minimum.method=0.9 is not met: 2 of 3 covered, a ratio of 0.6667
+
+A counter with nothing to count, such as `branch` in a class without a branch,
+meets every limit, and an unknown key or value fails the build naming the valid
+ones.
 
 Recording the tests with Java Flight Recorder
 ---------------------------------------------

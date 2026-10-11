@@ -1485,7 +1485,9 @@ public record Project(
                           module: a test that needs a JVM of its own goes to a module of its own
                       maven-failsafe-plugin / an integration test task
                           -> no phase of its own: -Djenesis.test.tag, or a @jenesis.test module
-                      jacoco-maven-plugin / jacoco -> jacoco.properties, a report (36)
+                      jacoco-maven-plugin / jacoco -> jacoco.properties, a report (36); the check
+                          goal's bundle rules / jacocoTestCoverageVerification -> minimum.<counter>
+                          (a covered ratio) and maximum.missed.<counter> there, which fail the build
                       pitest-maven / info.solidsoft.pitest -> pitest.properties (38)
                       jmh-maven-plugin / me.champeau.jmh -> @jenesis.plugin and @jenesis.main (39)
                       byte-buddy-maven-plugin / net.bytebuddy.byte-buddy-gradle-plugin -> no built-in:
@@ -2016,7 +2018,7 @@ public record Project(
                                                 (Jenesis repository only)
                       licensing.properties      license check: allowed/denied/unknown/override.<coord>
                       vulnerability.properties  OSV check: severity, warn
-                      jacoco.properties         test-coverage report
+                      jacoco.properties         test-coverage report: minimum.<counter>, maximum.missed.<counter>
                       graal.properties          native-image reachability agent during the test run
                       pitest.properties         PIT mutation testing
                       japicmp.properties        japicmp compares the built jar against the last release of

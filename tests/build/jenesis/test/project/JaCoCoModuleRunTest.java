@@ -21,6 +21,7 @@ import build.jenesis.step.Javac;
 import javax.tools.ToolProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class JaCoCoModuleRunTest {
 
@@ -40,6 +41,43 @@ public class JaCoCoModuleRunTest {
 
     @Test
     public void collects_coverage_and_renders_a_report() throws Exception {
+        cover(new LinkedHashMap<>());
+
+        Path exec = root.resolve("test").resolve("executed").resolve("output").resolve("jacoco.exec");
+        assertThat(exec).as("the agent wrote its execution data into the test step output").isNotEmptyFile();
+        assertThat(Files.readString(exec, StandardCharsets.ISO_8859_1))
+                .as("the agent instrumented and recorded the covered class")
+                .contains("coverage/Covered");
+
+        Path xml = root.resolve("coverage").resolve("report").resolve("output")
+                .resolve("reports").resolve("jacoco").resolve("jacoco.xml");
+        assertThat(xml).as("the report processor rendered an XML report").isNotEmptyFile();
+        assertThat(xml).content()
+                .contains("name=\"coverage/Covered\"")
+                .contains("covered=\"");
+    }
+
+    @Test
+    public void passes_a_coverage_the_limits_of_jacoco_properties_admit() throws Exception {
+        cover(new LinkedHashMap<>(Map.of("minimum.method", "0.5", "maximum.missed.method", "1")));
+
+        assertThat(root.resolve("coverage").resolve("report").resolve("output")
+                .resolve("reports").resolve("jacoco").resolve("jacoco.xml")).isNotEmptyFile();
+    }
+
+    @Test
+    public void fails_the_build_on_a_coverage_below_a_minimum_of_jacoco_properties() {
+        assertThatThrownBy(() -> cover(new LinkedHashMap<>(Map.of("minimum.method", "0.9"))))
+                .hasStackTraceContaining("minimum.method=0.9 is not met: 4 of 5 covered");
+    }
+
+    @Test
+    public void fails_the_build_on_more_missed_items_than_a_maximum_of_jacoco_properties() {
+        assertThatThrownBy(() -> cover(new LinkedHashMap<>(Map.of("maximum.missed.method", "0"))))
+                .hasStackTraceContaining("maximum.missed.method=0 is not met: 1 missed");
+    }
+
+    private void cover(SequencedMap<String, String> limits) throws Exception {
         Path artifacts = Files.createDirectory(dependencies.resolve(BuildStep.ARTIFACTS));
         for (Path path : bootModuleJars()) {
             String fileName = path.getFileName().toString();
@@ -56,6 +94,9 @@ public class JaCoCoModuleRunTest {
                     public int add(int left, int right) {
                         return left + right;
                     }
+                    public int negate(int value) {
+                        return -value;
+                    }
                 }
                 """);
         compileSources(classes.resolve(Javac.CLASSES + "coverage"), bootModuleJars(), Map.of(
@@ -64,6 +105,9 @@ public class JaCoCoModuleRunTest {
                         public class Covered {
                             public int add(int left, int right) {
                                 return left + right;
+                            }
+                            public int negate(int value) {
+                                return -value;
                             }
                         }
                         """,
@@ -110,22 +154,9 @@ public class JaCoCoModuleRunTest {
                 "dependencies", "classes");
         executor.addModule(
                 "coverage",
-                new JaCoCoModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT).classes(true),
+                new JaCoCoModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT).classes(true).limits(limits),
                 "test", "classes", "sources", "dependencies");
         executor.execute();
-
-        Path exec = root.resolve("test").resolve("executed").resolve("output").resolve("jacoco.exec");
-        assertThat(exec).as("the agent wrote its execution data into the test step output").isNotEmptyFile();
-        assertThat(Files.readString(exec, StandardCharsets.ISO_8859_1))
-                .as("the agent instrumented and recorded the covered class")
-                .contains("coverage/Covered");
-
-        Path xml = root.resolve("coverage").resolve("report").resolve("output")
-                .resolve("reports").resolve("jacoco").resolve("jacoco.xml");
-        assertThat(xml).as("the report processor rendered an XML report").isNotEmptyFile();
-        assertThat(xml).content()
-                .contains("name=\"coverage/Covered\"")
-                .contains("covered=\"");
     }
 
     private BuildExecutor newExecutor() throws IOException {
