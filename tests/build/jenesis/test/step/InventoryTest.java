@@ -120,6 +120,39 @@ public class InventoryTest {
     }
 
     @Test
+    public void records_the_sources_a_generator_or_an_annotation_processor_wrote() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        Path generator = Files.createDirectory(root.resolve("generator"));
+        Files.writeString(Files.createDirectories(generator.resolve("sources/demo")).resolve("Parser.java"), "");
+        Path javac = Files.createDirectory(root.resolve("javac"));
+        Files.createDirectories(javac.resolve("classes/demo"));
+        Files.writeString(Files.createDirectories(javac.resolve("generated/demo")).resolve("Mapper.java"), "");
+        Path idle = Files.createDirectory(root.resolve("idle"));
+        Files.createDirectories(idle.resolve("classes"));
+        Files.createDirectories(idle.resolve("generated"));
+        Path raw = Files.createDirectory(root.resolve("raw"));
+        Files.writeString(Files.createDirectories(raw.resolve("generated")).resolve("README.md"), "");
+        Path archive = Files.createDirectory(root.resolve("archive"));
+        Files.writeString(Files.createDirectories(archive.resolve("sources")).resolve("foo-sources.jar"), "src");
+
+        run(args("manifests", manifests,
+                "generator", generator,
+                "javac", javac,
+                "idle", idle,
+                "raw", raw,
+                "archive", archive));
+
+        SequencedProperties inventory = read(next.resolve(Inventory.INVENTORY));
+        assertThat(Inventory.paths(inventory, next, "module-foo.generated"))
+                .as("a sources folder holding no archive, and what javac generated beside the classes it compiled,"
+                        + " are generated sources; an empty folder, a generator's raw output and a sources jar are not")
+                .containsExactly(generator.resolve("sources"), javac.resolve("generated"));
+    }
+
+    @Test
     public void writes_all_fields_when_present() throws IOException {
         Path manifests = Files.createDirectory(root.resolve("manifests"));
         SequencedProperties module = new SequencedProperties();

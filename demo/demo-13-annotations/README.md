@@ -61,3 +61,14 @@ You can see this directly. Delete the `@jenesis.plugin` line from
 `requires`, but the processor no longer runs, `ImmutableAnimal` is never
 generated, and the build fails to compile `Zoo`. Processors are taken only from
 what you declare - never picked up from a dependency that happens to bundle one.
+
+In the editor
+-------------
+
+`ide` lists what the processor wrote as a generated source folder of the
+module, so the editor resolves `ImmutableAnimal` like any other class:
+
+    java build/jenesis/Make.java ide
+
+The folder lies in the build's output, so a build brings it up to date after
+`Animal` changes.

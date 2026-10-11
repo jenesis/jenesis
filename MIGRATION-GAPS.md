@@ -13,11 +13,12 @@ of an existing module, **L** a new mechanism.
 
 ## Status
 
-About 107 gaps found along the way are fixed in the tool, among them forking `javac`, `--source`/`--target`, modular
+About 108 gaps found along the way are fixed in the tool, among them forking `javac`, `--source`/`--target`, modular
 Javadoc, resources in the sources jar, a check for a module declared twice, `kotlinc` arguments, scope and exclusions
 on a pin, the operating system family as a platform token, bytecode transforms at `binary/transform` (bnd, AspectJ),
-`tar.gz` dependencies, Docker arguments, reusing a dependency resolution whose inputs did not change, and classifier
-variants (`classifiers.properties`, `@jenesis.pin <module> :<classifier>`).
+`tar.gz` dependencies, Docker arguments, reusing a dependency resolution whose inputs did not change, generated
+sources in the `ide` project files, and classifier variants (`classifiers.properties`,
+`@jenesis.pin <module> :<classifier>`).
 
 30 more are answered by the migration briefing (`skill/migrate`, `skill/registry`) rather than by the tool, because a
 plugin or a small change to the project covers them: OSGi manifests from a `binary/transform` plugin, resource
@@ -59,7 +60,6 @@ Compile avoidance matters most: it is the largest share of the difference to Gra
 | Documentation is switched on or off for the whole project; `packaging.properties` has no key for one module. | S | netty |
 | No development-only scope, for a dependency the application runs with locally but never ships. | S | spring-petclinic (DevTools kept in a Maven profile) |
 | A relocation POM is followed when read but cannot be published. | S | mapstruct (`mapstruct-jdk8`), picocli |
-| `ide` leaves out generated sources. | S | spring-boot-realworld-example-app |
 
 ## Compilers
 

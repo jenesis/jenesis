@@ -133,7 +133,16 @@ public class Ide implements BuildExecutorModule {
                         }
                     }
                 }
-                raws.add(new Raw(name, content, modular, test, release, coordinates, jars));
+                raws.add(new Raw(name,
+                        content,
+                        modular,
+                        test,
+                        release,
+                        coordinates,
+                        jars,
+                        Inventory.paths(inventory, argument.folder(), prefix + ".generated").stream()
+                                .map(generated -> generated.toAbsolutePath().normalize())
+                                .toList()));
             }
         }
         Map<Path, Raw> folded = new HashMap<>();
@@ -168,12 +177,18 @@ public class Ide implements BuildExecutorModule {
             List<Path> mainSources = new ArrayList<>();
             List<Path> testSources = new ArrayList<>();
             sources(raw.content(), raw.test(), mainSources, testSources);
+            List<Path> testGenerated = Stream.of(raw.test() ? raw : null, folded.get(raw.content()))
+                    .filter(Objects::nonNull)
+                    .flatMap(half -> half.generated().stream())
+                    .toList();
             modules.add(new Module(raw.name(),
                     raw.content(),
                     raw.modular(),
                     raw.release(),
                     mainSources,
                     testSources,
+                    raw.test() ? List.of() : raw.generated(),
+                    testGenerated,
                     new ArrayList<>(libraries),
                     new ArrayList<>(testLibraries),
                     new ArrayList<>(moduleDependencies)));
@@ -297,8 +312,8 @@ public class Ide implements BuildExecutorModule {
                       <natures>
                         <nature>org.eclipse.jdt.core.javanature</nature>
                       </natures>
-                    </projectDescription>
-                    """.formatted(escape(module.name())));
+                    %s</projectDescription>
+                    """.formatted(escape(module.name()), module.linkedResources()));
             Files.writeString(module.content().resolve(".classpath"), module.classpath());
         }
     }
@@ -332,6 +347,9 @@ public class Ide implements BuildExecutorModule {
                 sourcePaths.add(workspace(base, source));
             }
             for (Path source : module.testSources()) {
+                sourcePaths.add(workspace(base, source));
+            }
+            for (Path source : module.generated()) {
                 sourcePaths.add(workspace(base, source));
             }
             for (Path library : Stream.concat(module.libraries().stream(), module.testLibraries().stream()).toList()) {
@@ -381,6 +399,8 @@ public class Ide implements BuildExecutorModule {
                           Integer release,
                           List<Path> mainSources,
                           List<Path> testSources,
+                          List<Path> mainGenerated,
+                          List<Path> testGenerated,
                           List<Path> libraries,
                           List<Path> testLibraries,
                           List<String> moduleDependencies) {
@@ -406,7 +426,21 @@ public class Ide implements BuildExecutorModule {
                         .append(relative(source))
                         .append("\" isTestSource=\"true\"/>\n");
             }
+            for (Path source : generated()) {
+                if (source.startsWith(content())) {
+                    content.append("      ").append(generatedFolder(base, source)).append('\n');
+                }
+            }
             content.append("    </content>\n");
+            for (Path source : generated()) {
+                if (!source.startsWith(content())) {
+                    content.append("    <content url=\"file://")
+                            .append(escape(url(base, source)))
+                            .append("\">\n");
+                    content.append("      ").append(generatedFolder(base, source)).append('\n');
+                    content.append("    </content>\n");
+                }
+            }
             content.append("    <orderEntry type=\"inheritedJdk\"/>\n");
             content.append("    <orderEntry type=\"sourceFolder\" forTests=\"false\"/>\n");
             for (String dependency : moduleDependencies()) {
@@ -421,7 +455,7 @@ public class Ide implements BuildExecutorModule {
                 content.append("      <library>\n");
                 content.append("        <CLASSES>\n");
                 content.append("          <root url=\"jar://")
-                        .append(escape(libraryUrl(base, library)))
+                        .append(escape(url(base, library)))
                         .append("!/\"/>\n");
                 content.append("        </CLASSES>\n");
                 content.append("        <JAVADOC/>\n");
@@ -434,15 +468,24 @@ public class Ide implements BuildExecutorModule {
             return content.toString();
         }
 
+        private List<Path> generated() {
+            return Stream.concat(mainGenerated().stream(), testGenerated().stream()).toList();
+        }
+
+        private String generatedFolder(Path base, Path source) {
+            return "<sourceFolder url=\"file://" + escape(url(base, source)) + "\" isTestSource=\""
+                    + testGenerated().contains(source) + "\" generated=\"true\"/>";
+        }
+
         private String relative(Path source) {
             String relative = content().relativize(source).toString().replace(File.separatorChar, '/');
             return relative.isEmpty() ? "" : "/" + relative;
         }
 
-        private String libraryUrl(Path base, Path library) {
-            return library.startsWith(base)
-                    ? "$MODULE_DIR$/" + content().relativize(library).toString().replace(File.separatorChar, '/')
-                    : library.toString().replace(File.separatorChar, '/');
+        private String url(Path base, Path path) {
+            return path.startsWith(base)
+                    ? "$MODULE_DIR$/" + content().relativize(path).toString().replace(File.separatorChar, '/')
+                    : path.toString().replace(File.separatorChar, '/');
         }
 
         private String classpath() {
@@ -457,6 +500,16 @@ public class Ide implements BuildExecutorModule {
                 entry(content,
                         "kind=\"src\" output=\".eclipse/test-classes\"" + sourcePath(source),
                         List.of("test"));
+            }
+            for (Path source : mainGenerated()) {
+                entry(content,
+                        "kind=\"src\" path=\"" + escape(linked(source)) + "\"",
+                        List.of("optional", "ignore_optional_problems"));
+            }
+            for (Path source : testGenerated()) {
+                entry(content,
+                        "kind=\"src\" output=\".eclipse/test-classes\" path=\"" + escape(linked(source)) + "\"",
+                        List.of("optional", "ignore_optional_problems", "test"));
             }
             entry(content, "kind=\"con\" path=\"" + container(release()) + "\"", onModulePath);
             for (String dependency : moduleDependencies()) {
@@ -478,6 +531,33 @@ public class Ide implements BuildExecutorModule {
             content.append("</classpath>\n");
             return content.toString();
         }
+
+        private String linked(Path source) {
+            return source.startsWith(content())
+                    ? content().relativize(source).toString().replace(File.separatorChar, '/')
+                    : "generated-" + generated().indexOf(source);
+        }
+
+        private String linkedResources() {
+            List<Path> outside = generated().stream()
+                    .filter(source -> !source.startsWith(content()))
+                    .toList();
+            if (outside.isEmpty()) {
+                return "";
+            }
+            StringBuilder content = new StringBuilder("  <linkedResources>\n");
+            for (Path source : outside) {
+                content.append("    <link>\n")
+                        .append("      <name>").append(escape(linked(source))).append("</name>\n")
+                        .append("      <type>2</type>\n")
+                        .append("      <location>")
+                        .append(escape(source.toString().replace(File.separatorChar, '/')))
+                        .append("</location>\n")
+                        .append("    </link>\n");
+            }
+            return content.append("  </linkedResources>\n").toString();
+        }
+
         private String sourcePath(Path source) {
             String relative = escape(content()
                     .relativize(source)
@@ -493,6 +573,7 @@ public class Ide implements BuildExecutorModule {
                        boolean test,
                        Integer release,
                        List<String> coordinates,
-                       List<Path> jars) {
+                       List<Path> jars,
+                       List<Path> generated) {
     }
 }
