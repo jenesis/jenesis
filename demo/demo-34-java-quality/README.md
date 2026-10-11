@@ -3,9 +3,10 @@ Java code-quality demo
 
 Wire the inferred code-quality tools into a single modular Java project. There
 is no build script and no plugin to configure: a tool turns itself on when its
-configuration file is present in the `build.jenesis/` configuration directory. This demo ships six of them,
+configuration file is present in the `build.jenesis/` configuration directory. This demo ships eight of them,
 so Checkstyle and PMD lint the sources, SpotBugs analyses the compiled classes,
-forbiddenapis looks for calls the project forbids in them,
+forbiddenapis looks for calls the project forbids in them, the JDK's jdeps and
+jdeprscan for JDK internals and APIs scheduled for removal,
 `google-java-format` verifies the source layout, and every source is checked
 for the project's license header. Each tool resolves in its own group,
 independently of the module's own dependencies (here, none).
@@ -41,6 +42,8 @@ The configuration files sit in the *configuration directory*, which defaults to
     |-- spotbugs-exclude.xml       activates SpotBugs (analyses classes)
     |-- forbiddenapis.properties   activates forbiddenapis (checks classes for forbidden calls)
     |-- forbidden-signatures.txt   the project's own forbidden calls
+    |-- jdeps.properties           activates jdeps (JDK internal APIs the classes use)
+    |-- jdeprscan.properties       activates jdeprscan (APIs deprecated for removal)
     |-- javaformat.properties      selects the Java formatter (google) and its options
     |-- licenseheader.properties   the license header every source starts with
     |-- eclipse/
@@ -64,6 +67,8 @@ build script:
     pmd.xml                 -> PMD
     spotbugs-exclude.xml    -> SpotBugs
     forbiddenapis.properties -> forbiddenapis
+    jdeps.properties        -> jdeps
+    jdeprscan.properties    -> jdeprscan
     scalastyle-config.xml   -> Scalastyle, and so on for the other languages
 
 Jenesis binds the matched file from the configuration directory into the build
@@ -97,7 +102,7 @@ otherwise. A linter's property is `report` by default, and `ignore` skips it; a
 formatter's is `true` by default, and `false` skips it:
 
     jenesis.source.<tool>        Checkstyle, PMD, Detekt, Ktlint, Scalastyle, Scalafmt, CodeNarc
-    jenesis.validator.<tool>     SpotBugs, forbiddenapis
+    jenesis.validator.<tool>     SpotBugs, forbiddenapis, jdeps, jdeprscan
     jenesis.format.<tool>        the Java / Ktlint / Ktfmt / Scalafmt formatters
     jenesis.format.license       the license header check
 
@@ -127,8 +132,9 @@ module purely from its own location.
 Where the tools run and what they produce
 -----------------------------------------
 
-Checkstyle and PMD run on the sources, in parallel with compilation. SpotBugs and
-forbiddenapis are *validators* in the Java toolchain: they run once the classes exist. Each tool
+Checkstyle and PMD run on the sources, in parallel with compilation. SpotBugs,
+forbiddenapis, jdeps and jdeprscan are *validators* in the Java toolchain: they run
+once the classes exist. Each tool
 writes an XML report into a `reports/<tool>/` subfolder of its step's output, for
 example:
 
@@ -154,7 +160,8 @@ build when Checkstyle reports a violation, naming the number of findings and the
 report.
 Checkstyle, PMD, detekt, ktlint, Scalastyle and scalafmt fail as their own exit
 code decides, so a Checkstyle finding at severity `warning` is reported but does
-not fail the build; SpotBugs, CodeNarc and forbiddenapis fail on any finding their report holds.
+not fail the build; SpotBugs, CodeNarc, forbiddenapis, jdeps and jdeprscan fail on any finding their
+report holds.
 When wiring a tool yourself, `.strict(true)` on its module does the same.
 Report-only covers findings, not a tool that never ran: a linter that fails on
 its own configuration, and so writes no complete report, fails its step either
@@ -228,6 +235,31 @@ The other keys are `suppress` (annotations that silence a finding, as
 fails the build. Each finding is one line of the report, naming the call, the
 reason and where it was made.
 
+JDK internals and removals
+--------------------------
+
+Two tools of the JDK itself check what the classes ask of the JDK, the tests'
+included, and need nothing to resolve. An empty `jdeps.properties` runs
+`jdeps --jdk-internals`, which names every JDK internal API a class uses and
+what jdeps suggests instead, as for a class reading `sun.misc.Unsafe`:
+
+    sample.Legacy -> sun.misc.Unsafe: JDK internal API (jdk.unsupported), instead: See https://openjdk.org/jeps/260
+
+Its one key, `accept`, names the internal classes or packages a project uses on
+purpose, as `accept=sun.misc`, which are then no finding. An empty
+`jdeprscan.properties` runs `jdeprscan --for-removal`, which names every use of
+an API the JDK has scheduled for removal, as of `Thread.stop()`:
+
+    sample/Legacy uses deprecated method java/lang/Thread::stop()V (forRemoval=true)
+
+`removal=false` reports every deprecated API instead, and `release=<n>` checks
+against the deprecations of that Java release. Both run the tool of the JDK the
+build runs on, so building on a newer JDK, as
+`-Djenesis.toolchain.version=<n>` does, finds what that JDK encapsulated or
+scheduled for removal before the code runs on it.
+
+License headers
+---------------
 
 A `licenseheader.properties` holds the header every source starts with, as the
 text of its `text` key, `\n` separating the lines and a trailing `\` continuing
@@ -279,7 +311,7 @@ Pinning
 Each tool resolves in its own group (`checkstyle`, `pmd`, `spotbugs`,
 `forbiddenapis`, `google-java-format`, and `eclipse-java-format` under the `eclipse` profile),
 kept separate from the module's `main`-group dependencies, and floats a
-`RELEASE` version until pinned. The license header check needs no tool. The `dependencies`
+`RELEASE` version until pinned. The license header check, jdeps and jdeprscan need no tool. The `dependencies`
 selector therefore shows none of them as a dependency of the module;
 `-Djenesis.tree.tools=true` prints each tool's closure apart, under a heading
 naming its group. Running

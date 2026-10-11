@@ -95,6 +95,38 @@ public class InferredByteCodeQualityModuleTest {
         assertThat(root.resolve("quality").resolve("forbiddenapis")).doesNotExist();
     }
 
+    @Test
+    public void wires_jdeps_and_jdeprscan_when_their_configurations_are_present() throws IOException {
+        Files.writeString(project.resolve("jdeps.properties"), "");
+        Files.writeString(project.resolve("jdeprscan.properties"), "");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("quality", new InferredByteCodeQualityModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+        executor.execute();
+
+        assertThat(root.resolve("quality").resolve("jdeps").resolve("tool").resolve("check")).isDirectory();
+        assertThat(root.resolve("quality").resolve("jdeprscan").resolve("tool").resolve("check")).isDirectory();
+    }
+
+    @Test
+    public void the_jdeps_and_jdeprscan_overrides_switch_them_off() throws IOException {
+        Files.writeString(project.resolve("jdeps.properties"), "");
+        Files.writeString(project.resolve("jdeprscan.properties"), "");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("quality",
+                new InferredByteCodeQualityModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of())
+                        .jdeps(null)
+                        .jdeprscan(null),
+                "project");
+        executor.execute();
+
+        assertThat(root.resolve("quality").resolve("jdeps")).doesNotExist();
+        assertThat(root.resolve("quality").resolve("jdeprscan")).doesNotExist();
+    }
+
     private BuildExecutor newExecutor() throws IOException {
         return BuildExecutor.of(root,
                 Duration.ZERO,
