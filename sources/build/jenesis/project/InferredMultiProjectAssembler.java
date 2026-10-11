@@ -403,6 +403,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                 repositories,
                                 resolvers)
                         .pinning(descriptor.pinning())
+                        .configuration(descriptor.configuration())
+                        .location(descriptor.location())
                         .custom(hooks.getOrDefault("documentation", none));
                 if (hooks.containsKey("documentation/generate")) {
                     documentationModule = documentationModule.generateModule(InferredDocumentationChainModule.ofEnvironment(environment,

@@ -24,6 +24,8 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
+    private final SequencedSet<Path> configuration;
+    private final Path location;
     private final Javadoc javadocStep;
     private final DokkaDocumentationModule dokkaModule;
     private final ScalaDocumentationModule scaladocModule;
@@ -38,6 +40,8 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                                             Map<String, Resolver> resolvers) {
         this(repositories,
                 resolvers,
+                null,
+                Collections.emptyNavigableSet(),
                 null,
                 new Javadoc(ProcessHandler.Factory.of()),
                 new DokkaDocumentationModule(repositories, resolvers),
@@ -56,6 +60,8 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
         return new InferredDocumentationChainModule(repositories,
                 resolvers,
                 null,
+                Collections.emptyNavigableSet(),
+                null,
                 Javadoc.ofEnvironment(environment, ProcessHandler.Factory.ofEnvironment(environment)),
                 DokkaDocumentationModule.ofEnvironment(environment, repositories, resolvers),
                 ScalaDocumentationModule.ofEnvironment(environment, repositories, resolvers),
@@ -70,6 +76,8 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
     private InferredDocumentationChainModule(Map<String, Repository> repositories,
                                              Map<String, Resolver> resolvers,
                                              Pinning pinning,
+                                             SequencedSet<Path> configuration,
+                                             Path location,
                                              Javadoc javadocStep,
                                              DokkaDocumentationModule dokkaModule,
                                              ScalaDocumentationModule scaladocModule,
@@ -82,6 +90,8 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
+        this.configuration = configuration;
+        this.location = location;
         this.javadocStep = javadocStep;
         this.dokkaModule = dokkaModule;
         this.scaladocModule = scaladocModule;
@@ -97,6 +107,42 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
         return new InferredDocumentationChainModule(repositories,
                 resolvers,
                 pinning,
+                configuration,
+                location,
+                javadocStep,
+                dokkaModule,
+                scaladocModule,
+                groovydocModule,
+                javadoc,
+                dokka,
+                scaladoc,
+                groovydoc,
+                custom);
+    }
+
+    public InferredDocumentationChainModule configuration(SequencedSet<Path> configuration) {
+        return new InferredDocumentationChainModule(repositories,
+                resolvers,
+                pinning,
+                configuration,
+                location,
+                javadocStep,
+                dokkaModule,
+                scaladocModule,
+                groovydocModule,
+                javadoc,
+                dokka,
+                scaladoc,
+                groovydoc,
+                custom);
+    }
+
+    public InferredDocumentationChainModule location(Path location) {
+        return new InferredDocumentationChainModule(repositories,
+                resolvers,
+                pinning,
+                configuration,
+                location,
                 javadocStep,
                 dokkaModule,
                 scaladocModule,
@@ -112,6 +158,8 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
         return new InferredDocumentationChainModule(repositories,
                 resolvers,
                 pinning,
+                configuration,
+                location,
                 javadocStep,
                 dokkaModule,
                 scaladocModule,
@@ -127,6 +175,8 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
         return new InferredDocumentationChainModule(repositories,
                 resolvers,
                 pinning,
+                configuration,
+                location,
                 javadocStep,
                 dokkaModule,
                 scaladocModule,
@@ -142,6 +192,8 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
         return new InferredDocumentationChainModule(repositories,
                 resolvers,
                 pinning,
+                configuration,
+                location,
                 javadocStep,
                 dokkaModule,
                 scaladocModule,
@@ -157,6 +209,8 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
         return new InferredDocumentationChainModule(repositories,
                 resolvers,
                 pinning,
+                configuration,
+                location,
                 javadocStep,
                 dokkaModule,
                 scaladocModule,
@@ -172,6 +226,8 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
         return new InferredDocumentationChainModule(repositories,
                 resolvers,
                 pinning,
+                configuration,
+                location,
                 javadocStep,
                 dokkaModule,
                 scaladocModule,
@@ -198,7 +254,8 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
     }
 
     @Override
-    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
+    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        Path dokkaProperties = BuildStep.locate(configuration, "dokka.properties");
         buildExecutor.addStep(SCAN, new Scan(), inherited.sequencedKeySet());
         SequencedSet<String> documentInputs = new LinkedHashSet<>(inherited.sequencedKeySet());
         documentInputs.add(SCAN);
@@ -207,7 +264,9 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                         resolvers,
                         pinning,
                         javadocStep,
-                        dokkaModule,
+                        dokkaModule.location(location).config(dokkaProperties == null
+                                ? new SequencedProperties()
+                                : SequencedProperties.ofFiles(dokkaProperties)),
                         scaladocModule,
                         groovydocModule,
                         javadoc,
