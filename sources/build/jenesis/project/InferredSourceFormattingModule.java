@@ -16,7 +16,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     private static final String JAVA = "java",
             KTLINT = "ktlint",
             KTFMT = "ktfmt",
-            SCALAFMT = "scalafmt";
+            SCALAFMT = "scalafmt",
+            LICENSE = "license";
     private static final String FORMATTER = "formatter", STYLE = "style", REFLOW = "reflow", JAVADOC = "javadoc",
             IMPORTS = "imports", SORT = "sort", REMOVE = "remove", NONE = "none", PROFILE = "profile";
     private static final Set<String> GOOGLE_KEYS = Set.of(FORMATTER, STYLE, REFLOW, JAVADOC, IMPORTS);
@@ -33,10 +34,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     private final KtlintFormatModule ktlintModule;
     private final KtfmtFormatModule ktfmtModule;
     private final ScalafmtFormatModule scalafmtModule;
+    private final LicenseHeaderModule licenseModule;
     private final Function<BuildExecutorModule, BuildExecutorModule> java;
     private final Function<KtlintFormatModule, BuildExecutorModule> ktlint;
     private final Function<KtfmtFormatModule, BuildExecutorModule> ktfmt;
     private final Function<ScalafmtFormatModule, BuildExecutorModule> scalafmt;
+    private final Function<LicenseHeaderModule, BuildExecutorModule> license;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredSourceFormattingModule(SequencedSet<Path> configuration,
@@ -51,6 +54,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 new KtlintFormatModule(repositories, resolvers),
                 new KtfmtFormatModule(repositories, resolvers),
                 new ScalafmtFormatModule(repositories, resolvers),
+                new LicenseHeaderModule(),
+                value -> value,
                 value -> value,
                 value -> value,
                 value -> value,
@@ -71,6 +76,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 KtlintFormatModule.ofEnvironment(environment, repositories, resolvers),
                 KtfmtFormatModule.ofEnvironment(environment, repositories, resolvers),
                 ScalafmtFormatModule.ofEnvironment(environment, repositories, resolvers),
+                LicenseHeaderModule.ofEnvironment(environment),
+                value -> value,
                 value -> value,
                 value -> value,
                 value -> value,
@@ -96,6 +103,10 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         if (scalafmt != null) {
             module = module.scalafmt(scalafmt ? value -> value : null);
         }
+        Boolean license = environment.flagOrNull("format.license");
+        if (license != null) {
+            module = module.license(license ? value -> value : null);
+        }
         return module;
     }
 
@@ -108,10 +119,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                                            KtlintFormatModule ktlintModule,
                                            KtfmtFormatModule ktfmtModule,
                                            ScalafmtFormatModule scalafmtModule,
+                                           LicenseHeaderModule licenseModule,
                                            Function<BuildExecutorModule, BuildExecutorModule> java,
                                            Function<KtlintFormatModule, BuildExecutorModule> ktlint,
                                            Function<KtfmtFormatModule, BuildExecutorModule> ktfmt,
                                            Function<ScalafmtFormatModule, BuildExecutorModule> scalafmt,
+                                           Function<LicenseHeaderModule, BuildExecutorModule> license,
                                            SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
         this.pinning = pinning;
@@ -122,10 +135,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         this.ktlintModule = ktlintModule;
         this.ktfmtModule = ktfmtModule;
         this.scalafmtModule = scalafmtModule;
+        this.licenseModule = licenseModule;
         this.java = java;
         this.ktlint = ktlint;
         this.ktfmt = ktfmt;
         this.scalafmt = scalafmt;
+        this.license = license;
         this.custom = custom;
     }
 
@@ -139,10 +154,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlintModule,
                 ktfmtModule,
                 scalafmtModule,
+                licenseModule,
                 java,
                 ktlint,
                 ktfmt,
                 scalafmt,
+                license,
                 custom);
     }
 
@@ -156,10 +173,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlintModule,
                 ktfmtModule,
                 scalafmtModule,
+                licenseModule,
                 java,
                 ktlint,
                 ktfmt,
                 scalafmt,
+                license,
                 custom);
     }
 
@@ -173,10 +192,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlintModule,
                 ktfmtModule,
                 scalafmtModule,
+                licenseModule,
                 java,
                 ktlint,
                 ktfmt,
                 scalafmt,
+                license,
                 custom);
     }
 
@@ -190,10 +211,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlintModule,
                 ktfmtModule,
                 scalafmtModule,
+                licenseModule,
                 java,
                 ktlint,
                 ktfmt,
                 scalafmt,
+                license,
                 custom);
     }
 
@@ -207,10 +230,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlintModule,
                 ktfmtModule,
                 scalafmtModule,
+                licenseModule,
                 java,
                 ktlint,
                 ktfmt,
                 scalafmt,
+                license,
                 custom);
     }
 
@@ -224,10 +249,31 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlintModule,
                 ktfmtModule,
                 scalafmtModule,
+                licenseModule,
                 java,
                 ktlint,
                 ktfmt,
                 scalafmt,
+                license,
+                custom);
+    }
+
+    public InferredSourceFormattingModule license(Function<LicenseHeaderModule, BuildExecutorModule> license) {
+        return new InferredSourceFormattingModule(configuration,
+                pinning,
+                verify,
+                googleModule,
+                palantirModule,
+                eclipseModule,
+                ktlintModule,
+                ktfmtModule,
+                scalafmtModule,
+                licenseModule,
+                java,
+                ktlint,
+                ktfmt,
+                scalafmt,
+                license,
                 custom);
     }
 
@@ -241,10 +287,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlintModule,
                 ktfmtModule,
                 scalafmtModule,
+                licenseModule,
                 java,
                 ktlint,
                 ktfmt,
                 scalafmt,
+                license,
                 custom);
     }
 
@@ -264,9 +312,18 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        SequencedSet<String> inputs = new LinkedHashSet<>(inherited.sequencedKeySet());
+        if (Bind.configured(buildExecutor,
+                inherited.sequencedKeySet(),
+                LICENSE,
+                license,
+                LicenseHeaderModule.configurationFile(configuration),
+                () -> licenseModule.verify(verify))) {
+            inputs.add(LICENSE);
+        }
         Path javaFormat = BuildStep.locate(configuration, "javaformat.properties");
         Bind.configuredByProperties(buildExecutor,
-                inherited.sequencedKeySet(),
+                inputs,
                 JAVA,
                 java,
                 javaFormat,
@@ -333,7 +390,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                     + " sources - set jenesis.format.ktlint=false to format with ktfmt alone, or remove ktfmt.properties");
         }
         Bind.configuredByProperties(buildExecutor,
-                inherited.sequencedKeySet(),
+                inputs,
                 KTFMT,
                 ktfmt,
                 ktfmtFile,
@@ -365,13 +422,13 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                             .removeUnusedImports(imports == null || imports.contains(REMOVE));
                 });
         Bind.configured(buildExecutor,
-                inherited.sequencedKeySet(),
+                inputs,
                 KTLINT,
                 ktlint,
                 KtlintFormatModule.configurationFile(configuration),
                 () -> ktlintModule.pinning(pinning).verify(verify));
         Bind.configured(buildExecutor,
-                inherited.sequencedKeySet(),
+                inputs,
                 SCALAFMT,
                 scalafmt,
                 ScalafmtFormatModule.configurationFile(configuration),

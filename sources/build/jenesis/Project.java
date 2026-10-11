@@ -4204,7 +4204,9 @@ public record Project(
                 format.ktlint|true|ktlint formatting, activated by an .editorconfig
                 format.ktfmt|true|ktfmt formatting, activated by a ktfmt.properties, which names its style and what it does to the imports; refused beside ktlint formatting the same sources
                 format.scalafmt|true|scalafmt formatting
+                format.license|true|The license header check, activated by a license-header.txt, which every Java, Kotlin, Scala and Groovy source of a module must start with as a block comment, $YEAR standing for any year or range of years
                 format.rewrite|false|Let the formatters rewrite sources instead of verifying them
+                format.year||The year a license header's $YEAR is written as where -Djenesis.format.rewrite=true inserts one, or replaces one naming no year; a replaced header naming a year keeps it, and without this setting a header that needs one is refused, so a rewrite never writes the day it runs
                 generate.xjc|true|JAXB generation, activated by an xjc.properties
                 generate.protoc|true|protoc generation, activated by a protoc.properties
                 generate.avro|true|Avro generation, activated by an avro.properties
