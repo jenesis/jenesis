@@ -35,7 +35,6 @@ What follows is what remains.
 |---|---|---|
 | **No compile avoidance.** A dependency's jar is compared by its bytes, so any change to it recompiles every module that depends on it, even when its API is unchanged. | L | gson, caffeine, micrometer, moshi |
 | **Formatters take no options.** A line of `process-*.properties` becomes a JVM option, not a formatter option: no AOSP style, no reflow switch, no Eclipse formatter, no ktfmt, no licence headers. | M | moshi, mockito, junit-pioneer, hibernate-validator, jline3, JSqlParser |
-| **Tests always run on the build's JDK.** A test run on another Java version, as a CI matrix does, cannot be declared. | M | JavaHamcrest, JsonPath, junit-pioneer, jsoup, commons-lang, jjwt |
 | **One test run per module.** No second run of the same tests with other JVM options or another selection, as a second Surefire execution does. | M | micrometer, junit-framework, mockito (sibling modules instead), netty |
 
 Compile avoidance matters most: it is the largest share of the difference to Gradle on a build after an edit
@@ -107,6 +106,8 @@ These are decisions rather than gaps. The briefing says so and names the change 
 - a Java 8 or older base built from `module-info.java`;
 - white-box tests through `--patch-module`;
 - Gradle's highest-version conflict resolution;
+- tests on a JDK other than the build's - a CI matrix runs the whole build again with `jenesis.toolchain.version`
+  (JavaHamcrest, JsonPath, junit-pioneer, jsoup, commons-lang, jjwt);
 - retrying a failed test, which belongs to the test framework (JUnit Pioneer's `@RetryingTest`, TestNG's
   `IRetryAnalyzer`), and a JVM per test class - each test module runs in a JVM of its own, so a test that needs one
   becomes a module (micrometer, mockito, caffeine);
@@ -117,9 +118,9 @@ These are decisions rather than gaps. The briefing says so and names the change 
 
 1. **The small items, in one change.** A per-module coordinate variable, a per-module documentation switch, and
    failing on a class-less Kotlin Multiplatform root.
-2. **Test JDK and test runs.** Choosing the JDK a test run uses, and declaring more than one run per module, belong
-   together: a second run on another Java version is the most common reason for a second run. About eight
-   projects.
-3. **Formatter options.** Six projects.
-4. **Compile avoidance.** Compare a dependency by a fingerprint of its API rather than its bytes. The largest change,
+2. **Kotlin.** Friend paths for tests and multi-release Kotlin sources, then KSP.
+3. **The annotation-processor fallback** to the class path in a module build.
+4. **The medium compiler and test items.** Joint Java and Groovy compilation, Groovy before 4 and Scala 2, and a
+   test module that keeps a jar without a module identity on the class path.
+5. **Compile avoidance.** Compare a dependency by a fingerprint of its API rather than its bytes. The largest change,
    and the one a build after an edit shows most.
