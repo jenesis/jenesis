@@ -30,7 +30,11 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
 
     protected abstract boolean isFormattable(Path file);
 
-    protected abstract List<String> command(List<String> jars, Path config, List<String> files, boolean verify);
+    protected abstract List<String> command(BuildStepContext context,
+                                            List<String> jars,
+                                            Path config,
+                                            List<String> files,
+                                            boolean verify) throws IOException;
 
     protected Path config(Path folder) {
         return null;
@@ -97,7 +101,7 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
             throw new IllegalStateException("No " + tool + " jars resolved upstream of the " + tool + " step");
         }
         files.sort(null);
-        return CompletableFuture.completedStage(command(jars, config, files, verify));
+        return CompletableFuture.completedStage(command(context, jars, config, files, verify));
     }
 
     @Override

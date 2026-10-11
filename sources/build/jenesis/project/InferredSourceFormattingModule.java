@@ -17,15 +17,17 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
             KTLINT = "ktlint",
             SCALAFMT = "scalafmt";
     private static final String FORMATTER = "formatter", STYLE = "style", REFLOW = "reflow", JAVADOC = "javadoc",
-            IMPORTS = "imports", SORT = "sort", REMOVE = "remove", NONE = "none";
+            IMPORTS = "imports", SORT = "sort", REMOVE = "remove", NONE = "none", PROFILE = "profile";
     private static final Set<String> GOOGLE_KEYS = Set.of(FORMATTER, STYLE, REFLOW, JAVADOC, IMPORTS);
     private static final Set<String> PALANTIR_KEYS = Set.of(FORMATTER, REFLOW, IMPORTS);
+    private static final Set<String> ECLIPSE_KEYS = Set.of(FORMATTER, PROFILE);
 
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
     private final boolean verify;
     private final GoogleJavaFormatModule googleModule;
     private final PalantirJavaFormatModule palantirModule;
+    private final EclipseJavaFormatModule eclipseModule;
     private final KtlintFormatModule ktlintModule;
     private final ScalafmtFormatModule scalafmtModule;
     private final Function<BuildExecutorModule, BuildExecutorModule> java;
@@ -41,6 +43,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 true,
                 new GoogleJavaFormatModule(repositories, resolvers),
                 new PalantirJavaFormatModule(repositories, resolvers),
+                new EclipseJavaFormatModule(repositories, resolvers),
                 new KtlintFormatModule(repositories, resolvers),
                 new ScalafmtFormatModule(repositories, resolvers),
                 value -> value,
@@ -58,6 +61,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 true,
                 GoogleJavaFormatModule.ofEnvironment(environment, repositories, resolvers),
                 PalantirJavaFormatModule.ofEnvironment(environment, repositories, resolvers),
+                EclipseJavaFormatModule.ofEnvironment(environment, repositories, resolvers),
                 KtlintFormatModule.ofEnvironment(environment, repositories, resolvers),
                 ScalafmtFormatModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
@@ -88,6 +92,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                                            boolean verify,
                                            GoogleJavaFormatModule googleModule,
                                            PalantirJavaFormatModule palantirModule,
+                                           EclipseJavaFormatModule eclipseModule,
                                            KtlintFormatModule ktlintModule,
                                            ScalafmtFormatModule scalafmtModule,
                                            Function<BuildExecutorModule, BuildExecutorModule> java,
@@ -99,6 +104,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         this.verify = verify;
         this.googleModule = googleModule;
         this.palantirModule = palantirModule;
+        this.eclipseModule = eclipseModule;
         this.ktlintModule = ktlintModule;
         this.scalafmtModule = scalafmtModule;
         this.java = java;
@@ -113,6 +119,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 googleModule,
                 palantirModule,
+                eclipseModule,
                 ktlintModule,
                 scalafmtModule,
                 java,
@@ -127,6 +134,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 googleModule,
                 palantirModule,
+                eclipseModule,
                 ktlintModule,
                 scalafmtModule,
                 java,
@@ -141,6 +149,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 googleModule,
                 palantirModule,
+                eclipseModule,
                 ktlintModule,
                 scalafmtModule,
                 java,
@@ -155,6 +164,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 googleModule,
                 palantirModule,
+                eclipseModule,
                 ktlintModule,
                 scalafmtModule,
                 java,
@@ -169,6 +179,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 googleModule,
                 palantirModule,
+                eclipseModule,
                 ktlintModule,
                 scalafmtModule,
                 java,
@@ -183,6 +194,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 googleModule,
                 palantirModule,
+                eclipseModule,
                 ktlintModule,
                 scalafmtModule,
                 java,
@@ -207,11 +219,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        Path javaFormat = BuildStep.locate(configuration, "javaformat.properties");
         Bind.configuredByProperties(buildExecutor,
                 inherited.sequencedKeySet(),
                 JAVA,
                 java,
-                BuildStep.locate(configuration, "javaformat.properties"),
+                javaFormat,
                 properties -> switch (properties.value(FORMATTER)) {
                     case "google" -> {
                         Set<String> imports = javaFormat(properties, "google-java-format", GOOGLE_KEYS);
@@ -236,6 +249,26 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                                 .reflow(properties.flag(REFLOW, true))
                                 .sortImports(imports.contains(SORT))
                                 .removeUnusedImports(imports.contains(REMOVE));
+                    }
+                    case "eclipse" -> {
+                        javaFormat(properties, "the Eclipse formatter", ECLIPSE_KEYS);
+                        String profile = properties.value(PROFILE);
+                        if (profile == null) {
+                            yield eclipseModule.pinning(pinning).verify(verify);
+                        }
+                        Path relative = Path.of(profile).normalize();
+                        if (relative.isAbsolute() || relative.startsWith("..")) {
+                            throw new IllegalArgumentException("javaformat.properties names " + PROFILE + "=" + profile
+                                    + ", which is not beside or below it - place the profile in the folder of"
+                                    + " javaformat.properties");
+                        }
+                        Path resolved = javaFormat.resolveSibling(relative);
+                        if (!Files.isRegularFile(resolved)) {
+                            throw new IllegalArgumentException("javaformat.properties names " + PROFILE + "=" + profile
+                                    + ", but " + resolved + " is no file - export the formatter profile from Eclipse"
+                                    + " there");
+                        }
+                        yield eclipseModule.pinning(pinning).verify(verify).profile(resolved);
                     }
                     case null -> {
                         if (!properties.stringPropertyNames().isEmpty()) {

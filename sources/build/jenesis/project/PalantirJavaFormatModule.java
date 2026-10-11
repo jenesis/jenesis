@@ -210,7 +210,11 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
         }
 
         @Override
-        protected List<String> command(List<String> jars, Path config, List<String> files, boolean verify) {
+        protected List<String> command(BuildStepContext context,
+                                       List<String> jars,
+                                       Path config,
+                                       List<String> files,
+                                       boolean verify) {
             List<String> commands = new ArrayList<>(List.of(
                     "--add-exports", "jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
                     "--add-exports", "jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",

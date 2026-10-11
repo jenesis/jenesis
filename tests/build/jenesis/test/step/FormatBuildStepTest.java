@@ -7,6 +7,7 @@ import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
+import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
@@ -149,7 +150,11 @@ public class FormatBuildStepTest {
         }
 
         @Override
-        protected List<String> command(List<String> jars, Path config, List<String> files, boolean verify) {
+        protected List<String> command(BuildStepContext context,
+                                       List<String> jars,
+                                       Path config,
+                                       List<String> files,
+                                       boolean verify) {
             VERIFIED.add(files.stream().map(file -> Path.of(file).getFileName().toString()).toList());
             boolean unformatted = files.stream().anyMatch(file -> {
                 try {
