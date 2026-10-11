@@ -688,7 +688,10 @@ against. `-Djenesis.artifact.japicmp=false` is the opt-out.
 Other JVM languages need no configuration beyond their sources. `kotlin` is a
 module that mixes Java and Kotlin, and exports a package holding only Kotlin. The
 Kotlin compiler is resolved and pinned in a `kotlinc` group of its own, so it
-never mixes with the project's own dependencies.
+never mixes with the project's own dependencies. With
+`-Djenesis.project.documentation=true` Dokka documents the Kotlin sources, and a
+`dokka.properties` sets what the Dokka Gradle and Maven plugins configure - the
+module name, Markdown includes, source links, external links and the footer.
 
 `kotlin-quality` infers detekt (`detekt.yml`) and ktlint (`.editorconfig`) from
 their configuration files, with ktlint doubling as the formatter and sharing the

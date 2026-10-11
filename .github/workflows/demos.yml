@@ -114,7 +114,7 @@ jobs:
           - { name: jmh, dir: demo-39-jmh, entry: build/jenesis/Execute.java, verify: 'jar tf "$(find target -path "*/output/artifacts/*.jar" | head -1)" | grep -q "META-INF/BenchmarkList"' }
           - { name: api-compatibility, dir: demo-40-api-compatibility, entry: build/Demo.java, flags: -Djenesis.dependency.pin=versions, verify: 'find target -path "*reports/japicmp/japicmp-report.xml" -exec grep -l "library.Library" {} + | grep -q .' }
           - { name: kotlin, dir: demo-41-kotlin, entry: build/jenesis/Make.java, verify: 'find target -path "*/output/artifacts/*.jar" | grep -q .' }
-          - { name: kotlin-documentation, dir: demo-41-kotlin, entry: build/jenesis/Make.java, flags: -Djenesis.project.documentation=true, verify: 'find target -type d -name documentation | grep -q .' }
+          - { name: kotlin-documentation, dir: demo-41-kotlin, entry: build/jenesis/Make.java, flags: -Djenesis.project.documentation=true, verify: 'd="$(find target -type d -path "*documentation/generate/document/aggregate/output/javadoc" | head -1)" && grep -q "Documented by Dokka, built by Jenesis" "$d/index.html" && grep -q "documented from its Kotlin sources" "$d/index.html" && grep -rq "demo-41-kotlin/sources/sample/Sample.kt#L" "$d"' }
           - { name: kotlin-quality, dir: demo-42-kotlin-quality, entry: build/jenesis/Make.java, verify: 'find target -type d -name detekt | grep -q . && find target -type d -name ktlint | grep -q .' }
           - { name: kotlin-plugin, dir: demo-43-kotlin-plugin, entry: build/jenesis/Make.java, verify: 'find target -path "*/output/artifacts/*.jar" | grep -q .' }
           - { name: scala, dir: demo-44-scala, entry: build/jenesis/Make.java, verify: 'find target -path "*/output/artifacts/*.jar" | grep -q .' }

@@ -28,6 +28,9 @@ sources out under one package:
     |-- sources
     |   |-- module-info.java       requires kotlin.stdlib; exports sample; exports sample.pure
     |   |-- messages.properties    a root resource, read by Greeter at run time
+    |   |-- META-INF/build.jenesis
+    |   |   |-- dokka.properties   configures Dokka, when the build documents the module
+    |   |   `-- Module.md          the module and package documentation Dokka includes
     |   `-- sample
     |       |-- Greeter.java       a Java type in the exported 'sample' package; loads the resource
     |       |-- Sample.kt          Kotlin that calls Greeter
@@ -77,6 +80,35 @@ packaged into the mixed jar and is loadable. (Files under `META-INF/` are always
 copied this way too, except the `META-INF/versions/` multi-release overlay, which is
 compiled - see `../demo-11-java-multi-release`.)
 
+Documenting the Kotlin sources
+------------------------------
+
+With `-Djenesis.project.documentation=true`, Jenesis documents the module and
+archives the documentation as its javadoc jar. A module with Kotlin sources is
+documented by Dokka, resolved and pinned in a `dokka` group of its own:
+
+    java -Djenesis.project.documentation=true build/jenesis/Make.java
+
+`sources/META-INF/build.jenesis/dokka.properties` configures Dokka with the
+options the Dokka Gradle plugin and the `dokka-maven-plugin` take:
+
+    module-name=Kotlin demo
+    includes=META-INF/build.jenesis/Module.md
+    source-link=https://github.com/jenesis/jenesis/tree/main/demo/demo-41-kotlin/sources
+    footer-message=Documented by Dokka, built by Jenesis
+
+A file the properties name, here `Module.md`, is resolved against the module's
+folder, the one holding `module-info.java`, and is an input of the build:
+editing it renders the documentation again. The pages name the module
+`Kotlin demo`, open with the text of `Module.md`, link every declaration to its
+line on GitHub, and carry the footer. The other keys are `documented-visibilities`,
+`suppress-obvious-functions`, `suppress-inherited-members`, `skip-empty-packages`,
+`skip-deprecated`, `report-undocumented`, `suppressed-packages`, `fail-on-warning`,
+`jdk-version`, `source-link-suffix`, `external-link.<name>` with its
+`external-link.<name>.package-list`, `format=html|javadoc`, `custom-assets` and
+`custom-styles`; an unknown key fails the build, and so does Dokka when it
+fails, as javadoc does.
+
 Pinning
 -------
 
@@ -85,7 +117,8 @@ declaration: the module's own dependencies in the default `main` group (the Java
 module `kotlin.stdlib`, plus the non-modular transitives as
 `org.jetbrains.kotlin/kotlin-stdlib` and `org.jetbrains/annotations`) and the
 Kotlin compiler toolchain in its own `kotlinc` group (each
-`kotlinc/maven/...` coordinate with a version and SHA-256 checksum). Because the
-groups are separate, the running compiler is locked independently of the
-`kotlin.stdlib` the module ships against. Run `java build/jenesis/Make.java
-pin` to record or refresh the tags; re-running leaves the declaration unchanged.
+`kotlinc/maven/...` coordinate with a version and SHA-256 checksum), and Dokka
+in its `dokka` group. Because the groups are separate, the running compiler is
+locked independently of the `kotlin.stdlib` the module ships against. Run
+`java build/jenesis/Make.java pin` to record or refresh the tags; re-running
+leaves the declaration unchanged.
