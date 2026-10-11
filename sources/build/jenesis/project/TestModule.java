@@ -18,6 +18,7 @@ import build.jenesis.step.Dependencies;
 import build.jenesis.step.Java;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
+import javax.lang.model.SourceVersion;
 import org.xml.sax.Attributes;
 
 public class TestModule implements BuildExecutorModule {
@@ -41,6 +42,7 @@ public class TestModule implements BuildExecutorModule {
     private final String exclude;
     private final String tag;
     private final String engines;
+    private final List<String> scan;
     private final boolean force;
     private final boolean parallel;
     private final boolean reporting;
@@ -66,6 +68,7 @@ public class TestModule implements BuildExecutorModule {
                 null,
                 null,
                 null,
+                List.of(),
                 false,
                 false,
                 false,
@@ -94,6 +97,7 @@ public class TestModule implements BuildExecutorModule {
                 environment.getProperty("test.exclude"),
                 environment.getProperty("test.tag"),
                 null,
+                List.of(),
                 environment.flag("test.force"),
                 environment.flag("test.parallel"),
                 environment.flag("test.reporting"),
@@ -141,6 +145,7 @@ public class TestModule implements BuildExecutorModule {
                        String exclude,
                        String tag,
                        String engines,
+                       List<String> scan,
                        boolean force,
                        boolean parallel,
                        boolean reporting,
@@ -165,6 +170,7 @@ public class TestModule implements BuildExecutorModule {
         this.exclude = exclude;
         this.tag = tag;
         this.engines = engines;
+        this.scan = scan;
         this.force = force;
         this.parallel = parallel;
         this.reporting = reporting;
@@ -190,6 +196,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -216,6 +223,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -242,6 +250,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -268,6 +277,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -294,6 +304,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -320,6 +331,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -346,6 +358,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -372,6 +385,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -398,6 +412,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -424,6 +439,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -450,6 +466,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -476,6 +493,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -502,6 +520,44 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                incrementalDigest,
+                terms,
+                skip);
+    }
+
+    public TestModule scan(List<String> scan) {
+        for (String dependency : scan) {
+            int slash = dependency.indexOf('/');
+            if (slash < 0
+                    ? !SourceVersion.isName(dependency)
+                    : slash == 0 || slash == dependency.length() - 1 || dependency.indexOf('/', slash + 1) >= 0) {
+                throw new IllegalArgumentException("The scan key of test.properties names the dependencies whose test"
+                        + " classes run among the module's own, comma-separated, each by its module name or as"
+                        + " <groupId>/<artifactId>, as org.example.tck or org.example/tck: " + dependency);
+            }
+        }
+        return new TestModule(framework,
+                isTest,
+                factory,
+                resolvers,
+                dependencies,
+                jarsOnly,
+                requireFramework,
+                pinning,
+                pathPlacement,
+                moduleName,
+                directory,
+                filter,
+                exclude,
+                tag,
+                engines,
+                List.copyOf(scan),
                 force,
                 parallel,
                 reporting,
@@ -528,6 +584,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -554,6 +611,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -580,6 +638,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -606,6 +665,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -636,6 +696,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -662,6 +723,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -688,6 +750,7 @@ public class TestModule implements BuildExecutorModule {
                 exclude,
                 tag,
                 engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -740,6 +803,7 @@ public class TestModule implements BuildExecutorModule {
                         exclude,
                         tag,
                         engines,
+                        scan,
                         force,
                         parallel,
                         reporting,
@@ -926,6 +990,7 @@ public class TestModule implements BuildExecutorModule {
         private final transient String exclude;
         private final transient String tag;
         private final String engines;
+        private final List<String> scan;
         private final transient boolean force;
         private final transient boolean parallel;
         private final boolean reporting;
@@ -945,6 +1010,7 @@ public class TestModule implements BuildExecutorModule {
                     String exclude,
                     String tag,
                     String engines,
+                    List<String> scan,
                     boolean force,
                     boolean parallel,
                     boolean reporting,
@@ -964,6 +1030,7 @@ public class TestModule implements BuildExecutorModule {
             this.exclude = exclude;
             this.tag = tag;
             this.engines = engines;
+            this.scan = scan;
             this.force = force;
             this.parallel = parallel;
             this.reporting = reporting;
@@ -1176,11 +1243,52 @@ public class TestModule implements BuildExecutorModule {
             for (Map.Entry<String, String> entry : resolved.systemProperties().entrySet()) {
                 commands.add("-D" + entry.getKey() + "=" + entry.getValue());
             }
+            SequencedSet<Path> scanned = new LinkedHashSet<>();
+            for (String dependency : scan) {
+                SequencedSet<Path> held = new LinkedHashSet<>();
+                for (BuildStepArgument argument : arguments.values()) {
+                    if (argument.removed()) {
+                        continue;
+                    }
+                    if (dependency.indexOf('/') < 0) {
+                        for (Path jar : Dependencies.select(argument.folder(), group, "runtime")) {
+                            ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
+                            if (descriptor != null && descriptor.name().equals(dependency)) {
+                                held.add(jar);
+                            }
+                        }
+                    } else {
+                        held.addAll(Dependencies.select(argument.folder(), group, "runtime/maven/" + dependency));
+                    }
+                }
+                if (held.isEmpty()) {
+                    throw new IllegalStateException("The tests of " + (path == null ? "this module" : path) + " scan "
+                            + dependency + " for test classes, but no jar of it is on their test path - declare it"
+                            + " a dependency of these tests, "
+                            + (dependency.indexOf('/') < 0
+                                    ? "as requires " + dependency + "; in their module-info.java"
+                                    : "as a <dependency> on " + dependency.replace('/', ':') + " in their pom.xml,"
+                                            + " or by requiring the module it holds")
+                            + ", or remove it from the scan key of test.properties or the dependenciesToScan of"
+                            + " maven-surefire-plugin");
+                }
+                scanned.addAll(held);
+            }
             if (pathPlacement.modular() && resolved.runnerModule() != null) {
+                SequencedSet<String> added = new LinkedHashSet<>();
                 if (moduleName != null) {
+                    added.add(moduleName);
+                }
+                for (Path jar : scanned) {
+                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
+                    if (descriptor != null && pathPlacement.test(jar)) {
+                        added.add(descriptor.name());
+                    }
+                }
+                if (!added.isEmpty()) {
                     commands.add("--add-modules");
-                    commands.add(moduleName);
-                    ModuleDescriptor tested = null;
+                    commands.add(String.join(",", added));
+                    Map<String, ModuleDescriptor> opened = new HashMap<>();
                     SequencedSet<String> targets = new TreeSet<>();
                     Set<String> reflecting = resolved.reflectingModules();
                     for (BuildStepArgument argument : arguments.values()) {
@@ -1204,20 +1312,26 @@ public class TestModule implements BuildExecutorModule {
                             if (descriptor == null) {
                                 continue;
                             }
-                            if (descriptor.name().equals(moduleName)) {
-                                if (tested == null) {
-                                    tested = ModuleFinder.of(file).find(moduleName).orElseThrow().descriptor();
+                            if (added.contains(descriptor.name())) {
+                                if (!descriptor.isAutomatic() && !opened.containsKey(descriptor.name())) {
+                                    opened.put(descriptor.name(), ModuleFinder.of(file)
+                                            .find(descriptor.name())
+                                            .orElseThrow()
+                                            .descriptor());
                                 }
                             } else if (reflecting.contains(descriptor.name()) && pathPlacement.test(file)) {
                                 targets.add(descriptor.name());
                             }
                         }
                     }
-                    if (tested != null && !tested.isOpen()) {
-                        String target = targets.isEmpty() ? "ALL-UNNAMED" : String.join(",", targets);
-                        for (String name : new TreeSet<>(tested.packages())) {
-                            commands.add("--add-opens");
-                            commands.add(moduleName + "/" + name + "=" + target);
+                    String target = targets.isEmpty() ? "ALL-UNNAMED" : String.join(",", targets);
+                    for (String name : added) {
+                        ModuleDescriptor described = opened.get(name);
+                        if (described != null && !described.isOpen()) {
+                            for (String opening : new TreeSet<>(described.packages())) {
+                                commands.add("--add-opens");
+                                commands.add(name + "/" + opening + "=" + target);
+                            }
                         }
                     }
                 }
@@ -1270,6 +1384,33 @@ public class TestModule implements BuildExecutorModule {
                 }
                 return Optional.empty();
             });
+            BiConsumer<String, ClassModel> select = (className, model) -> {
+                if ((model.flags().flagsMask() & (ClassFile.ACC_ABSTRACT | ClassFile.ACC_MODULE)) != 0) {
+                    return;
+                }
+                boolean left = excluded.stream().anyMatch(pattern -> pattern.matcher(className).matches());
+                if (specs.isEmpty()) {
+                    if (isTest.test(className) && holdsTests(resolved, model, locator)) {
+                        (left ? excludedClasses : matchedClasses).add(className);
+                    }
+                } else {
+                    SequencedSet<String> methods = new TreeSet<>();
+                    for (TestSpec spec : specs) {
+                        if (spec.classPattern.matcher(className).matches()) {
+                            if (left) {
+                                excludedClasses.add(className);
+                            } else if (spec.method == null) {
+                                matchedClasses.add(className);
+                            } else {
+                                methods.add(spec.method);
+                            }
+                        }
+                    }
+                    if (!methods.isEmpty() && !matchedClasses.contains(className)) {
+                        matchedMethods.put(className, methods);
+                    }
+                }
+            };
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
@@ -1288,39 +1429,28 @@ public class TestModule implements BuildExecutorModule {
                         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                             if (file.toString().endsWith(".class")) {
                                 String raw = classes.relativize(file).toString();
-                                String className = raw.substring(0, raw.length() - 6).replace(File.separatorChar, '.');
                                 compiled.incrementAndGet();
-                                ClassModel model = classFile.parse(file);
-                                if ((model.flags().flagsMask()
-                                        & (ClassFile.ACC_ABSTRACT | ClassFile.ACC_MODULE)) != 0) {
-                                    return FileVisitResult.CONTINUE;
-                                }
-                                boolean left = excluded.stream().anyMatch(pattern -> pattern.matcher(className).matches());
-                                if (specs.isEmpty()) {
-                                    if (isTest.test(className) && holdsTests(resolved, model, locator)) {
-                                        (left ? excludedClasses : matchedClasses).add(className);
-                                    }
-                                } else {
-                                    SequencedSet<String> methods = new TreeSet<>();
-                                    for (TestSpec spec : specs) {
-                                        if (spec.classPattern.matcher(className).matches()) {
-                                            if (left) {
-                                                excludedClasses.add(className);
-                                            } else if (spec.method == null) {
-                                                matchedClasses.add(className);
-                                            } else {
-                                                methods.add(spec.method);
-                                            }
-                                        }
-                                    }
-                                    if (!methods.isEmpty() && !matchedClasses.contains(className)) {
-                                        matchedMethods.put(className, methods);
-                                    }
-                                }
+                                select.accept(raw.substring(0, raw.length() - 6).replace(File.separatorChar, '.'),
+                                        classFile.parse(file));
                             }
                             return FileVisitResult.CONTINUE;
                         }
                     });
+                }
+            }
+            int contained = 0;
+            for (Path jar : scanned) {
+                try (JarFile archive = new JarFile(jar.toFile())) {
+                    for (JarEntry entry : Collections.list(archive.entries())) {
+                        String name = entry.getName();
+                        if (name.endsWith(".class") && !name.startsWith("META-INF/") && !name.equals("module-info.class")) {
+                            contained++;
+                            try (InputStream input = archive.getInputStream(entry)) {
+                                select.accept(name.substring(0, name.length() - 6).replace('/', '.'),
+                                        classFile.parse(input.readAllBytes()));
+                            }
+                        }
+                    }
                 }
             }
             if (matchedClasses.isEmpty() && matchedMethods.isEmpty() && !excludedClasses.isEmpty()) {
@@ -1330,7 +1460,9 @@ public class TestModule implements BuildExecutorModule {
                         + (compiledFrom == null ? "" : " from " + compiledFrom + ", the folder compiled for"
                                 + " these tests beside src/test/kotlin and src/test/groovy of a pom.xml, so tests kept"
                                 + " in another one need it named as the test sources, by testSourceDirectory in a"
-                                + " pom.xml");
+                                + " pom.xml")
+                        + (scanned.isEmpty() ? "" : ", nor among the " + contained + " classes of the scanned "
+                                + scanned.stream().map(jar -> jar.getFileName().toString()).collect(Collectors.joining(", ")));
                 if (!specs.isEmpty()) {
                     throw new IllegalStateException("No tests matched the requested selection, filter: " + filter
                             + ", " + unmatched

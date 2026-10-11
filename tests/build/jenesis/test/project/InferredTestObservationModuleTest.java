@@ -213,6 +213,68 @@ public class InferredTestObservationModuleTest {
     }
 
     @Test
+    public void a_test_properties_file_names_the_dependencies_whose_tests_run_among_the_module_own()
+            throws IOException {
+        Files.writeString(project.resolve("test.properties"), "framework=junit-platform\nscan=org.example/tck\n");
+        Files.createDirectories(project.resolve(BuildStep.ARTIFACTS));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", resolving().test(module -> module.jarsOnly(false)), "project");
+
+        assertThatThrownBy(executor::execute)
+                .as("the test run looks for the jar the file names among the dependencies of the tests")
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .rootCause()
+                .hasMessageContaining("scan org.example/tck for test classes");
+    }
+
+    @Test
+    public void scans_what_the_module_description_names_from_a_pom_xml() throws IOException {
+        Files.writeString(project.resolve(BuildStep.MODULE), "test=\nscan=org.example/surefire\n");
+        Files.writeString(project.resolve("test.properties"), "framework=junit-platform\n");
+        Files.createDirectories(project.resolve(BuildStep.ARTIFACTS));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", resolving().test(module -> module.jarsOnly(false)), "project");
+
+        assertThatThrownBy(executor::execute)
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .rootCause()
+                .hasMessageContaining("scan org.example/surefire for test classes");
+    }
+
+    @Test
+    public void the_scan_of_a_test_properties_file_wins_over_the_one_of_the_module_description() throws IOException {
+        Files.writeString(project.resolve(BuildStep.MODULE), "test=\nscan=org.example/surefire\n");
+        Files.writeString(project.resolve("test.properties"), "framework=junit-platform\nscan=org.example/tck\n");
+        Files.createDirectories(project.resolve(BuildStep.ARTIFACTS));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", resolving().test(module -> module.jarsOnly(false)), "project");
+
+        assertThatThrownBy(executor::execute)
+                .as("the module's own file replaces what its pom.xml declares")
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .rootCause()
+                .hasMessageContaining("scan org.example/tck for test classes")
+                .hasMessageNotContaining("surefire for test classes");
+    }
+
+    @Test
+    public void a_test_properties_file_rejects_a_scan_that_names_no_dependency() throws IOException {
+        Files.writeString(project.resolve("test.properties"), "scan=org.example/tck/1.0");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", observation(), "project");
+
+        assertThatThrownBy(executor::execute)
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("by its module name or as <groupId>/<artifactId>")
+                .hasMessageContaining("org.example/tck/1.0");
+    }
+
+    @Test
     public void an_empty_test_properties_file_leaves_the_engine_inferred() throws IOException {
         Files.writeString(project.resolve("test.properties"), "");
         Files.createDirectories(project.resolve(BuildStep.ARTIFACTS));
