@@ -372,6 +372,7 @@ public class Javac extends ProcessBuildStep {
         SequencedMap<Integer, List<String>> versionedRoots = new TreeMap<>();
         Map<Integer, String> versionedModules = new HashMap<>();
         List<String> dependencyPath = new ArrayList<>(), processorPath = new ArrayList<>();
+        List<Path> classRoots = new ArrayList<>();
         boolean compilerPlugins = false;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -380,6 +381,7 @@ public class Javac extends ProcessBuildStep {
             Path classes = argument.folder().resolve(CLASSES);
             if (Files.exists(classes)) {
                 dependencyPath.add(classes.toString());
+                classRoots.add(classes);
             }
             for (Path jar : Dependencies.select(argument.folder(), group, "compile")) {
                 dependencyPath.add(jar.toString());
@@ -455,6 +457,15 @@ public class Javac extends ProcessBuildStep {
             int release = entry.getKey();
             List<String> files = entry.getValue();
             List<String> roots = versionedRoots.get(release);
+            List<String> overlays = new ArrayList<>();
+            for (Path classes : classRoots) {
+                for (int lower = release; lower >= 9; lower--) {
+                    Path overlay = classes.resolve("META-INF/versions/" + lower);
+                    if (Files.isDirectory(overlay)) {
+                        overlays.add(overlay.toString());
+                    }
+                }
+            }
             chain = chain.thenComposeAsync(_ -> {
                 try {
                     return runVersioned(executor,
@@ -470,6 +481,7 @@ public class Javac extends ProcessBuildStep {
                             versionedModules.get(release),
                             mainTarget,
                             roots,
+                            overlays,
                             release,
                             files);
                 } catch (IOException e) {
@@ -492,7 +504,7 @@ public class Javac extends ProcessBuildStep {
         }, executor);
     }
 
-    private static boolean hasMultiReleaseManifest(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+    public static boolean hasMultiReleaseManifest(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -523,6 +535,7 @@ public class Javac extends ProcessBuildStep {
                                                String versionedModule,
                                                Path mainTarget,
                                                List<String> versionedRoots,
+                                               List<String> overlays,
                                                int release,
                                                List<String> files) throws IOException {
         Path target = Files.createDirectories(context.next()
@@ -547,11 +560,13 @@ public class Javac extends ProcessBuildStep {
                 }
                 patchModule.addAll(versionedRoots);
             }
+            patchModule.addAll(overlays);
             PathPlacement pathPlacement = this.pathPlacement.forModuleInfo(true);
             for (String entry : dependencyPath) {
                 (pathPlacement.test(Path.of(entry)) ? modulePath : classPath).add(entry);
             }
         } else {
+            classPath.addAll(overlays);
             if (Files.exists(mainTarget)) {
                 classPath.add(mainTarget.toString());
             }
@@ -607,7 +622,7 @@ public class Javac extends ProcessBuildStep {
         return future;
     }
 
-    private static Integer versionOf(Path relative) {
+    public static Integer versionOf(Path relative) {
         String normalized = relative.toString().replace(File.separatorChar, '/');
         Matcher matcher = VERSIONED.matcher(normalized);
         return matcher.matches() ? Integer.parseInt(matcher.group(1)) : null;

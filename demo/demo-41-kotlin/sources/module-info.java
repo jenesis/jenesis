@@ -1,5 +1,5 @@
 /**
- * @jenesis.release 25
+ * @jenesis.release 21
  * @jenesis.pin dokka/maven/com.fasterxml.jackson.core/jackson-annotations 2.15.3 SHA-256/aae865c3d88256d61b11523cb1e88bd48d5b9ad5855fa1fc859504fd2204708a
  * @jenesis.pin dokka/maven/com.fasterxml.jackson.core/jackson-core 2.15.3 SHA-256/51fab7aad51ed588482edc507fd542747936c5094d1ab76ed21ddb63b96b610d
  * @jenesis.pin dokka/maven/com.fasterxml.jackson.core/jackson-databind 2.15.3 SHA-256/c3c53333a2172a80678bda1803e39cff45bec6ae3e9c7d4f44a81ec4e2ab18dc

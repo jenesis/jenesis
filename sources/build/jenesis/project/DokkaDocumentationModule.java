@@ -447,6 +447,14 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
                     .append("    \"skipEmptyPackages\": ").append(options.skipEmptyPackages()).append(",\n")
                     .append("    \"skipDeprecated\": ").append(options.skipDeprecated()).append(",\n")
                     .append("    \"reportUndocumented\": ").append(options.reportUndocumented());
+            List<String> versioned = sources.stream()
+                    .map(root -> Path.of(root).resolve("META-INF").resolve("versions"))
+                    .filter(Files::isDirectory)
+                    .map(Path::toString)
+                    .toList();
+            if (!versioned.isEmpty()) {
+                sourceSet.append(",\n    \"suppressedFiles\": ").append(strings(versioned));
+            }
             if (!options.documentedVisibilities().isEmpty()) {
                 sourceSet.append(",\n    \"documentedVisibilities\": ").append(strings(options.documentedVisibilities()));
             }

@@ -702,6 +702,41 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void versioned_compilation_sees_the_classes_another_compiler_wrote_for_its_release(boolean process) throws IOException {
+        Path kotlin = Files.createDirectories(root.resolve("kotlin"));
+        compile(kotlin.resolve(BuildStep.CLASSES), "sample/Other.java", """
+                package sample;
+                public class Other { }
+                """);
+        compile(kotlin.resolve(BuildStep.CLASSES + "META-INF/versions/21"), "sample/Other.java", """
+                package sample;
+                public class Other { public static String modern() { return "modern"; } }
+                """);
+        Path main = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(main.resolve("Helper.java"), "package sample; public class Helper { }\n");
+        Path versioned = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/21/sample"));
+        Files.writeString(versioned.resolve("Caller.java"), """
+                package sample;
+                public class Caller { public String value() { return Other.modern(); } }
+                """);
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("kotlin", new BuildStepArgument(kotlin, Map.of(
+                Path.of("classes/sample/Other.class"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("classes/META-INF/versions/21/sample/Other.class"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/Helper.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/META-INF/versions/21/sample/Caller.java"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                arguments).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "META-INF/versions/21/sample/Caller.class"))
+                .as("a versioned source compiles against the versioned classes of its release ahead of their base")
+                .isNotEmptyFile();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void versioned_compilation_patches_module_for_modular_main(boolean process) throws IOException {
         Path main = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(sources.resolve(BuildStep.SOURCES).resolve("module-info.java"),

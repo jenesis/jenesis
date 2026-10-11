@@ -80,6 +80,23 @@ packaged into the mixed jar and is loadable. (Files under `META-INF/` are always
 copied this way too, except the `META-INF/versions/` multi-release overlay, which is
 compiled - see `../demo-11-java-multi-release`.)
 
+A multi-release overlay in Kotlin
+---------------------------------
+
+The module compiles for Java 21, as `@jenesis.release 21` declares, and holds a
+second `Pure.kt` below `sources/META-INF/versions/25/`, exactly where
+`java-multi-release` keeps a newer Java class. Kotlin compiles it for Java 25 into
+the jar's `META-INF/versions/25/`, beside the Java 21 class of the same name, and
+the jar declares `Multi-Release: true`:
+
+    sample/pure/Pure.class                          Java 21
+    META-INF/versions/25/sample/pure/Pure.class     Java 25
+
+A JVM of release 25 or later loads the overlay, an older one the base class, which
+the test module asserts against the release it runs on. A Java source in the same
+folder compiles against the Kotlin classes of its release, and Dokka documents the
+base sources alone.
+
 Documenting the Kotlin sources
 ------------------------------
 
