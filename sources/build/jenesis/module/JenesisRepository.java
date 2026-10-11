@@ -87,6 +87,17 @@ public interface JenesisRepository extends Repository {
         };
     }
 
+    @Override
+    default JenesisRepository observed(Repository.Observer observer) {
+        return (executor, module, classifier, version, type) -> {
+            Optional<RepositoryItem> candidate = fetch(executor, module, classifier, version, type);
+            if (candidate.isPresent()) {
+                observer.fetched(coordinate(module, classifier, version, type), null, candidate.get());
+            }
+            return candidate;
+        };
+    }
+
     default JenesisRepository filter(Predicate<String> predicate) {
         return (executor, module, classifier, version, type) -> predicate.test(module)
                 ? fetch(executor, module, classifier, version, type)

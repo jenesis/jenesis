@@ -30,6 +30,7 @@ public class Dependencies implements BuildExecutorModule {
             ARCHIVES = "archives.properties",
             ALIASED = "aliased.properties",
             INTERNAL = "internal.properties",
+            RESOLUTION = "resolution.properties",
             MODULAR = "modular.properties",
             UNPINNED = "unpinned.properties";
     public static final String RESOLVED = "resolved/", MODULAR_PATH = "modular/";
@@ -422,6 +423,7 @@ public class Dependencies implements BuildExecutorModule {
                 }
             }
             Map<String, Repository> wrapped = new LinkedHashMap<>();
+            ConcurrentNavigableMap<String, RepositoryItem> fetched = new ConcurrentSkipListMap<>();
             repositories.forEach((name, repository) -> {
                 Repository effective = repository;
                 if (!previousArtifacts.isEmpty()) {
@@ -429,8 +431,84 @@ public class Dependencies implements BuildExecutorModule {
                             ? Optional.ofNullable(previousArtifacts.get(coordinate)).map(RepositoryItem::ofFile)
                             : Optional.empty());
                 }
-                wrapped.put(name, effective.materialized(libs));
+                wrapped.put(name, effective.materialized(libs).observed((coordinate, extension, item) -> {
+                    if (item.internal()) {
+                        fetched.putIfAbsent(name + "/" + coordinate + (extension == null ? "" : "#" + extension), item);
+                    }
+                }));
             });
+            Path previousResolution = context.previous() == null ? null : context.previous().resolve(RESOLUTION);
+            if (previousResolution != null && Files.exists(previousResolution)) {
+                SequencedProperties stored = SequencedProperties.ofFiles(previousResolution);
+                SequencedMap<String, RepositoryItem> current = new LinkedHashMap<>();
+                boolean reusable = true;
+                for (String key : stored.stringPropertyNames()) {
+                    if (!key.startsWith("fetched/")) {
+                        continue;
+                    }
+                    String location = key.substring("fetched/".length());
+                    int slash = location.indexOf('/'), hash = location.lastIndexOf('#');
+                    Repository repository = wrapped.get(location.substring(0, slash));
+                    RepositoryItem item = repository == null ? null : repository.fetch(executor,
+                            location.substring(slash + 1, hash < 0 ? location.length() : hash),
+                            hash < 0 ? null : location.substring(hash + 1)).orElse(null);
+                    if (item == null || !item.internal() || !fingerprint(item).equals(stored.getProperty(key))) {
+                        reusable = false;
+                        break;
+                    }
+                    current.put(location, item);
+                }
+                if (reusable && key(stored, requires, new TreeMap<>(categories), new TreeMap<>(aliases), versions,
+                        moduleAliases, moduleOverrides, bomTokens, exclusions, managedExclusions)
+                        .equals(stored.getProperty("inputs"))) {
+                    try (Stream<Path> files = Files.walk(context.previous())) {
+                        for (Path file : files.toList()) {
+                            Path target = context.next().resolve(context.previous().relativize(file));
+                            if (Files.isDirectory(file)) {
+                                Files.createDirectories(target);
+                            } else {
+                                BuildStep.linkOrCopy(target, file);
+                            }
+                        }
+                    }
+                    SequencedProperties index = SequencedProperties.ofFiles(context.next().resolve(DEPENDENCIES));
+                    Set<Path> refreshed = new HashSet<>();
+                    for (String key : index.stringPropertyNames()) {
+                        String[] parts = split(key);
+                        String location = parts == null
+                                ? null
+                                : stored.getProperty("placed/" + parts[2] + "/" + parts[3]);
+                        if (location == null) {
+                            continue;
+                        }
+                        String value = index.getProperty(key);
+                        int space = value.indexOf(' ');
+                        String relative = space < 0 ? value : value.substring(0, space);
+                        String checksum = space < 0 ? "" : value.substring(space + 1);
+                        Path target = context.next().resolve(relative).normalize();
+                        if (refreshed.add(target)) {
+                            Files.deleteIfExists(target);
+                            BuildStep.linkOrCopy(target, current.get(location).file().orElseThrow(() ->
+                                    new IllegalStateException("Repository did not materialize a file for "
+                                            + location)));
+                        }
+                        String declared = requires
+                                .getOrDefault(parts[0], Collections.emptyNavigableMap())
+                                .getOrDefault(parts[1], Collections.emptyNavigableMap())
+                                .getOrDefault(parts[2], Collections.emptyNavigableMap())
+                                .getOrDefault(parts[3], "");
+                        if (!declared.isEmpty()) {
+                            checksum = declared;
+                        } else if (!checksum.isEmpty()) {
+                            Resolver.validate(target, checksum, parts[2] + "/" + parts[3]);
+                        }
+                        index.setProperty(key, checksum.isEmpty() ? relative : relative + " " + checksum);
+                    }
+                    index.store(context.next().resolve(DEPENDENCIES));
+                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                }
+                fetched.clear();
+            }
             SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> managed = new LinkedHashMap<>();
             SequencedProperties unpinned = new SequencedProperties();
             if (!bomTokens.isEmpty()) {
@@ -848,6 +926,7 @@ public class Dependencies implements BuildExecutorModule {
             SequencedMap<String, SequencedSet<String>> grouped = new LinkedHashMap<>();
             SequencedMap<String, String> checksums = new LinkedHashMap<>();
             SequencedMap<String, Boolean> internals = new LinkedHashMap<>();
+            SequencedMap<String, Path> sources = new LinkedHashMap<>();
             for (Map.Entry<String, Resolver.Resolved> entry : materialized.entrySet()) {
                 String key = entry.getKey();
                 int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
@@ -871,6 +950,9 @@ public class Dependencies implements BuildExecutorModule {
                     }
                     placed.put(dependency, file);
                     internals.put(dependency, artifact.internal());
+                    if (artifact.internal()) {
+                        sources.put(dependency, artifact.file());
+                    }
                 }
                 checksums.merge(dependency, value, (left, right) -> {
                     if (right.isEmpty()) {
@@ -992,14 +1074,132 @@ public class Dependencies implements BuildExecutorModule {
                     archives.store(context.next().resolve(ARCHIVES));
                 }
             }
+            SequencedProperties resolution = new SequencedProperties();
+            for (Map.Entry<String, Path> entry : sources.entrySet()) {
+                fetched.entrySet().stream()
+                        .filter(candidate -> candidate.getValue().file().filter(entry.getValue()::equals).isPresent())
+                        .findFirst()
+                        .ifPresent(candidate -> resolution.setProperty("placed/" + entry.getKey(), candidate.getKey()));
+            }
+            if (resolution.size() == sources.size()) {
+                for (Map.Entry<String, RepositoryItem> entry : fetched.entrySet()) {
+                    resolution.setProperty("fetched/" + entry.getKey(), fingerprint(entry.getValue()));
+                }
+                resolution.setProperty("inputs", key(resolution, requires, new TreeMap<>(categories),
+                        new TreeMap<>(aliases), versions, moduleAliases, moduleOverrides, bomTokens, exclusions,
+                        managedExclusions));
+                resolution.store(context.next().resolve(RESOLUTION));
+            }
             index.store(context.next().resolve(DEPENDENCIES));
             graph.store(context.next().resolve(GRAPH));
             licenses.store(context.next().resolve(LICENSES));
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
+
+        private static String key(SequencedProperties resolution,
+                                  SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>> requires,
+                                  Object... inputs) {
+            Set<String> produced = new HashSet<>();
+            for (String key : resolution.stringPropertyNames()) {
+                if (key.startsWith("placed/") || key.startsWith("fetched/")) {
+                    String location = key.substring(key.indexOf('/') + 1);
+                    produced.add(location.indexOf('#') < 0 ? location : location.substring(0, location.indexOf('#')));
+                }
+            }
+            SequencedMap<String, String> declared = new LinkedHashMap<>();
+            requires.forEach((group, scopes) -> scopes.forEach((scope, repositories) -> repositories.forEach(
+                    (repository, coordinates) -> coordinates.forEach((coordinate, value) -> declared.put(
+                            group + "/" + scope + "/" + repository + "/" + coordinate,
+                            !value.isEmpty() && Stream.of(repository, Resolver.base(repository))
+                                    .map(prefix -> prefix + "/" + coordinate)
+                                    .anyMatch(location -> produced.stream().anyMatch(candidate ->
+                                            candidate.equals(location)
+                                                    || candidate.startsWith(location + "/")
+                                                    || candidate.startsWith(location + ":")))
+                                    ? "internal"
+                                    : value)))));
+            return digest(List.of(declared, List.of(inputs)));
+        }
+
+        private static String fingerprint(RepositoryItem item) throws IOException {
+            Path file = item.file().orElse(null);
+            SequencedMap<String, Object> description = new LinkedHashMap<>();
+            if (file == null) {
+                try (InputStream inputStream = item.toInputStream()) {
+                    description.put("content", new String(inputStream.readAllBytes(), StandardCharsets.ISO_8859_1));
+                }
+                return digest(description);
+            }
+            description.put("name", file.getFileName().toString());
+            SequencedMap<String, String> entries = new TreeMap<>();
+            SequencedSet<String> packages = new TreeSet<>();
+            try (FileSystem archive = Files.isDirectory(file) ? null : FileSystems.newFileSystem(file);
+                 Stream<Path> files = Files.walk(archive == null ? file : archive.getPath("/"))) {
+                Path root = archive == null ? file : archive.getPath("/");
+                for (Path candidate : files.filter(Files::isRegularFile).toList()) {
+                    String name = root.relativize(candidate).toString().replace(File.separatorChar, '/');
+                    if (name.equals(JarFile.MANIFEST_NAME)
+                            || name.equals("module-info.class")
+                            || name.startsWith("META-INF/versions/") && name.endsWith("/module-info.class")) {
+                        entries.put(name, new String(Files.readAllBytes(candidate), StandardCharsets.ISO_8859_1));
+                    } else if (!name.startsWith("META-INF/")) {
+                        packages.add(name.lastIndexOf('/') < 0 ? "" : name.substring(0, name.lastIndexOf('/')));
+                    }
+                }
+                description.put("licenses", License.ofArchive(root).stream().map(License::toString).toList());
+            } catch (ZipException | ProviderNotFoundException _) {
+                entries.put("", new String(Files.readAllBytes(file), StandardCharsets.ISO_8859_1));
+            }
+            description.put("entries", entries);
+            description.put("packages", packages);
+            Path declaration = PathPlacement.declaration(file);
+            if (Files.isRegularFile(declaration)) {
+                description.put("declaration", Files.readString(declaration));
+            }
+            return digest(description);
+        }
+
+        private static String digest(Object value) {
+            MessageDigest digest;
+            try {
+                digest = MessageDigest.getInstance("SHA-256");
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException(e);
+            }
+            update(digest, value);
+            return HexFormat.of().formatHex(digest.digest());
+        }
+
+        private static void update(MessageDigest digest, Object value) {
+            switch (value) {
+                case String text -> {
+                    byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+                    digest.update(ByteBuffer.allocate(5).put((byte) 's').putInt(bytes.length).array());
+                    digest.update(bytes);
+                }
+                case Map<?, ?> map -> {
+                    digest.update(ByteBuffer.allocate(5).put((byte) 'm').putInt(map.size()).array());
+                    map.forEach((key, entry) -> {
+                        update(digest, key);
+                        update(digest, entry);
+                    });
+                }
+                case Collection<?> collection -> {
+                    digest.update(ByteBuffer.allocate(5).put((byte) 'c').putInt(collection.size()).array());
+                    collection.forEach(element -> update(digest, element));
+                }
+                default -> throw new IllegalArgumentException("Cannot digest " + value.getClass().getName()
+                        + " as part of a resolution key: expected a string, a map or a collection");
+            }
+        }
     }
 
     private record Pinned(boolean strict) implements BuildStep {
+
+        @Override
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+            return arguments.values().stream().anyMatch(argument -> argument.hasChanged(Path.of(UNPINNED)));
+        }
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
