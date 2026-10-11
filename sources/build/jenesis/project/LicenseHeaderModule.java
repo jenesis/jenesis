@@ -104,7 +104,7 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                         metadata.value(declared.getFirst() + ".url")).identified(Dependencies.aliases(folders));
                 if (license.id() == null) {
                     throw new IllegalStateException("The declared license " + license.label() + " has no SPDX identifier"
-                            + " to name in a license header - map it with alias/<name or url>=<SPDX id> in spdx.properties,"
+                            + " to name in a license header - map it with alias/<license name>=<SPDX id> in spdx.properties,"
                             + " or set " + TEXT + "=<the header> in " + CONFIGURATION);
                 }
                 String copyright = metadata.value("copyright");
