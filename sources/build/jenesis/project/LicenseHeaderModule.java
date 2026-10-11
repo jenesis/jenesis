@@ -7,7 +7,6 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Environment;
 
 public class LicenseHeaderModule implements BuildExecutorModule {
 
@@ -17,25 +16,13 @@ public class LicenseHeaderModule implements BuildExecutorModule {
     private static final Set<String> EXTENSIONS = Set.of(".java", ".kt", ".scala", ".groovy");
 
     private final boolean verify;
-    private final String year;
 
     public LicenseHeaderModule() {
-        this(false, null);
+        this(false);
     }
 
-    public static LicenseHeaderModule ofEnvironment(Environment environment) {
-        String year = environment.value("format.year");
-        if (year != null && !PLACEHOLDER.matcher(year).matches()) {
-            throw new IllegalArgumentException("jenesis.format.year is " + year
-                    + ", but names the year a license header's " + YEAR + " is written as - a year such as 2026,"
-                    + " or a range such as 2016-2026");
-        }
-        return new LicenseHeaderModule(false, year);
-    }
-
-    private LicenseHeaderModule(boolean verify, String year) {
+    private LicenseHeaderModule(boolean verify) {
         this.verify = verify;
-        this.year = year;
     }
 
     public static Path configurationFile(SequencedSet<Path> configuration) {
@@ -43,19 +30,15 @@ public class LicenseHeaderModule implements BuildExecutorModule {
     }
 
     public LicenseHeaderModule verify(boolean verify) {
-        return new LicenseHeaderModule(verify, year);
-    }
-
-    public LicenseHeaderModule year(String year) {
-        return new LicenseHeaderModule(verify, year);
+        return new LicenseHeaderModule(verify);
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        buildExecutor.addStep(FORMAT, new Header(verify, year), inherited.sequencedKeySet());
+        buildExecutor.addStep(FORMAT, new Header(verify), inherited.sequencedKeySet());
     }
 
-    private record Header(boolean verify, String year) implements BuildStep {
+    private record Header(boolean verify) implements BuildStep {
 
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
@@ -134,13 +117,13 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                 String rendered = header;
                 if (header.contains(YEAR)) {
                     Matcher years = PLACEHOLDER.matcher(replaced ? comment : "");
-                    String written = years.find() ? years.group() : year;
-                    if (written == null) {
-                        throw new IllegalStateException(source.getKey() + " needs the license header written, whose "
-                                + YEAR + " names no year the build may choose - set -Djenesis.format.year=<year> to"
-                                + " name the one to write");
+                    if (!years.find()) {
+                        throw new IllegalStateException(source.getKey() + " needs the license header written, but"
+                                + " names no year for its " + YEAR + ", and the build writes no year of its own, so"
+                                + " that a rewrite is reproducible - write the year into " + HEADER + ", or the header"
+                                + " into this source");
                     }
-                    rendered = header.replace(YEAR, written);
+                    rendered = header.replace(YEAR, years.group());
                 }
                 String formatted = replaced
                         ? text.substring(0, start) + rendered + text.substring(end)

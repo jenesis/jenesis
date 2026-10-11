@@ -1511,8 +1511,8 @@ public record Project(
                           (34), the header as text, which every Java, Kotlin, Scala and Groovy
                           source starts with as a block comment, or as written where the file is a
                           comment already, as Spotless's file is; $YEAR matches any year or range,
-                          a rewrite keeps the year a replaced header names and writes
-                          -Djenesis.format.year=<year> where there is none, never the current one;
+                          a rewrite keeps the year a replaced header names and writes no year of
+                          its own, so a header with $YEAR is inserted into a source by hand;
                           mycila's year property becomes $YEAR, and its other ${...} properties are
                           written out
                       detekt, ktlint / the same -> detekt.yml, .editorconfig (42)
@@ -2142,7 +2142,7 @@ public record Project(
                                                 imports=sort,remove|sort)
                       license-header.txt        the license header every source starts with, as a
                                                 block comment, $YEAR matching any year or range;
-                                                -Djenesis.format.year names the one a rewrite writes
+                                                a rewrite keeps a year and writes none of its own
                       xjc.properties            JAXB: every .xsd compiled, every .xjb a binding; the
                                                 generated package is compiled into the module
                                                 (folders, package, catalog, arguments)
@@ -4280,7 +4280,6 @@ public record Project(
                 format.scalafmt|true|scalafmt formatting
                 format.license|true|The license header check, activated by a license-header.txt, which every Java, Kotlin, Scala and Groovy source of a module must start with as a block comment, $YEAR standing for any year or range of years
                 format.rewrite|false|Let the formatters rewrite sources instead of verifying them
-                format.year||The year a license header's $YEAR is written as where -Djenesis.format.rewrite=true inserts one, or replaces one naming no year; a replaced header naming a year keeps it, and without this setting a header that needs one is refused, so a rewrite never writes the day it runs
                 generate.xjc|true|JAXB generation, activated by an xjc.properties
                 generate.protoc|true|protoc generation, activated by a protoc.properties
                 generate.avro|true|Avro generation, activated by an avro.properties

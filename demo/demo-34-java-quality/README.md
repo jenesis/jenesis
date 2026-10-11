@@ -209,11 +209,14 @@ with a different one, fails the build, naming the file. Generated sources are no
 checked.
 
 The rewrite switch writes the header: it replaces a leading comment that is a
-license header, keeping the year it names, and inserts one where there is none.
-An inserted header takes its year from `-Djenesis.format.year`, never from the
-day the build runs:
+license header, keeping the year it names, and inserts one where there is none:
 
-    java -Djenesis.format.rewrite=true -Djenesis.format.year=2026 build/jenesis/Make.java
+    java -Djenesis.format.rewrite=true build/jenesis/Make.java
+
+The build writes no year of its own, so that a rewrite gives the same sources on
+every day it runs. A header whose `$YEAR` it would have to choose - one inserted
+where no license comment names a year - fails the rewrite, naming the file: write
+the year into `license-header.txt`, or the header into that file.
 
 `-Djenesis.format.license=false` skips the check, as `jenesis.format.java=false`
 skips the formatter.

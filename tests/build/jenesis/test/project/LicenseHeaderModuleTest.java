@@ -7,7 +7,6 @@ import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
-import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.project.LicenseHeaderModule;
 
@@ -59,20 +58,28 @@ public class LicenseHeaderModuleTest {
     }
 
     @Test
-    public void rewrite_inserts_the_header_with_the_named_year_and_replaces_a_different_one_keeping_its_year()
-            throws IOException {
-        Files.writeString(project.resolve(LicenseHeaderModule.HEADER), TEMPLATE);
+    public void rewrite_inserts_a_header_that_names_its_year() throws IOException {
+        Files.writeString(project.resolve(LicenseHeaderModule.HEADER), TEMPLATE.replace("$YEAR", "2026"));
         Path missing = source("sample/package-info.java", "/** The sample package. */\npackage sample;\n");
         Path descriptor = source("module-info.java", "\n\nmodule sample {\n}\n");
-        Path different = source("sample/Different.kt", "// Copyright 2019-2021 Someone Else\n// All rights reserved.\npackage sample\n");
-        Path windows = source("sample/Windows.java", "/* Copyright 2018 Someone Else */\r\npackage sample;\r\n");
 
-        newExecutor(new LicenseHeaderModule().year("2026")).execute();
+        newExecutor(new LicenseHeaderModule()).execute();
 
         assertThat(missing)
                 .as("a leading comment that is no license header stays below the inserted header")
                 .hasContent(HEADER.formatted("2026") + "\n\n/** The sample package. */\npackage sample;\n");
         assertThat(descriptor).hasContent(HEADER.formatted("2026") + "\n\nmodule sample {\n}\n");
+        newExecutor(new LicenseHeaderModule().verify(true)).execute();
+    }
+
+    @Test
+    public void rewrite_replaces_a_different_header_keeping_the_year_it_names() throws IOException {
+        Files.writeString(project.resolve(LicenseHeaderModule.HEADER), TEMPLATE);
+        Path different = source("sample/Different.kt", "// Copyright 2019-2021 Someone Else\n// All rights reserved.\npackage sample\n");
+        Path windows = source("sample/Windows.java", "/* Copyright 2018 Someone Else */\r\npackage sample;\r\n");
+
+        newExecutor(new LicenseHeaderModule()).execute();
+
         assertThat(different)
                 .as("a header of line comments is replaced, and keeps the years it names")
                 .hasContent(HEADER.formatted("2019-2021") + "\npackage sample\n");
@@ -95,23 +102,16 @@ public class LicenseHeaderModuleTest {
     }
 
     @Test
-    public void refuses_to_write_a_year_it_was_not_given() throws IOException {
+    public void writes_no_year_of_its_own() throws IOException {
         Files.writeString(project.resolve(LicenseHeaderModule.HEADER), TEMPLATE);
         Path sample = source("sample/Sample.java", "package sample;\n");
 
         assertThatThrownBy(newExecutor(new LicenseHeaderModule())::execute)
                 .rootCause()
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("-Djenesis.format.year=<year>");
+                .hasMessageContaining("writes no year of its own")
+                .hasMessageContaining(LicenseHeaderModule.HEADER);
         assertThat(sample).hasContent("package sample;\n");
-    }
-
-    @Test
-    public void refuses_a_year_setting_that_names_no_year() {
-        assertThatThrownBy(() -> LicenseHeaderModule.ofEnvironment(new Environment(Map.of("format.year", "this year"))))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("this year");
-        assertThat(LicenseHeaderModule.ofEnvironment(new Environment(Map.of("format.year", "2016-2026")))).isNotNull();
     }
 
     private Path source(String name, String content) throws IOException {
