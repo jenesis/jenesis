@@ -72,6 +72,54 @@ public class InferredSourceFormattingModuleTest {
     }
 
     @Test
+    public void wires_the_eclipse_formatter_with_its_profile_from_the_javaformat_properties_file() throws IOException {
+        Files.writeString(project.resolve("javaformat.properties"), "formatter=eclipse\nprofile=eclipse/formatter.xml\n");
+        Files.createDirectories(project.resolve("eclipse"));
+        Files.writeString(project.resolve("eclipse/formatter.xml"), "<profiles/>");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+        executor.execute("format/java/required", "format/java/profile");
+
+        assertThat(coordinates("java"))
+                .containsExactly("eclipse-java-format/runtime/maven/org.eclipse.jdt/org.eclipse.jdt.core/RELEASE");
+        assertThat(root.resolve("format/java/profile/output/eclipse-formatter.xml"))
+                .as("the profile is bound under the name the formatter reads, wherever it lives")
+                .hasContent("<profiles/>");
+    }
+
+    @Test
+    public void refuses_an_eclipse_profile_outside_the_configuration_folder() throws IOException {
+        Files.writeString(project.resolve("javaformat.properties"), "formatter=eclipse\nprofile=../formatter.xml\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("profile=../formatter.xml")
+                .hasMessageContaining("beside or below");
+    }
+
+    @Test
+    public void refuses_an_eclipse_profile_that_does_not_exist() throws IOException {
+        Files.writeString(project.resolve("javaformat.properties"), "formatter=eclipse\nprofile=formatter.xml\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("profile=formatter.xml")
+                .hasMessageContaining("is no file");
+    }
+
+    @Test
     public void refuses_a_key_the_selected_java_formatter_does_not_take() throws IOException {
         Files.writeString(project.resolve("javaformat.properties"), "formatter=palantir\njavadoc=false\n");
 

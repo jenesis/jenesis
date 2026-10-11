@@ -143,7 +143,11 @@ public class ScalafmtFormatModule implements BuildExecutorModule {
         }
 
         @Override
-        protected List<String> command(List<String> jars, Path config, List<String> files, boolean verify) {
+        protected List<String> command(BuildStepContext context,
+                                       List<String> jars,
+                                       Path config,
+                                       List<String> files,
+                                       boolean verify) {
             if (config == null) {
                 throw new IllegalStateException("No " + configFile + " found among the inputs of the scalafmt step");
             }
