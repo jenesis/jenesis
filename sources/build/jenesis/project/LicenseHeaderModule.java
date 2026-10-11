@@ -7,7 +7,9 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.License;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Dependencies;
 
 public class LicenseHeaderModule implements BuildExecutorModule {
 
@@ -45,20 +47,11 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                         + "=<the header> alone");
             }
         }
-        String header = configuration.value(TEXT);
-        if (header == null) {
-            throw new IllegalArgumentException(CONFIGURATION + " names no header - set " + TEXT
-                    + "=<the header>, with \\n between its lines");
-        }
-        return text(header);
+        return text(configuration.value(TEXT));
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        if (text == null) {
-            throw new IllegalStateException("The license header module is given no header - set " + TEXT + "= in "
-                    + CONFIGURATION);
-        }
         buildExecutor.addStep(FORMAT, new Header(verify, text), inherited.sequencedKeySet());
     }
 
@@ -74,12 +67,13 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
+            List<Path> folders = arguments.values().stream()
+                    .filter(argument -> !argument.removed())
+                    .map(BuildStepArgument::folder)
+                    .toList();
             SequencedMap<Path, Path> sources = new TreeMap<>();
-            for (BuildStepArgument argument : arguments.values()) {
-                if (argument.removed()) {
-                    continue;
-                }
-                Path folder = argument.folder().resolve(BuildStep.SOURCES);
+            for (Path root : folders) {
+                Path folder = root.resolve(BuildStep.SOURCES);
                 if (Files.isDirectory(folder)) {
                     try (Stream<Path> files = Files.walk(folder, FileVisitOption.FOLLOW_LINKS)) {
                         files.filter(Files::isRegularFile)
@@ -88,7 +82,37 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                     }
                 }
             }
-            String header = text.replace("\r\n", "\n").stripTrailing().replaceFirst("^\n+", "");
+            String header;
+            if (text == null) {
+                SequencedProperties metadata = SequencedProperties.ofFolders(folders, BuildStep.METADATA);
+                SequencedSet<String> declared = new TreeSet<>();
+                for (String key : metadata.stringPropertyNames()) {
+                    if (key.startsWith("license.") && key.lastIndexOf('.') > "license.".length()) {
+                        declared.add(key.substring(0, key.lastIndexOf('.')));
+                    }
+                }
+                if (declared.size() != 1) {
+                    throw new IllegalStateException("A license header without " + TEXT + " in " + CONFIGURATION
+                            + " names the one license the project declares, but it declares "
+                            + (declared.isEmpty() ? "none" : declared.size() + " (" + String.join(", ", declared) + ")")
+                            + " - declare one in the <licenses> of the pom.xml or as license.<id>.name in project.properties,"
+                            + " or set " + TEXT + "=<the header>");
+                }
+                License license = new License(null,
+                        null,
+                        metadata.value(declared.getFirst() + ".name"),
+                        metadata.value(declared.getFirst() + ".url")).identified(Dependencies.aliases(folders));
+                if (license.id() == null) {
+                    throw new IllegalStateException("The declared license " + license.label() + " has no SPDX identifier"
+                            + " to name in a license header - map it with alias/<name or url>=<SPDX id> in spdx.properties,"
+                            + " or set " + TEXT + "=<the header> in " + CONFIGURATION);
+                }
+                String copyright = metadata.value("copyright");
+                header = (copyright == null ? "" : "// SPDX-FileCopyrightText: " + copyright + "\n")
+                        + "// SPDX-License-Identifier: " + license.id();
+            } else {
+                header = text.replace("\r\n", "\n").stripTrailing().replaceFirst("^\n+", "");
+            }
             if (!header.startsWith("/*") && !header.startsWith("//")) {
                 header = header.lines()
                         .map(line -> (" * " + line).stripTrailing())

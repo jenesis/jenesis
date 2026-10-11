@@ -115,16 +115,65 @@ public class LicenseHeaderModuleTest {
     }
 
     @Test
-    public void refuses_a_licenseheader_properties_without_text_or_with_another_key() {
-        SequencedProperties empty = new SequencedProperties(), other = new SequencedProperties();
+    public void refuses_a_licenseheader_properties_with_another_key_than_text() {
+        SequencedProperties other = new SequencedProperties();
         other.setProperty("text", "Copyright 2026 the authors.");
         other.setProperty("year", "2026");
-        assertThatThrownBy(() -> new LicenseHeaderModule().configuration(empty))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("names no header");
         assertThatThrownBy(() -> new LicenseHeaderModule().configuration(other))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("names year");
+    }
+
+    @Test
+    public void derives_the_header_from_the_declared_license_and_copyright_without_text() throws IOException {
+        Files.writeString(project.resolve(BuildStep.METADATA), """
+                license.0.name=The Apache Software License, Version 2.0
+                license.0.url=https://www.apache.org/licenses/LICENSE-2.0.txt
+                copyright=2026 the original author or authors
+                """);
+        Path sample = source("sample/Sample.java", "/* Copyright 2019 Someone Else */\npackage sample;\n");
+
+        newExecutor(new LicenseHeaderModule().configuration(new SequencedProperties())).execute();
+
+        assertThat(sample).hasContent("""
+                // SPDX-FileCopyrightText: 2026 the original author or authors
+                // SPDX-License-Identifier: Apache-2.0
+                package sample;
+                """);
+        newExecutor(new LicenseHeaderModule().verify(true)).execute();
+    }
+
+    @Test
+    public void derives_a_header_without_copyright_when_none_is_declared() throws IOException {
+        Files.writeString(project.resolve(BuildStep.METADATA), "license.mit.name=MIT\n");
+        Path sample = source("sample/Sample.java", "package sample;\n");
+
+        newExecutor(new LicenseHeaderModule()).execute();
+
+        assertThat(sample).hasContent("// SPDX-License-Identifier: MIT\n\npackage sample;\n");
+    }
+
+    @Test
+    public void refuses_to_derive_a_header_from_no_several_or_an_unidentified_license() throws IOException {
+        source("sample/Sample.java", "package sample;\n");
+
+        assertThatThrownBy(newExecutor(new LicenseHeaderModule())::execute)
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("declares none");
+
+        Files.writeString(project.resolve(BuildStep.METADATA), "license.0.name=MIT\nlicense.1.name=Apache-2.0\n");
+        assertThatThrownBy(newExecutor(new LicenseHeaderModule())::execute)
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("declares 2 (license.0, license.1)");
+
+        Files.writeString(project.resolve(BuildStep.METADATA), "license.0.name=Our Own License\n");
+        assertThatThrownBy(newExecutor(new LicenseHeaderModule())::execute)
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Our Own License has no SPDX identifier")
+                .hasMessageContaining("spdx.properties");
     }
 
     private Path source(String name, String content) throws IOException {

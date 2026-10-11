@@ -43,6 +43,9 @@ The configuration files sit in the *configuration directory*, which defaults to
     |-- eclipse/
     |   |-- javaformat.properties  selects the Eclipse formatter, under a profile
     |   `-- eclipse-formatter.xml  the formatter profile Eclipse exports
+    |-- spdx/
+    |   `-- licenseheader.properties  no text: the header is derived, under a profile
+    |-- project.properties         the license and copyright the derived header names
     `-- sources
         |-- module-info.java
         `-- sample
@@ -202,7 +205,27 @@ the value on the next line:
     text=Copyright 2026 the Jenesis demo authors.\n\n\
       Licensed under the Apache License, Version 2.0.
 
-The file takes no other key.
+The file takes no other key. Without `text`, the header is derived from what the
+project declares: the one license of its `pom.xml` or its `project.properties`,
+named by its SPDX identifier, and its copyright where one is declared. The demo's
+`project.properties` declares both:
+
+    license.apache_2_0.name=Apache License, Version 2.0
+    license.apache_2_0.url=https://www.apache.org/licenses/LICENSE-2.0.txt
+    copyright=2026 the Jenesis demo authors
+
+and its `spdx` profile holds an empty `licenseheader.properties`, so
+
+    java -Djenesis.make.profiles=spdx -Djenesis.format.rewrite=true build/jenesis/Make.java
+
+starts every source with
+
+    // SPDX-FileCopyrightText: 2026 the Jenesis demo authors
+    // SPDX-License-Identifier: Apache-2.0
+
+A project that declares no license, or several, or one without a known SPDX
+identifier fails the build, naming what it found; `spdx.properties` maps a license
+name or URL to its identifier with `alias/<name or url>=<id>`.
 
 Every Java source, `module-info.java` and `package-info.java` included, and
 every Kotlin, Scala and Groovy source must start with it as a block comment, or
