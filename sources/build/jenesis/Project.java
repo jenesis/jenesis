@@ -4200,8 +4200,9 @@ public record Project(
                 source.scalafmt|report|ignore|report|strict: scalafmt checking, activated by a .scalafmt.conf; ignore skips it, report lists a source it would format differently, strict fails the build on one
                 source.codenarc|report|ignore|report|strict: CodeNarc, activated by a codenarc.xml; ignore skips it, report records its findings, strict fails the build on any of them
                 compile.errorprone|true|Error Prone over the javac plugin declared with @jenesis.plugin javac, activated by an errorprone.properties; javac forks to grant it the compiler internals it reads
-                format.java|true|The Java formatter a javaformat.properties selects
-                format.ktlint|true|ktlint formatting
+                format.java|true|The Java formatter a javaformat.properties selects - google, palantir or eclipse - with its options
+                format.ktlint|true|ktlint formatting, activated by an .editorconfig
+                format.ktfmt|true|ktfmt formatting, activated by a ktfmt.properties, which names its style and what it does to the imports; refused beside ktlint formatting the same sources
                 format.scalafmt|true|scalafmt formatting
                 format.rewrite|false|Let the formatters rewrite sources instead of verifying them
                 generate.xjc|true|JAXB generation, activated by an xjc.properties
