@@ -697,7 +697,8 @@ asks for `severity=non-breaking`, so the added overload is reported as well.
 ## 30. Kotlin - [`kotlin`](demo-41-kotlin/README.md), [`kotlin-quality`](demo-42-kotlin-quality/README.md), [`kotlin-plugin`](demo-43-kotlin-plugin/README.md)
 
 Other JVM languages need no configuration beyond their sources. `kotlin` is a
-module that mixes Java and Kotlin, and exports a package holding only Kotlin. The
+module that mixes Java and Kotlin, and exports a package holding only Kotlin,
+with a Kotlin class of its own for Java 25 below `META-INF/versions/25/`. The
 Kotlin compiler is resolved and pinned in a `kotlinc` group of its own, so it
 never mixes with the project's own dependencies. With
 `-Djenesis.project.documentation=true` Dokka documents the Kotlin sources, and a

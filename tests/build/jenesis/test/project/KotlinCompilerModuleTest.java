@@ -152,6 +152,48 @@ public class KotlinCompilerModuleTest {
     }
 
     @Test
+    public void compiles_a_kotlin_source_below_meta_inf_versions_for_its_release_into_the_versioned_classes() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
+        properties.store(project.resolve(BuildStep.VERSIONS));
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.kt"), """
+                package sample
+                class Sample { fun name(): String = "base" }
+                """);
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "META-INF/versions/17/sample"))
+                .resolve("Sample.kt"), """
+                package sample
+                class Sample { fun name(): String = "17" }
+                """);
+        Path processFolder = Files.createDirectories(project.resolve("process"));
+        SequencedProperties javacProperties = new SequencedProperties();
+        javacProperties.setProperty("--release", "11");
+        javacProperties.store(processFolder.resolve("javac.properties"));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "kotlin",
+                new KotlinCompilerModule(
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
+                "project");
+        executor.execute();
+
+        Path output = root.resolve("kotlin").resolve(KotlinCompilerModule.CLASSES).resolve("output");
+        Path base = output.resolve(BuildStep.CLASSES + "sample/Sample.class"),
+                versioned = output.resolve(BuildStep.CLASSES + "META-INF/versions/17/sample/Sample.class");
+        assertThat(majorVersion(base)).as("the base is compiled for the module's release").isEqualTo(55);
+        assertThat(majorVersion(versioned)).as("the overlay is compiled for its own release").isEqualTo(61);
+        assertThat(output.resolve("manifest.mf")).content().contains("Multi-Release: true");
+    }
+
+    private static int majorVersion(Path file) throws IOException {
+        byte[] bytes = Files.readAllBytes(file);
+        return ((bytes[6] & 0xFF) << 8) | (bytes[7] & 0xFF);
+    }
+
+    @Test
     public void picks_up_release_from_upstream_javac_properties() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
