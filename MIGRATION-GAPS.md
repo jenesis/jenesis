@@ -66,7 +66,7 @@ Compile avoidance matters most: it is the largest share of the difference to Gra
 
 | Gap | Size | Projects |
 |---|---|---|
-| No built-in module for Apache RAT, revapi or Android's animal-sniffer signatures; each needs a plugin. | M | several |
+| No built-in module for revapi; the built-in japicmp checks the same binary compatibility of the jar against its last release. | M | several |
 
 ## Dependency resolution
 
@@ -91,6 +91,8 @@ These are decisions rather than gaps. The briefing says so and names the change 
 - support for one framework or platform - GWT, Android, Angular and Node front ends, Asciidoctor, `quarkus:dev`
   and `@QuarkusTest` on the module path: the tool keeps to general-purpose functions, and each of these is a plugin,
   for the community to publish (guava, mockito, jhipster, picocli, hibernate-validator, quarkus);
+- Apache RAT, the release audit of one foundation's policy, which a plugin runs; and animal-sniffer, whose JDK
+  signatures are what `--release` checks as it compiles, while its Android signatures are Android's concern;
 - white-box tests through `--patch-module`;
 - Gradle's highest-version conflict resolution;
 - a root location for configuration of the tests alone or the main code alone - a file that differs for the tests

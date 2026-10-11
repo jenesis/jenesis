@@ -1466,7 +1466,8 @@ public record Project(
                           checks the API of the release it compiles for, unless the code calls a
                           newer API behind a runtime check, which the release refuses: then
                           --source=<release> in process-javac.properties, as below, and nothing
-                          checks the API; other signatures: none
+                          checks the API; an Android signature: none, as Android is a plugin's
+                          concern
                       maven.compiler.source/target without a release, where the code needs the
                           API of the JDK compiling it, as a guarded call of a newer one does
                           -> --source=<release> in process-javac.properties, since the build
@@ -1700,6 +1701,8 @@ public record Project(
                           bootstrap over the jar, and the tests are handed the model its test
                           support reads; @QuarkusTest runs on the class path only
                       war, ear -> none; a war module is skipped with a [SKIPPED] line
+                      apache-rat-plugin -> none; the release audit of one foundation's policy is
+                          a plugin's
                       GWT, Android, Angular or Node front ends, Asciidoctor -> none; the tool keeps
                           to general-purpose functions, so a framework's or platform's build is a
                           plugin, published as a module and named in jenesis.plugins.properties
