@@ -21,6 +21,8 @@ public class InferredDocumentationModule implements BuildExecutorModule {
     public static final String GENERATE = "generate", EMPTY = "empty", ARCHIVE = "archive";
 
     private final Pinning pinning;
+    private final SequencedSet<Path> configuration;
+    private final Path location;
     private final InferredDocumentationChainModule generateModule;
     private final Function<InferredDocumentationChainModule, BuildExecutorModule> generate;
     private final BuildStep archiver;
@@ -31,6 +33,8 @@ public class InferredDocumentationModule implements BuildExecutorModule {
     public InferredDocumentationModule(Map<String, Repository> repositories,
                                        Map<String, Resolver> resolvers) {
         this(null,
+                Collections.emptyNavigableSet(),
+                null,
                 new InferredDocumentationChainModule(repositories, resolvers),
                 value -> value,
                 new Jar(ProcessHandler.Factory.of(), Jar.Sort.JAVADOC),
@@ -43,6 +47,8 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                                                             Map<String, Repository> repositories,
                                                             Map<String, Resolver> resolvers) {
         return new InferredDocumentationModule(null,
+                Collections.emptyNavigableSet(),
+                null,
                 InferredDocumentationChainModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
                 Jar.ofEnvironment(environment, ProcessHandler.Factory.ofEnvironment(environment), Jar.Sort.JAVADOC),
@@ -52,6 +58,8 @@ public class InferredDocumentationModule implements BuildExecutorModule {
     }
 
     private InferredDocumentationModule(Pinning pinning,
+                                        SequencedSet<Path> configuration,
+                                        Path location,
                                         InferredDocumentationChainModule generateModule,
                                         Function<InferredDocumentationChainModule, BuildExecutorModule> generate,
                                         BuildStep archiver,
@@ -59,6 +67,8 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                                         boolean tests,
                                         SequencedMap<String, BuildExecutorModule> custom) {
         this.pinning = pinning;
+        this.configuration = configuration;
+        this.location = location;
         this.generateModule = generateModule;
         this.generate = generate;
         this.archiver = archiver;
@@ -69,6 +79,32 @@ public class InferredDocumentationModule implements BuildExecutorModule {
 
     public InferredDocumentationModule pinning(Pinning pinning) {
         return new InferredDocumentationModule(pinning,
+                configuration,
+                location,
+                generateModule,
+                generate,
+                archiver,
+                empty,
+                tests,
+                custom);
+    }
+
+    public InferredDocumentationModule configuration(SequencedSet<Path> configuration) {
+        return new InferredDocumentationModule(pinning,
+                configuration,
+                location,
+                generateModule,
+                generate,
+                archiver,
+                empty,
+                tests,
+                custom);
+    }
+
+    public InferredDocumentationModule location(Path location) {
+        return new InferredDocumentationModule(pinning,
+                configuration,
+                location,
                 generateModule,
                 generate,
                 archiver,
@@ -79,6 +115,8 @@ public class InferredDocumentationModule implements BuildExecutorModule {
 
     public InferredDocumentationModule generate(Function<InferredDocumentationChainModule, BuildExecutorModule> generate) {
         return new InferredDocumentationModule(pinning,
+                configuration,
+                location,
                 generateModule,
                 generate,
                 archiver,
@@ -89,6 +127,8 @@ public class InferredDocumentationModule implements BuildExecutorModule {
 
     public InferredDocumentationModule archiver(BuildStep archiver) {
         return new InferredDocumentationModule(pinning,
+                configuration,
+                location,
                 generateModule,
                 generate,
                 archiver,
@@ -99,6 +139,8 @@ public class InferredDocumentationModule implements BuildExecutorModule {
 
     public InferredDocumentationModule empty(boolean empty) {
         return new InferredDocumentationModule(pinning,
+                configuration,
+                location,
                 generateModule,
                 generate,
                 archiver,
@@ -109,6 +151,8 @@ public class InferredDocumentationModule implements BuildExecutorModule {
 
     public InferredDocumentationModule tests(boolean tests) {
         return new InferredDocumentationModule(pinning,
+                configuration,
+                location,
                 generateModule,
                 generate,
                 archiver,
@@ -119,6 +163,8 @@ public class InferredDocumentationModule implements BuildExecutorModule {
 
     public InferredDocumentationModule generateModule(InferredDocumentationChainModule generateModule) {
         return new InferredDocumentationModule(pinning,
+                configuration,
+                location,
                 generateModule,
                 generate,
                 archiver,
@@ -129,6 +175,8 @@ public class InferredDocumentationModule implements BuildExecutorModule {
 
     public InferredDocumentationModule custom(SequencedMap<String, BuildExecutorModule> custom) {
         return new InferredDocumentationModule(pinning,
+                configuration,
+                location,
                 generateModule,
                 generate,
                 archiver,
@@ -169,7 +217,10 @@ public class InferredDocumentationModule implements BuildExecutorModule {
             buildExecutor.addStep(EMPTY, new Empty());
             documented = EMPTY;
         } else {
-            BuildExecutorModule chain = generate.apply(generateModule.pinning(pinning));
+            BuildExecutorModule chain = generate.apply(generateModule
+                    .pinning(pinning)
+                    .configuration(configuration)
+                    .location(location));
             if (chain == null) {
                 return;
             }
