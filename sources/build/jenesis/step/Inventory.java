@@ -109,6 +109,7 @@ public class Inventory implements BuildStep {
                 Path.of(ARTIFACTS),
                 Path.of(Bom.BOM),
                 Path.of(SOURCES),
+                Path.of(Javac.GENERATED),
                 Path.of(DOCUMENTATION),
                 Path.of(DEPENDENCIES),
                 Path.of(BOMS),
@@ -149,7 +150,7 @@ public class Inventory implements BuildStep {
         SequencedSet<Path> artifacts = new LinkedHashSet<>();
         SequencedSet<Path> processes = new LinkedHashSet<>();
         SequencedSet<Path> bomArtifacts = new LinkedHashSet<>();
-        SequencedSet<Path> sources = new LinkedHashSet<>();
+        SequencedSet<Path> sources = new LinkedHashSet<>(), generated = new LinkedHashSet<>();
         SequencedSet<Path> documentation = new LinkedHashSet<>();
         SequencedSet<Path> jmods = new LinkedHashSet<>();
         SequencedMap<String, Path> reports = new LinkedHashMap<>();
@@ -230,6 +231,12 @@ public class Inventory implements BuildStep {
             collect(folder.resolve(ARTIFACTS), artifacts);
             collect(folder.resolve(Bom.BOM), bomArtifacts);
             collect(folder.resolve(SOURCES), sources);
+            if (holdsSources(folder.resolve(SOURCES))) {
+                generated.add(folder.resolve(SOURCES));
+            }
+            if (Files.isDirectory(folder.resolve(CLASSES)) && holdsSources(folder.resolve(Javac.GENERATED))) {
+                generated.add(folder.resolve(Javac.GENERATED));
+            }
             collect(folder.resolve(DOCUMENTATION), documentation);
             Path packages = folder.resolve(JPackage.PACKAGES);
             if (image == null && Files.isDirectory(packages)) {
@@ -453,6 +460,7 @@ public class Inventory implements BuildStep {
         writePaths(inventory, context, prefix + "process", processes);
         writePaths(inventory, context, prefix + "bomfile", bomArtifacts);
         writePaths(inventory, context, prefix + "sources", sources);
+        writePaths(inventory, context, prefix + "generated", generated);
         writePaths(inventory, context, prefix + "documentation", documentation);
         writePaths(inventory, context, prefix + "jmod", jmods);
         for (Map.Entry<String, Path> entry : reports.entrySet()) {
@@ -778,6 +786,20 @@ public class Inventory implements BuildStep {
                 return resolved;
             }
             resolved.add(folder.resolve(value).normalize());
+        }
+    }
+
+    private static boolean holdsSources(Path folder) throws IOException {
+        if (!Files.isDirectory(folder)) {
+            return false;
+        }
+        try (Stream<Path> files = Files.list(folder)) {
+            if (files.anyMatch(file -> file.getFileName().toString().endsWith(".jar"))) {
+                return false;
+            }
+        }
+        try (Stream<Path> files = Files.walk(folder)) {
+            return files.anyMatch(Files::isRegularFile);
         }
     }
 

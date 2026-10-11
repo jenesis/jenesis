@@ -374,6 +374,83 @@ public class IdeTest {
     }
 
     @Test
+    public void idea_marks_what_the_build_generated_as_generated_sources_of_their_half() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("src/main/java"));
+        Files.createDirectories(root.resolve("greeter").resolve("src/test/java"));
+        Path main = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.generated.0", "generated/sources");
+        });
+        Path test = inventory("test-module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.test", "greeter");
+            properties.setProperty("module-greeter.generated.0", "generated/sources");
+        });
+        Path mainGenerated = generated(main), testGenerated = generated(test);
+
+        run(Ide.IDEA, main, test);
+
+        Path iml = root.resolve("greeter").resolve("greeter.iml");
+        assertThat(sourceFolders(iml)).containsExactly(
+                Map.entry("file://$MODULE_DIR$/src/main/java", false),
+                Map.entry("file://$MODULE_DIR$/src/test/java", true),
+                Map.entry("file://$MODULE_DIR$/" + relative("greeter", mainGenerated), false),
+                Map.entry("file://$MODULE_DIR$/" + relative("greeter", testGenerated), true));
+        assertThat(attributes(iml, "sourceFolder", "generated"))
+                .as("IntelliJ IDEA keeps a generated folder apart from the folders a developer edits")
+                .containsExactly("", "", "true", "true");
+        assertThat(attributes(iml, "content", "url"))
+                .as("a folder outside the module's own folder is a content root of its own")
+                .containsExactly("file://$MODULE_DIR$",
+                        "file://$MODULE_DIR$/" + relative("greeter", mainGenerated),
+                        "file://$MODULE_DIR$/" + relative("greeter", testGenerated));
+    }
+
+    @Test
+    public void eclipse_links_what_the_build_generated_as_source_folders_of_their_half() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("src/main/java"));
+        Files.createDirectories(root.resolve("greeter").resolve("src/test/java"));
+        Path main = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.generated.0", "generated/sources");
+        });
+        Path test = inventory("test-module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.test", "greeter");
+            properties.setProperty("module-greeter.generated.0", "generated/sources");
+        });
+        Path mainGenerated = generated(main), testGenerated = generated(test);
+
+        run(Ide.ECLIPSE, main, test);
+
+        Path classpath = root.resolve("greeter").resolve(".classpath");
+        assertThat(classpathEntries(classpath, "src"))
+                .containsExactly("src/main/java", "src/test/java", "generated-0", "generated-1");
+        assertThat(elements(root.resolve("greeter").resolve(".project"), "location").stream()
+                .map(Element::getTextContent)
+                .toList())
+                .as("Eclipse reaches a folder outside the project through a linked folder")
+                .containsExactly(slash(mainGenerated.toAbsolutePath().normalize()), slash(testGenerated.toAbsolutePath().normalize()));
+        assertThat(attributes(classpath, "classpathentry", "output"))
+                .as("generated test sources compile with the tests")
+                .containsExactly("", ".eclipse/test-classes", "", ".eclipse/test-classes", "", "");
+    }
+
+    @Test
+    public void vscode_lists_what_the_build_generated_as_source_paths() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("sources"));
+        Path main = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.generated.0", "generated/sources");
+        });
+        generated(main);
+
+        run(Ide.VSCODE, main);
+
+        assertThat(sourcePaths()).containsExactly("greeter/sources", "out/module-greeter/generated/sources");
+    }
+
+    @Test
     public void eclipse_writes_project_and_classpath() throws IOException {
         Files.createDirectories(root.resolve("greeter").resolve("sources"));
         Files.createDirectories(root.resolve("greeter").resolve("test"));
@@ -621,6 +698,12 @@ public class IdeTest {
 
     private static String slash(Path path) {
         return path.toString().replace(File.separatorChar, '/');
+    }
+
+    private static Path generated(Path inventory) throws IOException {
+        Path sources = Files.createDirectories(inventory.resolve("generated/sources/demo"));
+        Files.writeString(sources.resolve("Generated.java"), "package demo; class Generated { }");
+        return sources.getParent();
     }
 
     private static Path library(Path inventory, String name) throws IOException {

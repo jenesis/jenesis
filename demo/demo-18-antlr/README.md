@@ -78,3 +78,14 @@ reach the jar:
 
 Turn it off with `-Djenesis.generate.antlr=false`, the same way every other
 generator is opted out.
+
+In the editor
+-------------
+
+`ide` lists the generated parser as a generated source folder of the module,
+so the editor resolves `CalcParser` and `CalcBaseVisitor` like any other class:
+
+    java build/jenesis/Make.java ide
+
+The folder lies in the build's output, so a build brings it up to date after
+the grammar changes.
