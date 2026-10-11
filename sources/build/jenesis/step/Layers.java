@@ -5,6 +5,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;
@@ -91,7 +92,7 @@ public class Layers implements BuildStep {
         Deque<String> pending = new ArrayDeque<>(List.of(api, "build.jenesis.launcher"));
         while (!pending.isEmpty()) {
             String module = pending.removeFirst();
-            if (module.startsWith("java.") || module.startsWith("jdk.") || !shared.add(module)) {
+            if (ModuleGraph.isSystemModule(module) || !shared.add(module)) {
                 continue;
             }
             ModuleDescriptor descriptor = host.get(module);

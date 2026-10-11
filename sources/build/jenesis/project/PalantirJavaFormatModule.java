@@ -34,7 +34,7 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
              null,
              "palantir-java-format",
              false,
-             ProcessBuildStep.Terms.of("palantir-java-format"));
+             new ProcessBuildStep.Terms());
     }
 
     public static PalantirJavaFormatModule ofEnvironment(Environment environment,
@@ -132,7 +132,8 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
                     "--add-exports", "jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
                     "--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
                     "-cp", String.join(File.pathSeparator, jars),
-                    "com.palantir.javaformat.java.Main"));
+                    "com.palantir.javaformat.java.Main",
+                    "--palantir"));
             if (verify) {
                 commands.add("--dry-run");
                 commands.add("--set-exit-if-changed");

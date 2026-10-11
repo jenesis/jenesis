@@ -8,11 +8,14 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Platform;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.maven.MavenDefaultRepository;
+import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisRepository;
 import build.jenesis.module.ModularJarResolver;
@@ -47,8 +50,9 @@ public class InternalModule implements BuildExecutorModule {
     public InternalModule(String prefix, String group, Path source) {
         this(prefix,
                 source,
-                Map.of(prefix, JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)),
-                Map.of(prefix, new ModularJarResolver(true)),
+                aliased(prefix, JenesisModuleRepository.of(JenesisRepository.Scope.MODULE),
+                        MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                aliased(prefix, new ModularJarResolver(true), new MavenPomResolver()),
                 group == null ? "main" : group);
     }
 
@@ -74,9 +78,12 @@ public class InternalModule implements BuildExecutorModule {
                                                String prefix,
                                                String group,
                                                Path source) {
-        Map<String, Repository> repositories = Map.of(prefix,
-                JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE));
-        Map<String, Resolver> resolvers = Map.of(prefix, ModularJarResolver.ofEnvironment(environment, true));
+        Map<String, Repository> repositories = aliased(prefix,
+                JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE),
+                MavenDefaultRepository.ofEnvironment(environment));
+        Map<String, Resolver> resolvers = aliased(prefix,
+                ModularJarResolver.ofEnvironment(environment, true),
+                MavenPomResolver.ofEnvironment(environment));
         return new InternalModule(prefix,
                 source,
                 Dependencies.ofEnvironment(environment, repositories, resolvers),
@@ -88,6 +95,13 @@ public class InternalModule implements BuildExecutorModule {
                 Platform.ofEnvironment(environment),
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap());
+    }
+
+    private static <T> Map<String, T> aliased(String prefix, T module, T maven) {
+        SequencedMap<String, T> resolution = new LinkedHashMap<>();
+        resolution.put(prefix, module);
+        resolution.putIfAbsent("maven", maven);
+        return resolution;
     }
 
     public InternalModule repositories(Map<String, Repository> repositories) {
@@ -275,7 +289,7 @@ public class InternalModule implements BuildExecutorModule {
                     new ParseModuleInfo(group, prefix, additionalDependencies, platform),
                     Stream.concat(Stream.of(SOURCE), inherited.sequencedKeySet().stream()));
             buildExecutor.addModule(DEPENDENCIES,
-                    dependencyModule.pinning(pinning),
+                    dependencyModule.pinning(pinning).pathPlacement(PathPlacement.MODULE_PATH),
                     REQUIRES);
         };
     }
@@ -347,19 +361,6 @@ public class InternalModule implements BuildExecutorModule {
                         "Internal module source is not modular (missing module-info.java)");
             }
             ModuleInfo info = new ModuleInfoParser(group).identify(moduleInfo);
-            SequencedProperties properties = new SequencedProperties();
-            for (String dependency : info.requires()) {
-                properties.setProperty(group + "/compile/" + prefix + "/" + dependency, "");
-                if (info.runtimeRequires().contains(dependency)) {
-                    properties.setProperty(group + "/runtime/" + prefix + "/" + dependency, "");
-                }
-            }
-            for (String dependency : additionalDependencies) {
-                properties.setProperty(group + "/compile/" + dependency, "");
-                properties.setProperty(group + "/runtime/" + dependency, "");
-            }
-            info.plugins().forEach((coordinate, group) -> properties.setProperty(group + "/plugin/" + coordinate, ""));
-            properties.store(context.next().resolve(BuildStep.REQUIRES));
             SequencedMap<String, String> pinned = new LinkedHashMap<>(info.versions());
             for (Map.Entry<String, SequencedMap<String, String>> variant : info.variants().entrySet()) {
                 String selected = platform.select(variant.getKey(),
@@ -368,6 +369,51 @@ public class InternalModule implements BuildExecutorModule {
                 if (selected != null) {
                     pinned.put(variant.getKey(), selected);
                 }
+            }
+            SequencedMap<String, String> coordinates = new LinkedHashMap<>();
+            for (String dependency : info.requires()) {
+                String target = info.aliases().get(dependency);
+                if (target == null) {
+                    coordinates.put(dependency, prefix + "/" + dependency);
+                } else {
+                    String version = pinned.getOrDefault(group + "/maven/" + target, "").split(" ", 2)[0];
+                    coordinates.put(dependency, "maven/" + target
+                            + (version.isEmpty() || version.startsWith(":") ? "" : "/" + version));
+                }
+            }
+            SequencedProperties properties = new SequencedProperties();
+            coordinates.forEach((dependency, coordinate) -> {
+                properties.setProperty(group + "/compile/" + coordinate, "");
+                if (info.runtimeRequires().contains(dependency)) {
+                    properties.setProperty(group + "/runtime/" + coordinate, "");
+                }
+            });
+            for (String dependency : additionalDependencies) {
+                properties.setProperty(group + "/compile/" + dependency, "");
+                properties.setProperty(group + "/runtime/" + dependency, "");
+            }
+            info.plugins().forEach((coordinate, group) -> properties.setProperty(group + "/plugin/" + coordinate, ""));
+            properties.store(context.next().resolve(BuildStep.REQUIRES));
+            if (!info.aliases().isEmpty()) {
+                SequencedProperties aliases = new SequencedProperties();
+                info.aliases().forEach((alias, target) -> aliases.setProperty(group + "/" + prefix + "/" + alias, target));
+                aliases.store(context.next().resolve(BuildStep.ALIASES));
+            }
+            if (!info.excludes().isEmpty()) {
+                SequencedProperties exclusions = new SequencedProperties();
+                for (Map.Entry<String, SequencedSet<String>> entry : info.excludes().entrySet()) {
+                    String coordinate = coordinates.get(entry.getKey());
+                    if (coordinate == null) {
+                        throw new IllegalArgumentException("Cannot apply @jenesis.exclude to " + entry.getKey()
+                                + ", which the plugin " + info.coordinate() + " does not require (declared requires: "
+                                + info.requires() + ")");
+                    }
+                    exclusions.setProperty(group + "/compile/" + coordinate, String.join(",", entry.getValue()));
+                    if (info.runtimeRequires().contains(entry.getKey())) {
+                        exclusions.setProperty(group + "/runtime/" + coordinate, String.join(",", entry.getValue()));
+                    }
+                }
+                exclusions.store(context.next().resolve(BuildStep.EXCLUSIONS));
             }
             SequencedProperties versions = new SequencedProperties();
             pinned.forEach(versions::setProperty);

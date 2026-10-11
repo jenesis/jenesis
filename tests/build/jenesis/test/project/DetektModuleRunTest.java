@@ -16,6 +16,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.DetektModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class DetektModuleRunTest {
 
@@ -103,6 +104,34 @@ public class DetektModuleRunTest {
         Path report = root.resolve("detekt").resolve("check").resolve("output").resolve("reports").resolve("detekt").resolve("detekt-report.xml");
         assertThat(report).isNotEmptyFile();
         assertThat(report).content().contains("MaxLineLength");
+    }
+
+    @Test
+    public void fails_a_report_only_run_when_detekt_cannot_load_its_configuration() throws IOException {
+        SequencedProperties versions = new SequencedProperties();
+        versions.load(new StringReader(PINS));
+        versions.store(project.resolve(BuildStep.VERSIONS));
+        Files.writeString(project.resolve("detekt.yml"), """
+                style:
+                  active: [
+                """);
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Sample.kt"), """
+                package sample
+                fun greet(): Int = 42
+                """);
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "detekt",
+                new DetektModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .as("report-only covers findings, not a Detekt that never ran")
+                .hasMessageContaining("Unexpected exit code");
     }
 
     private BuildExecutor newExecutor() throws IOException {

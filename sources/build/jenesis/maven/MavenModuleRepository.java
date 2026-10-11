@@ -196,6 +196,12 @@ public class MavenModuleRepository implements JenesisRepository {
             if (Objects.equals(version, "LATEST")) {
                 return latest == null ? newest(version, groupId, artifactId, _ -> true) : latest;
             }
+            if (release != null && !MavenDefaultVersionNegotiator.isStable(release)) {
+                return versions.stream()
+                        .filter(MavenDefaultVersionNegotiator::isStable)
+                        .max(MavenDefaultVersionNegotiator::compareVersions)
+                        .orElse(release);
+            }
             return release == null
                     ? newest(version, groupId, artifactId, MavenDefaultVersionNegotiator::isStable)
                     : release;

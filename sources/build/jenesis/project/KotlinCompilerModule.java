@@ -48,7 +48,7 @@ public class KotlinCompilerModule implements BuildExecutorModule {
              "kotlinc",
              "main",
              null,
-             ProcessBuildStep.Terms.of("kotlinc"));
+             new ProcessBuildStep.Terms());
     }
 
     public static KotlinCompilerModule ofEnvironment(Environment environment,
@@ -122,9 +122,7 @@ public class KotlinCompilerModule implements BuildExecutorModule {
         buildExecutor.addStep(COMPILED,
                 factory == null ? new Compile(terms, includeResources, tool, group) : new Compile(terms, includeResources, tool, group, factory),
                 compileInputs);
-        buildExecutor.addStep(CLASSES, new Versions(), Stream.concat(
-                Stream.of(COMPILED),
-                compileInputs.stream()));
+        buildExecutor.addStep(CLASSES, new Versions(), COMPILED);
     }
 
     @Override
@@ -292,7 +290,18 @@ public class KotlinCompilerModule implements BuildExecutorModule {
             }
             List<String> userClasspath = new ArrayList<>(jars);
             userClasspath.addAll(classpath);
-            List<String> commands = new ArrayList<>(List.of(
+            List<String> commands = new ArrayList<>(), options = new ArrayList<>();
+            for (String option : prepended(properties)) {
+                if (option.startsWith("-J")) {
+                    commands.add(option.substring(2));
+                } else if (option.startsWith("-D")) {
+                    commands.add(option);
+                } else {
+                    options.add(option);
+                }
+            }
+            properties.values().forEach(Map::clear);
+            commands.addAll(List.of(
                     "-cp", String.join(File.pathSeparator, jars),
                     "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
                     "-d", target.toString(),
@@ -301,11 +310,12 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                     "-classpath", String.join(File.pathSeparator, userClasspath)));
             if (release != null) {
                 commands.add("-jvm-target");
-                commands.add(release);
+                commands.add(Integer.parseInt(release) < 9 ? "1." + release : release);
             }
             for (String plugin : plugins) {
                 commands.add("-Xplugin=" + plugin);
             }
+            commands.addAll(options);
             commands.addAll(files);
             return CompletableFuture.completedStage(commands);
         }

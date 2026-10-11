@@ -19,8 +19,16 @@ public interface TestFramework extends Serializable {
         return Collections.emptyNavigableMap();
     }
 
+    default boolean holdsTests(ClassModel type) {
+        return true;
+    }
+
     default Map<String, String> systemProperties() {
         return Map.of();
+    }
+
+    default TestFramework runningOn(List<Path> jars) throws IOException {
+        return this;
     }
 
     List<String> arguments(Path supplement,
@@ -34,6 +42,15 @@ public interface TestFramework extends Serializable {
         if (!requested.all()) {
             throw new IllegalArgumentException(getClass().getSimpleName() + " cannot select tests by tag, so it cannot run "
                     + requested);
+        }
+        return arguments;
+    }
+
+    default List<String> engines(List<String> arguments, String engines) {
+        if (engines != null) {
+            throw new IllegalArgumentException(getClass().getSimpleName() + " runs on no JUnit Platform engine, so"
+                    + " the engines key of test.properties cannot select " + engines
+                    + " - leave it out for these tests");
         }
         return arguments;
     }
@@ -60,8 +77,19 @@ public interface TestFramework extends Serializable {
 
     static List<ModuleDescriptor> modules(Iterable<Path> folders) throws IOException {
         List<ModuleDescriptor> modules = new ArrayList<>();
+        for (Path file : jars(folders)) {
+            ModuleDescriptor module = PathPlacement.moduleDescriptor(file);
+            if (module != null) {
+                modules.add(module);
+            }
+        }
+        modules.sort(Comparator.comparing(ModuleDescriptor::name));
+        return modules;
+    }
+
+    static List<Path> jars(Iterable<Path> folders) throws IOException {
+        List<Path> jars = new ArrayList<>();
         for (Path folder : folders) {
-            List<Path> jars = new ArrayList<>();
             Path artifacts = folder.resolve(BuildStep.ARTIFACTS);
             if (Files.exists(artifacts)) {
                 try (DirectoryStream<Path> stream = Files.newDirectoryStream(artifacts)) {
@@ -73,14 +101,7 @@ public interface TestFramework extends Serializable {
                 }
             }
             jars.addAll(Dependencies.all(folder));
-            for (Path file : jars) {
-                ModuleDescriptor module = PathPlacement.moduleDescriptor(file);
-                if (module != null) {
-                    modules.add(module);
-                }
-            }
         }
-        modules.sort(Comparator.comparing(ModuleDescriptor::name));
-        return modules;
+        return jars;
     }
 }

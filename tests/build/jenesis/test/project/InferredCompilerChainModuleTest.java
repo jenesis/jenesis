@@ -13,6 +13,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.InferredCompilerChainModule;
+import build.jenesis.project.JavaToolchainModule;
 import build.jenesis.project.KotlinCompilerModule;
 import build.jenesis.project.ScalaCompilerModule;
 import build.jenesis.step.Dependencies;
@@ -148,6 +149,64 @@ public class InferredCompilerChainModuleTest {
     }
 
     @Test
+    public void java_kotlin_and_scala_classes_merge_into_one_classes_folder_each_written_once() throws Exception {
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
+        versions.setProperty("scalac/scalac/maven/org.scala-lang/scala3-compiler_3", SCALA_VERSION);
+        versions.store(project.resolve(BuildStep.VERSIONS));
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Base.java"), """
+                package sample;
+                public class Base {
+                    public String name() { return "base"; }
+                }
+                """);
+        Files.writeString(sampleDir.resolve("Mid.kt"), """
+                package sample
+                class Mid {
+                    fun describe(): String = Base().name() + "->kotlin"
+                }
+                """);
+        Files.writeString(sampleDir.resolve("Top.scala"), """
+                package sample
+                class Top:
+                  def describe(): String = Base().name() + "->scala"
+                """);
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "toolchain",
+                new JavaToolchainModule()
+                        .compiler(new InferredCompilerChainModule(
+                                Collections.emptyNavigableSet(),
+                                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))))
+                        .archiver(null),
+                "project");
+        executor.execute();
+
+        Path classes = root.resolve("toolchain")
+                .resolve(JavaToolchainModule.CLASSES)
+                .resolve("output")
+                .resolve(BuildStep.CLASSES);
+        assertThat(classes.resolve("sample/Base.class")).isNotEmptyFile();
+        assertThat(classes.resolve("sample/Mid.class")).isNotEmptyFile();
+        assertThat(classes.resolve("sample/Top.class")).isNotEmptyFile();
+        Path scalaClasses = root.resolve("toolchain")
+                .resolve("compiled")
+                .resolve(InferredCompilerChainModule.COMPILE)
+                .resolve(InferredCompilerChainModule.SCALAC)
+                .resolve(ScalaCompilerModule.CLASSES)
+                .resolve("output")
+                .resolve(BuildStep.CLASSES);
+        assertThat(scalaClasses.resolve("sample/Top.class")).isNotEmptyFile();
+        assertThat(scalaClasses.resolve("sample/Mid.class"))
+                .as("the Scala compiler reads the Kotlin classes but does not pass them on as its own")
+                .doesNotExist();
+    }
+
+    @Test
     public void kotlin_only_project_runs_kotlin_skipping_scala() throws Exception {
         SequencedProperties versions = new SequencedProperties();
         versions.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
@@ -253,6 +312,60 @@ public class InferredCompilerChainModuleTest {
     }
 
     @Test
+    public void javac_runs_in_a_process_of_its_own_when_the_process_factory_is_fork() throws IOException {
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("OnlyJava.java"), "package sample; public class OnlyJava { }\n");
+        Path process = Files.createDirectories(project.resolve("process"));
+        Files.writeString(process.resolve("javac.properties"), "-J-Xss4M=\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "chain",
+                InferredCompilerChainModule.ofEnvironment(
+                        new Environment(Map.of("process.factory", "fork")),
+                        Collections.emptyNavigableSet(),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
+                "project");
+        executor.execute();
+
+        assertThat(chainCompile()
+                .resolve(InferredCompilerChainModule.JAVAC)
+                .resolve("output")
+                .resolve(BuildStep.CLASSES)
+                .resolve("sample/OnlyJava.class"))
+                .as("a -J option reaches only a forked javac, which the process factory selects")
+                .isNotEmptyFile();
+    }
+
+    @Test
+    public void javac_copies_no_file_beside_the_sources_when_resources_are_not_included() throws IOException {
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("OnlyJava.java"), "package sample; public class OnlyJava { }\n");
+        Files.writeString(sampleDir.resolve("OnlyJava.java.in"), "template");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "chain",
+                new InferredCompilerChainModule(
+                        Collections.emptyNavigableSet(),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)))
+                        .includeResources(false),
+                "project");
+        executor.execute();
+
+        Path javaClasses = chainCompile()
+                .resolve(InferredCompilerChainModule.JAVAC)
+                .resolve("output")
+                .resolve(BuildStep.CLASSES);
+        assertThat(javaClasses.resolve("sample/OnlyJava.class")).isNotEmptyFile();
+        assertThat(javaClasses.resolve("sample/OnlyJava.java.in")).doesNotExist();
+    }
+
+    @Test
     public void resource_step_copies_resources_when_no_compilers_are_wired() throws IOException {
         Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(sampleDir.resolve("app.properties"), "key=value");
@@ -275,6 +388,23 @@ public class InferredCompilerChainModuleTest {
                 .resolve("output")
                 .resolve(BuildStep.CLASSES);
         assertThat(resourceOutput.resolve("sample/app.properties")).content().isEqualTo("key=value");
+    }
+
+    @Test
+    public void resource_step_leaves_the_configuration_folder_out() throws IOException {
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("app.properties"), "key=value");
+        Path configuration = Files.createDirectories(project.resolve(BuildStep.SOURCES + "META-INF/build.jenesis"));
+        Files.writeString(configuration.resolve("project.properties"), "artifact=sample");
+
+        runChain();
+
+        Path resourceOutput = chainCompile()
+                .resolve(InferredCompilerChainModule.RESOURCE)
+                .resolve("output")
+                .resolve(BuildStep.CLASSES);
+        assertThat(resourceOutput.resolve("sample/app.properties")).content().isEqualTo("key=value");
+        assertThat(resourceOutput.resolve("META-INF/build.jenesis")).doesNotExist();
     }
 
     @Test

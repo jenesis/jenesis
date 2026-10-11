@@ -11,6 +11,15 @@ import build.jenesis.PathPlacement;
 public class JPackage extends ProcessBuildStep {
 
     public static final String PACKAGES = "packages/";
+    private static final String FAKEROOT = """
+            #!/bin/sh
+            case "$1" in
+              -v|--version) echo "fakeroot (dpkg-deb --root-owner-group)"; exit 0 ;;
+              dpkg-deb) shift; exec dpkg-deb --root-owner-group "$@" ;;
+            esac
+            echo "fakeroot: Jenesis runs dpkg-deb alone, with --root-owner-group" >&2
+            exit 1
+            """;
 
     private final String type;
     private final String group;
@@ -19,7 +28,7 @@ public class JPackage extends ProcessBuildStep {
         this(factory.apply("jpackage", "bin/jpackage"),
              null,
              "main",
-             Terms.of("jpackage"));
+             new Terms());
     }
 
     public static JPackage ofEnvironment(Environment environment,
@@ -53,6 +62,24 @@ public class JPackage extends ProcessBuildStep {
         return type == null || super.configurations().isEmpty()
                 ? super.configurations()
                 : List.of("jpackage", "jpackage-" + type);
+    }
+
+    @Override
+    protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
+        ProcessHandler handler = super.handler(context, commands);
+        if (!"deb".equals(type) || !FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+            return handler;
+        }
+        Path folder = Files.createDirectories(context.supplement().resolve("fakeroot"));
+        Files.writeString(folder.resolve("fakeroot"), FAKEROOT);
+        Files.setPosixFilePermissions(folder.resolve("fakeroot"), PosixFilePermissions.fromString("rwxr-xr-x"));
+        ProcessHandler.OfProcess process = switch (handler) {
+            case ProcessHandler.OfProcess forked -> forked;
+            case ProcessHandler.OfTool _ -> ProcessHandler.OfProcess.ofJavaHome("bin/jpackage").apply(commands);
+        };
+        SortedMap<String, String> environment = new TreeMap<>(process.environment());
+        environment.merge("PATH", folder.toString(), (path, shim) -> shim + File.pathSeparator + path);
+        return process.environment(environment);
     }
 
     @Override

@@ -38,6 +38,10 @@ public interface HashFunction {
                 try (DirectoryStream<Path> stream = Files.newDirectoryStream(current)) {
                     stream.forEach(queue::add);
                 }
+            } else if (Files.isSymbolicLink(current) && Files.notExists(current)) {
+                throw new NoSuchFileException(current.toString(),
+                        Files.readSymbolicLink(current).toString(),
+                        "a symbolic link to a file that does not exist; link one that does, or copy the file in its place");
             } else {
                 files.add(current);
             }

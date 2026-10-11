@@ -47,6 +47,21 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void marks_a_module_unstaged_where_packaging_properties_stages_none() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"), "stage=false\n");
+        assertThat(fixture.execute("sub/prepare").get("sub/prepare").resolve(Inventory.UNSTAGED))
+                .as("the inventory reads the marker and the staged repositories leave the module out")
+                .exists();
+    }
+
+    @Test
+    public void marks_no_module_unstaged_by_default() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        assertThat(fixture.execute("sub/prepare").get("sub/prepare").resolve(Inventory.UNSTAGED)).doesNotExist();
+    }
+
+    @Test
     public void absent_main_in_module_properties_yields_no_jar_arguments() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
@@ -288,6 +303,20 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void a_system_property_in_a_process_file_is_one_argument_whose_value_may_be_a_variable() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("process-test.properties"),
+                "-Dplain=value\n-DshardCount=@shards\n-DshardIndex=@shard/0\n-Descaped\\=kept=\n-Dflag=\n");
+        Path prepareOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
+                new Environment(Map.of("variable.shards", "40"))), "sub/prepare").get("sub/prepare");
+        SequencedProperties arguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("test.properties"));
+        assertThat(arguments.stringPropertyNames())
+                .as("a -D line is the one argument -Dkey=value the JVM reads, not -Dkey followed by value")
+                .containsExactlyInAnyOrder("-Dplain=value", "-DshardCount=40", "-DshardIndex=0", "-Descaped=kept", "-Dflag");
+        assertThat(arguments.stringPropertyNames()).allSatisfy(key -> assertThat(arguments.getProperty(key)).isEmpty());
+    }
+
+    @Test
     public void a_variable_that_is_not_set_and_has_no_default_names_the_setting() throws IOException {
         Fixture fixture = setUp("main=\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("environment-test.properties"), "GREETING=@greeting\n");
@@ -310,6 +339,33 @@ public class InferredMultiProjectAssemblerTest {
         assertThat(javacArguments.getProperty("-g"))
                 .as("a configuration key without a build-generated counterpart is added")
                 .isEqualTo("");
+    }
+
+    @Test
+    public void a_process_command_file_refuses_an_argument_the_module_declaration_hands_the_tool() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(Files.createDirectories(fixture.manifests().resolve(ProcessBuildStep.PROCESS))
+                .resolve("javac.properties"), "--release=8\n");
+        Files.writeString(fixture.configuration().resolve("process-javac.properties"), "--release=17\n-g=\n");
+        assertThatThrownBy(() -> fixture.execute("sub/prepare"))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("process-javac.properties sets --release, which the build already hands javac as"
+                        + " --release 8")
+                .hasMessageContaining("@jenesis.release")
+                .hasMessageContaining("maven.compiler.testRelease");
+    }
+
+    @Test
+    public void a_process_command_file_sets_an_argument_that_a_module_it_depends_on_sets_as_well() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(Files.createDirectories(fixture.artifacts().resolve(ProcessBuildStep.PROCESS))
+                .resolve("javac.properties"), "-g=\n");
+        Files.writeString(fixture.configuration().resolve("process-javac.properties"), "-g=\n");
+        Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
+        assertThat(SequencedProperties.ofFiles(prepareOutput.resolve(ProcessBuildStep.PROCESS + "javac.properties")))
+                .as("only the module's own declaration hands javac an argument, not what an upstream module prepared")
+                .containsEntry("-g", "");
     }
 
     @Test
@@ -518,6 +574,60 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void sources_jar_holds_what_a_generator_added_to_the_sources() throws IOException {
+        Fixture fixture = setUp("path=\n", false, true, false);
+        Files.writeString(Files.createDirectories(fixture.sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { Generated generated; }");
+        Files.writeString(fixture.configuration().resolve("plugin-generator.properties"), "");
+        SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("generator+binary/generated", (_, _) -> new GeneratingStep().asModule("generator"));
+        Path sourcesOutput = fixture.execute(new InferredMultiProjectAssembler().plugins(plugins), "sub/sources/archive")
+                .get("sub/sources/archive");
+        try (JarFile jar = new JarFile(sourcesOutput.resolve("sources").resolve("sources.jar").toFile())) {
+            assertThat(jar.stream().map(JarEntry::getName))
+                    .as("a sources jar holds the generated sources the module is compiled from, as Maven's does")
+                    .contains("sample/Sample.java", "sample/Generated.java");
+        }
+    }
+
+    @Test
+    public void sources_jar_holds_the_resources_and_the_project_resources_of_the_module() throws IOException {
+        Fixture base = setUp("path=\n", false, true, false);
+        Fixture fixture = new Fixture(base.descriptor().resources(BuildExecutorModule.PREVIOUS + "artifacts"),
+                base.build(),
+                base.manifests(),
+                base.sources(),
+                base.artifacts(),
+                base.configuration(),
+                base.profile());
+        Files.writeString(Files.createDirectories(fixture.sources().resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }");
+        Files.writeString(Files.createDirectories(fixture.artifacts().resolve(BuildStep.RESOURCES + "META-INF/services"))
+                .resolve("java.lang.Runnable"), "sample.Sample\n");
+        SequencedMap<Path, Path> resources = new LinkedHashMap<>();
+        resources.put(Path.of("META-INF/LICENSE.md"), Files.writeString(root.resolve("LICENSE.md"), "licence"));
+        Path sourcesOutput = fixture.execute(new InferredMultiProjectAssembler().resources(resources), "sub/sources/archive")
+                .get("sub/sources/archive");
+        try (JarFile jar = new JarFile(sourcesOutput.resolve("sources").resolve("sources.jar").toFile())) {
+            assertThat(jar.stream().map(JarEntry::getName))
+                    .as("a sources jar holds the resources and the project resources the module's jar holds, as Maven's and Gradle's do")
+                    .contains("sample/Sample.java", "META-INF/services/java.lang.Runnable", "META-INF/LICENSE.md");
+        }
+    }
+
+    private record GeneratingStep() implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.SOURCES + "sample")).resolve("Generated.java"),
+                    "package sample; public class Generated { }");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    @Test
     public void source_flag_disabled_omits_sources_jar_step() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/sources/archive"))
@@ -534,6 +644,55 @@ public class InferredMultiProjectAssemblerTest {
                 }
                 """);
         Path javadocOutput = fixture.execute("sub/documentation/archive").get("sub/documentation/archive");
+        assertThat(javadocOutput.resolve("documentation").resolve("javadoc.jar")).exists();
+    }
+
+    @Test
+    public void a_process_command_file_for_javadoc_reaches_the_javadoc_of_the_documentation_jar() throws IOException {
+        Fixture fixture = setUp("main=foo.Main\n", false, false, true);
+        Files.writeString(fixture.configuration().resolve("process-javadoc.properties"), "-windowtitle=Configured\n");
+        Files.createDirectory(fixture.sources.resolve(BuildStep.SOURCES));
+        Files.writeString(fixture.sources.resolve(BuildStep.SOURCES).resolve("Foo.java"), "public class Foo {}");
+        Path javadocOutput = fixture.execute("sub/documentation/archive").get("sub/documentation/archive");
+        assertThat(fixture.build().resolve("sub/documentation/generate/document/javadoc/supplement/command"))
+                .content()
+                .contains("-windowtitle Configured");
+        try (JarFile jar = new JarFile(javadocOutput.resolve("documentation").resolve("javadoc.jar").toFile())) {
+            assertThat(jar.getManifest().getMainAttributes().getValue("Main-Class"))
+                    .as("the main class the module's own jar names does not reach its documentation jar")
+                    .isNull();
+        }
+    }
+
+    @Test
+    public void compares_the_api_of_a_main_module_against_its_last_release() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("japicmp.properties"), "baseline=org.example/sample/1.0\n");
+        Path required = fixture.execute("sub/artifact/japicmp/required").get("sub/artifact/japicmp/required");
+        assertThat(required.resolve(BuildStep.REQUIRES)).exists();
+    }
+
+    @Test
+    public void compares_no_api_of_a_test_module() throws IOException {
+        Fixture fixture = setUp("path=\ntest=main_artifact\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("japicmp.properties"), "baseline=org.example/sample/1.0\n");
+        assertThatThrownBy(() -> fixture.execute("sub/artifact/japicmp/required"))
+                .as("the tests of a module have no release of their own to be compatible with")
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: japicmp/required - ");
+    }
+
+    @Test
+    public void documents_no_test_module_unless_the_tests_are_staged() throws IOException {
+        Fixture fixture = setUp("path=\ntest=main_artifact\n", false, false, true);
+        assertThatThrownBy(() -> fixture.execute("sub/documentation/archive"))
+                .as("the documentation of a test module is never published unless its artifacts are staged")
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: archive - ");
+        Files.createDirectory(fixture.sources.resolve(BuildStep.SOURCES));
+        Files.writeString(fixture.sources.resolve(BuildStep.SOURCES).resolve("FooTest.java"), "public class FooTest {}");
+        Path javadocOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
+                new Environment(Map.of("stage.tests", "true"))), "sub/documentation/archive").get("sub/documentation/archive");
         assertThat(javadocOutput.resolve("documentation").resolve("javadoc.jar")).exists();
     }
 
@@ -570,7 +729,7 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("path=\ntest=\nabstract=true\n", true, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/observed/test/resolved"))
                 .rootCause()
-                .hasMessageStartingWith("Unknown selector: observed/test/resolved - ");
+                .hasMessageStartingWith("Unknown selector: test/resolved - ");
     }
 
     @Test
@@ -780,6 +939,32 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void hands_the_tests_the_project_resources_beside_the_module_jar() throws IOException {
+        Fixture fixture = setUp("path=\ntest=main_artifact\n", true, false, false);
+        SequencedMap<Path, Path> resources = new LinkedHashMap<>();
+        resources.put(Path.of("META-INF/NOTICE"), Files.writeString(root.resolve("NOTICE"), "notice"));
+        Path recorded = fixture.execute(new InferredMultiProjectAssembler()
+                                .resources(resources)
+                                .observe(observe -> observe.test(null).custom("inputs", new InputsStep())),
+                        "sub/observed/custom/inputs")
+                .get("sub/observed/custom/inputs");
+        assertThat(Files.readAllLines(recorded.resolve("inputs.txt")))
+                .as("with jenesis.test.jars=false the tests run against the resources folders, so they read them")
+                .anyMatch(input -> input.endsWith("include/resources"));
+    }
+
+    private record InputsStep() implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Files.write(context.next().resolve("inputs.txt"), arguments.sequencedKeySet());
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    @Test
     public void wires_a_plugin_whose_properties_file_is_found_and_hands_it_the_values() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("plugin-lint.properties"), "level=strict\n");
@@ -840,6 +1025,74 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void a_transform_replaces_the_compiled_classes_it_writes_and_passes_every_other_one_on() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Path sample = Files.createDirectories(fixture.sources().resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sample.resolve("Sample.java"), "package sample; public class Sample { }");
+        Files.writeString(sample.resolve("Other.java"), "package sample; public class Other { }");
+        Files.writeString(fixture.configuration().resolve("plugin-rewrite.properties"), "");
+        SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("rewrite+binary/transform", (_, _) -> new TransformingStep("rewritten").asModule("rewrite"));
+        Path artifacts = fixture.execute(new InferredMultiProjectAssembler().plugins(plugins), "sub/binary/artifacts")
+                .get("sub/binary/artifacts");
+        try (JarFile jar = new JarFile(jarIn(artifacts).toFile())) {
+            assertThat(new String(jar.getInputStream(jar.getEntry("sample/Sample.class")).readAllBytes(), StandardCharsets.UTF_8))
+                    .as("the jar holds the class the transform wrote in place of the one javac compiled")
+                    .isEqualTo("rewritten");
+            assertThat(jar.getEntry("sample/Other.class"))
+                    .as("a class the transform did not write reaches the jar as javac compiled it")
+                    .isNotNull();
+        }
+    }
+
+    @Test
+    public void transforms_run_in_the_order_they_are_named_each_handed_what_the_one_before_wrote() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(Files.createDirectories(fixture.sources().resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }");
+        Files.writeString(fixture.configuration().resolve("plugin-first.properties"), "");
+        Files.writeString(fixture.configuration().resolve("plugin-second.properties"), "");
+        SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("first+binary/transform", (_, _) -> new TransformingStep("first").asModule("first"));
+        plugins.put("second+binary/transform", (_, _) -> new TransformingStep("+second").asModule("second"));
+        Path artifacts = fixture.execute(new InferredMultiProjectAssembler().plugins(plugins), "sub/binary/artifacts")
+                .get("sub/binary/artifacts");
+        try (JarFile jar = new JarFile(jarIn(artifacts).toFile())) {
+            assertThat(new String(jar.getInputStream(jar.getEntry("sample/Sample.class")).readAllBytes(), StandardCharsets.UTF_8))
+                    .as("the second transform is handed the class the first one wrote")
+                    .isEqualTo("first+second");
+        }
+        assertThat(SequencedProperties.ofFiles(fixture.build()
+                .resolve("sub/binary/transform/second/classes/output/transformed.properties")).stringPropertyNames())
+                .as("what a transform writes beside its classes, as the dependencies it resolved, passes on with them")
+                .containsExactlyInAnyOrder("first", "+second");
+    }
+
+    private static Path jarIn(Path folder) throws IOException {
+        try (Stream<Path> files = Files.walk(folder)) {
+            return files.filter(file -> file.toString().endsWith(".jar")).findFirst().orElseThrow();
+        }
+    }
+
+    private record TransformingStep(String suffix) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            byte[] handed = Files.readAllBytes(arguments.firstEntry().getValue().folder()
+                    .resolve(BuildStep.CLASSES + "sample/Sample.class"));
+            String base = handed.length > 3 && (handed[0] & 0xFF) == 0xCA && (handed[1] & 0xFF) == 0xFE
+                    ? ""
+                    : new String(handed, StandardCharsets.UTF_8);
+            Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.CLASSES + "sample")).resolve("Sample.class"),
+                    base + suffix);
+            Files.writeString(context.next().resolve("transformed.properties"), suffix + "=\n");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    @Test
     public void stages_what_a_packager_writes_into_packages() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("plugin-appimage.properties"), "");
@@ -849,6 +1102,24 @@ public class InferredMultiProjectAssemblerTest {
         assertThat(outputs.get("package/packaged").resolve(JPackage.PACKAGES + "app.AppImage")).exists();
         assertThat(SequencedProperties.ofFiles(outputs.get("package/inventory").resolve(Inventory.INVENTORY)).stringPropertyNames())
                 .as("the package reaches the stage through the module's inventory")
+                .anyMatch(key -> key.endsWith(".package"));
+    }
+
+    @Test
+    public void stages_a_bundle_among_the_packages() throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"), "bundle=true\n");
+        Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "project=sample\nartifact=app\nversion=1\n");
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(
+                Files.createDirectories(fixture.artifacts().resolve(BuildStep.ARTIFACTS)).resolve("app.jar")))) {
+            jar.putNextEntry(new JarEntry("com/example/Entry.class"));
+            jar.write(new byte[]{1, 2, 3});
+            jar.closeEntry();
+        }
+        SequencedMap<String, Path> outputs = fixture.execute("package");
+        assertThat(outputs.get("package/packaged").resolve(JPackage.PACKAGES + "app.zip")).exists();
+        assertThat(SequencedProperties.ofFiles(outputs.get("package/inventory").resolve(Inventory.INVENTORY)).stringPropertyNames())
+                .as("the bundle reaches the stage, and so export and release, through the module's inventory")
                 .anyMatch(key -> key.endsWith(".package"));
     }
 

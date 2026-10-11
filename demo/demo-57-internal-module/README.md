@@ -93,7 +93,10 @@ values for a provider that takes none fails the build rather than dropping them:
     }
 
 The plugin's `greeting` step writes `sources/sample/Greeting.java` into its output,
-quoting the text with `org.json`, and `javac` compiles it with `Sample.java`.
+quoting the text with `org.json`, and `javac` compiles it with `Sample.java`. What
+a plugin generates is part of the module's sources from then on: `javadoc`
+documents `Greeting`, and the sources jar that `-Djenesis.project.sources=true`
+stages carries `sample/Greeting.java` beside `sample/Sample.java`.
 
 The plugin's dependencies - `build.jenesis` and `org.json` - resolve from the
 default Jenesis repository, with the local export (`~/.jenesis`) searched first,

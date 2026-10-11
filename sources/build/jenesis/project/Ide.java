@@ -97,57 +97,72 @@ public class Ide implements BuildExecutorModule {
                 continue;
             }
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
-            String prefix = prefix(inventory);
-            if (prefix == null) {
-                continue;
-            }
-            String path = inventory.getProperty(prefix + ".path");
-            if (path == null) {
-                continue;
-            }
-            Path content = path.isEmpty() ? base : base.resolve(path).normalize();
-            String module = inventory.getProperty(prefix + ".module");
-            boolean modular = module != null && !module.isEmpty();
-            String name = modular ? module : name(path, base);
-            String declared = inventory.getProperty(prefix + ".release");
-            Integer release = declared == null || declared.isEmpty() ? null : Integer.valueOf(declared);
-            boolean fixture = inventory.getProperty(prefix + ".abstract") != null;
-            boolean test = !fixture && inventory.getProperty(prefix + ".test") != null;
-            List<String> coordinates = new ArrayList<>();
-            List<Path> jars = new ArrayList<>();
-            for (int index = 0; ; index++) {
-                String value = inventory.getProperty(prefix + ".dependency." + index);
-                if (value == null) {
-                    break;
-                }
-                String group = inventory.getProperty(prefix + ".dependency." + index + ".group");
-                String[] parts = value.split(" ");
-                if (group != null && !group.equals("main") || parts[0].contains("/pom/")) {
+            for (String prefix : Inventory.prefixes(inventory)) {
+                if (inventory.value(prefix + ".packaging") != null) {
                     continue;
                 }
-                coordinates.add(parts[0]);
-                jars.add(argument.folder().resolve(parts[1]).toAbsolutePath().normalize());
-            }
-            for (String key : inventory.stringPropertyNames()) {
-                if (key.startsWith(prefix + ".identity.")) {
-                    String coordinate = inventory.getProperty(key);
-                    if (!coordinate.contains("/pom/")) {
-                        identities.putIfAbsent(coordinate, name);
+                String path = inventory.getProperty(prefix + ".path");
+                Path content = path.isEmpty() ? base : base.resolve(path).normalize();
+                String module = inventory.getProperty(prefix + ".module");
+                boolean modular = module != null && !module.isEmpty();
+                String name = modular ? module : name(path, base);
+                String declared = inventory.getProperty(prefix + ".release");
+                Integer release = declared == null || declared.isEmpty() ? null : Integer.valueOf(declared);
+                boolean fixture = inventory.getProperty(prefix + ".abstract") != null;
+                boolean test = !fixture && inventory.getProperty(prefix + ".test") != null;
+                List<String> coordinates = new ArrayList<>();
+                List<Path> jars = new ArrayList<>();
+                for (int index = 0; ; index++) {
+                    String value = inventory.getProperty(prefix + ".dependency." + index);
+                    if (value == null) {
+                        break;
+                    }
+                    String group = inventory.getProperty(prefix + ".dependency." + index + ".group");
+                    String[] parts = value.split(" ");
+                    if (group != null && !group.equals("main") || parts[0].contains("/pom/")) {
+                        continue;
+                    }
+                    coordinates.add(parts[0]);
+                    jars.add(argument.folder().resolve(parts[1]).toAbsolutePath().normalize());
+                }
+                for (String key : inventory.stringPropertyNames()) {
+                    if (key.startsWith(prefix + ".identity.")) {
+                        String coordinate = inventory.getProperty(key);
+                        if (!coordinate.contains("/pom/")) {
+                            identities.putIfAbsent(coordinate, name);
+                        }
                     }
                 }
+                raws.add(new Raw(name, content, modular, test, release, coordinates, jars));
             }
-            raws.add(new Raw(name, content, modular, test, release, coordinates, jars));
+        }
+        Map<Path, Raw> folded = new HashMap<>();
+        Set<Path> mains = raws.stream().filter(raw -> !raw.test()).map(Raw::content).collect(Collectors.toSet());
+        for (Raw raw : raws) {
+            if (raw.test() && mains.contains(raw.content())) {
+                folded.put(raw.content(), raw);
+            }
         }
         List<Module> modules = new ArrayList<>();
         for (Raw raw : raws) {
-            SequencedSet<Path> libraries = new LinkedHashSet<>();
+            if (folded.get(raw.content()) == raw) {
+                continue;
+            }
+            SequencedSet<Path> libraries = new LinkedHashSet<>(), testLibraries = new LinkedHashSet<>();
             SequencedSet<String> moduleDependencies = new LinkedHashSet<>();
-            for (int index = 0; index < raw.coordinates().size(); index++) {
-                String internal = identities.get(raw.coordinates().get(index));
-                if (internal == null) {
-                    libraries.add(raw.jars().get(index));
-                } else if (!internal.equals(raw.name())) {
-                    moduleDependencies.add(internal);
+            for (Raw half : Stream.of(raw, folded.get(raw.content())).filter(Objects::nonNull).toList()) {
+                for (int index = 0; index < half.coordinates().size(); index++) {
+                    String internal = identities.get(half.coordinates().get(index));
+                    if (internal == null) {
+                        Path jar = half.jars().get(index);
+                        if (half == raw) {
+                            libraries.add(jar);
+                        } else if (raw.jars().stream().noneMatch(main -> main.getFileName().equals(jar.getFileName()))) {
+                            testLibraries.add(jar);
+                        }
+                    } else if (!internal.equals(raw.name())) {
+                        moduleDependencies.add(internal);
+                    }
                 }
             }
             List<Path> mainSources = new ArrayList<>();
@@ -160,6 +175,7 @@ public class Ide implements BuildExecutorModule {
                     mainSources,
                     testSources,
                     new ArrayList<>(libraries),
+                    new ArrayList<>(testLibraries),
                     new ArrayList<>(moduleDependencies)));
         }
         return modules;
@@ -178,6 +194,11 @@ public class Ide implements BuildExecutorModule {
                 testSources.add(directory);
             }
         }
+        List<Path> found = Stream.concat(mainSources.stream(), testSources.stream()).toList();
+        Predicate<Path> enclosing = directory -> found.stream()
+                .anyMatch(other -> !other.equals(directory) && other.startsWith(directory));
+        mainSources.removeIf(enclosing);
+        testSources.removeIf(enclosing);
         if (test && testSources.isEmpty()) {
             testSources.add(content);
         } else if (!test && mainSources.isEmpty()) {
@@ -191,16 +212,6 @@ public class Ide implements BuildExecutorModule {
             return name == null ? "root" : name.toString();
         }
         return path.replace('/', '.').replace('\\', '.');
-    }
-
-    private static String prefix(SequencedProperties inventory) {
-        for (String key : inventory.stringPropertyNames()) {
-            int dot = key.indexOf('.');
-            if (dot > 0) {
-                return key.substring(0, dot);
-            }
-        }
-        return null;
     }
 
     private static void idea(List<Module> modules, Path base) throws IOException {
@@ -323,7 +334,7 @@ public class Ide implements BuildExecutorModule {
             for (Path source : module.testSources()) {
                 sourcePaths.add(workspace(base, source));
             }
-            for (Path library : module.libraries()) {
+            for (Path library : Stream.concat(module.libraries().stream(), module.testLibraries().stream()).toList()) {
                 libraries.putIfAbsent(library.getFileName().toString(), workspace(base, library));
             }
         }
@@ -371,6 +382,7 @@ public class Ide implements BuildExecutorModule {
                           List<Path> mainSources,
                           List<Path> testSources,
                           List<Path> libraries,
+                          List<Path> testLibraries,
                           List<String> moduleDependencies) {
 
         private String iml(Path base, int feature) {
@@ -402,8 +414,10 @@ public class Ide implements BuildExecutorModule {
                         .append(escape(dependency))
                         .append("\"/>\n");
             }
-            for (Path library : libraries()) {
-                content.append("    <orderEntry type=\"module-library\">\n");
+            for (Path library : Stream.concat(libraries().stream(), testLibraries().stream()).toList()) {
+                content.append("    <orderEntry type=\"module-library\"")
+                        .append(testLibraries().contains(library) ? " scope=\"TEST\"" : "")
+                        .append(">\n");
                 content.append("      <library>\n");
                 content.append("        <CLASSES>\n");
                 content.append("          <root url=\"jar://")
@@ -454,6 +468,11 @@ public class Ide implements BuildExecutorModule {
                 entry(content,
                         "kind=\"lib\" path=\"" + escape(library.toString().replace(File.separatorChar, '/')) + "\"",
                         onModulePath);
+            }
+            for (Path library : testLibraries()) {
+                entry(content,
+                        "kind=\"lib\" path=\"" + escape(library.toString().replace(File.separatorChar, '/')) + "\"",
+                        Stream.concat(onModulePath.stream(), Stream.of("test")).toList());
             }
             content.append("  <classpathentry kind=\"output\" path=\".eclipse/classes\"/>\n");
             content.append("</classpath>\n");

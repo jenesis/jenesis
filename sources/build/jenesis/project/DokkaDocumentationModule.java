@@ -47,7 +47,7 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
              "main",
              null,
              null,
-             ProcessBuildStep.Terms.of("dokka"));
+             new ProcessBuildStep.Terms());
     }
 
     public static DokkaDocumentationModule ofEnvironment(Environment environment,
@@ -182,14 +182,6 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
                     Set.of(".kt"),
                     Set.of("dokka.properties"),
                     false);
-        }
-
-        @Override
-        public boolean acceptableExitCode(int code,
-                                          Executor executor,
-                                          BuildStepContext context,
-                                          SequencedMap<String, BuildStepArgument> arguments) {
-            return true;
         }
 
         @Override

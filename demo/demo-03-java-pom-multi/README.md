@@ -22,14 +22,15 @@ The project is an aggregator `pom.xml` over two module directories:
 
     demo/demo-03-java-pom-multi
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
-    |-- pom.xml              aggregator (packaging pom); lists the two modules
+    |-- pom.xml              aggregator (packaging pom); lists the modules
     |-- greeter/            the library module (with a JUnit test)
     |   |-- pom.xml          <sourceDirectory> + <testSourceDirectory>; a test-scoped JUnit dependency
     |   |-- sources/sample/greeter/Greeter.java
     |   `-- test/sample/greeter/GreeterTest.java
-    `-- app/                the consumer module
-        |-- pom.xml          depends on greeter + commons-lang3
-        `-- sources/sample/app/App.java   uses Greeter + StringUtils
+    |-- app/                the consumer module
+    |   |-- pom.xml          depends on greeter + commons-lang3
+    |   `-- sources/sample/app/App.java   uses Greeter + StringUtils
+    `-- bom/pom.xml          a bill of materials over greeter and app (packaging pom)
 
 The root `pom.xml` carries `<packaging>pom</packaging>`, so Jenesis treats it as
 an aggregator and never builds it as a jar; its presence is what selects the
@@ -42,6 +43,23 @@ Jenesis builds `greeter` first, exposes its output through the sibling's `assign
 step, and prepends that as a repository when resolving `app`, so the sibling
 coordinate resolves from within the build while `commons-lang3` is fetched from
 Maven Central.
+
+Publishing a bill of materials
+------------------------------
+
+`bom/pom.xml` is a module of `<packaging>pom</packaging>` that lists no modules
+but declares a `<dependencyManagement>` naming `greeter` and `app` at
+`${project.version}`. Such a POM is a BOM: nothing is compiled for it, and a
+`stage` publishes it beside the two jars, as its POM alone:
+
+    java -Djenesis.test.skip=true build/jenesis/Make.java stage
+
+    target/stage/maven/output/build/jenesis/demo/bom/1.0.0/bom-1.0.0.pom
+
+The staged POM carries the BOM's coordinate, its packaging and its metadata, and
+its own `<dependencyManagement>` with every `${...}` resolved. It names no parent
+and leaves out the parent's managed versions, since the aggregator is never
+published. `export` installs it and `release` publishes it like any staged POM.
 
 Tests
 -----
@@ -74,6 +92,11 @@ entry in `<dependencyManagement>` (written by `pin` as part of the full resolved
 closure, with its checksum) overrides it, so the pinned version always wins - you
 could pin a higher console version here than the derived default and Jenesis would
 honor it.
+
+The tests of a module run in that module's folder, with the `basedir` property set
+to it, as Maven runs them: `runs_in_the_folder_of_its_module` reads `pom.xml` by a
+relative path and finds `greeter/pom.xml`, so a test reading `src/test/...` the
+same way finds what the module holds.
 
 Sharing test code across modules
 --------------------------------
@@ -125,13 +148,20 @@ for across the tree, not how much of each matched module is rebuilt.
 
 Test runs are narrowed with `-Djenesis.test.filter`, a comma-separated list of
 `<class-regex>[#<method>]` patterns; the regex matches the fully-qualified class
-name. `greeter` ships two tests, so this runs only one of them:
+name. `greeter` ships three tests, so this runs only one of them:
 
     java -Djenesis.test.filter='.*GreeterTest#prefix_is_a_greeting' build/jenesis/Make.java
 
 The test step's summary then reports `1 tests successful` instead of the default
-`2`. The `-D` flag must come **before** the source file - anything after it is
+`3`. The `-D` flag must come **before** the source file - anything after it is
 read as a selector.
+
+`-Djenesis.test.exclude` takes the same comma-separated class patterns, without a
+`#<method>`, and leaves out the classes they match while the default naming stays
+in force. A module whose every test is left out runs none, so this builds both
+modules and runs no test at all:
+
+    java -Djenesis.test.exclude='.*GreeterTest' build/jenesis/Make.java
 
 Tests can also be selected by tag with `-Djenesis.test.tag`, a comma-separated
 list of alternatives, a test running where it matches one of them. An alternative
@@ -154,22 +184,35 @@ Passing `-Djenesis.test.parallel` runs the matched tests in parallel, letting
 the test framework execute them concurrently where its configuration allows.
 
 Three more switches round out the test wiring. `-Djenesis.test.reporting=true`
-writes machine-readable reports into the module's `reports/tests`, next to the
-console summary: the legacy JUnit XML that CI report plugins read, and the JUnit
-open-test-reporting XML. `-Djenesis.test.skip=true` skips the test step entirely
+keeps the machine-readable reports every test run writes in the module's
+`reports/tests` rather than under the step's `supplement/reports`: the legacy JUnit
+XML that CI report plugins read, and the JUnit open-test-reporting XML. `-Djenesis.test.skip=true` skips the test step entirely
 - handy when staging an artifact whose tests have already run.
 And on a `stage` build, `-Djenesis.stage.tests=true` also stages the module's
 `tests`-classifier variant beside the main jar, so the test artifact is published
-too (by default only the main artifact is staged).
+too (by default only the main artifact is staged). A module that holds nothing to
+publish, such as one of integration tests, says so in a `build.jenesis/packaging.properties`
+beside its `pom.xml`:
+
+    stage=false
+
+It is built and tested but never staged, so neither `export` nor `release` ships it.
+The BOM reads the same line, from `bom/build.jenesis/packaging.properties`, and is
+then left out of the staged repositories as well. Maven's `maven.deploy.skip` and
+`maven.install.skip` are not read: a module that sets them states the same with
+this line.
 
 When a test fails
 -----------------
 
-A failing test fails the build. The `failed` line of the test step in
+A failing test fails the build, and the error names each failed test, at most
+twenty of them, read from the reports the runner writes whatever reached the
+console. The `failed` line of the test step in
 `target/.jenesis.events.jsonl` names a `folder` ending in `~`, which keeps the
 run as it ended: the command under `supplement/command`, the runner's output
-under `supplement/output` and `supplement/error`, and the reports with
-`-Djenesis.test.reporting=true`, beside a `.jenesis.failed` marker. It stays
+under `supplement/output` and `supplement/error`, and its reports under
+`supplement/reports` - or under `reports/tests` with
+`-Djenesis.test.reporting=true` - beside a `.jenesis.failed` marker. It stays
 until the step runs again.
 
 Pinned dependencies

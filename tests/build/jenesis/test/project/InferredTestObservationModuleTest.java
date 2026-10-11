@@ -48,6 +48,28 @@ public class InferredTestObservationModuleTest {
     }
 
     @Test
+    public void observes_nothing_of_a_module_its_description_declares_no_or_an_abstract_test_module()
+            throws IOException {
+        Files.writeString(project.resolve("jacoco.properties"), "");
+        Path main = Files.createDirectory(project.resolve("main")), base = Files.createDirectory(project.resolve("base"));
+        Files.writeString(main.resolve(BuildStep.MODULE), "module=sample\n");
+        Files.writeString(base.resolve(BuildStep.MODULE), "test=sample\nabstract=true\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("main", main);
+        executor.addSource("base", base);
+        executor.addModule("main-observed", observation().test(_ -> (_, _) -> {}), "main");
+        executor.addModule("base-observed", observation().test(_ -> (_, _) -> {}), "base");
+        executor.execute();
+
+        assertThat(root.resolve("main-observed").resolve("jacoco"))
+                .as("a module that declares no tests is not observed")
+                .doesNotExist();
+        assertThat(root.resolve("base-observed").resolve("jacoco"))
+                .as("an abstract test module runs no tests of its own")
+                .doesNotExist();
+    }
+
+    @Test
     public void the_observe_override_switches_off_jacoco() throws IOException {
         Files.writeString(project.resolve("jacoco.properties"), "");
         BuildExecutor executor = newExecutor();
@@ -165,7 +187,7 @@ public class InferredTestObservationModuleTest {
 
     @Test
     public void a_test_properties_file_rejects_an_unknown_property() throws IOException {
-        Files.writeString(project.resolve("test.properties"), "engines=junit-platform");
+        Files.writeString(project.resolve("test.properties"), "runner=junit-platform");
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule("observed", observation(), "project");
@@ -173,7 +195,7 @@ public class InferredTestObservationModuleTest {
         assertThatThrownBy(executor::execute)
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .rootCause()
-                .hasMessageContaining("Unknown test property: engines");
+                .hasMessageContaining("Unknown test property: runner");
     }
 
     @Test

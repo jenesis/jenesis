@@ -1,0 +1,3 @@
+Manifest-Version: 1.0
+Implementation-Title: Compiler arguments demo
+Implementation-Vendor: Example Corp

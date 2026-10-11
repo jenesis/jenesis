@@ -99,9 +99,16 @@ platform it is for so `pin` keeps the ones it cannot resolve itself:
     protoc-grpc-java/maven/io.grpc/protoc-gen-grpc-java/exe/linux-x86_64 1.83.1 SHA-256/db4044... (linux,x86_64)
     -->
 
-Pin `protoc` rather than floating it: `com.google.protobuf:protoc` still publishes
-a `21.0-rc-1` that Maven Central reports as the latest release, and the generated
-code has to match the `protobuf-java` the module depends on.
+`pin` refreshes only the lines of the platform it runs on. To add another platform
+from one machine, write its line with the SHA-256 of the executable Maven Central
+publishes for that classifier:
+
+    curl -s https://repo1.maven.org/maven2/com/google/protobuf/protoc/4.32.1/protoc-4.32.1-osx-aarch_64.exe | sha256sum
+
+Pin `protoc` rather than floating it: the generated code has to match the
+`protobuf-java` the module depends on. An unpinned `protoc` takes the newest release
+without a pre-release qualifier, passing over the `21.0-rc-1` that Maven Central
+reports as the latest release.
 
 A protoc plugin is a second native executable, named and resolved the same way:
 
@@ -111,6 +118,16 @@ which resolves in its own `protoc-grpc-java` group and reaches protoc as
 `--plugin=protoc-gen-grpc-java=<path> --grpc-java_out=<dir>`, so `GreeterGrpc`
 lands next to `GreetingProto`.
 
+Importing a well-known type
+---------------------------
+
+`greeting.proto` imports `google/protobuf/timestamp.proto`. The `protoc` executable
+from Maven Central ships without the well-known types, but `protobuf-java`, which the
+module depends on for the generated code anyway, carries them, and every `.proto` in a
+compile dependency is on protoc's include path. An import of a well-known type, or of
+a `.proto` another library publishes, resolves without copying the file into the
+project.
+
 Where generation runs in the build
 ----------------------------------
 
@@ -119,11 +136,11 @@ compiler chain:
 
     generated/<tool>/generate -> compiled/javac -> classes -> artifacts/jar
 
-Everything downstream of the compiler sees the generated classes, so tests and
-`javadoc` cover them. Everything *upstream* does not: the inferred linters and
-formatters (`check`, `format`) read the module's own sources only, so generated
-code is never linted or reformatted. The sources jar is upstream too: it carries
-the schema, from which the generated files follow, not the generated files.
+Everything downstream of the generators sees the generated sources, so tests and
+`javadoc` cover them, and the sources jar carries them beside the schema they
+follow from, as Maven's does. Everything *upstream* does not: the inferred linters
+and formatters (`check`, `format`) read the module's own sources only, so
+generated code is never linted or reformatted.
 
 Layout
 ------

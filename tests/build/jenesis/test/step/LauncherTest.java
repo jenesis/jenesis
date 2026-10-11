@@ -12,9 +12,11 @@ import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.JPackage;
 import build.jenesis.step.Launcher;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class LauncherTest {
 
@@ -28,6 +30,62 @@ public class LauncherTest {
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
         input = Files.createDirectory(root.resolve("input"));
+    }
+
+    @Test
+    public void names_the_module_and_how_to_declare_a_main_class_when_it_has_none() throws IOException {
+        writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"));
+        writeJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"), "sample/Sample.class");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("launcher/runtime/maven/build.jenesis/build.jenesis.launcher", "resolved/launcher.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties application = new SequencedProperties();
+        application.setProperty("name", "app");
+        application.store(input.resolve("launcher.properties"));
+        List<String> printed = new ArrayList<>();
+
+        BuildStepResult result = Launcher.ofEnvironment(new Environment(Map.of("palette.colors", "none")).out(printed::add),
+                "launcher",
+                PathPlacement.INFERRED).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("resolved/launcher.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Launcher.LAUNCHER)).doesNotExist();
+        assertThat(printed).hasSize(1);
+        assertThat(printed.getFirst())
+                .as("launcher=true without a main class stages nothing, which the build says rather than keeps quiet about")
+                .startsWith("[SKIPPED]")
+                .contains("app builds no executable jar", "@jenesis.main", "<mainClass>");
+    }
+
+    @Test
+    public void refuses_a_launcher_older_than_the_one_reading_the_descriptor_where_the_jar_holds_it() throws IOException {
+        writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"), "0.5.3");
+        writeJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"), "sample/Sample.class");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("launcher/runtime/maven/build.jenesis/build.jenesis.launcher", "resolved/launcher.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties application = new SequencedProperties();
+        application.setProperty("mainClass", "sample.Sample");
+        application.setProperty("name", "app");
+        application.store(input.resolve("launcher.properties"));
+
+        assertThatThrownBy(() -> Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.INFERRED).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(input, Map.of())))))
+                .as("a launcher reading its descriptor elsewhere would yield a jar that fails only at java -jar")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("version 0.5.3")
+                .hasMessageContaining("0.6.0 or later")
+                .hasMessageContaining("pin launcher/maven/build.jenesis/build.jenesis.launcher");
+        assertThat(next.resolve(Launcher.LAUNCHER)).doesNotExist();
     }
 
     @Test
@@ -57,6 +115,9 @@ public class LauncherTest {
         assertThat(result.next()).isTrue();
         Path jar = next.resolve(Launcher.LAUNCHER).resolve("app.jar");
         assertThat(jar).isRegularFile();
+        assertThat(next.resolve(JPackage.PACKAGES).resolve("app.jar"))
+                .as("the executable jar is a deliverable, staged with the packages")
+                .hasSameBinaryContentAs(jar);
         SequencedSet<String> entries = entries(jar);
         assertThat(entries)
                 .as("the launcher classes are shaded into the root, without its module-info or manifest")
@@ -67,15 +128,47 @@ public class LauncherTest {
                 .contains("META-INF/LICENSE", "META-INF/NOTICE")
                 .doesNotContain("META-INF/sbom/build.jenesis.launcher.cdx.json");
         assertThat(entries).contains(
-                "application.properties",
+                "META-INF/jenesis/application.properties",
                 "jars/app.jar/sample/Sample.class",
                 "jars/lib.jar/lib/Lib.class");
+        assertThat(entries)
+                .as("the descriptor leaves the root to a file of the application's own name")
+                .doesNotContain("application.properties");
         assertThat(mainClass(jar)).isEqualTo("build.jenesis.launcher.Launcher");
         Properties descriptor = application(jar);
         assertThat(descriptor.getProperty("mainClass")).isEqualTo("sample.Sample");
         assertThat(descriptor.getProperty("mainModule")).isNull();
         assertThat(descriptor.getProperty("classpath")).isEqualTo("app.jar,lib.jar");
         assertThat(descriptor.getProperty("modulepath")).isEmpty();
+    }
+
+    @Test
+    public void keeps_the_directory_entries_of_the_jars_it_explodes() throws IOException {
+        writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"));
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(
+                Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar")))) {
+            jar.putNextEntry(new JarEntry("sample/"));
+            jar.closeEntry();
+            entry(jar, "sample/Sample.class");
+            jar.putNextEntry(new JarEntry("templates/"));
+            jar.closeEntry();
+            entry(jar, "templates/welcome.html");
+        }
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("launcher/runtime/maven/build.jenesis/build.jenesis.launcher", "resolved/launcher.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties application = new SequencedProperties();
+        application.setProperty("mainClass", "sample.Sample");
+        application.setProperty("name", "app");
+        application.store(input.resolve("launcher.properties"));
+        Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.INFERRED).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(input, Map.of())))).toCompletableFuture().join();
+        assertThat(entries(next.resolve(Launcher.LAUNCHER).resolve("app.jar")))
+                .as("a class path scan asks for a package as a directory, so a stored jar keeps the directories it holds")
+                .contains("jars/app.jar/sample/", "jars/app.jar/templates/", "jars/app.jar/templates/welcome.html")
+                .doesNotContain("build/", "build/jenesis/launcher/");
     }
 
     @Test
@@ -147,6 +240,53 @@ public class LauncherTest {
         assertThat(descriptor.getProperty("mainModule")).isEqualTo("sample");
         assertThat(descriptor.getProperty("modulepath")).isEqualTo("sample.jar");
         assertThat(descriptor.getProperty("classpath")).isEmpty();
+    }
+
+    @Test
+    public void carries_the_module_options_of_the_java_process_and_names_those_it_cannot() throws IOException {
+        writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"));
+        compileModularJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("sample.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("launcher/runtime/maven/build.jenesis/build.jenesis.launcher", "resolved/launcher.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties application = new SequencedProperties();
+        application.setProperty("mainClass", "sample.Sample");
+        application.setProperty("mainModule", "sample");
+        application.setProperty("name", "sample");
+        application.store(input.resolve("launcher.properties"));
+        Files.createDirectory(input.resolve("process"));
+        Files.writeString(input.resolve("process/java.properties"), """
+                --add-reads=sample=java.sql
+                --add-exports=sample/sample=ALL-UNNAMED
+                --add-opens sample/sample=java.base
+                --enable-native-access=sample,ALL-UNNAMED
+                -Xmx1g
+                """);
+        List<String> printed = new ArrayList<>();
+
+        BuildStepResult result = Launcher.ofEnvironment(Environment.NONE.out(printed::add), "launcher", PathPlacement.INFERRED).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("resolved/launcher.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/java.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        Path jar = next.resolve(Launcher.LAUNCHER).resolve("sample.jar");
+        Properties descriptor = application(jar);
+        assertThat(descriptor.getProperty("addReads")).isEqualTo("sample=java.sql");
+        assertThat(descriptor.getProperty("addExports")).isEqualTo("sample/sample=ALL-UNNAMED");
+        assertThat(descriptor.getProperty("addOpens")).isEqualTo("sample/sample=java.base");
+        assertThat(descriptor.getProperty("enableNativeAccess")).isEqualTo("sample");
+        try (JarFile file = new JarFile(jar.toFile())) {
+            assertThat(file.getManifest().getMainAttributes().getValue("Enable-Native-Access")).isEqualTo("ALL-UNNAMED");
+        }
+        assertThat(printed).singleElement().asString()
+                .contains("sample.jar carries no -Xmx1g of process-java.properties")
+                .contains("bundle=true");
     }
 
     @Test
@@ -246,8 +386,17 @@ public class LauncherTest {
     }
 
     private static void writeLauncherJar(Path path) throws IOException {
+        writeLauncherJar(path, "0.6.0");
+    }
+
+    private static void writeLauncherJar(Path path, String version) throws IOException {
         try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(path))) {
-            entry(jar, "module-info.class");
+            jar.putNextEntry(new JarEntry("module-info.class"));
+            jar.write(ClassFile.of().buildModule(ModuleAttribute.of(
+                    ModuleDesc.of("build.jenesis.launcher"),
+                    builder -> builder.moduleVersion(version)
+                            .requires(ModuleRequireInfo.of(ModuleDesc.of("java.base"), 0, null)))));
+            jar.closeEntry();
             entry(jar, "build/jenesis/launcher/Launcher.class");
             entry(jar, "META-INF/LICENSE");
             entry(jar, "META-INF/NOTICE");
@@ -303,7 +452,7 @@ public class LauncherTest {
     private static Properties application(Path zip) throws IOException {
         try (ZipFile file = new ZipFile(zip.toFile())) {
             Properties properties = new Properties();
-            try (InputStream in = file.getInputStream(file.getEntry("application.properties"))) {
+            try (InputStream in = file.getInputStream(file.getEntry("META-INF/jenesis/application.properties"))) {
                 properties.load(in);
             }
             return properties;

@@ -89,13 +89,16 @@ An alias does not have to be required, either. It maps a name onto any jar the
 resolved tree already contains, so a project can name a transitive dependency it
 never mentions. Here the `requires` is what pulls args4j in: Jenesis translates a
 `requires` of an aliased name into a requirement on the aliased Maven coordinate.
-Declaring an alias for something the tree does not contain is an error - there is
-nothing to rename.
+An alias for something the tree does not contain applies nowhere - there is
+nothing to rename - so an alias a parent POM declares names its jar only in the
+modules that resolve it.
 
 The declaration also travels. Jenesis writes it into this module's own manifest as
 `Jenesis-Aliases: org.kohsuke.args4j=args4j/args4j`, so a downstream module that
 depends on `demo.cli` inherits the name without redeclaring it, and two modules
-that disagree about a name fail the build rather than racing over one file.
+that disagree about a name fail the build rather than racing over one file. An
+alias applies only where its target is resolved, so a downstream module that never
+pulls an optional dependency in, or excludes it, ignores it.
 
 The alias itself never carries a version - the tag is exactly two words, and a
 third is rejected with an error naming the `@jenesis.pin` line to write instead,

@@ -48,7 +48,7 @@ public class ScalaCompilerModule implements BuildExecutorModule {
              "scalac",
              "main",
              null,
-             ProcessBuildStep.Terms.of("scalac"));
+             new ProcessBuildStep.Terms());
     }
 
     public static ScalaCompilerModule ofEnvironment(Environment environment,
@@ -122,9 +122,7 @@ public class ScalaCompilerModule implements BuildExecutorModule {
         buildExecutor.addStep(COMPILED,
                 factory == null ? new Compile(terms, includeResources, tool, group) : new Compile(terms, includeResources, tool, group, factory),
                 compileInputs);
-        buildExecutor.addStep(CLASSES, new Versions(), Stream.concat(
-                Stream.of(COMPILED),
-                compileInputs.stream()));
+        buildExecutor.addStep(CLASSES, new Versions(), COMPILED);
     }
 
     @Override

@@ -2,6 +2,7 @@ package build.jenesis.module;
 
 import module java.base;
 import module jdk.compiler;
+import build.jenesis.ModuleGraph;
 import build.jenesis.Platform;
 import com.sun.source.doctree.LiteralTree;
 import javax.lang.model.SourceVersion;
@@ -46,7 +47,7 @@ public class ModuleInfoParser {
             for (DirectiveTree directive : module.getDirectives()) {
                 if (directive instanceof RequiresTree requires) {
                     String name = requires.getModuleName().toString();
-                    if (!name.startsWith("java.") && !name.startsWith("jdk.")) {
+                    if (!ModuleGraph.isSystemModule(name)) {
                         dependencies.add(name);
                         if (!requires.isStatic()) {
                             runtimeDependencies.add(name);
@@ -131,7 +132,7 @@ public class ModuleInfoParser {
                                     }
                                 }
                                 if (token.isEmpty() || version.isEmpty()
-                                        || token.startsWith("java.") || token.startsWith("jdk.")) {
+                                        || ModuleGraph.isSystemModule(token)) {
                                     continue;
                                 }
                                 String[] words = version.split(" ");
@@ -232,6 +233,13 @@ public class ModuleInfoParser {
                                 if (token.isEmpty()) {
                                     continue;
                                 }
+                                if (token.indexOf(' ') >= 0) {
+                                    throw new IllegalArgumentException("Malformed @jenesis.plugin declaration '"
+                                            + content
+                                            + "': expected [<group>] <module> or [<group>] maven/<groupId>/<artifactId>,"
+                                            + " with a version written into the coordinate, as"
+                                            + " maven/<groupId>/<artifactId>/<version>, or left to pin");
+                                }
                                 plugins.put(token.indexOf('/') < 0 ? "module/" + token : token, group);
                             }
                             case "jenesis.layer" -> {
@@ -273,7 +281,7 @@ public class ModuleInfoParser {
                                             + " <groupId>/<artifactId>[/<type>[/<classifier>]]");
                                 }
                                 String alias = words[0];
-                                if (alias.startsWith("java.") || alias.startsWith("jdk.")) {
+                                if (ModuleGraph.isSystemModule(alias)) {
                                     throw new IllegalArgumentException("Illegal @jenesis.alias name '"
                                             + alias
                                             + "': platform modules cannot be aliased");
@@ -309,7 +317,7 @@ public class ModuleInfoParser {
                                             + "': expected <module-name> <groupId>/<artifactId>...");
                                 }
                                 String excluded = words[0];
-                                if (excluded.startsWith("java.") || excluded.startsWith("jdk.")) {
+                                if (ModuleGraph.isSystemModule(excluded)) {
                                     throw new IllegalArgumentException("Illegal @jenesis.exclude module '"
                                             + excluded
                                             + "': platform modules resolve no dependencies");
@@ -339,7 +347,7 @@ public class ModuleInfoParser {
                                             + "': expected <module-name> <module-name>...");
                                 }
                                 for (String word : words) {
-                                    if (word.startsWith("java.") || word.startsWith("jdk.")) {
+                                    if (ModuleGraph.isSystemModule(word)) {
                                         throw new IllegalArgumentException("Illegal @jenesis.override module '"
                                                 + word
                                                 + "': platform modules cannot be overridden or carry an override");
@@ -368,7 +376,7 @@ public class ModuleInfoParser {
                                 int split = content.indexOf(' ');
                                 String token = split < 0 ? content : content.substring(0, split);
                                 String arguments = split < 0 ? "" : content.substring(split + 1).trim();
-                                if (token.startsWith("java.") || token.startsWith("jdk.")) {
+                                if (ModuleGraph.isSystemModule(token)) {
                                     throw new IllegalArgumentException("Illegal @jenesis.attach token '"
                                             + token
                                             + "': platform modules cannot be attached");
@@ -394,7 +402,7 @@ public class ModuleInfoParser {
                                             + module.getName());
                                 }
                                 for (String token : content.split(" ")) {
-                                    if (token.startsWith("java.") || token.startsWith("jdk.")) {
+                                    if (ModuleGraph.isSystemModule(token)) {
                                         throw new IllegalArgumentException("Illegal @jenesis.native token '"
                                                 + token
                                                 + "': platform modules cannot be granted native access");
@@ -500,6 +508,11 @@ public class ModuleInfoParser {
                     }
                 }
             }
+            for (Map.Entry<String, String> alias : aliases.entrySet()) {
+                String named = group + "/module/" + alias.getKey(), coordinate = group + "/maven/" + alias.getValue();
+                aliased(versions, named, coordinate);
+                aliased(variants, named, coordinate);
+            }
             return new ModuleInfo(module.getName().toString(),
                     release,
                     name,
@@ -563,7 +576,25 @@ public class ModuleInfoParser {
         return slash < 0 ? "module/" + token : token;
     }
 
+    private static <V> void aliased(SequencedMap<String, V> pins, String named, String coordinate) {
+        V pinned = pins.remove(named);
+        if (pinned == null) {
+            return;
+        }
+        V previous = pins.putIfAbsent(coordinate, pinned);
+        if (previous != null && !previous.equals(pinned)) {
+            throw new IllegalArgumentException("@jenesis.pin pins " + named.substring(named.lastIndexOf('/') + 1)
+                    + " at " + pinned + " and the artifact its @jenesis.alias names, "
+                    + coordinate.substring(coordinate.indexOf("/maven/") + 7) + ", at " + previous
+                    + " - keep one of the two lines");
+        }
+    }
+
     private String expand(String tag, String token) {
+        return expand(group, tag, token);
+    }
+
+    static String expand(String group, String tag, String token) {
         int firstSlash = token.indexOf('/');
         int secondSlash = firstSlash < 0 ? -1 : token.indexOf('/', firstSlash + 1);
         if (firstSlash < 0) {
@@ -582,6 +613,17 @@ public class ModuleInfoParser {
                         + token
                         + "': expected <module>, <groupId>/<artifactId>,"
                         + " or <group>/<repository>/<coordinate>");
+            }
+            String first = token.substring(0, firstSlash), second = token.substring(firstSlash + 1, secondSlash);
+            if (first.equals("maven")) {
+                return group + "/" + token;
+            }
+            if (first.indexOf('.') >= 0 && !second.equals("maven") && !second.equals("module")) {
+                throw new IllegalArgumentException("Malformed @" + tag + " token '"
+                        + token
+                        + "': " + first + " reads as a group and " + second + " as a repository, which"
+                        + " names nothing - a Maven coordinate with a type or a classifier is written maven/"
+                        + token + ", or <group>/maven/" + token + " for a group other than " + group);
             }
             return token;
         }

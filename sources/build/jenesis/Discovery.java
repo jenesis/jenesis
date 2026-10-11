@@ -1,10 +1,12 @@
 package build.jenesis;
 
 import module java.base;
+import java.security.cert.CertificateException;
 
 public final class Discovery {
 
-    private static final String LOCATION = "https://{domain}/.well-known/java-repository.properties";
+    private static final String LOCATION = "https://{domain}/.well-known/java-repository.properties",
+            ANSWERS = "well-known", ABSENT = ".absent";
     private static final Pattern SUFFIX = Pattern.compile("[A-Za-z0-9]+");
     private static final Pattern NAME = Pattern.compile("[A-Za-z0-9_-]{1,63}(\\.[A-Za-z0-9_-]{1,63})+");
     private static final Pattern SELECTED = Pattern.compile("([a-z]+)\\[([^\\]]*)]");
@@ -12,30 +14,68 @@ public final class Discovery {
 
     private final String uri;
     private final Repository.Connection connection;
+    private final int timeout;
+    private final Path cache;
+    private final Duration ttl;
     private final Map<String, FutureTask<Optional<Properties>>> files = new ConcurrentHashMap<>();
 
     public Discovery() {
-        this(LOCATION, new Repository.Connection());
+        this(LOCATION,
+                new Repository.Connection(),
+                5_000,
+                Path.of(System.getProperty("user.home")).resolve(".jenesis").resolve(ANSWERS),
+                Duration.ofHours(24));
     }
 
     public static Discovery ofEnvironment(Environment environment) {
-        return new Discovery(LOCATION, Repository.Connection.ofEnvironment(environment));
+        String local = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
+        return new Discovery(LOCATION,
+                Repository.Connection.ofEnvironment(environment),
+                environment.number("repository.discovery.timeout", 5_000),
+                (local == null
+                        ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
+                        : Path.of(local)).resolve(ANSWERS),
+                Duration.ofHours(environment.number("repository.discovery.ttl", 24)));
     }
 
-    public Discovery(String uri, Repository.Connection connection) {
+    public Discovery(String uri, Repository.Connection connection, int timeout, Path cache, Duration ttl) {
         if (!uri.contains("{domain}")) {
             throw new IllegalArgumentException("The location of a domain's file must name {domain}: " + uri);
         }
+        if (timeout <= 0) {
+            throw new IllegalArgumentException("The timeout for a domain's file is " + timeout + ", where it is a"
+                    + " positive number of milliseconds within which the domain connects and answers each read,"
+                    + " such as 5000, the default, as a domain that never answers would otherwise stall the build");
+        }
+        if (ttl.isNegative()) {
+            throw new IllegalArgumentException("The time a domain's answer is kept is " + ttl + ", where it is zero"
+                    + " to keep no answer or a positive duration, such as 24 hours, the default");
+        }
         this.uri = uri;
         this.connection = connection;
+        this.timeout = timeout;
+        this.cache = cache;
+        this.ttl = ttl;
     }
 
     public Discovery uri(String uri) {
-        return new Discovery(uri, connection);
+        return new Discovery(uri, connection, timeout, cache, ttl);
     }
 
     public Discovery connection(Repository.Connection connection) {
-        return new Discovery(uri, connection);
+        return new Discovery(uri, connection, timeout, cache, ttl);
+    }
+
+    public Discovery timeout(int timeout) {
+        return new Discovery(uri, connection, timeout, cache, ttl);
+    }
+
+    public Discovery cache(Path cache) {
+        return new Discovery(uri, connection, timeout, cache, ttl);
+    }
+
+    public Discovery ttl(Duration ttl) {
+        return new Discovery(uri, connection, timeout, cache, ttl);
     }
 
     public static String domain(String namespace) {
@@ -45,7 +85,7 @@ public final class Discovery {
     }
 
     public Optional<DiscoveredLocation> lookup(String namespace, String kind, String name) throws IOException {
-        if (connection.offline() || !NAME.matcher(namespace).matches()) {
+        if (!NAME.matcher(namespace).matches()) {
             return Optional.empty();
         }
         String[] labels = namespace.split("\\.");
@@ -54,15 +94,69 @@ public final class Discovery {
             String domain = domain(String.join(".", Arrays.copyOf(labels, count)));
             URI source = URI.create(uri.replace("{domain}", domain));
             FutureTask<Optional<Properties>> task = new FutureTask<>(() -> {
-                Properties properties = new Properties();
-                try (InputStream inputStream = Repository.open(connection, source, null);
-                     Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8)) {
-                    properties.load(reader);
-                } catch (IOException e) {
-                    if (e instanceof SSLException || e.getCause() instanceof SSLException) {
-                        throw e;
+                String entry = URLEncoder.encode(source.toString(), StandardCharsets.UTF_8);
+                Path present = cache.resolve(entry), absent = cache.resolve(entry + ABSENT), kept = null;
+                if (!ttl.isZero()) {
+                    for (Path candidate : List.of(present, absent)) {
+                        if (Files.isRegularFile(candidate) && (kept == null || Files.getLastModifiedTime(candidate)
+                                .compareTo(Files.getLastModifiedTime(kept)) > 0)) {
+                            kept = candidate;
+                        }
                     }
+                    if (kept != null && !connection.offline() && Files.getLastModifiedTime(kept)
+                            .toInstant()
+                            .plus(ttl)
+                            .isBefore(Instant.now())) {
+                        kept = null;
+                    }
+                }
+                byte[] bytes;
+                if (kept != null) {
+                    bytes = kept.equals(absent) ? null : Files.readAllBytes(kept);
+                } else if (connection.offline()) {
+                    bytes = null;
+                } else {
+                    Repository.Connection once = connection.retries(0).connectTimeout(timeout).readTimeout(timeout);
+                    try (InputStream inputStream = Repository.open(once, source, null)) {
+                        bytes = inputStream.readAllBytes();
+                    } catch (FileNotFoundException _) {
+                        bytes = null;
+                    } catch (IOException e) {
+                        boolean handshake = false;
+                        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+                            handshake |= cause instanceof SSLHandshakeException;
+                            if (cause instanceof SSLPeerUnverifiedException
+                                    || handshake && (cause instanceof CertificateException
+                                    || cause instanceof CertPathValidatorException
+                                    || cause instanceof CertPathBuilderException)) {
+                                throw new IOException(source + " is served with a certificate that does not verify,"
+                                        + " so what " + domain + " publishes can neither be trusted nor taken for"
+                                        + " absent (set -Djenesis.repository.insecure=true to accept such a"
+                                        + " certificate, or -Djenesis.repository.discovery=false to ask no domain)", e);
+                            }
+                        }
+                        return Optional.empty();
+                    }
+                    Path writable = ttl.isZero() ? null : cache;
+                    while (writable != null && Files.notExists(writable)) {
+                        writable = writable.getParent();
+                    }
+                    if (writable != null && Files.isWritable(writable)) {
+                        Files.createDirectories(cache);
+                        Path temporary = Files.createTempFile(cache, "answer", ".tmp");
+                        Files.write(temporary, bytes == null ? new byte[0] : bytes);
+                        Files.move(temporary,
+                                bytes == null ? absent : present,
+                                StandardCopyOption.REPLACE_EXISTING,
+                                StandardCopyOption.ATOMIC_MOVE);
+                    }
+                }
+                if (bytes == null) {
                     return Optional.empty();
+                }
+                Properties properties = new Properties();
+                try (Reader reader = new InputStreamReader(new ByteArrayInputStream(bytes), StandardCharsets.UTF_8)) {
+                    properties.load(reader);
                 }
                 return Optional.of(properties);
             });

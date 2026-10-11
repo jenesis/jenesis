@@ -22,6 +22,7 @@ Layout
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- build.jenesis/explicit/test.properties   framework=junit-platform, under a profile
     |-- build.jenesis/legacy/test.properties     framework=junit4, under a profile
+    |-- build.jenesis/jupiter/test.properties    engines=-junit-vintage, under a profile
     |-- greeter/
     |   |-- module-info.java     module demo.greeter; ships pinned
     |   `-- sample/greeter/Greeter.java
@@ -111,6 +112,21 @@ as above. The demo ships the file under a profile, so both paths stay runnable:
 
 Being a file in the project rather than a command-line flag, the declaration is
 what every checkout and every CI run reads.
+
+Choosing the engines
+--------------------
+
+On the JUnit Platform every engine on the path discovers tests, including one a
+library or the test resources register for a test of their own. The key `engines`
+of a module's `test.properties` names the engines its tests run on by their ids,
+a leading `-` leaving one out. The `jupiter` profile declares
+`engines=-junit-vintage`, so this runs the Jupiter tests alone:
+
+    java -Djenesis.make.profiles=jupiter -Djenesis.print.tests=true build/jenesis/Make.java
+
+Which engines a module's tests need does not change from one run to the next, so
+the choice is a file of the module rather than a setting of the command line.
+JUnit 4 and TestNG run no platform engine, so they refuse the key.
 
 Selecting by category
 ---------------------

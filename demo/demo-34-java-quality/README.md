@@ -34,6 +34,7 @@ The configuration files sit in the *configuration directory*, which defaults to
     demo/demo-34-java-quality
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
     |-- checkstyle.xml             activates Checkstyle (lints sources)
+    |-- checkstyle.properties      the ${...} properties checkstyle.xml names
     |-- pmd.xml                    activates PMD (lints sources)
     |-- spotbugs-exclude.xml       activates SpotBugs (analyses classes)
     |-- javaformat.properties      selects the Java formatter (google)
@@ -64,15 +65,16 @@ naming the formatter:
 `formatter=palantir` selects the Palantir formatter instead; without the file, no
 Java formatter runs.
 
-A discovered tool can be switched off without deleting its configuration file by
-setting its property to `false`. By default every property is `true`, so file
-discovery alone decides; the property is an opt-out:
+A discovered tool can be switched off without deleting its configuration file
+through its property, so file discovery alone decides until the property says
+otherwise. A linter's property is `report` by default, and `ignore` skips it; a
+formatter's is `true` by default, and `false` skips it:
 
     jenesis.source.<tool>        Checkstyle, PMD, Detekt, Ktlint, Scalastyle, Scalafmt, CodeNarc
     jenesis.validator.spotbugs   SpotBugs
     jenesis.format.<tool>        the Java / Ktlint / Scalafmt formatters
 
-For example `-Djenesis.source.checkstyle=false` keeps `checkstyle.xml` in place
+For example `-Djenesis.source.checkstyle=ignore` keeps `checkstyle.xml` in place
 but skips Checkstyle, while PMD and SpotBugs still run.
 
 Per-module configuration
@@ -112,8 +114,34 @@ in its own subfolder: `target/stage/reports/<kind>/<module>/`, for example
 `target/stage/reports/checkstyle/sources/checkstyle-report.xml`.
 
 By default the linters are report-only: they record findings but do not fail the
-build. Pass `.strict(true)` when wiring a tool yourself to turn a finding into a
-build failure.
+build. A linter that found something says so in one line of the build's output,
+with the number of findings and where its report is:
+
+    [FINDINGS] checkstyle found 2 findings, reported in target/build/.../checkstyle/check/output/reports/checkstyle/checkstyle-report.xml
+
+`-Djenesis.print.findings=false` leaves that line out. To turn findings into a
+build failure, set the tool's property to `strict`, on the command line or in
+`jenesis.properties`. For example `-Djenesis.source.checkstyle=strict` fails the
+build when Checkstyle reports a violation, naming the number of findings and the
+report.
+Checkstyle, PMD, detekt, ktlint, Scalastyle and scalafmt fail as their own exit
+code decides, so a Checkstyle finding at severity `warning` is reported but does
+not fail the build; SpotBugs and CodeNarc fail on any finding their report holds.
+When wiring a tool yourself, `.strict(true)` on its module does the same.
+Report-only covers findings, not a tool that never ran: a linter that fails on
+its own configuration, and so writes no complete report, fails its step either
+way.
+
+Checkstyle reads `${config_loc}` as the folder of `checkstyle.xml`, as the Maven
+and Gradle plugins define it. A file the configuration names as
+`${config_loc}/<path>`, such as a suppressions file beside it, is handed to
+Checkstyle with it and re-runs the check when it changes; any other file of the
+configuration directory is not. Every other `${<property>}` the configuration
+names is a line of a `checkstyle.properties` beside it, which takes the place of
+the Maven plugin's `propertyExpansion` and Gradle's `configProperties`; without
+one Checkstyle fails to load the configuration. Here `checkstyle.xml` sets its
+severity to `${checkstyle.severity}`, which the file names as `warning`.
+`config_loc` is the one property the file cannot set.
 
 Formatting: verify, and how to reformat
 ---------------------------------------
@@ -136,7 +164,10 @@ Pinning
 
 Each tool resolves in its own group (`checkstyle`, `pmd`, `spotbugs`,
 `google-java-format`), kept separate from the module's `main`-group
-dependencies, and floats a `RELEASE` version until pinned. Running
+dependencies, and floats a `RELEASE` version until pinned. The `dependencies`
+selector therefore shows none of them as a dependency of the module;
+`-Djenesis.tree.tools=true` prints each tool's closure apart, under a heading
+naming its group. Running
 `java build/jenesis/Make.java pin` records every resolved tool jar with its
 `SHA-256` into `@jenesis.pin` tags, exactly as the other demos pin their
 compilers. These closures are large (PMD's CLI bundle alone pulls in well over a

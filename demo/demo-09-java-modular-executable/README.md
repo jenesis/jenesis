@@ -213,6 +213,11 @@ jar adds `--add-modules ALL-MODULE-PATH,ALL-DEFAULT` to root the whole
 module path and the default platform set,
 exactly as the jpackage section above describes. Here the closure is
 `demo.modular.executable` + `org.slf4j`, both explicit modules, so those lines are absent.
+
+What `process-java.properties` gives the JVM of the module - an `--add-reads` its module
+path needs, a system property - leads both argument files, as it leads the JVM `Execute`
+starts. `stage` collects the zip into `stage/packages/` as `<artifact>.zip`, beside what
+jpackage writes there, so `export` and `release` ship it like any other package.
 Unzipped onto a JRE base, the bundle needs no JDK and no jpackage:
 
     FROM gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
@@ -242,8 +247,9 @@ That Dockerfile does not have to be written by hand either: a `docker` key in
 
 Because the module declares `mainModule`, the jars carrying a module descriptor are named
 on the module path and the entry point launches the module, not a class - and the whole
-command travels in the argument file, so the `ENTRYPOINT` is the same three words however
-large the closure grows:
+command travels in the argument file, led by what `process-java.properties` gives the JVM
+of the module as in the bundle, so the `ENTRYPOINT` is the same three words however large
+the closure grows:
 
     FROM gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
     LABEL ...                      the metadata, as in ../demo-08-java-pom-executable
@@ -330,12 +336,12 @@ jar, so modularity survives. The target resolves the published
     java build/jenesis/Make.java
 
     demo.modular.executable.jar
-    |-- META-INF/MANIFEST.MF                  Main-Class: build.jenesis.launcher.Launcher
-    |-- build/jenesis/launcher/*.class        the launcher (the jar's own unnamed module at run time)
-    |-- application.properties                mainClass, mainModule, modulepath, classpath
-    `-- jars/<dep>.jar/...                    each dependency, exploded
+    |-- META-INF/MANIFEST.MF                      Main-Class: build.jenesis.launcher.Launcher
+    |-- META-INF/jenesis/application.properties   mainClass, mainModule, modulepath, classpath
+    |-- build/jenesis/launcher/*.class            the launcher (the jar's own unnamed module at run time)
+    `-- jars/<dep>.jar/...                        each dependency, exploded
 
-The launcher's `Main-Class` reads `application.properties`, resolves the jars `modulepath`
+The launcher's `Main-Class` reads `META-INF/jenesis/application.properties`, resolves the jars `modulepath`
 names into a fresh `ModuleLayer` and the ones `classpath` names into the unnamed module
 of the same loader, and invokes the entry point - reconstructing what
 `java -p modulepath -cp classpath -m demo.modular.executable/sample.Sample` would do,
@@ -353,7 +359,12 @@ build is reproducible, and `pin` refreshes it the same way it pins everything el
 
 Unlike `jpackage` and `bundle`, this carries no JVM and no `jlink` runtime - it is a
 plain jar that runs on any JDK 25 - and unlike the `bundle.zip` it needs no launch
-script. (A bundle with no `mainClass` is instead a self-contained Java agent; see the
+script. `stage` collects it into `stage/packages/` as `<artifact>.jar`. It carries the
+`--add-reads`, `--add-exports`, `--add-opens` and `--enable-native-access` lines of
+`process-java.properties`, which the launcher applies to the modules it defines. Any other
+JVM option does not travel with it, because `java -jar` reads none from the jar it runs:
+the build names each one it leaves out, and an application that needs one passes it to
+`java -jar` or ships as a bundle. (A bundle with no `mainClass` is instead a self-contained Java agent; see the
 launcher's own documentation.)
 
 Fully bundled native installer
@@ -399,7 +410,7 @@ produces (tens of megabytes): because this is a modular application, jpackage's 
 `org.slf4j`, `java.base`), rather than bundling a full runtime.
 
 Producing a native installer needs the platform's packaging tooling on the PATH (Linux:
-`dpkg-deb`/`fakeroot` for `deb`, `rpmbuild` for `rpm`; Windows: the WiX Toolset; macOS:
+`dpkg-deb` for `deb`, with no `fakeroot`, `rpmbuild` for `rpm`; Windows: the WiX Toolset; macOS:
 the bundled `productbuild`/`hdiutil`). For that reason it is run locally rather than in
 CI, where `Demo.java`'s app-image - which needs no native tooling - covers the packaging
 path.

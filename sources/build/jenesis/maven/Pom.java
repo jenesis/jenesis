@@ -5,7 +5,9 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Dependencies;
 
 public class Pom implements BuildStep {
 
@@ -55,6 +57,8 @@ public class Pom implements BuildStep {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(resolved ? DEPENDENCIES : REQUIRES),
                 Path.of(EXCLUSIONS),
+                Path.of(OPTIONALS),
+                Path.of(Dependencies.GRAPH),
                 Path.of(METADATA)));
     }
 
@@ -69,17 +73,61 @@ public class Pom implements BuildStep {
                 .toList();
         SequencedProperties requires = SequencedProperties.ofFolders(folders, resolved ? DEPENDENCIES : REQUIRES);
         SequencedProperties exclusions = SequencedProperties.ofFolders(folders, EXCLUSIONS);
+        SequencedProperties optionals = SequencedProperties.ofFolders(folders, OPTIONALS);
         SequencedProperties metadata = SequencedProperties.ofFolders(folders, METADATA);
+        SequencedMap<String, Resolver.Resolution> graph = Dependencies.graph(folders.stream()
+                .map(folder -> folder.resolve(Dependencies.GRAPH))
+                .toList(), List.of());
+        Set<String> vertices = new HashSet<>();
+        graph.forEach((groupScope, resolution) -> {
+            if (groupScope.startsWith(group + "/")) {
+                vertices.addAll(resolution.vertices().keySet());
+            }
+        });
+        Set<String> coordinateOptionals = new HashSet<>(), unversionedOptionals = new HashSet<>();
+        for (String key : optionals.stringPropertyNames()) {
+            if (key.startsWith(group + "/")) {
+                String coordinate = key.substring(key.indexOf('/', key.indexOf('/') + 1) + 1);
+                coordinateOptionals.add(coordinate);
+                unversionedOptionals.add(unversioned(coordinate, vertices));
+            }
+        }
+        Map<String, Set<String>> beneathOptionals = new HashMap<>(), required = new HashMap<>();
+        if (resolved && !unversionedOptionals.isEmpty()) {
+            graph.forEach((groupScope, resolution) -> {
+                if (!groupScope.startsWith(group + "/")) {
+                    return;
+                }
+                Set<String> optionalRoots = new HashSet<>(), requiredRoots = new HashSet<>();
+                Map<String, Set<String>> children = new HashMap<>();
+                for (Resolver.Edge edge : resolution.edges()) {
+                    String coordinate = unversioned(edge.coordinate(), vertices);
+                    if (edge.parent() != null) {
+                        children.computeIfAbsent(unversioned(edge.parent(), vertices), _ -> new HashSet<>()).add(coordinate);
+                    } else if (unversionedOptionals.contains(coordinate)) {
+                        optionalRoots.add(coordinate);
+                    } else {
+                        requiredRoots.add(coordinate);
+                    }
+                }
+                Set<String> beneath = reached(children, optionalRoots), delivered = reached(children, requiredRoots);
+                beneath.removeAll(delivered);
+                beneath.removeAll(optionalRoots);
+                beneathOptionals.put(groupScope.substring(group.length() + 1), beneath);
+                required.put(groupScope.substring(group.length() + 1), delivered);
+            });
+        }
         SequencedMap<String, SequencedSet<String>> coordinateScopes = new LinkedHashMap<>();
         for (String key : requires.stringPropertyNames()) {
             int first = key.indexOf('/');
             int second = key.indexOf('/', first + 1);
-            String coordinate = key.substring(second + 1);
-            if (!key.startsWith(group + "/")) {
+            String coordinate = key.substring(second + 1), scope = key.substring(first + 1, second);
+            if (!key.startsWith(group + "/") || beneathOptionals
+                    .getOrDefault(scope, Set.of())
+                    .contains(unversioned(coordinate, vertices))) {
                 continue;
             }
-            coordinateScopes.computeIfAbsent(coordinate, _ -> new LinkedHashSet<>())
-                    .add(key.substring(first + 1, second));
+            coordinateScopes.computeIfAbsent(coordinate, _ -> new LinkedHashSet<>()).add(scope);
         }
         SequencedMap<String, String> coordinateExclusions = new LinkedHashMap<>();
         for (String key : exclusions.stringPropertyNames()) {
@@ -100,16 +148,39 @@ public class Pom implements BuildStep {
         SequencedMap<MavenDependencyKey, MavenDependencyValue> deps = new LinkedHashMap<>();
         for (Map.Entry<String, SequencedSet<String>> scopedEntry : coordinateScopes.entrySet()) {
             String name = scopedEntry.getKey();
-            int separator = name.indexOf('/');
-            if (separator == -1 || !prefixes.contains(name.substring(0, separator))) {
-                continue;
-            }
             boolean inCompile = scopedEntry.getValue().contains("compile");
             boolean inRuntime = scopedEntry.getValue().contains("runtime");
-            if (!inCompile && !inRuntime) {
+            int separator = name.indexOf('/');
+            if (separator == -1 || !inCompile && !inRuntime) {
                 continue;
             }
-            MavenDependencyKey.Versioned parsed = MavenDependencyKey.parse(name.substring(separator + 1));
+            String coordinate = name;
+            if (!resolved) {
+                boolean maven = prefixes.contains(name.substring(0, separator));
+                String module = name.substring(separator + 1);
+                coordinate = scopedEntry.getValue().stream()
+                        .map(scope -> graph.get(group + "/" + scope))
+                        .filter(Objects::nonNull)
+                        .flatMap(resolution -> resolution.vertices().entrySet().stream())
+                        .filter(vertex -> vertex.getValue().resolvedVersion() != null && (maven
+                                ? vertex.getKey().equals(name)
+                                : module.equals(vertex.getValue().module())
+                                        && prefixes.contains(vertex.getKey().substring(0, vertex.getKey().indexOf('/')))))
+                        .findFirst()
+                        .map(vertex -> vertex.getKey() + "/" + vertex.getValue().resolvedVersion())
+                        .orElse(maven ? name : null);
+                if (coordinate == null) {
+                    throw new IllegalStateException("The POM of " + groupId + ":" + artifactId
+                            + " names what its module requires, and " + module
+                            + " resolved to no Maven artifact it could name: set flatten=true in packaging.properties"
+                            + " to publish the resolved closure instead");
+                }
+                separator = coordinate.indexOf('/');
+            }
+            if (!prefixes.contains(coordinate.substring(0, separator))) {
+                continue;
+            }
+            MavenDependencyKey.Versioned parsed = MavenDependencyKey.parse(coordinate.substring(separator + 1));
             MavenDependencyScope scope = inCompile && inRuntime
                     ? MavenDependencyScope.COMPILE
                     : inCompile ? MavenDependencyScope.PROVIDED : MavenDependencyScope.RUNTIME;
@@ -136,7 +207,10 @@ public class Pom implements BuildStep {
                     scope,
                     null,
                     excludes,
-                    null));
+                    (resolved
+                            ? unversionedOptionals.contains(unversioned(name, vertices))
+                                    && !required.getOrDefault("runtime", Set.of()).contains(unversioned(name, vertices))
+                            : coordinateOptionals.contains(name)) ? Boolean.TRUE : null));
         }
         try (Writer writer = Files.newBufferedWriter(context.next().resolve(POM))) {
             emitter.emit(
@@ -144,7 +218,7 @@ public class Pom implements BuildStep {
                     artifactId,
                     version,
                     deps,
-                    parseMetadata(metadata)).accept(writer);
+                    MavenPomEmitter.Metadata.of(metadata)).accept(writer);
         }
         if (embedded) {
             Path folder = Files.createDirectories(context.next()
@@ -161,54 +235,22 @@ public class Pom implements BuildStep {
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
-    private static MavenPomEmitter.Metadata parseMetadata(SequencedProperties metadata) {
-        if (metadata.isEmpty()) {
-            return null;
-        }
-        SequencedSet<String> licenseIds = new LinkedHashSet<>(), developerIds = new LinkedHashSet<>();
-        for (String key : metadata.stringPropertyNames()) {
-            int dot = key.lastIndexOf('.');
-            if (key.startsWith("license.") && dot > "license.".length()) {
-                licenseIds.add(key.substring("license.".length(), dot));
-            } else if (key.startsWith("developer.") && dot > "developer.".length()) {
-                developerIds.add(key.substring("developer.".length(), dot));
-            }
-        }
-        List<MavenPomEmitter.Metadata.License> licenses = new ArrayList<>();
-        for (String id : licenseIds) {
-            licenses.add(new MavenPomEmitter.Metadata.License(
-                    metadata.getProperty("license." + id + ".name"),
-                    metadata.getProperty("license." + id + ".url")));
-        }
-        List<MavenPomEmitter.Metadata.Developer> developers = new ArrayList<>();
-        for (String id : developerIds) {
-            developers.add(new MavenPomEmitter.Metadata.Developer(
-                    id,
-                    metadata.getProperty("developer." + id + ".name"),
-                    metadata.getProperty("developer." + id + ".email")));
-        }
-        MavenPomEmitter.Metadata.Scm scm = null;
-        String scmConnection = metadata.getProperty("scm.connection");
-        String scmDeveloperConnection = metadata.getProperty("scm.developerConnection");
-        String scmUrl = metadata.getProperty("scm.url");
-        String scmTag = metadata.value("scm.tag");
-        if (scmConnection != null || scmDeveloperConnection != null || scmUrl != null || scmTag != null) {
-            scm = new MavenPomEmitter.Metadata.Scm(
-                    scmConnection,
-                    scmDeveloperConnection,
-                    scmUrl,
-                    scmTag);
-        }
-        return new MavenPomEmitter.Metadata(
-                metadata.getProperty("name"),
-                metadata.getProperty("description"),
-                metadata.getProperty("url"),
-                licenses,
-                developers,
-                scm,
-                metadata.value("organization.name") == null && metadata.value("organization.url") == null
-                        ? null
-                        : new MavenPomEmitter.Metadata.Organization(metadata.value("organization.name"), metadata.value("organization.url")));
+    private static String unversioned(String coordinate, Set<String> vertices) {
+        return vertices.contains(coordinate) || coordinate.indexOf('/') == coordinate.lastIndexOf('/')
+                ? coordinate
+                : coordinate.substring(0, coordinate.lastIndexOf('/'));
     }
 
+    private static Set<String> reached(Map<String, Set<String>> children, Set<String> roots) {
+        Set<String> reached = new HashSet<>(roots);
+        Queue<String> pending = new ArrayDeque<>(roots);
+        while (!pending.isEmpty()) {
+            for (String child : children.getOrDefault(pending.remove(), Set.of())) {
+                if (reached.add(child)) {
+                    pending.add(child);
+                }
+            }
+        }
+        return reached;
+    }
 }

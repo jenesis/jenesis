@@ -512,10 +512,8 @@ public class Signatures extends ProcessBuildStep {
                     + command
                     + " for " + file
                     + "\nTo reproduce, execute:\n "
-                    + String.join(" ", handler.commands())
-                    + (Files.isRegularFile(error)
-                            ? "\n\nError:\n" + new String(Files.readAllBytes(error), NATIVE_ENCODING)
-                            : ""));
+                    + shell(handler.commands())
+                    + tail("Error", error));
         }
         return new Status(fingerprint, failure, signed, keyExpired ? expired : -1, missing);
     }

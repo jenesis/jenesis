@@ -23,7 +23,7 @@ public class NativeImage extends EnvironmentalProcessBuildStep {
     }
 
     public NativeImage(PathPlacement pathPlacement, Function<List<String>, ? extends ProcessHandler> factory) {
-        this(pathPlacement, factory, "main", Terms.of("native-image"));
+        this(pathPlacement, factory, "main", new Terms());
     }
 
     public static NativeImage ofEnvironment(Environment environment,

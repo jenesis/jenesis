@@ -53,6 +53,73 @@ public class InventoryTest {
     }
 
     @Test
+    public void tells_the_module_of_a_key_whose_module_path_holds_dots() {
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-modules/org.example.path", "modules/org.example");
+        inventory.setProperty("module-modules/org.example.cli.path", "modules/org.example.cli");
+        inventory.setProperty("module-modules/org.example.cli.mainClass", "org.example.cli.Main");
+        inventory.setProperty("module-modules/org.example.report.path", "reports/path");
+        SequencedSet<String> prefixes = Inventory.prefixes(inventory);
+        assertThat(prefixes)
+                .as("a prefix is what a <prefix>.path key composes from its own value, so a report kind is none")
+                .containsExactlyInAnyOrder("module-modules/org.example", "module-modules/org.example.cli");
+        assertThat(Inventory.ownerOf("module-modules/org.example.cli.mainClass", prefixes))
+                .as("the longest prefix a key starts with owns it")
+                .isEqualTo("module-modules/org.example.cli");
+        assertThat(Inventory.ownerOf("module-modules/org.example.report.path", prefixes))
+                .isEqualTo("module-modules/org.example");
+        assertThat(Inventory.ownerOf("module-modules/org.mainClass", prefixes)).isNull();
+    }
+
+    @Test
+    public void reads_agents_and_native_access_of_a_module_whose_path_holds_dots() throws IOException {
+        Path folder = Files.createDirectory(root.resolve("inventory"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-modules/org.example.agent.path", "modules/org.example.agent");
+        inventory.setProperty("module-modules/org.example.agent.mainClass", "org.example.agent.Main");
+        inventory.setProperty("module-modules/org.example.agent.agent.0", "lib/agent.jar");
+        inventory.setProperty("module-modules/org.example.agent.agent.0.arguments", "x=y");
+        inventory.setProperty("module-modules/org.example.agent.nativeAccess.0", "lib/native.jar");
+        inventory.store(folder.resolve(Inventory.INVENTORY));
+        assertThat(Inventory.agents(folder))
+                .as("a module folder named like an agent key holds no agent of its own")
+                .containsExactly(Map.entry("agent.jar", "x=y"));
+        assertThat(Inventory.nativeAccess(folder)).containsExactly(folder.resolve("lib/native.jar").toAbsolutePath());
+    }
+
+    @Test
+    public void attaches_files_to_a_module_whose_path_holds_dots() throws IOException {
+        Path module = Files.createDirectory(root.resolve("module"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-modules/org.example.cli.path", "modules/org.example.cli");
+        inventory.setProperty("module-modules/org.example.cli.attachment.licenses", "licenses.zip");
+        inventory.store(module.resolve(Inventory.INVENTORY));
+        Path additions = Files.createDirectory(root.resolve("additions"));
+        SequencedProperties attached = new SequencedProperties();
+        attached.setProperty("module-modules/org.example.cli.attachment.notice", "notice.txt");
+        attached.store(additions.resolve(Inventory.INVENTORY));
+        assertThat(Inventory.attachments(List.of(
+                new BuildStepArgument(module, Map.of()),
+                new BuildStepArgument(additions, Map.of()))))
+                .containsExactly(Map.entry("module-modules/org.example.cli", new LinkedHashMap<>(Map.of(
+                        "licenses", module.resolve("licenses.zip"),
+                        "notice", additions.resolve("notice.txt")))));
+    }
+
+    @Test
+    public void attaches_nothing_from_an_input_that_was_removed() throws IOException {
+        Path module = Files.createDirectory(root.resolve("module"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module.path", "");
+        inventory.setProperty("module.attachment.notice", "notice.txt");
+        inventory.store(module.resolve(Inventory.INVENTORY));
+        assertThat(Inventory.attachments(List.of(
+                new BuildStepArgument(null, Checksum.removed(Set.of(Path.of(Inventory.INVENTORY)))),
+                new BuildStepArgument(module, Map.of()))))
+                .containsExactly(Map.entry("module", new LinkedHashMap<>(Map.of("notice", module.resolve("notice.txt")))));
+    }
+
+    @Test
     public void writes_all_fields_when_present() throws IOException {
         Path manifests = Files.createDirectory(root.resolve("manifests"));
         SequencedProperties module = new SequencedProperties();
@@ -665,6 +732,24 @@ public class InventoryTest {
         SequencedProperties inventory = read(next.resolve(Inventory.INVENTORY));
         assertThat(inventory.getProperty("module-foo.runtime.0")).isEqualTo(relativize(libA));
         assertThat(inventory.getProperty("module-foo.runtime.1")).isEqualTo(relativize(libB));
+    }
+
+    @Test
+    public void marks_a_module_unstaged_where_an_input_carries_the_marker() throws IOException {
+        Path manifests = manifests();
+        Path prepared = Files.createDirectory(root.resolve("prepared"));
+        Files.createFile(prepared.resolve(Inventory.UNSTAGED));
+
+        run(args("manifests", manifests, "prepared", prepared));
+
+        assertThat(read(next.resolve(Inventory.INVENTORY)).getProperty("module-foo.stage")).isEqualTo("false");
+    }
+
+    @Test
+    public void leaves_a_module_staged_by_default() throws IOException {
+        run(args("manifests", manifests()));
+
+        assertThat(read(next.resolve(Inventory.INVENTORY)).getProperty("module-foo.stage")).isNull();
     }
 
     @Test

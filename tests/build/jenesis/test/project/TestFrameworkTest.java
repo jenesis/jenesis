@@ -236,9 +236,100 @@ public class TestFrameworkTest {
                 false,
                 false))
                 .containsExactly("execute", "--disable-banner", "--disable-ansi-colors",
+                        "--reports-dir=" + root.resolve("reports"),
+                        "--config=junit.platform.reporting.open.xml.enabled=true",
+                        "--config=junit.platform.reporting.output.dir=" + root.resolve("reports"),
                         "--select-class=sample.BetaTest",
                         "--select-method=sample.AlphaTest#first",
                         "--select-method=sample.AlphaTest#second");
+    }
+
+    @Test
+    public void junit_platform_drives_a_console_launcher_older_than_1_10_without_the_execute_command() {
+        assertThat(new JUnitPlatform("1.9.3").arguments(root,
+                root,
+                new LinkedHashSet<>(List.of("sample.BetaTest")),
+                new LinkedHashMap<>(),
+                false,
+                false))
+                .as("the execute command exists from JUnit Platform 1.10 on, and an older launcher rejects it")
+                .containsExactly("--disable-banner", "--disable-ansi-colors", "--reports-dir=" + root.resolve("reports"),
+                        "--config=junit.platform.reporting.open.xml.enabled=true",
+                        "--config=junit.platform.reporting.output.dir=" + root.resolve("reports"),
+                        "--select-class=sample.BetaTest");
+    }
+
+    @Test
+    public void junit_platform_drives_a_console_launcher_from_1_10_with_the_execute_command() {
+        for (String version : List.of("1.10.0", "1.14.4", "6.0.0")) {
+            assertThat(new JUnitPlatform(version).arguments(root,
+                    root,
+                    new LinkedHashSet<>(List.of("sample.BetaTest")),
+                    new LinkedHashMap<>(),
+                    false,
+                    false))
+                    .as("version %s", version)
+                    .containsExactly("execute", "--disable-banner", "--disable-ansi-colors",
+                            "--reports-dir=" + root.resolve("reports"),
+                            "--config=junit.platform.reporting.open.xml.enabled=true",
+                            "--config=junit.platform.reporting.output.dir=" + root.resolve("reports"),
+                            "--select-class=sample.BetaTest");
+        }
+    }
+
+    @Test
+    public void junit_platform_refuses_a_console_launcher_older_than_1_5_naming_how_to_raise_it() {
+        assertThatThrownBy(() -> new JUnitPlatform("1.3.2").arguments(root,
+                root,
+                new LinkedHashSet<>(List.of("sample.BetaTest")),
+                new LinkedHashMap<>(),
+                false,
+                false))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("1.3.2")
+                .hasMessageContaining("raise the JUnit Platform to 1.5 or newer")
+                .hasMessageContaining("org.junit:junit-bom");
+    }
+
+    @Test
+    public void junit_platform_reads_the_console_launcher_version_from_the_jar_that_holds_it() throws IOException {
+        Path unrelated = root.resolve("unrelated.jar"), launcher = root.resolve("launcher.jar");
+        writeJar(root, "unrelated.jar", "org.junit.platform.engine");
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().put(Attributes.Name.IMPLEMENTATION_VERSION, "1.9.3");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(launcher), manifest)) {
+            output.putNextEntry(new JarEntry("org/junit/platform/console/ConsoleLauncher.class"));
+            output.closeEntry();
+        }
+        assertThat(new JUnitPlatform().runningOn(List.of(unrelated, launcher)))
+                .as("a standalone launcher declares no module, so its version is read off its manifest")
+                .isEqualTo(new JUnitPlatform("1.9.3"));
+        assertThat(new JUnitPlatform().runningOn(List.of(unrelated)))
+                .as("without a launcher on the path the newest command line is written")
+                .isEqualTo(new JUnitPlatform());
+    }
+
+    @Test
+    public void junit_platform_includes_and_excludes_the_engines_it_is_given() {
+        assertThat(new JUnitPlatform().engines(List.of("execute"), "junit-jupiter, -test-only-engine"))
+                .containsExactly("execute", "--include-engine=junit-jupiter", "--exclude-engine=test-only-engine");
+        assertThat(new JUnitPlatform().engines(List.of("execute"), null)).containsExactly("execute");
+    }
+
+    @Test
+    public void junit_platform_refuses_an_engine_selection_that_names_no_engine() {
+        assertThatThrownBy(() -> new JUnitPlatform().engines(List.of(), "junit-jupiter,-"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("junit-jupiter,-junit-vintage");
+    }
+
+    @Test
+    public void a_framework_off_the_junit_platform_refuses_an_engine_selection() {
+        assertThatThrownBy(() -> new JUnit4().engines(List.of(), "junit-jupiter"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("engines key of test.properties");
+        assertThat(new TestNG().engines(List.of("-d"), null)).containsExactly("-d");
     }
 
     @Test
@@ -278,7 +369,7 @@ public class TestFrameworkTest {
     }
 
     @Test
-    public void junit_platform_commands_add_both_report_formats_when_enabled() {
+    public void junit_platform_writes_both_report_formats_into_the_reports_folder_or_else_the_supplement() {
         assertThat(new JUnitPlatform().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
@@ -294,8 +385,10 @@ public class TestFrameworkTest {
                 Collections.emptyNavigableMap(),
                 false,
                 false))
-                .noneMatch(command -> command.startsWith("--reports-dir")
-                        || command.startsWith("--config=junit.platform.reporting."));
+                .as("the same reports are written whether or not they are kept, so a failure can always be read from them")
+                .contains("--reports-dir=" + root.resolve("reports"),
+                        "--config=junit.platform.reporting.open.xml.enabled=true",
+                        "--config=junit.platform.reporting.output.dir=" + root.resolve("reports"));
     }
 
     @Test
@@ -306,7 +399,7 @@ public class TestFrameworkTest {
                 Collections.emptyNavigableMap(),
                 false,
                 true))
-                .containsExactly("-d", root.resolve(BuildStep.REPORTS + "tests").toString());
+                .containsExactly("-verbose", "2", "-d", root.resolve(BuildStep.REPORTS + "tests").toString());
     }
 
     @Test

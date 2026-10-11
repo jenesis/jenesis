@@ -10,6 +10,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.Platform;
 import build.jenesis.Repository;
@@ -42,9 +43,15 @@ import static java.util.Objects.requireNonNull;
 
 public class MavenProject implements BuildExecutorModule {
 
-    public static final String POM = "pom/", MAVEN = "maven/";
-    private static final String SCAN = "scan";
+    public static final String POM = "pom/", MAVEN = "maven/", BOM = "bom/";
+    public static final String EXPRESSIONS = "expressions.properties", SCOPES = "scopes.properties";
+    private static final String SCAN = "scan", POM_METADATA = "metadata.", BOMS = "boms", POMS = "poms", SKIPPED = "skipped.properties";
+    private static final Set<String> JARS = Set.of("jar", "bundle"), AGGREGATES = Set.of("pom", "bom");
     private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-";
+    private static final Set<String> COMMANDED = Set.of("version", "scm.tag", "scm.revision", "scm.tree");
+    private static final Pattern UNRESOLVED = Pattern.compile("\\$\\{([^}]+)}");
+    private static final Function<List<Path>, SequencedSet<Path>> OWN_CONFIGURATIONS =
+            locals -> Collections.unmodifiableSequencedSet(new LinkedHashSet<>(locals));
 
     private final Path root;
     private final String group;
@@ -52,12 +59,23 @@ public class MavenProject implements BuildExecutorModule {
     private final MavenRepository repository;
     private final MavenResolver resolver;
     private final Platform platform;
+    private final Consumer<String> printing;
+    private final Palette palette;
+    private final Function<List<Path>, SequencedSet<Path>> configurations;
 
     public MavenProject(Path root,
                         String prefix,
                         MavenRepository repository,
                         MavenResolver resolver) {
-        this(root, "main", prefix, repository, resolver, new Platform());
+        this(root,
+                "main",
+                prefix,
+                repository,
+                resolver,
+                new Platform(),
+                null,
+                Palette.NONE,
+                OWN_CONFIGURATIONS);
     }
 
     public static MavenProject ofEnvironment(Environment environment,
@@ -65,7 +83,10 @@ public class MavenProject implements BuildExecutorModule {
                                       String prefix,
                                       MavenRepository repository,
                                       MavenResolver resolver) {
-        return new MavenProject(root, prefix, repository, resolver).platform(Platform.ofEnvironment(environment));
+        return new MavenProject(root, prefix, repository, resolver)
+                .platform(Platform.ofEnvironment(environment))
+                .printing(environment.flag("print.progress", true) ? environment.out() : null,
+                        Palette.ofEnvironment(environment));
     }
 
     private MavenProject(Path root,
@@ -73,21 +94,35 @@ public class MavenProject implements BuildExecutorModule {
                          String prefix,
                          MavenRepository repository,
                          MavenResolver resolver,
-                         Platform platform) {
+                         Platform platform,
+                         Consumer<String> printing,
+                         Palette palette,
+                         Function<List<Path>, SequencedSet<Path>> configurations) {
         this.root = root;
         this.group = group;
         this.prefix = prefix;
         this.repository = repository;
         this.resolver = resolver;
         this.platform = platform;
+        this.printing = printing;
+        this.palette = palette;
+        this.configurations = configurations;
     }
 
     public MavenProject group(String group) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations);
     }
 
     public MavenProject platform(Platform platform) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations);
+    }
+
+    public MavenProject printing(Consumer<String> printing, Palette palette) {
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations);
+    }
+
+    public MavenProject configurations(Function<List<Path>, SequencedSet<Path>> configurations) {
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations);
     }
 
     public static BuildExecutorModule make(Environment environment,
@@ -101,6 +136,7 @@ public class MavenProject implements BuildExecutorModule {
                 Map.of("maven", MavenPomResolver.ofEnvironment(environment)),
                 null,
                 Collections.emptyNavigableSet(),
+                OWN_CONFIGURATIONS,
                 assembler);
     }
 
@@ -112,12 +148,17 @@ public class MavenProject implements BuildExecutorModule {
                                            Map<String, Resolver> resolvers,
                                            Pinning pinning,
                                            SequencedSet<Path> spdx,
+                                           Function<List<Path>, SequencedSet<Path>> configurations,
                                            MultiProjectAssembler<? super MavenModuleDescriptor> assembler) {
         MavenRepository repository = MavenRepository.of(requireNonNull(repositories.get(prefix)));
         MavenResolver resolver = MavenResolver.of(resolvers.get(prefix));
         Dependencies dependencyModule = Dependencies.ofEnvironment(environment, repositories, resolvers);
-        return new MultiProjectModule(MavenProject.ofEnvironment(environment, root, prefix, repository, resolver).group(group),
-                identifier -> Optional.of(identifier.substring(0, identifier.indexOf('/'))),
+        return new MultiProjectModule(MavenProject.ofEnvironment(environment, root, prefix, repository, resolver)
+                        .group(group)
+                        .configurations(configurations),
+                identifier -> identifier.indexOf('/') < 0
+                        ? Optional.empty()
+                        : Optional.of(identifier.substring(0, identifier.indexOf('/'))),
                 _ -> (name, dependencies, arguments) -> {
                     Path location = MultiProjectModule.location(root, arguments);
                     SequencedSet<String> spdxInherited = new LinkedHashSet<>();
@@ -165,7 +206,9 @@ public class MavenProject implements BuildExecutorModule {
                         artifactInputs.add(PREPARE);
                         artifactInputs.addAll(spdxSources);
                         depExec.addModule(ARTIFACTS,
-                                dependencyModule.repositories(mergedRepositories).pinning(pinning),
+                                dependencyModule.repositories(mergedRepositories)
+                                        .pinning(pinning)
+                                        .pathPlacement(name.startsWith("test-") ? PathPlacement.CLASS_PATH : PathPlacement.INFERRED),
                                 artifactInputs);
                     }, dependencyDeps);
                     SequencedMap<String, String> produceDeps = new LinkedHashMap<>();
@@ -217,7 +260,7 @@ public class MavenProject implements BuildExecutorModule {
         if (path.startsWith(wrapped)) {
             return Optional.of(path.substring(wrapped.length()));
         }
-        return Optional.empty();
+        return path.equals(BOMS + "/" + POMS) ? Optional.of(BOMS) : Optional.empty();
     }
 
     @Override
@@ -228,8 +271,43 @@ public class MavenProject implements BuildExecutorModule {
         String group = this.group;
         Platform platform = this.platform;
         buildExecutor.addStep(SCAN, new Scan(root));
-        buildExecutor.addStep(PREPARE, new Prepare(prefix, resolver, repository), SCAN);
+        buildExecutor.addStep(PREPARE,
+                new Prepare(prefix, resolver, repository),
+                Stream.concat(Stream.of(SCAN), inherited.sequencedKeySet().stream()));
+        buildExecutor.addModule(BOMS, (boms, prepared) -> {
+            SortedSet<String> unstaged = new TreeSet<>();
+            Path descriptors = prepared.get(PREVIOUS + PREPARE).resolve(BOM);
+            if (Files.isDirectory(descriptors)) {
+                try (DirectoryStream<Path> files = Files.newDirectoryStream(descriptors, "*.properties")) {
+                    for (Path file : files) {
+                        String name = file.getFileName().toString(), path = SequencedProperties.ofFiles(file).getProperty("path");
+                        Path packaging = BuildStep.locate(configurations.apply(new MavenModuleDescriptor(
+                                name.substring(0, name.length() - ".properties".length()),
+                                Collections.emptyNavigableSet(),
+                                Collections.emptyNavigableSet(),
+                                Collections.emptyNavigableSet(),
+                                root.resolve(path)).configurations()), "packaging.properties");
+                        if (packaging != null && !SequencedProperties.ofFiles(packaging).flag("stage", true)) {
+                            unstaged.add(path);
+                        }
+                    }
+                }
+            }
+            boms.addStep(POMS, new Boms(unstaged), prepared.sequencedKeySet());
+        }, Stream.concat(Stream.of(PREPARE), inherited.sequencedKeySet().stream()));
         buildExecutor.addModule(MODULE, (modules, paths) -> {
+            Path skipped = paths.get(PREVIOUS + PREPARE).resolve(SKIPPED);
+            if (printing != null && Files.exists(skipped)) {
+                SequencedProperties.ofFiles(skipped).forEachProperty((pom, packaging) -> printing.accept(
+                        ("%s%-11s%s %s builds nothing, as its packaging %s is none of jar and bundle, the packagings"
+                                + " this build builds: where it is a jar with more in it, declare <packaging>jar</packaging>"
+                                + " and let a plugin add the rest")
+                                .formatted(palette.warning(),
+                                        "[SKIPPED]",
+                                        palette.reset(),
+                                        Path.of(pom),
+                                        packaging)));
+            }
             try (DirectoryStream<Path> files = Files.newDirectoryStream(
                     paths.get(PREVIOUS + PREPARE).resolve(MAVEN),
                     "*.properties")) {
@@ -247,20 +325,100 @@ public class MavenProject implements BuildExecutorModule {
                         if (sources != null && Files.exists(sources)) {
                             active = true;
                         }
+                        SequencedSet<Path> languages = new LinkedHashSet<>();
+                        for (int languageIndex = 0; ; languageIndex++) {
+                            String language = properties.getProperty("sources." + languageIndex);
+                            if (language == null) {
+                                break;
+                            }
+                            Path folder = base.resolve(language).normalize();
+                            if (Files.isDirectory(folder) && (sources == null || !folder.equals(sources.normalize()))) {
+                                languages.add(folder);
+                                active = true;
+                            }
+                        }
                         int index = 0;
+                        Set<Path> directories = new HashSet<>();
                         for (int resourceIndex = 0; ; resourceIndex++) {
                             String resource = properties.getProperty("resources." + resourceIndex);
                             if (resource == null) {
                                 break;
                             }
-                            Path resources = base.resolve(resource);
-                            if (Files.exists(resources)) {
+                            Path resources = base.resolve(resource), directory = resources.toAbsolutePath().normalize();
+                            if (Files.exists(resources) && directories.add(directory)) {
+                                for (Path owned : List.of(paths.get(PREVIOUS + PREPARE), root.resolve(".jenesis"))) {
+                                    Path normalized = owned.toAbsolutePath().normalize();
+                                    if (normalized.startsWith(directory)) {
+                                        throw new IllegalArgumentException("The resource directory " + resource
+                                                + " of " + base.resolve("pom.xml")
+                                                + " contains " + directory.relativize(normalized).getName(0)
+                                                + ", which the build writes itself; a resource directory is copied whole,"
+                                                + " without its includes, excludes or targetPath, so place a single file with"
+                                                + " -Djenesis.project.resources=<file>:<path in the jar>, as"
+                                                + " LICENSE:META-INF/LICENSE, and move that resource into a <profile> activated by"
+                                                + " a property, such as <property><name>!jenesis</name></property>, which Maven"
+                                                + " still activates and this build does not");
+                                    }
+                                }
                                 module.addSource("resources-" + ++index, Bind.asResources(), resources);
                                 active = true;
+                            } else if (!Files.exists(resources)
+                                    && !Path.of(resource).normalize().equals(Path.of("src", name.startsWith("test-") ? "test" : "main", "resources"))
+                                    && printing != null) {
+                                printing.accept(("%s%-11s%s %s names the resource directory %s, which does not exist"
+                                        + " beside it, so it adds no resources")
+                                        .formatted(palette.warning(),
+                                                "[RESOURCES]",
+                                                palette.reset(),
+                                                Path.of(properties.getProperty("path")).resolve("pom.xml"),
+                                                resource));
                             }
                         }
+                        Path tests = file.resolveSibling("test-" + name);
+                        if (!active && name.startsWith(SIBLING_MODULE_PREFIX) && Files.exists(tests)) {
+                            SequencedProperties testProperties = SequencedProperties.ofFiles(tests);
+                            active = testProperties.stringPropertyNames().stream()
+                                    .filter(key -> key.equals("sources")
+                                            || key.startsWith("sources.")
+                                            || key.startsWith("resources."))
+                                    .map(testProperties::getProperty)
+                                    .filter(folder -> !folder.isEmpty())
+                                    .anyMatch(folder -> Files.exists(base.resolve(folder)))
+                                    || configuresPlugin(base.resolve("src/test/build.jenesis"));
+                        }
+                        if (!active && name.startsWith("test-" + SIBLING_MODULE_PREFIX)) {
+                            active = configuresPlugin(base.resolve("src/test/build.jenesis"));
+                        }
+                        if (!active && name.startsWith(SIBLING_MODULE_PREFIX)) {
+                            active = configuresPlugin(base.resolve("src/main/build.jenesis"))
+                                    || configuresPlugin(base.resolve("build.jenesis"));
+                            if (!active && printing != null) {
+                                printing.accept(("%s%-11s%s %s builds no jar, as %s has neither sources nor resources:"
+                                        + " a plugin that generates them is configured by a plugin-<name>.properties in"
+                                        + " %s, which builds the module")
+                                        .formatted(palette.warning(),
+                                                "[SKIPPED]",
+                                                palette.reset(),
+                                                properties.getProperty("groupId") + ":" + properties.getProperty("artifactId"),
+                                                Path.of(properties.getProperty("path")).resolve("pom.xml"),
+                                                Path.of(properties.getProperty("path")).resolve("src/main/build.jenesis")));
+                            }
+                        }
+                        if (active && printing != null && !name.startsWith("test-") && properties.getProperty("release") == null) {
+                            printing.accept(("%s%-11s%s %s compiles for release %d, the JDK the build runs on, as %s sets"
+                                    + " neither maven.compiler.release nor its target or source - maven.compiler.release sets it")
+                                    .formatted(palette.warning(),
+                                            "[RELEASE]",
+                                            palette.reset(),
+                                            properties.getProperty("groupId") + ":" + properties.getProperty("artifactId"),
+                                            Runtime.version().feature(),
+                                            Path.of(properties.getProperty("path")).resolve("pom.xml")));
+                        }
                         if (active) {
-                            module.addSource("sources", Bind.asSources(), sources == null ? base : sources);
+                            SequencedSet<Path> folders = new LinkedHashSet<>();
+                            folders.add(sources == null ? base : sources);
+                            folders.addAll(languages);
+                            module.addSource("sources", Bind.asSources(), folders);
                             module.addStep(COORDINATES, (_, context, _) -> {
                                 SequencedProperties coordinates = new SequencedProperties();
                                 coordinates.setProperty(properties.getProperty("coordinate"), "");
@@ -275,10 +433,6 @@ public class MavenProject implements BuildExecutorModule {
                             });
                             int feature = Runtime.version().feature();
                             module.addStep(MANIFESTS, (_, context, manifestArgs) -> {
-                                Path pomFile = paths.get(PREVIOUS + SCAN)
-                                        .resolve(POM)
-                                        .resolve(properties.getProperty("path"))
-                                        .resolve("pom.xml");
                                 String[] coordinateParts = properties.getProperty("coordinate").split("/");
                                 String testsOf = coordinateParts.length == 6 && "tests".equals(coordinateParts[4])
                                         ? coordinateParts[2]
@@ -290,24 +444,24 @@ public class MavenProject implements BuildExecutorModule {
                                 String test = properties.getProperty("dependencies.test", "");
                                 String checksums = properties.getProperty("checksums", "");
                                 Map<String, String> checksumByCoordinate = new LinkedHashMap<>();
-                                for (String entry : checksums.isEmpty() ? new String[0] : checksums.split(",")) {
+                                for (String entry : checksums.isEmpty() ? new String[0] : checksums.split("\t")) {
                                     int split = entry.indexOf('=');
                                     if (split > 0) {
                                         checksumByCoordinate.put(entry.substring(0, split), entry.substring(split + 1));
                                     }
                                 }
-                                for (String dependency : compile.isEmpty() ? new String[0] : compile.split(",")) {
+                                for (String dependency : compile.isEmpty() ? new String[0] : compile.split("\t")) {
                                     String value = checksumByCoordinate.getOrDefault(dependency, "");
                                     requires.setProperty(group + "/compile/" + dependency, value);
                                     requires.setProperty(group + "/runtime/" + dependency, value);
                                 }
-                                for (String dependency : provided.isEmpty() ? new String[0] : provided.split(",")) {
+                                for (String dependency : provided.isEmpty() ? new String[0] : provided.split("\t")) {
                                     requires.setProperty(group + "/compile/" + dependency, checksumByCoordinate.getOrDefault(dependency, ""));
                                 }
-                                for (String dependency : runtime.isEmpty() ? new String[0] : runtime.split(",")) {
+                                for (String dependency : runtime.isEmpty() ? new String[0] : runtime.split("\t")) {
                                     requires.setProperty(group + "/runtime/" + dependency, checksumByCoordinate.getOrDefault(dependency, ""));
                                 }
-                                for (String dependency : test.isEmpty() ? new String[0] : test.split(",")) {
+                                for (String dependency : test.isEmpty() ? new String[0] : test.split("\t")) {
                                     String value = checksumByCoordinate.getOrDefault(dependency, "");
                                     requires.setProperty(group + "/compile/" + dependency, value);
                                     requires.setProperty(group + "/runtime/" + dependency, value);
@@ -334,9 +488,13 @@ public class MavenProject implements BuildExecutorModule {
                                 String declared = properties.getProperty("plugins", "");
                                 for (String entry : declared.isEmpty() ? new String[0] : declared.split("\t")) {
                                     int split = entry.indexOf('=');
+                                    String plugin = entry.substring(0, split);
                                     requires.setProperty(entry.substring(split + 1)
                                             + "/plugin/"
-                                            + entry.substring(0, split), "");
+                                            + plugin
+                                            + (plugin.startsWith("maven/") && plugin.split("/").length == 3
+                                                    ? "/RELEASE"
+                                                    : ""), "");
                                 }
                                 requires.store(context.next().resolve(BuildStep.REQUIRES));
                                 String keys = properties.getProperty("signatures", "");
@@ -361,13 +519,28 @@ public class MavenProject implements BuildExecutorModule {
                                     }
                                     natives.store(context.next().resolve(BuildStep.NATIVES));
                                 }
+                                List<String> aliased = properties.value("aliases") == null
+                                        ? List.of()
+                                        : List.of(properties.value("aliases").split("\t"));
+                                if (!aliased.isEmpty()) {
+                                    SequencedProperties aliases = new SequencedProperties();
+                                    for (String entry : aliased) {
+                                        int split = entry.indexOf('=');
+                                        aliases.setProperty(group + "/module/" + entry.substring(0, split),
+                                                entry.substring(split + 1));
+                                    }
+                                    aliases.store(context.next().resolve(BuildStep.ALIASES));
+                                }
                                 String named = properties.getProperty("named"), release = properties.getProperty("release");
                                 boolean preview = release != null && release.endsWith("-preview");
-                                if (named != null || preview) {
+                                if (named != null || preview || !aliased.isEmpty()) {
                                     Manifest manifest = new Manifest();
                                     manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
                                     if (named != null) {
                                         manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, named);
+                                    }
+                                    if (!aliased.isEmpty()) {
+                                        manifest.getMainAttributes().putValue(PathPlacement.ALIASES, String.join(",", aliased));
                                     }
                                     if (preview) {
                                         manifest.getMainAttributes().putValue(PathPlacement.PREVIEW,
@@ -388,10 +561,52 @@ public class MavenProject implements BuildExecutorModule {
                                 if (!exclusionsProperties.isEmpty()) {
                                     exclusionsProperties.store(context.next().resolve(BuildStep.EXCLUSIONS));
                                 }
+                                SequencedProperties managedExclusions = new SequencedProperties();
+                                for (String key : properties.stringPropertyNames()) {
+                                    if (key.startsWith("managed.exclusions.")) {
+                                        managedExclusions.setProperty(group + "/" + key.substring("managed.exclusions.".length()),
+                                                properties.getProperty(key));
+                                    }
+                                }
+                                if (!managedExclusions.isEmpty()) {
+                                    managedExclusions.store(context.next().resolve(BuildStep.MANAGED));
+                                }
+                                SequencedProperties managedScopes = new SequencedProperties();
+                                for (String key : properties.stringPropertyNames()) {
+                                    if (key.startsWith("managed.scope.")) {
+                                        managedScopes.setProperty(group + "/" + key.substring("managed.scope.".length()),
+                                                properties.getProperty(key));
+                                    }
+                                }
+                                if (!managedScopes.isEmpty()) {
+                                    managedScopes.store(context.next().resolve(SCOPES));
+                                }
+                                SequencedProperties expressions = new SequencedProperties();
+                                for (String key : properties.stringPropertyNames()) {
+                                    if (key.startsWith("expression.")) {
+                                        expressions.setProperty(key.substring("expression.".length()),
+                                                properties.getProperty(key));
+                                    }
+                                }
+                                if (!expressions.isEmpty()) {
+                                    expressions.store(context.next().resolve(EXPRESSIONS));
+                                }
+                                String optionalDependencies = properties.getProperty("optional");
+                                if (optionalDependencies != null) {
+                                    List<String> optional = List.of(optionalDependencies.split("\t"));
+                                    SequencedProperties optionals = new SequencedProperties();
+                                    for (String key : requires.stringPropertyNames()) {
+                                        int scopeSlash = key.indexOf('/', key.indexOf('/') + 1);
+                                        if (optional.contains(key.substring(scopeSlash + 1))) {
+                                            optionals.setProperty(key, "");
+                                        }
+                                    }
+                                    optionals.store(context.next().resolve(BuildStep.OPTIONALS));
+                                }
                                 SequencedProperties versions = new SequencedProperties();
                                 String managed = properties.getProperty("managedDependencies", "");
                                 if (!managed.isEmpty()) {
-                                    for (String entry : managed.split(",")) {
+                                    for (String entry : managed.split("\t")) {
                                         int split = entry.indexOf('=');
                                         String coord = entry.substring(0, split), version = entry.substring(split + 1);
                                         versions.setProperty(group + "/" + coord, version);
@@ -428,6 +643,7 @@ public class MavenProject implements BuildExecutorModule {
                                 Javac.writeRelease(context.next(), properties.getProperty("release"), feature);
                                 SequencedProperties descriptor = new SequencedProperties();
                                 descriptor.setProperty("path", properties.getProperty("path"));
+                                descriptor.setProperty("sources", properties.getProperty("sources"));
                                 descriptor.setProperty("modular", "false");
                                 if (testsOf != null) {
                                     descriptor.setProperty("test", testsOf);
@@ -440,21 +656,7 @@ public class MavenProject implements BuildExecutorModule {
                                     descriptor.setProperty("native", "true");
                                 }
                                 descriptor.store(context.next().resolve(BuildStep.MODULE));
-                                SequencedProperties metadata = new SequencedProperties();
-                                metadata.setProperty("project", properties.getProperty("groupId"));
-                                metadata.setProperty("artifact", properties.getProperty("artifactId"));
-                                metadata.setProperty("version", properties.getProperty("version"));
-                                extractMetadata(pomFile).forEach(metadata::put);
-                                for (BuildStepArgument argument : manifestArgs.values()) {
-                                    if (argument.removed()) {
-                                        continue;
-                                    }
-                                    Path upstream = argument.folder().resolve(BuildStep.METADATA);
-                                    if (Files.isRegularFile(upstream)) {
-                                        SequencedProperties.ofFiles(upstream).forEach(metadata::put);
-                                    }
-                                }
-                                metadata.store(context.next().resolve(BuildStep.METADATA));
+                                metadata(properties, manifestArgs.values()).store(context.next().resolve(BuildStep.METADATA));
                                 return CompletableFuture.completedStage(new BuildStepResult(true));
                             }, modInherited.sequencedKeySet());
                         }
@@ -464,117 +666,118 @@ public class MavenProject implements BuildExecutorModule {
         }, Stream.concat(Stream.of(SCAN, PREPARE), inherited.sequencedKeySet().stream()));
     }
 
-    private static SequencedProperties extractMetadata(Path pomFile) throws IOException {
-        SequencedProperties result = new SequencedProperties();
-        if (!Files.isRegularFile(pomFile)) {
-            return result;
+    private static SequencedProperties metadata(SequencedProperties properties,
+                                                Collection<BuildStepArgument> arguments) throws IOException {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", properties.getProperty("groupId"));
+        metadata.setProperty("artifact", properties.getProperty("artifactId"));
+        metadata.setProperty("version", properties.getProperty("version"));
+        SequencedProperties own = new SequencedProperties();
+        for (String key : properties.stringPropertyNames()) {
+            if (key.startsWith(POM_METADATA)) {
+                own.setProperty(key.substring(POM_METADATA.length()), properties.getProperty(key));
+            }
         }
-        Document document;
-        try (InputStream stream = Files.newInputStream(pomFile)) {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setNamespaceAware(true);
-            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            document = factory.newDocumentBuilder().parse(stream);
-        } catch (ParserConfigurationException | SAXException e) {
-            throw new IOException(e);
-        }
-        NodeList children = document.getDocumentElement().getChildNodes();
-        for (int index = 0; index < children.getLength(); index++) {
-            Node node = children.item(index);
-            if (node.getNodeType() != Node.ELEMENT_NODE) {
+        own.forEach(metadata::put);
+        Set<String> lists = own.stringPropertyNames().stream()
+                .filter(key -> key.startsWith("license.") || key.startsWith("developer."))
+                .map(key -> key.substring(0, key.indexOf('.') + 1))
+                .collect(Collectors.toSet());
+        for (BuildStepArgument argument : arguments) {
+            if (argument.removed()) {
                 continue;
             }
-            String name = node.getLocalName() == null ? node.getNodeName() : node.getLocalName();
-            switch (name) {
-                case "name" -> result.setProperty("name", node.getTextContent().trim());
-                case "description" -> result.setProperty("description", node.getTextContent().trim());
-                case "url" -> result.setProperty("url", node.getTextContent().trim());
-                case "licenses" -> {
-                    NodeList licenses = node.getChildNodes();
-                    for (int licenseIndex = 0; licenseIndex < licenses.getLength(); licenseIndex++) {
-                        Node licenseNode = licenses.item(licenseIndex);
-                        if (licenseNode.getNodeType() != Node.ELEMENT_NODE) {
-                            continue;
-                        }
-                        String licenseName = licenseNode.getLocalName() == null
-                                ? licenseNode.getNodeName()
-                                : licenseNode.getLocalName();
-                        if (!"license".equals(licenseName)) {
-                            continue;
-                        }
-                        Element license = (Element) licenseNode;
-                        Element nameElement = firstChild(license, "name");
-                        if (nameElement == null) {
-                            continue;
-                        }
-                        String licenseTitle = nameElement.getTextContent().trim();
-                        if (licenseTitle.isEmpty()) {
-                            continue;
-                        }
-                        String id = licenseTitle.toLowerCase(Locale.ROOT)
-                                .replace(' ', '_')
-                                .replace('.', '_');
-                        result.setProperty("license." + id + ".name", licenseTitle);
-                        copyChildText(license, "url", result, "license." + id + ".url");
+            Path upstream = argument.folder().resolve(BuildStep.METADATA);
+            if (Files.isRegularFile(upstream)) {
+                SequencedProperties.ofFiles(upstream).forEachProperty((key, value) -> {
+                    if (COMMANDED.contains(key)
+                            || !own.containsKey(key)
+                            && lists.stream().noneMatch(key::startsWith)) {
+                        metadata.setProperty(key, value);
                     }
-                }
-                case "developers" -> {
-                    NodeList developers = node.getChildNodes();
-                    for (int developerIndex = 0; developerIndex < developers.getLength(); developerIndex++) {
-                        Node devNode = developers.item(developerIndex);
-                        if (devNode.getNodeType() != Node.ELEMENT_NODE) {
-                            continue;
-                        }
-                        String devName = devNode.getLocalName() == null ? devNode.getNodeName() : devNode.getLocalName();
-                        if (!"developer".equals(devName)) {
-                            continue;
-                        }
-                        Element developer = (Element) devNode;
-                        Element idElement = firstChild(developer, "id");
-                        if (idElement == null) {
-                            continue;
-                        }
-                        String id = idElement.getTextContent().trim();
-                        if (id.isEmpty()) {
-                            continue;
-                        }
-                        copyChildText(developer, "name", result, "developer." + id + ".name");
-                        copyChildText(developer, "email", result, "developer." + id + ".email");
-                    }
-                }
-                case "organization" -> {
-                    copyChildText(node, "name", result, "organization.name");
-                    copyChildText(node, "url", result, "organization.url");
-                }
-                case "scm" -> {
-                    copyChildText(node, "connection", result, "scm.connection");
-                    copyChildText(node, "developerConnection", result, "scm.developerConnection");
-                    copyChildText(node, "tag", result, "scm.tag");
-                    copyChildText(node, "url", result, "scm.url");
-                }
-                default -> {
-                }
+                });
             }
         }
-        return result;
+        return metadata;
     }
 
-    private static Element firstChild(Node parent, String localName) {
-        NodeList children = parent.getChildNodes();
-        for (int index = 0; index < children.getLength(); index++) {
-            Node node = children.item(index);
-            if (node.getNodeType() == Node.ELEMENT_NODE && localName.equals(node.getLocalName())) {
-                return (Element) node;
-            }
+    private static boolean configuresPlugin(Path configuration) throws IOException {
+        if (!Files.isDirectory(configuration)) {
+            return false;
         }
-        return null;
+        try (Stream<Path> configured = Files.list(configuration)) {
+            return configured.map(path -> path.getFileName().toString())
+                    .anyMatch(entry -> entry.startsWith("plugin-") && entry.endsWith(".properties"));
+        }
     }
 
-    private static void copyChildText(Node parent, String localName, SequencedProperties target, String key) {
-        Element child = firstChild(parent, localName);
-        if (child != null) {
-            target.setProperty(key, child.getTextContent().trim());
+    private record Boms(SortedSet<String> unstaged) implements BuildStep {
+
+        private Boms {
+            unstaged = new TreeSet<>(unstaged);
+        }
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Path descriptors = arguments.get(PREVIOUS + PREPARE).folder().resolve(BOM);
+            if (!Files.isDirectory(descriptors)) {
+                return CompletableFuture.completedStage(new BuildStepResult(true));
+            }
+            List<BuildStepArgument> upstream = arguments.entrySet().stream()
+                    .filter(entry -> !entry.getKey().equals(PREVIOUS + PREPARE))
+                    .map(Map.Entry::getValue)
+                    .toList();
+            List<Path> files = new ArrayList<>();
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(descriptors, "*.properties")) {
+                stream.forEach(files::add);
+            }
+            files.sort(null);
+            SequencedProperties inventory = new SequencedProperties();
+            MavenPomEmitter emitter = new MavenPomEmitter();
+            for (Path file : files) {
+                SequencedProperties properties = SequencedProperties.ofFiles(file);
+                SequencedProperties metadata = metadata(properties, upstream);
+                SequencedMap<MavenDependencyKey, MavenDependencyValue> managed = new LinkedHashMap<>();
+                for (int index = 0; properties.value("managed." + index) != null; index++) {
+                    String prefix = "managed." + index;
+                    MavenDependencyKey.Versioned parsed = MavenDependencyKey.parse(properties.value(prefix));
+                    List<String> exclusions = properties.entries(prefix + ".exclusions");
+                    String scope = properties.value(prefix + ".scope"), optional = properties.value(prefix + ".optional");
+                    managed.put(parsed.key(), new MavenDependencyValue(parsed.version(),
+                            scope == null ? null : MavenDependencyScope.of(scope),
+                            null,
+                            exclusions == null ? null : exclusions.stream().map(exclusion -> new MavenDependencyName(
+                                    exclusion.substring(0, exclusion.indexOf('/')),
+                                    exclusion.substring(exclusion.indexOf('/') + 1))).toList(),
+                            optional == null ? null : Boolean.valueOf(optional)));
+                }
+                String name = file.getFileName().toString(), path = properties.getProperty("path");
+                Path pom = Files.createDirectory(context.next().resolve(name.substring(0, name.length() - ".properties".length())))
+                        .resolve(Pom.POM);
+                try (Writer writer = Files.newBufferedWriter(pom)) {
+                    emitter.emit(metadata.getProperty("project"),
+                            metadata.getProperty("artifact"),
+                            metadata.getProperty("version"),
+                            "pom",
+                            Collections.emptyNavigableMap(),
+                            managed,
+                            MavenPomEmitter.Metadata.of(metadata)).accept(writer);
+                }
+                String prefix = Inventory.prefixOf(path);
+                inventory.setProperty(prefix + "path", path);
+                inventory.setProperty(prefix + "pom", context.next().relativize(pom).toString().replace(File.separatorChar, '/'));
+                inventory.setProperty(prefix + "packaging", "pom");
+                if (unstaged.contains(path)) {
+                    inventory.setProperty(prefix + "stage", "false");
+                }
+            }
+            if (!inventory.isEmpty()) {
+                inventory.store(context.next().resolve(Inventory.INVENTORY));
+            }
+            return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }
 
@@ -598,8 +801,10 @@ public class MavenProject implements BuildExecutorModule {
                 }
 
                 @Override
-                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
                     if (!dir.equals(root) && Files.exists(dir.resolve(BuildExecutor.SKIP_MARKER))) {
+                        Files.createFile(Files.createDirectories(poms.resolve(root.relativize(dir)))
+                                .resolve(BuildExecutor.SKIP_MARKER));
                         return FileVisitResult.SKIP_SUBTREE;
                     }
                     return FileVisitResult.CONTINUE;
@@ -632,14 +837,78 @@ public class MavenProject implements BuildExecutorModule {
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
             Path maven = Files.createDirectory(context.next().resolve(MAVEN));
-            for (Map.Entry<Path, MavenLocalPom> entry : resolver.local(executor,
-                    repository,
-                    arguments.get(SCAN)
-                            .folder()
-                            .resolve(POM)).entrySet()) {
-                MavenLocalPom value = entry.getValue();
-                if (value.packaging() != null && !"jar".equals(value.packaging())) {
+            SequencedProperties skipped = new SequencedProperties();
+            String version = null;
+            for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
+                if (argument.getKey().equals(SCAN) || argument.getValue().removed()) {
                     continue;
+                }
+                Path file = argument.getValue().folder().resolve(BuildStep.METADATA);
+                if (Files.isRegularFile(file)) {
+                    version = SequencedProperties.ofFiles(file).value("version", version);
+                }
+            }
+            SequencedMap<Path, MavenLocalPom> poms = resolver.local(executor,
+                    repository,
+                    arguments.get(SCAN).folder().resolve(POM));
+            Map<String, String> siblings = new HashMap<>();
+            poms.values().forEach(pom -> siblings.put(pom.groupId() + "/" + pom.artifactId(), pom.version()));
+            for (Map.Entry<Path, MavenLocalPom> entry : poms.entrySet()) {
+                MavenLocalPom value = entry.getValue();
+                if (version != null) {
+                    value = value.version(version)
+                            .dependencies(versioned(value.dependencies(), siblings, version))
+                            .managedDependencies(versioned(value.managedDependencies(), siblings, version))
+                            .bom(versioned(value.bom(), siblings, version));
+                }
+                Path pomFile = entry.getKey().resolve("pom.xml");
+                String unresolved = unresolved(value.version());
+                if (unresolved != null) {
+                    throw new IllegalArgumentException("The version " + value.version() + " of " + value.groupId() + ":"
+                            + value.artifactId() + " in " + pomFile + " names the property " + unresolved + ", which no"
+                            + " pom.xml defines and which this build does not take from a Maven extension: define it in"
+                            + " the pom.xml, or set the version as jenesis.project.version, on the command line or in"
+                            + " jenesis.properties");
+                }
+                if (value.dependencies() != null) {
+                    for (Map.Entry<MavenDependencyKey, MavenDependencyValue> dependency : value.dependencies().entrySet()) {
+                        MavenDependencyKey key = dependency.getKey();
+                        SequencedMap<String, String> components = new LinkedHashMap<>();
+                        components.put("groupId", key.groupId());
+                        components.put("artifactId", key.artifactId());
+                        components.put("type", key.type());
+                        components.put("classifier", key.classifier());
+                        components.put("version", dependency.getValue().version());
+                        for (Map.Entry<String, String> component : components.entrySet()) {
+                            String property = unresolved(component.getValue());
+                            if (property != null) {
+                                throw new IllegalArgumentException("The " + component.getKey() + " "
+                                        + component.getValue() + " of the dependency " + key.groupId() + ":"
+                                        + key.artifactId() + " in " + pomFile + " names the property " + property
+                                        + ", which no pom.xml defines: define it in the pom.xml");
+                            }
+                        }
+                    }
+                }
+                if (value.bom() != null) {
+                    writeBom(Files.createDirectories(context.next().resolve(BOM)), value, entry.getKey());
+                    continue;
+                } else if (value.packaging() != null && !JARS.contains(value.packaging())) {
+                    if (!AGGREGATES.contains(value.packaging())) {
+                        skipped.setProperty(pomFile.toString().replace(File.separatorChar, '/'), value.packaging());
+                    }
+                    continue;
+                }
+                if (value.dependencies() != null) {
+                    for (MavenDependencyKey key : value.dependencies().sequencedKeySet()) {
+                        if (!key.jar() && !key.type().equals("pom")) {
+                            throw new IllegalArgumentException("The dependency " + key.groupId() + ":" + key.artifactId()
+                                    + " in " + pomFile + " is of type " + key.type() + ", which Maven places on no path"
+                                    + " and which Jenesis does not unpack: declare it in a profile that a property"
+                                    + " activates, such as <property><name>!jenesis</name></property>, which Maven"
+                                    + " activates and Jenesis never does");
+                        }
+                    }
                 }
                 String coordinate = new MavenDependencyKey(value.groupId(), value.artifactId(), "jar", null)
                         .coordinate(prefix, value.version());
@@ -651,7 +920,57 @@ public class MavenProject implements BuildExecutorModule {
                 writeModule(maven, value, relativePath, coordinate, selfPom, false, qualifiedDependencies, attachments(value, false));
                 writeModule(maven, value, relativePath, coordinate, selfPom, true, qualifiedDependencies, attachments(value, true));
             }
+            if (!skipped.isEmpty()) {
+                skipped.store(context.next().resolve(SKIPPED));
+            }
             return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+
+        private static SequencedMap<MavenDependencyKey, MavenDependencyValue> versioned(
+                SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies,
+                Map<String, String> siblings,
+                String version) {
+            if (dependencies == null) {
+                return null;
+            }
+            SequencedMap<MavenDependencyKey, MavenDependencyValue> versioned = new LinkedHashMap<>();
+            dependencies.forEach((key, value) -> versioned.put(key,
+                    Objects.equals(siblings.get(key.groupId() + "/" + key.artifactId()), value.version())
+                            ? value.version(version)
+                            : value));
+            return versioned;
+        }
+
+        private static String unresolved(String text) {
+            Matcher matcher = UNRESOLVED.matcher(text == null ? "" : text);
+            return matcher.find() ? matcher.group(1) : null;
+        }
+
+        private static void writeBom(Path folder, MavenLocalPom value, Path path) throws IOException {
+            String relativePath = path.toString().replace(File.separatorChar, '/');
+            SequencedProperties properties = new SequencedProperties();
+            properties.setProperty("path", relativePath);
+            properties.setProperty("groupId", value.groupId());
+            properties.setProperty("artifactId", value.artifactId());
+            properties.setProperty("version", value.version());
+            int index = 0;
+            for (Map.Entry<MavenDependencyKey, MavenDependencyValue> managed : value.bom().entrySet()) {
+                String prefix = "managed." + index++;
+                properties.setProperty(prefix, managed.getKey().coordinate(null, managed.getValue().version()));
+                if (managed.getValue().scope() != null) {
+                    properties.setProperty(prefix + ".scope", managed.getValue().scope().name().toLowerCase(Locale.ROOT));
+                }
+                if (managed.getValue().exclusions() != null) {
+                    properties.setProperty(prefix + ".exclusions", managed.getValue().exclusions().stream()
+                            .map(name -> name.groupId() + "/" + name.artifactId())
+                            .collect(Collectors.joining(",")));
+                }
+                if (managed.getValue().optional() != null) {
+                    properties.setProperty(prefix + ".optional", managed.getValue().optional().toString());
+                }
+            }
+            value.metadata().properties().forEach((key, metadata) -> properties.setProperty(POM_METADATA + key, metadata));
+            properties.store(folder.resolve("module-" + BuildExecutorModule.encodePath(relativePath) + ".properties"));
         }
 
         private String attachments(MavenLocalPom value, boolean test) {
@@ -714,8 +1033,9 @@ public class MavenProject implements BuildExecutorModule {
             properties.setProperty("groupId", value.groupId());
             properties.setProperty("artifactId", value.artifactId());
             properties.setProperty("version", value.version());
-            if (value.release() != null) {
-                properties.setProperty("release", value.release());
+            String release = test ? value.testRelease() : value.release();
+            if (release != null) {
+                properties.setProperty("release", release);
             }
             if (!test && value.mainClass() != null) {
                 properties.setProperty("mainClass", value.mainClass());
@@ -729,10 +1049,10 @@ public class MavenProject implements BuildExecutorModule {
                                         || dep.getValue().scope() == MavenDependencyScope.PROVIDED
                                         || dep.getValue().scope() == MavenDependencyScope.TEST)
                                 .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version()))
-                                .collect(Collectors.joining(","));
+                                .collect(Collectors.joining("\t"));
                 properties.setProperty("dependencies.test", testDependencies.isEmpty()
                         ? coordinate
-                        : testDependencies + "," + coordinate);
+                        : testDependencies + "\t" + coordinate);
             } else {
                 for (MavenDependencyScope scope : List.of(
                         MavenDependencyScope.COMPILE,
@@ -742,7 +1062,17 @@ public class MavenProject implements BuildExecutorModule {
                             value.dependencies() == null ? "" : value.dependencies().entrySet().stream()
                                     .filter(dep -> dep.getValue().scope() == scope)
                                     .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version()))
-                                    .collect(Collectors.joining(",")));
+                                    .collect(Collectors.joining("\t")));
+                }
+            }
+            if (!test && value.dependencies() != null) {
+                String optional = value.dependencies().entrySet().stream()
+                        .filter(dep -> dep.getValue().scope() != MavenDependencyScope.TEST
+                                && Boolean.TRUE.equals(dep.getValue().optional()))
+                        .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version()))
+                        .collect(Collectors.joining("\t"));
+                if (!optional.isEmpty()) {
+                    properties.setProperty("optional", optional);
                 }
             }
             if (value.dependencies() != null) {
@@ -756,11 +1086,42 @@ public class MavenProject implements BuildExecutorModule {
                     }
                 });
             }
+            value.expressions().forEach((depKey, expression) -> {
+                MavenDependencyValue resolved = value.managedDependencies() == null
+                        ? null
+                        : value.managedDependencies().get(depKey);
+                if (resolved == null && value.dependencies() != null) {
+                    resolved = value.dependencies().get(depKey);
+                }
+                MavenDependencyKey raw = expression.key();
+                properties.setProperty("expression." + depKey.coordinate(null, null),
+                        raw.groupId() + "/" + raw.artifactId()
+                                + "/" + (raw.type() == null ? "" : raw.type())
+                                + "/" + (raw.classifier() == null ? "" : raw.classifier())
+                                + (expression.version() == null || resolved == null || resolved.version() == null
+                                        ? ""
+                                        : " " + expression.version() + " " + resolved.version()));
+            });
+            if (value.managedDependencies() != null) {
+                value.managedDependencies().forEach((depKey, depValue) -> {
+                    if (depValue.exclusions() != null && !depValue.exclusions().isEmpty()) {
+                        properties.setProperty(
+                                "managed.exclusions." + depKey.coordinate(prefix, null),
+                                depValue.exclusions().stream()
+                                        .map(name -> name.groupId() + "/" + name.artifactId())
+                                        .collect(Collectors.joining(",")));
+                    }
+                    if (depValue.scope() != null && depValue.scope() != MavenDependencyScope.IMPORT) {
+                        properties.setProperty("managed.scope." + depKey.coordinate(prefix, null),
+                                depValue.scope().name().toLowerCase(Locale.ROOT));
+                    }
+                });
+            }
             String managed = value.managedDependencies() == null ? "" : value.managedDependencies().entrySet().stream()
                     .map(dep -> dep.getKey().coordinate(prefix, null)
                             + "=" + dep.getValue().version()
                             + (dep.getValue().checksum() == null ? "" : " " + dep.getValue().checksum()))
-                    .collect(Collectors.joining(","));
+                    .collect(Collectors.joining("\t"));
             properties.setProperty("managedDependencies", managed);
             if (!qualifiedDependencies.isEmpty()) {
                 properties.setProperty("qualifiedDependencies", qualifiedDependencies);
@@ -789,9 +1150,32 @@ public class MavenProject implements BuildExecutorModule {
                     properties.setProperty("natives", natives);
                 }
             }
-            if (value.plugins() != null && !value.plugins().isEmpty()) {
-                properties.setProperty("plugins", value.plugins().entrySet().stream()
+            SequencedMap<String, String> plugins = test ? value.testPlugins() : value.plugins();
+            if (plugins != null && !plugins.isEmpty()) {
+                properties.setProperty("plugins", plugins.entrySet().stream()
                         .map(plugin -> plugin.getKey() + "=" + plugin.getValue())
+                        .collect(Collectors.joining("\t")));
+                if (value.pluginExclusions() != null) {
+                    value.pluginExclusions().forEach((plugin, excluded) -> {
+                        if (plugins.containsKey(plugin)) {
+                            properties.setProperty("exclusions." + plugin
+                                    + (plugin.split("/").length == 3 ? "/RELEASE" : ""), excluded);
+                        }
+                    });
+                }
+            }
+            SequencedMap<String, String> aliases = value.aliases() == null
+                    ? new LinkedHashMap<>()
+                    : new LinkedHashMap<>(value.aliases());
+            if (!test && value.dependencies() != null) {
+                Map<Boolean, Set<String>> tokens = value.dependencies().entrySet().stream()
+                        .collect(Collectors.partitioningBy(dep -> dep.getValue().scope() == MavenDependencyScope.TEST,
+                                Collectors.mapping(dep -> dep.getKey().coordinate(null, null), Collectors.toSet())));
+                aliases.values().removeIf(token -> tokens.get(true).contains(token) && !tokens.get(false).contains(token));
+            }
+            if (!aliases.isEmpty()) {
+                properties.setProperty("aliases", aliases.entrySet().stream()
+                        .map(alias -> alias.getKey() + "=" + alias.getValue())
                         .collect(Collectors.joining("\t")));
             }
             if (value.signatures() != null && !value.signatures().isEmpty()) {
@@ -807,11 +1191,15 @@ public class MavenProject implements BuildExecutorModule {
                                             : dep.getValue().scope() != MavenDependencyScope.TEST))
                             .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version())
                                     + "=" + dep.getValue().checksum())
-                            .collect(Collectors.joining(",")));
+                            .collect(Collectors.joining("\t")));
             String sourceDirectory = test ? value.testSourceDirectory() : value.sourceDirectory();
             properties.setProperty("sources", sourceDirectory == null
                     ? (test ? "src/test/java" : "src/main/java")
                     : sourceDirectory.replace(File.separatorChar, '/'));
+            List<String> languages = List.of("kotlin", "groovy");
+            for (int index = 0; index < languages.size(); index++) {
+                properties.setProperty("sources." + index, "src/" + (test ? "test" : "main") + "/" + languages.get(index));
+            }
             List<String> resourceDirectories = test ? value.testResourceDirectories() : value.resourceDirectories();
             List<String> resources = resourceDirectories == null
                     ? List.of(test ? "src/test/resources" : "src/main/resources")
@@ -822,6 +1210,7 @@ public class MavenProject implements BuildExecutorModule {
             for (int index = 0; index < resources.size(); index++) {
                 properties.setProperty("resources." + index, resources.get(index));
             }
+            value.metadata().properties().forEach((key, metadata) -> properties.setProperty(POM_METADATA + key, metadata));
             properties.store(maven.resolve((test ? "test-module-" : "module-")
                     + BuildExecutorModule.encodePath(relativePath) + ".properties"));
         }

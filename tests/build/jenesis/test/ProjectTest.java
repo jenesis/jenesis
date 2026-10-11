@@ -22,6 +22,7 @@ import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.ProjectModuleDescriptor;
 import build.jenesis.project.ProjectPlugins;
+import org.assertj.core.api.InstanceOfAssertFactories;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -160,10 +161,8 @@ public class ProjectTest {
     }
 
     @Test
-    public void auto_throws_when_neither_descriptor_is_present() {
-        assertThatThrownBy(() -> Project.Layout.of(root))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("No build descriptor found");
+    public void auto_detects_no_layout_when_neither_descriptor_is_present() throws IOException {
+        assertThat(Project.Layout.of(root)).isSameAs(Project.Layout.UNDESCRIBED);
     }
 
     @Test
@@ -178,8 +177,149 @@ public class ProjectTest {
     @Test
     public void build_throws_when_no_descriptor_is_detected() {
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root).target(root.resolve("target")).build())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("No build descriptor found");
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .rootCause()
+                .hasMessageContaining("No build descriptor found")
+                .hasMessageContaining("skill/migrate");
+    }
+
+    @Test
+    public void prints_the_briefing_before_a_descriptor_is_written() throws IOException {
+        List<String> printed = new ArrayList<>();
+        Project.ofEnvironment(new Environment(settings).out(printed::add), root)
+                .target(root.resolve("target"))
+                .build(Project.SKILL + "/migrate", Project.HELP);
+        assertThat(String.join("\n", printed))
+                .contains("Migrate a Maven or Gradle build")
+                .contains("no pom.xml or module-info.java yet");
+    }
+
+    @Test
+    public void prints_the_migration_task_a_user_hands_an_agent_apart_from_the_briefing() throws IOException {
+        List<String> prompt = new ArrayList<>();
+        Project.ofEnvironment(new Environment(settings).out(prompt::add), root)
+                .target(root.resolve("target"))
+                .build(Project.PROMPT + "/migrate");
+        assertThat(prompt)
+                .as("the task is printed alone, as plain text, with no line of the build around it")
+                .singleElement(InstanceOfAssertFactories.STRING)
+                .startsWith("Migrate the build of this project to Jenesis")
+                .contains("java build/jenesis/Make.java skill/migrate", "summary of the migration", "shading")
+                .doesNotContain("\u001B");
+        List<String> briefing = new ArrayList<>();
+        Project.ofEnvironment(new Environment(settings).out(briefing::add), root)
+                .target(root.resolve("target"))
+                .build(Project.SKILL);
+        assertThat(briefing)
+                .as("an agent reading the briefing is not handed the task")
+                .noneMatch(page -> page.startsWith("Migrate the build of this project"));
+    }
+
+    @Test
+    public void every_page_and_demo_a_skill_page_names_exists() throws IOException {
+        List<String> printed = new ArrayList<>();
+        Project.ofEnvironment(new Environment(settings).out(printed::add), root)
+                .target(root.resolve("target"))
+                .build(Project.SKILL);
+        String pages = String.join("\n", printed);
+        SequencedSet<String> named = Pattern.compile("skill/([a-z]+)").matcher(pages).results()
+                .map(match -> match.group(1))
+                .collect(Collectors.toCollection(TreeSet::new));
+        assertThat(named).contains("start", "migrate", "demos");
+        for (String page : named) {
+            List<String> single = new ArrayList<>();
+            Project.ofEnvironment(new Environment(settings).out(single::add), root)
+                    .target(root.resolve("target"))
+                    .build(Project.SKILL + "/" + page);
+            assertThat(single)
+                    .as("skill/%s names a page that is printed on its own", page)
+                    .anyMatch(text -> text.startsWith("# Jenesis "));
+        }
+        Path demo = Path.of("demo");
+        assertThat(demo).as("the tests run from the root of the repository, beside its demos").isDirectory();
+        SequencedSet<String> folders;
+        try (Stream<Path> listed = Files.list(demo)) {
+            folders = listed.map(folder -> folder.getFileName().toString())
+                    .filter(folder -> folder.matches("demo-\\d{2}-.+"))
+                    .collect(Collectors.toCollection(TreeSet::new));
+        }
+        Set<String> numbers = folders.stream().map(folder -> folder.substring(5, 7)).collect(Collectors.toSet());
+        Pattern.compile("\\((\\d{2}(?:, \\d{2})*)\\)").matcher(pages).results()
+                .flatMap(match -> Stream.of(match.group(1).split(", ")))
+                .forEach(number -> assertThat(numbers).as("demo %s, named in parentheses", number).contains(number));
+        Pattern.compile("demo-(\\d{2})((?:-[a-z0-9]+)*)").matcher(pages).results()
+                .forEach(match -> assertThat(folders)
+                        .as("%s, named by its folder", match.group())
+                        .anyMatch(folder -> folder.equals(match.group()) || folder.startsWith(match.group() + "-")));
+        String recipes = printed.stream().filter(page -> page.startsWith("# Jenesis - Copy a demo")).findFirst().orElseThrow();
+        Matcher count = Pattern.compile("(\\d+) demos under `demo/`").matcher(recipes);
+        assertThat(count.find()).isTrue();
+        assertThat(Integer.parseInt(count.group(1))).as("the demos the page counts").isEqualTo(folders.size());
+        String listing = recipes.substring(count.end());
+        Pattern.compile("\\b(\\d{2})\\b").matcher(listing).results()
+                .forEach(match -> assertThat(numbers).as("demo %s of skill/demos", match.group(1)).contains(match.group(1)));
+        Pattern.compile("(?<!, )\\b(\\d{2}) ([a-z][a-z0-9-]*[a-z0-9])\\b(?![*-])").matcher(listing).results()
+                .forEach(match -> assertThat(folders)
+                        .as("demo %s of skill/demos is named for its folder", match.group(1))
+                        .contains("demo-" + match.group(1) + "-" + match.group(2)));
+    }
+
+    @Test
+    public void packages_only_the_compiled_sources_of_a_maven_source_directory_beside_its_resources() throws IOException {
+        Files.writeString(root.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>demo</groupId>
+                    <artifactId>templated</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        Path sources = Files.createDirectories(root.resolve("src/main/java/demo"));
+        Files.writeString(sources.resolve("Hello.java"), "package demo; public class Hello { }\n");
+        Files.writeString(sources.resolve("Hello.java.in"), "template");
+        Files.writeString(Files.createDirectories(root.resolve("src/main/resources/demo")).resolve("hello.txt"), "hello");
+        Path target = root.resolve("target");
+        Project.ofEnvironment(new Environment(settings), root)
+                .target(target)
+                .layout(Project.Layout.MAVEN)
+                .build(Project.BUILD);
+        Path jar;
+        try (Stream<Path> files = Files.walk(target)) {
+            jar = files.filter(file -> file.toString().endsWith(".jar") && file.getParent().endsWith("output/artifacts"))
+                    .findFirst()
+                    .orElseThrow();
+        }
+        try (JarFile file = new JarFile(jar.toFile())) {
+            assertThat(file.stream().map(JarEntry::getName).toList())
+                    .contains("demo/Hello.class", "demo/hello.txt")
+                    .as("a file of the source directory that no compiler reads stays out of the jar, as with Maven")
+                    .doesNotContain("demo/Hello.java.in");
+        }
+    }
+
+    @Test
+    public void the_dependencies_selector_resolves_and_prints_without_running_the_tests() throws IOException {
+        Files.writeString(root.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>demo</groupId>
+                    <artifactId>tested</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>25</maven.compiler.release>
+                    </properties>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(root.resolve("src/main/java/demo")).resolve("Sample.java"),
+                "package demo; public class Sample { }\n");
+        Files.writeString(Files.createDirectories(root.resolve("src/test/java/demo")).resolve("SampleTest.java"),
+                "package demo; public class SampleTest { }\n");
+        List<String> errors = new ArrayList<>();
+        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString()))
+                        .out(_ -> { })
+                        .err(errors::add), root, new LinkedHashSet<>(), Project.DEPENDENCIES))
+                .as("the tests, which name no framework the build could run them with, are left to a build: %s", errors)
+                .isNotNull();
     }
 
     @Test
@@ -800,6 +940,52 @@ public class ProjectTest {
     }
 
     @Test
+    public void releases_the_staged_maven_tree_into_the_maven_repository_it_names() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
+        List<String> requests = new CopyOnWriteArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            requests.add(exchange.getRequestMethod() + " " + exchange.getRequestURI().getPath());
+            exchange.sendResponseHeaders(exchange.getRequestMethod().equals("GET") ? 404 : 201, -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            settings.put("release.maven.uri", "http://localhost:" + server.getAddress().getPort() + "/repository/");
+            settings.put("repository.insecure", "true");
+            List<String> printed = new ArrayList<>();
+            Project.ofEnvironment(new Environment(settings).out(printed::add), root)
+                    .target(root.resolve("target"))
+                    .version("1.0.0")
+                    .layout(Project.Layout.MODULAR_TO_MAVEN)
+                    .build(Project.RELEASE);
+            assertThat(requests)
+                    .contains("PUT /repository/demo/empty/demo.empty/1.0.0/demo.empty-1.0.0.jar",
+                            "PUT /repository/demo/empty/demo.empty/1.0.0/demo.empty-1.0.0.jar.sha1",
+                            "PUT /repository/demo/empty/demo.empty/1.0.0/demo.empty-1.0.0.pom",
+                            "GET /repository/demo/empty/demo.empty/maven-metadata.xml",
+                            "PUT /repository/demo/empty/demo.empty/maven-metadata.xml");
+            assertThat(printed).anyMatch(line -> line.contains("[RELEASED]"));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void refuses_to_release_into_a_maven_repository_from_a_layout_that_stages_no_maven_tree() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
+        settings.put("release.maven.uri", "https://repository.invalid/repository/");
+        Project project = Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .version("1.0.0")
+                .layout(Project.Layout.MODULAR);
+        assertThatThrownBy(() -> project.build(Project.RELEASE))
+                .rootCause()
+                .hasMessageContaining("jenesis.release.maven.uri");
+    }
+
+    @Test
     public void modular_layout_registers_export_step() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
         Project project = Project.ofEnvironment(new Environment(settings), root).target(target);
@@ -886,6 +1072,23 @@ public class ProjectTest {
                 .layout(layout)
                 .build("+anything");
         assertThat(result).containsExactly(Map.entry("resolved", source));
+    }
+
+    @Test
+    public void refuses_a_project_version_that_is_no_module_version() {
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.version", "bd7698f")), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.project.version is bd7698f")
+                .hasMessageContaining("--module-version");
+        assertThat(Project.ofEnvironment(new Environment(Map.of("project.version", "1.2.0-3-gbd7698f")), root).version())
+                .isEqualTo("1.2.0-3-gbd7698f");
+    }
+
+    @Test
+    public void refuses_an_empty_project_version() {
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.version", "")), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.project.version is set but empty");
     }
 
     @Test
@@ -1238,6 +1441,15 @@ public class ProjectTest {
     }
 
     @Test
+    public void the_layered_settings_rejects_a_key_written_without_its_prefix() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "maven.uri=https://example.com/\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maven.uri in ")
+                .hasMessageContaining("write jenesis.maven.uri");
+    }
+
+    @Test
     public void the_layered_settings_rejects_root_in_a_profile() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
         Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.make.root=elsewhere\n");
@@ -1409,6 +1621,14 @@ public class ProjectTest {
     }
 
     @Test
+    public void the_layered_settings_rejects_the_maven_release_token_in_a_file_the_project_provides() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.release.maven.token=Basic c2VjcmV0\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.release.maven.token cannot be set in");
+    }
+
+    @Test
     public void the_layered_settings_rejects_a_program_in_the_project_file() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.openpgp.command=./verify.sh\n");
         assertThatThrownBy(() -> Make.settings(root, settings))
@@ -1423,6 +1643,15 @@ public class ProjectTest {
         assertThatThrownBy(() -> Make.settings(root, settings))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.maven.local cannot be set in");
+    }
+
+    @Test
+    public void the_layered_settings_rejects_the_time_discovery_keeps_an_answer_in_the_project_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.repository.discovery.ttl=100000\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .as("what a domain answered is kept for every project of the machine, which a project cannot prolong")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.repository.discovery.ttl cannot be set in");
     }
 
     @Test
@@ -1572,5 +1801,149 @@ public class ProjectTest {
                 .isEqualTo(Project.Layout.AUTO);
         assertThat(project.version()).isNull();
         assertThat(project.cache()).isNull();
+    }
+    @Test
+    public void the_pom_of_a_maven_module_lists_its_own_dependencies_and_not_those_of_a_sibling_it_depends_on() throws IOException {
+        writeMavenProjectWithSibling();
+        String pom = publishedPom(Project.Layout.MAVEN);
+        assertThat(pom)
+                .contains("<artifactId>base</artifactId>")
+                .as("what only the sibling declares reaches a consumer through the sibling's own POM")
+                .doesNotContain("<artifactId>library</artifactId>", "<groupId>*</groupId>");
+    }
+
+    @Test
+    public void the_pom_of_a_maven_module_lists_its_resolved_closure_where_its_packaging_properties_sets_flatten()
+            throws IOException {
+        writeMavenProjectWithSibling();
+        Files.writeString(Files.createDirectories(root.resolve("user/build.jenesis")).resolve("packaging.properties"),
+                "flatten=true\n");
+        assertThat(publishedPom(Project.Layout.MAVEN))
+                .as("a flattened POM names the whole closure and excludes what each entry would bring")
+                .contains("<artifactId>base</artifactId>", "<artifactId>library</artifactId>", "<groupId>*</groupId>");
+    }
+
+    @Test
+    public void the_pom_of_a_modular_module_lists_its_resolved_closure_unless_its_packaging_properties_sets_flatten_false()
+            throws IOException {
+        writeLibrary();
+        Files.writeString(Files.createDirectories(root.resolve("base/base")).resolve("Type.java"),
+                "package base; public class Type { }\n");
+        Files.writeString(root.resolve("base/module-info.java"), """
+                /**
+                 * @jenesis.alias library external/library
+                 * @jenesis.pin external/library 1
+                 */
+                module base {
+                    requires transitive library;
+                    exports base;
+                }
+                """);
+        Files.writeString(Files.createDirectories(root.resolve("user/user")).resolve("Type.java"),
+                "package user; public class Type { }\n");
+        Files.writeString(root.resolve("user/module-info.java"), """
+                module user {
+                    requires base;
+                    exports user;
+                }
+                """);
+        settings.put("maven.uri", elsewhere.resolve("repository").toUri().toString());
+        settings.put("maven.local", Files.createDirectories(elsewhere.resolve("local")).toString());
+        assertThat(publishedPom(Project.Layout.MODULAR_TO_MAVEN))
+                .as("a module declaration publishes the flattened closure by default")
+                .contains("<artifactId>base</artifactId>", "<artifactId>library</artifactId>", "<groupId>*</groupId>");
+        Files.writeString(Files.createDirectories(root.resolve("user/META-INF/build.jenesis")).resolve("packaging.properties"),
+                "flatten=false\n");
+        assertThat(publishedPom(Project.Layout.MODULAR_TO_MAVEN))
+                .as("flatten=false publishes what the module requires, named by the artifact it resolved to")
+                .contains("<artifactId>base</artifactId>")
+                .doesNotContain("<artifactId>library</artifactId>", "<groupId>*</groupId>");
+    }
+
+    private void writeLibrary() throws IOException {
+        Path repository = Files.createDirectories(elsewhere.resolve("repository/external/library/1"));
+        Files.writeString(repository.resolve("library-1.pom"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>external</groupId>
+                    <artifactId>library</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        try (JarOutputStream _ = new JarOutputStream(Files.newOutputStream(repository.resolve("library-1.jar")))) {
+        }
+    }
+
+    private void writeMavenProjectWithSibling() throws IOException {
+        writeLibrary();
+        Files.writeString(root.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>base</module>
+                        <module>user</module>
+                    </modules>
+                </project>
+                """);
+        for (String module : List.of("base", "user")) {
+            Files.writeString(Files.createDirectories(root.resolve(module + "/src/main/java/" + module)).resolve("Type.java"),
+                    "package " + module + "; public class Type { }\n");
+        }
+        Files.writeString(root.resolve("base/pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>base</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>external</groupId>
+                            <artifactId>library</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(root.resolve("user/pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>user</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>base</artifactId>
+                            <version>1</version>
+                            <scope>runtime</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        settings.put("maven.uri", elsewhere.resolve("repository").toUri().toString());
+        settings.put("maven.local", Files.createDirectories(elsewhere.resolve("local")).toString());
+    }
+
+    private String publishedPom(Project.Layout layout) throws IOException {
+        SequencedMap<String, Path> outputs = Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .layout(layout)
+                .build(Project.BUILD);
+        return Files.readString(outputs.entrySet().stream()
+                .filter(entry -> entry.getKey().endsWith("/module-user/produce/describe/pom"))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElseThrow()
+                .resolve("pom.xml"));
     }
 }

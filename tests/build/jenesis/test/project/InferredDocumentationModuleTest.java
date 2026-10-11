@@ -68,6 +68,26 @@ public class InferredDocumentationModuleTest {
     }
 
     @Test
+    public void documents_java_sources_that_declare_a_module_as_that_module() throws IOException {
+        Path sources = Files.createDirectories(project.resolve(BuildStep.SOURCES));
+        Files.writeString(sources.resolve("module-info.java"), "module sample {\n    exports sample;\n}\n");
+        Files.writeString(Files.createDirectories(sources.resolve("sample")).resolve("Greeter.java"),
+                "package sample; /** Greets. */ public class Greeter {}");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("doc",
+                new InferredDocumentationChainModule(Map.of(), Map.of("maven", Resolver.identity())),
+                "project");
+        Path javadoc = executor.execute().get("doc/document/aggregate").resolve("javadoc");
+
+        assertThat(javadoc.resolve("sample/module-summary.html"))
+                .as("a module's documentation carries its module page and its packages below its name")
+                .isNotEmptyFile();
+        assertThat(javadoc.resolve("sample/sample/Greeter.html")).isNotEmptyFile();
+    }
+
+    @Test
     public void archives_an_intentionally_empty_javadoc_jar_without_rendering_the_documentation() throws IOException {
         Path sample = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(sample.resolve("Greeter.java"), "package sample; class Greeter {}");
@@ -91,6 +111,32 @@ public class InferredDocumentationModuleTest {
             assertThat(jar.stream().map(JarEntry::getName))
                     .containsExactlyInAnyOrder("META-INF/", "META-INF/MANIFEST.MF", "INTENTIONALLY_EMPTY");
         }
+    }
+
+    @Test
+    public void documents_a_module_its_description_declares_a_test_module_only_where_its_tests_are_staged()
+            throws IOException {
+        Files.writeString(project.resolve(BuildStep.MODULE), "test=main_artifact\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("documentation",
+                InferredDocumentationModule.ofEnvironment(new Environment(Map.of("documentation.empty", "true")),
+                        Map.of(),
+                        Map.of("maven", Resolver.identity())),
+                "project");
+        executor.addModule("staged",
+                InferredDocumentationModule.ofEnvironment(new Environment(Map.of("documentation.empty", "true",
+                                "stage.tests", "true")),
+                        Map.of(),
+                        Map.of("maven", Resolver.identity())),
+                "project");
+        SequencedMap<String, Path> steps = executor.execute();
+
+        assertThat(steps.keySet())
+                .as("the documentation of a test module is published only with its staged tests")
+                .noneMatch(step -> step.startsWith("documentation/"))
+                .contains("staged/archive");
     }
 
     @Test

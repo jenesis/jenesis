@@ -24,6 +24,7 @@ public class JaCoCoModule implements BuildExecutorModule {
     private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
+    private final boolean classes;
     private final ProcessBuildStep.Terms terms;
 
     public JaCoCoModule(Map<String, Repository> repositories,
@@ -31,7 +32,8 @@ public class JaCoCoModule implements BuildExecutorModule {
         this(new Dependencies(repositories, resolvers),
              null,
              "jacoco",
-             ProcessBuildStep.Terms.of("jacoco"));
+             false,
+             new ProcessBuildStep.Terms());
     }
 
     public static JaCoCoModule ofEnvironment(Environment environment,
@@ -40,29 +42,36 @@ public class JaCoCoModule implements BuildExecutorModule {
         return new JaCoCoModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "jacoco",
+                false,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "jacoco"));
     }
 
     private JaCoCoModule(Dependencies dependencies,
                          Pinning pinning,
                          String tool,
+                         boolean classes,
                          ProcessBuildStep.Terms terms) {
         this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
+        this.classes = classes;
         this.terms = terms;
     }
 
     public JaCoCoModule pinning(Pinning pinning) {
-        return new JaCoCoModule(dependencies, pinning, tool, terms);
+        return new JaCoCoModule(dependencies, pinning, tool, classes, terms);
     }
 
     public JaCoCoModule tool(String tool) {
-        return new JaCoCoModule(dependencies, pinning, tool, terms);
+        return new JaCoCoModule(dependencies, pinning, tool, classes, terms);
+    }
+
+    public JaCoCoModule classes(boolean classes) {
+        return new JaCoCoModule(dependencies, pinning, tool, classes, terms);
     }
 
     public JaCoCoModule printing(BiConsumer<Boolean, String> printing) {
-        return new JaCoCoModule(dependencies, pinning, tool, terms.printing(printing));
+        return new JaCoCoModule(dependencies, pinning, tool, classes, terms.printing(printing));
     }
 
     @Override
@@ -77,7 +86,7 @@ public class JaCoCoModule implements BuildExecutorModule {
         SequencedSet<String> reportInputs = new LinkedHashSet<>();
         reportInputs.add(DEPENDENCIES);
         reportInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(REPORT, new Report(terms, tool), reportInputs);
+        buildExecutor.addStep(REPORT, new Report(terms, tool, classes), reportInputs);
     }
 
     private record Requires(String tool) implements BuildStep {
@@ -102,10 +111,12 @@ public class JaCoCoModule implements BuildExecutorModule {
     private static class Report extends ProcessBuildStep {
 
         private final String tool;
+        private final boolean classes;
 
-        private Report(ProcessBuildStep.Terms terms, String tool) {
+        private Report(ProcessBuildStep.Terms terms, String tool, boolean classes) {
             super("jacoco", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
+            this.classes = classes;
         }
 
         @Override
@@ -115,7 +126,7 @@ public class JaCoCoModule implements BuildExecutorModule {
                                                      SequencedMap<String, SequencedMap<String, String>> properties)
                 throws IOException {
             List<String> jars = new ArrayList<>(), sources = new ArrayList<>();
-            SequencedSet<String> classes = new LinkedHashSet<>();
+            SequencedSet<String> covering = new LinkedHashSet<>();
             SequencedMap<String, Path> covered = new LinkedHashMap<>();
             Path data = null;
             for (BuildStepArgument argument : arguments.values()) {
@@ -129,20 +140,20 @@ public class JaCoCoModule implements BuildExecutorModule {
                 if (Files.isRegularFile(exec)) {
                     data = exec;
                 }
-                Path compiled = argument.folder().resolve(BuildStep.CLASSES);
-                if (Files.isDirectory(compiled)) {
-                    classes.add(compiled.toString());
+                Path compiled = argument.folder().resolve(BuildStep.CLASSES),
+                        source = argument.folder().resolve(BuildStep.SOURCES);
+                if (classes && Files.isDirectory(compiled)) {
+                    covering.add(compiled.toString());
                 }
-                Path source = argument.folder().resolve(BuildStep.SOURCES);
-                if (Files.isDirectory(source)) {
+                if (classes && Files.isDirectory(source)) {
                     sources.add(source.toString());
                 }
                 Dependencies.internal(argument.folder()).forEach(covered::putIfAbsent);
             }
             for (Path jar : covered.values()) {
-                classes.add(jar.toString());
+                covering.add(jar.toString());
             }
-            if (data == null || classes.isEmpty()) {
+            if (data == null || covering.isEmpty()) {
                 return CompletableFuture.completedStage(null);
             }
             if (jars.isEmpty()) {
@@ -152,7 +163,7 @@ public class JaCoCoModule implements BuildExecutorModule {
             List<String> commands = new ArrayList<>(List.of(
                     "-cp", String.join(File.pathSeparator, jars),
                     "org.jacoco.cli.internal.Main", "report", data.toString()));
-            for (String directory : classes) {
+            for (String directory : covering) {
                 commands.add("--classfiles");
                 commands.add(directory);
             }

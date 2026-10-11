@@ -56,6 +56,59 @@ public class CheckstyleModuleTest {
                 .containsExactly("custom/runtime/maven/com.puppycrawl.tools/checkstyle/RELEASE");
     }
 
+    @Test
+    public void puts_the_jars_of_a_checkstyle_plugin_on_the_class_path_of_checkstyle() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("checkstyle/plugin/maven/org.example/checks/1.0", "");
+        requires.store(project.resolve(BuildStep.REQUIRES));
+        Files.writeString(project.resolve("checkstyle.xml"), "<module name=\"Checker\"/>");
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }");
+        Path served = Files.createDirectories(root.resolve("served"));
+        jar(served.resolve("checkstyle.jar"), "com.puppycrawl.tools.checkstyle.Main", ClassFile.of().build(
+                ClassDesc.of("com.puppycrawl.tools.checkstyle.Main"),
+                type -> type.withFlags(ClassFile.ACC_PUBLIC).withMethodBody("main",
+                        MethodTypeDesc.of(ConstantDescs.CD_void, ConstantDescs.CD_String.arrayType()),
+                        ClassFile.ACC_PUBLIC | ClassFile.ACC_STATIC,
+                        code -> code.ldc("org.example.Check")
+                                .invokestatic(ConstantDescs.CD_Class,
+                                        "forName",
+                                        MethodTypeDesc.of(ConstantDescs.CD_Class, ConstantDescs.CD_String))
+                                .pop()
+                                .return_())));
+        jar(served.resolve("checks.jar"), "org.example.Check", ClassFile.of().build(
+                ClassDesc.of("org.example.Check"),
+                type -> type.withFlags(ClassFile.ACC_PUBLIC)));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("checkstyle",
+                new CheckstyleModule(Map.of("maven", (_, coordinate, _) -> Optional.of(RepositoryItem.ofFile(
+                        served.resolve(coordinate.contains("checkstyle") ? "checkstyle.jar" : "checks.jar")))),
+                        Map.of("maven", Resolver.identity())),
+                "project");
+        assertThat(executor.execute("checkstyle/check"))
+                .as("a custom check that @jenesis.plugin checkstyle names loads beside Checkstyle")
+                .containsKey("checkstyle/check");
+    }
+
+    private static void jar(Path file, String type, byte[] bytes) throws IOException {
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(file))) {
+            out.putNextEntry(new JarEntry(type.replace('.', '/') + ".class"));
+            out.write(bytes);
+            out.closeEntry();
+        }
+    }
+
+    @Test
+    public void hands_over_a_checkstyle_properties_beside_the_configuration() throws IOException {
+        Path configuration = Files.writeString(project.resolve("checkstyle.xml"), "<module name=\"Checker\"/>");
+        assertThat(CheckstyleModule.siblings(configuration)).isEmpty();
+        Files.writeString(project.resolve("checkstyle.properties"), "type.format=^[a-z]+$\n");
+        assertThat(CheckstyleModule.siblings(configuration))
+                .as("the properties a configuration expands are an input of the check")
+                .containsExactly(Path.of("checkstyle.properties"));
+    }
+
     private BuildExecutor newExecutor() throws IOException {
         return BuildExecutor.of(root,
                 Duration.ZERO,

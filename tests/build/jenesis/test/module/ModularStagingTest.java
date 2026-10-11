@@ -45,9 +45,42 @@ public class ModularStagingTest {
     }
 
     @Test
+    public void stages_a_module_whose_path_holds_dots_with_what_another_inventory_attaches() throws IOException {
+        Path inv = inventory("org.example.cli", "org.example.cli", null, null, "classes.jar");
+        writeArtifact(inv, "classes.jar", "jar");
+        Path additions = Files.createDirectory(source.resolve("additions"));
+        SequencedProperties attached = new SequencedProperties();
+        attached.setProperty("module-org.example.cli.attachment.licenses", "LICENSES.zip");
+        attached.store(additions.resolve(Inventory.INVENTORY));
+        Files.writeString(additions.resolve("LICENSES.zip"), "zip");
+
+        run(false, inv, additions);
+
+        assertThat(next.resolve("org.example.cli/org.example.cli.jar")).hasContent("jar");
+        assertThat(next.resolve("org.example.cli/org.example.cli-licenses.zip")).hasContent("zip");
+    }
+
+    @Test
+    public void leaves_out_a_module_whose_packaging_stages_none() throws IOException {
+        Path staged = inventory("staged", "demo.staged", null, null, "classes.jar");
+        writeArtifact(staged, "classes.jar", "jar");
+        Path unstaged = inventory("unstaged", "demo.unstaged", null, null, "classes.jar");
+        writeArtifact(unstaged, "classes.jar", "jar");
+        SequencedProperties inventory = SequencedProperties.ofFiles(unstaged.resolve(Inventory.INVENTORY));
+        inventory.setProperty("module-unstaged.stage", "false");
+        inventory.store(unstaged.resolve(Inventory.INVENTORY));
+
+        run(false, staged, unstaged);
+
+        assertThat(next.resolve("demo.staged/demo.staged.jar")).hasContent("jar");
+        assertThat(next.resolve("demo.unstaged")).doesNotExist();
+    }
+
+    @Test
     public void stages_jmod_alongside_module_jar() throws IOException {
         Path folder = Files.createDirectory(source.resolve("foo"));
         SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-foo.path", "foo");
         inventory.setProperty("module-foo.module", "demo.foo");
         inventory.setProperty("module-foo.artifacts.0", "artifacts/classes.jar");
         inventory.setProperty("module-foo.jmod.0", "jmods/demo.foo.jmod");
@@ -65,6 +98,7 @@ public class ModularStagingTest {
     public void stages_a_file_another_inventory_attaches_to_the_module() throws IOException {
         Path folder = Files.createDirectory(source.resolve("foo"));
         SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-foo.path", "foo");
         inventory.setProperty("module-foo.module", "demo.foo");
         inventory.setProperty("module-foo.artifacts.0", "classes.jar");
         inventory.store(folder.resolve(Inventory.INVENTORY));
@@ -85,6 +119,7 @@ public class ModularStagingTest {
     public void refuses_an_attachment_whose_file_the_build_stages_already() throws IOException {
         Path folder = Files.createDirectory(source.resolve("foo"));
         SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-foo.path", "foo");
         inventory.setProperty("module-foo.module", "demo.foo");
         inventory.setProperty("module-foo.artifacts.0", "classes.jar");
         inventory.setProperty("module-foo.sources.0", "sources.jar");
@@ -103,6 +138,7 @@ public class ModularStagingTest {
     public void stages_an_attachment_under_a_classifier_the_build_leaves_unused() throws IOException {
         Path folder = Files.createDirectory(source.resolve("foo"));
         SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-foo.path", "foo");
         inventory.setProperty("module-foo.module", "demo.foo");
         inventory.setProperty("module-foo.artifacts.0", "classes.jar");
         inventory.setProperty("module-foo.attachment.sources", "other.jar");
@@ -125,6 +161,7 @@ public class ModularStagingTest {
         Files.writeString(artifactDir.resolve("classes.jar"), "classes-bytes");
 
         SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-mod.path", "mod");
         inventory.setProperty("module-mod.module", "demo.foo");
         inventory.setProperty("module-mod.artifacts.0",
                 "../../produce/assemble/binary/artifacts/jar/output/artifacts/classes.jar");
@@ -141,6 +178,7 @@ public class ModularStagingTest {
     public void stages_bom_as_module_properties() throws IOException {
         Path folder = Files.createDirectory(source.resolve("foo"));
         SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-foo.path", "foo");
         inventory.setProperty("module-foo.module", "demo.foo");
         inventory.setProperty("module-foo.version", "1.0.0");
         inventory.setProperty("module-foo.artifacts.0", "artifacts/classes.jar");
@@ -231,6 +269,7 @@ public class ModularStagingTest {
     private Path abstractTestModule() throws IOException {
         Path folder = Files.createDirectory(source.resolve("testing"));
         SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-testing.path", "testing");
         inventory.setProperty("module-testing.module", "foo.testing");
         inventory.setProperty("module-testing.test", "");
         inventory.setProperty("module-testing.abstract", "true");
@@ -298,6 +337,7 @@ public class ModularStagingTest {
         Path folder = Files.createDirectory(source.resolve(path));
         SequencedProperties inventory = new SequencedProperties();
         String prefix = "module-" + path;
+        inventory.setProperty(prefix + ".path", path);
         inventory.setProperty(prefix + ".module", moduleName);
         if (testsOf != null) {
             inventory.setProperty(prefix + ".test", testsOf);

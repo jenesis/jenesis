@@ -6,6 +6,7 @@ import build.jenesis.BuildStepHashFunction;
 import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.License;
+import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.maven.MavenDefaultRepository;
@@ -15,6 +16,7 @@ import build.jenesis.maven.MavenDependencyName;
 import build.jenesis.maven.MavenDependencyScope;
 import build.jenesis.maven.MavenDependencyValue;
 import build.jenesis.maven.MavenLocalPom;
+import build.jenesis.maven.MavenPomEmitter;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.maven.MavenRepository;
 import build.jenesis.maven.MavenResolver;
@@ -323,6 +325,59 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void reads_a_parent_whose_plugin_configuration_holds_an_element_with_an_unbound_prefix() throws IOException {
+        addToRepository("group", "parent", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <other.version>1</other.version>
+                    </properties>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <artifactId>maven-compiler-plugin</artifactId>
+                                <configuration>
+                                    <compilerArguments>
+                                        <Xlint:all />
+                                    </compilerArguments>
+                                </configuration>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """);
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>artifact</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>${other.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("other", "artifact", "1", leafPom());
+        assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null))
+                .containsExactly(Map.entry(
+                        new MavenDependencyKey("other", "artifact", "jar", null),
+                        new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
+    }
+
+    @Test
     public void can_resolve_dependencies_with_property() throws IOException {
         addToRepository("group", "artifact", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -584,7 +639,7 @@ public class MavenPomResolverTest {
         assertThatThrownBy(() -> mavenPomResolver.dependencies(
                 Runnable::run, mavenRepository, "group", "artifact", "1", null))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Failed to resolve other:artifact:${undefined.property}");
+                .hasMessageContaining("The dependency other:artifact:${undefined.property} names the property undefined.property");
     }
 
     @Test
@@ -605,7 +660,7 @@ public class MavenPomResolverTest {
         assertThatThrownBy(() -> mavenPomResolver.dependencies(
                 Runnable::run, mavenRepository, "group", "artifact", "1", null))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Failed to resolve other:artifact:${undefined.property}");
+                .hasMessageContaining("The dependency other:artifact:${undefined.property} names the property undefined.property");
     }
 
     @Test
@@ -843,6 +898,77 @@ public class MavenPomResolverTest {
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
+    }
+
+    @Test
+    public void fails_naming_a_parent_that_cannot_be_fetched() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>parent</groupId>
+                        <artifactId>missing</artifactId>
+                        <version>1-SNAPSHOT</version>
+                    </parent>
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null))
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cannot fetch the parent parent:missing:1-SNAPSHOT")
+                .hasMessageContaining("-Djenesis.maven.uri");
+    }
+
+    @Test
+    public void resolves_a_snapshot_parent_by_the_timestamped_pom_its_metadata_names() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>parent</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1-SNAPSHOT</version>
+                    </parent>
+                </project>
+                """);
+        Path folder = Files.createDirectories(repository.resolve("parent/artifact/1-SNAPSHOT"));
+        Files.writeString(folder.resolve("maven-metadata.xml"), """
+                <metadata>
+                  <versioning>
+                    <snapshotVersions>
+                      <snapshotVersion>
+                        <extension>pom</extension>
+                        <value>1-20261001.194937-10</value>
+                      </snapshotVersion>
+                    </snapshotVersions>
+                  </versioning>
+                </metadata>
+                """);
+        Files.writeString(folder.resolve("artifact-1-20261001.194937-10.pom"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("other", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                </project>
+                """);
+        assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null))
+                .containsExactly(Map.entry(
+                        new MavenDependencyKey("other", "artifact", "jar", null),
+                        new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
     }
 
     @Test
@@ -1165,6 +1291,112 @@ public class MavenPomResolverTest {
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
+    }
+
+    @Test
+    public void a_processor_a_dependency_declares_is_not_followed_as_an_artifact() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>processing</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                            <type>processor</type>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("other", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                </project>
+                """);
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+                Runnable::run,
+                mavenRepository,
+                "group",
+                "artifact",
+                "1",
+                null);
+        assertThat(dependencies)
+                .as("a processor compiles the module that declares it and is no artifact of the module's consumers")
+                .containsExactly(Map.entry(
+                        new MavenDependencyKey("other", "artifact", "jar", null),
+                        new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
+    }
+
+    @Test
+    public void follows_a_relocation_to_the_coordinate_it_names_and_says_so() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>old</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                            <scope>runtime</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("old", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>old</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <distributionManagement>
+                        <relocation>
+                            <groupId>new</groupId>
+                        </relocation>
+                    </distributionManagement>
+                </project>
+                """);
+        addToRepository("new", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>transitive</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("transitive", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                </project>
+                """);
+        List<String> printed = new ArrayList<>();
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver
+                .printing(printed::add, Palette.NONE)
+                .dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null);
+        assertThat(dependencies)
+                .as("the relocated artifact publishes no jar, so the coordinate it names takes its place and scope")
+                .containsExactly(Map.entry(
+                                new MavenDependencyKey("new", "artifact", "jar", null),
+                                new MavenDependencyValue("1", MavenDependencyScope.RUNTIME, null, null, null)),
+                        Map.entry(
+                                new MavenDependencyKey("transitive", "artifact", "jar", null),
+                                new MavenDependencyValue("1", MavenDependencyScope.RUNTIME, null, null, null)));
+        assertThat(printed).containsExactly("[RELOCATED] old:artifact:1 is relocated to new:artifact:1,"
+                + " which is resolved in its place");
     }
 
     @Test
@@ -2478,6 +2710,410 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void refuses_a_transitive_dependency_naming_a_property_its_pom_does_not_define_whatever_the_jvm_holds() throws IOException {
+        addToRepository("group", "artifact", "1", rootPom("", "middle"));
+        addToRepository("middle", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>shared</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                            <classifier>${jenesis.undefined.platform}</classifier>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        System.setProperty("jenesis.undefined.platform", "linux");
+        try {
+            assertThatThrownBy(() -> mavenPomResolver.dependencies(
+                    Runnable::run, mavenRepository, "group", "artifact", "1", null))
+                    .as("a POM is read from its model alone, so the build JVM's properties never decide a coordinate")
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("The dependency shared:artifact:${jenesis.undefined.platform}:1 of middle:artifact:1")
+                    .hasMessageContaining("names the property jenesis.undefined.platform")
+                    .hasMessageContaining("exclude shared:artifact from middle:artifact");
+        } finally {
+            System.clearProperty("jenesis.undefined.platform");
+        }
+    }
+
+    @Test
+    public void activates_the_profiles_of_a_dependency_pom_that_the_operating_system_selects() throws IOException {
+        addToRepository("group", "artifact", "1", rootPom("", "openjfx"));
+        addToRepository("openjfx", "javafx", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>openjfx</groupId>
+                    <artifactId>javafx</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <profiles>
+                        <profile>
+                            <activation><os><name>linux</name></os></activation>
+                            <properties><javafx.platform>linux</javafx.platform></properties>
+                        </profile>
+                        <profile>
+                            <activation><os><name>linux</name><arch>aarch64</arch></os></activation>
+                            <properties><javafx.platform>linux-aarch64</javafx.platform></properties>
+                        </profile>
+                        <profile>
+                            <activation><os><family>mac</family><arch>!aarch64</arch></os></activation>
+                            <properties><javafx.platform>mac</javafx.platform></properties>
+                        </profile>
+                        <profile>
+                            <activation><os><family>windows</family></os></activation>
+                            <properties><javafx.platform>win</javafx.platform></properties>
+                        </profile>
+                        <profile>
+                            <activation><os><family>unix</family></os><jdk>[1.8,9)</jdk></activation>
+                            <properties><javafx.platform>legacy</javafx.platform></properties>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        addToRepository("openjfx", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>openjfx</groupId>
+                        <artifactId>javafx</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>artifact</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>openjfx</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                            <classifier>${javafx.platform}</classifier>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Map<List<String>, String> platforms = Map.of(
+                List.of("Linux", "amd64", "6.1"), "linux",
+                List.of("Linux", "aarch64", "6.1"), "linux-aarch64",
+                List.of("Mac OS X", "x86_64", "14.4"), "mac",
+                List.of("Windows 11", "amd64", "10.0"), "win");
+        for (Map.Entry<List<String>, String> platform : platforms.entrySet()) {
+            List<String> os = platform.getKey();
+            assertThat(mavenPomResolver.os(os.get(0), os.get(1), os.get(2)).dependencies(
+                    Runnable::run, mavenRepository, "group", "artifact", "1", null).keySet())
+                    .as("OpenJFX selects its platform's jar by profiles its POM activates on the OS, %s here", os)
+                    .contains(new MavenDependencyKey("openjfx", "artifact", "jar", platform.getValue()));
+        }
+    }
+
+    @Test
+    public void matches_a_family_that_maven_does_not_name_against_the_operating_system_name() throws IOException {
+        addToRepository("group", "artifact", "1", rootPom("", "brotli"));
+        addToRepository("brotli", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>brotli</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <profiles>
+                        <profile>
+                            <activation><os><family>Linux</family><arch>amd64</arch></os></activation>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>brotli</groupId>
+                                    <artifactId>native-linux-x86_64</artifactId>
+                                    <version>1</version>
+                                </dependency>
+                            </dependencies>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        addToRepository("brotli", "native-linux-x86_64", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>brotli</groupId>
+                    <artifactId>native-linux-x86_64</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        MavenDependencyKey linux = new MavenDependencyKey("brotli", "native-linux-x86_64", "jar", null);
+        assertThat(mavenPomResolver.os("Linux", "amd64", "6.1").dependencies(
+                Runnable::run, mavenRepository, "group", "artifact", "1", null).keySet())
+                .as("Maven matches a family it has no name for as a part of os.name, ignoring case")
+                .contains(linux);
+        assertThat(mavenPomResolver.os("Mac OS X", "amd64", "14.4").dependencies(
+                Runnable::run, mavenRepository, "group", "artifact", "1", null).keySet())
+                .doesNotContain(linux);
+    }
+
+    @Test
+    public void applies_the_exclusion_a_dependency_inherits_from_its_parents_management_to_its_own_dependency() throws IOException {
+        addToRepository("group", "artifact", "1", rootPom("", "embedder"));
+        addToRepository("managing", "artifact", "1", rootPom("""
+                <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>guava</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>1</version>
+                                <exclusions>
+                                    <exclusion>
+                                        <groupId>other</groupId>
+                                        <artifactId>artifact</artifactId>
+                                    </exclusion>
+                                </exclusions>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                """, "embedder"));
+        addToRepository("parent", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>parent</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>guava</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>1</version>
+                                <exclusions>
+                                    <exclusion>
+                                        <groupId>j2objc</groupId>
+                                        <artifactId>artifact</artifactId>
+                                    </exclusion>
+                                </exclusions>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        addToRepository("embedder", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>parent</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>embedder</groupId>
+                    <artifactId>artifact</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>guava</groupId>
+                            <artifactId>artifact</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("guava", "artifact", "1", rootPom("", "j2objc", "other"));
+        for (String groupId : List.of("j2objc", "other")) {
+            addToRepository(groupId, "artifact", "1", leafPom());
+        }
+        for (String root : List.of("group", "managing")) {
+            assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, root, "artifact", "1", null).keySet())
+                    .as("the management a POM inherits shapes its own dependencies before %s's management adds to it", root)
+                    .contains(new MavenDependencyKey("guava", "artifact", "jar", null))
+                    .doesNotContain(new MavenDependencyKey("j2objc", "artifact", "jar", null));
+        }
+        assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, "managing", "artifact", "1", null).keySet())
+                .as("the exclusion the project manages is applied as well")
+                .doesNotContain(new MavenDependencyKey("other", "artifact", "jar", null));
+    }
+
+    @Test
+    public void applies_a_managed_exclusion_to_the_managed_dependency_where_it_is_reached_transitively() throws IOException {
+        addToRepository("group", "artifact", "1", rootPom("", "middle"));
+        addToRepository("middle", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>shared</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>kept</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                            <exclusions>
+                                <exclusion>
+                                    <groupId>own</groupId>
+                                    <artifactId>artifact</artifactId>
+                                </exclusion>
+                            </exclusions>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("kept", "artifact", "1", rootPom("", "own", "other"));
+        for (String groupId : List.of("shared", "own", "other")) {
+            addToRepository(groupId, "artifact", "1", leafPom());
+        }
+        for (String groupId : List.of("group", "middle", "shared", "kept", "own", "other")) {
+            addJarToRepository(groupId, "artifact", "1");
+        }
+        Resolver.Resolution resolution = mavenPomResolver.dependencies(
+                Runnable::run,
+                "maven",
+                Map.<String, Repository>of("maven", mavenRepository),
+                new LinkedHashMap<>(Map.of("group/artifact/1", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                new LinkedHashMap<>(Map.of(
+                        "middle/artifact", new LinkedHashSet<>(List.of("shared/artifact")),
+                        "kept/artifact", new LinkedHashSet<>(List.of("other/artifact")))),
+                DependencyScope.COMPILE);
+        assertThat(resolution.vertices().keySet())
+                .as("Maven applies the exclusions a <dependencyManagement> entry declares wherever its dependency"
+                        + " appears, in addition to those the depending POM declares")
+                .containsExactlyInAnyOrder("maven/group/artifact", "maven/middle/artifact", "maven/kept/artifact");
+    }
+
+    @Test
+    public void draws_no_edge_to_a_test_or_provided_dependency_of_a_library_that_is_resolved_otherwise() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>tested</artifactId>
+                            <version>0.9</version>
+                            <scope>test</scope>
+                        </dependency>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>provided</artifactId>
+                            <version>0.9</version>
+                            <scope>provided</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        for (String artifact : List.of("tested", "provided")) {
+            addToRepository("other", artifact, "1", """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                        <modelVersion>4.0.0</modelVersion>
+                    </project>
+                    """);
+            addJarToRepository("other", artifact, "1");
+        }
+        addJarToRepository("group", "artifact", "1");
+        Resolver.Resolution resolution = mavenPomResolver.dependencies(
+                Runnable::run,
+                "maven",
+                Map.<String, Repository>of("maven", mavenRepository),
+                new LinkedHashMap<>(Map.of(
+                        "other/tested/1", Collections.emptyNavigableSet(),
+                        "other/provided/1", Collections.emptyNavigableSet(),
+                        "group/artifact/1", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE);
+        assertThat(resolution.edges())
+                .as("a library's own test and provided dependencies are not followed, so the tree draws no edge to them")
+                .noneMatch(edge -> "maven/group/artifact/1".equals(edge.parent()));
+        assertThat(resolution.vertices().get("maven/other/tested").resolvedVersion()).isEqualTo("1");
+        assertThat(resolution.vertices().get("maven/other/provided").resolvedVersion()).isEqualTo("1");
+    }
+
+    @Test
+    public void fetches_no_artifact_of_a_type_maven_places_on_no_path_but_follows_its_dependencies() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>native</groupId>
+                            <artifactId>archive</artifactId>
+                            <version>1</version>
+                            <type>tar.gz</type>
+                        </dependency>
+                        <dependency>
+                            <groupId>plugin</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                            <type>maven-plugin</type>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("native", "archive", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>leaf</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("plugin", "artifact", "1", leafPom());
+        addToRepository("leaf", "artifact", "1", leafPom());
+        addToRepository("grouping", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <packaging>pom</packaging>
+                    <dependencies>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        for (String groupId : List.of("group", "plugin", "leaf")) {
+            addJarToRepository(groupId, "artifact", "1");
+        }
+        Resolver.Resolution resolution = mavenPomResolver.dependencies(
+                Runnable::run,
+                "maven",
+                Map.<String, Repository>of("maven", mavenRepository),
+                new LinkedHashMap<>(Map.of("grouping/artifact/pom/1", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE);
+        assertThat(resolution.artifacts().keySet())
+                .as("Maven adds a jar, and a maven-plugin as one, to a path, but neither a POM nor an archive of"
+                        + " another type, whose dependencies it still follows")
+                .containsExactlyInAnyOrder("maven/group/artifact/1", "maven/plugin/artifact/1", "maven/leaf/artifact/1");
+        assertThat(resolution.vertices()).containsKeys("maven/grouping/artifact/pom", "maven/native/archive/tar.gz");
+    }
+
+    @Test
+    public void fetches_an_artifact_of_another_type_that_the_build_names_itself() throws IOException {
+        addToRepository("tool", "executable", "1", leafPom());
+        Files.writeString(Files.createDirectories(repository.resolve("tool/executable/1")).resolve("executable-1-linux.exe"),
+                "executable");
+        Resolver.Resolution resolution = mavenPomResolver.dependencies(
+                Runnable::run,
+                "maven",
+                Map.<String, Repository>of("maven", mavenRepository),
+                new LinkedHashMap<>(Map.of("tool/executable/exe/linux/1", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.RUNTIME);
+        assertThat(resolution.artifacts().keySet()).containsExactly("maven/tool/executable/exe/linux/1");
+    }
+
+    @Test
     public void can_resolve_open_range_version() throws IOException {
         addToRepository("group", "artifact", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -3730,6 +4366,413 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void names_a_dependency_a_local_pom_declares_twice_and_keeps_the_second_as_maven_does() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>project</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>2</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        List<String> printed = new ArrayList<>();
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver
+                .printing(printed::add, Palette.NONE)
+                .local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).dependencies())
+                .as("the second declaration replaces the first, as in Maven")
+                .containsExactly(Map.entry(new MavenDependencyKey("group", "artifact", "jar", null),
+                        new MavenDependencyValue("2", MavenDependencyScope.TEST, null, null, null)));
+        assertThat(printed).containsExactly("[DUPLICATE] The pom.xml of project declares group:artifact:jar twice,"
+                + " at version 1 and 2: the second declaration replaces the first, as in Maven, which warns as well"
+                + " - remove one");
+    }
+
+    @Test
+    public void names_a_dependency_a_published_pom_declares_twice_once_and_as_needing_no_action() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>2</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("other", "artifact", "2", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>other</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>2</version>
+                </project>
+                """);
+        List<String> printed = new ArrayList<>();
+        MavenPomResolver resolver = mavenPomResolver.printing(printed::add, Palette.NONE);
+        for (int index = 0; index < 2; index++) {
+            resolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null);
+        }
+        assertThat(printed)
+                .as("a POM read again by every resolution of a build is named once, as one its artifact was published with")
+                .containsExactly("[DUPLICATE] The pom.xml of artifact declares other:artifact:jar twice,"
+                        + " at version 1 and 2: the second declaration replaces the first, as in Maven, which warns as well"
+                        + " - it is the artifact's own published POM, so this needs no action");
+    }
+
+    @Test
+    public void local_pom_inherits_the_metadata_of_its_parent_in_the_project_as_maven_does() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <name>Parent</name>
+                    <description>The parent.</description>
+                    <url>https://example.com/project</url>
+                    <organization>
+                        <name>Example Ltd</name>
+                    </organization>
+                    <licenses>
+                        <license>
+                            <name>Apache-2.0</name>
+                            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+                        </license>
+                    </licenses>
+                    <developers>
+                        <developer>
+                            <id>google</id>
+                        </developer>
+                    </developers>
+                    <scm child.scm.connection.inherit.append.path="false">
+                        <connection>scm:git:https://example.com/project.git</connection>
+                        <developerConnection>scm:git:git@example.com:project.git</developerConnection>
+                        <tag>v1</tag>
+                        <url>https://example.com/project/</url>
+                    </scm>
+                    <modules>
+                        <module>inheriting</module>
+                        <module>declaring</module>
+                    </modules>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("inheriting")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>inheriting-artifact</artifactId>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("declaring")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>declaring</artifactId>
+                    <description>Its own.</description>
+                    <url>https://example.com/${project.artifactId}</url>
+                    <developers>
+                        <developer>
+                            <id>alice</id>
+                            <name>Alice Example</name>
+                        </developer>
+                    </developers>
+                    <scm>
+                        <url>https://example.com/declaring</url>
+                    </scm>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("inheriting")).metadata())
+                .as("everything but the name is inherited, the url and the scm locations with the artifactId appended")
+                .isEqualTo(new MavenPomEmitter.Metadata(null,
+                        "The parent.",
+                        "https://example.com/project/inheriting-artifact",
+                        List.of(new MavenPomEmitter.Metadata.License("Apache-2.0",
+                                "https://www.apache.org/licenses/LICENSE-2.0.txt")),
+                        List.of(new MavenPomEmitter.Metadata.Developer("google", null, null)),
+                        new MavenPomEmitter.Metadata.Scm("scm:git:https://example.com/project.git",
+                                "scm:git:git@example.com:project.git/inheriting-artifact",
+                                "https://example.com/project/inheriting-artifact/",
+                                "v1"),
+                        new MavenPomEmitter.Metadata.Organization("Example Ltd", null)));
+        assertThat(poms.get(Path.of("declaring")).metadata())
+                .as("what a module declares wins, a list replaces the parent's, and a declared scm keeps its own tag")
+                .isEqualTo(new MavenPomEmitter.Metadata(null,
+                        "Its own.",
+                        "https://example.com/declaring",
+                        List.of(new MavenPomEmitter.Metadata.License("Apache-2.0",
+                                "https://www.apache.org/licenses/LICENSE-2.0.txt")),
+                        List.of(new MavenPomEmitter.Metadata.Developer("alice", "Alice Example", null)),
+                        new MavenPomEmitter.Metadata.Scm("scm:git:https://example.com/project.git",
+                                "scm:git:git@example.com:project.git/declaring",
+                                "https://example.com/declaring",
+                                null),
+                        new MavenPomEmitter.Metadata.Organization("Example Ltd", null)));
+    }
+
+    @Test
+    public void local_pom_reads_a_developers_details_and_the_issue_and_ci_management_and_inherits_them() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <developers>
+                        <developer>
+                            <id>alice</id>
+                            <name>Alice Example</name>
+                            <url>https://example.com/alice</url>
+                            <organization>Example Ltd</organization>
+                            <organizationUrl>https://example.com</organizationUrl>
+                            <roles>
+                                <role>lead</role>
+                                <role>developer</role>
+                            </roles>
+                            <timezone>Europe/Oslo</timezone>
+                        </developer>
+                        <developer>
+                            <id>bob</id>
+                            <url>https://example.com/bob</url>
+                        </developer>
+                    </developers>
+                    <issueManagement>
+                        <system>GitHub</system>
+                        <url>https://example.com/issues</url>
+                    </issueManagement>
+                    <ciManagement>
+                        <system>GitHub Actions</system>
+                        <url>https://example.com/actions</url>
+                    </ciManagement>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("child")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <issueManagement>
+                        <url>https://example.com/child/issues</url>
+                    </issueManagement>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("child")).metadata())
+                .as("the developers are inherited as a list, the issue and ci management field by field as Maven merges them")
+                .isEqualTo(new MavenPomEmitter.Metadata(null,
+                        null,
+                        null,
+                        List.of(),
+                        List.of(new MavenPomEmitter.Metadata.Developer("alice",
+                                        "Alice Example",
+                                        null,
+                                        "https://example.com/alice",
+                                        "Example Ltd",
+                                        "https://example.com",
+                                        List.of("lead", "developer"),
+                                        "Europe/Oslo"),
+                                new MavenPomEmitter.Metadata.Developer("bob",
+                                        null,
+                                        null,
+                                        "https://example.com/bob",
+                                        null,
+                                        null,
+                                        List.of(),
+                                        null)),
+                        null,
+                        null,
+                        new MavenPomEmitter.Metadata.Management("GitHub", "https://example.com/child/issues"),
+                        new MavenPomEmitter.Metadata.Management("GitHub Actions", "https://example.com/actions"),
+                        null));
+    }
+
+    @Test
+    public void local_pom_reads_a_licence_distribution_and_the_inception_year_and_inherits_them() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <inceptionYear>2010</inceptionYear>
+                    <licenses>
+                        <license>
+                            <name>Apache 2.0</name>
+                            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+                            <distribution>repo</distribution>
+                        </license>
+                    </licenses>
+                    <modules>
+                        <module>child</module>
+                        <module>other</module>
+                    </modules>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("child")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("other")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>other</artifactId>
+                    <inceptionYear>2020</inceptionYear>
+                    <licenses>
+                        <license>
+                            <name>MIT</name>
+                        </license>
+                    </licenses>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("child")).metadata())
+                .as("the inception year and the licences with their distribution are inherited where a module declares none")
+                .isEqualTo(new MavenPomEmitter.Metadata(null,
+                        null,
+                        null,
+                        List.of(new MavenPomEmitter.Metadata.License("Apache 2.0",
+                                "https://www.apache.org/licenses/LICENSE-2.0.txt",
+                                "repo")),
+                        List.of(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        "2010"));
+        assertThat(poms.get(Path.of("other")).metadata())
+                .as("a module's own inception year and licences win over its parent's")
+                .isEqualTo(new MavenPomEmitter.Metadata(null,
+                        null,
+                        null,
+                        List.of(new MavenPomEmitter.Metadata.License("MIT", null)),
+                        List.of(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        "2020"));
+    }
+
+    @Test
+    public void local_pom_inherits_the_metadata_of_a_parent_it_fetches() throws IOException {
+        addToRepository("group", "grandparent", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>grandparent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <url>https://example.com</url>
+                    <licenses>
+                        <license>
+                            <name>MIT</name>
+                        </license>
+                    </licenses>
+                </project>
+                """);
+        addToRepository("group", "parent", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>grandparent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>parent</artifactId>
+                    <packaging>pom</packaging>
+                </project>
+                """);
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                        <relativePath/>
+                    </parent>
+                    <artifactId>artifact</artifactId>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).metadata())
+                .as("each generation appends its artifactId to the url it inherits")
+                .isEqualTo(new MavenPomEmitter.Metadata(null,
+                        null,
+                        "https://example.com/parent/artifact",
+                        List.of(new MavenPomEmitter.Metadata.License("MIT", null)),
+                        List.of(),
+                        null,
+                        null));
+    }
+
+    @Test
     public void local_pom_dependency_management_checksum_is_honored() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -3760,6 +4803,150 @@ public class MavenPomResolverTest {
         MavenLocalPom pom = poms.get(Path.of(""));
         assertThat(pom.dependencies().get(new MavenDependencyKey("group", "artifact", "jar", null)).checksum())
                 .isEqualTo("SHA256/cafebabe");
+    }
+
+    @Test
+    public void local_pom_dependency_management_wins_over_a_parent_entry_naming_the_artifact_by_a_property() throws IOException {
+        Path subproject = Files.createDirectory(project.resolve("subproject"));
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>subproject</module>
+                    </modules>
+                    <properties>
+                        <managed.artifactId>artifact</managed.artifactId>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>group</groupId>
+                                <artifactId>${managed.artifactId}</artifactId>
+                                <version>1</version>
+                                <scope>test</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        Files.writeString(subproject.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>project</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>artifact</artifactId>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>group</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>1</version>
+                                <!--Checksum/SHA256/cafebabe-->
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>${managed.artifactId}</artifactId>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        MavenLocalPom pom = poms.get(Path.of("subproject"));
+        assertThat(pom.managedDependencies().get(new MavenDependencyKey("group", "artifact", "jar", null)).checksum())
+                .as("the subproject's own entry is the one that manages the artifact the parent names by a property")
+                .isEqualTo("SHA256/cafebabe");
+        assertThat(pom.dependencies().get(new MavenDependencyKey("group", "artifact", "jar", null)).checksum())
+                .isEqualTo("SHA256/cafebabe");
+    }
+
+    @Test
+    public void local_pom_inherits_the_source_and_resource_directories_of_its_local_parent_unless_it_names_its_own() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>inheriting</module>
+                        <module>overriding</module>
+                    </modules>
+                    <build>
+                        <sourceDirectory>src/main/groovy</sourceDirectory>
+                        <testSourceDirectory>src/test/groovy</testSourceDirectory>
+                        <resources>
+                            <resource>
+                                <directory>assets</directory>
+                            </resource>
+                        </resources>
+                        <testResources>
+                            <testResource>
+                                <directory>fixtures</directory>
+                            </testResource>
+                        </testResources>
+                    </build>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("inheriting")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>project</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>inheriting</artifactId>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("overriding")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>project</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>overriding</artifactId>
+                    <build>
+                        <testSourceDirectory>src/test/java</testSourceDirectory>
+                        <testResources>
+                            <testResource>
+                                <directory>data</directory>
+                            </testResource>
+                        </testResources>
+                    </build>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        MavenLocalPom inheriting = poms.get(Path.of("inheriting"));
+        assertThat(inheriting.sourceDirectory()).isEqualTo("src/main/groovy");
+        assertThat(inheriting.testSourceDirectory()).isEqualTo("src/test/groovy");
+        assertThat(inheriting.resourceDirectories()).containsExactly("assets");
+        assertThat(inheriting.testResourceDirectories()).containsExactly("fixtures");
+        MavenLocalPom overriding = poms.get(Path.of("overriding"));
+        assertThat(overriding.sourceDirectory()).isEqualTo("src/main/groovy");
+        assertThat(overriding.testSourceDirectory())
+                .as("a module's own directory wins over its parent's")
+                .isEqualTo("src/test/java");
+        assertThat(overriding.resourceDirectories()).containsExactly("assets");
+        assertThat(overriding.testResourceDirectories()).containsExactly("data");
     }
 
     @Test
@@ -3845,6 +5032,139 @@ public class MavenPomResolverTest {
         assertThat(app.testSourceDirectory()).isEqualTo("src/test/java");
         assertThat(app.resourceDirectories()).containsExactly("assets");
         assertThat(poms.get(Path.of("api")).version()).isEqualTo("1.2");
+    }
+
+    @Test
+    public void a_processor_dependency_compiles_only_the_half_whose_scope_declares_it() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.plugin javac maven/org.example/checker/1-->
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>main-processor</artifactId>
+                            <version>1</version>
+                            <type>processor</type>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>test-processor</artifactId>
+                            <version>1</version>
+                            <type>processor</type>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        MavenLocalPom pom = mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of(""));
+        assertThat(pom.plugins())
+                .as("a processor of the main scopes compiles the main half alone, beside the plugins every half takes")
+                .containsExactly(Map.entry("maven/org.example/checker/1", "javac"),
+                        Map.entry("maven/org.example/main-processor/1", "plugin"));
+        assertThat(pom.testPlugins())
+                .as("a test-scoped processor compiles the test half alone")
+                .containsExactly(Map.entry("maven/org.example/checker/1", "javac"),
+                        Map.entry("maven/org.example/test-processor/1", "plugin"));
+        assertThat(pom.dependencies()).isEmpty();
+    }
+
+    @Test
+    public void reads_a_module_alias_from_a_pom_comment_and_inherits_one_from_a_local_parent() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <!--jenesis.alias groovy.all org.codehaus.groovy/groovy-all-->
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("child")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <!--jenesis.alias
+                    jline jline/jline
+                    -->
+                </project>
+                """);
+        assertThat(mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of("child")).aliases())
+                .as("a jar without a module name is named for the module path, as @jenesis.alias does in module-info.java")
+                .containsExactly(Map.entry("jline", "jline/jline"), Map.entry("groovy.all", "org.codehaus.groovy/groovy-all"));
+    }
+
+    @Test
+    public void aliases_a_java_prefixed_module_the_jdk_does_not_hold_and_refuses_one_it_does() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.alias java.money javax.money/money-api-->
+                </project>
+                """);
+        assertThat(mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of("")).aliases())
+                .containsExactly(Map.entry("java.money", "javax.money/money-api"));
+        Files.writeString(project.resolve("pom.xml"), Files.readString(project.resolve("pom.xml"))
+                .replace("java.money", "java.sql"));
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Illegal jenesis.alias name 'java.sql'");
+    }
+
+    @Test
+    public void refuses_a_plugin_comment_that_writes_a_version_after_the_coordinate() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.plugin javac maven/com.google.errorprone/error_prone_core 2.36.0-->
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed jenesis.plugin declaration"
+                        + " 'javac maven/com.google.errorprone/error_prone_core 2.36.0'")
+                .hasMessageContaining("maven/<groupId>/<artifactId>/<version>");
+    }
+
+    @Test
+    public void refuses_a_module_alias_comment_that_names_no_coordinate() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.alias jline jline-->
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed jenesis.alias target 'jline'")
+                .hasMessageContaining("<groupId>/<artifactId>");
     }
 
     @Test
@@ -4012,6 +5332,503 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_compiles_its_tests_for_the_test_release_or_else_its_release() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>tested</module>
+                        <module>plain</module>
+                    </modules>
+                    <properties>
+                        <tests.version>17</tests.version>
+                        <maven.compiler.release>8</maven.compiler.release>
+                    </properties>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("tested")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>project</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>tested</artifactId>
+                    <properties>
+                        <maven.compiler.testRelease>${tests.version}</maven.compiler.testRelease>
+                    </properties>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("plain")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>project</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>plain</artifactId>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("tested")).release()).isEqualTo("8");
+        assertThat(poms.get(Path.of("tested")).testRelease()).isEqualTo("17");
+        assertThat(poms.get(Path.of("plain")).testRelease())
+                .as("without maven.compiler.testRelease the tests are compiled for the release of the main code")
+                .isEqualTo("8");
+    }
+
+    @Test
+    public void local_pom_enables_the_preview_features_of_its_test_release() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>21</maven.compiler.release>
+                        <maven.compiler.testRelease>25</maven.compiler.testRelease>
+                        <maven.compiler.enablePreview>true</maven.compiler.enablePreview>
+                    </properties>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).release()).isEqualTo("21-preview");
+        assertThat(poms.get(Path.of("")).testRelease()).isEqualTo("25-preview");
+    }
+
+    @Test
+    public void local_pom_reads_the_compiler_target_or_else_its_source_as_the_release_it_does_not_declare() throws IOException {
+        Map<String, String> cases = new LinkedHashMap<>();
+        cases.put("<maven.compiler.source>1.8</maven.compiler.source><maven.compiler.target>1.8</maven.compiler.target>", "8");
+        cases.put("<maven.compiler.source>11</maven.compiler.source>", "11");
+        cases.put("<maven.compiler.release></maven.compiler.release><maven.compiler.target>1.8</maven.compiler.target>", "8");
+        cases.put("<maven.compiler.release>17</maven.compiler.release><maven.compiler.target>1.8</maven.compiler.target>", "17");
+        for (Map.Entry<String, String> entry : cases.entrySet()) {
+            Files.writeString(project.resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>project</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                        <properties>%s</properties>
+                    </project>
+                    """.formatted(entry.getKey()));
+            MavenLocalPom pom = mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of(""));
+            assertThat(pom.release()).as(entry.getKey()).isEqualTo(entry.getValue());
+            assertThat(pom.testRelease()).as(entry.getKey()).isEqualTo(entry.getValue());
+        }
+    }
+
+    @Test
+    public void a_profile_of_a_fetched_parent_that_the_jdk_activates_sets_the_release() throws IOException {
+        addToRepository("parent", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>parent</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <profiles>
+                        <profile>
+                            <id>java-9-up</id>
+                            <activation>
+                                <jdk>[9,)</jdk>
+                            </activation>
+                            <properties>
+                                <maven.compiler.release>8</maven.compiler.release>
+                            </properties>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>parent</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                </project>
+                """);
+        assertThat(mavenPomResolver.jdk("25.0.4.1").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .as("Maven activates the parent's profile on a JDK of 9 or newer, so the jar is compiled for release 8")
+                .isEqualTo("8");
+        assertThat(mavenPomResolver.jdk("1.8.0_402").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .isNull();
+    }
+
+    @Test
+    public void a_dependency_that_a_profile_active_by_default_declares_is_resolved() throws IOException {
+        addToRepository("group", "artifact", "1", rootPom("", "client"));
+        addToRepository("client", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <profiles>
+                        <profile>
+                            <id>default</id>
+                            <activation>
+                                <activeByDefault>true</activeByDefault>
+                            </activation>
+                            <dependencies>
+                                %s
+                            </dependencies>
+                        </profile>
+                    </profiles>
+                </project>
+                """.formatted(dependencyOn("core", "1")));
+        addToRepository("core", "artifact", "1", leafPom());
+        assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null).keySet())
+                .containsExactly(
+                        new MavenDependencyKey("client", "artifact", "jar", null),
+                        new MavenDependencyKey("core", "artifact", "jar", null));
+    }
+
+    @Test
+    public void a_profile_active_by_default_yields_to_one_the_jdk_activates_in_the_same_pom() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>${chosen}</maven.compiler.release>
+                    </properties>
+                    <profiles>
+                        <profile>
+                            <id>default</id>
+                            <activation>
+                                <activeByDefault>true</activeByDefault>
+                            </activation>
+                            <properties>
+                                <chosen>11</chosen>
+                            </properties>
+                        </profile>
+                        <profile>
+                            <id>modern</id>
+                            <activation>
+                                <jdk>[17,)</jdk>
+                            </activation>
+                            <properties>
+                                <chosen>17</chosen>
+                            </properties>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        assertThat(mavenPomResolver.jdk("25.0.4.1").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .isEqualTo("17");
+        assertThat(mavenPomResolver.jdk("11.0.2").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .isEqualTo("11");
+    }
+
+    @Test
+    public void a_jdk_activation_matches_a_prefix_a_negation_and_a_range_as_maven_does() throws IOException {
+        List<List<String>> cases = List.of(
+                List.of("1.8", "1.8.0_402", "true"),
+                List.of("1.8", "25.0.4.1", "false"),
+                List.of("25", "25.0.4.1", "true"),
+                List.of("!1.8", "25.0.4.1", "true"),
+                List.of("!1.8", "1.8.0_402", "false"),
+                List.of("[9,)", "25.0.4.1", "true"),
+                List.of("[9,)", "1.8.0_402", "false"),
+                List.of("[1.8,17)", "11.0.2", "true"),
+                List.of("[1.8,17)", "17", "false"),
+                List.of("[1.8,17]", "17", "true"),
+                List.of("(,11)", "1.8.0_402", "true"),
+                List.of("(,11)", "11.0.2", "false"),
+                List.of("(17,)", "17", "false"),
+                List.of("!(,11)", "25.0.4.1", "true"),
+                List.of("[11,12),[16,)", "25.0.4.1", "true"),
+                List.of("[11,12),[16,)", "11.0.2", "true"),
+                List.of("[11,12),[16,)", "14.0.1", "false"),
+                List.of("[17]", "17", "true"),
+                List.of("[17]", "21", "false"),
+                List.of("[9,", "25.0.4.1", "true"),
+                List.of("[9,", "1.8.0_402", "false"),
+                List.of("[11", "25.0.4.1", "true"),
+                List.of("[11", "11.0.2", "true"),
+                List.of("[11", "1.8.0_402", "false"),
+                List.of("(11", "11", "false"),
+                List.of("(11", "17", "true"),
+                List.of("[11,12),[16,", "25.0.4.1", "true"));
+        for (List<String> entry : cases) {
+            Files.writeString(project.resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>project</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                        <profiles>
+                            <profile>
+                                <activation>
+                                    <jdk>%s</jdk>
+                                </activation>
+                                <properties>
+                                    <maven.compiler.release>21</maven.compiler.release>
+                                </properties>
+                            </profile>
+                        </profiles>
+                    </project>
+                    """.formatted(entry.get(0)));
+            assertThat(mavenPomResolver.jdk(entry.get(1)).local(Runnable::run, mavenRepository, project).get(Path.of("")).release() != null)
+                    .as("<jdk>%s</jdk> on Java %s", entry.get(0), entry.get(1))
+                    .isEqualTo(Boolean.parseBoolean(entry.get(2)));
+        }
+    }
+
+    @Test
+    public void a_profile_activated_by_a_property_or_a_file_stays_inactive_and_one_activated_by_the_os_follows_it()
+            throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>${chosen}</maven.compiler.release>
+                    </properties>
+                    <profiles>
+                        <profile>
+                            <id>default</id>
+                            <activation>
+                                <activeByDefault>true</activeByDefault>
+                            </activation>
+                            <properties>
+                                <chosen>11</chosen>
+                            </properties>
+                        </profile>
+                        <profile>
+                            <id>property</id>
+                            <activation>
+                                <jdk>[1.8,)</jdk>
+                                <property>
+                                    <name>!skip</name>
+                                </property>
+                            </activation>
+                            <properties>
+                                <chosen>17</chosen>
+                            </properties>
+                        </profile>
+                        <profile>
+                            <id>os</id>
+                            <activation>
+                                <os>
+                                    <family>unix</family>
+                                </os>
+                            </activation>
+                            <properties>
+                                <chosen>21</chosen>
+                            </properties>
+                        </profile>
+                        <profile>
+                            <id>file</id>
+                            <activation>
+                                <file>
+                                    <exists>pom.xml</exists>
+                                </file>
+                            </activation>
+                            <properties>
+                                <chosen>25</chosen>
+                            </properties>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        assertThat(mavenPomResolver.jdk("25.0.4.1").os("Windows 11", "amd64", "10.0")
+                .local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .isEqualTo("11");
+        assertThat(mavenPomResolver.jdk("25.0.4.1").os("Linux", "amd64", "6.1")
+                .local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .isEqualTo("21");
+    }
+
+    @Test
+    public void a_profile_of_the_module_adds_its_dependencies_managed_versions_and_resource_directories() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>declared</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                    <profiles>
+                        <profile>
+                            <id>default</id>
+                            <activation>
+                                <activeByDefault>true</activeByDefault>
+                            </activation>
+                            <dependencyManagement>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>managed</groupId>
+                                        <artifactId>artifact</artifactId>
+                                        <version>2</version>
+                                    </dependency>
+                                </dependencies>
+                            </dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>managed</groupId>
+                                    <artifactId>artifact</artifactId>
+                                </dependency>
+                            </dependencies>
+                            <build>
+                                <resources>
+                                    <resource>
+                                        <directory>src/extra</directory>
+                                    </resource>
+                                </resources>
+                            </build>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        MavenLocalPom pom = mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of(""));
+        assertThat(pom.dependencies()).containsExactly(
+                Map.entry(new MavenDependencyKey("declared", "artifact", "jar", null),
+                        new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)),
+                Map.entry(new MavenDependencyKey("managed", "artifact", "jar", null),
+                        new MavenDependencyValue("2", MavenDependencyScope.COMPILE, null, null, null)));
+        assertThat(pom.resourceDirectories())
+                .as("a profile's resources replace the default folder, as in Maven")
+                .containsExactly("src/extra");
+    }
+
+    @Test
+    public void an_unclosed_jdk_range_of_a_fetched_parent_is_open_ended_as_in_objenesis() throws IOException {
+        addToRepository("org/objenesis", "objenesis-parent", "3.4", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.objenesis</groupId>
+                    <artifactId>objenesis-parent</artifactId>
+                    <version>3.4</version>
+                    <packaging>pom</packaging>
+                    <profiles>
+                        <profile>
+                            <id>java9</id>
+                            <activation>
+                                <jdk>[9,</jdk>
+                            </activation>
+                            <properties>
+                                <maven.compiler.release>8</maven.compiler.release>
+                            </properties>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.objenesis</groupId>
+                        <artifactId>objenesis-parent</artifactId>
+                        <version>3.4</version>
+                    </parent>
+                    <artifactId>objenesis</artifactId>
+                </project>
+                """);
+        assertThat(mavenPomResolver.jdk("25.0.4.1").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .as("Maven reads <jdk>[9,</jdk> as [9,) and activates the profile on Java 25")
+                .isEqualTo("8");
+        assertThat(mavenPomResolver.jdk("1.8.0_402").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .isNull();
+    }
+
+    @Test
+    public void a_jdk_activation_of_a_fetched_pom_that_is_no_version_range_leaves_its_profile_inactive() throws IOException {
+        addToRepository("parent", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>parent</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <profiles>
+                        <profile>
+                            <activation>
+                                <jdk>[nine,)</jdk>
+                            </activation>
+                            <properties>
+                                <maven.compiler.release>8</maven.compiler.release>
+                            </properties>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>parent</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                </project>
+                """);
+        assertThat(mavenPomResolver.jdk("25.0.4.1").local(Runnable::run, mavenRepository, project).get(Path.of("")).release())
+                .as("a third-party POM's activation that cannot be read does not stop the build")
+                .isNull();
+    }
+
+    @Test
+    public void a_jdk_activation_that_is_no_version_range_is_refused() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <profiles>
+                        <profile>
+                            <activation>
+                                <jdk>[nine,)</jdk>
+                            </activation>
+                        </profile>
+                    </profiles>
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("<jdk>[nine,)</jdk>")
+                .hasMessageContaining("such as [9,), [1.8,17) or [11,12),[16,)");
+    }
+
+    @Test
     public void local_pom_direct_dependency_checksum_is_ignored() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -4037,6 +5854,61 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_inherits_the_plugin_comment_of_its_local_parent_but_not_its_pins() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <!--jenesis.plugin
+                    javac maven/com.google.errorprone/error_prone_core
+                    maven/org.example/processor/1.0
+                    -->
+                    <!--jenesis.pin
+                    javac/maven/com.google.errorprone/error_prone_core 2.50.0
+                    javac/maven/com.google.guava/guava 33.0.0-jre
+                    -->
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("child")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>project</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <!--jenesis.plugin
+                    maven/org.example/other/2.0
+                    -->
+                    <!--jenesis.pin
+                    javac/maven/com.google.guava/guava 33.5.0-jre
+                    -->
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        MavenLocalPom child = poms.get(Path.of("child"));
+        assertThat(child.plugins())
+                .as("a module inherits the plugins its parent in the project declares, beside its own")
+                .containsEntry("maven/com.google.errorprone/error_prone_core", "javac")
+                .containsEntry("maven/org.example/processor/1.0", "plugin")
+                .containsEntry("maven/org.example/other/2.0", "plugin");
+        assertThat(child.qualifiedDependencies())
+                .as("pin writes a module's pins into its own POM, so a parent's would only be shadowed there")
+                .containsExactly(Map.entry("javac/maven/com.google.guava/guava", "33.5.0-jre"));
+        assertThat(poms.get(Path.of("")).qualifiedDependencies())
+                .containsEntry("javac/maven/com.google.guava/guava", "33.0.0-jre");
+    }
+
+    @Test
     public void local_pom_reads_plugin_comment_block() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -4059,6 +5931,64 @@ public class MavenPomResolverTest {
                         Map.entry("module/some.processor", "plugin"),
                         Map.entry("maven/org.example/processor/1.0", "plugin"),
                         Map.entry("org.jetbrains.kotlin/kotlin-serialization", "kotlinc"));
+    }
+
+    @Test
+    public void local_pom_takes_the_version_of_a_processor_named_without_one_from_its_dependency_management() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <processor.version>1.5</processor.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.example</groupId>
+                                <artifactId>processor</artifactId>
+                                <version>${processor.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.example</groupId>
+                                <artifactId>typed</artifactId>
+                                <version>2.5</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.jetbrains.kotlin</groupId>
+                                <artifactId>kotlin-serialization</artifactId>
+                                <version>3.0</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>typed</artifactId>
+                            <type>processor</type>
+                        </dependency>
+                    </dependencies>
+                    <!--jenesis.plugin
+                    maven/org.example/processor
+                    maven/org.example/pinned/1.0
+                    maven/org.example/unmanaged
+                    kotlinc maven/org.jetbrains.kotlin/kotlin-serialization
+                    -->
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).plugins())
+                .as("Maven resolves a versionless annotation processor path at the version its dependency management"
+                        + " names, but no plugin of another tool")
+                .containsExactly(
+                        Map.entry("maven/org.example/processor/1.5", "plugin"),
+                        Map.entry("maven/org.example/pinned/1.0", "plugin"),
+                        Map.entry("maven/org.example/unmanaged", "plugin"),
+                        Map.entry("maven/org.jetbrains.kotlin/kotlin-serialization", "kotlinc"),
+                        Map.entry("maven/org.example/typed/2.5", "plugin"));
     }
 
     @Test

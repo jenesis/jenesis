@@ -17,6 +17,7 @@ import build.jenesis.module.ModularProject;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.JavaToolchainModule;
 import build.jenesis.project.MultiProjectModule;
+import build.jenesis.step.Bind;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -207,6 +208,34 @@ public class ModularProjectTest {
     }
 
     @Test
+    public void an_unversioned_plugin_takes_its_newest_release_until_it_is_pinned() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.plugin javac maven/com.google.errorprone/error_prone_core
+                 * @jenesis.plugin processor
+                 */
+                module foo {
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("module/module-/manifests").resolve(BuildStep.REQUIRES)))
+                .as("a Maven coordinate without a version floats as a tool the build resolves itself does,"
+                        + " and a module is resolved by its name as ever")
+                .containsOnlyKeys("javac/plugin/maven/com.google.errorprone/error_prone_core/RELEASE",
+                        "plugin/plugin/module/processor");
+    }
+
+    @Test
     public void grants_native_access_to_what_it_names_and_records_every_name_in_its_manifest()
             throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
@@ -311,6 +340,37 @@ public class ModularProjectTest {
         assertThat(manifest.getMainAttributes().getValue(PathPlacement.ALIASES))
                 .as("a consumer of this module inherits the declaration through its manifest")
                 .isEqualTo("toolkit.lib=org.example/plain-lib");
+    }
+
+    @Test
+    public void requires_an_alias_at_the_version_pinned_under_its_module_name() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias toolkit.lib org.example/plain-lib
+                 * @jenesis.pin toolkit.lib 1.0 SHA-256/cafebabe
+                 */
+                module foo {
+                  requires toolkit.lib;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path module = results.get("module/module-/manifests");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.VERSIONS)))
+                .containsOnly(Map.entry("main/maven/org.example/plain-lib", "1.0 SHA-256/cafebabe"));
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES)))
+                .as("a pin naming the module requires the coordinate its alias names at that version")
+                .containsOnly(Map.entry("main/compile/maven/org.example/plain-lib/1.0", ""),
+                        Map.entry("main/runtime/maven/org.example/plain-lib/1.0", ""));
     }
 
     @Test
@@ -884,6 +944,49 @@ public class ModularProjectTest {
     }
 
     @Test
+    public void names_a_module_that_declares_no_release() throws IOException {
+        Files.writeString(Files.createDirectory(project.resolve("released")).resolve("module-info.java"), """
+                /**
+                 * @jenesis.release 21
+                 */
+                module released { }
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("unset")).resolve("module-info.java"), """
+                module unset { }
+                """);
+        BuildExecutor root = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        List<String> printed = new ArrayList<>();
+        root.addModule("modules", ModularProject.make(new Environment(Map.of("palette.colors", "none")).out(printed::add),
+                project,
+                "main",
+                "module",
+                _ -> true,
+                Map.of(),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, false)),
+                null,
+                true,
+                true,
+                Collections.emptyNavigableSet(),
+                Collections.emptyNavigableSet(),
+                Collections.emptyNavigableSet(),
+                (_, _, _) -> new AssemblyDescriptor((buildExecutor, _) -> buildExecutor.addModule("java",
+                        new JavaToolchainModule(),
+                        "../sources", "../manifests", "../dependencies/artifacts"))));
+        root.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(printed).containsExactly("[RELEASE]   unset compiles for release " + Runtime.version().feature()
+                + ", the JDK the build runs on, as unset" + File.separator + "module-info.java declares no"
+                + " @jenesis.release - @jenesis.release sets it");
+    }
+
+    @Test
     public void can_resolve_multi_module() throws IOException {
         Files.writeString(Files.createDirectory(project.resolve("foo")).resolve("module-info.java"), """
                 module foo {
@@ -1044,6 +1147,35 @@ public class ModularProjectTest {
         SequencedProperties module = SequencedProperties.ofFiles(
                 results.get("module/module-/manifests").resolve(BuildStep.MODULE));
         assertThat(module.getProperty("main")).isNull();
+    }
+
+    @Test
+    public void a_module_overrides_the_coordinate_of_the_project_in_its_own_configuration_location() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                module com.acme.check {
+                  requires bar;
+                }
+                """);
+        Path configuration = Files.createDirectories(project.resolve("META-INF").resolve("build.jenesis"));
+        Files.writeString(configuration.resolve("project.properties"), "artifact=acme-check\nurl=https://acme.example/check\n");
+        Path root = Files.writeString(project.resolve("project.properties"),
+                "project=com.acme.legacy\nurl=https://acme.example\nscm.url=https://acme.example/scm\n");
+        BuildExecutor executor = executor();
+        executor.addSource("metadata", Bind.asMetadata(), root);
+        executor.addModule("module", new ModularProject("module", project), "metadata");
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        SequencedProperties metadata = SequencedProperties.ofFiles(
+                results.get("module/module-/manifests").resolve(BuildStep.METADATA));
+        assertThat(metadata.getProperty("project"))
+                .as("the project's file overrides the groupId the module name derives")
+                .isEqualTo("com.acme.legacy");
+        assertThat(metadata.getProperty("artifact"))
+                .as("the module's own file overrides the artifactId")
+                .isEqualTo("acme-check");
+        assertThat(metadata.getProperty("url"))
+                .as("the module's own file is layered over the project's")
+                .isEqualTo("https://acme.example/check");
+        assertThat(metadata.getProperty("scm.url")).isEqualTo("https://acme.example/scm");
     }
 
     private BuildExecutor executor() throws IOException {

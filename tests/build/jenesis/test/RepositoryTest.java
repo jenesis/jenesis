@@ -160,6 +160,25 @@ public class RepositoryTest {
     }
 
     @Test
+    public void open_names_a_mirror_when_the_server_keeps_limiting_requests() throws IOException {
+        settings.put("repository.insecure", "true");
+        AtomicInteger hits = new AtomicInteger();
+        HttpServer server = serve(_ -> 429, Map.of(), hits);
+        try {
+            URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
+            assertThatThrownBy(() -> Repository.open(connection().retries(1).backoff(Duration.ofMillis(1)), uri, null).close())
+                    .isInstanceOf(IOException.class)
+                    .hasMessageContaining("429 Too Many Requests after 2 attempt(s)")
+                    .hasMessageContaining("configure a mirror of this repository")
+                    .as("a repository of any kind answers this way, so the advice names no repository's setting")
+                    .hasMessageNotContaining("jenesis.maven.uri");
+            assertThat(hits.get()).isEqualTo(2);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     public void open_times_out_on_a_stalled_server() throws IOException {
         settings.put("repository.insecure", "true");
         settings.put("repository.read.timeout", "200");

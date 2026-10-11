@@ -1,6 +1,7 @@
 package build.jenesis.step;
 
 import module java.base;
+import module java.xml;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -12,8 +13,11 @@ import build.jenesis.SequencedProperties;
 public abstract class ProcessBuildStep implements BuildStep {
 
     public static final String PROCESS = "process/", ENVIRONMENT = "environment/";
-    protected static final Charset NATIVE_ENCODING = nativeEncoding();
+    private static final SAXParserFactory REPORTS = reports();
     private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
+    private static final int TAIL = 200;
+    private static final int KILLED = 128 + 9;
+    private static final Pattern UNQUOTED = Pattern.compile("[A-Za-z0-9_@%+=:,./-]+");
 
     static {
         if (System.getProperty("java.home") == null) {
@@ -30,7 +34,7 @@ public abstract class ProcessBuildStep implements BuildStep {
     protected final transient Terms terms;
 
     protected ProcessBuildStep(String command, Function<List<String>, ? extends ProcessHandler> factory) {
-        this(command, factory, Terms.of(command));
+        this(command, factory, new Terms());
     }
 
     protected ProcessBuildStep(String command,
@@ -41,14 +45,18 @@ public abstract class ProcessBuildStep implements BuildStep {
         this.terms = terms;
     }
 
-    public record Terms(BiConsumer<Boolean, String> printing, Semaphore permits, Consumer<String> announcing) {
+    public record Terms(BiConsumer<Boolean, String> printing,
+                        Semaphore permits,
+                        Consumer<String> announcing,
+                        Consumer<String> reporting,
+                        int tail) {
 
-        public static Terms of(String command) {
-            return ofEnvironment(Environment.NONE, command, false);
-        }
-
-        public static Terms of(String command, boolean printing) {
-            return ofEnvironment(Environment.NONE, command, printing);
+        public Terms() {
+            this(null,
+                    PERMITS.computeIfAbsent(Runtime.getRuntime().availableProcessors(), Semaphore::new),
+                    null,
+                    null,
+                    TAIL);
         }
 
         public static Terms ofEnvironment(Environment environment, String command) {
@@ -58,9 +66,14 @@ public abstract class ProcessBuildStep implements BuildStep {
         public static Terms ofEnvironment(Environment environment,
                                    String command,
                                    boolean printing) {
-            int concurrency = environment.number("process.concurrency", 0);
+            int concurrency = environment.number("process.concurrency", Runtime.getRuntime().availableProcessors());
             if (concurrency < 0) {
                 throw new IllegalArgumentException("Process concurrency must not be negative: " + concurrency);
+            }
+            int tail = environment.number("process.tail", TAIL);
+            if (tail < 0) {
+                throw new IllegalArgumentException("jenesis.process.tail is " + tail
+                        + ", but names how many lines of a failed tool's output to print: 0 or more, 0 printing all");
             }
             boolean streamed = environment.flag("print." + command,
                     environment.flag("print.process", printing));
@@ -74,23 +87,32 @@ public abstract class ProcessBuildStep implements BuildStep {
                     environment.flag("print.command")
                             ? executed -> out.accept("%s%-11s%s %s".formatted(
                                     palette.info(), "[EXECUTED]", palette.reset(), executed))
-                            : null);
+                            : null,
+                    environment.flag("print.findings", true)
+                            ? found -> out.accept("%s%-11s%s %s".formatted(
+                                    palette.warning(), "[FINDINGS]", palette.reset(), found))
+                            : null,
+                    tail);
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {
-            return new Terms(printing, permits, announcing);
+            return new Terms(printing, permits, announcing, reporting, tail);
         }
-    }
 
-    private static Charset nativeEncoding() {
-        String name = System.getProperty("native.encoding");
-        if (name == null) {
-            return Charset.defaultCharset();
+        public Terms permits(Semaphore permits) {
+            return new Terms(printing, permits, announcing, reporting, tail);
         }
-        try {
-            return Charset.forName(name);
-        } catch (IllegalArgumentException _) {
-            return Charset.defaultCharset();
+
+        public Terms announcing(Consumer<String> announcing) {
+            return new Terms(printing, permits, announcing, reporting, tail);
+        }
+
+        public Terms reporting(Consumer<String> reporting) {
+            return new Terms(printing, permits, announcing, reporting, tail);
+        }
+
+        public Terms tail(int tail) {
+            return new Terms(printing, permits, announcing, reporting, tail);
         }
     }
 
@@ -149,7 +171,7 @@ public abstract class ProcessBuildStep implements BuildStep {
         if (printing == null) {
             return null;
         }
-        printing.accept(false, String.join(" ", handler.commands()));
+        printing.accept(false, shell(handler.commands()));
         return new ProcessHandler.Tee(executor,
                 line -> printing.accept(false, line),
                 line -> printing.accept(true, line));
@@ -187,12 +209,38 @@ public abstract class ProcessBuildStep implements BuildStep {
                 for (String value : entry.getValue().split("\n")) {
                     prepended.add(entry.getKey());
                     if (!value.isEmpty()) {
-                        prepended.add(value);
+                        prepended.addAll(List.of(value.split("\t")));
                     }
                 }
             }
         }
         return prepended;
+    }
+
+    private static SAXParserFactory reports() {
+        SAXParserFactory factory = SAXParserFactory.newDefaultInstance();
+        try {
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        } catch (ParserConfigurationException | SAXException e) {
+            throw new IllegalStateException(e);
+        }
+        return factory;
+    }
+
+    protected static boolean parsed(Path report, DefaultHandler handler) throws IOException {
+        try {
+            REPORTS.newSAXParser().parse(report.toFile(), handler);
+            return true;
+        } catch (SAXException _) {
+            return false;
+        } catch (ParserConfigurationException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    protected Optional<String> diagnosis(BuildStepContext context) throws IOException {
+        return Optional.empty();
     }
 
     public boolean acceptableExitCode(int code,
@@ -219,11 +267,12 @@ public abstract class ProcessBuildStep implements BuildStep {
                 commands.addAll(processed);
                 Path output = context.supplement().resolve("output"), error = context.supplement().resolve("error");
                 ProcessHandler handler = environment(handler(context, commands), arguments);
-                Files.writeString(context.supplement().resolve("command"), String.join(" ", handler.commands()));
+                String executed = shell(handler.commands());
+                Files.writeString(context.supplement().resolve("command"), executed);
                 ProcessHandler.Tee tee = tee(executor, handler);
                 Consumer<String> announcing = terms.announcing();
                 if (announcing != null) {
-                    announcing.accept(String.join(" ", handler.commands()));
+                    announcing.accept(executed);
                 }
                 executor.execute(() -> {
                     worker.set(Thread.currentThread());
@@ -232,12 +281,18 @@ public abstract class ProcessBuildStep implements BuildStep {
                         if (acceptableExitCode(exitCode, executor, context, arguments)) {
                             future.complete(new BuildStepResult(true));
                         } else {
-                            String outputString = Files.exists(output) ? new String(Files.readAllBytes(output), NATIVE_ENCODING) : "";
-                            String errorString = Files.exists(error) ? new String(Files.readAllBytes(error), NATIVE_ENCODING) : "";
                             throw new IllegalStateException("Unexpected exit code: " + exitCode + "\n"
-                                    + "To reproduce, execute:\n " + String.join(" ", handler.commands())
-                                    + (outputString.isBlank() ? "" : ("\n\nOutput:\n" + outputString))
-                                    + (errorString.isBlank() ? "" : ("\n\nError:\n" + errorString)));
+                                    + (exitCode == KILLED && handler.external()
+                                            ? "The process was killed with SIGKILL, possibly by the kernel's"
+                                                    + " out-of-memory killer: lower jenesis.process.concurrency, or the"
+                                                    + " heap of the JVM it runs, as -Xmx in process-test.properties for"
+                                                    + " the tests\n"
+                                            : "")
+                                    + diagnosis(context).map(diagnosis -> diagnosis + "\n").orElse("")
+                                    + "To reproduce, execute:\n "
+                                    + executed
+                                    + tail("Output", output)
+                                    + tail("Error", error));
                         }
                     } catch (Throwable t) {
                         future.completeExceptionally(t);
@@ -260,6 +315,41 @@ public abstract class ProcessBuildStep implements BuildStep {
             }
         });
         return result;
+    }
+
+    protected String tail(String label, Path file) throws IOException {
+        if (!Files.exists(file)) {
+            return "";
+        }
+        Deque<String> lines = new ArrayDeque<>();
+        long total = 0;
+        boolean blank = true;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(Files.newInputStream(file),
+                StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                total++;
+                blank &= line.isBlank();
+                lines.addLast(line);
+                if (terms.tail() > 0 && lines.size() > terms.tail()) {
+                    lines.removeFirst();
+                }
+            }
+        }
+        if (blank) {
+            return "";
+        }
+        return "\n\n" + label
+                + (lines.size() < total
+                        ? ", the last " + lines.size() + " out of " + total + " lines - " + file + " holds all of them"
+                        : "")
+                + ":\n" + String.join("\n", lines) + "\n";
+    }
+
+    protected static String shell(List<String> words) {
+        return words.stream()
+                .map(word -> UNQUOTED.matcher(word).matches() ? word : "'" + word.replace("'", "'\\''") + "'")
+                .collect(Collectors.joining(" "));
     }
 
     public static List<String> argumentFile(Path file, SequencedMap<String, String> options) throws IOException {

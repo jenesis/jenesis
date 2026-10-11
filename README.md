@@ -222,7 +222,9 @@ Read [jenesis.build](https://jenesis.build) first: the concepts a contributor ne
 incremental change detection, the extension points - are documented there rather than duplicated here. Beyond
 that the source is the reference, every public type under `sources/build/jenesis/` being small enough to read
 end to end, with the tests as executable documentation of the API. `java build/jenesis/Make.java skill/start`
-prints the same material as an agent briefing, an overview with a page per topic, as `skill/tags`.
+prints the same material as an agent briefing, an overview with a page per topic, as `skill/tags`. A user hands an
+agent the move of a Maven or Gradle build by entering `! java build/jenesis/Make.java prompt/migrate` in its
+prompt, which prints that task, or by pasting what the command prints.
 
 Two conventions govern the code here:
 

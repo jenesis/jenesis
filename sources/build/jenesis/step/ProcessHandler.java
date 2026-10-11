@@ -31,6 +31,10 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
     }
 
+    private static Writer writer(Path file) throws IOException {
+        return new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(file), StandardCharsets.UTF_8));
+    }
+
     enum Factory {
         TOOL {
             @Override
@@ -123,13 +127,13 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
         private int run(Path output, Path error, Tee tee) throws IOException {
             if (tee == null) {
-                try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(output, encoding()));
-                     PrintWriter err = new PrintWriter(Files.newBufferedWriter(error, encoding()))) {
+                try (PrintWriter out = new PrintWriter(writer(output));
+                     PrintWriter err = new PrintWriter(writer(error))) {
                     return toolProvider.run(out, err, commands.toArray(String[]::new));
                 }
             }
-            try (PrintWriter out = new PrintWriter(new LineTee(Files.newBufferedWriter(output, encoding()), tee.out()), true);
-                 PrintWriter err = new PrintWriter(new LineTee(Files.newBufferedWriter(error, encoding()), tee.err()), true)) {
+            try (PrintWriter out = new PrintWriter(new LineTee(writer(output), tee.out()), true);
+                 PrintWriter err = new PrintWriter(new LineTee(writer(error), tee.err()), true)) {
                 return toolProvider.run(out, err, commands.toArray(String[]::new));
             }
         }
@@ -187,20 +191,33 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
         private final List<String> commands;
         private final SortedMap<String, String> environment;
+        private final Path directory;
+        private final Charset output, error;
 
         private OfProcess(List<String> commands) {
+            this(commands, encoding(), encoding());
+        }
+
+        private OfProcess(List<String> commands, Charset output, Charset error) {
             SortedMap<String, String> environment = new TreeMap<>(WINDOWS ? String.CASE_INSENSITIVE_ORDER : null);
             System.getenv().forEach((name, value) -> {
                 if (name.startsWith("LC_") || PLATFORM.contains(WINDOWS ? name.toUpperCase(Locale.ROOT) : name)) {
                     environment.put(name, value);
                 }
             });
-            this(commands, environment);
+            this(commands, environment, null, output, error);
         }
 
-        private OfProcess(List<String> commands, SortedMap<String, String> environment) {
+        private OfProcess(List<String> commands,
+                          SortedMap<String, String> environment,
+                          Path directory,
+                          Charset output,
+                          Charset error) {
             this.commands = commands;
             this.environment = Collections.unmodifiableSortedMap(environment);
+            this.directory = directory;
+            this.output = output;
+            this.error = error;
         }
 
         public static Function<List<String>, OfProcess> ofJavaHome(String command) {
@@ -213,7 +230,14 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             } else {
                 File program = new File(home, command + (WINDOWS ? ".exe" : ""));
                 if (program.isFile()) {
-                    return of(List.of(program.getPath()));
+                    String option = command.equals("bin/java") ? "-D" : "-J-D";
+                    return arguments -> {
+                        List<String> commands = new ArrayList<>(List.of(program.getPath()));
+                        Charset output = printing(arguments, option + "stdout.encoding=", commands),
+                                error = printing(arguments, option + "stderr.encoding=", commands);
+                        commands.addAll(arguments);
+                        return new OfProcess(List.copyOf(commands), output, error);
+                    };
                 } else {
                     throw new IllegalStateException("Could not find command " + program.getPath() + " in " + home);
                 }
@@ -228,6 +252,22 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                         : Stream.of(located);
                 return new OfProcess(Stream.concat(program, arguments.stream()).toList());
             };
+        }
+
+        private static Charset printing(List<String> arguments, String option, List<String> commands) {
+            for (String argument : arguments) {
+                if (argument.startsWith(option)) {
+                    String name = argument.substring(option.length());
+                    try {
+                        return Charset.forName(name);
+                    } catch (IllegalArgumentException e) {
+                        throw new IllegalArgumentException(argument + " names no charset this JVM knows,"
+                                + " so what the tool prints cannot be read: name one such as UTF-8, the default", e);
+                    }
+                }
+            }
+            commands.add(option + "UTF-8");
+            return StandardCharsets.UTF_8;
         }
 
         private static String locate(String command) {
@@ -305,7 +345,15 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess environment(SortedMap<String, String> environment) {
-            return new OfProcess(commands, new TreeMap<>(environment));
+            return new OfProcess(commands, new TreeMap<>(environment), directory, output, error);
+        }
+
+        public Path directory() {
+            return directory;
+        }
+
+        public OfProcess directory(Path directory) {
+            return new OfProcess(commands, new TreeMap<>(environment), directory, output, error);
         }
 
         @Override
@@ -316,8 +364,8 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         @Override
         public int execute(Path output, Path error, Tee tee) throws IOException {
             ProcessBuilder builder = new ProcessBuilder(commands);
-            if (tee == null) {
-                builder.redirectOutput(output.toFile()).redirectError(error.toFile());
+            if (directory != null) {
+                builder.directory(directory.toFile());
             }
             builder.environment().clear();
             builder.environment().putAll(environment);
@@ -326,27 +374,23 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             builder.environment().putIfAbsent("TERM", "dumb");
             Process process = builder.start();
             process.getOutputStream().close();
-            CompletableFuture<Void> errored = null;
-            if (tee != null) {
-                CompletableFuture<Void> target = new CompletableFuture<>();
-                errored = target;
-                tee.executor().execute(() -> {
-                    try {
-                        drain(process.getErrorStream(), error, tee.err());
-                        target.complete(null);
-                    } catch (Throwable t) {
-                        target.completeExceptionally(t);
-                    }
-                });
+            CompletableFuture<Void> errored, printed;
+            if (tee == null) {
+                errored = drain(Thread.ofVirtual()::start, process.getErrorStream(), this.error, error, null);
+                printed = drain(Thread.ofVirtual()::start, process.getInputStream(), this.output, output, null);
+            } else {
+                errored = drain(tee.executor(), process.getErrorStream(), this.error, error, tee.err());
+                printed = null;
             }
             try {
                 if (tee != null) {
-                    drain(process.getInputStream(), output, tee.out());
+                    drain(process.getInputStream(), this.output, output, tee.out());
                 }
                 int code = process.waitFor();
-                if (errored != null) {
-                    errored.join();
+                if (printed != null) {
+                    printed.join();
                 }
+                errored.join();
                 return code;
             } catch (InterruptedException e) {
                 process.destroyForcibly();
@@ -359,15 +403,46 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             }
         }
 
-        private static void drain(InputStream stream, Path file, Consumer<String> consumer) throws IOException {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, encoding()));
-                 BufferedWriter writer = Files.newBufferedWriter(file, encoding())) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    writer.write(line);
-                    writer.newLine();
-                    writer.flush();
-                    consumer.accept(line);
+        private static CompletableFuture<Void> drain(Executor executor,
+                                                     InputStream stream,
+                                                     Charset encoding,
+                                                     Path file,
+                                                     Consumer<String> consumer) {
+            CompletableFuture<Void> drained = new CompletableFuture<>();
+            executor.execute(() -> {
+                try {
+                    drain(stream, encoding, file, consumer);
+                    drained.complete(null);
+                } catch (Throwable t) {
+                    drained.completeExceptionally(t);
+                }
+            });
+            return drained;
+        }
+
+        private static void drain(InputStream stream, Charset encoding, Path file, Consumer<String> consumer)
+                throws IOException {
+            try (Reader reader = new InputStreamReader(stream, encoding);
+                 Writer writer = writer(file)) {
+                StringBuilder line = new StringBuilder();
+                char[] buffer = new char[8192];
+                int read;
+                while ((read = reader.read(buffer)) != -1) {
+                    writer.write(buffer, 0, read);
+                    if (consumer == null) {
+                        continue;
+                    }
+                    for (int index = 0; index < read; index++) {
+                        if (buffer[index] == '\n') {
+                            consumer.accept(line.toString());
+                            line.setLength(0);
+                        } else if (buffer[index] != '\r') {
+                            line.append(buffer[index]);
+                        }
+                    }
+                }
+                if (consumer != null && !line.isEmpty()) {
+                    consumer.accept(line.toString());
                 }
             }
         }

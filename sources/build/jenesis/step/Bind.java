@@ -12,29 +12,36 @@ import build.jenesis.SequencedProperties;
 public class Bind implements BuildStep {
 
     private static final String BOUND = "bound";
+    private static final Set<String> IDE_FILES = Set.of(".classpath", ".project", ".settings", ".factorypath", ".eclipse");
 
     private final Map<Path, Path> paths;
     private final Set<String> extensions;
+    private final boolean ide;
 
     public Bind(Map<Path, Path> paths) {
-        this(paths, null);
+        this(paths, null, true);
     }
 
-    private Bind(Map<Path, Path> paths, Set<String> extensions) {
+    private Bind(Map<Path, Path> paths, Set<String> extensions, boolean ide) {
         this.paths = paths;
         this.extensions = extensions;
+        this.ide = ide;
     }
 
     public Bind extensions(Set<String> extensions) {
-        return new Bind(paths, extensions);
+        return new Bind(paths, extensions, ide);
+    }
+
+    public Bind ide(boolean ide) {
+        return new Bind(paths, extensions, ide);
     }
 
     public static Bind asSources() {
-        return new Bind(Map.of(Path.of("."), Path.of(SOURCES)));
+        return new Bind(Map.of(Path.of("."), Path.of(SOURCES))).ide(false);
     }
 
     public static Bind asResources() {
-        return new Bind(Map.of(Path.of("."), Path.of(RESOURCES)));
+        return new Bind(Map.of(Path.of("."), Path.of(RESOURCES))).ide(false);
     }
 
     public static Bind asIdentity(String name) {
@@ -79,6 +86,16 @@ public class Bind implements BuildStep {
                                                                   Function<M, BuildExecutorModule> configurator,
                                                                   Path configurationFile,
                                                                   Supplier<M> module) {
+        configured(buildExecutor, inputs, name, configurator, configurationFile, Collections.emptyNavigableSet(), module);
+    }
+
+    public static <M extends BuildExecutorModule> void configured(BuildExecutor buildExecutor,
+                                                                  SequencedSet<String> inputs,
+                                                                  String name,
+                                                                  Function<M, BuildExecutorModule> configurator,
+                                                                  Path configurationFile,
+                                                                  SequencedSet<Path> siblings,
+                                                                  Supplier<M> module) {
         if (configurator == null || configurationFile == null) {
             return;
         }
@@ -87,9 +104,19 @@ public class Bind implements BuildStep {
             return;
         }
         buildExecutor.addModule(name, (nested, inherited) -> {
-            nested.addSource("configuration",
-                    new Bind(Map.of(Path.of(""), configurationFile.getFileName())),
-                    configurationFile);
+            if (siblings.isEmpty()) {
+                nested.addSource("configuration",
+                        new Bind(Map.of(Path.of(""), configurationFile.getFileName())),
+                        configurationFile);
+            } else {
+                SequencedSet<String> sources = new LinkedHashSet<>();
+                for (Path file : Stream.concat(Stream.of(configurationFile.getFileName()), siblings.stream()).toList()) {
+                    String source = "configuration-" + sources.size();
+                    nested.addSource(source, new Bind(Map.of(Path.of(""), file)), configurationFile.resolveSibling(file));
+                    sources.add(source);
+                }
+                nested.addStep("configuration", new Bind(Map.of(Path.of(""), Path.of(""))), sources);
+            }
             SequencedSet<String> toolInputs = new LinkedHashSet<>();
             toolInputs.add("configuration");
             toolInputs.addAll(inherited.sequencedKeySet());
@@ -146,6 +173,10 @@ public class Bind implements BuildStep {
                                 @Override
                                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
                                         throws IOException {
+                                    if (!ide && source.equals(dir.getParent())
+                                            && IDE_FILES.contains(dir.getFileName().toString())) {
+                                        return FileVisitResult.SKIP_SUBTREE;
+                                    }
                                     if (!filtered) {
                                         Files.createDirectories(target.resolve(source.relativize(dir)));
                                     }
@@ -155,15 +186,17 @@ public class Bind implements BuildStep {
                                 @Override
                                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
                                         throws IOException {
-                                    if (filtered && extensions.stream()
-                                            .noneMatch(file.getFileName().toString()::endsWith)) {
+                                    String name = file.getFileName().toString();
+                                    if (filtered && extensions.stream().noneMatch(name::endsWith)
+                                            || !ide && source.equals(file.getParent())
+                                            && (IDE_FILES.contains(name) || name.endsWith(".iml"))) {
                                         return FileVisitResult.CONTINUE;
                                     }
                                     Path resolved = target.resolve(source.relativize(file));
                                     if (filtered) {
                                         Files.createDirectories(resolved.getParent());
                                     }
-                                    BuildStep.linkOrCopy(resolved, file);
+                                    BuildStep.linkOrCopy(resolved, Files.isSymbolicLink(file) ? file.toRealPath() : file);
                                     return FileVisitResult.CONTINUE;
                                 }
                             });

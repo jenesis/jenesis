@@ -94,6 +94,40 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_pin_reads_a_repository_first_token_in_the_group_of_the_module() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin maven/org.glassfish/jakarta.json/jar/module 2.0.1
+                 */
+                module foo {
+                    requires bar;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.versions())
+                .as("a classified coordinate is spelt as a key of a pin-<name>.properties file spells it")
+                .containsOnlyKeys("main/maven/org.glassfish/jakarta.json/jar/module")
+                .containsEntry("main/maven/org.glassfish/jakarta.json/jar/module", "2.0.1");
+    }
+
+    @Test
+    public void jenesis_pin_refuses_a_classified_coordinate_that_reads_as_a_group() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin org.glassfish/jakarta.json/jar/module 2.0.1
+                 */
+                module foo {
+                    requires bar;
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("a group named like a groupId would be stored where no resolution ever looks")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.pin token 'org.glassfish/jakarta.json/jar/module'")
+                .hasMessageContaining("written maven/org.glassfish/jakarta.json/jar/module");
+    }
+
+    @Test
     public void jenesis_pin_tolerates_surrounding_whitespace() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
@@ -125,6 +159,51 @@ public class ModuleInfoParserTest {
                 .containsEntry("toolkit.lib", "org.example/plain-lib")
                 .containsEntry("other.lib", "org.example/other-lib")
                 .containsEntry("natives.lib", "org.example/plain-lib/jar/natives-linux");
+    }
+
+    @Test
+    public void jenesis_pin_of_an_aliased_module_name_pins_the_coordinate_of_its_alias() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin toolkit.lib 1.2.3 SHA-256/abc
+                 * @jenesis.alias toolkit.lib org.example/plain-lib
+                 * @jenesis.pin natives.lib 2.0 (linux-x86_64)
+                 * @jenesis.alias natives.lib org.example/plain-lib/jar/natives-linux
+                 * @jenesis.pin other.lib 3.0
+                 */
+                module foo {
+                    requires toolkit.lib;
+                    requires natives.lib;
+                    requires other.lib;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.versions())
+                .as("an aliased module resolves as the coordinate its alias names, which is what its pin must name")
+                .containsEntry("main/maven/org.example/plain-lib", "1.2.3 SHA-256/abc")
+                .containsEntry("main/module/other.lib", "3.0")
+                .doesNotContainKey("main/module/toolkit.lib");
+        assertThat(info.variants())
+                .containsKey("main/maven/org.example/plain-lib/jar/natives-linux")
+                .doesNotContainKey("main/module/natives.lib");
+    }
+
+    @Test
+    public void jenesis_pin_refuses_an_aliased_module_name_and_its_coordinate_pinned_apart() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias toolkit.lib org.example/plain-lib
+                 * @jenesis.pin toolkit.lib 1.2.3
+                 * @jenesis.pin org.example/plain-lib 1.2.4
+                 */
+                module foo {
+                    requires toolkit.lib;
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("toolkit.lib at 1.2.3")
+                .hasMessageContaining("org.example/plain-lib, at 1.2.4");
     }
 
     @Test
@@ -364,6 +443,44 @@ public class ModuleInfoParserTest {
         assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("platform modules cannot be aliased");
+    }
+
+    @Test
+    public void jenesis_plugin_refuses_a_version_written_after_the_coordinate() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.plugin maven/org.jboss.logging/jboss-logging-processor 3.6.1.Final
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("a version beside the coordinate would otherwise become part of a file name to fetch")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.plugin declaration"
+                        + " 'maven/org.jboss.logging/jboss-logging-processor 3.6.1.Final'")
+                .hasMessageContaining("maven/<groupId>/<artifactId>/<version>");
+    }
+
+    @Test
+    public void a_java_prefixed_module_the_jdk_does_not_hold_is_a_dependency_and_can_be_aliased() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias java.money javax.money/money-api
+                 */
+                module foo {
+                    requires java.sql;
+                    requires static java.money;
+                    requires jdk.unsupported;
+                    requires jdk.example.library;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.requires())
+                .as("only a module of the running JDK is a platform module, whatever its name starts with")
+                .containsExactly("java.money", "jdk.example.library");
+        assertThat(info.runtimeRequires()).containsExactly("jdk.example.library");
+        assertThat(info.aliases()).containsEntry("java.money", "javax.money/money-api");
     }
 
     @Test

@@ -45,11 +45,31 @@ public class IdeTest {
     }
 
     @Test
+    public void idea_writes_the_module_whose_path_holds_dots() throws IOException {
+        Files.createDirectories(root.resolve("modules").resolve("org.example.cli").resolve("sources"));
+        Path inventory = inventory("module-cli", properties -> {
+            properties.setProperty("module-modules/org.example.cli.path", "modules/org.example.cli");
+            properties.setProperty("module-modules/org.example.cli.release", "21");
+            properties.setProperty("module-modules/org.example.cli.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
+        });
+        library(inventory, "lib.jar");
+
+        run(Ide.IDEA, inventory);
+
+        Path iml = root.resolve("modules").resolve("org.example.cli").resolve("modules.org.example.cli.iml");
+        assertThat(sourceFolders(iml)).containsExactly(Map.entry("file://$MODULE_DIR$/sources", false));
+        assertThat(libraryUrls(iml))
+                .as("the dependencies are read under the module's whole prefix, not one cut at the first dot")
+                .hasSize(1);
+        assertThat(modulePaths()).containsExactly("$PROJECT_DIR$/modules/org.example.cli/modules.org.example.cli.iml");
+    }
+
+    @Test
     public void idea_resolves_libraries_below_the_module_directory() throws IOException {
         Files.createDirectories(root.resolve("nested").resolve("greeter").resolve("sources"));
         Path inventory = inventory("module-greeter", properties -> {
-            properties.setProperty("module-greeter.path", "nested/greeter");
-            properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
+            properties.setProperty("module-nested/greeter.path", "nested/greeter");
+            properties.setProperty("module-nested/greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
         });
         library(inventory, "lib.jar");
 
@@ -201,14 +221,14 @@ public class IdeTest {
         Files.createDirectories(root.resolve("format").resolve("spi"));
         Files.createDirectories(root.resolve("app"));
         Path store = inventory("module-store", properties -> {
-            properties.setProperty("module-store.path", "store/spi");
-            properties.setProperty("module-store.module", "app.store");
-            properties.setProperty("module-store.identity.0", "maven/org.example/store/1.0");
+            properties.setProperty("module-store/spi.path", "store/spi");
+            properties.setProperty("module-store/spi.module", "app.store");
+            properties.setProperty("module-store/spi.identity.0", "maven/org.example/store/1.0");
         });
         Path format = inventory("module-format", properties -> {
-            properties.setProperty("module-format.path", "format/spi");
-            properties.setProperty("module-format.module", "app.format");
-            properties.setProperty("module-format.identity.0", "maven/org.example/format/1.0");
+            properties.setProperty("module-format/spi.path", "format/spi");
+            properties.setProperty("module-format/spi.module", "app.format");
+            properties.setProperty("module-format/spi.identity.0", "maven/org.example/format/1.0");
         });
         Path app = inventory("module-app", properties -> {
             properties.setProperty("module-app.path", "app");
@@ -239,6 +259,50 @@ public class IdeTest {
 
         assertThat(sourceFolders(root.resolve("greeter-test").resolve("greeter-test.iml")))
                 .containsExactly(Map.entry("file://$MODULE_DIR$/sources", true));
+    }
+
+    @Test
+    public void idea_folds_the_tests_of_a_pom_module_into_its_one_module_with_the_main_sources_as_production() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("src/main/java"));
+        Files.createDirectories(root.resolve("greeter").resolve("src/test/java"));
+        Path main = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
+        });
+        library(main, "lib.jar");
+        Path test = inventory("test-module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.test", "greeter");
+            properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
+            properties.setProperty("module-greeter.dependency.1", "maven/org.example/testing/1.0 lib/testing.jar");
+        });
+        library(test, "lib.jar");
+        library(test, "testing.jar");
+
+        run(Ide.IDEA, main, test);
+
+        Path iml = root.resolve("greeter").resolve("greeter.iml");
+        assertThat(modulePaths())
+                .as("the main and the test half of a pom.xml module share its folder and are one module")
+                .containsExactly("$PROJECT_DIR$/greeter/greeter.iml");
+        assertThat(sourceFolders(iml)).containsExactly(
+                Map.entry("file://$MODULE_DIR$/src/main/java", false),
+                Map.entry("file://$MODULE_DIR$/src/test/java", true));
+        assertThat(attributes(iml, "orderEntry", "scope"))
+                .as("what only the tests resolve is a test library")
+                .containsExactly("", "", "", "TEST");
+    }
+
+    @Test
+    public void idea_marks_no_folder_that_holds_another_source_folder_as_a_source_folder() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("src/main/java"));
+        Path inventory = inventory("module-greeter", properties ->
+                properties.setProperty("module-greeter.path", "greeter"));
+
+        run(Ide.IDEA, inventory);
+
+        assertThat(sourceFolders(root.resolve("greeter").resolve("greeter.iml")))
+                .containsExactly(Map.entry("file://$MODULE_DIR$/src/main/java", false));
     }
 
     @Test

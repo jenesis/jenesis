@@ -19,7 +19,7 @@ public abstract class Java extends EnvironmentalProcessBuildStep {
                    PathPlacement pathPlacement,
                    boolean jarsOnly,
                    String group) {
-        this(factory, pathPlacement, jarsOnly, group, Terms.of("java"));
+        this(factory, pathPlacement, jarsOnly, group, new Terms());
     }
 
     protected Java(Function<List<String>, ? extends ProcessHandler> factory,
@@ -127,29 +127,68 @@ public abstract class Java extends EnvironmentalProcessBuildStep {
         SequencedMap<String, Path> pool = new LinkedHashMap<>();
         SequencedMap<Path, Boolean> placed = new LinkedHashMap<>();
         SequencedSet<String> natives = new LinkedHashSet<>();
+        Set<String> selected = new HashSet<>();
         ModuleGraph graph = new ModuleGraph();
+        SequencedMap<Path, Set<String>> contents = new LinkedHashMap<>();
+        if (!jarsOnly) {
+            for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
+                for (String folder : List.of(Javac.CLASSES, Bind.RESOURCES)) {
+                    Path candidate = argument.folder().resolve(folder);
+                    if (Files.isDirectory(candidate)) {
+                        try (Stream<Path> files = Files.walk(candidate)) {
+                            contents.put(candidate, files.filter(Files::isRegularFile)
+                                    .map(file -> candidate.relativize(file).toString().replace(File.separatorChar, '/'))
+                                    .collect(Collectors.toSet()));
+                        }
+                    }
+                }
+            }
+        }
+        List<Path> candidates = List.copyOf(contents.sequencedKeySet());
+        Set<Path> superseded = new HashSet<>();
+        for (int index = 0; index < candidates.size(); index++) {
+            Set<String> held = contents.get(candidates.get(index));
+            for (int other = 0; other < candidates.size(); other++) {
+                Set<String> covering = contents.get(candidates.get(other));
+                if (other != index && covering.containsAll(held) && (other > index || covering.size() > held.size())) {
+                    superseded.add(candidates.get(index));
+                }
+            }
+        }
+        Set<String> placedEntries = new HashSet<>();
+        contents.forEach((folder, entries) -> {
+            if (!superseded.contains(folder)) {
+                placedEntries.addAll(entries);
+            }
+        });
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
             BuildStepArgument argument = entry.getValue();
             if (argument.removed()) {
                 continue;
             }
-            if (!jarsOnly) {
-                for (String folder : List.of(Javac.CLASSES, Bind.RESOURCES)) {
-                    Path candidate = argument.folder().resolve(folder);
-                    if (Files.isDirectory(candidate)) {
-                        graph.place(pathPlacement, candidate, modulePath, classPath);
-                    }
+            for (String folder : List.of(Javac.CLASSES, Bind.RESOURCES)) {
+                Path candidate = argument.folder().resolve(folder);
+                if (contents.containsKey(candidate) && !superseded.contains(candidate)) {
+                    graph.place(pathPlacement, candidate, modulePath, classPath);
                 }
             }
             Path artifacts = argument.folder().resolve(ARTIFACTS);
             if (Files.isDirectory(artifacts)) {
                 try (DirectoryStream<Path> files = Files.newDirectoryStream(artifacts)) {
                     for (Path file : files) {
-                        graph.place(pathPlacement, file, modulePath, classPath);
+                        if (placedEntries.isEmpty() || !packages(file, placedEntries)) {
+                            graph.place(pathPlacement, file, modulePath, classPath);
+                        }
                     }
                 }
             }
             for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
+                if (!selected.add(file.getFileName().toString())) {
+                    continue;
+                }
                 boolean module = graph.place(pathPlacement, file);
                 (module ? modulePath : classPath).add(file.toString());
                 placed.putIfAbsent(file, module);
@@ -263,6 +302,18 @@ public abstract class Java extends EnvironmentalProcessBuildStep {
                 return CompletableFuture.failedStage(e);
             }
         }, executor);
+    }
+
+    private static boolean packages(Path file, Set<String> entries) throws IOException {
+        if (!Files.isRegularFile(file) || !file.getFileName().toString().endsWith(".jar")) {
+            return false;
+        }
+        try (ZipFile zip = new ZipFile(file.toFile())) {
+            return zip.stream().anyMatch(entry -> !entry.isDirectory()
+                    && !entry.getName().startsWith("META-INF/")
+                    && !entry.getName().equals("module-info.class")
+                    && entries.contains(entry.getName()));
+        }
     }
 
     private static String path(SequencedSet<String> names, SequencedMap<String, Path> pool) {

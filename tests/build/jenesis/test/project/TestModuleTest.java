@@ -3,14 +3,17 @@ package build.jenesis.test.project;
 import module java.base;
 import module java.compiler;
 import module org.junit.jupiter.api;
+import module org.junit.jupiter.params;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
+import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.PathPlacement;
+import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
@@ -101,6 +104,203 @@ public class TestModuleTest {
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
+        assertThat(reportedErrors(supplement)).isEmpty();
+    }
+
+    @Test
+    public void runs_only_the_engines_the_selection_leaves_in() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false)
+                        .engines("-junit-jupiter"),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content()
+                .as("an engine left out discovers nothing, so its tests do not run")
+                .doesNotContain("Hello world!");
+    }
+
+    @Test
+    public void reads_its_resources_as_files_when_the_tests_run_against_folders() throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "FileTest", """
+                package sample;
+                public class FileTest {
+                    @org.junit.jupiter.api.Test
+                    public void test() throws Exception {
+                        java.io.File file = new java.io.File(getClass().getResource("/data.txt").toURI());
+                        System.out.println("Read " + java.nio.file.Files.readString(file.toPath()));
+                    }
+                }
+                """, bootModuleJars());
+        Files.writeString(Files.createDirectories(classes.resolve(BuildStep.RESOURCES)).resolve("data.txt"), "a file");
+        settings.put("test.jars", "false");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .isTest(candidate -> candidate.endsWith("FileTest")),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content()
+                .as("a resource in a folder has a file: URL, where one in a jar is not hierarchical")
+                .contains("Read a file");
+    }
+
+    @Test
+    public void runs_the_tests_in_the_directory_it_is_given_so_that_a_relative_path_names_a_file_of_the_module()
+            throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "DirectoryTest", """
+                package sample;
+                public class DirectoryTest {
+                    @org.junit.jupiter.api.Test
+                    public void test() throws Exception {
+                        try (java.io.InputStream input = new java.io.FileInputStream("src/test/fixture.txt")) {
+                            System.out.println("Read " + new String(input.readAllBytes())
+                                    + " below " + System.getProperty("basedir"));
+                        }
+                    }
+                }
+                """, bootModuleJars());
+        Files.writeString(Files.createDirectories(module.resolve("src/test")).resolve("fixture.txt"), "a fixture");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .isTest(candidate -> candidate.endsWith("DirectoryTest"))
+                        .jarsOnly(false)
+                        .directory(module),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content()
+                .as("a test JVM runs in the module's folder, as Surefire runs one in the module's basedir")
+                .contains("Read a fixture below " + module.toAbsolutePath());
+        assertThat(reportedErrors(supplement)).isEmpty();
+    }
+
+    @Test
+    public void a_failed_run_names_its_failed_tests_even_when_the_tests_swallow_the_output() throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "SilentTest", """
+                package sample;
+                public class SilentTest {
+                    @org.junit.jupiter.api.BeforeAll
+                    public static void silence() throws java.io.IOException {
+                        new java.io.FileOutputStream(java.io.FileDescriptor.out).close();
+                    }
+                    @org.junit.jupiter.api.Test
+                    public void fails() { throw new AssertionError("broken"); }
+                    @org.junit.jupiter.api.Test
+                    public void passes() { }
+                }
+                """, bootModuleJars());
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .isTest(candidate -> candidate.endsWith("SilentTest")).jarsOnly(false),
+                "dependencies", "classes");
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .as("the reports the runner writes name what failed whatever reached the console")
+                .hasMessageContaining("1 test failed")
+                .hasMessageContaining(":\n  sample.SilentTest#fails()\nTo reproduce")
+                .hasMessageNotContaining("passes()");
+    }
+
+    @Test
+    public void refuses_to_run_the_tests_of_a_module_on_the_module_path_against_folders() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                new TestModule(Map.of(), Map.of())
+                        .jarsOnly(false)
+                        .pathPlacement(PathPlacement.MODULE_PATH)
+                        .moduleName("sample"),
+                "dependencies", "classes");
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("module sample")
+                .hasMessageContaining("jenesis.test.jars=true");
+    }
+
+    @Test
+    public void selects_by_maven_naming_in_the_default_package_but_not_nested_or_versioned_classes() throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "PlainTest", """
+                public class PlainTest {
+                    @org.junit.jupiter.api.Test
+                    public void test() { System.out.println("Default package!"); }
+                    public static class HelperTest {
+                        @org.junit.jupiter.api.Test
+                        public void test() { System.out.println("Nested helper!"); }
+                    }
+                }
+                """, bootModuleJars());
+        Path versioned = Files.createDirectories(classes.resolve(Javac.CLASSES + "META-INF/versions/11/sample"));
+        Files.copy(classes.resolve(Javac.CLASSES + "sample/TestSample.class"), versioned.resolve("TestSample.class"));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .jarsOnly(false),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content()
+                .contains("Hello world!")
+                .contains("Default package!")
+                .as("a nested class is run by its enclosing class's engine, as Maven's default excludes leave it")
+                .doesNotContain("Nested helper!");
         assertThat(reportedErrors(supplement)).isEmpty();
     }
 
@@ -274,8 +474,14 @@ public class TestModuleTest {
         assertThat(reportedErrors(supplement)).isEmpty();
     }
 
-    @Test
-    public void opens_a_test_module_that_is_not_open_to_the_framework() throws Exception {
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = ".*")
+    public void opens_a_test_module_that_is_not_open_to_the_framework_and_never_selects_its_descriptor(String filter)
+            throws Exception {
+        if (filter != null) {
+            settings.put("test.filter", filter);
+        }
         Path output = Files.createDirectories(module.resolve(Javac.CLASSES));
         List<Path> modulePath = new ArrayList<>(bootModuleJars());
         modulePath.add(downloadJar(Files.createTempFile(root, "apiguardian", ".jar"),
@@ -382,21 +588,93 @@ public class TestModuleTest {
     }
 
     @Test
+    public void selects_by_name_only_the_junit4_classes_that_can_hold_tests() throws Exception {
+        Path junitJar = downloadJar(junit4Dependencies.resolve("junit-4.13.2.jar"),
+                "https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar",
+                "8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3");
+        Path hamcrestJar = downloadJar(junit4Dependencies.resolve("hamcrest-core-1.3.jar"),
+                "https://repo1.maven.org/maven2/org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar",
+                "66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9");
+        populateFilteredArtifacts(junit4Dependencies, Set.of("junit-4.13.2.jar", "hamcrest-core-1.3.jar"));
+        Path sampleClasses = classes.resolve(Javac.CLASSES + "sample");
+        List<Path> classPath = List.of(junitJar, hamcrestJar, sampleClasses.getParent());
+        compileSource(sampleClasses, "SampleTest", """
+                package sample;
+                public class SampleTest {
+                    @org.junit.Test
+                    public void test() { System.out.println("Annotated!"); }
+                }
+                """, classPath);
+        compileSource(sampleClasses, "AbstractBase", """
+                package sample;
+                public abstract class AbstractBase {
+                    @org.junit.Test
+                    public void test() { System.out.println("Inherited!"); }
+                }
+                """, classPath);
+        compileSource(sampleClasses, "InheritingTest", """
+                package sample;
+                public class InheritingTest extends AbstractBase { }
+                """, classPath);
+        compileSource(sampleClasses, "LegacyTest", """
+                package sample;
+                public class LegacyTest extends junit.framework.TestCase {
+                    public void testLegacy() { System.out.println("Legacy!"); }
+                }
+                """, classPath);
+        compileSource(sampleClasses, "TestTypes", """
+                package sample;
+                public class TestTypes {
+                    public static final String VALUE = "helper";
+                }
+                """, classPath);
+        compileSource(sampleClasses, "Holder", """
+                package sample;
+                public class Holder extends java.util.ArrayList<String> { }
+                """, classPath);
+        compileSource(sampleClasses, "RfcTests", """
+                package sample;
+                public class RfcTests extends Holder { }
+                """, classPath);
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("main/maven/junit/junit",
+                "4.13.2 SHA-256/8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3");
+        versions.setProperty("main/maven/org.hamcrest/hamcrest-core",
+                "1.3 SHA-256/66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9");
+        versions.store(junit4Dependencies.resolve(BuildStep.VERSIONS));
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/runtime/maven/junit/junit", "");
+        requires.store(junit4Dependencies.resolve(BuildStep.REQUIRES));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", junit4Dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnit4())
+                        .jarsOnly(false)
+                        .pathPlacement(PathPlacement.CLASS_PATH),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output"))
+                .as("a class named like a test that declares, inherits or extends none is not handed to the runner")
+                .content()
+                .contains("Annotated!", "Inherited!", "Legacy!", "OK (3 tests)")
+                .doesNotContain("initializationError");
+    }
+
+    @Test
     public void can_execute_testng() throws Exception {
-        Path testngJar = downloadJar(testngDependencies.resolve("testng-7.10.2.jar"),
-                "https://repo1.maven.org/maven2/org/testng/testng/7.10.2/testng-7.10.2.jar",
-                "225fd56447f2e5e439db3b483a79cd9f294fad9f357f8352b12ee6a3411ebb15");
-        Path jcommanderJar = downloadJar(testngDependencies.resolve("jcommander-1.82.jar"),
-                "https://repo1.maven.org/maven2/com/beust/jcommander/1.82/jcommander-1.82.jar",
-                "deeac157c8de6822878d85d0c7bc8467a19cc8484d37788f7804f039dde280b1");
-        Path slf4jJar = downloadJar(testngDependencies.resolve("slf4j-api-1.7.36.jar"),
-                "https://repo1.maven.org/maven2/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar",
-                "d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0");
-        Path jqueryJar = downloadJar(testngDependencies.resolve("jquery-3.7.1.jar"),
-                "https://repo1.maven.org/maven2/org/webjars/jquery/3.7.1/jquery-3.7.1.jar",
-                "262016dd3a559df87aefbe392804e9bf620787c9204c0ab8522d4c231ea65097");
-        populateFilteredArtifacts(testngDependencies, Set.of(
-                "testng-7.10.2.jar", "jcommander-1.82.jar", "slf4j-api-1.7.36.jar", "jquery-3.7.1.jar"));
+        Path testngJar = testngDependencies();
         Path sampleClasses = classes.resolve(Javac.CLASSES + "sample");
         compileSource(sampleClasses, "TestNGTestSample", """
                 package sample;
@@ -405,20 +683,6 @@ public class TestModuleTest {
                     public void test() { System.out.println("Hello world!"); }
                 }
                 """, List.of(testngJar));
-        SequencedProperties versions = new SequencedProperties();
-        versions.setProperty("main/maven/org.testng/testng",
-                "7.10.2 SHA-256/225fd56447f2e5e439db3b483a79cd9f294fad9f357f8352b12ee6a3411ebb15");
-        versions.setProperty("main/maven/com.beust/jcommander",
-                "1.82 SHA-256/deeac157c8de6822878d85d0c7bc8467a19cc8484d37788f7804f039dde280b1");
-        versions.setProperty("main/maven/org.slf4j/slf4j-api",
-                "1.7.36 SHA-256/d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0");
-        versions.setProperty("main/maven/org.webjars/jquery",
-                "3.7.1 SHA-256/262016dd3a559df87aefbe392804e9bf620787c9204c0ab8522d4c231ea65097");
-        versions.store(testngDependencies.resolve(BuildStep.VERSIONS));
-        SequencedProperties requires = new SequencedProperties();
-        requires.setProperty("main/runtime/maven/org.testng/testng", "");
-        requires.store(testngDependencies.resolve(BuildStep.REQUIRES));
-
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", testngDependencies);
         executor.addSource("classes", classes);
@@ -438,6 +702,72 @@ public class TestModuleTest {
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
+    }
+
+    @Test
+    public void names_the_test_class_testng_cannot_instantiate() throws Exception {
+        Path testngJar = testngDependencies();
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "BrokenTestNGSample", """
+                package sample;
+                public class BrokenTestNGSample {
+                    private static final Object LOG = log();
+                    private static Object log() { throw new IllegalStateException("Invalid logger interface"); }
+                    @org.testng.annotations.Test
+                    public void test() { }
+                }
+                """, List.of(testngJar));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", testngDependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new TestNG())
+                        .isTest(candidate -> candidate.endsWith("BrokenTestNGSample")).jarsOnly(false).pathPlacement(PathPlacement.CLASS_PATH),
+                "dependencies", "classes");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .as("TestNG exits with 8 and says nothing below -verbose 2 when it cannot create a test class")
+                .hasMessageContaining("An error occurred while instantiating class sample.BrokenTestNGSample")
+                .hasMessageContaining("Invalid logger interface");
+    }
+
+    private Path testngDependencies() throws Exception {
+        Path testngJar = downloadJar(testngDependencies.resolve("testng-7.10.2.jar"),
+                "https://repo1.maven.org/maven2/org/testng/testng/7.10.2/testng-7.10.2.jar",
+                "225fd56447f2e5e439db3b483a79cd9f294fad9f357f8352b12ee6a3411ebb15");
+        downloadJar(testngDependencies.resolve("jcommander-1.82.jar"),
+                "https://repo1.maven.org/maven2/com/beust/jcommander/1.82/jcommander-1.82.jar",
+                "deeac157c8de6822878d85d0c7bc8467a19cc8484d37788f7804f039dde280b1");
+        downloadJar(testngDependencies.resolve("slf4j-api-1.7.36.jar"),
+                "https://repo1.maven.org/maven2/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar",
+                "d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0");
+        downloadJar(testngDependencies.resolve("jquery-3.7.1.jar"),
+                "https://repo1.maven.org/maven2/org/webjars/jquery/3.7.1/jquery-3.7.1.jar",
+                "262016dd3a559df87aefbe392804e9bf620787c9204c0ab8522d4c231ea65097");
+        populateFilteredArtifacts(testngDependencies, Set.of(
+                "testng-7.10.2.jar", "jcommander-1.82.jar", "slf4j-api-1.7.36.jar", "jquery-3.7.1.jar"));
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("main/maven/org.testng/testng",
+                "7.10.2 SHA-256/225fd56447f2e5e439db3b483a79cd9f294fad9f357f8352b12ee6a3411ebb15");
+        versions.setProperty("main/maven/com.beust/jcommander",
+                "1.82 SHA-256/deeac157c8de6822878d85d0c7bc8467a19cc8484d37788f7804f039dde280b1");
+        versions.setProperty("main/maven/org.slf4j/slf4j-api",
+                "1.7.36 SHA-256/d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0");
+        versions.setProperty("main/maven/org.webjars/jquery",
+                "3.7.1 SHA-256/262016dd3a559df87aefbe392804e9bf620787c9204c0ab8522d4c231ea65097");
+        versions.store(testngDependencies.resolve(BuildStep.VERSIONS));
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/runtime/maven/org.testng/testng", "");
+        requires.store(testngDependencies.resolve(BuildStep.REQUIRES));
+        return testngJar;
     }
 
     @Test
@@ -546,6 +876,92 @@ public class TestModuleTest {
     }
 
     @Test
+    public void exclude_leaves_out_a_test_class_the_default_naming_selects() throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "SkippedTest", """
+                package sample;
+                public class SkippedTest {
+                    @org.junit.jupiter.api.Test
+                    public void test() { System.out.println("must not run"); }
+                }
+                """, bootModuleJars());
+        Files.writeString(manifests.resolve(BuildStep.MODULE), "path=greeter\n");
+        settings.put("test.exclude", "other/sample\\.TestSample, .*\\.SkippedTest");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addSource("manifests", manifests);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnitPlatform()).jarsOnly(false),
+                "dependencies", "classes", "manifests");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content()
+                .contains("Hello world!")
+                .doesNotContain("must not run");
+        assertThat(supplement.resolve("java.args")).content()
+                .as("an excluded class leaves the default naming in force, and an entry naming another module does not apply")
+                .contains("--select-class=sample.TestSample")
+                .doesNotContain("SkippedTest");
+    }
+
+    @Test
+    public void a_test_module_whose_every_test_is_excluded_runs_no_tests() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnitPlatform())
+                        .exclude(".*TestSample").jarsOnly(false),
+                "dependencies", "classes");
+        executor.execute();
+
+        assertThat(root.resolve("test").resolve("executed").resolve("supplement").resolve("java.args"))
+                .as("a module whose tests are all excluded runs none, rather than failing")
+                .doesNotExist();
+    }
+
+    @Test
+    public void exclude_refuses_an_entry_naming_a_method() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnitPlatform())
+                        .exclude("sample\\.TestSample#test").jarsOnly(false),
+                "dependencies", "classes");
+
+        assertThatThrownBy(executor::execute).rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.test.exclude")
+                .hasMessageContaining("jenesis.test.filter");
+    }
+
+    @Test
     public void filter_with_method_selector_targets_specific_method() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", dependencies);
@@ -568,6 +984,45 @@ public class TestModuleTest {
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
         assertThat(supplement.resolve("java.args")).content().contains("--select-method=sample.TestSample#test");
+    }
+
+    @Test
+    public void filter_with_several_method_selectors_of_one_class_runs_every_named_method() throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "TwoMethodSample", """
+                package sample;
+                public class TwoMethodSample {
+                    @org.junit.jupiter.api.Test
+                    public void first() { System.out.println("Ran first"); }
+                    @org.junit.jupiter.api.Test
+                    public void second() { System.out.println("Ran second"); }
+                    @org.junit.jupiter.api.Test
+                    public void third() { System.out.println("Ran third"); }
+                }
+                """, bootModuleJars());
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnitPlatform())
+                        .isTest((Predicate<String> & Serializable) _ -> false)
+                        .filter("sample\\.TwoMethodSample#first,sample\\.TwoMethodSample#second").jarsOnly(false),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content()
+                .contains("Ran first", "Ran second")
+                .doesNotContain("Ran third");
+        assertThat(supplement.resolve("java.args")).content()
+                .contains("--select-method=sample.TwoMethodSample#first", "--select-method=sample.TwoMethodSample#second");
     }
 
     @Test
@@ -653,6 +1108,43 @@ public class TestModuleTest {
     }
 
     @Test
+    public void reports_rather_than_fails_a_module_whose_test_sources_hold_no_test_naming_their_folder() throws IOException {
+        SequencedProperties described = new SequencedProperties();
+        described.setProperty("path", "impl");
+        described.setProperty("sources", "src/test/java");
+        described.setProperty("test", "impl");
+        described.store(manifests.resolve(BuildStep.MODULE));
+        List<String> printed = new ArrayList<>();
+        settings.put("palette.colors", "none");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("manifests", manifests);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings).out(printed::add),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnitPlatform())
+                        .isTest((Predicate<String> & Serializable) _ -> false)
+                        .jarsOnly(false),
+                "dependencies", "manifests", "classes");
+        executor.execute();
+
+        assertThat(root.resolve("test").resolve("executed").resolve("supplement").resolve("java.args"))
+                .as("test sources that hold no test run none, as Surefire's failIfNoTests defaults to false")
+                .doesNotExist();
+        assertThat(printed)
+                .as("a test folder the module does not name is not compiled, which the report makes visible")
+                .anyMatch(line -> line.contains("tests ran no test, as no class among the 1 classes compiled from"
+                        + " impl/src/test/java") && line.contains("src/test/groovy"));
+    }
+
+    @Test
     public void throws_when_no_framework_found() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", emptyDependencies);
@@ -718,6 +1210,59 @@ public class TestModuleTest {
     }
 
     @Test
+    public void resolves_the_closure_of_tests_on_the_class_path_where_two_jars_carry_one_module_name() throws IOException {
+        Path repository = Files.createDirectory(root.resolve("repository"));
+        for (String artifact : List.of("lib", "lib-native")) {
+            Path folder = repository.resolve("org/example/" + artifact + "/1.0");
+            writeModuleJar(folder, artifact + "-1.0.jar", "lib.shared", "1.0");
+            Files.writeString(folder.resolve(artifact + "-1.0.pom"), """
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <groupId>org.example</groupId>
+                        <artifactId>%s</artifactId>
+                        <version>1.0</version>
+                    </project>
+                    """.formatted(artifact));
+        }
+        Path console = repository.resolve("org/junit/platform/junit-platform-console/1.0");
+        writeModuleJar(console, "junit-platform-console-1.0.jar", "org.junit.platform.console", "1.0");
+        Files.writeString(console.resolve("junit-platform-console-1.0.pom"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.junit.platform</groupId>
+                    <artifactId>junit-platform-console</artifactId>
+                    <version>1.0</version>
+                </project>
+                """);
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/runtime/maven/org.example/lib/1.0", "");
+        requires.setProperty("main/runtime/maven/org.example/lib-native/1.0", "");
+        requires.store(emptyDependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("main/maven/org.junit.platform/junit-platform-console", "1.0");
+        versions.store(emptyDependencies.resolve(BuildStep.VERSIONS));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", emptyDependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                                Map.of("maven", new MavenDefaultRepository(repository.toUri(), repository, Map.of(), null)),
+                                Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnitPlatform())
+                        .pathPlacement(PathPlacement.CLASS_PATH)
+                        .isTest(candidate -> candidate.endsWith("TestSample"))
+                        .jarsOnly(false)
+                        .skip(true),
+                "dependencies", "classes");
+
+        SequencedMap<String, Path> outputs = executor.execute();
+
+        assertThat(outputs.get("test/artifacts").resolve(BuildStep.DEPENDENCIES))
+                .as("tests on the class path load both jars, as Maven's would, so no module name settles one of them")
+                .content()
+                .contains("maven/org.example/lib/1.0", "maven/org.example/lib-native/1.0");
+    }
+
+    @Test
     public void requires_step_emits_runner_coordinate_when_missing() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", emptyDependencies);
@@ -739,6 +1284,47 @@ public class TestModuleTest {
     }
 
     @Test
+    public void the_project_dependencies_are_declared_before_the_runner_so_mediation_prefers_them() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/runtime/maven/org.example/library/1.0", "");
+        requires.store(emptyDependencies.resolve(BuildStep.REQUIRES));
+        RecordingResolver.ORDER.clear();
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", emptyDependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", new RecordingResolver()))
+                        .framework(new JUnitPlatform())
+                        .isTest(candidate -> candidate.endsWith("TestSample"))
+                        .jarsOnly(false)
+                        .skip(true),
+                "dependencies", "classes");
+        executor.execute();
+
+        assertThat(RecordingResolver.ORDER)
+                .as("a launcher the build adds fills what the tests lack, as a Maven test class path would, so the"
+                        + " version a nearest-first mediation picks on a tie is the project's own")
+                .containsExactly("org.example/library/1.0", "org.junit.platform/junit-platform-console");
+    }
+
+    private record RecordingResolver() implements Resolver {
+
+        private static final List<String> ORDER = new CopyOnWriteArrayList<>();
+
+        @Override
+        public Resolver.Resolution dependencies(Executor executor,
+                                                String prefix,
+                                                Map<String, Repository> repositories,
+                                                SequencedMap<String, SequencedSet<String>> coordinates,
+                                                SequencedMap<String, String> versions,
+                                                DependencyScope scope) {
+            ORDER.addAll(coordinates.sequencedKeySet());
+            return new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>());
+        }
+    }
+
+    @Test
     public void requires_step_emits_observability_agent_coordinate() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", emptyDependencies);
@@ -756,7 +1342,31 @@ public class TestModuleTest {
         assertThat(readRequires(root.resolve("test").resolve("resolved")).stringPropertyNames())
                 .containsExactlyInAnyOrder(
                         "main/runtime/maven/org.junit.platform/junit-platform-console",
-                        "main/runtime/maven/org.jacoco/org.jacoco.agent/jar/runtime/RELEASE");
+                        "jacoco/runtime/maven/org.jacoco/org.jacoco.agent/jar/runtime/RELEASE");
+    }
+
+    @Test
+    public void an_observability_agent_follows_the_release_its_engine_pins() throws IOException {
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("jacoco/maven/org.ow2.asm/asm", "9.7");
+        versions.setProperty("jacoco/maven/org.jacoco/org.jacoco.cli", "0.8.12 SHA-256/0000");
+        versions.store(emptyDependencies.resolve(BuildStep.VERSIONS));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", emptyDependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                        .framework(new JUnitPlatform())
+                        .observe(new JaCoCo())
+                        .isTest(candidate -> candidate.endsWith("TestSample"))
+                        .jarsOnly(false),
+                "dependencies", "classes");
+        executor.execute("test/" + "resolved");
+
+        assertThat(readRequires(root.resolve("test").resolve("resolved")).stringPropertyNames())
+                .as("the agent writes what the report reads, so it takes the release of the tool its group pins")
+                .contains("jacoco/runtime/maven/org.jacoco/org.jacoco.agent/jar/runtime/0.8.12");
     }
 
     @Test
@@ -998,6 +1608,27 @@ public class TestModuleTest {
                 .doesNotContain(EXECUTED);
         assertThat(executeTests(".*Sample", null))
                 .as("a filter selects classes the test predicate rejects, so no filter is a superset of another")
+                .contains(EXECUTED);
+    }
+
+    @Test
+    public void a_changed_exclusion_reruns_the_tests_the_scope_it_recorded_left_out() throws IOException {
+        settings.put("test.exclude", ".*UnrelatedTest");
+        try {
+            assertThat(executeTests(null, null)).contains(EXECUTED);
+            assertThat(executeTests(null, null))
+                    .as("an unchanged exclusion reuses the cached test result")
+                    .doesNotContain(EXECUTED);
+            assertThat(SequencedProperties.ofFiles(root.resolve("test")
+                    .resolve(TestModule.EXECUTED)
+                    .resolve("output")
+                    .resolve("testscope.properties")))
+                    .containsEntry("exclude", ".*UnrelatedTest");
+        } finally {
+            settings.remove("test.exclude");
+        }
+        assertThat(executeTests(null, null))
+                .as("a run that left classes out covers no run that includes them")
                 .contains(EXECUTED);
     }
 

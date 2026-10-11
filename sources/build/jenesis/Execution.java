@@ -79,12 +79,16 @@ public record Execution(Project project, String mainClass, String module, Contai
                 continue;
             }
             SequencedProperties loaded = SequencedProperties.ofFiles(inventory);
-            for (String key : loaded.stringPropertyNames()) {
-                merged.setProperty(key, loaded.getProperty(key));
-                int dot = key.indexOf('.');
-                if (dot > 0 && key.endsWith(".path")) {
-                    sourceByPrefix.put(key.substring(0, dot), entry.getValue());
+            for (String prefix : Inventory.prefixes(loaded)) {
+                if (loaded.getProperty(prefix + ".test") != null) {
+                    continue;
                 }
+                loaded.forEachProperty((key, value) -> {
+                    if (key.startsWith(prefix + ".")) {
+                        merged.setProperty(key, value);
+                    }
+                });
+                sourceByPrefix.put(prefix, entry.getValue());
             }
         }
         String selectedPrefix = module == null
@@ -148,7 +152,7 @@ public record Execution(Project project, String mainClass, String module, Contai
                 for (String value : values.split("\n")) {
                     javaArgs.add(option);
                     if (!value.isEmpty()) {
-                        javaArgs.add(value);
+                        javaArgs.addAll(List.of(value.split("\t")));
                     }
                 }
             });

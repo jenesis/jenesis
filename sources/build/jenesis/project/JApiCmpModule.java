@@ -36,7 +36,7 @@ public class JApiCmpModule implements BuildExecutorModule {
              "japicmp",
              "main",
              new SequencedProperties(),
-             ProcessBuildStep.Terms.of("japicmp"));
+             new ProcessBuildStep.Terms());
     }
 
     public static JApiCmpModule ofEnvironment(Environment environment,
@@ -208,7 +208,18 @@ public class JApiCmpModule implements BuildExecutorModule {
                         + baselines);
             }
             Path report = Files.createDirectories(context.next().resolve(BuildStep.REPORTS + "japicmp"));
-            List<String> commands = new ArrayList<>(List.of(
+            List<String> commands = new ArrayList<>(), options = new ArrayList<>();
+            for (String option : prepended(properties)) {
+                if (option.startsWith("-J")) {
+                    commands.add(option.substring(2));
+                } else if (option.startsWith("-D")) {
+                    commands.add(option);
+                } else {
+                    options.add(option);
+                }
+            }
+            properties.values().forEach(Map::clear);
+            commands.addAll(List.of(
                     "-cp", String.join(File.pathSeparator, jars),
                     "japicmp.JApiCmp",
                     "-o", baselines.getFirst(),
@@ -270,6 +281,7 @@ public class JApiCmpModule implements BuildExecutorModule {
                     commands.add("--error-on-" + failure);
                 }
             }
+            commands.addAll(options);
             return CompletableFuture.completedStage(commands);
         }
     }

@@ -52,9 +52,20 @@ public class ErrorProne implements BuildStep {
             declared |= !Dependencies.select(argument.folder(), compiler, "plugin").isEmpty();
         }
         if (!declared) {
-            throw new IllegalStateException("No " + compiler + " plugin resolved for Error Prone"
-                    + " (declare @jenesis.plugin " + compiler
-                    + " maven/com.google.errorprone/error_prone_core in the module declaration)");
+            boolean pom = false;
+            for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
+                Path module = argument.folder().resolve(BuildStep.MODULE);
+                pom |= Files.isRegularFile(module) && SequencedProperties.ofFiles(module).value("module") == null;
+            }
+            throw new IllegalStateException("No " + compiler + " plugin resolved for Error Prone (declare "
+                    + (pom
+                            ? "<!--jenesis.plugin " + compiler + " maven/com.google.errorprone/error_prone_core-->"
+                                    + " in the module's pom.xml or in a parent pom.xml in the project"
+                            : "@jenesis.plugin " + compiler + " maven/com.google.errorprone/error_prone_core"
+                                    + " in the module declaration") + ")");
         }
         SequencedProperties options = new SequencedProperties();
         options.setProperty("-XDcompilePolicy=simple", "");

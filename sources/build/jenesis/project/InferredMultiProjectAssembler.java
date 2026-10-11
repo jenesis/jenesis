@@ -48,6 +48,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             "binary",
             "binary/generated",
             "binary/compiled",
+            "binary/transform",
             "binary/validate",
             "artifact",
             "observed",
@@ -285,7 +286,12 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 closure = new LinkedHashSet<>(Set.of("modules"));
             }
             sub.addStep("prepare",
-                    new Prepare(descriptor.pathPlacement(), List.copyOf(packaging.formats()), overrides, environments),
+                    new Prepare(descriptor.pathPlacement(),
+                            packaging.stage(),
+                            List.copyOf(packaging.formats()),
+                            List.copyOf(descriptor.manifests()),
+                            overrides,
+                            environments),
                     outerInherited.sequencedKeySet().stream());
             sub.addModule("check",
                     check.apply(InferredSourceCodeQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
@@ -326,11 +332,14 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         repositories,
                         resolvers).custom(hooks.get("binary/generated")));
             }
-            if (hooks.containsKey("binary/compiled")) {
-                toolchainModule = toolchainModule.compilerModule(InferredCompilerChainModule.ofEnvironment(environment,
-                        descriptor.configuration(),
-                        repositories,
-                        resolvers).custom(hooks.get("binary/compiled")));
+            toolchainModule = toolchainModule.compilerModule(InferredCompilerChainModule.ofEnvironment(environment,
+                            descriptor.configuration(),
+                            repositories,
+                            resolvers)
+                    .includeResources(descriptor.includeResources())
+                    .custom(hooks.getOrDefault("binary/compiled", none)));
+            if (hooks.containsKey("binary/transform")) {
+                toolchainModule = toolchainModule.transformer(new ClassTransformModule(hooks.get("binary/transform")));
             }
             if (hooks.containsKey("binary/validate")) {
                 toolchainModule = toolchainModule.validatorModule(InferredByteCodeQualityModule.ofEnvironment(environment,
@@ -358,33 +367,23 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             InferredArtifactQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
                                     .pinning(descriptor.pinning())
                                     .custom(hooks.getOrDefault("artifact", none))),
-                    Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
+                    Stream.concat(Stream.of("prepare", "binary"), inputs(descriptor, closure)));
             sub.addStep("layers",
                     new Layers(),
                     Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             if (descriptor.test()) {
-                Path module = null;
-                for (String manifest : descriptor.manifests()) {
-                    Path candidate = outerInherited.get(manifest);
-                    if (candidate != null && Files.isRegularFile(candidate.resolve(BuildStep.MODULE))) {
-                        module = candidate.resolve(BuildStep.MODULE);
-                        break;
-                    }
-                }
-                if (module != null) {
-                    SequencedProperties properties = SequencedProperties.ofFiles(module);
-                    if (properties.getProperty("test") != null && !properties.flag("abstract")) {
-                        sub.addModule("observed",
-                                observe.apply(
-                                InferredTestObservationModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
-                                        .pinning(descriptor.pinning())
-                                        .pathPlacement(descriptor.pathPlacement())
-                                        .moduleName(properties.getProperty("module"))
-                                        .custom(hooks.getOrDefault("observed", none))),
-                                Stream.concat(Stream.of("prepare", "binary", "layers"),
-                                        inputs(descriptor, closure)));
-                    }
-                }
+                sub.addModule("observed",
+                        observe.apply(
+                        InferredTestObservationModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
+                                .pinning(descriptor.pinning())
+                                .pathPlacement(descriptor.pathPlacement())
+                                .directory(descriptor.directory())
+                                .custom(hooks.getOrDefault("observed", none))),
+                        Stream.of(descriptor.resources().stream(),
+                                        resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"),
+                                        Stream.of("prepare", "binary", "layers"),
+                                        inputs(descriptor, closure))
+                                .flatMap(Function.identity()));
             }
             if (descriptor.source()) {
                 sub.addModule("sources",
@@ -392,7 +391,12 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         module.addStep("archive",
                                 Jar.ofEnvironment(environment, factory, Jar.Sort.SOURCES),
                                 inherited.sequencedKeySet()),
-                        Stream.concat(descriptor.sources().stream(), descriptor.manifests().stream()));
+                        Stream.of(descriptor.sources().stream(),
+                                        descriptor.resources().stream(),
+                                        resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"),
+                                        descriptor.manifests().stream(),
+                                        Stream.of("binary"))
+                                .flatMap(Function.identity()));
             }
             if (descriptor.documentation()) {
                 InferredDocumentationModule documentationModule = InferredDocumentationModule.ofEnvironment(environment,
@@ -407,7 +411,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
                 sub.addModule("documentation",
                         documentation.apply(documentationModule),
-                        Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
+                        Stream.concat(Stream.of("prepare", "binary"), inputs(descriptor, closure)));
             }
             if (packaging.jmod() || packaging.jlink() || packaging.jpackaged() || packaging.nativeImage()) {
                 sub.addStep("legal", Legal.ofEnvironment(environment), Stream.concat(Stream.of("binary"), closure.stream()));
@@ -527,23 +531,29 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         images.add("native");
                     }
                 }
+                SequencedSet<String> packaged = new LinkedHashSet<>();
+                if (images.contains("jpackage")) {
+                    packaged.add("jpackage");
+                }
+                if (packaging.bundle()) {
+                    packaged.add("bundle");
+                }
+                if (packaging.launcher()) {
+                    packaged.add("launcher");
+                }
                 if (!packagers.isEmpty()) {
                     SequencedSet<String> handed = new LinkedHashSet<>(linked);
                     handed.addAll(images);
-                    if (packaging.bundle()) {
-                        handed.add("bundle");
-                    }
-                    if (packaging.launcher()) {
-                        handed.add("launcher");
-                    }
+                    handed.addAll(packaged);
                     sub.addModule("custom", (nested, nestedInherited) -> packagers.forEach((name, module) ->
                             nested.addModule(name, module, nestedInherited.sequencedKeySet())), handed);
-                    sub.addStep("packaged", new Packaged(), images.contains("jpackage")
-                            ? Stream.of("jpackage", "custom")
-                            : Stream.of("custom"));
+                    packaged.add("custom");
+                    images.add("custom");
+                }
+                if (!packaged.isEmpty() && !packaged.equals(Set.of("jpackage"))) {
+                    sub.addStep("packaged", new Packaged(), packaged.stream());
                     images.remove("jpackage");
                     images.addFirst("packaged");
-                    images.add("custom");
                 }
                 if (packaging.launcher()) {
                     images.add("launcher");
@@ -642,7 +652,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         }
     }
 
-    private record Packaging(boolean jmod,
+    private record Packaging(boolean stage,
+                            boolean jmod,
                             boolean jlink,
                             boolean bundle,
                             boolean launcher,
@@ -672,7 +683,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
 
         private static Packaging configured(Path properties) throws IOException {
             if (properties == null) {
-                return new Packaging(false,
+                return new Packaging(true,
+                        false,
                         false,
                         false,
                         false,
@@ -707,7 +719,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 throw new IllegalArgumentException(properties + " sets docker.jpackage=" + dockerJPackage
                         + ", which a Linux image cannot run - name one of " + Docker.FORMATS);
             }
-            return new Packaging(configuration.flag("jmod"),
+            return new Packaging(configuration.flag("stage", true),
+                    configuration.flag("jmod"),
                     configuration.flag("jlink"),
                     configuration.flag("bundle"),
                     configuration.flag("launcher"),
@@ -752,20 +765,24 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         for (String tool : new TreeSet<>(files.keySet())) {
             SequencedMap<String, String> values = new LinkedHashMap<>();
             SequencedProperties.ofFiles(files.get(tool)).forEachProperty((key, value) -> {
+                String resolved;
                 if (!value.startsWith("@") || value.startsWith("@@")) {
-                    values.put(key, value.startsWith("@") ? value.substring(1) : value);
-                    return;
+                    resolved = value.startsWith("@") ? value.substring(1) : value;
+                } else {
+                    int slash = value.indexOf('/');
+                    String name = value.substring(1, slash == -1 ? value.length() : slash);
+                    resolved = environment.value("variable." + name, slash == -1 ? null : value.substring(slash + 1));
+                    if (resolved == null) {
+                        throw new IllegalArgumentException(files.get(tool) + " sets " + key + " to " + value
+                                + ", but jenesis.variable." + name + " is not set - set it, or give a default as @"
+                                + name + "/<default>");
+                    }
                 }
-                int slash = value.indexOf('/');
-                String name = value.substring(1, slash == -1 ? value.length() : slash),
-                        fallback = slash == -1 ? null : value.substring(slash + 1),
-                        resolved = environment.value("variable." + name, fallback);
-                if (resolved == null) {
-                    throw new IllegalArgumentException(files.get(tool) + " sets " + key + " to " + value
-                            + ", but jenesis.variable." + name + " is not set - set it, or give a default as @"
-                            + name + "/<default>");
+                if (prefix.equals("process-") && key.startsWith("-D") && key.indexOf('=') < 0 && !resolved.isEmpty()) {
+                    values.put(key + "=" + resolved, "");
+                } else {
+                    values.put(key, resolved);
                 }
-                values.put(key, resolved);
             });
             perTool.put(tool, values);
         }
@@ -773,7 +790,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
     }
 
     private record Prepare(PathPlacement pathPlacement,
+                           boolean staged,
                            List<String> packageTypes,
+                           List<String> manifests,
                            SequencedMap<String, SequencedMap<String, String>> overrides,
                            SequencedMap<String, SequencedMap<String, String>> environments) implements BuildStep {
 
@@ -787,7 +806,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             String artifact = null;
             String moduleName = null;
             SequencedProperties described = null;
-            for (BuildStepArgument argument : arguments.values()) {
+            for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
+                BuildStepArgument argument = entry.getValue();
                 if (argument.removed()) {
                     continue;
                 }
@@ -804,6 +824,30 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         String value = module.getProperty("module");
                         if (value != null && !value.isEmpty()) {
                             moduleName = value;
+                        }
+                    }
+                }
+                if (manifests.contains(entry.getKey())) {
+                    for (Map.Entry<String, SequencedMap<String, String>> override : overrides.entrySet()) {
+                        Path generated = argument.folder().resolve(ProcessBuildStep.PROCESS + override.getKey() + ".properties");
+                        if (!Files.isRegularFile(generated)) {
+                            continue;
+                        }
+                        SequencedProperties declared = SequencedProperties.ofFiles(generated);
+                        for (String key : override.getValue().keySet()) {
+                            if (declared.containsKey(key)) {
+                                String value = declared.getProperty(key);
+                                throw new IllegalArgumentException("process-" + override.getKey() + ".properties sets "
+                                        + key + ", which the build already hands " + override.getKey() + " as "
+                                        + (value.isEmpty() ? key : key + " " + value) + " from the module's declaration - "
+                                        + (key.equals("--release") || key.equals("--enable-preview")
+                                                ? "declare the release there instead: @jenesis.release in"
+                                                        + " module-info.java, or maven.compiler.release and, for the"
+                                                        + " tests, maven.compiler.testRelease in pom.xml, written"
+                                                        + " <release>-preview or with maven.compiler.enablePreview for"
+                                                        + " preview features"
+                                                : "change it there instead and remove the line"));
+                            }
                         }
                     }
                 }
@@ -901,10 +945,14 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 for (Map.Entry<String, SequencedProperties> type : typed.entrySet()) {
                     type.getValue().store(processFolder.resolve("jpackage-" + type.getKey() + ".properties"));
                 }
+            }
+            if (main != null || artifact != null) {
                 SequencedProperties launcher = new SequencedProperties();
-                launcher.setProperty("mainClass", main);
-                if (pathPlacement.modular() && moduleName != null) {
-                    launcher.setProperty("mainModule", moduleName);
+                if (main != null) {
+                    launcher.setProperty("mainClass", main);
+                    if (pathPlacement.modular() && moduleName != null) {
+                        launcher.setProperty("mainModule", moduleName);
+                    }
                 }
                 if (artifact != null) {
                     launcher.setProperty("name", artifact);
@@ -945,6 +993,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     tool.getValue().forEach(variables::setProperty);
                     variables.store(environmentFolder.resolve(tool.getKey() + ".properties"));
                 }
+            }
+            if (!staged) {
+                Files.createFile(context.next().resolve(Inventory.UNSTAGED));
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }

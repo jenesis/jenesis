@@ -21,7 +21,7 @@ public class Jar extends ProcessBuildStep {
         this(factory.apply("jar", "bin/jar"),
              sort,
              BuildStep.timestamp(),
-             Terms.of("jar"));
+             new Terms());
     }
 
     public static Jar ofEnvironment(Environment environment,
@@ -51,11 +51,25 @@ public class Jar extends ProcessBuildStep {
     }
 
     @Override
+    protected List<String> configurations() {
+        return sort == Sort.CLASSES ? super.configurations() : List.of();
+    }
+
+    @Override
     public CompletionStage<List<String>> process(Executor executor,
                                                  BuildStepContext context,
                                                  SequencedMap<String, BuildStepArgument> arguments,
                                                  SequencedMap<String, SequencedMap<String, String>> properties)
             throws IOException {
+        for (SequencedMap<String, String> configured : properties.values()) {
+            for (String option : List.of("--manifest", "-m")) {
+                if (configured.containsKey(option)) {
+                    throw new IllegalArgumentException("process-jar.properties sets " + option + ", but the jar step"
+                            + " writes the manifest itself - place the attributes in a META-INF/MANIFEST.MF among"
+                            + " the module's resources instead, which is the basis of the jar's manifest");
+                }
+            }
+        }
         List<String> commands = new ArrayList<>(List.of(
                 "--create",
                 "--file",
@@ -66,6 +80,17 @@ public class Jar extends ProcessBuildStep {
             commands.add("--date=" + timestamp);
         }
         List<Path> manifestFiles = new ArrayList<>();
+        for (BuildStepArgument argument : sort == Sort.CLASSES ? arguments.values() : List.<BuildStepArgument>of()) {
+            if (argument.removed()) {
+                continue;
+            }
+            for (String name : sort.folders) {
+                Path candidate = argument.folder().resolve(name).resolve(JarFile.MANIFEST_NAME);
+                if (Files.isRegularFile(candidate)) {
+                    manifestFiles.add(candidate);
+                }
+            }
+        }
         for (BuildStepArgument argument : sort == Sort.CLASSES ? arguments.values() : List.<BuildStepArgument>of()) {
             if (argument.removed()) {
                 continue;
@@ -101,10 +126,28 @@ public class Jar extends ProcessBuildStep {
             }
             for (String name : sort.folders) {
                 Path folder = argument.folder().resolve(name);
-                if (Files.exists(folder)) {
+                if (!Files.exists(folder)) {
+                    continue;
+                }
+                Path metaInf = folder.resolve("META-INF");
+                if (!Files.isDirectory(metaInf.resolve("build.jenesis"))) {
                     commands.add("-C");
                     commands.add(folder.toString());
                     commands.add(".");
+                    continue;
+                }
+                List<Path> entries = new ArrayList<>();
+                try (Stream<Path> files = Files.list(folder)) {
+                    files.filter(file -> !file.equals(metaInf)).forEach(entries::add);
+                }
+                try (Stream<Path> files = Files.list(metaInf)) {
+                    files.filter(file -> !BuildStep.underBuildJenesis(folder.relativize(file))).forEach(entries::add);
+                }
+                entries.sort(null);
+                for (Path entry : entries) {
+                    commands.add("-C");
+                    commands.add(folder.toString());
+                    commands.add(folder.relativize(entry).toString());
                 }
             }
         }

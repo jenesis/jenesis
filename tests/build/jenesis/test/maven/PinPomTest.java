@@ -2,6 +2,7 @@ package build.jenesis.test.maven;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Checksum;
@@ -9,6 +10,7 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
+import build.jenesis.maven.MavenProject;
 import build.jenesis.maven.PinPom;
 import build.jenesis.step.Inventory;
 
@@ -288,6 +290,33 @@ public class PinPomTest {
     }
 
     @Test
+    public void merges_every_pin_comment_into_one_block_so_none_shadows_it() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.pin javac/maven/a/b 1-->
+                    <!--jenesis.pin javac/maven/c/d 2 (windows)-->
+                    <!--jenesis.pin javac/maven/e/f 3-->
+                </project>
+                """);
+        writeResolved("javac", Map.of("maven/a/b", "1 SHA-256/ab", "maven/e/f", "3 SHA-256/ef"));
+        String result = run(pom);
+        assertThat(result.split("<!--jenesis.pin", -1))
+                .as("a later pin comment would win over the block pin writes")
+                .hasSize(2);
+        assertThat(result)
+                .contains("javac/maven/a/b 1 SHA-256/ab")
+                .contains("javac/maven/c/d 2 (windows)")
+                .contains("javac/maven/e/f 3 SHA-256/ef")
+                .doesNotContain("javac/maven/e/f 3-->");
+    }
+
+    @Test
     public void encodes_double_hyphen_in_a_comment_block() throws IOException {
         Path pom = root.resolve("pom.xml");
         Files.writeString(pom, """
@@ -415,6 +444,213 @@ public class PinPomTest {
                 .contains("<artifactId>fresh</artifactId>")
                 .doesNotContain("<artifactId>old</artifactId>");
         assertThat(result.indexOf("<artifactId>bom</artifactId>")).isLessThan(result.indexOf("<artifactId>fresh</artifactId>"));
+        assertThat(run(pom)).isEqualTo(result);
+    }
+
+    @Test
+    public void keeps_the_exclusions_and_scope_of_a_managed_entry_it_rewrites() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.mysql</groupId>
+                                <artifactId>mysql-connector-j</artifactId>
+                                <version>9.6.0</version>
+                                <scope>runtime</scope>
+                                <exclusions>
+                                    <exclusion>
+                                        <groupId>com.google.protobuf</groupId>
+                                        <artifactId>protobuf-java</artifactId>
+                                    </exclusion>
+                                </exclusions>
+                                <!--Checksum/SHA-256/stale-->
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        writeResolved(Map.of("maven/com.mysql/mysql-connector-j", "9.7.0 SHA-256/deadbeef"));
+        String result = run(pom);
+        assertThat(result)
+                .as("a pin replaces the version and the checksum of an entry, and what else it says still holds")
+                .contains("""
+                                <dependency>
+                                    <groupId>com.mysql</groupId>
+                                    <artifactId>mysql-connector-j</artifactId>
+                                    <version>9.7.0</version>
+                                    <scope>runtime</scope>
+                                    <exclusions>
+                                        <exclusion>
+                                            <groupId>com.google.protobuf</groupId>
+                                            <artifactId>protobuf-java</artifactId>
+                                        </exclusion>
+                                    </exclusions>
+                                    <!--Checksum/SHA-256/deadbeef-->
+                                </dependency>
+                    """)
+                .doesNotContain("9.6.0", "stale");
+        assertThat(run(pom)).isEqualTo(result);
+    }
+
+    @Test
+    public void keeps_the_property_expressions_of_an_entry_and_writes_only_the_version_it_owns() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.openjfx</groupId>
+                                <artifactId>javafx-base</artifactId>
+                                <version>${javafx.version}</version>
+                                <classifier>${javafx.platform}</classifier>
+                                <exclusions>
+                                    <exclusion>
+                                        <groupId>org.openjfx</groupId>
+                                        <artifactId>javafx-base</artifactId>
+                                    </exclusion>
+                                </exclusions>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        writeResolved(Map.of(
+                "maven/org.openjfx/javafx-base/jar/linux", "17.0.20 SHA-256/cafebabe",
+                "maven/org.openjfx/javafx-graphics/jar/linux", "17.0.21 SHA-256/deadbeef"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "");
+        module.store(input.resolve(BuildStep.MODULE));
+        SequencedProperties expressions = new SequencedProperties();
+        expressions.setProperty("org.openjfx/javafx-base/jar/linux",
+                "org.openjfx/javafx-base//${javafx.platform} ${javafx.version} 17.0.20");
+        expressions.setProperty("org.openjfx/javafx-graphics/jar/linux",
+                "org.openjfx/javafx-graphics//${javafx.platform} ${javafx.version} 17.0.20");
+        expressions.store(input.resolve(MavenProject.EXPRESSIONS));
+        String result = run(pom);
+        assertThat(result)
+                .as("the classifier a property selects stays that property, so another platform's build still finds"
+                        + " its managed entry, and so does a version the property still names")
+                .contains("""
+                                <dependency>
+                                    <groupId>org.openjfx</groupId>
+                                    <artifactId>javafx-base</artifactId>
+                                    <version>${javafx.version}</version>
+                                    <classifier>${javafx.platform}</classifier>
+                                    <exclusions>
+                                        <exclusion>
+                                            <groupId>org.openjfx</groupId>
+                                            <artifactId>javafx-base</artifactId>
+                                        </exclusion>
+                                    </exclusions>
+                                    <!--Checksum/SHA-256/cafebabe-->
+                                </dependency>
+                    """)
+                .as("a version resolved to another than the property names is written as the version pinned")
+                .contains("""
+                                <dependency>
+                                    <groupId>org.openjfx</groupId>
+                                    <artifactId>javafx-graphics</artifactId>
+                                    <version>17.0.21</version>
+                                    <classifier>${javafx.platform}</classifier>
+                                    <!--Checksum/SHA-256/deadbeef-->
+                                </dependency>
+                    """);
+        assertThat(run(pom)).isEqualTo(result);
+    }
+
+    @Test
+    public void carries_the_exclusions_of_an_imported_bom_into_the_entry_that_pins_its_coordinate() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        writeResolved(Map.of("maven/com.mysql/mysql-connector-j", "9.7.0 SHA-256/deadbeef"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "");
+        module.store(input.resolve(BuildStep.MODULE));
+        SequencedProperties managed = new SequencedProperties();
+        managed.setProperty("main/maven/com.mysql/mysql-connector-j", "com.google.protobuf/protobuf-java");
+        managed.store(input.resolve(BuildStep.MANAGED));
+        String result = run(pom);
+        assertThat(result)
+                .as("the project's own entry shadows the bill of materials' one, so it has to exclude what that one excluded")
+                .contains("""
+                                <dependency>
+                                    <groupId>com.mysql</groupId>
+                                    <artifactId>mysql-connector-j</artifactId>
+                                    <version>9.7.0</version>
+                                    <exclusions>
+                                        <exclusion>
+                                            <groupId>com.google.protobuf</groupId>
+                                            <artifactId>protobuf-java</artifactId>
+                                        </exclusion>
+                                    </exclusions>
+                                    <!--Checksum/SHA-256/deadbeef-->
+                                </dependency>
+                    """);
+        assertThat(run(pom)).isEqualTo(result);
+    }
+
+    @Test
+    public void carries_the_scope_an_imported_bom_manages_into_the_entry_that_pins_its_coordinate() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        writeResolved(Map.of("maven/io.netty/netty-tcnative-boringssl-static/jar/linux-x86_64", "2.0.70.Final SHA-256/deadbeef",
+                "maven/io.netty/netty-common", "4.1.115.Final SHA-256/cafebabe"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "");
+        module.store(input.resolve(BuildStep.MODULE));
+        SequencedProperties scopes = new SequencedProperties();
+        scopes.setProperty("main/maven/io.netty/netty-tcnative-boringssl-static/jar/linux-x86_64", "runtime");
+        scopes.store(input.resolve(MavenProject.SCOPES));
+        String result = run(pom);
+        assertThat(result)
+                .as("the project's own entry shadows the bill of materials' one, so it has to state the scope that one managed")
+                .contains("""
+                                <dependency>
+                                    <groupId>io.netty</groupId>
+                                    <artifactId>netty-tcnative-boringssl-static</artifactId>
+                                    <version>2.0.70.Final</version>
+                                    <classifier>linux-x86_64</classifier>
+                                    <scope>runtime</scope>
+                                    <!--Checksum/SHA-256/deadbeef-->
+                                </dependency>
+                    """)
+                .contains("""
+                                <dependency>
+                                    <groupId>io.netty</groupId>
+                                    <artifactId>netty-common</artifactId>
+                                    <version>4.1.115.Final</version>
+                                    <!--Checksum/SHA-256/cafebabe-->
+                                </dependency>
+                    """);
         assertThat(run(pom)).isEqualTo(result);
     }
 
@@ -636,6 +872,42 @@ public class PinPomTest {
         }
         String expected = HexFormat.of().formatHex(digest.digest(payload));
         assertThat(result).contains("kotlin/maven/org.jetbrains/something 1.2.3 SHA-256/" + expected);
+    }
+
+    @Test
+    public void manages_a_coordinate_at_the_version_the_pom_declares_inline_rather_than_at_another_halfs() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.slf4j</groupId>
+                            <artifactId>slf4j-api</artifactId>
+                            <version>2.0.19</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        writeResolved(Map.of("maven/org.slf4j/slf4j-api", "1.7.36 SHA-256/main"));
+        writeResolved(Map.of("maven/org.slf4j/slf4j-api", "2.0.19 SHA-256/test"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "");
+        module.store(input.resolve(BuildStep.MODULE));
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.slf4j/slf4j-api/2.0.19", "");
+        requires.setProperty("main/runtime/maven/org.slf4j/slf4j-api/2.0.19", "");
+        requires.store(input.resolve(BuildStep.REQUIRES));
+        String result = run(pom);
+        assertThat(result)
+                .as("the version the pom declares itself is the one its resolution keeps, so a managed entry may not override it")
+                .contains("<version>2.0.19</version>\n                <!--Checksum/SHA-256/test-->")
+                .doesNotContain("1.7.36");
     }
 
     @Test

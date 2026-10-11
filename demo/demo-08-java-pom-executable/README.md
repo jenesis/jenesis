@@ -112,6 +112,10 @@ Every jar is stored once under `jars/`, and the argument file is the launch itse
     "jars/build.jenesis.demo%2Fjava-pom-executable%2F1.0.0.jar:jars/org.apache.commons.lang3-3.14.0.jar"
     "sample.Sample"
 
+What `process-java.properties` gives the program's JVM leads both argument files, as it
+leads the JVM `Execute` starts, and `stage` collects the zip into `stage/packages/` as
+`<artifact>.zip`, so `export` and `release` ship it like any other package.
+
 Unzipped onto a JRE base, it needs no JDK, no jpackage and no descriptor reader:
 
     FROM gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
@@ -148,7 +152,8 @@ its `Digest`.
     `-- jars/                      the app jar and commons-lang3
 
 The generated file is the one written by hand above, with the entry point taken from the
-module's main class. Every jar of the application is named rather than globbed, and the command
+module's main class, and `process-java.properties` leads its argument file as it leads the
+bundle's. Every jar of the application is named rather than globbed, and the command
 travels in the argument file, so the `ENTRYPOINT` stays this size however many jars the
 application resolves. The class path ends with one glob, `/app/extensions/classpath/*`, and the
 module path is `/app/extensions/modulepath`. The build creates neither folder, and `java` skips a
@@ -212,18 +217,33 @@ A single executable jar with the launcher
 A `launcher=true` line in `packaging.properties` turns the bundle into a **single
 executable jar** you run with `java -jar foo.jar`, by shading the published
 `build.jenesis:build.jenesis.launcher` into the jar root as its `Main-Class` and
-exploding each dependency into a `jars/<jar>/` subfolder, with `classpath` naming them
-(this app is non-modular, so everything is class path). `build/DemoLauncher.java` activates the
+exploding each dependency into a `jars/<jar>/` subfolder, with `classpath` in the jar's
+`META-INF/jenesis/application.properties` naming them (this app is non-modular, so everything
+is class path). The application sees what `classpath` names and nothing else of the jar: not
+the launcher's classes, not the descriptor and not the jar's own manifest, so an
+`application.properties` of its own - the file a framework such as Spring Boot reads its
+configuration from - is the one it finds. `build/DemoLauncher.java` activates the
 committed `launcher` profile with `Project.profiles(...)`: the profile's
 `build.jenesis/launcher/packaging.properties` (`launcher=true`) outranks the module's
 own `packaging.properties`, then the demo builds and runs the produced jar:
 
     java build/DemoLauncher.java ada lovelace
 
+`stage` collects the jar into `stage/packages/` as `<artifact>.jar`. Every jar it stores
+keeps its directory entries, so a scan of a package on the class path finds them as it
+would in the original jar. Of `process-java.properties`, the jar carries the
+`--add-reads`, `--add-exports`, `--add-opens` and `--enable-native-access` lines, which the
+launcher applies as it builds the module graph. Any other JVM option does not travel with
+it, because `java -jar` reads none from the jar it runs: the build names each one it
+leaves out, and an application that needs one passes it to `java -jar` or ships as a
+bundle.
+
 The launcher is shaded into the artifact, so it is pinned like any dependency - the
 `pom.xml` carries a `<!--jenesis.pin launcher/maven/build.jenesis/build.jenesis.launcher
 ... -->` block (its own `launcher` group, kept out of `<dependencyManagement>` because
-it is not an application dependency). The modular sibling keeps each modular
+it is not an application dependency). A launcher older than 0.6.0 reads its descriptor from
+another place in the jar, so the build refuses one, pinned or resolved, rather than writing a
+jar that fails only at `java -jar`. The modular sibling keeps each modular
 dependency in its own subfolder and reconstructs them on the module path at run time.
 
 Fully bundled native installer
@@ -255,7 +275,7 @@ the modular sibling produces a much smaller package, since
 there jpackage's internal `jlink` can trim the runtime to the module graph.
 
 Producing a native installer needs the platform's packaging tooling on the PATH (Linux:
-`dpkg-deb`/`fakeroot` for `deb`, `rpmbuild` for `rpm`; Windows: the WiX Toolset; macOS:
+`dpkg-deb` for `deb`, with no `fakeroot`, `rpmbuild` for `rpm`; Windows: the WiX Toolset; macOS:
 the bundled `productbuild`/`hdiutil`). For that reason it is run locally rather than in
 CI, where `Demo.java`'s app-image - which needs no native tooling - covers the packaging
 path.

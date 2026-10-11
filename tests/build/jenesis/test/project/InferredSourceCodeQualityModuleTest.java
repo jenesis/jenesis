@@ -13,6 +13,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.project.InferredSourceCodeQualityModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class InferredSourceCodeQualityModuleTest {
 
@@ -34,6 +35,49 @@ public class InferredSourceCodeQualityModuleTest {
         SequencedProperties requires = SequencedProperties.ofFiles(requiredOutput.resolve(BuildStep.REQUIRES));
         assertThat(requires.stringPropertyNames())
                 .containsExactly("checkstyle/runtime/maven/com.puppycrawl.tools/checkstyle/RELEASE");
+    }
+
+    @Test
+    public void binds_the_files_checkstyle_xml_references_by_config_loc_beside_it() throws IOException {
+        Files.writeString(project.resolve("checkstyle.xml"), """
+                <module name="Checker">
+                    <module name="SuppressionFilter"><property name="file" value="${config_loc}/suppressions.xml"/></module>
+                    <module name="SuppressionFilter"><property name="file" value="${config_loc}/rules/more.xml"/></module>
+                </module>
+                """);
+        Files.writeString(project.resolve("suppressions.xml"), "<suppressions/>");
+        Files.writeString(Files.createDirectory(project.resolve("rules")).resolve("more.xml"), "<suppressions/>");
+        Files.writeString(project.resolve("unrelated.xml"), "<unrelated/>");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("quality", new InferredSourceCodeQualityModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+        executor.execute("quality/checkstyle/configuration");
+
+        Path configuration = root.resolve("quality").resolve("checkstyle").resolve("configuration").resolve("output");
+        assertThat(configuration.resolve("checkstyle.xml")).exists();
+        assertThat(configuration.resolve("suppressions.xml")).hasContent("<suppressions/>");
+        assertThat(configuration.resolve("rules").resolve("more.xml")).hasContent("<suppressions/>");
+        assertThat(configuration.resolve("unrelated.xml"))
+                .as("only what the configuration references becomes an input of Checkstyle")
+                .doesNotExist();
+    }
+
+    @Test
+    public void refuses_a_config_loc_reference_outside_the_folder_of_checkstyle_xml() throws IOException {
+        Files.writeString(project.resolve("checkstyle.xml"), """
+                <module name="Checker">
+                    <module name="SuppressionFilter"><property name="file" value="${config_loc}/../suppressions.xml"/></module>
+                </module>
+                """);
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("quality", new InferredSourceCodeQualityModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("${config_loc}/../suppressions.xml");
     }
 
     @Test
@@ -70,7 +114,7 @@ public class InferredSourceCodeQualityModuleTest {
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("quality", InferredSourceCodeQualityModule.ofEnvironment(new Environment(Map.of("source.checkstyle", "false")),
+        executor.addModule("quality", InferredSourceCodeQualityModule.ofEnvironment(new Environment(Map.of("source.checkstyle", "ignore")),
                 new LinkedHashSet<>(List.of(project)),
                 Map.of(),
                 Map.of()), "project");
@@ -82,9 +126,21 @@ public class InferredSourceCodeQualityModuleTest {
     }
 
     @Test
+    public void refuses_a_setting_that_is_neither_ignore_warn_nor_strict() {
+        assertThatThrownBy(() -> InferredSourceCodeQualityModule.ofEnvironment(
+                new Environment(Map.of("source.checkstyle", "false")),
+                new LinkedHashSet<>(List.of(project)),
+                Map.of(),
+                Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.source.checkstyle 'false'")
+                .hasMessageContaining("ignore, report, strict");
+    }
+
+    @Test
     public void wires_every_tool_when_it_is_given_no_provider() throws IOException {
         Files.writeString(project.resolve("checkstyle.xml"), "<module name=\"Checker\"/>");
-        settings.put("source.checkstyle", "false");
+        settings.put("source.checkstyle", "ignore");
         try {
             BuildExecutor executor = newExecutor();
             executor.addSource("project", project);

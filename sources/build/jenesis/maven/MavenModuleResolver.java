@@ -57,7 +57,7 @@ public class MavenModuleResolver implements Resolver {
     private static String pomVersion(InputStream stream, String coordinate) throws IOException {
         Document document;
         try (stream) {
-            document = MavenDefaultVersionNegotiator.toDocumentBuilderFactory().newDocumentBuilder().parse(stream);
+            document = MavenDefaultVersionNegotiator.toDocumentBuilderFactory(false).newDocumentBuilder().parse(stream);
         } catch (SAXException | ParserConfigurationException e) {
             throw new IllegalStateException("Failed to parse discovery POM for " + coordinate, e);
         }
@@ -68,7 +68,7 @@ public class MavenModuleResolver implements Resolver {
             if (node.getNodeType() != Node.ELEMENT_NODE) {
                 continue;
             }
-            String name = node.getLocalName() == null ? node.getNodeName() : node.getLocalName();
+            String name = node.getNodeName();
             if (name.equals("version")) {
                 return node.getTextContent().trim();
             } else if (name.equals("parent")) {
@@ -78,10 +78,7 @@ public class MavenModuleResolver implements Resolver {
                     if (candidate.getNodeType() != Node.ELEMENT_NODE) {
                         continue;
                     }
-                    String nestedName = candidate.getLocalName() == null
-                            ? candidate.getNodeName()
-                            : candidate.getLocalName();
-                    if (nestedName.equals("version")) {
+                    if (candidate.getNodeName().equals("version")) {
                         parent = candidate.getTextContent().trim();
                     }
                 }
@@ -100,6 +97,17 @@ public class MavenModuleResolver implements Resolver {
                                             SequencedMap<String, SequencedSet<String>> coordinates,
                                             SequencedMap<String, String> versions,
                                             DependencyScope scope) throws IOException {
+        return dependencies(executor, prefix, repositories, coordinates, versions, new LinkedHashMap<>(), scope);
+    }
+
+    @Override
+    public Resolver.Resolution dependencies(Executor executor,
+                                            String prefix,
+                                            Map<String, Repository> repositories,
+                                            SequencedMap<String, SequencedSet<String>> coordinates,
+                                            SequencedMap<String, String> versions,
+                                            SequencedMap<String, SequencedSet<String>> managedExclusions,
+                                            DependencyScope scope) throws IOException {
         Repository repository = repositories.getOrDefault(Resolver.base(prefix), discovery);
         List<MavenResolver.RootPom> rootPoms = new ArrayList<>();
         SequencedMap<MavenDependencyKey, MavenDependencyValue> mavenPins = new LinkedHashMap<>();
@@ -111,7 +119,16 @@ public class MavenModuleResolver implements Resolver {
                         ? coordinate + ":pom"
                         : coordinate + "/" + managed.version() + ":pom";
                 RepositoryItem item = repository.fetch(executor, fetchCoord)
-                        .orElseThrow(() -> new IllegalArgumentException("No POM found for " + coordinate));
+                        .orElseThrow(() -> new IllegalArgumentException("The module name " + coordinate
+                                + " has no artifact behind it"
+                                + (managed == null ? "" : " in version " + managed.version())
+                                + ": no POM is found for it, as the module repositories name no Maven artifact"
+                                + " that declares it - which is so for a jar that declares no module name and is"
+                                + " required by the name its file name derives - or the artifact they name"
+                                + " publishes no POM; map the name to its artifact with @jenesis.alias "
+                                + coordinate + " <groupId>/<artifactId> in module-info.java, or with"
+                                + " <!--jenesis.alias " + coordinate + " <groupId>/<artifactId>--> in pom.xml"
+                                + (managed == null ? "" : ", or pin a version the artifact is published in")));
                 List<MavenDependencyName> exclusions = null;
                 if (!entry.getValue().isEmpty()) {
                     exclusions = new ArrayList<>();
@@ -143,6 +160,16 @@ public class MavenModuleResolver implements Resolver {
                     mavenPins.put(MavenDependencyKey.parseKey(pin.getKey()), managed);
                 }
             }
+            managedExclusions.forEach((coordinate, excludes) -> mavenPins.merge(MavenDependencyKey.parseKey(coordinate),
+                    new MavenDependencyValue(null, null, null, excludes.stream().map(exclude -> {
+                        int separator = exclude.indexOf('/');
+                        if (separator < 1 || separator == exclude.length() - 1) {
+                            throw new IllegalArgumentException("Malformed managed exclusion '" + exclude + "' for "
+                                    + coordinate + ": expected <groupId>/<artifactId>");
+                        }
+                        return new MavenDependencyName(exclude.substring(0, separator), exclude.substring(separator + 1));
+                    }).toList(), null, null),
+                    (pinned, excluded) -> pinned.exclusions(excluded.exclusions())));
         } catch (RuntimeException | IOException e) {
             for (MavenResolver.RootPom opened : rootPoms) {
                 try {
@@ -158,9 +185,11 @@ public class MavenModuleResolver implements Resolver {
                 executor, mavenRepo, rootPoms, mavenPins, MavenDependencyScope.COMPILE, mavenPrefix);
         SequencedMap<MavenDependencyKey, MavenDependencyValue> closure = resolution.dependencies();
         SequencedMap<String, String> result = new LinkedHashMap<>();
-        closure.forEach((key, value) -> result.put(
-                key.coordinate(mavenPrefix, value.version()),
-                value.checksum() == null ? "" : value.checksum()));
+        closure.forEach((key, value) -> {
+            if (key.jar()) {
+                result.put(key.coordinate(mavenPrefix, value.version()), value.checksum() == null ? "" : value.checksum());
+            }
+        });
         SequencedMap<String, Resolver.Resolved> materialized = new LinkedHashMap<>(
                 Resolver.materializeAll(executor, repositories, mavenPrefix, result));
         Map<String, ModuleDescriptor> descriptors = new ConcurrentHashMap<>();

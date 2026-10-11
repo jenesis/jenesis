@@ -16,6 +16,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.PmdModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class PmdModuleRunTest {
 
@@ -174,6 +175,78 @@ public class PmdModuleRunTest {
         Path report = root.resolve("pmd").resolve("check").resolve("output").resolve("reports").resolve("pmd").resolve("pmd-report.xml");
         assertThat(report).isNotEmptyFile();
         assertThat(report).content().contains("SystemPrintln");
+    }
+
+    @Test
+    public void runs_no_rule_below_the_minimum_priority() throws IOException {
+        SequencedProperties versions = new SequencedProperties();
+        versions.load(new StringReader(PINS));
+        versions.store(project.resolve(BuildStep.VERSIONS));
+        Files.writeString(project.resolve("pmd.xml"), """
+                <?xml version="1.0"?>
+                <ruleset name="test"
+                         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0">
+                    <rule ref="category/java/bestpractices.xml/SystemPrintln">
+                        <priority>3</priority>
+                    </rule>
+                </ruleset>
+                """);
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Sample.java"), """
+                package sample;
+                public class Sample {
+                    public void run() {
+                        System.out.println("hello");
+                    }
+                }
+                """);
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "pmd",
+                PmdModule.ofEnvironment(new Environment(Map.of("source.pmd.priority", "2", "source.pmd", "strict")),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                "project");
+        executor.execute();
+
+        Path report = root.resolve("pmd").resolve("check").resolve("output").resolve("reports").resolve("pmd").resolve("pmd-report.xml");
+        assertThat(report).content()
+                .as("a rule of priority 3 does not run when the minimum priority is 2, as maven-pmd-plugin's minimumPriority")
+                .doesNotContain("SystemPrintln");
+    }
+
+    @Test
+    public void fails_a_report_only_run_when_pmd_cannot_load_its_rule_set() throws IOException {
+        SequencedProperties versions = new SequencedProperties();
+        versions.load(new StringReader(PINS));
+        versions.store(project.resolve(BuildStep.VERSIONS));
+        Files.writeString(project.resolve("pmd.xml"), """
+                <?xml version="1.0"?>
+                <ruleset name="test"
+                         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0">
+                    <rule ref="category/java/bestpractices.xml/NoSuchRule"/>
+                </ruleset>
+                """);
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Sample.java"), """
+                package sample;
+                public class Sample {
+                }
+                """);
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "pmd",
+                new PmdModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .as("report-only covers findings, not a PMD that never ran")
+                .hasMessageContaining("Unexpected exit code");
     }
 
     private BuildExecutor newExecutor() throws IOException {

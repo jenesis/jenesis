@@ -8,6 +8,7 @@ public final class Make {
     private static final List<String> CREDENTIALS = List.of("jenesis.maven.token",
             "jenesis.module.token",
             "jenesis.release.token",
+            "jenesis.release.maven.token",
             "jenesis.cache.key");
     private static final List<String> PLAINTEXT = List.of("jenesis.repository.insecure", "jenesis.cache.insecure");
     private static final List<String> PROGRAMS = List.of("jenesis.daemon.options",
@@ -16,6 +17,7 @@ public final class Make {
     private static final List<String> SHARED = List.of("jenesis.cache.uri",
             "jenesis.maven.local",
             "jenesis.module.local",
+            "jenesis.repository.discovery.ttl",
             "jenesis.sigstore.uri",
             "jenesis.sigstore.issuers");
     private static final List<String> CONFINED = List.of("jenesis.project.target",
@@ -25,7 +27,7 @@ public final class Make {
             "jenesis.make.classes",
             "jenesis.pin.file",
             "jenesis.aot.file");
-    private static final Set<String> PRINTING = Set.of("help", "skill", "configuration", "properties", "--stop");
+    private static final Set<String> PRINTING = Set.of("help", "skill", "prompt", "configuration", "properties", "--stop");
 
     private final String mainClass;
     private final Map<String, String> ambient;
@@ -709,6 +711,12 @@ public final class Make {
     }
 
     private static void requireApplicable(Path root, Path file, Properties properties, boolean trusted) {
+        for (String name : new TreeSet<>(properties.stringPropertyNames())) {
+            if (!name.startsWith("jenesis.")) {
+                throw new IllegalArgumentException(name + " in " + file + " is no setting: every key of this file"
+                        + " is written in full, as `configuration` prints it, so write jenesis." + name);
+            }
+        }
         if (properties.getProperty(PROVIDED) != null) {
             throw new IllegalStateException(PROVIDED + " cannot be set in " + file
                     + ": it records which settings the files a project provides supplied, and Make derives it");

@@ -6,6 +6,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildExecutorException;
+import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -61,6 +62,34 @@ public class ProjectPluginsTest {
         assertThat(SequencedProperties.ofFiles(additions.resolve(Inventory.INVENTORY)).getProperty("module-app.attachment.licenses"))
                 .isEqualTo("attachment/licenses/licenses.txt");
         assertThat(additions.resolve("attachment/licenses/licenses.txt")).hasContent("licenses");
+    }
+
+    @Test
+    public void adds_what_a_transform_attaches_to_a_module_whose_path_holds_dots() throws IOException {
+        buildExecutor.addModule("dotted", (dotted, _) -> {
+            for (String path : List.of("modules/org.example", "modules/org.example.cli")) {
+                dotted.addStep(BuildExecutorModule.encodePath(path), (_, context, _) -> {
+                    SequencedProperties inventory = new SequencedProperties();
+                    inventory.setProperty("module-" + path + ".path", path);
+                    inventory.store(context.next().resolve(Inventory.INVENTORY));
+                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                });
+            }
+        });
+        buildExecutor.addModule("postprocess", new ProjectPlugins()
+                .transform("licenses", new Attach("licenses", "module-modules/org.example.cli"))
+                .postprocess(new LinkedHashSet<>()), "build", "dotted");
+
+        SequencedMap<String, Path> result = buildExecutor.execute("postprocess");
+
+        Path additions = result.get("postprocess/additions/" + BuildExecutorModule.encodePath("module-modules/org.example.cli"));
+        assertThat(additions).isNotNull();
+        assertThat(SequencedProperties.ofFiles(additions.resolve(Inventory.INVENTORY))
+                .getProperty("module-modules/org.example.cli.attachment.licenses"))
+                .as("the key belongs to the module whose prefix it starts with longest, not to the one cut at a dot")
+                .isEqualTo("attachment/licenses/licenses.txt");
+        assertThat(result.get("postprocess/additions/" + BuildExecutorModule.encodePath("module-modules/org.example"))
+                .resolve(Inventory.INVENTORY)).doesNotExist();
     }
 
     @Test

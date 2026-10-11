@@ -7,6 +7,7 @@ import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
+import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.PathPlacement;
@@ -19,6 +20,8 @@ import build.jenesis.maven.MavenProject;
 import build.jenesis.maven.MavenRepository;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.JavaToolchainModule;
+import build.jenesis.step.Bind;
+import build.jenesis.step.Versions;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -82,6 +85,121 @@ public class MavenProjectTest {
         assertThat(results.keySet())
                 .as("a folder carrying the skip marker is not discovered as a subproject")
                 .noneMatch(key -> key.contains("skipped"));
+    }
+
+    @Test
+    public void skips_a_listed_module_whose_folder_is_marked_to_be_skipped() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>kept</module>
+                        <module>skipped</module>
+                    </modules>
+                </project>
+                """);
+        for (String name : List.of("kept", "skipped")) {
+            Path subproject = Files.createDirectory(project.resolve(name));
+            Files.writeString(Files.createDirectories(subproject.resolve("src/main/java")).resolve("source"), "foo");
+            Files.writeString(subproject.resolve("pom.xml"), """
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>group</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>%s</artifactId>
+                    </project>
+                    """.formatted(name));
+        }
+        Files.createFile(project.resolve("skipped").resolve(BuildExecutor.SKIP_MARKER));
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results).containsKey("maven/module-kept/manifests");
+        assertThat(results.keySet())
+                .as("a module the aggregator lists is left out when its folder carries the skip marker")
+                .noneMatch(key -> key.contains("skipped"));
+    }
+
+    @Test
+    public void names_the_module_entry_that_points_at_a_folder_without_a_pom() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>missing</module>
+                    </modules>
+                </project>
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("<module>missing</module>")
+                .hasMessageContaining("no pom.xml");
+    }
+
+    @Test
+    public void refuses_a_dependency_of_a_type_maven_places_on_no_path_in_a_module_it_builds() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>archive</artifactId>
+                            <version>1</version>
+                            <type>zip</type>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("other:archive")
+                .hasMessageContaining("is of type zip")
+                .hasMessageContaining("<property><name>!jenesis</name></property>");
     }
 
     @Test
@@ -202,6 +320,97 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void accepts_a_library_and_its_tests_jar_carrying_one_module_name_as_test_dependencies() throws IOException {
+        SequencedMap<String, Path> results = sharedModuleProject("test").execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results.get("maven/test-module-/dependencies/artifacts").resolve(BuildStep.DEPENDENCIES))
+                .as("the tests of a pom.xml module run on the class path, where a module name means nothing")
+                .content()
+                .contains("maven/org.example/lib/1.0", "maven/org.example/lib/jar/tests/1.0");
+    }
+
+    @Test
+    public void refuses_a_library_and_its_tests_jar_carrying_one_module_name_as_main_dependencies() throws IOException {
+        BuildExecutor executor = sharedModuleProject("compile");
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .as("the main half compiles a module-info.java on the module path, where it resolves only one of them")
+                .hasStackTraceContaining("maven/org.example/lib/1.0 and maven/org.example/lib/jar/tests/1.0"
+                        + " both carry module lib.shared in group main")
+                .hasStackTraceContaining("an <exclusions> entry in pom.xml");
+    }
+
+    private BuildExecutor sharedModuleProject(String scope) throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>lib</artifactId>
+                            <version>1.0</version>
+                            <scope>%1$s</scope>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>lib</artifactId>
+                            <version>1.0</version>
+                            <type>test-jar</type>
+                            <scope>%1$s</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """.formatted(scope));
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java/sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java/sample")).resolve("SampleTest.java"),
+                "package sample; public class SampleTest { }");
+        Path folder = Files.createDirectories(repository.resolve("org/example/lib/1.0"));
+        Files.writeString(folder.resolve("lib-1.0.pom"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.example</groupId>
+                    <artifactId>lib</artifactId>
+                    <version>1.0</version>
+                </project>
+                """);
+        for (String name : List.of("lib-1.0.jar", "lib-1.0-tests.jar")) {
+            Manifest manifest = new Manifest(new ByteArrayInputStream(
+                    "Manifest-Version: 1.0\nAutomatic-Module-Name: lib.shared\n\n".getBytes(StandardCharsets.UTF_8)));
+            try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(folder.resolve(name)), manifest)) {
+                jar.putNextEntry(new JarEntry(name.contains("tests") ? "lib/ValueTest.class" : "lib/Value.class"));
+                jar.closeEntry();
+            }
+        }
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", MavenProject.make(Environment.NONE,
+                project,
+                "main",
+                "maven",
+                Map.of("maven", new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)),
+                null,
+                Collections.emptyNavigableSet(),
+                LinkedHashSet::new,
+                (_, _, _) -> new AssemblyDescriptor((buildExecutor, _) -> buildExecutor.addModule("java",
+                        new JavaToolchainModule(),
+                        "../sources",
+                        "../manifests",
+                        "../dependencies/artifacts"))));
+        return executor;
+    }
+
+    @Test
     public void native_access_the_project_names_is_recorded_in_its_jar_and_granted_in_its_tests()
             throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
@@ -243,6 +452,304 @@ public class MavenProjectTest {
                 .containsOnlyKeys("main/native/maven/group/artifact", "main/native/maven/org.example/jni");
         assertThat(SequencedProperties.ofFiles(test.resolve(BuildStep.MODULE)).getProperty("native")).isNull();
         assertThat(test.resolve("manifest.mf")).doesNotExist();
+    }
+
+    @Test
+    public void compiles_the_tests_for_the_release_maven_compiler_test_release_names() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>8</maven.compiler.release>
+                        <maven.compiler.testRelease>17</maven.compiler.testRelease>
+                    </properties>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve("process/javac.properties"))
+                .getProperty("--release")).isEqualTo("8");
+        assertThat(SequencedProperties.ofFiles(results.get("maven/test-module-/manifests").resolve("process/javac.properties"))
+                .getProperty("--release")).isEqualTo("17");
+    }
+
+    @Test
+    public void compiles_for_the_compiler_target_when_no_release_is_set_and_names_a_module_that_sets_neither() throws IOException {
+        for (String name : List.of("targeted", "unset")) {
+            Path module = Files.createDirectory(project.resolve(name));
+            Files.writeString(Files.createDirectories(module.resolve("src/main/java")).resolve("source"), "foo");
+            Files.writeString(module.resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>group</groupId>
+                        <artifactId>%s</artifactId>
+                        <version>1</version>
+                        %s
+                    </project>
+                    """.formatted(name, name.equals("targeted")
+                    ? "<properties><maven.compiler.source>1.8</maven.compiler.source><maven.compiler.target>1.8</maven.compiler.target></properties>"
+                    : ""));
+        }
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>targeted</module>
+                        <module>unset</module>
+                    </modules>
+                </project>
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        List<String> printed = new ArrayList<>();
+        executor.addModule("maven", MavenProject.ofEnvironment(new Environment(Map.of("palette.colors", "none")).out(printed::add),
+                project,
+                "maven",
+                mavenRepository,
+                mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-targeted/manifests").resolve("process/javac.properties"))
+                .getProperty("--release"))
+                .as("maven.compiler.target 1.8 compiles for release 8, as the compiler plugin does")
+                .isEqualTo("8");
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-unset/manifests").resolve("process/javac.properties"))
+                .getProperty("--release")).isEqualTo(Integer.toString(Runtime.version().feature()));
+        assertThat(printed).containsExactly("[RELEASE]   group:unset compiles for release " + Runtime.version().feature()
+                + ", the JDK the build runs on, as " + Path.of("unset", "pom.xml") + " sets neither maven.compiler.release nor its target or source"
+                + " - maven.compiler.release sets it");
+    }
+
+    @Test
+    public void an_unversioned_plugin_takes_its_newest_release_until_it_is_pinned() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.plugin
+                    javac maven/com.google.errorprone/error_prone_core
+                    maven/org.example/processor/1.0
+                    -->
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.REQUIRES))
+                .stringPropertyNames())
+                .as("a plugin declared without a version floats as a tool the build resolves itself does, until a pin settles it")
+                .contains("javac/plugin/maven/com.google.errorprone/error_prone_core/RELEASE",
+                        "plugin/plugin/maven/org.example/processor/1.0");
+    }
+
+    @Test
+    public void a_processor_dependency_reaches_only_the_half_that_declares_it() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>processor</artifactId>
+                            <version>1.0</version>
+                            <type>processor</type>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.REQUIRES))
+                .stringPropertyNames())
+                .contains("plugin/plugin/maven/org.example/processor/1.0");
+        assertThat(SequencedProperties.ofFiles(results.get("maven/test-module-/manifests").resolve(BuildStep.REQUIRES))
+                .stringPropertyNames())
+                .as("the main half's processor does not compile the tests")
+                .noneMatch(key -> key.contains("org.example/processor"));
+    }
+
+    @Test
+    public void a_processor_dependency_keeps_its_exclusions() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>processor</artifactId>
+                            <version>1.0</version>
+                            <type>processor</type>
+                            <exclusions>
+                                <exclusion>
+                                    <groupId>com.google.guava</groupId>
+                                    <artifactId>guava</artifactId>
+                                </exclusion>
+                            </exclusions>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>floating</artifactId>
+                            <type>processor</type>
+                            <exclusions>
+                                <exclusion>
+                                    <groupId>org.example</groupId>
+                                    <artifactId>excluded</artifactId>
+                                </exclusion>
+                            </exclusions>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.EXCLUSIONS)))
+                .as("an <exclusions> entry of a processor prunes the processor path as it prunes a dependency's")
+                .containsOnly(Map.entry("plugin/plugin/maven/org.example/processor/1.0", "com.google.guava/guava"),
+                        Map.entry("plugin/plugin/maven/org.example/floating/RELEASE", "org.example/excluded"));
+    }
+
+    @Test
+    public void a_module_alias_comment_names_the_jar_for_the_dependency_resolution_and_the_manifest() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.alias jline jline/jline-->
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path manifests = results.get("maven/module-/manifests");
+        assertThat(SequencedProperties.ofFiles(manifests.resolve(BuildStep.ALIASES)))
+                .containsOnly(Map.entry("main/module/jline", "jline/jline"));
+        try (InputStream input = Files.newInputStream(manifests.resolve(Versions.MANIFEST))) {
+            assertThat(new Manifest(input).getMainAttributes().getValue(PathPlacement.ALIASES))
+                    .as("the jar tells a consumer which name its descriptor requires the dependency by")
+                    .isEqualTo("jline=jline/jline");
+        }
+    }
+
+    @Test
+    public void a_module_alias_of_a_test_dependency_reaches_only_the_test_module() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.alias truth com.google.truth/truth-->
+                    <!--jenesis.alias jline jline/jline-->
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.truth</groupId>
+                            <artifactId>truth</artifactId>
+                            <version>1.4.5</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.ALIASES)))
+                .as("the main module does not resolve a test dependency, so an alias of one is no alias of it")
+                .containsOnly(Map.entry("main/module/jline", "jline/jline"));
+        assertThat(SequencedProperties.ofFiles(results.get("maven/test-module-/manifests").resolve(BuildStep.ALIASES)))
+                .containsOnly(Map.entry("main/module/truth", "com.google.truth/truth"),
+                        Map.entry("main/module/jline", "jline/jline"));
     }
 
     @Test
@@ -479,6 +986,236 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void reads_a_version_range_of_the_project_s_own_pom_whole() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <tool.version>[8.1,)</tool.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>range</groupId>
+                                <artifactId>managed-dep</artifactId>
+                                <version>[3.0,4.0)</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>range</groupId>
+                            <artifactId>compile-dep</artifactId>
+                            <version>[1.0,2.0)</version>
+                            <optional>true</optional>
+                        </dependency>
+                        <dependency>
+                            <groupId>range</groupId>
+                            <artifactId>test-dep</artifactId>
+                            <version>${tool.version}</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+
+        Path module = results.get("maven/module-/manifests");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES)).stringPropertyNames())
+                .containsExactlyInAnyOrder(
+                        "main/compile/maven/range/compile-dep/[1.0,2.0)",
+                        "main/runtime/maven/range/compile-dep/[1.0,2.0)");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.OPTIONALS)).stringPropertyNames())
+                .containsExactlyInAnyOrder(
+                        "main/compile/maven/range/compile-dep/[1.0,2.0)",
+                        "main/runtime/maven/range/compile-dep/[1.0,2.0)");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.VERSIONS)))
+                .containsOnly(Map.entry("main/maven/range/managed-dep", "[3.0,4.0)"));
+        assertThat(SequencedProperties.ofFiles(results.get("maven/test-module-/manifests").resolve(BuildStep.REQUIRES))
+                .stringPropertyNames())
+                .containsExactlyInAnyOrder(
+                        "main/compile/maven/range/compile-dep/[1.0,2.0)",
+                        "main/runtime/maven/range/compile-dep/[1.0,2.0)",
+                        "main/compile/maven/range/test-dep/[8.1,)",
+                        "main/runtime/maven/range/test-dep/[8.1,)",
+                        "main/compile/maven/group/artifact/1",
+                        "main/runtime/maven/group/artifact/1");
+    }
+
+    @Test
+    public void the_exclusions_of_a_managed_dependency_are_recorded_for_the_pin_that_replaces_its_entry() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>other</groupId>
+                                <artifactId>lib</artifactId>
+                                <version>1</version>
+                                <exclusions>
+                                    <exclusion>
+                                        <groupId>excluded</groupId>
+                                        <artifactId>transitive</artifactId>
+                                    </exclusion>
+                                </exclusions>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.MANAGED))
+                .getProperty("main/maven/other/lib"))
+                .as("a managed entry's exclusions are what a pinned entry replacing it has to repeat")
+                .isEqualTo("excluded/transitive");
+    }
+
+    @Test
+    public void the_scope_an_imported_bom_manages_is_recorded_for_the_pin_that_replaces_its_entry() throws IOException {
+        Files.writeString(Files.createDirectories(repository.resolve("org/example/bom/1")).resolve("bom-1.pom"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.example</groupId>
+                    <artifactId>bom</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.example</groupId>
+                                <artifactId>native</artifactId>
+                                <version>1</version>
+                                <scope>runtime</scope>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.example</groupId>
+                                <artifactId>plain</artifactId>
+                                <version>1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.example</groupId>
+                                <artifactId>bom</artifactId>
+                                <version>1</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(MavenProject.SCOPES)))
+                .as("Maven applies a managed scope to what reaches the entry transitively, so a pinned entry replacing it repeats it")
+                .containsOnly(Map.entry("main/maven/org.example/native", "runtime"));
+    }
+
+    @Test
+    public void the_property_expressions_of_a_dependency_are_recorded_for_the_pin_that_rewrites_its_entry() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <javafx.platform>linux</javafx.platform>
+                        <javafx.version>17</javafx.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.openjfx</groupId>
+                                <artifactId>javafx-base</artifactId>
+                                <version>${javafx.version}</version>
+                                <classifier>${javafx.platform}</classifier>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.openjfx</groupId>
+                            <artifactId>javafx-base</artifactId>
+                            <classifier>${javafx.platform}</classifier>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(MavenProject.EXPRESSIONS)))
+                .as("pin writes the entry with the expressions the POM wrote, and the version only where it still is the property's")
+                .containsExactly(Map.entry("org.openjfx/javafx-base/jar/linux",
+                        "org.openjfx/javafx-base/jar/${javafx.platform} ${javafx.version} 17"));
+    }
+
+    @Test
     public void exclusions_are_written_for_both_main_and_test_modules() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -528,6 +1265,224 @@ public class MavenProjectTest {
         SequencedProperties testRequires = SequencedProperties.ofFiles(
                 results.get("maven/test-module-/manifests").resolve(BuildStep.REQUIRES));
         assertThat(testRequires.stringPropertyNames()).contains("main/compile/maven/other/lib/1", "main/runtime/maven/other/lib/1");
+    }
+
+    @Test
+    public void marks_an_optional_dependency_of_the_main_module_and_none_of_the_test_module() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>optional</artifactId>
+                            <version>1</version>
+                            <optional>true</optional>
+                        </dependency>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>required</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.OPTIONALS))
+                .stringPropertyNames())
+                .as("the published POM keeps the dependency optional, so a consumer does not inherit it")
+                .containsExactlyInAnyOrder("main/compile/maven/other/optional/1", "main/runtime/maven/other/optional/1");
+        assertThat(results.get("maven/test-module-/manifests").resolve(BuildStep.OPTIONALS))
+                .as("the test module publishes no POM")
+                .doesNotExist();
+    }
+
+    @Test
+    public void describes_a_bom_by_its_own_dependency_management_with_its_properties_resolved() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <url>https://example.com</url>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>other</groupId>
+                                <artifactId>inherited</artifactId>
+                                <version>2</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <modules>
+                        <module>bom</module>
+                    </modules>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("bom")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>bom</artifactId>
+                    <packaging>pom</packaging>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>${project.groupId}</groupId>
+                                <artifactId>library</artifactId>
+                                <version>${project.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>other</groupId>
+                                <artifactId>other-bom</artifactId>
+                                <version>3</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results.keySet())
+                .as("neither the aggregator nor the BOM is a module that compiles")
+                .noneMatch(key -> key.contains("module-"));
+        Path boms = results.get("maven/boms");
+        SequencedProperties inventory = SequencedProperties.ofFiles(boms.resolve("inventory.properties"));
+        assertThat(inventory).containsEntry("module-bom.path", "bom")
+                .containsEntry("module-bom.packaging", "pom")
+                .as("a BOM is staged unless its packaging.properties says otherwise")
+                .doesNotContainKey("module-bom.stage");
+        String pom = Files.readString(boms.resolve(inventory.getProperty("module-bom.pom")));
+        assertThat(pom)
+                .contains("<groupId>group</groupId>", "<artifactId>bom</artifactId>", "<version>1</version>",
+                        "<packaging>pom</packaging>", "<url>https://example.com/bom</url>")
+                .contains("<artifactId>library</artifactId>", "<artifactId>other-bom</artifactId>", "<scope>import</scope>")
+                .doesNotContain("${", "<parent>")
+                .as("the parent's managed versions stay with the parent, which is not published")
+                .doesNotContain("inherited");
+    }
+
+    @Test
+    public void keeps_a_bom_out_of_the_staged_repositories_where_its_packaging_properties_sets_stage_false()
+            throws IOException {
+        writeBom();
+        Files.writeString(Files.createDirectories(project.resolve("bom/build.jenesis")).resolve("packaging.properties"),
+                "stage=false\n");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        SequencedProperties inventory = SequencedProperties.ofFiles(results.get("maven/boms").resolve("inventory.properties"));
+        assertThat(inventory)
+                .containsEntry("module-bom.packaging", "pom")
+                .as("the BOM's POM is still written, and staging leaves it out")
+                .containsEntry("module-bom.stage", "false");
+    }
+
+    @Test
+    public void reads_the_stage_of_a_bom_from_every_configuration_location_a_module_reads() throws IOException {
+        writeBom();
+        Path shared = Files.createDirectory(project.resolve("shared"));
+        Files.writeString(shared.resolve("packaging.properties"), "stage=false\n");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver)
+                .configurations(locals -> {
+                    SequencedSet<Path> locations = new LinkedHashSet<>(locals);
+                    locations.add(shared);
+                    return locations;
+                }));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/boms").resolve("inventory.properties")))
+                .as("a configuration folder the project names reaches a BOM as it reaches any module")
+                .containsEntry("module-bom.stage", "false");
+    }
+
+    private void writeBom() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>bom</module>
+                    </modules>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("bom")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>bom</artifactId>
+                    <packaging>pom</packaging>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>group</groupId>
+                                <artifactId>library</artifactId>
+                                <version>1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
     }
 
     @Test
@@ -657,6 +1612,54 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void reads_the_kotlin_and_groovy_folders_of_each_scope_beside_its_source_directory() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <build>
+                        <testSourceDirectory>src/test/groovy</testSourceDirectory>
+                    </build>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java/sample")).resolve("Sample.java"), "java");
+        Files.writeString(Files.createDirectories(project.resolve("src/main/kotlin/sample")).resolve("Other.kt"), "kotlin");
+        Files.writeString(Files.createDirectories(project.resolve("src/main/groovy/sample")).resolve("Third.groovy"), "groovy");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/groovy/sample")).resolve("SampleSpec.groovy"), "spec");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/kotlin/sample")).resolve("SampleTest.kt"), "test");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path main = results.get("maven/module-/sources").resolve(BuildStep.SOURCES + "sample");
+        assertThat(main.resolve("Sample.java")).content().isEqualTo("java");
+        assertThat(main.resolve("Other.kt"))
+                .as("the Kotlin plugin compiles src/main/kotlin beside the source directory")
+                .content()
+                .isEqualTo("kotlin");
+        assertThat(main.resolve("Third.groovy"))
+                .as("GMavenPlus compiles src/main/groovy beside the source directory")
+                .content()
+                .isEqualTo("groovy");
+        Path test = results.get("maven/test-module-/sources").resolve(BuildStep.SOURCES + "sample");
+        assertThat(test.resolve("SampleSpec.groovy"))
+                .as("a folder the pom names as its source directory is read once")
+                .content()
+                .isEqualTo("spec");
+        assertThat(test.resolve("SampleTest.kt")).content().isEqualTo("test");
+    }
+
+    @Test
     public void can_resolve_sources_and_resources_explicit() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -702,6 +1705,199 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void reads_a_resource_directory_the_pom_names_twice_once() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <build>
+                       <resources>
+                         <resource>
+                           <directory>src/main/resources</directory>
+                           <filtering>true</filtering>
+                           <includes>
+                             <include>**/*.properties</include>
+                           </includes>
+                         </resource>
+                         <resource>
+                           <directory>src/main/resources/</directory>
+                           <filtering>false</filtering>
+                           <excludes>
+                             <exclude>**/*.properties</exclude>
+                           </excludes>
+                         </resource>
+                         <resource>
+                           <directory>${project.basedir}/src/main/resources</directory>
+                         </resource>
+                       </resources>
+                    </build>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/main/resources")).resolve("resource"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results).containsKey("maven/module-/resources-1");
+        assertThat(results.keySet())
+                .as("a directory named twice is copied once, so that the jar holds each of its files once")
+                .noneMatch(key -> key.startsWith("maven/module-/resources-") && !key.equals("maven/module-/resources-1"));
+        assertThat(results.get("maven/module-/resources-1").resolve(BuildStep.RESOURCES + "resource")).content().isEqualTo("bar");
+    }
+
+    @Test
+    public void resolves_the_basedir_of_an_inherited_resource_directory_in_the_inheriting_module() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <build>
+                       <resources>
+                         <resource>
+                           <directory>${project.basedir}/src/main/resources</directory>
+                         </resource>
+                         <resource>
+                           <directory>${basedir}/src/main/missing</directory>
+                         </resource>
+                       </resources>
+                    </build>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("child")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                        <maven.compiler.release>21</maven.compiler.release>
+                    </properties>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("child/src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("child/src/main/resources")).resolve("resource"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        List<String> printed = new ArrayList<>();
+        executor.addModule("maven", MavenProject.ofEnvironment(new Environment(Map.of("palette.colors", "none")).out(printed::add),
+                project,
+                "maven",
+                mavenRepository,
+                mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results.get("maven/module-child/resources-1").resolve(BuildStep.RESOURCES + "resource"))
+                .as("Maven interpolates project.basedir in the module that inherits the resource directory")
+                .content()
+                .isEqualTo("bar");
+        assertThat(printed).contains("[RESOURCES] " + Path.of("child", "pom.xml")
+                + " names the resource directory ./src/main/missing, which does not exist beside it, so it adds no resources");
+    }
+
+    @Test
+    public void refuses_a_resource_directory_that_contains_the_build_output() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <build>
+                       <resources>
+                         <resource>
+                           <directory>./</directory>
+                         </resource>
+                       </resources>
+                    </build>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(project.resolve("target"),
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .as("copying the project root would copy the build's own output into itself without end")
+                .hasMessageContaining("The resource directory ./")
+                .hasMessageContaining("contains target")
+                .hasMessageContaining("-Djenesis.project.resources=<file>:<path in the jar>")
+                .hasMessageContaining("move that resource into a <profile> activated by a property");
+    }
+
+    @Test
+    public void refuses_a_resource_directory_that_contains_the_local_jenesis_folder() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <build>
+                       <resources>
+                         <resource>
+                           <directory>.</directory>
+                         </resource>
+                       </resources>
+                    </build>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.createDirectories(project.resolve(".jenesis/artifacts"));
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("contains .jenesis");
+    }
+
+    @Test
     public void can_resolve_test_sources_and_resources() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -730,6 +1926,187 @@ public class MavenProjectTest {
                 "maven/test-module-/resources-1");
         assertThat(results.get("maven/test-module-/sources").resolve(BuildStep.SOURCES + "source")).content().isEqualTo("foo");
         assertThat(results.get("maven/test-module-/resources-1").resolve(BuildStep.RESOURCES + "resource")).content().isEqualTo("bar");
+    }
+
+    @Test
+    public void builds_an_empty_main_module_for_a_pom_with_test_sources_alone() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results)
+                .as("the test module requires the main artifact, which Maven builds as an empty jar")
+                .containsKeys("maven/module-/manifests", "maven/module-/coordinates", "maven/test-module-/manifests");
+        assertThat(results.get("maven/module-/sources")).isEmptyDirectory();
+    }
+
+    @Test
+    public void builds_a_module_without_sources_that_configures_a_plugin_and_names_one_that_does_not() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <maven.compiler.release>21</maven.compiler.release>
+                    </properties>
+                    <modules>
+                        <module>generated</module>
+                        <module>empty</module>
+                    </modules>
+                </project>
+                """);
+        for (String name : List.of("generated", "empty")) {
+            Files.writeString(Files.createDirectory(project.resolve(name)).resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>group</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>%s</artifactId>
+                    </project>
+                    """.formatted(name));
+        }
+        Files.writeString(Files.createDirectories(project.resolve("generated/src/main/build.jenesis"))
+                .resolve("plugin-generator.properties"), "");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        List<String> printed = new ArrayList<>();
+        executor.addModule("maven", MavenProject.ofEnvironment(new Environment(Map.of("palette.colors", "none")).out(printed::add),
+                project,
+                "maven",
+                mavenRepository,
+                mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results)
+                .as("a plugin the module configures generates what it compiles")
+                .containsKeys("maven/module-generated/manifests", "maven/module-generated/coordinates")
+                .doesNotContainKeys("maven/module-empty/manifests");
+        assertThat(printed).containsExactly("[SKIPPED]   group:empty builds no jar, as " + Path.of("empty", "pom.xml") + " has neither sources nor"
+                + " resources: a plugin that generates them is configured by a plugin-<name>.properties in "
+                + Path.of("empty", "src", "main", "build.jenesis") + ", which builds the module");
+    }
+
+    @Test
+    public void builds_the_tests_of_a_module_whose_test_half_only_configures_a_plugin() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>21</maven.compiler.release>
+                    </properties>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/test/build.jenesis"))
+                .resolve("plugin-generator.properties"), "");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results)
+                .as("a plugin the test half configures generates the tests it compiles, against the main half")
+                .containsKeys("maven/test-module-/manifests", "maven/module-/manifests");
+    }
+
+    @Test
+    public void builds_a_bundle_as_a_jar_and_names_a_module_whose_packaging_it_does_not_build() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <maven.compiler.release>21</maven.compiler.release>
+                    </properties>
+                    <modules>
+                        <module>bundled</module>
+                        <module>web</module>
+                    </modules>
+                </project>
+                """);
+        for (String name : List.of("bundled", "web")) {
+            Files.writeString(Files.createDirectory(project.resolve(name)).resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>group</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>%s</artifactId>
+                        <packaging>%s</packaging>
+                    </project>
+                    """.formatted(name, name.equals("web") ? "war" : "bundle"));
+            Files.writeString(Files.createDirectories(project.resolve(name + "/src/main/java")).resolve("source"), "foo");
+        }
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        List<String> printed = new ArrayList<>();
+        executor.addModule("maven", MavenProject.ofEnvironment(new Environment(Map.of("palette.colors", "none")).out(printed::add),
+                project,
+                "maven",
+                mavenRepository,
+                mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results)
+                .as("maven-bundle-plugin's packaging produces a jar")
+                .containsKeys("maven/module-bundled/manifests", "maven/module-bundled/coordinates")
+                .doesNotContainKeys("maven/module-web/manifests");
+        assertThat(printed).containsExactly("[SKIPPED]   " + Path.of("web", "pom.xml") + " builds nothing, as its packaging war is none of jar"
+                + " and bundle, the packagings this build builds: where it is a jar with more in it, declare"
+                + " <packaging>jar</packaging> and let a plugin add the rest");
     }
 
     @Test
@@ -850,6 +2227,7 @@ public class MavenProjectTest {
                 Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)),
                 null,
                 Collections.emptyNavigableSet(),
+                LinkedHashSet::new,
                 (descriptor, _, _) -> {
                     switch (descriptor.name()) {
                         case "module-foo" -> {
@@ -1279,6 +2657,7 @@ public class MavenProjectTest {
         SequencedProperties moduleProperties = SequencedProperties.ofFiles(moduleFile);
         assertThat(moduleProperties).containsOnly(
                 Map.entry("path", ""),
+                Map.entry("sources", "src/main/java"),
                 Map.entry("modular", "false"));
         Path metadataFile = module.resolve(BuildStep.METADATA);
         assertThat(metadataFile).exists();
@@ -1302,6 +2681,331 @@ public class MavenProjectTest {
                 Map.entry("scm.developerConnection", "scm:git:git@example.com:project.git"),
                 Map.entry("scm.tag", "v1"),
                 Map.entry("scm.url", "https://example.com/project"));
+    }
+
+    @Test
+    public void the_module_pom_wins_over_the_project_metadata_for_what_it_declares_and_the_command_line_over_both()
+            throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <description>Own description.</description>
+                    <licenses>
+                        <license>
+                            <name>MIT</name>
+                        </license>
+                    </licenses>
+                    <scm>
+                        <tag>HEAD</tag>
+                    </scm>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Path file = Files.writeString(project.resolve("project.properties"), """
+                description=Project description.
+                url=https://example.com/project
+                license.apache.name=Apache-2.0
+                scm.url=https://example.com/project
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addSource("file", Bind.asMetadata(), file);
+        executor.addStep("command", (_, context, _) -> {
+            SequencedProperties values = new SequencedProperties();
+            values.setProperty("version", "2");
+            values.setProperty("scm.tag", "v2");
+            values.store(context.next().resolve(BuildStep.METADATA));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "file", "command");
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        SequencedProperties metadata = SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.METADATA));
+        assertThat(metadata).containsOnly(
+                Map.entry("project", "group"),
+                Map.entry("artifact", "artifact"),
+                Map.entry("version", "2"),
+                Map.entry("description", "Own description."),
+                Map.entry("url", "https://example.com/project"),
+                Map.entry("license.mit.name", "MIT"),
+                Map.entry("scm.tag", "v2"),
+                Map.entry("scm.url", "https://example.com/project"));
+    }
+
+    @Test
+    public void refuses_a_version_that_names_a_property_no_pom_defines_naming_the_property() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>${nisse.jgit.dynamicVersion}</version>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names the property nisse.jgit.dynamicVersion")
+                .hasMessageContaining("jenesis.project.version");
+    }
+
+    @Test
+    public void refuses_a_dependency_classifier_that_names_a_property_no_pom_defines_naming_the_property() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.openjfx</groupId>
+                            <artifactId>javafx-base</artifactId>
+                            <version>17</version>
+                            <classifier>${javafx.platform}</classifier>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The classifier ${javafx.platform} of the dependency org.openjfx:javafx-base")
+                .hasMessageContaining("names the property javafx.platform, which no pom.xml defines");
+    }
+
+    @Test
+    public void a_commanded_version_replaces_an_undefined_one_in_the_project_and_its_sibling_dependencies() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>${nisse.jgit.dynamicVersion}</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>foo</module>
+                        <module>bar</module>
+                    </modules>
+                </project>
+                """);
+        for (String name : List.of("foo", "bar")) {
+            Files.writeString(Files.createDirectory(project.resolve(name)).resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>group</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>${nisse.jgit.dynamicVersion}</version>
+                        </parent>
+                        <artifactId>%s</artifactId>
+                        %s
+                    </project>
+                    """.formatted(name, name.equals("bar") ? """
+                    <dependencies>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>foo</artifactId>
+                            <version>${project.version}</version>
+                        </dependency>
+                    </dependencies>
+                    """ : ""));
+            Files.writeString(Files.createDirectories(project.resolve(name + "/src/main/java")).resolve("source"), name);
+        }
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addStep("command", (_, context, _) -> {
+            SequencedProperties values = new SequencedProperties();
+            values.setProperty("version", "2");
+            values.store(context.next().resolve(BuildStep.METADATA));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "command");
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-bar/manifests").resolve(BuildStep.REQUIRES)).stringPropertyNames())
+                .as("a sibling is required at the version the build stamps on it, which is what its POM and SBOM then name")
+                .contains("main/runtime/maven/group/foo/2");
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-foo/coordinates").resolve(BuildStep.IDENTITY)).stringPropertyNames())
+                .contains("maven/group/foo/2");
+    }
+
+    @Test
+    public void returns_to_the_declared_version_once_the_commanded_one_is_no_longer_given() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor commanded = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        commanded.addStep("command", (_, context, _) -> {
+            SequencedProperties values = new SequencedProperties();
+            values.setProperty("version", "2");
+            values.store(context.next().resolve(BuildStep.METADATA));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        commanded.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "command");
+        commanded.execute(Runnable::run).toCompletableFuture().join();
+        BuildExecutor declared = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        declared.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = declared.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/coordinates").resolve(BuildStep.IDENTITY)).stringPropertyNames())
+                .as("a build without the version setting is handed the step that stamped it as removed, and builds the declared version")
+                .contains("maven/group/artifact/1");
+    }
+
+    @Test
+    public void keeps_a_developer_that_names_no_id_under_a_key_derived_from_its_name() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <developers>
+                        <developer>
+                            <id>alice</id>
+                            <name>Alice Example</name>
+                        </developer>
+                        <developer>
+                            <name>Bob Example</name>
+                        </developer>
+                        <developer>
+                            <name>Bob Example</name>
+                            <email>bob@example.org</email>
+                        </developer>
+                        <developer>
+                            <email>carol@example.com</email>
+                        </developer>
+                    </developers>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        SequencedProperties metadata = SequencedProperties.ofFiles(results.get("maven/module-/manifests")
+                .resolve(BuildStep.METADATA));
+        assertThat(metadata)
+                .as("a developer without an id is kept under a key of its name, marked as having no id")
+                .contains(
+                        Map.entry("developer.alice.name", "Alice Example"),
+                        Map.entry("developer.bob_example.id", ""),
+                        Map.entry("developer.bob_example.name", "Bob Example"),
+                        Map.entry("developer.bob_example_2.id", ""),
+                        Map.entry("developer.bob_example_2.name", "Bob Example"),
+                        Map.entry("developer.bob_example_2.email", "bob@example.org"),
+                        Map.entry("developer.carol_example_com.id", ""),
+                        Map.entry("developer.carol_example_com.email", "carol@example.com"))
+                .doesNotContainKey("developer.alice.id");
+    }
+
+    @Test
+    public void keeps_a_developer_that_names_only_its_id() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <developers>
+                        <developer>
+                            <id>google</id>
+                            <organization>Google Inc.</organization>
+                        </developer>
+                    </developers>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        SequencedProperties metadata = SequencedProperties.ofFiles(results.get("maven/module-/manifests")
+                .resolve(BuildStep.METADATA));
+        assertThat(metadata)
+                .as("a developer that names neither a name nor an email is kept by its id")
+                .containsEntry("developer.google.id", "google");
     }
 
     @Test

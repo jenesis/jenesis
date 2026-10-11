@@ -32,10 +32,10 @@ public class TestFrameworkAdapterTest {
     }
 
     @Test
-    public void junit_platform_declares_dumb_terminal_system_property() {
+    public void junit_platform_sets_no_system_property_that_would_configure_the_code_under_test() {
         assertThat(new JUnitPlatform().systemProperties())
-                .hasSize(1)
-                .containsEntry("org.jline.terminal.dumb", "true");
+                .as("a property of a library, as org.jline.terminal.dumb, reaches the tests of that library as well")
+                .isEmpty();
     }
 
     @Test
@@ -110,7 +110,7 @@ public class TestFrameworkAdapterTest {
                 Collections.emptyNavigableMap(),
                 false,
                 false))
-                .containsExactly("-d", root.resolve("test-output").toString());
+                .containsExactly("-verbose", "2", "-d", root.resolve("test-output").toString());
     }
 
     @Test
@@ -124,6 +124,7 @@ public class TestFrameworkAdapterTest {
                 true,
                 false))
                 .containsExactly(
+                        "-verbose", "2",
                         "-d", root.resolve("test-output").toString(),
                         "-parallel", "methods",
                         "-testclass", "sample.AlphaTest,sample.BetaTest",

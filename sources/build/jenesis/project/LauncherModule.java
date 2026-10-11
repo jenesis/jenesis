@@ -14,6 +14,7 @@ import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Launcher;
 import build.jenesis.step.Sbom;
 
 public class LauncherModule implements BuildExecutorModule {
@@ -27,6 +28,7 @@ public class LauncherModule implements BuildExecutorModule {
     private final PathPlacement pathPlacement;
     private final Sbom sbom;
     private final SequencedSet<String> sbomInputs;
+    private final Launcher launcher;
 
     public LauncherModule(Map<String, Repository> repositories,
                           Map<String, Resolver> resolvers) {
@@ -35,7 +37,8 @@ public class LauncherModule implements BuildExecutorModule {
              "launcher",
              PathPlacement.INFERRED,
              null,
-             null);
+             null,
+             new Launcher("launcher", PathPlacement.INFERRED));
     }
 
     public static LauncherModule ofEnvironment(Environment environment,
@@ -46,7 +49,8 @@ public class LauncherModule implements BuildExecutorModule {
                 "launcher",
                 PathPlacement.INFERRED,
                 null,
-                null);
+                null,
+                Launcher.ofEnvironment(environment, "launcher", PathPlacement.INFERRED));
     }
 
     private LauncherModule(Dependencies dependencies,
@@ -54,33 +58,39 @@ public class LauncherModule implements BuildExecutorModule {
                            String group,
                            PathPlacement pathPlacement,
                            Sbom sbom,
-                           SequencedSet<String> sbomInputs) {
+                           SequencedSet<String> sbomInputs,
+                           Launcher launcher) {
         this.dependencies = dependencies;
         this.pinning = pinning;
         this.group = group;
         this.pathPlacement = pathPlacement;
         this.sbom = sbom;
         this.sbomInputs = sbomInputs;
+        this.launcher = launcher;
     }
 
     public LauncherModule pinning(Pinning pinning) {
-        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs);
+        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs, launcher);
     }
 
     public LauncherModule group(String group) {
-        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs);
+        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs, launcher);
     }
 
     public LauncherModule pathPlacement(PathPlacement pathPlacement) {
-        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs);
+        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs, launcher);
     }
 
     public LauncherModule sbom(Sbom sbom) {
-        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs);
+        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs, launcher);
     }
 
     public LauncherModule sbomInputs(SequencedSet<String> sbomInputs) {
-        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs);
+        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs, launcher);
+    }
+
+    public LauncherModule launcher(Launcher launcher) {
+        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs, launcher);
     }
 
     @Override
@@ -106,7 +116,7 @@ public class LauncherModule implements BuildExecutorModule {
         }
         bundleInputs.add(DEPENDENCIES);
         bundleInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(BUNDLE, new build.jenesis.step.Launcher(group, pathPlacement), bundleInputs);
+        buildExecutor.addStep(BUNDLE, launcher.tool(group).pathPlacement(pathPlacement), bundleInputs);
     }
 
     private record Requires(String group) implements BuildStep {

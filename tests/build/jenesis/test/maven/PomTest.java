@@ -11,8 +11,10 @@ import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.Pom;
+import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class PomTest {
 
@@ -105,6 +107,169 @@ public class PomTest {
     }
 
     @Test
+    public void leaves_out_of_a_flattened_pom_what_only_an_optional_dependency_brings() throws IOException {
+        SequencedProperties dependencies = new SequencedProperties(), graph = new SequencedProperties();
+        int index = 0;
+        for (String scope : List.of("compile", "runtime")) {
+            for (String coordinate : List.of("lib/1", "lib-child/1", "other/2", "other-child/2", "shared/3")) {
+                dependencies.setProperty("main/" + scope + "/maven/org.example/" + coordinate, "");
+                graph.setProperty("vertex/main/" + scope + "/maven/org.example/" + coordinate.substring(0, coordinate.indexOf('/')),
+                        coordinate.substring(coordinate.indexOf('/') + 1) + "\t\tfalse\tfalse");
+            }
+            for (String edge : List.of("\tlib/1", "\tother/2", "lib/1\tlib-child/1", "lib/1\tshared/3",
+                    "other/2\tother-child/2", "other/2\tshared/3")) {
+                graph.setProperty("edge/" + index++, edge("main", scope, edge));
+            }
+        }
+        dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+        graph.store(argument.resolve(Dependencies.GRAPH));
+        SequencedProperties optionals = new SequencedProperties();
+        optionals.setProperty("main/compile/maven/org.example/lib/1", "");
+        optionals.setProperty("main/runtime/maven/org.example/lib/1", "");
+        optionals.store(argument.resolve(BuildStep.OPTIONALS));
+        String pom = flattened();
+        assertThat(pom.indexOf("<optional>true</optional>"))
+                .as("the optional dependency stays in the POM, optional")
+                .isGreaterThan(pom.indexOf("<artifactId>lib</artifactId>"))
+                .isLessThan(pom.indexOf("<artifactId>other</artifactId>"));
+        assertThat(pom)
+                .as("what only the optional dependency brings reaches a consumer only through that dependency,"
+                        + " which then declares it itself, as Maven resolves it")
+                .doesNotContain("<artifactId>lib-child</artifactId>")
+                .as("what a required dependency brings as well stays")
+                .contains("<artifactId>other</artifactId>", "<artifactId>other-child</artifactId>", "<artifactId>shared</artifactId>");
+        assertThat(pom.indexOf("<optional>", pom.indexOf("<artifactId>other</artifactId>")))
+                .as("nothing but the optional dependency is optional")
+                .isNegative();
+    }
+
+    @Test
+    public void keeps_an_optional_dependency_in_a_flattened_pom_required_where_a_required_dependency_brings_it()
+            throws IOException {
+        SequencedProperties dependencies = new SequencedProperties(), graph = new SequencedProperties();
+        int index = 0;
+        for (String scope : List.of("compile", "runtime")) {
+            for (String coordinate : List.of("lib/1", "lib-child/1", "other/2")) {
+                dependencies.setProperty("main/" + scope + "/maven/org.example/" + coordinate, "");
+                graph.setProperty("vertex/main/" + scope + "/maven/org.example/" + coordinate.substring(0, coordinate.indexOf('/')),
+                        coordinate.substring(coordinate.indexOf('/') + 1) + "\t\tfalse\tfalse");
+            }
+            for (String edge : List.of("\tlib/1", "\tother/2", "lib/1\tlib-child/1", "other/2\tlib/1")) {
+                graph.setProperty("edge/" + index++, edge("main", scope, edge));
+            }
+        }
+        dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+        graph.store(argument.resolve(Dependencies.GRAPH));
+        SequencedProperties optionals = new SequencedProperties();
+        optionals.setProperty("main/compile/maven/org.example/lib/1", "");
+        optionals.setProperty("main/runtime/maven/org.example/lib/1", "");
+        optionals.store(argument.resolve(BuildStep.OPTIONALS));
+        assertThat(flattened())
+                .as("a consumer receives the optional dependency through the required one, so the flattened POM,"
+                        + " which excludes what each entry brings, names it as required, with what it brings")
+                .contains("<artifactId>lib</artifactId>", "<artifactId>lib-child</artifactId>")
+                .doesNotContain("<optional>");
+    }
+
+    @Test
+    public void names_a_required_module_by_the_maven_artifact_it_resolved_to_where_the_pom_is_not_flattened()
+            throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/module/org.example.lib", "");
+        requires.setProperty("main/runtime/module/org.example.lib", "");
+        requires.setProperty("main/compile/module/org.example.annotations", "");
+        requires.setProperty("main/compile/maven/org.example/aliased", "");
+        requires.setProperty("main/runtime/maven/org.example/aliased", "");
+        requires.store(argument.resolve(BuildStep.REQUIRES));
+        SequencedProperties exclusions = new SequencedProperties();
+        exclusions.setProperty("main/compile/module/org.example.lib", "org.example/unwanted");
+        exclusions.store(argument.resolve(BuildStep.EXCLUSIONS));
+        SequencedProperties graph = new SequencedProperties();
+        for (String scope : List.of("compile", "runtime")) {
+            graph.setProperty("vertex/main/" + scope + "/maven/org.example/lib", "1.2.3\torg.example.lib\tfalse\tfalse");
+            graph.setProperty("vertex/main/" + scope + "/maven/org.example/transitive", "4.5.6\torg.example.transitive\tfalse\tfalse");
+            graph.setProperty("vertex/main/" + scope + "/maven/org.example/aliased", "7.8.9\t\tfalse\tfalse");
+        }
+        graph.setProperty("vertex/main/compile/maven/org.example/annotations", "2.0\torg.example.annotations\tfalse\tfalse");
+        graph.store(argument.resolve(Dependencies.GRAPH));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(argument, Map.of(
+                                Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.EXCLUSIONS), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(Dependencies.GRAPH), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        String pom = Files.readString(next.resolve(Pom.POM));
+        assertThat(pom)
+                .as("each module the declaration requires is named by its artifact, at the version resolved")
+                .contains("<artifactId>lib</artifactId>", "<version>1.2.3</version>",
+                        "<artifactId>annotations</artifactId>", "<version>2.0</version>",
+                        "<artifactId>aliased</artifactId>", "<version>7.8.9</version>")
+                .as("an exclusion the declaration names is kept for the consumer's resolution")
+                .contains("<artifactId>unwanted</artifactId>")
+                .as("what a required module brings is left to its own POM")
+                .doesNotContain("<artifactId>transitive</artifactId>", "<groupId>*</groupId>");
+        assertThat(pom.indexOf("<scope>provided</scope>"))
+                .as("a requires static is needed to compile alone, so it is provided")
+                .isGreaterThan(pom.indexOf("<artifactId>annotations</artifactId>"))
+                .isLessThan(pom.indexOf("<artifactId>aliased</artifactId>"));
+    }
+
+    @Test
+    public void refuses_a_pom_that_is_not_flattened_where_a_required_module_resolved_to_no_maven_artifact()
+            throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/module/org.example.lib", "");
+        requires.setProperty("main/runtime/module/org.example.lib", "");
+        requires.store(argument.resolve(BuildStep.REQUIRES));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        assertThatThrownBy(() -> new Pom().apply(Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(argument, Map.of(
+                        Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
+                        Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED)))))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("org.example.lib")
+                .hasMessageContaining("flatten=true");
+    }
+
+    private static String edge(String group, String scope, String edge) {
+        int tab = edge.indexOf('\t');
+        String parent = edge.substring(0, tab), child = edge.substring(tab + 1);
+        return String.join("\t", group, scope, "maven", "true", "compile", child.substring(child.indexOf('/') + 1),
+                parent.isEmpty() ? "" : "maven/org.example/" + parent, "maven/org.example/" + child);
+    }
+
+    private String flattened() throws IOException {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        new Pom().resolved(true).apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(argument, Map.of(
+                                Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.OPTIONALS), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(Dependencies.GRAPH), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        return Files.readString(next.resolve(Pom.POM));
+    }
+
+    @Test
     public void writes_the_pom_and_its_coordinate_where_a_jar_carries_them() throws IOException {
         SequencedProperties metadata = new SequencedProperties();
         metadata.setProperty("project", "build.jenesis");
@@ -161,8 +326,6 @@ public class PomTest {
         dependencies.setProperty("main/runtime/maven/org.example/other/jar/4.5.6", "");
         dependencies.setProperty("main/compile/maven/org.example/zip/zip/7.8.9", "");
         dependencies.setProperty("main/runtime/maven/org.example/zip/zip/7.8.9", "");
-        dependencies.setProperty("main/compile/module/com.example.foo", "");
-        dependencies.setProperty("main/runtime/module/com.example.foo", "");
         dependencies.store(argument.resolve(BuildStep.REQUIRES));
         SequencedProperties metadata = new SequencedProperties();
         metadata.setProperty("project", "build.jenesis");
@@ -455,6 +618,95 @@ public class PomTest {
         assertThat(pom).contains("<connection>scm:git:https://example.com/jenesis.git</connection>");
     }
 
+    @Test
+    public void emits_a_developers_details_and_the_issue_and_ci_management() throws IOException {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.setProperty("developer.alice.name", "Alice Example");
+        metadata.setProperty("developer.alice.url", "https://example.com/alice");
+        metadata.setProperty("developer.alice.organization", "Example Ltd");
+        metadata.setProperty("developer.alice.organizationUrl", "https://example.com");
+        metadata.setProperty("developer.alice.roles", "lead, developer");
+        metadata.setProperty("developer.alice.timezone", "Europe/Oslo");
+        metadata.setProperty("issueManagement.system", "GitHub");
+        metadata.setProperty("issueManagement.url", "https://example.com/issues");
+        metadata.setProperty("ciManagement.system", "GitHub Actions");
+        metadata.setProperty("ciManagement.url", "https://example.com/actions");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        String pom = Files.readString(next.resolve(Pom.POM)).replaceAll(">\\s+<", "><");
+        assertThat(pom).contains("<developer><id>alice</id><name>Alice Example</name>"
+                + "<url>https://example.com/alice</url><organization>Example Ltd</organization>"
+                + "<organizationUrl>https://example.com</organizationUrl>"
+                + "<roles><role>lead</role><role>developer</role></roles>"
+                + "<timezone>Europe/Oslo</timezone></developer>");
+        assertThat(pom).contains("<issueManagement><system>GitHub</system><url>https://example.com/issues</url></issueManagement>"
+                + "<ciManagement><system>GitHub Actions</system><url>https://example.com/actions</url></ciManagement>");
+    }
+
+    @Test
+    public void emits_a_licence_distribution_and_the_inception_year() throws IOException {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.setProperty("url", "https://example.com");
+        metadata.setProperty("inceptionYear", "2010");
+        metadata.setProperty("license.apache_2_0.name", "Apache 2.0");
+        metadata.setProperty("license.apache_2_0.url", "https://www.apache.org/licenses/LICENSE-2.0.txt");
+        metadata.setProperty("license.apache_2_0.distribution", "repo");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        String pom = Files.readString(next.resolve(Pom.POM)).replaceAll(">\\s+<", "><");
+        assertThat(pom).contains("<url>https://example.com</url><inceptionYear>2010</inceptionYear><licenses>");
+        assertThat(pom).contains("<license><name>Apache 2.0</name>"
+                + "<url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>"
+                + "<distribution>repo</distribution></license>");
+    }
+
+    @Test
+    public void emits_a_developer_without_an_id_where_its_id_is_empty() throws IOException {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.setProperty("developer.alice.name", "Alice Example");
+        metadata.setProperty("developer.bob_example.id", "");
+        metadata.setProperty("developer.bob_example.name", "Bob Example");
+        metadata.setProperty("developer.carol.id", "carol-id");
+        metadata.setProperty("developer.carol.name", "Carol Example");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        String pom = Files.readString(next.resolve(Pom.POM));
+        assertThat(pom)
+                .as("a developer's key is its id unless an id is declared")
+                .contains("<id>alice</id>", "<id>carol-id</id>", "<name>Bob Example</name>")
+                .doesNotContain("<id>carol</id>");
+        assertThat(pom)
+                .as("a developer whose id is empty is published by name alone")
+                .doesNotContain("<id>bob_example</id>", "<id/>", "<id></id>");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"v1.0.0", ""})
     public void emits_a_scm_tag_unless_it_is_empty(String tag) throws IOException {
@@ -592,6 +844,42 @@ public class PomTest {
         assertThat(pom.indexOf("<exclusions>"))
                 .isGreaterThan(pom.indexOf("<artifactId>lib</artifactId>"))
                 .isLessThan(pom.indexOf("<artifactId>other</artifactId>"));
+    }
+
+    @Test
+    public void keeps_a_dependency_optional_that_its_module_declared_optional() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.example/lib/1.2.3", "");
+        requires.setProperty("main/runtime/maven/org.example/lib/1.2.3", "");
+        requires.setProperty("main/compile/maven/org.example/other/4.5.6", "");
+        requires.setProperty("main/runtime/maven/org.example/other/4.5.6", "");
+        requires.store(argument.resolve(BuildStep.REQUIRES));
+        SequencedProperties optionals = new SequencedProperties();
+        optionals.setProperty("main/compile/maven/org.example/lib/1.2.3", "");
+        optionals.setProperty("main/runtime/maven/org.example/lib/1.2.3", "");
+        optionals.store(argument.resolve(BuildStep.OPTIONALS));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.OPTIONALS), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        String pom = Files.readString(next.resolve(Pom.POM));
+        assertThat(pom.indexOf("<optional>true</optional>"))
+                .as("the optional dependency stays optional, so a consumer does not inherit it")
+                .isGreaterThan(pom.indexOf("<artifactId>lib</artifactId>"))
+                .isLessThan(pom.indexOf("<artifactId>other</artifactId>"));
+        assertThat(pom.indexOf("<optional>", pom.indexOf("<artifactId>other</artifactId>")))
+                .as("the other dependency is required as declared")
+                .isNegative();
     }
 
 }

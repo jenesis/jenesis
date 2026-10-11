@@ -43,89 +43,80 @@ public class ModularStaging implements BuildStep {
                 continue;
             }
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
-            String prefix = inventoryPrefix(inventory, inventoryFile);
-            String testsOf = inventory.getProperty(prefix + ".test");
-            if (!includeTests && testsOf != null) {
-                continue;
-            }
-            String moduleName = inventory.getProperty(prefix + ".module");
-            if (moduleName == null) {
-                continue;
-            }
-            SAFE_SEGMENT.accept("module name", moduleName);
-            Path artifact = single(Inventory.paths(inventory, argument.folder(), prefix + ".artifacts"),
-                    prefix,
-                    "artifacts",
-                    true,
-                    ".jar",
-                    inventoryFile);
-            Path sources = single(Inventory.paths(inventory, argument.folder(), prefix + ".sources"),
-                    prefix,
-                    "sources",
-                    false,
-                    ".jar",
-                    inventoryFile);
-            Path javadoc = single(Inventory.paths(inventory, argument.folder(), prefix + ".documentation"),
-                    prefix,
-                    "documentation",
-                    false,
-                    ".jar",
-                    inventoryFile);
-            Path jmod = single(Inventory.paths(inventory, argument.folder(), prefix + ".jmod"),
-                    prefix,
-                    "jmod",
-                    false,
-                    ".jmod",
-                    inventoryFile);
-            Path bom = single(Inventory.paths(inventory, argument.folder(), prefix + ".bomfile"),
-                    prefix,
-                    "bomfile",
-                    false,
-                    ".properties",
-                    inventoryFile);
-            String pomRelative = inventory.getProperty(prefix + ".pom");
-            Path pom = pomRelative == null ? null : argument.folder().resolve(pomRelative).normalize();
-            String version = inventory.getProperty(prefix + ".version");
-            if (version != null) {
-                SAFE_SEGMENT.accept("version", version);
-            }
-            Path target = version == null
-                    ? context.next().resolve(moduleName)
-                    : context.next().resolve(moduleName).resolve(version);
-            if (!target.normalize().startsWith(context.next().normalize())) {
-                throw new IllegalStateException("Resolved path escapes the staging root: " + target);
-            }
-            Files.createDirectories(target);
-            link(artifact, target.resolve(moduleName + ".jar"));
-            link(sources, target.resolve(moduleName + "-sources.jar"));
-            link(javadoc, target.resolve(moduleName + "-javadoc.jar"));
-            link(jmod, target.resolve(moduleName + ".jmod"));
-            link(pom, target.resolve(moduleName + ".pom"));
-            link(bom, target.resolve(moduleName + ".properties"));
-            for (Map.Entry<String, Path> attachment : attachments.getOrDefault(prefix, Collections.emptyNavigableMap()).entrySet()) {
-                SAFE_SEGMENT.accept("classifier", attachment.getKey());
-                String name = attachment.getValue().getFileName().toString();
-                Path staged = target.resolve(moduleName + "-" + attachment.getKey()
-                        + (name.lastIndexOf('.') < 0 ? "" : name.substring(name.lastIndexOf('.'))));
-                if (Files.exists(staged)) {
-                    throw new IllegalArgumentException("Cannot attach " + attachment.getValue() + " to " + moduleName
-                            + " as " + attachment.getKey() + " - " + staged.getFileName() + " is staged already, so give"
-                            + " the attachment another classifier or switch off what stages that file");
+            for (String prefix : Inventory.prefixes(inventory)) {
+                String testsOf = inventory.getProperty(prefix + ".test");
+                if (!includeTests && testsOf != null || !inventory.flag(prefix + ".stage", true)) {
+                    continue;
                 }
-                BuildStep.linkOrCopy(staged, attachment.getValue());
+                String moduleName = inventory.getProperty(prefix + ".module");
+                if (moduleName == null) {
+                    continue;
+                }
+                SAFE_SEGMENT.accept("module name", moduleName);
+                Path artifact = single(Inventory.paths(inventory, argument.folder(), prefix + ".artifacts"),
+                        prefix,
+                        "artifacts",
+                        true,
+                        ".jar",
+                        inventoryFile);
+                Path sources = single(Inventory.paths(inventory, argument.folder(), prefix + ".sources"),
+                        prefix,
+                        "sources",
+                        false,
+                        ".jar",
+                        inventoryFile);
+                Path javadoc = single(Inventory.paths(inventory, argument.folder(), prefix + ".documentation"),
+                        prefix,
+                        "documentation",
+                        false,
+                        ".jar",
+                        inventoryFile);
+                Path jmod = single(Inventory.paths(inventory, argument.folder(), prefix + ".jmod"),
+                        prefix,
+                        "jmod",
+                        false,
+                        ".jmod",
+                        inventoryFile);
+                Path bom = single(Inventory.paths(inventory, argument.folder(), prefix + ".bomfile"),
+                        prefix,
+                        "bomfile",
+                        false,
+                        ".properties",
+                        inventoryFile);
+                String pomRelative = inventory.getProperty(prefix + ".pom");
+                Path pom = pomRelative == null ? null : argument.folder().resolve(pomRelative).normalize();
+                String version = inventory.getProperty(prefix + ".version");
+                if (version != null) {
+                    SAFE_SEGMENT.accept("version", version);
+                }
+                Path target = version == null
+                        ? context.next().resolve(moduleName)
+                        : context.next().resolve(moduleName).resolve(version);
+                if (!target.normalize().startsWith(context.next().normalize())) {
+                    throw new IllegalStateException("Resolved path escapes the staging root: " + target);
+                }
+                Files.createDirectories(target);
+                link(artifact, target.resolve(moduleName + ".jar"));
+                link(sources, target.resolve(moduleName + "-sources.jar"));
+                link(javadoc, target.resolve(moduleName + "-javadoc.jar"));
+                link(jmod, target.resolve(moduleName + ".jmod"));
+                link(pom, target.resolve(moduleName + ".pom"));
+                link(bom, target.resolve(moduleName + ".properties"));
+                for (Map.Entry<String, Path> attachment : attachments.getOrDefault(prefix, Collections.emptyNavigableMap()).entrySet()) {
+                    SAFE_SEGMENT.accept("classifier", attachment.getKey());
+                    String name = attachment.getValue().getFileName().toString();
+                    Path staged = target.resolve(moduleName + "-" + attachment.getKey()
+                            + (name.lastIndexOf('.') < 0 ? "" : name.substring(name.lastIndexOf('.'))));
+                    if (Files.exists(staged)) {
+                        throw new IllegalArgumentException("Cannot attach " + attachment.getValue() + " to " + moduleName
+                                + " as " + attachment.getKey() + " - " + staged.getFileName() + " is staged already, so give"
+                                + " the attachment another classifier or switch off what stages that file");
+                    }
+                    BuildStep.linkOrCopy(staged, attachment.getValue());
+                }
             }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
-    }
-
-    private static String inventoryPrefix(SequencedProperties inventory, Path file) {
-        for (String key : inventory.stringPropertyNames()) {
-            int dot = key.indexOf('.');
-            if (dot > 0) {
-                return key.substring(0, dot);
-            }
-        }
-        throw new IllegalStateException("Inventory contains no prefixed keys: " + file);
     }
 
     private static Path single(List<Path> entries,

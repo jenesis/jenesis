@@ -43,6 +43,7 @@ public class MavenRepositoryStaging implements BuildStep {
     private Collected collectModules(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
         SequencedMap<String, Module> stagedByArtifactId = new LinkedHashMap<>();
         List<Module> testModules = new ArrayList<>();
+        Set<String> unstaged = new HashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -52,61 +53,70 @@ public class MavenRepositoryStaging implements BuildStep {
                 continue;
             }
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
-            String prefix = inventoryPrefix(inventory, inventoryFile);
-            Path pom = resolve(argument.folder(), inventory.getProperty(prefix + ".pom"));
-            if (pom == null) {
-                continue;
-            }
-            Coordinates coordinates = parseCoordinates(pom);
-            boolean abstractTest = inventory.flag(prefix + ".abstract");
-            if (abstractTest && !includeTests) {
-                continue;
-            }
-            Path artifact = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".artifacts"),
-                    prefix,
-                    "artifacts",
-                    true,
-                    inventoryFile);
-            Path sources = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".sources"),
-                    prefix,
-                    "sources",
-                    false,
-                    inventoryFile);
-            Path javadoc = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".documentation"),
-                    prefix,
-                    "documentation",
-                    false,
-                    inventoryFile);
-            Path sbom = sbomReport(inventory, argument.folder(), prefix);
-            String testsOf = inventory.getProperty(prefix + ".test");
-            Module module = new Module(prefix, coordinates, artifact, sources, javadoc, pom, testsOf, sbom);
-            if (testsOf == null || abstractTest) {
-                Module previous = stagedByArtifactId.putIfAbsent(coordinates.artifactId(), module);
-                if (previous != null) {
-                    throw new IllegalStateException("Duplicate staged artifactId '"
-                            + coordinates.artifactId()
-                            + "' declared by inventories '"
-                            + previous.prefix()
-                            + "' ("
-                            + previous.coordinates().groupId()
-                            + ":"
-                            + previous.coordinates().artifactId()
-                            + ":"
-                            + previous.coordinates().version()
-                            + ") and '"
-                            + prefix
-                            + "' ("
-                            + coordinates.groupId()
-                            + ":"
-                            + coordinates.artifactId()
-                            + ":"
-                            + coordinates.version()
-                            + ")");
+            for (String prefix : Inventory.prefixes(inventory)) {
+                Path pom = resolve(argument.folder(), inventory.getProperty(prefix + ".pom"));
+                if (pom == null) {
+                    continue;
                 }
-            } else if (includeTests) {
-                testModules.add(module);
+                Coordinates coordinates = parseCoordinates(pom);
+                if (!inventory.flag(prefix + ".stage", true)) {
+                    if (inventory.getProperty(prefix + ".test") == null) {
+                        unstaged.add(coordinates.artifactId());
+                    }
+                    continue;
+                }
+                boolean abstractTest = inventory.flag(prefix + ".abstract");
+                if (abstractTest && !includeTests) {
+                    continue;
+                }
+                boolean packaged = !"pom".equals(inventory.value(prefix + ".packaging"));
+                Path artifact = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".artifacts"),
+                        prefix,
+                        "artifacts",
+                        packaged,
+                        inventoryFile);
+                Path sources = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".sources"),
+                        prefix,
+                        "sources",
+                        false,
+                        inventoryFile);
+                Path javadoc = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".documentation"),
+                        prefix,
+                        "documentation",
+                        false,
+                        inventoryFile);
+                Path sbom = sbomReport(inventory, argument.folder(), prefix);
+                String testsOf = inventory.getProperty(prefix + ".test");
+                Module module = new Module(prefix, coordinates, artifact, sources, javadoc, pom, testsOf, sbom);
+                if (testsOf == null || abstractTest) {
+                    Module previous = stagedByArtifactId.putIfAbsent(coordinates.artifactId(), module);
+                    if (previous != null) {
+                        throw new IllegalStateException("Duplicate staged artifactId '"
+                                + coordinates.artifactId()
+                                + "' declared by inventories '"
+                                + previous.prefix()
+                                + "' ("
+                                + previous.coordinates().groupId()
+                                + ":"
+                                + previous.coordinates().artifactId()
+                                + ":"
+                                + previous.coordinates().version()
+                                + ") and '"
+                                + prefix
+                                + "' ("
+                                + coordinates.groupId()
+                                + ":"
+                                + coordinates.artifactId()
+                                + ":"
+                                + coordinates.version()
+                                + ")");
+                    }
+                } else if (includeTests) {
+                    testModules.add(module);
+                }
             }
         }
+        testModules.removeIf(test -> unstaged.contains(test.testsOf()));
         return new Collected(stagedByArtifactId, testModules);
     }
 
@@ -246,16 +256,6 @@ public class MavenRepositoryStaging implements BuildStep {
     }
 
     private record DependencyEntry(String groupId, String artifactId, String version) {
-    }
-
-    private static String inventoryPrefix(SequencedProperties inventory, Path file) {
-        for (String key : inventory.stringPropertyNames()) {
-            int dot = key.indexOf('.');
-            if (dot > 0) {
-                return key.substring(0, dot);
-            }
-        }
-        throw new IllegalStateException("Inventory contains no prefixed keys: " + file);
     }
 
     private static Path resolve(Path base, String relative) {

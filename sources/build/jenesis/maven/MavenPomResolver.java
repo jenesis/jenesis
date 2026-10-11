@@ -2,37 +2,48 @@ package build.jenesis.maven;
 
 import module java.base;
 import module java.xml;
+import build.jenesis.BuildExecutor;
 import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.License;
+import build.jenesis.ModuleGraph;
+import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.Platform;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Dependencies;
 
 public class MavenPomResolver implements MavenResolver {
 
     private static final String NAMESPACE_4_0_0 = "http://maven.apache.org/POM/4.0.0",
             NAMESPACE_4_1_0 = "http://maven.apache.org/POM/4.1.0";
     private static final Set<String> IMPLICITS = Set.of("groupId", "artifactId", "version", "packaging");
+    private static final Set<String> ACTIVATIONS = Set.of("jdk", "os", "activeByDefault");
+    private static final Set<String> PROCESSORS = Set.of("processor", "classpath-processor", "modular-processor");
     private static final Pattern PROPERTY = Pattern.compile("(\\$\\{([^}]+)})");
     private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
+    private static final Pattern JDK_RANGE = Pattern.compile(
+            "\\s*([\\[(])\\s*([0-9]{1,8}(?:\\.[0-9]{1,8})*)?\\s*(,)?\\s*([0-9]{1,8}(?:\\.[0-9]{1,8})*)?\\s*([\\])])\\s*(,|$)");
+    private static final Pattern JDK_UNCLOSED = Pattern.compile(".*[\\[(]\\s*[0-9.]*\\s*,\\s*");
+    private static final Pattern JDK_BOUND = Pattern.compile(".*[\\[(]\\s*[0-9.]+\\s*");
     public static final String CHECKSUM_PREFIX = "Checksum/";
 
     private final Supplier<MavenVersionNegotiator> negotiatorSupplier;
-    private final transient DocumentBuilderFactory factory = MavenDefaultVersionNegotiator.toDocumentBuilderFactory();
+    private final String jdk, osName, osArch, osVersion;
+    private final transient Consumer<String> printing;
+    private final transient Palette palette;
+    private final transient Set<String> printed;
+    private final transient DocumentBuilderFactory factory = MavenDefaultVersionNegotiator.toDocumentBuilderFactory(false);
 
     public MavenPomResolver() {
         this(MavenDefaultVersionNegotiator.maven());
     }
 
     public static MavenPomResolver ofEnvironment(Environment environment) {
-        String property = environment.getProperty("resolver.maven");
-        if (property == null) {
-            return new MavenPomResolver();
-        }
+        String property = environment.value("resolver.maven", "maven");
         return new MavenPomResolver(switch (property.toLowerCase(Locale.ROOT)) {
             case "maven" -> MavenDefaultVersionNegotiator.maven();
             case "latest" -> MavenDefaultVersionNegotiator.latest();
@@ -44,11 +55,56 @@ public class MavenPomResolver implements MavenResolver {
             default -> throw new IllegalArgumentException("Unknown jenesis.resolver.maven '"
                     + property
                     + "', expected one of: maven, latest, release, stable, closest, fail, managed");
-        });
+        }).printing(environment.flag("print.progress", true) ? environment.out() : null,
+                Palette.ofEnvironment(environment));
     }
 
     public <S extends Supplier<MavenVersionNegotiator> & Serializable> MavenPomResolver(S negotiatorSupplier) {
+        this(negotiatorSupplier,
+                System.getProperty("java.version"),
+                System.getProperty("os.name"),
+                System.getProperty("os.arch"),
+                System.getProperty("os.version"),
+                null,
+                Palette.NONE,
+                ConcurrentHashMap.newKeySet());
+    }
+
+    private MavenPomResolver(Supplier<MavenVersionNegotiator> negotiatorSupplier,
+                             String jdk,
+                             String osName,
+                             String osArch,
+                             String osVersion,
+                             Consumer<String> printing,
+                             Palette palette,
+                             Set<String> printed) {
         this.negotiatorSupplier = negotiatorSupplier;
+        this.jdk = jdk;
+        this.osName = osName.toLowerCase(Locale.ENGLISH);
+        this.osArch = osArch.toLowerCase(Locale.ENGLISH);
+        this.osVersion = osVersion.toLowerCase(Locale.ENGLISH);
+        this.printing = printing;
+        this.palette = palette;
+        this.printed = printed;
+    }
+
+    public MavenPomResolver jdk(String jdk) {
+        return new MavenPomResolver(negotiatorSupplier, jdk, osName, osArch, osVersion, printing, palette, printed);
+    }
+
+    public MavenPomResolver os(String osName, String osArch, String osVersion) {
+        return new MavenPomResolver(negotiatorSupplier, jdk, osName, osArch, osVersion, printing, palette, printed);
+    }
+
+    public MavenPomResolver printing(Consumer<String> printing, Palette palette) {
+        return new MavenPomResolver(negotiatorSupplier,
+                jdk,
+                osName,
+                osArch,
+                osVersion,
+                printing,
+                palette,
+                ConcurrentHashMap.newKeySet());
     }
 
     @Override
@@ -57,6 +113,17 @@ public class MavenPomResolver implements MavenResolver {
                                             Map<String, Repository> repositories,
                                             SequencedMap<String, SequencedSet<String>> coordinates,
                                             SequencedMap<String, String> versions,
+                                            DependencyScope scope) throws IOException {
+        return dependencies(executor, prefix, repositories, coordinates, versions, new LinkedHashMap<>(), scope);
+    }
+
+    @Override
+    public Resolver.Resolution dependencies(Executor executor,
+                                            String prefix,
+                                            Map<String, Repository> repositories,
+                                            SequencedMap<String, SequencedSet<String>> coordinates,
+                                            SequencedMap<String, String> versions,
+                                            SequencedMap<String, SequencedSet<String>> managedExclusions,
                                             DependencyScope scope) throws IOException {
         Map<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>();
         versions.forEach((coordinate, value) -> {
@@ -70,6 +137,21 @@ public class MavenPomResolver implements MavenResolver {
             String checksum = split < 0 ? null : value.substring(split + 1).trim();
             managedDependencies.put(key, new MavenDependencyValue(
                     version, null, null, null, null, checksum));
+        });
+        managedExclusions.forEach((coordinate, excludes) -> {
+            List<MavenDependencyName> exclusions = excludes.stream()
+                    .map(entry -> {
+                        int separator = entry.indexOf('/');
+                        if (separator < 1 || separator == entry.length() - 1) {
+                            throw new IllegalArgumentException("Malformed managed exclusion '" + entry + "' for "
+                                    + coordinate + ": expected <groupId>/<artifactId>");
+                        }
+                        return new MavenDependencyName(entry.substring(0, separator), entry.substring(separator + 1));
+                    })
+                    .toList();
+            managedDependencies.merge(MavenDependencyKey.parseKey(coordinate),
+                    new MavenDependencyValue(null, null, null, exclusions, null, null),
+                    MavenPomResolver::merge);
         });
         SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = new LinkedHashMap<>();
         coordinates.forEach((coordinate, excludes) -> {
@@ -113,14 +195,16 @@ public class MavenPomResolver implements MavenResolver {
         });
         Traversal traversal = dependencies(executor,
                 MavenRepository.of(repositories.getOrDefault(Resolver.base(prefix), Repository.empty())),
-                new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of()), true, null, Set.of(), null, null),
+                new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of(), null), true, null, Set.of(), null, null),
                 new ConcurrentHashMap<>(),
                 new ConcurrentHashMap<>(),
                 prefix);
         SequencedMap<String, String> resolved = new LinkedHashMap<>();
-        traversal.dependencies().forEach((key, value) -> resolved.put(
-                key.coordinate(prefix, value.version()),
-                value.checksum() == null ? "" : value.checksum()));
+        traversal.dependencies().forEach((key, value) -> {
+            if (key.jar() || dependencies.containsKey(key) && !key.type().equals("pom")) {
+                resolved.put(key.coordinate(prefix, value.version()), value.checksum() == null ? "" : value.checksum());
+            }
+        });
         SequencedMap<String, Resolver.Resolved> artifacts = Resolver.materializeAll(executor, repositories, prefix, resolved);
         Map<String, ModuleDescriptor> descriptors = new ConcurrentHashMap<>();
         List<CompletableFuture<?>> pending = new ArrayList<>();
@@ -159,7 +243,7 @@ public class MavenPomResolver implements MavenResolver {
             SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies) throws IOException {
         return dependencies(executor,
                 repository,
-                new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of()),
+                new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of(), null),
                         true,
                         null,
                         Set.of(),
@@ -254,7 +338,7 @@ public class MavenPomResolver implements MavenResolver {
         }
         Traversal traversal = dependencies(executor,
                 repository,
-                new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of()), true, scope, Set.of(), null, null),
+                new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of(), null), true, scope, Set.of(), null, null),
                 unresolved,
                 resolved,
                 prefix);
@@ -346,7 +430,8 @@ public class MavenPomResolver implements MavenResolver {
                     key.type(),
                     key.classifier(),
                     resolutions.get(key).currentVersion,
-                    initial.pom().managedDependencies().containsKey(key));
+                    initial.pom().managedDependencies().containsKey(key)
+                            && initial.pom().managedDependencies().get(key).version() != null);
         }
         SequencedMap<MavenDependencyKey, MavenDependencyValue> results = new LinkedHashMap<>();
         dependencies.forEach(key -> {
@@ -382,28 +467,64 @@ public class MavenPomResolver implements MavenResolver {
         SequencedSet<MavenDependencyKey> conflicting = new LinkedHashSet<>();
         Queue<PendingPom> queue = new ArrayDeque<>();
         do {
+            DependencyCoordinate relocation = current.pom().relocation();
+            if (relocation != null && current.origin() != null) {
+                MavenDependencyKey origin = current.origin(), target = new MavenDependencyKey(
+                        relocation.groupId() == null ? origin.groupId() : relocation.groupId(),
+                        relocation.artifactId() == null ? origin.artifactId() : relocation.artifactId(),
+                        origin.type(),
+                        origin.classifier());
+                String version = relocation.version() == null
+                        ? resolutions.get(origin).currentVersion
+                        : relocation.version();
+                if (!target.equals(origin)) {
+                    dependencies.remove(origin);
+                    if (printing != null) {
+                        print("%s%-11s%s %s:%s:%s is relocated to %s:%s:%s, which is resolved in its place"
+                                .formatted(palette.warning(),
+                                        "[RELOCATED]",
+                                        palette.reset(),
+                                        origin.groupId(),
+                                        origin.artifactId(),
+                                        resolutions.get(origin).currentVersion,
+                                        target.groupId(),
+                                        target.artifactId(),
+                                        version));
+                    }
+                    SequencedMap<MavenDependencyKey, MavenDependencyValue> relocated = new LinkedHashMap<>();
+                    relocated.put(target, new MavenDependencyValue(version, MavenDependencyScope.COMPILE, null, null, null));
+                    current = new ContextualPom(new ResolvedPom(Map.of(), relocated, List.of(), null),
+                            false,
+                            current.scope(),
+                            current.exclusions(),
+                            origin,
+                            current.originVersion());
+                }
+            }
             for (Map.Entry<MavenDependencyKey, MavenDependencyValue> entry : current.pom().dependencies().entrySet()) {
                 if (current.exclusions().contains(MavenDependencyName.EXCLUDE_ALL)) {
                     break;
                 } else if (current.exclusions().contains(new MavenDependencyName(entry.getKey().groupId(), entry.getKey().artifactId()))
                         || current.exclusions().contains(new MavenDependencyName(entry.getKey().groupId(), "*"))
-                        || current.exclusions().contains(new MavenDependencyName("*", entry.getKey().artifactId()))) {
+                        || current.exclusions().contains(new MavenDependencyName("*", entry.getKey().artifactId()))
+                        || PROCESSORS.contains(entry.getKey().type())) {
                     continue;
                 }
                 MavenDependencyValue override = managedDependencies.get(entry.getKey()), value;
                 if (current.root()) {
                     value = merge(entry.getValue(), override);
                 } else {
-                    value = override == null ? entry.getValue() : merge(override, entry.getValue());
-                    value = merge(value, current.pom().managedDependencies().get(entry.getKey()));
+                    MavenDependencyValue declared = merge(entry.getValue(), current.pom().managedDependencies().get(entry.getKey()));
+                    value = override == null ? declared : merge(override, declared);
+                    if (override != null && override.exclusions() != null && declared.exclusions() != null) {
+                        value = value.exclusions(Stream.concat(declared.exclusions().stream(),
+                                override.exclusions().stream()).distinct().toList());
+                    }
                 }
                 value = defaultScope(value);
                 if (!current.root() && Objects.equals(Boolean.TRUE, value.optional())) {
                     continue;
                 }
-                DependencyResolution resolution = resolutions.computeIfAbsent(
-                        entry.getKey(),
-                        _ -> new DependencyResolution());
                 MavenDependencyScope resolvedScope = switch (current.scope()) {
                     case null -> value.scope();
                     case COMPILE -> switch (value.scope()) {
@@ -415,12 +536,43 @@ public class MavenPomResolver implements MavenResolver {
                         default -> null;
                     };
                     case SYSTEM, IMPORT -> null;
-                }, scope = resolution.currentScope == null || resolution.currentScope.reduces(resolvedScope)
-                        ? resolvedScope
-                        : resolution.currentScope;
-                if (scope == null) {
+                };
+                if (resolvedScope == null) {
                     continue;
                 }
+                MavenDependencyKey dependencyKey = entry.getKey();
+                String undefined = Stream.of(dependencyKey.groupId(),
+                                dependencyKey.artifactId(),
+                                dependencyKey.type(),
+                                dependencyKey.classifier(),
+                                value.version())
+                        .filter(Objects::nonNull)
+                        .map(PROPERTY::matcher)
+                        .filter(Matcher::find)
+                        .map(matcher -> matcher.group(2))
+                        .findFirst()
+                        .orElse(null);
+                if (undefined != null) {
+                    MavenDependencyKey origin = current.origin();
+                    throw new IllegalStateException("The dependency " + dependencyKey.groupId() + ":"
+                            + dependencyKey.artifactId()
+                            + (dependencyKey.classifier() == null ? "" : ":" + dependencyKey.classifier())
+                            + ":" + value.version() + (origin == null
+                                    ? ""
+                                    : " of " + origin.groupId() + ":" + origin.artifactId() + ":" + current.originVersion())
+                            + " names the property " + undefined + ", which neither the declaring POM, its parents"
+                            + " nor a profile this build activates defines - a profile is activated by <jdk>, <os>"
+                            + " or <activeByDefault> alone, and a property of the JVM or of the environment is never read"
+                            + (origin == null ? "" : ": exclude " + dependencyKey.groupId() + ":"
+                                    + dependencyKey.artifactId() + " from " + origin.groupId() + ":"
+                                    + origin.artifactId() + " and declare the artifact it stands for yourself"));
+                }
+                DependencyResolution resolution = resolutions.computeIfAbsent(
+                        entry.getKey(),
+                        _ -> new DependencyResolution());
+                MavenDependencyScope scope = resolution.currentScope == null || resolution.currentScope.reduces(resolvedScope)
+                        ? resolvedScope
+                        : resolution.currentScope;
                 String version;
                 resolution.bindChecksum(entry.getKey(), value.version(), value.checksum());
                 if (resolution.currentVersion == null) {
@@ -507,9 +659,16 @@ public class MavenPomResolver implements MavenResolver {
         SequencedSet<Path> modules = new LinkedHashSet<>();
         Map<DependencyCoordinate, UnresolvedPom> unresolved = new HashMap<>();
         Map<Path, UnresolvedPom> paths = new HashMap<>();
-        Queue<Path> queue = new ArrayDeque<>();
-        Path current = root;
-        do {
+        Queue<Map.Entry<Path, String>> queue = new ArrayDeque<>(List.of(Map.entry(root, "")));
+        while (!queue.isEmpty()) {
+            Map.Entry<Path, String> listed = queue.remove();
+            Path current = listed.getKey();
+            if (Files.exists(current.resolve(BuildExecutor.SKIP_MARKER))) {
+                continue;
+            } else if (!Files.isRegularFile(current.resolve("pom.xml"))) {
+                throw new IllegalArgumentException(listed.getValue() + " names "
+                        + root.relativize(current) + ", which holds no pom.xml - correct or remove the entry");
+            }
             if (modules.add(current)) {
                 UnresolvedPom pom;
                 try {
@@ -527,14 +686,15 @@ public class MavenPomResolver implements MavenResolver {
                 }
                 if (pom.modules() != null) {
                     for (String module : pom.modules()) {
-                        queue.add(current.resolve(module).normalize());
+                        queue.add(Map.entry(current.resolve(module).normalize(),
+                                "<module>" + module + "</module> of " + root.relativize(current.resolve("pom.xml"))));
                     }
                 }
                 paths.put(current, pom);
             } else {
                 throw new IllegalArgumentException("Circular POM module reference to " + current);
             }
-        } while ((current = queue.poll()) != null);
+        }
         Map<MavenDependencyName, String> subprojects = new HashMap<>();
         for (Path module : modules) {
             UnresolvedPom pom = paths.get(module);
@@ -548,26 +708,24 @@ public class MavenPomResolver implements MavenResolver {
         SequencedMap<Path, MavenLocalPom> results = new LinkedHashMap<>();
         for (Path module : modules) {
             UnresolvedPom pom = paths.get(module);
-            SequencedMap<String, String> plugins = new LinkedHashMap<>(pom.plugins());
             SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = new LinkedHashMap<>();
-            SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>();
-            for (Map.Entry<DependencyKey, DependencyValue> entry : pom.managedDependencies().entrySet()) {
-                MavenDependencyKey key = entry.getKey().resolve(pom.properties());
-                MavenDependencyValue value = entry.getValue().resolve(pom.properties());
-                if (value.scope() == MavenDependencyScope.IMPORT) {
-                    flattenImport(executor,
-                            MavenRepository.of(repository),
-                            key.groupId(),
-                            key.artifactId(),
-                            value.version(),
-                            value.checksum(),
-                            managedDependencies,
-                            new HashSet<>(),
-                            unresolved);
-                } else {
-                    managedDependencies.put(key, value);
-                }
-            }
+            SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies = managed(executor,
+                    MavenRepository.of(repository),
+                    pom,
+                    unresolved);
+            SequencedMap<String, String> plugins = new LinkedHashMap<>(), pluginExclusions = new LinkedHashMap<>();
+            pom.plugins().forEach((plugin, group) -> {
+                String[] segments = plugin.split("/");
+                MavenDependencyValue managedPlugin = Dependencies.PROCESSOR_PATH.contains(group)
+                        && segments.length == 3
+                        && segments[0].equals("maven")
+                        ? managedDependencies.get(new MavenDependencyKey(segments[1], segments[2], "jar", null))
+                        : null;
+                plugins.put(managedPlugin == null || managedPlugin.version() == null
+                        ? plugin
+                        : plugin + "/" + managedPlugin.version(), group);
+            });
+            SequencedMap<String, String> testPlugins = new LinkedHashMap<>(plugins);
             pom.dependencies().forEach((key, value) -> {
                 MavenDependencyKey resolvedKey = key.resolve(pom.properties());
                 MavenDependencyValue resolved = defaultScope(merge(value.resolve(pom.properties()),
@@ -582,10 +740,23 @@ public class MavenPomResolver implements MavenResolver {
                             resolved.checksum());
                 }
                 switch (resolvedKey.type()) {
-                    case "processor", "classpath-processor", "modular-processor" -> plugins.put("maven/"
-                            + resolvedKey.groupId() + "/"
-                            + resolvedKey.artifactId()
-                            + (resolved.version() == null ? "" : "/" + resolved.version()), "plugin");
+                    case "processor", "classpath-processor", "modular-processor" -> {
+                        MavenDependencyValue managedJar = resolved.version() == null
+                                ? managedDependencies.get(new MavenDependencyKey(resolvedKey.groupId(),
+                                        resolvedKey.artifactId(),
+                                        "jar",
+                                        resolvedKey.classifier()))
+                                : null;
+                        String version = managedJar == null ? resolved.version() : managedJar.version();
+                        String plugin = "maven/" + resolvedKey.groupId() + "/" + resolvedKey.artifactId()
+                                + (version == null ? "" : "/" + version);
+                        (resolved.scope() == MavenDependencyScope.TEST ? testPlugins : plugins).put(plugin, "plugin");
+                        if (resolved.exclusions() != null && !resolved.exclusions().isEmpty()) {
+                            pluginExclusions.put(plugin, resolved.exclusions().stream()
+                                    .map(name -> name.groupId() + "/" + name.artifactId())
+                                    .collect(Collectors.joining(",")));
+                        }
+                    }
                     case "classpath-jar", "modular-jar" -> throw new IllegalArgumentException("The dependency on "
                             + resolvedKey.groupId() + ":" + resolvedKey.artifactId() + " in " + module.resolve("pom.xml")
                             + " is of type " + resolvedKey.type() + ", but Jenesis places a jar by whether it"
@@ -593,30 +764,70 @@ public class MavenPomResolver implements MavenResolver {
                     default -> dependencies.put(resolvedKey, resolved);
                 }
             });
-            String release = property(pom.properties().get("maven.compiler.release"), pom.properties());
+            String release = Stream.of("maven.compiler.release", "maven.compiler.target", "maven.compiler.source")
+                    .map(key -> property(pom.properties().get(key), pom.properties()))
+                    .filter(value -> value != null && !value.isBlank())
+                    .findFirst()
+                    .map(value -> value.startsWith("1.") ? value.substring(2) : value)
+                    .orElse(null),
+                    testRelease = property(pom.properties().get("maven.compiler.testRelease"), pom.properties());
+            if (Boolean.parseBoolean(property(pom.properties().get("maven.compiler.enablePreview"), pom.properties()))) {
+                release = (release == null ? Integer.toString(Runtime.version().feature()) : release) + "-preview";
+                testRelease = testRelease == null ? null : testRelease + "-preview";
+            }
+            SequencedMap<MavenDependencyKey, MavenDependencyKey.Versioned> expressions = new LinkedHashMap<>();
+            Stream.concat(pom.managedDependencies().entrySet().stream(), pom.dependencies().entrySet().stream())
+                    .filter(entry -> Stream.of(entry.getKey().groupId(),
+                                    entry.getKey().artifactId(),
+                                    entry.getKey().type(),
+                                    entry.getKey().classifier(),
+                                    entry.getValue().version())
+                            .anyMatch(text -> text != null && text.contains("${")))
+                    .forEach(entry -> {
+                        DependencyKey raw = entry.getKey();
+                        String rawVersion = entry.getValue().version() != null && entry.getValue().version().contains("${")
+                                ? entry.getValue().version()
+                                : null;
+                        expressions.merge(raw.resolve(pom.properties()),
+                                new MavenDependencyKey.Versioned(new MavenDependencyKey(raw.groupId(),
+                                        raw.artifactId(),
+                                        raw.type(),
+                                        raw.classifier()), rawVersion),
+                                (previous, next) -> new MavenDependencyKey.Versioned(previous.key(),
+                                        previous.version() == null ? next.version() : previous.version()));
+                    });
             results.put(root.relativize(module), new MavenLocalPom(property(pom.groupId(), pom.properties()),
                     property(pom.artifactId(), pom.properties()),
                     property(pom.version(), pom.properties()),
                     property(pom.packaging(), pom.properties()),
-                    Boolean.parseBoolean(property(pom.properties().get("maven.compiler.enablePreview"), pom.properties()))
-                            ? (release == null ? Integer.toString(Runtime.version().feature()) : release) + "-preview"
-                            : release,
-                    property(pom.sourceDirectory(), pom.properties()),
+                    release,
+                    testRelease == null ? release : testRelease,
+                    directory(pom.sourceDirectory(), pom.properties()),
                     pom.resourceDirectories() == null ? null : pom.resourceDirectories().stream()
-                            .map(resource -> property(resource, pom.properties()))
+                            .map(resource -> directory(resource, pom.properties()))
                             .toList(),
-                    property(pom.testSourceDirectory(), pom.properties()),
+                    directory(pom.testSourceDirectory(), pom.properties()),
                     pom.testResourceDirectories() == null ? null : pom.testResourceDirectories().stream()
-                            .map(resource -> property(resource, pom.properties()))
+                            .map(resource -> directory(resource, pom.properties()))
                             .toList(),
                     dependencies,
                     managedDependencies,
+                    pom.bom() == null ? null : pom.bom().entrySet().stream().collect(Collectors.toMap(
+                            entry -> entry.getKey().resolve(pom.properties()),
+                            entry -> entry.getValue().resolve(pom.properties()),
+                            (left, _) -> left,
+                            LinkedHashMap::new)),
                     pom.qualifiedDependencies(),
                     pom.attachments(),
                     pom.natives(),
                     plugins,
+                    testPlugins,
+                    pluginExclusions,
+                    pom.aliases(),
                     pom.signatures(),
-                    property(pom.properties().get("mainClass"), pom.properties())));
+                    property(pom.properties().get("mainClass"), pom.properties()),
+                    pom.metadata().expand(value -> property(value, pom.properties())),
+                    expressions));
         }
         return results;
     }
@@ -639,8 +850,8 @@ public class MavenPomResolver implements MavenResolver {
             }
             document = builder.parse(inputStream);
         }
-        String namespace = document.getDocumentElement().getNamespaceURI();
-        return switch (namespace == null ? NAMESPACE_4_0_0 : namespace) {
+        String namespace = document.getDocumentElement().getAttribute("xmlns");
+        return switch (namespace.isEmpty() ? NAMESPACE_4_0_0 : namespace) {
             case NAMESPACE_4_0_0, NAMESPACE_4_1_0 -> {
                 boolean inferring = NAMESPACE_4_1_0.equals(namespace);
                 ParentCoordinate parent = null;
@@ -697,7 +908,12 @@ public class MavenPomResolver implements MavenResolver {
                 Map<DependencyKey, DependencyValue> inheritedManagedDependencies = new LinkedHashMap<>();
                 SequencedMap<DependencyKey, DependencyValue> dependencies = new LinkedHashMap<>();
                 List<License> parentLicenses = List.of();
+                SequencedMap<String, String> parentPlugins = Collections.emptyNavigableMap(),
+                        parentAliases = Collections.emptyNavigableMap();
+                MavenPomEmitter.Metadata parentMetadata = MavenPomEmitter.Metadata.NONE;
+                Set<String> parentVerbatim = Set.of();
                 String groupId = null, artifactId = null, version = null;
+                UnresolvedPom localParent = null;
                 if (parent != null) {
                     if (!children.add(new DependencyCoordinate(parent.groupId(),
                             parent.artifactId(),
@@ -731,6 +947,10 @@ public class MavenPomResolver implements MavenResolver {
                                     || !parent.artifactId().equals(artifactId)
                                     || !parent.version().equals(version)) {
                                 resolution = null;
+                            } else {
+                                parentPlugins = resolution.plugins();
+                                parentAliases = resolution.aliases();
+                                localParent = resolution;
                             }
                         }
                     }
@@ -743,6 +963,15 @@ public class MavenPomResolver implements MavenResolver {
                                 null,
                                 children,
                                 unresolved);
+                        if (resolution.missing()) {
+                            throw new IllegalStateException("Cannot fetch the parent " + parent.groupId() + ":"
+                                    + parent.artifactId() + ":" + parent.version()
+                                    + toElementText(document.getDocumentElement(), "artifactId")
+                                            .map(child -> ", the parent of " + child + ",")
+                                            .orElse("")
+                                    + " from the Maven repositories in use - name the repository that publishes it"
+                                    + " with -Djenesis.maven.uri, or point the parent's relativePath at a local copy");
+                        }
                         groupId = property(resolution.groupId(), resolution.properties());
                         artifactId = property(resolution.artifactId(), resolution.properties());
                         version = property(resolution.version(), resolution.properties());
@@ -758,6 +987,8 @@ public class MavenPomResolver implements MavenResolver {
                     inheritedManagedDependencies.putAll(resolution.managedDependencies());
                     dependencies.putAll(resolution.dependencies());
                     parentLicenses = resolution.licenses();
+                    parentMetadata = resolution.metadata();
+                    parentVerbatim = resolution.verbatim();
                 }
                 IMPLICITS.forEach(property -> toElements(document.getDocumentElement(), property)
                         .findFirst()
@@ -765,29 +996,60 @@ public class MavenPomResolver implements MavenResolver {
                             String value = node.getTextContent().trim();
                             properties.put(property, value);
                             properties.put("project." + property, value);
+                            properties.put("pom." + property, value);
                         }));
-                toElements(document.getDocumentElement(), "properties")
-                        .limit(1)
+                List<Node> models = Stream.concat(Stream.of(document.getDocumentElement()),
+                        toActiveProfiles(document.getDocumentElement(), path, trusted)).toList();
+                models.stream()
+                        .flatMap(model -> toElements(model, "properties").limit(1))
                         .flatMap(MavenPomResolver::toChildren)
                         .filter(node -> node.getNodeType() == Node.ELEMENT_NODE)
-                        .forEach(node -> properties.put(node.getLocalName(), node.getTextContent().trim()));
-                toElements(document.getDocumentElement(), "dependencyManagement")
-                        .limit(1)
-                        .flatMap(node -> toElements(node, "dependencies"))
-                        .limit(1)
+                        .forEach(node -> properties.put(node.getNodeName(), node.getTextContent().trim()));
+                models.stream()
+                        .flatMap(model -> toElements(model, "dependencyManagement").limit(1))
+                        .flatMap(node -> toElements(node, "dependencies").limit(1))
                         .flatMap(node -> toElements(node, "dependency"))
                         .map(node -> toDependency(node, trusted))
                         .forEach(entry -> managedDependencies.put(entry.getKey(), entry.getValue()));
+                Map<DependencyKey, DependencyValue> declaredManagedDependencies = new LinkedHashMap<>(managedDependencies);
                 inheritedManagedDependencies.forEach(managedDependencies::putIfAbsent);
-                toElements(document.getDocumentElement(), "dependencies")
-                        .limit(1)
-                        .flatMap(node -> toElements(node, "dependency"))
-                        .map(node -> toDependency(node, false))
-                        .forEach(entry -> dependencies.putLast(entry.getKey(), entry.getValue()));
-                Node build = extended
+                SequencedMap<DependencyKey, DependencyValue> declaredDependencies = new LinkedHashMap<>();
+                models.stream()
+                        .flatMap(model -> toElements(model, "dependencies").limit(1))
+                        .forEach(declarations -> {
+                            SequencedMap<DependencyKey, DependencyValue> listed = new LinkedHashMap<>();
+                            toElements(declarations, "dependency").map(node -> toDependency(node, false)).forEach(entry -> {
+                                DependencyValue previous = listed.put(entry.getKey(), entry.getValue());
+                                if (previous != null && path != null && printing != null) {
+                                    print(("%s%-11s%s The pom.xml of %s declares %s:%s:%s%s twice, at version %s"
+                                            + " and %s: the second declaration replaces the first, as in Maven, which warns"
+                                            + (trusted
+                                                    ? " as well - remove one"
+                                                    : " as well - it is the artifact's own published POM, so this"
+                                                            + " needs no action"))
+                                            .formatted(palette.warning(),
+                                                    "[DUPLICATE]",
+                                                    palette.reset(),
+                                                    toElementText(document.getDocumentElement(), "artifactId").orElse(""),
+                                                    entry.getKey().groupId(),
+                                                    entry.getKey().artifactId(),
+                                                    entry.getKey().type() == null ? "jar" : entry.getKey().type(),
+                                                    entry.getKey().classifier() == null ? "" : ":" + entry.getKey().classifier(),
+                                                    previous.version() == null ? "none" : previous.version(),
+                                                    entry.getValue().version() == null ? "none" : entry.getValue().version()));
+                                }
+                            });
+                            declaredDependencies.putAll(listed);
+                        });
+                declaredDependencies.forEach(dependencies::putLast);
+                Node build = extended || trusted && path != null
                         ? toElements(document.getDocumentElement(), "build").findFirst().orElse(null)
                         : null;
+                List<Node> builds = extended || trusted && path != null
+                        ? models.stream().flatMap(model -> toElements(model, "build").limit(1)).toList()
+                        : List.of();
                 List<String> subprojects = null;
+                boolean bom = false;
                 if (extended) {
                     Node listed = toElements(document.getDocumentElement(), "subprojects").findFirst()
                             .or(() -> toElements(document.getDocumentElement(), "modules").findFirst())
@@ -805,21 +1067,22 @@ public class MavenPomResolver implements MavenResolver {
                                     .toList();
                         }
                     }
+                    bom = (subprojects == null || subprojects.isEmpty())
+                            && ("pom".equals(packaging) || "bom".equals(packaging))
+                            && !declaredManagedDependencies.isEmpty();
                 }
                 String sourceDirectory = build == null ? null : toElementText(build, "sourceDirectory").orElse(null),
                         testSourceDirectory = build == null ? null : toElementText(build, "testSourceDirectory").orElse(null);
-                List<String> resourceDirectories = build == null ? null : toElements(build, "resources").findFirst()
-                        .map(node -> toElements(node, "resource")
-                                .map(child -> toElementText(child, "directory").orElse(null))
-                                .filter(Objects::nonNull)
-                                .toList())
-                        .orElse(null),
-                        testResourceDirectories = build == null ? null : toElements(build, "testResources").findFirst()
-                                .map(node -> toElements(node, "testResource")
-                                        .map(child -> toElementText(child, "directory").orElse(null))
-                                        .filter(Objects::nonNull)
-                                        .toList())
-                                .orElse(null);
+                List<String> resourceDirectories = toDirectories(builds, "resources", "resource"),
+                        testResourceDirectories = toDirectories(builds, "testResources", "testResource");
+                if (localParent != null) {
+                    sourceDirectory = sourceDirectory == null ? localParent.sourceDirectory() : sourceDirectory;
+                    testSourceDirectory = testSourceDirectory == null ? localParent.testSourceDirectory() : testSourceDirectory;
+                    resourceDirectories = resourceDirectories == null ? localParent.resourceDirectories() : resourceDirectories;
+                    testResourceDirectories = testResourceDirectories == null
+                            ? localParent.testResourceDirectories()
+                            : testResourceDirectories;
+                }
                 Node sources = build == null || !inferring ? null : toElements(build, "sources").findFirst().orElse(null);
                 if (sources != null) {
                     SequencedMap<String, List<String>> declaredSources = new LinkedHashMap<>();
@@ -865,6 +1128,20 @@ public class MavenPomResolver implements MavenResolver {
                                 toElementText(node, "name").orElse(null),
                                 toElementText(node, "url").orElse(null)))
                         .toList();
+                Element project = document.getDocumentElement(),
+                        scm = (Element) toElements(project, "scm").findFirst().orElse(null);
+                Set<String> verbatim = new HashSet<>();
+                String child = toElementText(project, "artifactId").orElse(artifactId);
+                for (String key : List.of("url", "scm.connection", "scm.developerConnection", "scm.url")) {
+                    Element holder = key.equals("url") ? project : scm;
+                    String append = holder == null
+                            ? ""
+                            : holder.getAttribute("child." + (key.equals("url") ? "project.url" : key) + ".inherit.append.path").trim();
+                    if (append.isEmpty() ? parentVerbatim.contains(key) : append.equals("false")) {
+                        verbatim.add(key);
+                    }
+                }
+                MavenPomEmitter.Metadata metadata = toMetadata(project).inherit(parentMetadata, parentVerbatim, child, scm != null);
                 yield new UnresolvedPom(
                         toElementText(document.getDocumentElement(), "groupId").orElse(groupId),
                         toElementText(document.getDocumentElement(), "artifactId").orElse(artifactId),
@@ -887,13 +1164,28 @@ public class MavenPomResolver implements MavenResolver {
                         extended
                                 ? toNatives(document.getDocumentElement())
                                 : Collections.emptyNavigableSet(),
-                        extended
-                                ? toPlugins(document.getDocumentElement())
+                        extended || trusted && path != null
+                                ? inherited(toPlugins(document.getDocumentElement()), parentPlugins)
+                                : Collections.emptyNavigableMap(),
+                        extended || trusted && path != null
+                                ? inherited(toAliases(document.getDocumentElement()), parentAliases)
                                 : Collections.emptyNavigableMap(),
                         extended
                                 ? toSignatures(document.getDocumentElement())
                                 : Collections.emptyNavigableMap(),
-                        ownLicenses.isEmpty() ? parentLicenses : ownLicenses);
+                        ownLicenses.isEmpty() ? parentLicenses : ownLicenses,
+                        metadata,
+                        verbatim,
+                        bom ? declaredManagedDependencies : null,
+                        false,
+                        toElements(project, "distributionManagement")
+                                .flatMap(management -> toElements(management, "relocation"))
+                                .findFirst()
+                                .map(relocation -> new DependencyCoordinate(
+                                        toElementText(relocation, "groupId").orElse(null),
+                                        toElementText(relocation, "artifactId").orElse(null),
+                                        toElementText(relocation, "version").orElse(null)))
+                                .orElse(null));
             }
             default -> throw new IllegalArgumentException("Unknown namespace: " + namespace);
         };
@@ -936,7 +1228,13 @@ public class MavenPomResolver implements MavenResolver {
                             Collections.emptyNavigableSet(),
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
-                            List.of());
+                            Collections.emptyNavigableMap(),
+                            List.of(),
+                            MavenPomEmitter.Metadata.NONE,
+                            Set.of(),
+                            null,
+                            true,
+                            null);
                 } else {
                     Path localPath = candidate.file().map(Path::getParent).orElse(null);
                     Map<Path, UnresolvedPom> localPaths = localPath == null ? null : new HashMap<>();
@@ -997,29 +1295,48 @@ public class MavenPomResolver implements MavenResolver {
                                 MavenRepository repository,
                                 UnresolvedPom pom,
                                 Map<DependencyCoordinate, UnresolvedPom> unresolved) throws IOException {
-        Map<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>();
+        Map<MavenDependencyKey, MavenDependencyValue> managedDependencies = managed(executor, repository, pom, unresolved);
         SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = new LinkedHashMap<>();
+        pom.dependencies().forEach((key, value) -> dependencies.put(
+                key.resolve(pom.properties()),
+                value.resolve(pom.properties())));
+        return new ResolvedPom(managedDependencies,
+                dependencies,
+                pom.licenses(),
+                pom.relocation() == null ? null : new DependencyCoordinate(
+                        property(pom.relocation().groupId(), pom.properties()),
+                        property(pom.relocation().artifactId(), pom.properties()),
+                        property(pom.relocation().version(), pom.properties())));
+    }
+
+    private SequencedMap<MavenDependencyKey, MavenDependencyValue> managed(Executor executor,
+                                                                         MavenRepository repository,
+                                                                         UnresolvedPom pom,
+                                                                         Map<DependencyCoordinate, UnresolvedPom> unresolved)
+            throws IOException {
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>();
+        List<Map.Entry<MavenDependencyKey, MavenDependencyValue>> imports = new ArrayList<>();
         for (Map.Entry<DependencyKey, DependencyValue> entry : pom.managedDependencies().entrySet()) {
             MavenDependencyKey key = entry.getKey().resolve(pom.properties());
             MavenDependencyValue value = entry.getValue().resolve(pom.properties());
             if (value.scope() == MavenDependencyScope.IMPORT) {
-                flattenImport(executor,
-                        repository,
-                        key.groupId(),
-                        key.artifactId(),
-                        value.version(),
-                        value.checksum(),
-                        managedDependencies,
-                        new HashSet<>(),
-                        unresolved);
+                imports.add(Map.entry(key, value));
             } else {
-                managedDependencies.put(key, value);
+                managedDependencies.putIfAbsent(key, value);
             }
         }
-        pom.dependencies().forEach((key, value) -> dependencies.put(
-                key.resolve(pom.properties()),
-                value.resolve(pom.properties())));
-        return new ResolvedPom(managedDependencies, dependencies, pom.licenses());
+        for (Map.Entry<MavenDependencyKey, MavenDependencyValue> imported : imports) {
+            flattenImport(executor,
+                    repository,
+                    imported.getKey().groupId(),
+                    imported.getKey().artifactId(),
+                    imported.getValue().version(),
+                    imported.getValue().checksum(),
+                    managedDependencies,
+                    new HashSet<>(),
+                    unresolved);
+        }
+        return managedDependencies;
     }
 
     private void flattenImport(Executor executor,
@@ -1095,11 +1412,122 @@ public class MavenPomResolver implements MavenResolver {
                 index -> index + 1).mapToObj(children::item);
     }
 
-    private static Stream<Node> toElements(Node node, String localName) {
-        return toChildren(node).filter(child -> Objects.equals(child.getLocalName(), localName)
-                && (child.getNamespaceURI() == null
-                        || NAMESPACE_4_0_0.equals(child.getNamespaceURI())
-                        || NAMESPACE_4_1_0.equals(child.getNamespaceURI())));
+    private static Stream<Node> toElements(Node node, String name) {
+        return toChildren(node).filter(child -> child.getNodeType() == Node.ELEMENT_NODE
+                && child.getNodeName().equals(name));
+    }
+
+    private static List<String> toDirectories(List<Node> builds, String list, String element) {
+        List<Node> declared = builds.stream().flatMap(build -> toElements(build, list).limit(1)).toList();
+        return declared.isEmpty() ? null : declared.stream()
+                .flatMap(node -> toElements(node, element))
+                .map(child -> toElementText(child, "directory").orElse(null))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private Stream<Node> toActiveProfiles(Node project, Path path, boolean trusted) {
+        List<Node> profiles = toElements(project, "profiles")
+                .limit(1)
+                .flatMap(node -> toElements(node, "profile"))
+                .toList();
+        List<Node> activated = profiles.stream().filter(profile -> toElements(profile, "activation")
+                .findFirst()
+                .filter(activation -> toChildren(activation)
+                        .filter(condition -> condition.getNodeType() == Node.ELEMENT_NODE)
+                        .allMatch(condition -> ACTIVATIONS.contains(condition.getNodeName())))
+                .filter(activation -> toElements(activation, "jdk").findFirst().isPresent()
+                        || toElements(activation, "os").findFirst().isPresent())
+                .filter(activation -> toElementText(activation, "jdk").map(range -> isJdk(range, path, trusted)).orElse(true))
+                .filter(activation -> toElements(activation, "os").findFirst().map(this::isOs).orElse(true))
+                .isPresent()).toList();
+        return activated.isEmpty()
+                ? profiles.stream().filter(profile -> toElements(profile, "activation")
+                        .findFirst()
+                        .flatMap(activation -> toElementText(activation, "activeByDefault"))
+                        .filter("true"::equals)
+                        .isPresent())
+                : activated.stream();
+    }
+
+    private boolean isJdk(String activation, Path path, boolean trusted) {
+        boolean negated = activation.startsWith("!");
+        String required = negated ? activation.substring(1).trim() : activation;
+        if (!required.startsWith("[") && !required.startsWith("(")) {
+            return jdk.startsWith(required) != negated;
+        }
+        if (JDK_UNCLOSED.matcher(required).matches()) {
+            required = required + ")";
+        } else if (JDK_BOUND.matcher(required).matches()) {
+            required = required + ",)";
+        }
+        Matcher matcher = JDK_RANGE.matcher(required);
+        boolean matched = false;
+        int end = 0;
+        while (end < required.length() && matcher.find(end) && matcher.start() == end) {
+            String minimum = matcher.group(2), maximum = matcher.group(3) == null ? minimum : matcher.group(4);
+            if (minimum == null && maximum == null && matcher.group(3) == null) {
+                break;
+            }
+            int fromMinimum = minimum == null ? 1 : compareJdk(minimum),
+                    fromMaximum = maximum == null ? -1 : compareJdk(maximum);
+            matched |= (fromMinimum > 0 || fromMinimum == 0 && matcher.group(1).equals("["))
+                    && (fromMaximum < 0 || fromMaximum == 0 && matcher.group(5).equals("]"));
+            end = matcher.end();
+        }
+        if (end != required.length() || required.endsWith(",")) {
+            if (!trusted) {
+                return false;
+            }
+            throw new IllegalArgumentException("The profile activation <jdk>" + activation + "</jdk> of "
+                    + (path == null ? "a POM" : path.resolve("pom.xml"))
+                    + " is neither a version prefix, such as 1.8, nor ranges of versions, such as [9,), [1.8,17)"
+                    + " or [11,12),[16,)");
+        }
+        return matched != negated;
+    }
+
+    private boolean isOs(Node os) {
+        return toChildren(os).filter(condition -> condition.getNodeType() == Node.ELEMENT_NODE).allMatch(condition -> {
+            String required = condition.getTextContent().trim().toLowerCase(Locale.ENGLISH);
+            boolean negated = required.startsWith("!");
+            String value = negated ? required.substring(1).trim() : required;
+            boolean windows = osName.contains("windows");
+            boolean matched = switch (condition.getNodeName()) {
+                case "family" -> switch (value) {
+                    case "windows" -> windows;
+                    case "win9x", "winnt" -> windows && Stream.of("95", "98", "me", "ce").anyMatch(osName::contains)
+                            == value.equals("win9x");
+                    case "dos" -> windows || osName.contains("os/2");
+                    case "mac" -> osName.contains("mac");
+                    case "unix" -> !windows
+                            && !osName.contains("os/2")
+                            && !osName.contains("netware")
+                            && !osName.contains("openvms")
+                            && (!osName.contains("mac") || osName.endsWith("x"));
+                    case "tandem" -> osName.contains("nonstop_kernel");
+                    case "z/os" -> osName.contains("z/os") || osName.contains("os/390");
+                    default -> osName.contains(value);
+                };
+                case "name" -> osName.equals(value);
+                case "arch" -> osArch.equals(value);
+                case "version" -> osVersion.equals(value);
+                default -> true;
+            };
+            return matched != negated;
+        });
+    }
+
+    private int compareJdk(String bound) {
+        String[] running = jdk.replaceAll("[^0-9._-]", "").split("[._-]+"), required = bound.split("\\.");
+        for (int index = 0; index < 3; index++) {
+            int left = index < running.length && !running[index].isEmpty() ? Integer.parseInt(running[index]) : 0,
+                    right = index < required.length ? Integer.parseInt(required[index]) : 0;
+            if (left != right) {
+                return Integer.compare(left, right);
+            }
+        }
+        return 0;
     }
 
     private static Optional<String> toElementText(Node node, String localName) {
@@ -1112,13 +1540,12 @@ public class MavenPomResolver implements MavenResolver {
         String aliased = switch (type) {
             case "test-jar" -> "tests";
             case "ejb-client" -> "client";
-            case "javadoc" -> "javadoc";
-            case "java-source" -> "sources";
+            case "ejb", "maven-plugin", "bundle" -> "";
             default -> null;
         };
         if (aliased != null) {
             type = "jar";
-            if (classifier == null) {
+            if (classifier == null && !aliased.isEmpty()) {
                 classifier = aliased;
             }
         }
@@ -1306,6 +1733,72 @@ public class MavenPomResolver implements MavenResolver {
         return entries;
     }
 
+    private static MavenPomEmitter.Metadata toMetadata(Node node) {
+        List<MavenPomEmitter.Metadata.License> licenses = toElements(node, "licenses").limit(1)
+                .flatMap(declared -> toElements(declared, "license"))
+                .filter(license -> !toElementText(license, "name").orElse("").isEmpty())
+                .map(license -> new MavenPomEmitter.Metadata.License(toElementText(license, "name").orElseThrow(),
+                        toElementText(license, "url").orElse(null),
+                        toElementText(license, "distribution").orElse(null)))
+                .toList();
+        List<MavenPomEmitter.Metadata.Developer> developers = toElements(node, "developers").limit(1)
+                .flatMap(declared -> toElements(declared, "developer"))
+                .map(developer -> new MavenPomEmitter.Metadata.Developer(toElementText(developer, "id")
+                                .filter(id -> !id.isEmpty())
+                                .orElse(null),
+                        toElementText(developer, "name").orElse(null),
+                        toElementText(developer, "email").orElse(null),
+                        toElementText(developer, "url").orElse(null),
+                        toElementText(developer, "organization").orElse(null),
+                        toElementText(developer, "organizationUrl").orElse(null),
+                        toElements(developer, "roles").limit(1)
+                                .flatMap(roles -> toElements(roles, "role"))
+                                .map(role -> role.getTextContent().trim())
+                                .filter(role -> !role.isEmpty())
+                                .toList(),
+                        toElementText(developer, "timezone").orElse(null)))
+                .filter(developer -> developer.id() != null || !developer.derivedId().isEmpty())
+                .toList();
+        Function<String, MavenPomEmitter.Metadata.Management> management = name -> toElements(node, name)
+                .findFirst()
+                .map(declared -> new MavenPomEmitter.Metadata.Management(toElementText(declared, "system").orElse(null),
+                        toElementText(declared, "url").orElse(null)))
+                .filter(declared -> declared.system() != null || declared.url() != null)
+                .orElse(null);
+        return new MavenPomEmitter.Metadata(toElementText(node, "name").orElse(null),
+                toElementText(node, "description").orElse(null),
+                toElementText(node, "url").orElse(null),
+                licenses,
+                developers,
+                toElements(node, "scm").findFirst()
+                        .map(scm -> new MavenPomEmitter.Metadata.Scm(toElementText(scm, "connection").orElse(null),
+                                toElementText(scm, "developerConnection").orElse(null),
+                                toElementText(scm, "url").orElse(null),
+                                toElementText(scm, "tag").orElse(null)))
+                        .filter(scm -> !scm.equals(new MavenPomEmitter.Metadata.Scm(null, null, null, null)))
+                        .orElse(null),
+                toElements(node, "organization").findFirst()
+                        .map(organization -> new MavenPomEmitter.Metadata.Organization(toElementText(organization, "name").orElse(null),
+                                toElementText(organization, "url").orElse(null)))
+                        .filter(organization -> organization.name() != null || organization.url() != null)
+                        .orElse(null),
+                management.apply("issueManagement"),
+                management.apply("ciManagement"),
+                toElementText(node, "inceptionYear").orElse(null));
+    }
+
+    private void print(String line) {
+        if (printed.add(line)) {
+            printing.accept(line);
+        }
+    }
+
+    private static SequencedMap<String, String> inherited(SequencedMap<String, String> own,
+                                                          SequencedMap<String, String> parent) {
+        parent.forEach(own::putIfAbsent);
+        return own;
+    }
+
     private static SequencedMap<String, String> toPlugins(Node node) {
         SequencedMap<String, String> entries = new LinkedHashMap<>();
         toChildren(node)
@@ -1332,7 +1825,64 @@ public class MavenPomResolver implements MavenResolver {
                         if (token.isEmpty()) {
                             continue;
                         }
+                        if (token.indexOf(' ') >= 0) {
+                            throw new IllegalArgumentException("Malformed jenesis.plugin declaration '"
+                                    + trimmed
+                                    + "': expected [<group>] <module> or [<group>] maven/<groupId>/<artifactId>,"
+                                    + " with a version written into the coordinate, as"
+                                    + " maven/<groupId>/<artifactId>/<version>, or left to pin."
+                                    + " Every line inside a jenesis.plugin comment is a declaration of its own");
+                        }
                         entries.put(token.indexOf('/') < 0 ? "module/" + token : token, group);
+                    }
+                });
+        return entries;
+    }
+
+    private static SequencedMap<String, String> toAliases(Node node) {
+        SequencedMap<String, String> entries = new LinkedHashMap<>();
+        toChildren(node)
+                .filter(child -> child.getNodeType() == Node.COMMENT_NODE)
+                .map(Node::getNodeValue)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(text -> text.startsWith("jenesis.alias"))
+                .forEach(text -> {
+                    for (String line : text.substring("jenesis.alias".length()).replace("&#45;", "-").split("\n")) {
+                        String declaration = line.trim().replaceAll("\\s+", " ");
+                        if (declaration.isEmpty()) {
+                            continue;
+                        }
+                        String[] words = declaration.split(" ");
+                        if (words.length != 2) {
+                            throw new IllegalArgumentException("Malformed jenesis.alias declaration '"
+                                    + declaration
+                                    + "': expected <module> <groupId>/<artifactId>[/<type>[/<classifier>]]."
+                                    + " Every line inside a jenesis.alias comment is a declaration of its own,"
+                                    + " so prose written among them is read as one; move it outside the comment");
+                        }
+                        if (ModuleGraph.isSystemModule(words[0]) || words[0].indexOf('/') >= 0) {
+                            throw new IllegalArgumentException("Illegal jenesis.alias name '"
+                                    + words[0]
+                                    + "': expected the name of a module that is not a platform module");
+                        }
+                        String[] segments = words[1].split("/", -1);
+                        if (segments.length < 2
+                                || segments.length > 4
+                                || Arrays.stream(segments).anyMatch(String::isEmpty)) {
+                            throw new IllegalArgumentException("Malformed jenesis.alias target '"
+                                    + words[1]
+                                    + "': expected <groupId>/<artifactId>[/<type>[/<classifier>]]");
+                        }
+                        String previous = entries.putIfAbsent(words[0], words[1]);
+                        if (previous != null && !previous.equals(words[1])) {
+                            throw new IllegalArgumentException("Duplicate jenesis.alias for "
+                                    + words[0]
+                                    + ": "
+                                    + previous
+                                    + " and "
+                                    + words[1]);
+                        }
                     }
                 });
         return entries;
@@ -1355,7 +1905,7 @@ public class MavenPomResolver implements MavenResolver {
                         int space = trimmed.indexOf(' ');
                         String token = space < 0 ? trimmed : trimmed.substring(0, space);
                         String arguments = space < 0 ? "" : trimmed.substring(space + 1).trim();
-                        if (token.startsWith("java.") || token.startsWith("jdk.")) {
+                        if (ModuleGraph.isSystemModule(token)) {
                             throw new IllegalArgumentException("Illegal jenesis.attach token '"
                                     + token
                                     + "': platform modules cannot be attached");
@@ -1413,7 +1963,7 @@ public class MavenPomResolver implements MavenResolver {
                                 + " the project's own included");
                     }
                     for (String token : declaration.split("\\s+")) {
-                        if (token.startsWith("java.") || token.startsWith("jdk.")) {
+                        if (ModuleGraph.isSystemModule(token)) {
                             throw new IllegalArgumentException("Illegal jenesis.native token '"
                                     + token
                                     + "': platform modules cannot be granted native access");
@@ -1441,6 +1991,13 @@ public class MavenPomResolver implements MavenResolver {
         return property(text, properties, Set.of());
     }
 
+    private static String directory(String text, Map<String, String> properties) {
+        Map<String, String> located = new HashMap<>(properties);
+        located.put("basedir", ".");
+        located.put("project.basedir", ".");
+        return property(text, located);
+    }
+
     private static String property(String text, Map<String, String> properties, Set<String> previous) {
         if (text != null && text.contains("$")) {
             Matcher matcher = PROPERTY.matcher(text);
@@ -1448,9 +2005,6 @@ public class MavenPomResolver implements MavenResolver {
             while (matcher.find()) {
                 String property = matcher.group(2);
                 String replacement = properties.get(property);
-                if (replacement == null) {
-                    replacement = System.getProperty(property);
-                }
                 if (replacement == null) {
                     matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group()));
                 } else {
@@ -1575,13 +2129,20 @@ public class MavenPomResolver implements MavenResolver {
                                  SequencedMap<String, String> attachments,
                                  SequencedSet<String> natives,
                                  SequencedMap<String, String> plugins,
+                                 SequencedMap<String, String> aliases,
                                  SequencedMap<String, String> signatures,
-                                 List<License> licenses) {
+                                 List<License> licenses,
+                                 MavenPomEmitter.Metadata metadata,
+                                 Set<String> verbatim,
+                                 Map<DependencyKey, DependencyValue> bom,
+                                 boolean missing,
+                                 DependencyCoordinate relocation) {
     }
 
     private record ResolvedPom(Map<MavenDependencyKey, MavenDependencyValue> managedDependencies,
                                SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies,
-                               List<License> licenses) {
+                               List<License> licenses,
+                               DependencyCoordinate relocation) {
     }
 
     private record ContextualPom(ResolvedPom pom,

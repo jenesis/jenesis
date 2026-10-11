@@ -100,6 +100,31 @@ public class JarTest {
     }
 
     @ParameterizedTest
+    @EnumSource(value = Jar.Sort.class, names = {"CLASSES", "SOURCES"})
+    public void leaves_the_configuration_folder_out_of_the_jar(Jar.Sort sort) throws IOException {
+        Path folder = Files.createDirectories(classes.resolve(sort == Jar.Sort.CLASSES ? BuildStep.RESOURCES : BuildStep.SOURCES));
+        Files.writeString(Files.createDirectory(folder.resolve("sample")).resolve("Sample.txt"), "sample");
+        Path configuration = Files.createDirectories(folder.resolve("META-INF/build.jenesis"));
+        Files.writeString(configuration.resolve("project.properties"), "artifact=sample");
+        Files.writeString(folder.resolve("META-INF/LICENSE"), "licence");
+        BuildStepResult result = Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, sort).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of())))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        Path jar;
+        try (Stream<Path> files = Files.walk(next)) {
+            jar = files.filter(file -> file.toString().endsWith(".jar")).findFirst().orElseThrow();
+        }
+        try (JarFile file = new JarFile(jar.toFile())) {
+            assertThat(file.stream().map(JarEntry::getName).toList())
+                    .contains("sample/Sample.txt", "META-INF/LICENSE")
+                    .as("the build's configuration is no content of the module")
+                    .noneMatch(name -> name.startsWith("META-INF/build.jenesis"));
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void can_execute_javadoc_jar(boolean process) throws IOException {
         Path folder = Files.createDirectory(classes.resolve(Javadoc.JAVADOC));
@@ -321,6 +346,72 @@ public class JarTest {
                 .toCompletableFuture().join();
 
         assertThat(mainAttributes().getValue("Created-By")).isEqualTo("Something Else");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void a_manifest_among_the_resources_is_the_basis_of_the_jar_manifest(boolean process) throws IOException {
+        Files.createDirectory(classes.resolve(Javac.CLASSES));
+        Files.writeString(Files.createDirectories(classes.resolve("resources/META-INF")).resolve("MANIFEST.MF"), """
+                Manifest-Version: 1.0
+                Automatic-Module-Name: sample.library
+                Created-By: Maven JAR Plugin
+                """);
+        Files.writeString(classes.resolve("manifest.mf"), """
+                Manifest-Version: 1.0
+                Sbom-Format: CycloneDX
+                """);
+        Jar.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
+                .toCompletableFuture().join();
+
+        Attributes attributes = mainAttributes();
+        assertThat(attributes.getValue("Automatic-Module-Name")).isEqualTo("sample.library");
+        assertThat(attributes.getValue("Sbom-Format"))
+                .as("what the build writes is merged over the project's manifest")
+                .isEqualTo("CycloneDX");
+        assertThat(attributes.getValue("Created-By")).isEqualTo("Maven JAR Plugin");
+        try (JarFile jar = new JarFile(next.resolve(BuildStep.ARTIFACTS + "classes.jar").toFile())) {
+            assertThat(jar.stream().filter(entry -> entry.getName().equalsIgnoreCase(JarFile.MANIFEST_NAME)))
+                    .as("the project's manifest is not added a second time beside the merged one")
+                    .hasSize(1);
+        }
+    }
+
+    @Test
+    public void a_manifest_among_the_resources_that_contradicts_the_build_is_refused() throws IOException {
+        Files.createDirectory(classes.resolve(Javac.CLASSES));
+        Path manifest = Files.createDirectories(classes.resolve("resources/META-INF")).resolve("MANIFEST.MF");
+        Files.writeString(manifest, "Manifest-Version: 1.0\nMulti-Release: false\n");
+        Files.writeString(classes.resolve("manifest.mf"), "Manifest-Version: 1.0\nMulti-Release: true\n");
+        assertThatThrownBy(() -> Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
+                .toCompletableFuture().join())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Conflicting manifest attribute 'Multi-Release' in "
+                        + classes.resolve("manifest.mf")
+                        + ": 'false' vs 'true'");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"--manifest", "-m"})
+    public void refuses_a_manifest_option_in_the_process_file(String option) throws IOException {
+        Files.createDirectory(classes.resolve(Javac.CLASSES));
+        Files.writeString(Files.createDirectory(classes.resolve("process")).resolve("jar.properties"),
+                option + "=extra.mf\n");
+        assertThatThrownBy(() -> Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
+                .toCompletableFuture().join())
+                .as("a manifest named on the command line would silently replace the one the step merges")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("process-jar.properties sets " + option)
+                .hasMessageContaining("META-INF/MANIFEST.MF among the module's resources");
     }
 
     private Attributes mainAttributes() throws IOException {

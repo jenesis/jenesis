@@ -65,7 +65,7 @@ once where the object is built:
 
 - `ofEnvironment(environment, …)` is the static factory that reads every setting from the `Environment` it is
   given (`environment.value("executor.digest", "MD5")`, `environment.number("executor.concurrency", 0)`,
-  `environment.flag("source.pmd", true)`), with a value the object cannot do without following it as a
+  `environment.flag("test.skip")`), with a value the object cannot do without following it as a
   further argument (`Project.ofEnvironment(environment, root)`);
 - the public no-argument or short constructor reads nothing and takes each setting's default, exactly as
   if the environment answered for none of them - that is what `Environment.NONE` is;
@@ -258,8 +258,10 @@ fails the build by throwing, and `inspect` fails it as well when
 an inspection changed a file it was handed. The module hook point `package` is the one whose output is staged beyond the
 module: what its plugins write into `packages/` is merged with the stock `jpackage` output, refusing a name written
 twice, and staged in `stage/packages/`. A plugin adds and
-never replaces: a build that changes what the stock steps do is an entry point of its own that wires its
-assembler in code. A plugin runs the project's code, as its tests and annotation processors do, so the project
+never replaces, with one exception: the plugins of the module hook point `binary/transform` rewrite the module's
+compiled classes, in the order they are named, each handed what the one before wrote, and what one writes replaces
+the class file of that name - bytecode enhancement, and nothing else. Any other change to what the stock steps do is
+an entry point of its own that wires its assembler in code. A plugin runs the project's code, as its tests and annotation processors do, so the project
 names it itself; what isolates an untrusted project is `jenesis.project.docker`, under which the host runs no
 build, `watch` included, before the container is up, and `Make.settings` refuses every `jenesis.project.docker*`
 and `jenesis.execute.docker*` key in a file the project provides, so a project can neither switch the isolation
@@ -299,7 +301,8 @@ part of the key of `prepare` and of every step reading what it writes; `@@` is a
 **Modules activate on a file.** A build module under `project/` (`CheckstyleModule`, `JaCoCoModule`, …)
 switches itself on when its configuration file is present in a configuration folder
 (`configurationFile(configuration)`), resolves its tool in a dependency group named after the tool, and is
-opted out with its `jenesis.<kind>.<tool>=false` property. The inferred assembler wires the modules; a new
+switched by its `jenesis.<kind>.<tool>` property: `ignore` leaves it out, `report` (the default) records its
+findings, `strict` fails the build on them; whether they are printed is a `jenesis.print.*` flag of its own. The inferred assembler wires the modules; a new
 tool is a new module in the same shape, plus a demo.
 
 **A tool reads one folder, the inference fills it.** A generator module (`XjcModule`,

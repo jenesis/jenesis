@@ -41,7 +41,7 @@ and writes an XML report under its step's output folder:
     target/build/.../assemble/check/codenarc/check/output/codenarc-report.xml
 
 CodeNarc is report-only by default; it records findings without failing the
-build. As in the Groovy demo, the exported package keeps a Java type
+build, unless `-Djenesis.source.codenarc=strict` asks it to fail on any. As in the Groovy demo, the exported package keeps a Java type
 (`Greeter`), because `groovyc` does not read `.java` as source and so cannot
 contribute a class to a package it does not also define (see `../demo-46-groovy`).
 

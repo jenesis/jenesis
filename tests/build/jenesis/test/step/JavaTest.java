@@ -168,6 +168,88 @@ public class JavaTest {
         assertThat(supplement.resolve("output")).content().isEqualTo("Hello world!");
     }
 
+    @Test
+    public void a_jar_two_predecessors_resolved_is_named_once_on_the_class_path() throws IOException {
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        for (String name : List.of("module", "observed")) {
+            Path folder = Files.createDirectories(root.resolve(name).resolve("resolved"));
+            for (String jar : List.of("first-1.0.jar", "second-1.0.jar")) {
+                try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(folder.resolve(jar)))) {
+                    output.putNextEntry(new JarEntry("db/data.sql"));
+                    output.write(new byte[]{1});
+                    output.closeEntry();
+                }
+            }
+            Files.writeString(root.resolve(name).resolve(BuildStep.DEPENDENCIES), name.equals("module")
+                    ? "main/runtime/maven/sample/first/1.0=resolved/first-1.0.jar\n"
+                            + "main/runtime/maven/sample/second/1.0=resolved/second-1.0.jar\n"
+                    : "main/runtime/maven/sample/second/1.0=resolved/second-1.0.jar\n"
+                            + "main/runtime/maven/sample/first/1.0=resolved/first-1.0.jar\n");
+            arguments.put(name, new BuildStepArgument(root.resolve(name), Map.of()));
+        }
+        BuildStepResult result = Java.of(PathPlacement.CLASS_PATH, true, "-version").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                arguments).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(supplement.resolve("java.args"))
+                .as("a jar resolved by two predecessors is one jar, and naming it twice doubles every resource it holds")
+                .content()
+                .contains("\"--class-path\"\n\""
+                        + (root.resolve("module/resolved/first-1.0.jar")
+                                + File.pathSeparator
+                                + root.resolve("module/resolved/second-1.0.jar")).replace("\\", "\\\\")
+                        + "\"\n")
+                .doesNotContain("observed");
+    }
+
+    @Test
+    public void folders_name_the_classes_and_resources_once_without_the_jar_they_were_packaged_into() throws IOException {
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        Map<String, List<String>> folders = new LinkedHashMap<>();
+        folders.put("compiled", List.of(Javac.CLASSES + "module-info.class", Javac.CLASSES + "sample/Sample.class"));
+        folders.put("merged", List.of(Javac.CLASSES + "module-info.class",
+                Javac.CLASSES + "sample/Sample.class",
+                Javac.CLASSES + "sample/Other.class"));
+        folders.put("resources", List.of(BuildStep.RESOURCES + "sample.properties"));
+        for (Map.Entry<String, List<String>> folder : folders.entrySet()) {
+            for (String file : folder.getValue()) {
+                Files.write(Files.createDirectories(root.resolve(folder.getKey()).resolve(file).getParent())
+                        .resolve(Path.of(file).getFileName()), new byte[]{1});
+            }
+            arguments.put(folder.getKey(), new BuildStepArgument(root.resolve(folder.getKey()), Map.of()));
+        }
+        Map<String, List<String>> jars = new LinkedHashMap<>();
+        jars.put("packaged", List.of("sample/Sample.class", "sample.properties", "META-INF/maven/sample/pom.properties"));
+        jars.put("dependency", List.of("module-info.class", "other/Lib.class"));
+        for (Map.Entry<String, List<String>> jar : jars.entrySet()) {
+            Path artifacts = Files.createDirectories(root.resolve(jar.getKey()).resolve(BuildStep.ARTIFACTS));
+            try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(artifacts.resolve(jar.getKey() + ".jar")))) {
+                for (String entry : jar.getValue()) {
+                    output.putNextEntry(new JarEntry(entry));
+                    output.write(new byte[]{1});
+                    output.closeEntry();
+                }
+            }
+            arguments.put(jar.getKey(), new BuildStepArgument(root.resolve(jar.getKey()), Map.of()));
+        }
+        BuildStepResult result = Java.of(PathPlacement.CLASS_PATH, false, "-version").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                arguments).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(supplement.resolve("java.args"))
+                .as("a folder another one holds entirely and a jar packaging the folders would double what a scan finds")
+                .content()
+                .contains("\"--class-path\"\n\""
+                        + String.join(File.pathSeparator,
+                                root.resolve("merged").resolve(Javac.CLASSES).toString(),
+                                root.resolve("resources").resolve(BuildStep.RESOURCES).toString(),
+                                root.resolve("dependency").resolve(BuildStep.ARTIFACTS + "dependency.jar").toString())
+                        .replace("\\", "\\\\")
+                        + "\"\n");
+    }
+
     private static String reportedErrors(Path supplement) throws IOException {
         return Files.readString(supplement.resolve("error"))
                 .lines()

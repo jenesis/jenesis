@@ -15,13 +15,14 @@ import build.jenesis.step.Bind;
 public class InferredTestObservationModule implements BuildExecutorModule {
 
     public static final String TEST = "test", MUTATE = "mutate";
-    private static final String FRAMEWORK = "framework";
-    private static final Set<String> TEST_KEYS = Set.of(FRAMEWORK);
+    private static final String FRAMEWORK = "framework", ENGINES = "engines";
+    private static final Set<String> TEST_KEYS = Set.of(FRAMEWORK, ENGINES);
 
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
     private final PathPlacement pathPlacement;
     private final String moduleName;
+    private final Path directory;
     private final TestModule testModule;
     private final JaCoCoModule jacocoModule;
     private final PiTestModule pitestModule;
@@ -38,6 +39,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         this(configuration,
                 null,
                 PathPlacement.CLASS_PATH,
+                null,
                 null,
                 new TestModule(repositories, resolvers),
                 new JaCoCoModule(repositories, resolvers),
@@ -57,6 +59,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         InferredTestObservationModule module = new InferredTestObservationModule(configuration,
                 null,
                 PathPlacement.CLASS_PATH,
+                null,
                 null,
                 TestModule.ofEnvironment(environment, repositories, resolvers),
                 JaCoCoModule.ofEnvironment(environment, repositories, resolvers),
@@ -86,9 +89,9 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         return module;
     }
 
-    private static TestFramework declaredFramework(Path file) throws IOException {
+    private static TestModule declared(TestModule module, Path file) throws IOException {
         if (file == null) {
-            return null;
+            return module;
         }
         SequencedProperties properties = SequencedProperties.ofFiles(file);
         for (String key : properties.stringPropertyNames()) {
@@ -96,14 +99,16 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 throw new IllegalArgumentException("Unknown test property: " + key);
             }
         }
-        String framework = properties.value(FRAMEWORK);
-        return framework == null ? null : TestFramework.named(framework);
+        String framework = properties.value(FRAMEWORK), engines = properties.value(ENGINES);
+        TestModule declared = framework == null ? module : module.framework(TestFramework.named(framework));
+        return engines == null ? declared : declared.engines(engines);
     }
 
     private InferredTestObservationModule(SequencedSet<Path> configuration,
                                           Pinning pinning,
                                           PathPlacement pathPlacement,
                                           String moduleName,
+                                          Path directory,
                                           TestModule testModule,
                                           JaCoCoModule jacocoModule,
                                           PiTestModule pitestModule,
@@ -117,6 +122,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
         this.moduleName = moduleName;
+        this.directory = directory;
         this.testModule = testModule;
         this.jacocoModule = jacocoModule;
         this.pitestModule = pitestModule;
@@ -133,6 +139,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -149,6 +156,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -165,6 +173,24 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                jfr,
+                pitest,
+                custom);
+    }
+
+    public InferredTestObservationModule directory(Path directory) {
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -181,6 +207,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -197,6 +224,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -213,6 +241,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -229,6 +258,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -245,6 +275,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -261,6 +292,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pinning,
                 pathPlacement,
                 moduleName,
+                directory,
                 testModule,
                 jacocoModule,
                 pitestModule,
@@ -288,6 +320,11 @@ public class InferredTestObservationModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        Path described = BuildStep.locate(new LinkedHashSet<>(inherited.values()), BuildStep.MODULE);
+        SequencedProperties description = described == null ? null : SequencedProperties.ofFiles(described);
+        if (description != null && (description.getProperty("test") == null || description.flag("abstract"))) {
+            return;
+        }
         SequencedMap<String, BuildExecutorModule> reports = new LinkedHashMap<>();
         List<ObservabilityEngine> engines = new ArrayList<>();
         if (jacoco != null && BuildStep.locate(configuration, "jacoco.properties") != null) {
@@ -317,9 +354,9 @@ public class InferredTestObservationModule implements BuildExecutorModule {
             TestModule module = testModule.observe(engines)
                     .pinning(pinning)
                     .pathPlacement(pathPlacement)
-                    .moduleName(moduleName);
-            TestFramework declared = declaredFramework(BuildStep.locate(configuration, "test.properties"));
-            BuildExecutorModule executed = test.apply(declared == null ? module : module.framework(declared));
+                    .moduleName(moduleName == null && description != null ? description.getProperty("module") : moduleName)
+                    .directory(directory);
+            BuildExecutorModule executed = test.apply(declared(module, BuildStep.locate(configuration, "test.properties")));
             if (executed != null) {
                 buildExecutor.addModule(TEST, executed, inherited.sequencedKeySet());
                 SequencedSet<String> reportInputs = new LinkedHashSet<>();
