@@ -114,6 +114,22 @@ public class Jar extends ProcessBuildStep {
         }
         merged.getMainAttributes().putIfAbsent(Attributes.Name.MANIFEST_VERSION, "1.0");
         merged.getMainAttributes().putIfAbsent(CREATED_BY, "Jenesis");
+        SequencedProperties metadata = SequencedProperties.ofFolders(arguments.values().stream()
+                .filter(argument -> !argument.removed())
+                .map(BuildStepArgument::folder)
+                .toList(), METADATA);
+        String title = metadata.value("name", metadata.value("artifact")),
+                version = metadata.value("version"),
+                vendor = metadata.value("organization.name");
+        if (title != null) {
+            merged.getMainAttributes().putIfAbsent(Attributes.Name.IMPLEMENTATION_TITLE, title);
+        }
+        if (version != null) {
+            merged.getMainAttributes().putIfAbsent(Attributes.Name.IMPLEMENTATION_VERSION, version);
+        }
+        if (vendor != null) {
+            merged.getMainAttributes().putIfAbsent(Attributes.Name.IMPLEMENTATION_VENDOR, vendor);
+        }
         Path output = context.supplement().resolve(Versions.MANIFEST);
         try (OutputStream out = Files.newOutputStream(output)) {
             merged.write(out);

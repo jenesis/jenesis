@@ -1526,9 +1526,11 @@ public record Project(
 
                       maven-jar-plugin / jar -> on by default; archives are reproducible unless
                           jenesis.archive.timestamp is emptied (71)
-                      maven-jar-plugin manifestEntries, addDefaultImplementationEntries /
-                          jar.manifest.attributes -> a META-INF/MANIFEST.MF among the resources,
-                          the basis of the jar's manifest (12)
+                      maven-jar-plugin manifestEntries / jar.manifest.attributes -> a
+                          META-INF/MANIFEST.MF among the resources, the basis of the jar's manifest
+                          (12); addDefaultImplementationEntries -> on by default: Implementation-Title
+                          and -Vendor, and -Version where the POM, project.properties or
+                          jenesis.project.version names one
                       maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (48, 67),
                           whose jar holds the sources and, as Maven's and Gradle's do, the resources,
                           including those of -Djenesis.project.resources
