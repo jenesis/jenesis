@@ -88,7 +88,7 @@ Quick index
 | 37 | [`test-selection`](demo-37-test-selection/README.md)              | Re-run only the tests a change can reach                                     | `java build/Demo.java`            |
 | 38 | [`pitest`](demo-38-pitest/README.md)                              | Mutation testing with PIT                                                    | `java build/jenesis/Make.java`    |
 | 39 | [`jmh`](demo-39-jmh/README.md)                                    | Generate, compile and run a JMH benchmark                                    | `java build/jenesis/Execute.java` |
-| 40 | [`api-compatibility`](demo-40-api-compatibility/README.md)        | Compare the jar against the last release with japicmp                        | `java build/Demo.java`            |
+| 40 | [`api-compatibility`](demo-40-api-compatibility/README.md)        | Compare the jar against the last release with japicmp and revapi             | `java build/Demo.java`            |
 | 41 | [`kotlin`](demo-41-kotlin/README.md)                              | Java and Kotlin in one module                                                | `java build/jenesis/Make.java`    |
 | 42 | [`kotlin-quality`](demo-42-kotlin-quality/README.md)              | detekt, ktlint and ktfmt, inferred from their config files                   | `java build/jenesis/Make.java`    |
 | 43 | [`kotlin-plugin`](demo-43-kotlin-plugin/README.md)                | Run a Kotlin compiler plugin declared with `@jenesis.plugin`                 | `java build/jenesis/Make.java`    |
@@ -689,6 +689,10 @@ four `error-on-*` keys turn a finding into a failure:
 
 The demo publishes its own previous release first, so it has something to compare
 against. `-Djenesis.artifact.japicmp=false` is the opt-out.
+
+A `revapi.properties` runs revapi against the same baseline, reporting every
+difference from the severity it names in `reports/revapi/revapi.json`; the demo
+asks for `severity=non-breaking`, so the added overload is reported as well.
 
 ## 30. Kotlin - [`kotlin`](demo-41-kotlin/README.md), [`kotlin-quality`](demo-42-kotlin-quality/README.md), [`kotlin-plugin`](demo-43-kotlin-plugin/README.md)
 

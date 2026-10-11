@@ -36,6 +36,38 @@ public class InferredArtifactQualityModuleTest {
     }
 
     @Test
+    public void wires_revapi_when_its_properties_file_is_present() throws IOException {
+        Files.writeString(project.resolve("revapi.properties"), "baseline=com.example/library\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("artifact", artifact(), "project");
+        executor.execute("artifact/revapi/required");
+
+        SequencedProperties requires = SequencedProperties.ofFiles(root.resolve("artifact").resolve("revapi")
+                .resolve("required").resolve("output").resolve(BuildStep.REQUIRES));
+        assertThat(requires.stringPropertyNames()).contains("revapi/baseline/maven/com.example/library/RELEASE");
+    }
+
+    @Test
+    public void compares_no_api_with_revapi_of_a_test_module_or_when_switched_off() throws IOException {
+        Files.writeString(project.resolve("revapi.properties"), "baseline=com.example/library\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("artifact", artifact().revapi(null), "project");
+        executor.execute();
+        assertThat(root.resolve("artifact").resolve("revapi")).doesNotExist();
+
+        Files.writeString(project.resolve(BuildStep.MODULE), "test=main_artifact\n");
+        BuildExecutor tests = newExecutor();
+        tests.addSource("project", project);
+        tests.addModule("tests", artifact(), "project");
+        tests.execute();
+        assertThat(root.resolve("tests").resolve("revapi")).doesNotExist();
+    }
+
+    @Test
     public void skips_japicmp_when_no_properties_file_is_present() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);

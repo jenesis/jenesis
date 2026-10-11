@@ -86,7 +86,9 @@ public class JApiCmpModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        buildExecutor.addStep(REQUIRED, new Requires(tool, config.value("baseline")), inherited.sequencedKeySet());
+        buildExecutor.addStep(REQUIRED,
+                new Baseline(tool, config.value("baseline"), List.of(MAVEN_GROUP + "/" + MAVEN_ARTIFACT), "japicmp.properties"),
+                inherited.sequencedKeySet());
         SequencedSet<String> resolveInputs = new LinkedHashSet<>();
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
@@ -97,58 +99,6 @@ public class JApiCmpModule implements BuildExecutorModule {
         compareInputs.add(DEPENDENCIES);
         compareInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addStep(COMPARE, new Compare(terms, tool, group, config), compareInputs);
-    }
-
-    private record Requires(String tool, String baseline) implements BuildStep {
-
-        @Override
-        public CompletionStage<BuildStepResult> apply(Executor executor,
-                                                      BuildStepContext context,
-                                                      SequencedMap<String, BuildStepArgument> arguments)
-                throws IOException {
-            String coordinate = tool + "/baseline/" + (baseline == null
-                    ? released(arguments)
-                    : qualified(baseline));
-            SequencedProperties requires = new SequencedProperties();
-            requires.setProperty(tool + "/runtime/maven/" + MAVEN_GROUP + "/" + MAVEN_ARTIFACT + "/RELEASE", "");
-            requires.setProperty(coordinate, "");
-            requires.store(context.next().resolve(BuildStep.REQUIRES));
-            SequencedProperties exclusions = new SequencedProperties();
-            exclusions.setProperty(coordinate, "*/*");
-            exclusions.store(context.next().resolve(BuildStep.EXCLUSIONS));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
-        }
-
-        private static String qualified(String baseline) {
-            return switch (baseline.split("/", -1).length) {
-                case 2 -> "maven/" + baseline + "/RELEASE";
-                case 3 -> "maven/" + baseline;
-                case 4 -> baseline;
-                default -> throw new IllegalArgumentException("Malformed japicmp baseline '"
-                        + baseline
-                        + "': expected <groupId>/<artifactId>, <groupId>/<artifactId>/<version>"
-                        + " or <repository>/<groupId>/<artifactId>/<version>");
-            };
-        }
-
-        private static String released(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
-            for (BuildStepArgument argument : arguments.values()) {
-                if (argument.removed()) {
-                    continue;
-                }
-                Path file = argument.folder().resolve(BuildStep.METADATA);
-                if (!Files.isRegularFile(file)) {
-                    continue;
-                }
-                SequencedProperties metadata = SequencedProperties.ofFiles(file);
-                String project = metadata.value("project"), artifact = metadata.value("artifact");
-                if (project != null && artifact != null) {
-                    return "maven/" + project + "/" + artifact + "/RELEASE";
-                }
-            }
-            throw new IllegalStateException("No Maven coordinate to compare against among the inputs of the"
-                    + " japicmp step: declare baseline=<groupId>/<artifactId> in japicmp.properties");
-        }
     }
 
     private static class Compare extends ProcessBuildStep {
