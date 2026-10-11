@@ -74,16 +74,6 @@ Compile avoidance matters most: it is the largest share of the difference to Gra
 |---|---|---|
 | A Kotlin Multiplatform artifact resolves to its root jar, which holds no classes, and nothing reports it. Without Gradle module metadata the platform variant is not found; at the least, the build should fail and name the variant to depend on. | M | spring-boot-realworld-example-app (clikt), micrometer, moshi |
 
-## Frameworks without a built-in module
-
-| Gap | Size | Projects |
-|---|---|---|
-| GWT | L | guava |
-| Android | L | mockito |
-| Angular and Node front ends | L | jhipster |
-| Asciidoctor | L | picocli, hibernate-validator |
-| `quarkus:dev`, and `@QuarkusTest` on the module path | L | quarkus |
-
 ## Partial or unconfirmed
 
 - When a test JVM writes outside its own folder, the build names the folder it wrote to but does not prevent the
@@ -98,6 +88,9 @@ These are decisions rather than gaps. The briefing says so and names the change 
 - more than one release per module, including compiled stubs excluded from the jar - the stubs become a module of
   their own, required as `static`, and a newer call becomes a multi-release class;
 - a Java 8 or older base built from `module-info.java`;
+- support for one framework or platform - GWT, Android, Angular and Node front ends, Asciidoctor, `quarkus:dev`
+  and `@QuarkusTest` on the module path: the tool keeps to general-purpose functions, and each of these is a plugin,
+  for the community to publish (guava, mockito, jhipster, picocli, hibernate-validator, quarkus);
 - white-box tests through `--patch-module`;
 - Gradle's highest-version conflict resolution;
 - a root location for configuration of the tests alone or the main code alone - a file that differs for the tests
