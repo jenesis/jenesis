@@ -46,7 +46,6 @@ Compile avoidance matters most: it is the largest share of the difference to Gra
 | Gap | Size | Projects |
 |---|---|---|
 | A process file's `@<key>` reads only the global `jenesis.variable.*`; there is no variable for the module's own coordinates. | S | netty |
-| No retry of a failed test, and no fork per test class. | S | micrometer, mockito, caffeine |
 | Tests shipped in a dependency's jar do not run; only the module's own compiled tests are selected. | S | caffeine (JCache conformance suite) |
 | No location for configuration that only the tests, or only the main code, of every module should see. | S | jline3 (copied into 16 test modules), hibernate-validator |
 | A plugin cannot hand a file it produced to the test JVM; the path of its step has to be written into `process-test.properties`. | S | quarkus, mockito (OSGi tests dropped) |
@@ -109,6 +108,9 @@ These are decisions rather than gaps. The briefing says so and names the change 
 - a Java 8 or older base built from `module-info.java`;
 - white-box tests through `--patch-module`;
 - Gradle's highest-version conflict resolution;
+- retrying a failed test, which belongs to the test framework (JUnit Pioneer's `@RetryingTest`, TestNG's
+  `IRetryAnalyzer`), and a JVM per test class - each test module runs in a JVM of its own, so a test that needs one
+  becomes a module (micrometer, mockito, caffeine);
 - overriding a `pom.xml` `${...}` property from the command line;
 - Gradle module metadata, war and ear archives, and running Docker containers as part of a build.
 
