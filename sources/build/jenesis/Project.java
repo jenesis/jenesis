@@ -2522,7 +2522,7 @@ public record Project(
                 case "demos" -> """
                     # Jenesis - Copy a demo
 
-                    73 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    74 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -2557,7 +2557,9 @@ public record Project(
                                          42 kotlin-quality, 45 scala-quality, 47 groovy-quality
                       Tests              35 test-framework (what the tests are written against),
                                          36 code-coverage (JaCoCo), 37 test-selection (incremental),
-                                         38 pitest (mutation), 39 jmh (benchmark harness)
+                                         38 pitest (mutation), 39 jmh (benchmark harness),
+                                         74 test-runs (the tests of a scanned jar, run again
+                                         with other flags by another module)
                       Other languages    41 kotlin, 43 kotlin-plugin, 44 scala, 46 groovy
                       Operating it       48 profiles, 49 build-cache, 50 docker-isolation,
                                          51 agents (@jenesis.attach),

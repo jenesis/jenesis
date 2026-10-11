@@ -122,6 +122,7 @@ Quick index
 | 71 | [`reproducible`](demo-71-reproducible/README.md)                  | Build the same bytes on every machine, checked against a recorded digest     | `java build/Demo.java`            |
 | 72 | [`native-image`](demo-72-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
 | 73 | [`jpx`](demo-73-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
+| 74 | [`test-runs`](demo-74-test-runs/README.md)                        | Run the tests a dependency's jar holds, once per module that scans it        | `java build/jenesis/Make.java`    |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1129,6 +1130,21 @@ be pointed at a mirror with `JENESIS_REPOSITORY_URI` and `MAVEN_REPOSITORY_URI`.
 
 The demo runs those same commands from `java build/Demo.java`, with the
 installation directed at its own `target/` so your home directory is left alone.
+
+## 56. Tests from a jar, and a second run - [`test-runs`](demo-74-test-runs/README.md)
+
+A module runs the tests it compiles, and also those of a dependency its
+`test.properties` names:
+
+    scan=demo.suite
+
+The scanned jar's test classes are chosen by the same naming rules and filters
+as the module's own, and a change to the jar re-runs them. That runs a test
+suite shipped in a jar, and it is how the same tests run twice with other JVM
+flags: `fast` and `slow` both scan `suite`, each with a `process-test.properties`
+of its own. A second run is a module, selected, cached and reported on its own.
+A `pom.xml` build declares the same as Surefire's `<dependenciesToScan>`, which
+the demo's `maven/` folder shows.
 
 Cross-cutting concepts
 ----------------------
