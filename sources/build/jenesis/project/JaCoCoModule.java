@@ -1,6 +1,7 @@
 package build.jenesis.project;
 
 import module java.base;
+import module java.xml;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
@@ -19,12 +20,15 @@ import build.jenesis.step.ProcessHandler;
 public class JaCoCoModule implements BuildExecutorModule {
 
     public static final String REPORT = "report";
-    private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
+    private static final String REQUIRED = "required", DEPENDENCIES = "dependencies",
+            MINIMUM = "minimum.", MAXIMUM_MISSED = "maximum.missed.";
+    private static final List<String> COUNTERS = List.of("instruction", "branch", "line", "complexity", "method", "class");
 
     private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
     private final boolean classes;
+    private final SequencedMap<String, String> limits;
     private final ProcessBuildStep.Terms terms;
 
     public JaCoCoModule(Map<String, Repository> repositories,
@@ -33,6 +37,7 @@ public class JaCoCoModule implements BuildExecutorModule {
              null,
              "jacoco",
              false,
+             new LinkedHashMap<>(),
              new ProcessBuildStep.Terms());
     }
 
@@ -43,6 +48,7 @@ public class JaCoCoModule implements BuildExecutorModule {
                 null,
                 "jacoco",
                 false,
+                new LinkedHashMap<>(),
                 ProcessBuildStep.Terms.ofEnvironment(environment, "jacoco"));
     }
 
@@ -50,28 +56,60 @@ public class JaCoCoModule implements BuildExecutorModule {
                          Pinning pinning,
                          String tool,
                          boolean classes,
+                         SequencedMap<String, String> limits,
                          ProcessBuildStep.Terms terms) {
         this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.classes = classes;
+        this.limits = limits;
         this.terms = terms;
     }
 
     public JaCoCoModule pinning(Pinning pinning) {
-        return new JaCoCoModule(dependencies, pinning, tool, classes, terms);
+        return new JaCoCoModule(dependencies, pinning, tool, classes, limits, terms);
     }
 
     public JaCoCoModule tool(String tool) {
-        return new JaCoCoModule(dependencies, pinning, tool, classes, terms);
+        return new JaCoCoModule(dependencies, pinning, tool, classes, limits, terms);
     }
 
     public JaCoCoModule classes(boolean classes) {
-        return new JaCoCoModule(dependencies, pinning, tool, classes, terms);
+        return new JaCoCoModule(dependencies, pinning, tool, classes, limits, terms);
+    }
+
+    public JaCoCoModule limits(SequencedMap<String, String> limits) {
+        SequencedMap<String, String> validated = new LinkedHashMap<>();
+        limits.forEach((key, value) -> {
+            String counter = key.startsWith(MINIMUM) ? key.substring(MINIMUM.length())
+                    : key.startsWith(MAXIMUM_MISSED) ? key.substring(MAXIMUM_MISSED.length())
+                    : null;
+            if (counter == null || !COUNTERS.contains(counter)) {
+                throw new IllegalArgumentException("Unknown key " + key + " in jacoco.properties, expected "
+                        + MINIMUM + "<counter> or " + MAXIMUM_MISSED + "<counter> for a counter of " + COUNTERS);
+            }
+            try {
+                if (key.startsWith(MINIMUM)) {
+                    double ratio = Double.parseDouble(value.trim());
+                    if (!(ratio >= 0 && ratio <= 1)) {
+                        throw new NumberFormatException(value);
+                    }
+                } else if (Long.parseLong(value.trim()) < 0) {
+                    throw new NumberFormatException(value);
+                }
+            } catch (NumberFormatException _) {
+                throw new IllegalArgumentException("The value " + value + " of " + key + " in jacoco.properties is "
+                        + (key.startsWith(MINIMUM)
+                                ? "no covered ratio, expected a number from 0 to 1, such as 0.8"
+                                : "no count of missed items, expected a whole number of at least 0"));
+            }
+            validated.put(key, value.trim());
+        });
+        return new JaCoCoModule(dependencies, pinning, tool, classes, validated, terms);
     }
 
     public JaCoCoModule printing(BiConsumer<Boolean, String> printing) {
-        return new JaCoCoModule(dependencies, pinning, tool, classes, terms.printing(printing));
+        return new JaCoCoModule(dependencies, pinning, tool, classes, limits, terms.printing(printing));
     }
 
     @Override
@@ -86,7 +124,7 @@ public class JaCoCoModule implements BuildExecutorModule {
         SequencedSet<String> reportInputs = new LinkedHashSet<>();
         reportInputs.add(DEPENDENCIES);
         reportInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(REPORT, new Report(terms, tool, classes), reportInputs);
+        buildExecutor.addStep(REPORT, new Report(terms, tool, classes, new LinkedHashMap<>(limits)), reportInputs);
     }
 
     private record Requires(String tool) implements BuildStep {
@@ -112,11 +150,66 @@ public class JaCoCoModule implements BuildExecutorModule {
 
         private final String tool;
         private final boolean classes;
+        private final LinkedHashMap<String, String> limits;
 
-        private Report(ProcessBuildStep.Terms terms, String tool, boolean classes) {
+        private Report(ProcessBuildStep.Terms terms, String tool, boolean classes, LinkedHashMap<String, String> limits) {
             super("jacoco", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.classes = classes;
+            this.limits = limits;
+        }
+
+        @Override
+        public boolean acceptableExitCode(int code,
+                                          Executor executor,
+                                          BuildStepContext context,
+                                          SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            if (code != 0 || limits.isEmpty()) {
+                return code == 0;
+            }
+            Map<String, long[]> totals = new HashMap<>();
+            Path xml = context.next().resolve(BuildStep.REPORTS + "jacoco").resolve("jacoco.xml");
+            if (!parsed(xml, new DefaultHandler() {
+
+                private int depth;
+
+                @Override
+                public void startElement(String uri, String localName, String qName, org.xml.sax.Attributes attributes) {
+                    if (++depth == 2 && qName.equals("counter")) {
+                        totals.put(attributes.getValue("type").toLowerCase(Locale.ROOT), new long[]{
+                                Long.parseLong(attributes.getValue("missed")),
+                                Long.parseLong(attributes.getValue("covered"))});
+                    }
+                }
+
+                @Override
+                public void endElement(String uri, String localName, String qName) {
+                    depth--;
+                }
+            })) {
+                throw new IllegalStateException("The JaCoCo report " + xml + " is not well-formed XML, so the limits of"
+                        + " jacoco.properties cannot be checked");
+            }
+            List<String> violations = new ArrayList<>();
+            limits.forEach((key, value) -> {
+                boolean minimum = key.startsWith(MINIMUM);
+                long[] total = totals.getOrDefault(key.substring(minimum ? MINIMUM.length() : MAXIMUM_MISSED.length()),
+                        new long[2]);
+                if (minimum && total[0] + total[1] > 0) {
+                    double ratio = (double) total[1] / (total[0] + total[1]);
+                    if (ratio < Double.parseDouble(value)) {
+                        violations.add(key + "=" + value + " is not met: " + total[1] + " of " + (total[0] + total[1])
+                                + " covered, a ratio of " + String.format(Locale.ROOT, "%.4f", ratio));
+                    }
+                } else if (!minimum && total[0] > Long.parseLong(value)) {
+                    violations.add(key + "=" + value + " is not met: " + total[0] + " missed");
+                }
+            });
+            if (!violations.isEmpty()) {
+                throw new IllegalStateException("The test coverage falls short of jacoco.properties, whose report is "
+                        + xml.getParent().resolve("index.html") + ":\n  " + String.join("\n  ", violations));
+            }
+            return true;
         }
 
         @Override

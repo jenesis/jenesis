@@ -327,8 +327,11 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         }
         SequencedMap<String, BuildExecutorModule> reports = new LinkedHashMap<>();
         List<ObservabilityEngine> engines = new ArrayList<>();
-        if (jacoco != null && BuildStep.locate(configuration, "jacoco.properties") != null) {
-            BuildExecutorModule report = jacoco.apply(jacocoModule.pinning(pinning));
+        Path coverage = BuildStep.locate(configuration, "jacoco.properties");
+        if (jacoco != null && coverage != null) {
+            SequencedMap<String, String> limits = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(coverage).forEachProperty(limits::put);
+            BuildExecutorModule report = jacoco.apply(jacocoModule.pinning(pinning).limits(limits));
             if (report != null) {
                 JaCoCo engine = new JaCoCo();
                 engines.add(engine);
