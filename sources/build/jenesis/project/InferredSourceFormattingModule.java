@@ -76,7 +76,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 KtlintFormatModule.ofEnvironment(environment, repositories, resolvers),
                 KtfmtFormatModule.ofEnvironment(environment, repositories, resolvers),
                 ScalafmtFormatModule.ofEnvironment(environment, repositories, resolvers),
-                LicenseHeaderModule.ofEnvironment(environment),
+                new LicenseHeaderModule(),
                 value -> value,
                 value -> value,
                 value -> value,
