@@ -13,12 +13,14 @@ import build.jenesis.step.Bind;
 
 public class InferredByteCodeQualityModule implements BuildExecutorModule {
 
-    public static final String SPOTBUGS = "spotbugs";
+    public static final String SPOTBUGS = "spotbugs", FORBIDDENAPIS = "forbiddenapis";
 
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
     private final SpotBugsModule spotbugsModule;
     private final Function<SpotBugsModule, BuildExecutorModule> spotbugs;
+    private final ForbiddenApisModule forbiddenapisModule;
+    private final Function<ForbiddenApisModule, BuildExecutorModule> forbiddenapis;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredByteCodeQualityModule(SequencedSet<Path> configuration,
@@ -27,6 +29,8 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
         this(configuration,
                 null,
                 new SpotBugsModule(repositories, resolvers),
+                value -> value,
+                new ForbiddenApisModule(repositories, resolvers),
                 value -> value,
                 Collections.emptyNavigableMap());
     }
@@ -39,9 +43,14 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 null,
                 SpotBugsModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
+                ForbiddenApisModule.ofEnvironment(environment, repositories, resolvers),
+                value -> value,
                 Collections.emptyNavigableMap());
         if (Enforcement.ofEnvironment(environment, "validator.spotbugs") == Enforcement.IGNORE) {
             module = module.spotbugs(null);
+        }
+        if (Enforcement.ofEnvironment(environment, "validator.forbiddenapis") == Enforcement.IGNORE) {
+            module = module.forbiddenapis(null);
         }
         return module;
     }
@@ -50,11 +59,15 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                                           Pinning pinning,
                                           SpotBugsModule spotbugsModule,
                                           Function<SpotBugsModule, BuildExecutorModule> spotbugs,
+                                          ForbiddenApisModule forbiddenapisModule,
+                                          Function<ForbiddenApisModule, BuildExecutorModule> forbiddenapis,
                                           SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
         this.pinning = pinning;
         this.spotbugsModule = spotbugsModule;
         this.spotbugs = spotbugs;
+        this.forbiddenapisModule = forbiddenapisModule;
+        this.forbiddenapis = forbiddenapis;
         this.custom = custom;
     }
 
@@ -63,6 +76,8 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 pinning,
                 spotbugsModule,
                 spotbugs,
+                forbiddenapisModule,
+                forbiddenapis,
                 custom);
     }
 
@@ -71,6 +86,18 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 pinning,
                 spotbugsModule,
                 spotbugs,
+                forbiddenapisModule,
+                forbiddenapis,
+                custom);
+    }
+
+    public InferredByteCodeQualityModule forbiddenapis(Function<ForbiddenApisModule, BuildExecutorModule> forbiddenapis) {
+        return new InferredByteCodeQualityModule(configuration,
+                pinning,
+                spotbugsModule,
+                spotbugs,
+                forbiddenapisModule,
+                forbiddenapis,
                 custom);
     }
 
@@ -79,6 +106,8 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 pinning,
                 spotbugsModule,
                 spotbugs,
+                forbiddenapisModule,
+                forbiddenapis,
                 custom);
     }
 
@@ -97,13 +126,21 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
     }
 
     @Override
-    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
+    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
         Bind.configured(buildExecutor,
                 inherited.sequencedKeySet(),
                 SPOTBUGS,
                 spotbugs,
                 SpotBugsModule.configurationFile(configuration),
                 () -> spotbugsModule.pinning(pinning));
+        Path forbiddenapisFile = ForbiddenApisModule.configurationFile(configuration);
+        Bind.configured(buildExecutor,
+                inherited.sequencedKeySet(),
+                FORBIDDENAPIS,
+                forbiddenapis,
+                forbiddenapisFile,
+                forbiddenapis == null ? Collections.emptyNavigableSet() : ForbiddenApisModule.siblings(forbiddenapisFile),
+                () -> forbiddenapisModule.pinning(pinning));
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
                     nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());

@@ -82,7 +82,7 @@ Quick index
 | 31 | [`sbom`](demo-31-sbom/README.md)                                  | The CycloneDX bill of materials every build emits                            | `java build/jenesis/Make.java`    |
 | 32 | [`compliance`](demo-32-compliance/README.md)                      | Fail the build on a dependency license the policy denies                     | `java build/Demo.java`            |
 | 33 | [`vulnerabilities`](demo-33-vulnerabilities/README.md)            | Fail the build on a known vulnerability, queried from OSV                    | `java build/Demo.java`            |
-| 34 | [`java-quality`](demo-34-java-quality/README.md)                  | Checkstyle, PMD, SpotBugs, formatters and license headers, by config file    | `java build/jenesis/Make.java`    |
+| 34 | [`java-quality`](demo-34-java-quality/README.md)                  | Checkstyle, PMD, SpotBugs, forbiddenapis, formatters and license headers     | `java build/jenesis/Make.java`    |
 | 35 | [`test-framework`](demo-35-test-framework/README.md)              | Run tests whose module names no engine, inferred or declared                 | `java build/jenesis/Make.java`    |
 | 36 | [`code-coverage`](demo-36-code-coverage/README.md)                | Record coverage with JaCoCo and render a report                              | `java build/jenesis/Make.java`    |
 | 37 | [`test-selection`](demo-37-test-selection/README.md)              | Re-run only the tests a change can reach                                     | `java build/Demo.java`            |
@@ -613,6 +613,7 @@ reaches OSV unless you ask it to.
 `java-quality` turns a set of tools on without a build script: each runs because
 its configuration file is there. A `checkstyle.xml` and a `pmd.xml` lint the
 sources, a `spotbugs-exclude.xml` brings in SpotBugs over the compiled classes,
+a `forbiddenapis.properties` checks them for calls the project forbids,
 a `javaformat.properties` selects `google-java-format` with its options, and a
 `licenseheader.properties` holds the header every source must start with. Each tool
 resolves in a group of its own, so its dependencies never mix with yours; its

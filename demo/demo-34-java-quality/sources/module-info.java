@@ -65,6 +65,7 @@
  * @jenesis.pin eclipse-java-format/maven/org.eclipse.platform/org.eclipse.text 3.14.800 SHA-256/14814c1f1a737fde0a2d56c47a2f02cf4c8c5dee748756c4763e674cae214250
  * @jenesis.pin eclipse-java-format/maven/org.osgi/org.osgi.service.prefs 1.1.2 SHA-256/43c7c870710e363405d422da653cce0d798a4537f76e4930f79bceadd3a55345
  * @jenesis.pin eclipse-java-format/maven/org.osgi/osgi.annotation 8.0.1 SHA-256/a0e8a4c362bd3600812f37b0ea45fba966c7bc049d01fed56a09ecc74082759e
+ * @jenesis.pin forbiddenapis/maven/de.thetaphi/forbiddenapis 3.11 SHA-256/2d9243b165c566a5ca140be8dfd11ce7bf4ce00e07ccdc31d2c0719cd061c9c6
  * @jenesis.pin google-java-format/maven/com.google.code.findbugs/jsr305 3.0.2 SHA-256/766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7
  * @jenesis.pin google-java-format/maven/com.google.errorprone/error_prone_annotations 2.21.1 SHA-256/d1f3c66aa91ac52549e00ae3b208ba4b9af7d72d68f230643553beb38e6118ac
  * @jenesis.pin google-java-format/maven/com.google.googlejavaformat/google-java-format 1.35.0 SHA-256/b2a52e363d51dd86b3b38d1a8dd51538541b42ff1048769684681c676550f043

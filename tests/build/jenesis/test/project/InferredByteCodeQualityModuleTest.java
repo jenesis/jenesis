@@ -61,6 +61,40 @@ public class InferredByteCodeQualityModuleTest {
                 .doesNotExist();
     }
 
+    @Test
+    public void wires_forbiddenapis_with_its_signatures_when_its_configuration_is_present() throws IOException {
+        Files.writeString(project.resolve("forbiddenapis.properties"), "bundled=jdk-unsafe\nsignatures=forbidden.txt\n");
+        Files.writeString(project.resolve("forbidden.txt"), "java.util.Vector\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("quality", new InferredByteCodeQualityModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+        executor.execute("quality/forbiddenapis/configuration", "quality/forbiddenapis/tool/required");
+
+        assertThat(root.resolve("quality").resolve("forbiddenapis").resolve("configuration").resolve("output"))
+                .as("the signatures file is handed over beside the configuration")
+                .isDirectoryContaining(path -> path.getFileName().toString().equals("forbidden.txt"))
+                .isDirectoryContaining(path -> path.getFileName().toString().equals("forbiddenapis.properties"));
+        SequencedProperties requires = SequencedProperties.ofFiles(root.resolve("quality").resolve("forbiddenapis")
+                .resolve("tool").resolve("required").resolve("output").resolve(BuildStep.REQUIRES));
+        assertThat(requires.stringPropertyNames())
+                .containsExactly("forbiddenapis/runtime/maven/de.thetaphi/forbiddenapis/RELEASE");
+    }
+
+    @Test
+    public void the_forbiddenapis_override_switches_off_forbiddenapis() throws IOException {
+        Files.writeString(project.resolve("forbiddenapis.properties"), "bundled=jdk-unsafe\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("quality",
+                new InferredByteCodeQualityModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()).forbiddenapis(null),
+                "project");
+        executor.execute();
+
+        assertThat(root.resolve("quality").resolve("forbiddenapis")).doesNotExist();
+    }
+
     private BuildExecutor newExecutor() throws IOException {
         return BuildExecutor.of(root,
                 Duration.ZERO,
