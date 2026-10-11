@@ -225,7 +225,7 @@ starts every source with
 
 A project that declares no license, or several, or one without a known SPDX
 identifier fails the build, naming what it found; `spdx.properties` maps a license
-name or URL to its identifier with `alias/<name or url>=<id>`.
+name or URL to its identifier with `alias/<license name>=<id>`.
 
 Every Java source, `module-info.java` and `package-info.java` included, and
 every Kotlin, Scala and Groovy source must start with it as a block comment, or
