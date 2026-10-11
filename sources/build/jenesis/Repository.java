@@ -27,6 +27,16 @@ public interface Repository {
         return cached(folder, true);
     }
 
+    default Repository observed(Observer observer) {
+        return (executor, coordinate, extension) -> {
+            Optional<RepositoryItem> candidate = fetch(executor, coordinate, extension);
+            if (candidate.isPresent()) {
+                observer.fetched(coordinate, extension, candidate.get());
+            }
+            return candidate;
+        };
+    }
+
     default Repository spilled(Path folder) {
         return (executor, coordinate, extension) -> {
             Optional<RepositoryItem> candidate = fetch(executor, coordinate, extension);
@@ -294,6 +304,12 @@ public interface Repository {
             List<String> provided = environment.entries("make.provided");
             return provided != null && provided.contains(key) ? PROJECT : USER;
         }
+    }
+
+    @FunctionalInterface
+    interface Observer {
+
+        void fetched(String coordinate, String extension, RepositoryItem item) throws IOException;
     }
 
     record Credential(String token, Origin origin) {
