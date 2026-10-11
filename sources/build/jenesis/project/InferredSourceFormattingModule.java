@@ -313,12 +313,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
         SequencedSet<String> inputs = new LinkedHashSet<>(inherited.sequencedKeySet());
-        if (Bind.configured(buildExecutor,
+        if (Bind.configuredByProperties(buildExecutor,
                 inherited.sequencedKeySet(),
                 LICENSE,
                 license,
                 LicenseHeaderModule.configurationFile(configuration),
-                () -> licenseModule.verify(verify))) {
+                properties -> licenseModule.verify(verify).configuration(properties))) {
             inputs.add(LICENSE);
         }
         Path javaFormat = BuildStep.locate(configuration, "javaformat.properties");

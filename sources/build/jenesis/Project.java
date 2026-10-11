@@ -1507,12 +1507,12 @@ public record Project(
                           false -> imports=sort; maxWidth and the indents have no counterpart, as
                           ktfmt's command line takes none
                       Spotless licenseHeader(), licenseHeaderFile() / the same,
-                          license-maven-plugin (com.mycila) check and format -> license-header.txt
-                          (34), the header as text, which every Java, Kotlin, Scala and Groovy
-                          source starts with as a block comment, or as written where the file is a
-                          comment already, as Spotless's file is; the header is matched and
-                          written exactly as it stands, so Spotless's $YEAR and mycila's ${...}
-                          properties are written out, a year included
+                          license-maven-plugin (com.mycila) check and format
+                          -> licenseheader.properties (34), text=<the header>, which every Java,
+                          Kotlin, Scala and Groovy source starts with as a block comment, or as
+                          written where the text is a comment already, as Spotless's file is; the
+                          header is matched and written exactly as it stands, so Spotless's $YEAR
+                          and mycila's ${...} properties are written out, a year included
                       detekt, ktlint / the same -> detekt.yml, .editorconfig (42)
                       scalastyle, scalafmt / the same -> scalastyle-config.xml, .scalafmt.conf (45)
                       codenarc / codenarc -> codenarc.xml (47)
@@ -2138,9 +2138,9 @@ public record Project(
                       ktfmt.properties          ktfmt formats Kotlin in place of ktlint
                                                 (style=meta|google|kotlinlang,
                                                 imports=sort,remove|sort)
-                      license-header.txt        the license header every source starts with, as a
-                                                block comment, matched and written exactly as
-                                                it stands
+                      licenseheader.properties  text=<the license header every source starts
+                                                with>, as a block comment, matched and written
+                                                exactly as it stands
                       xjc.properties            JAXB: every .xsd compiled, every .xjb a binding; the
                                                 generated package is compiled into the module
                                                 (folders, package, catalog, arguments)
@@ -4276,7 +4276,7 @@ public record Project(
                 format.ktlint|true|ktlint formatting, activated by an .editorconfig
                 format.ktfmt|true|ktfmt formatting, activated by a ktfmt.properties, which names its style and what it does to the imports; refused beside ktlint formatting the same sources
                 format.scalafmt|true|scalafmt formatting
-                format.license|true|The license header check, activated by a license-header.txt, which every Java, Kotlin, Scala and Groovy source of a module must start with as a block comment, exactly as it stands
+                format.license|true|The license header check, activated by a licenseheader.properties, whose text every Java, Kotlin, Scala and Groovy source of a module must start with as a block comment, exactly as it stands
                 format.rewrite|false|Let the formatters rewrite sources instead of verifying them
                 generate.xjc|true|JAXB generation, activated by an xjc.properties
                 generate.protoc|true|protoc generation, activated by a protoc.properties

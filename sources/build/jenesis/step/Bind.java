@@ -125,7 +125,7 @@ public class Bind implements BuildStep {
         return true;
     }
 
-    public static <M extends BuildExecutorModule> void configuredByProperties(BuildExecutor buildExecutor,
+    public static <M extends BuildExecutorModule> boolean configuredByProperties(BuildExecutor buildExecutor,
                                                                               SequencedSet<String> inputs,
                                                                               String name,
                                                                               Function<M, BuildExecutorModule> configurator,
@@ -133,16 +133,18 @@ public class Bind implements BuildStep {
                                                                               Function<SequencedProperties, M> module)
             throws IOException {
         if (configurator == null || configurationProperties == null || !Files.isRegularFile(configurationProperties)) {
-            return;
+            return false;
         }
         M candidate = module.apply(SequencedProperties.ofFiles(configurationProperties));
         if (candidate == null) {
-            return;
+            return false;
         }
         BuildExecutorModule configured = configurator.apply(candidate);
-        if (configured != null) {
-            buildExecutor.addModule(name, configured, inputs);
+        if (configured == null) {
+            return false;
         }
+        buildExecutor.addModule(name, configured, inputs);
+        return true;
     }
 
     @Override

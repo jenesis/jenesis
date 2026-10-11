@@ -614,7 +614,7 @@ reaches OSV unless you ask it to.
 its configuration file is there. A `checkstyle.xml` and a `pmd.xml` lint the
 sources, a `spotbugs-exclude.xml` brings in SpotBugs over the compiled classes,
 a `javaformat.properties` selects `google-java-format` with its options, and a
-`license-header.txt` holds the header every source must start with. Each tool
+`licenseheader.properties` holds the header every source must start with. Each tool
 resolves in a group of its own, so its dependencies never mix with yours; its
 `eclipse` profile formats with the Eclipse formatter and an exported profile
 instead.

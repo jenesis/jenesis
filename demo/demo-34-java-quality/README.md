@@ -39,7 +39,7 @@ The configuration files sit in the *configuration directory*, which defaults to
     |-- pmd.xml                    activates PMD (lints sources)
     |-- spotbugs-exclude.xml       activates SpotBugs (analyses classes)
     |-- javaformat.properties      selects the Java formatter (google) and its options
-    |-- license-header.txt         the license header every source starts with
+    |-- licenseheader.properties   the license header every source starts with
     |-- eclipse/
     |   |-- javaformat.properties  selects the Eclipse formatter, under a profile
     |   `-- eclipse-formatter.xml  the formatter profile Eclipse exports
@@ -195,11 +195,14 @@ again.
 License headers
 ---------------
 
-A `license-header.txt` holds the header every source starts with, as text:
+A `licenseheader.properties` holds the header every source starts with, as the
+text of its `text` key, `\n` separating the lines and a trailing `\` continuing
+the value on the next line:
 
-    Copyright 2026 the Jenesis demo authors.
+    text=Copyright 2026 the Jenesis demo authors.\n\n\
+      Licensed under the Apache License, Version 2.0.
 
-    Licensed under the Apache License, Version 2.0.
+The file takes no other key.
 
 Every Java source, `module-info.java` and `package-info.java` included, and
 every Kotlin, Scala and Groovy source must start with it as a block comment, or

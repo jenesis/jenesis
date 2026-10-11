@@ -7,36 +7,62 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.SequencedProperties;
 
 public class LicenseHeaderModule implements BuildExecutorModule {
 
-    public static final String FORMAT = "format", HEADER = "license-header.txt";
+    public static final String FORMAT = "format", CONFIGURATION = "licenseheader.properties", TEXT = "text";
     private static final Set<String> EXTENSIONS = Set.of(".java", ".kt", ".scala", ".groovy");
 
     private final boolean verify;
+    private final String text;
 
     public LicenseHeaderModule() {
-        this(false);
+        this(false, null);
     }
 
-    private LicenseHeaderModule(boolean verify) {
+    private LicenseHeaderModule(boolean verify, String text) {
         this.verify = verify;
+        this.text = text;
     }
 
     public static Path configurationFile(SequencedSet<Path> configuration) {
-        return BuildStep.locate(configuration, HEADER);
+        return BuildStep.locate(configuration, CONFIGURATION);
     }
 
     public LicenseHeaderModule verify(boolean verify) {
-        return new LicenseHeaderModule(verify);
+        return new LicenseHeaderModule(verify, text);
+    }
+
+    public LicenseHeaderModule text(String text) {
+        return new LicenseHeaderModule(verify, text);
+    }
+
+    public LicenseHeaderModule configuration(SequencedProperties configuration) {
+        for (String key : configuration.stringPropertyNames()) {
+            if (!key.equals(TEXT)) {
+                throw new IllegalArgumentException(CONFIGURATION + " names " + key + ", but takes " + TEXT
+                        + "=<the header> alone");
+            }
+        }
+        String header = configuration.value(TEXT);
+        if (header == null) {
+            throw new IllegalArgumentException(CONFIGURATION + " names no header - set " + TEXT
+                    + "=<the header>, with \\n between its lines");
+        }
+        return text(header);
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        buildExecutor.addStep(FORMAT, new Header(verify), inherited.sequencedKeySet());
+        if (text == null) {
+            throw new IllegalStateException("The license header module is given no header - set " + TEXT + "= in "
+                    + CONFIGURATION);
+        }
+        buildExecutor.addStep(FORMAT, new Header(verify, text), inherited.sequencedKeySet());
     }
 
-    private record Header(boolean verify) implements BuildStep {
+    private record Header(boolean verify, String text) implements BuildStep {
 
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
@@ -48,15 +74,10 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            String template = null;
             SequencedMap<Path, Path> sources = new TreeMap<>();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
-                }
-                Path candidate = argument.folder().resolve(HEADER);
-                if (Files.isRegularFile(candidate)) {
-                    template = Files.readString(candidate);
                 }
                 Path folder = argument.folder().resolve(BuildStep.SOURCES);
                 if (Files.isDirectory(folder)) {
@@ -67,10 +88,7 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                     }
                 }
             }
-            if (template == null) {
-                throw new IllegalStateException("No " + HEADER + " among the inputs of the license header step");
-            }
-            String header = template.replace("\r\n", "\n").stripTrailing().replaceFirst("^\n+", "");
+            String header = text.replace("\r\n", "\n").stripTrailing().replaceFirst("^\n+", "");
             if (!header.startsWith("/*") && !header.startsWith("//")) {
                 header = header.lines()
                         .map(line -> (" * " + line).stripTrailing())
@@ -117,7 +135,7 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                         : formatted);
             }
             if (!deviations.isEmpty()) {
-                throw new IllegalStateException("Not every source starts with the license header of " + HEADER
+                throw new IllegalStateException("Not every source starts with the license header of " + CONFIGURATION
                         + " - run with -Djenesis.format.rewrite=true to write it:\n"
                         + deviations.entrySet().stream()
                                 .map(entry -> "  " + entry.getKey() + ": " + entry.getValue())
