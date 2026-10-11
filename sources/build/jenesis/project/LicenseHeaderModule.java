@@ -10,9 +10,7 @@ import build.jenesis.BuildStepResult;
 
 public class LicenseHeaderModule implements BuildExecutorModule {
 
-    public static final String FORMAT = "format", HEADER = "license-header.txt", YEAR = "$YEAR";
-    private static final String YEARS = "[0-9]{4}(?:\\s*-\\s*[0-9]{4})?";
-    private static final Pattern PLACEHOLDER = Pattern.compile(YEARS);
+    public static final String FORMAT = "format", HEADER = "license-header.txt";
     private static final Set<String> EXTENSIONS = Set.of(".java", ".kt", ".scala", ".groovy");
 
     private final boolean verify;
@@ -78,9 +76,6 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                         .map(line -> (" * " + line).stripTrailing())
                         .collect(Collectors.joining("\n", "/*\n", "\n */"));
             }
-            Pattern expected = Pattern.compile(Arrays.stream(header.split(Pattern.quote(YEAR), -1))
-                    .map(Pattern::quote)
-                    .collect(Collectors.joining(YEARS)));
             SequencedMap<Path, String> deviations = new LinkedHashMap<>();
             for (Map.Entry<Path, Path> source : sources.entrySet()) {
                 String content = Files.readString(source.getValue());
@@ -105,7 +100,7 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                     }
                 }
                 String comment = end < 0 ? null : text.substring(start, end);
-                if (comment != null && expected.matcher(comment).matches()) {
+                if (header.equals(comment)) {
                     continue;
                 }
                 String lower = comment == null ? "" : comment.toLowerCase(Locale.ROOT);
@@ -114,20 +109,9 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                     deviations.put(source.getKey(), replaced ? "a different license header" : "no license header");
                     continue;
                 }
-                String rendered = header;
-                if (header.contains(YEAR)) {
-                    Matcher years = PLACEHOLDER.matcher(replaced ? comment : "");
-                    if (!years.find()) {
-                        throw new IllegalStateException(source.getKey() + " needs the license header written, but"
-                                + " names no year for its " + YEAR + ", and the build writes no year of its own, so"
-                                + " that a rewrite is reproducible - write the year into " + HEADER + ", or the header"
-                                + " into this source");
-                    }
-                    rendered = header.replace(YEAR, years.group());
-                }
                 String formatted = replaced
-                        ? text.substring(0, start) + rendered + text.substring(end)
-                        : rendered + "\n\n" + text.substring(start);
+                        ? text.substring(0, start) + header + text.substring(end)
+                        : header + "\n\n" + text.substring(start);
                 Files.writeString(source.getValue(), content.contains("\r\n")
                         ? formatted.replace("\n", "\r\n")
                         : formatted);

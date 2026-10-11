@@ -105,7 +105,7 @@ public class InferredSourceFormattingModuleTest {
 
     @Test
     public void checks_the_license_header_when_license_header_txt_is_present() throws IOException {
-        Files.writeString(project.resolve("license-header.txt"), "Copyright $YEAR the authors.\n");
+        Files.writeString(project.resolve("license-header.txt"), "Copyright 2026 the authors.\n");
         Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(project.resolve(BuildStep.SOURCES + "sample").resolve("Sample.java"), "package sample; class Sample {}");
 
@@ -121,7 +121,7 @@ public class InferredSourceFormattingModuleTest {
 
     @Test
     public void the_license_override_switches_off_the_header_check() throws IOException {
-        Files.writeString(project.resolve("license-header.txt"), "Copyright $YEAR the authors.\n");
+        Files.writeString(project.resolve("license-header.txt"), "Copyright 2026 the authors.\n");
         Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(project.resolve(BuildStep.SOURCES + "sample").resolve("Sample.java"), "package sample; class Sample {}");
 
