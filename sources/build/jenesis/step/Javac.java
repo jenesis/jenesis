@@ -15,7 +15,6 @@ import java.util.jar.Attributes;
 
 public class Javac extends ProcessBuildStep {
 
-    public static final String GENERATED = "generated/";
     private static final Pattern VERSIONED = Pattern.compile("META-INF/versions/(\\d+)/.+");
     private static final Set<String> SYSTEM_MODULE_OPTIONS = Set.of("--add-exports", "--add-reads", "--patch-module");
     private static final Set<String> SOURCE_OPTIONS = Set.of("--source", "-source");
@@ -197,7 +196,7 @@ public class Javac extends ProcessBuildStep {
             }
         }
         Path target = Files.createDirectory(context.next().resolve(CLASSES)),
-                generated = Files.createDirectory(context.next().resolve(GENERATED));
+                generated = Files.createDirectory(context.next().resolve(SOURCES));
         List<String> files = new ArrayList<>(),
                 path = new ArrayList<>(),
                 processorPath = new ArrayList<>(),
@@ -529,7 +528,7 @@ public class Javac extends ProcessBuildStep {
         Path target = Files.createDirectories(context.next()
                 .resolve(CLASSES + "META-INF/versions/" + release)),
                 generated = Files.createDirectories(context.next()
-                        .resolve(GENERATED + "META-INF/versions/" + release));
+                        .resolve(SOURCES + "META-INF/versions/" + release));
         List<String> commands = new ArrayList<>(prepended),
                 options = new ArrayList<>(List.of("-d", target.toString(), "-s", generated.toString()));
         commands.addAll(sourceAndTarget

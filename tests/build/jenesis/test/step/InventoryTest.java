@@ -120,36 +120,33 @@ public class InventoryTest {
     }
 
     @Test
-    public void records_the_sources_a_generator_or_an_annotation_processor_wrote() throws IOException {
+    public void records_the_sources_a_generator_or_an_annotation_processor_wrote_apart_from_a_sources_archive() throws IOException {
         Path manifests = Files.createDirectory(root.resolve("manifests"));
         SequencedProperties module = new SequencedProperties();
         module.setProperty("path", "foo");
         module.store(manifests.resolve(BuildStep.MODULE));
         Path generator = Files.createDirectory(root.resolve("generator"));
         Files.writeString(Files.createDirectories(generator.resolve("sources/demo")).resolve("Parser.java"), "");
-        Path javac = Files.createDirectory(root.resolve("javac"));
-        Files.createDirectories(javac.resolve("classes/demo"));
-        Files.writeString(Files.createDirectories(javac.resolve("generated/demo")).resolve("Mapper.java"), "");
+        Path processor = Files.createDirectory(root.resolve("processor"));
+        Files.writeString(Files.createDirectories(processor.resolve("sources")).resolve("Mapper.java"), "");
         Path idle = Files.createDirectory(root.resolve("idle"));
-        Files.createDirectories(idle.resolve("classes"));
-        Files.createDirectories(idle.resolve("generated"));
-        Path raw = Files.createDirectory(root.resolve("raw"));
-        Files.writeString(Files.createDirectories(raw.resolve("generated")).resolve("README.md"), "");
+        Files.createDirectories(idle.resolve("sources"));
         Path archive = Files.createDirectory(root.resolve("archive"));
-        Files.writeString(Files.createDirectories(archive.resolve("sources")).resolve("foo-sources.jar"), "src");
+        Path jar = Files.writeString(Files.createDirectories(archive.resolve("sources")).resolve("foo-sources.jar"), "src");
 
         run(args("manifests", manifests,
                 "generator", generator,
-                "javac", javac,
+                "processor", processor,
                 "idle", idle,
-                "raw", raw,
                 "archive", archive));
 
         SequencedProperties inventory = read(next.resolve(Inventory.INVENTORY));
         assertThat(Inventory.paths(inventory, next, "module-foo.generated"))
-                .as("a sources folder holding no archive, and what javac generated beside the classes it compiled,"
-                        + " are generated sources; an empty folder, a generator's raw output and a sources jar are not")
-                .containsExactly(generator.resolve("sources"), javac.resolve("generated"));
+                .as("a sources folder holding anything but an archive is a source tree; an empty one is none")
+                .containsExactly(generator.resolve("sources"), processor.resolve("sources"));
+        assertThat(Inventory.paths(inventory, next, "module-foo.sources"))
+                .as("a source file at the root of a sources folder is no sources archive")
+                .containsExactly(jar);
     }
 
     @Test
