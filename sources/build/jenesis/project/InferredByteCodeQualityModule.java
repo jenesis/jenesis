@@ -13,7 +13,8 @@ import build.jenesis.step.Bind;
 
 public class InferredByteCodeQualityModule implements BuildExecutorModule {
 
-    public static final String SPOTBUGS = "spotbugs", FORBIDDENAPIS = "forbiddenapis";
+    public static final String SPOTBUGS = "spotbugs", FORBIDDENAPIS = "forbiddenapis", JDEPS = "jdeps",
+            JDEPRSCAN = "jdeprscan";
 
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
@@ -21,6 +22,10 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
     private final Function<SpotBugsModule, BuildExecutorModule> spotbugs;
     private final ForbiddenApisModule forbiddenapisModule;
     private final Function<ForbiddenApisModule, BuildExecutorModule> forbiddenapis;
+    private final JDepsModule jdepsModule;
+    private final Function<JDepsModule, BuildExecutorModule> jdeps;
+    private final JDeprScanModule jdeprscanModule;
+    private final Function<JDeprScanModule, BuildExecutorModule> jdeprscan;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredByteCodeQualityModule(SequencedSet<Path> configuration,
@@ -31,6 +36,10 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 new SpotBugsModule(repositories, resolvers),
                 value -> value,
                 new ForbiddenApisModule(repositories, resolvers),
+                value -> value,
+                new JDepsModule(),
+                value -> value,
+                new JDeprScanModule(),
                 value -> value,
                 Collections.emptyNavigableMap());
     }
@@ -45,12 +54,22 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 value -> value,
                 ForbiddenApisModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
+                JDepsModule.ofEnvironment(environment),
+                value -> value,
+                JDeprScanModule.ofEnvironment(environment),
+                value -> value,
                 Collections.emptyNavigableMap());
         if (Enforcement.ofEnvironment(environment, "validator.spotbugs") == Enforcement.IGNORE) {
             module = module.spotbugs(null);
         }
         if (Enforcement.ofEnvironment(environment, "validator.forbiddenapis") == Enforcement.IGNORE) {
             module = module.forbiddenapis(null);
+        }
+        if (Enforcement.ofEnvironment(environment, "validator.jdeps") == Enforcement.IGNORE) {
+            module = module.jdeps(null);
+        }
+        if (Enforcement.ofEnvironment(environment, "validator.jdeprscan") == Enforcement.IGNORE) {
+            module = module.jdeprscan(null);
         }
         return module;
     }
@@ -61,6 +80,10 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                                           Function<SpotBugsModule, BuildExecutorModule> spotbugs,
                                           ForbiddenApisModule forbiddenapisModule,
                                           Function<ForbiddenApisModule, BuildExecutorModule> forbiddenapis,
+                                          JDepsModule jdepsModule,
+                                          Function<JDepsModule, BuildExecutorModule> jdeps,
+                                          JDeprScanModule jdeprscanModule,
+                                          Function<JDeprScanModule, BuildExecutorModule> jdeprscan,
                                           SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
         this.pinning = pinning;
@@ -68,6 +91,10 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
         this.spotbugs = spotbugs;
         this.forbiddenapisModule = forbiddenapisModule;
         this.forbiddenapis = forbiddenapis;
+        this.jdepsModule = jdepsModule;
+        this.jdeps = jdeps;
+        this.jdeprscanModule = jdeprscanModule;
+        this.jdeprscan = jdeprscan;
         this.custom = custom;
     }
 
@@ -78,6 +105,10 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 spotbugs,
                 forbiddenapisModule,
                 forbiddenapis,
+                jdepsModule,
+                jdeps,
+                jdeprscanModule,
+                jdeprscan,
                 custom);
     }
 
@@ -88,6 +119,10 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 spotbugs,
                 forbiddenapisModule,
                 forbiddenapis,
+                jdepsModule,
+                jdeps,
+                jdeprscanModule,
+                jdeprscan,
                 custom);
     }
 
@@ -98,6 +133,38 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 spotbugs,
                 forbiddenapisModule,
                 forbiddenapis,
+                jdepsModule,
+                jdeps,
+                jdeprscanModule,
+                jdeprscan,
+                custom);
+    }
+
+    public InferredByteCodeQualityModule jdeps(Function<JDepsModule, BuildExecutorModule> jdeps) {
+        return new InferredByteCodeQualityModule(configuration,
+                pinning,
+                spotbugsModule,
+                spotbugs,
+                forbiddenapisModule,
+                forbiddenapis,
+                jdepsModule,
+                jdeps,
+                jdeprscanModule,
+                jdeprscan,
+                custom);
+    }
+
+    public InferredByteCodeQualityModule jdeprscan(Function<JDeprScanModule, BuildExecutorModule> jdeprscan) {
+        return new InferredByteCodeQualityModule(configuration,
+                pinning,
+                spotbugsModule,
+                spotbugs,
+                forbiddenapisModule,
+                forbiddenapis,
+                jdepsModule,
+                jdeps,
+                jdeprscanModule,
+                jdeprscan,
                 custom);
     }
 
@@ -108,6 +175,10 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 spotbugs,
                 forbiddenapisModule,
                 forbiddenapis,
+                jdepsModule,
+                jdeps,
+                jdeprscanModule,
+                jdeprscan,
                 custom);
     }
 
@@ -141,6 +212,18 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 forbiddenapisFile,
                 forbiddenapis == null ? Collections.emptyNavigableSet() : ForbiddenApisModule.siblings(forbiddenapisFile),
                 () -> forbiddenapisModule.pinning(pinning));
+        Bind.configured(buildExecutor,
+                inherited.sequencedKeySet(),
+                JDEPS,
+                jdeps,
+                JDepsModule.configurationFile(configuration),
+                () -> jdepsModule);
+        Bind.configured(buildExecutor,
+                inherited.sequencedKeySet(),
+                JDEPRSCAN,
+                jdeprscan,
+                JDeprScanModule.configurationFile(configuration),
+                () -> jdeprscanModule);
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
                     nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());

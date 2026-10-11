@@ -38,13 +38,13 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
     enum Factory {
         TOOL {
             @Override
-            Function<List<String>, ? extends ProcessHandler> apply(String tool, String fork) {
+            public Function<List<String>, ? extends ProcessHandler> apply(String tool, String fork) {
                 return ProcessHandler.OfTool.of(tool);
             }
         },
         FORK {
             @Override
-            Function<List<String>, ? extends ProcessHandler> apply(String tool, String fork) {
+            public Function<List<String>, ? extends ProcessHandler> apply(String tool, String fork) {
                 return ProcessHandler.OfProcess.ofJavaHome(fork);
             }
         };
@@ -69,7 +69,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             };
         }
 
-        abstract Function<List<String>, ? extends ProcessHandler> apply(String tool, String fork);
+        public abstract Function<List<String>, ? extends ProcessHandler> apply(String tool, String fork);
     }
 
     final class OfTool implements ProcessHandler {

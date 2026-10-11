@@ -1492,6 +1492,16 @@ public record Project(
                           signaturesWithSeverityWarn -> warn; failOnMissingClasses=false ->
                           allowmissingclasses; ignoreSignaturesOfMissingClasses ->
                           ignoresignaturesofmissingclasses
+                      maven-jdeps-plugin jdkinternals and test-jdkinternals
+                          -> jdeps.properties (34), the JDK's jdeps --jdk-internals over main and
+                          test classes; accept=<internal classes or packages used on purpose>;
+                          failOnWarning, true by default there -> jenesis.validator.jdeps=strict
+                      maven-jdeprscan-plugin forRemoval, release
+                          -> jdeprscan.properties (34), the JDK's jdeprscan --for-removal;
+                          removal=false reports every deprecated API, release=<n> checks the
+                          deprecations of that Java release. Both run the build JDK's tool, so a
+                          build on a newer JDK (jenesis.toolchain.version) finds what that JDK
+                          encapsulated or scheduled for removal
                       fmt-maven-plugin, Spotless googleJavaFormat() / the same
                           -> javaformat.properties with formatter=google (34), which verifies and
                           fails the build on an unformatted source; -Djenesis.format.rewrite=true
@@ -2153,6 +2163,10 @@ public record Project(
                                                 signatures, suppress, includes, excludes, warn,
                                                 allowmissingclasses,
                                                 ignoresignaturesofmissingclasses)
+                      jdeps.properties          jdeps --jdk-internals over the compiled classes
+                                                (accept)
+                      jdeprscan.properties      jdeprscan --for-removal over the compiled classes
+                                                (removal, release)
                       licenseheader.properties  text=<the license header every source starts
                                                 with>, as a block comment, matched and written
                                                 exactly as it stands; without text, SPDX lines
@@ -2235,9 +2249,9 @@ public record Project(
                     another.
 
                     Linters and the ktlint/scalafmt formatters activate from their own native config
-                    files instead (checkstyle.xml, pmd.xml, spotbugs-exclude.xml, forbiddenapis.properties, .editorconfig,
+                    files instead (checkstyle.xml, pmd.xml, spotbugs-exclude.xml, forbiddenapis.properties, jdeps.properties, .editorconfig,
                     .scalafmt.conf, ...). A linter reports its findings, as its setting
-                    jenesis.source.<tool> (jenesis.validator.<tool> for SpotBugs and forbiddenapis) is report by default;
+                    jenesis.source.<tool> (jenesis.validator.<tool> for SpotBugs, forbiddenapis, jdeps and jdeprscan) is report by default;
                     strict fails the build on them instead, and ignore skips the linter. Whether a
                     [FINDINGS] line with their number and its report is printed is
                     jenesis.print.findings, true by default.
@@ -2501,6 +2515,7 @@ public record Project(
                       binary/transform       classes/ rewritten from what the compilers wrote, the
                                              place of a bytecode enhancer
                       binary/validate        a verdict on the compiled classes, beside SpotBugs
+                                             and jdeps
                       artifact               a step over the jar, beside japicmp
                       observed               a step over the tests' run, beside JaCoCo and PIT
                       package                packages/, staged in stage/packages
@@ -4283,6 +4298,8 @@ public record Project(
                 source.pmd.priority|5|The lowest rule priority PMD runs, from 1, the highest, to 5, the lowest, as maven-pmd-plugin's minimumPriority
                 validator.spotbugs|report|ignore|report|strict: SpotBugs, activated by a spotbugs-exclude.xml; ignore skips it, report records its findings, strict fails the build on any of them
                 validator.forbiddenapis|report|ignore|report|strict: forbiddenapis, activated by a forbiddenapis.properties; ignore skips it, report records its findings, strict fails the build on any of them
+                validator.jdeps|report|ignore|report|strict: jdeps --jdk-internals, activated by a jdeps.properties; ignore skips it, report records the JDK internal APIs the classes use, strict fails the build on any of them
+                validator.jdeprscan|report|ignore|report|strict: jdeprscan, activated by a jdeprscan.properties; ignore skips it, report records the uses of APIs deprecated for removal, strict fails the build on any of them
                 source.detekt|report|ignore|report|strict: detekt, activated by a detekt.yml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
                 source.ktlint|report|ignore|report|strict: ktlint linting, activated by an .editorconfig; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
                 source.scalastyle|report|ignore|report|strict: Scalastyle, activated by a scalastyle-config.xml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
