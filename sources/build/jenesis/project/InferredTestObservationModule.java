@@ -15,8 +15,8 @@ import build.jenesis.step.Bind;
 public class InferredTestObservationModule implements BuildExecutorModule {
 
     public static final String TEST = "test", MUTATE = "mutate";
-    private static final String FRAMEWORK = "framework", ENGINES = "engines";
-    private static final Set<String> TEST_KEYS = Set.of(FRAMEWORK, ENGINES);
+    private static final String FRAMEWORK = "framework", ENGINES = "engines", SCAN = "scan";
+    private static final Set<String> TEST_KEYS = Set.of(FRAMEWORK, ENGINES, SCAN);
 
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
@@ -100,7 +100,9 @@ public class InferredTestObservationModule implements BuildExecutorModule {
             }
         }
         String framework = properties.value(FRAMEWORK), engines = properties.value(ENGINES);
+        List<String> scan = properties.entries(SCAN);
         TestModule declared = framework == null ? module : module.framework(TestFramework.named(framework));
+        declared = scan == null ? declared : declared.scan(scan);
         return engines == null ? declared : declared.engines(engines);
     }
 
@@ -359,6 +361,10 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                     .pathPlacement(pathPlacement)
                     .moduleName(moduleName == null && description != null ? description.getProperty("module") : moduleName)
                     .directory(directory);
+            List<String> scanned = description == null ? null : description.entries(SCAN);
+            if (scanned != null) {
+                module = module.scan(scanned);
+            }
             BuildExecutorModule executed = test.apply(declared(module, BuildStep.locate(configuration, "test.properties")));
             if (executed != null) {
                 buildExecutor.addModule(TEST, executed, inherited.sequencedKeySet());

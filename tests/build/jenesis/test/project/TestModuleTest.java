@@ -41,7 +41,8 @@ public class TestModuleTest {
     private final Map<String, String> settings = new HashMap<>();
 
     @TempDir
-    private Path root, dependencies, classes, module, manifests, emptyDependencies, junit4Dependencies, testngDependencies;
+    private Path root, dependencies, classes, module, manifests, emptyDependencies, junit4Dependencies, testngDependencies,
+            scanned, compiled;
 
     @BeforeEach
     public void setUp() throws Exception {
@@ -1145,6 +1146,256 @@ public class TestModuleTest {
     }
 
     @Test
+    public void runs_the_tests_of_a_scanned_dependency_by_the_naming_rules_of_its_own() throws IOException {
+        scannedJar(scanned, "main/runtime/maven/org.example/tck/1.0", bootModuleJars(), Map.of(
+                "tck/ConformanceTest", """
+                        package tck;
+                        public class ConformanceTest {
+                            @org.junit.jupiter.api.Test
+                            public void test() { System.out.println("Scanned!"); }
+                        }
+                        """,
+                "tck/Conformance", """
+                        package tck;
+                        public class Conformance {
+                            @org.junit.jupiter.api.Test
+                            public void test() { System.out.println("Not named as a test!"); }
+                        }
+                        """,
+                "tck/AbstractTest", """
+                        package tck;
+                        public abstract class AbstractTest {
+                            @org.junit.jupiter.api.Test
+                            public void test() { System.out.println("Abstract!"); }
+                        }
+                        """));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addSource("scanned", scanned);
+        executor.addModule("test", scanning().scan(List.of("org.example/tck")), "dependencies", "classes", "scanned");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output"))
+                .as("the scanned jar's tests run beside the module's own, chosen by the same naming rules")
+                .content()
+                .contains("Hello world!", "Scanned!")
+                .doesNotContain("Not named as a test!", "Abstract!");
+        assertThat(reportedErrors(supplement)).isEmpty();
+    }
+
+    @Test
+    public void applies_the_filter_and_the_exclusion_to_the_classes_of_a_scanned_dependency() throws IOException {
+        scannedJar(scanned, "main/runtime/maven/org.example/tck/1.0", bootModuleJars(), Map.of(
+                "tck/KeptTest", """
+                        package tck;
+                        public class KeptTest {
+                            @org.junit.jupiter.api.Test
+                            public void test() { System.out.println("Kept!"); }
+                        }
+                        """,
+                "tck/ExcludedTest", """
+                        package tck;
+                        public class ExcludedTest {
+                            @org.junit.jupiter.api.Test
+                            public void test() { System.out.println("Excluded!"); }
+                        }
+                        """));
+        settings.put("test.filter", "tck\\..*");
+        settings.put("test.exclude", ".*ExcludedTest");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addSource("scanned", scanned);
+        executor.addModule("test", scanning().scan(List.of("org.example/tck")), "dependencies", "classes", "scanned");
+        executor.execute();
+
+        assertThat(root.resolve("test").resolve("executed").resolve("supplement").resolve("output"))
+                .as("the filter and the exclusion reach a scanned class as they reach one of the module's own")
+                .content()
+                .contains("Kept!")
+                .doesNotContain("Excluded!", "Hello world!");
+    }
+
+    @Test
+    public void selects_the_junit4_classes_of_a_scanned_dependency_by_the_classes_they_extend() throws Exception {
+        Path junitJar = downloadJar(junit4Dependencies.resolve("junit-4.13.2.jar"),
+                "https://repo1.maven.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar",
+                "8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3");
+        populateFilteredArtifacts(junit4Dependencies, Set.of("junit-4.13.2.jar", "hamcrest-core-1.3.jar"));
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("main/maven/junit/junit",
+                "4.13.2 SHA-256/8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3");
+        versions.setProperty("main/maven/org.hamcrest/hamcrest-core",
+                "1.3 SHA-256/66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9");
+        versions.store(junit4Dependencies.resolve(BuildStep.VERSIONS));
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/runtime/maven/junit/junit", "");
+        requires.store(junit4Dependencies.resolve(BuildStep.REQUIRES));
+        scannedJar(scanned, "main/runtime/maven/org.example/tck/1.0", List.of(junitJar), Map.of(
+                "tck/AbstractCase", """
+                        package tck;
+                        public abstract class AbstractCase {
+                            @org.junit.Test
+                            public void test() { System.out.println("Inherited!"); }
+                        }
+                        """,
+                "tck/InheritingTest", """
+                        package tck;
+                        public class InheritingTest extends AbstractCase { }
+                        """,
+                "tck/HelperTest", """
+                        package tck;
+                        public class HelperTest {
+                            public static final String VALUE = "helper";
+                        }
+                        """));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", junit4Dependencies);
+        executor.addSource("classes", classes);
+        executor.addSource("scanned", scanned);
+        executor.addModule("test",
+                scanning().framework(new JUnit4()).pathPlacement(PathPlacement.CLASS_PATH).scan(List.of("org.example/tck")),
+                "dependencies", "classes", "scanned");
+        executor.execute();
+
+        assertThat(root.resolve("test").resolve("executed").resolve("supplement").resolve("output"))
+                .as("a scanned class named like a test runs under JUnit 4 only where it or a class it extends holds one")
+                .content()
+                .contains("Inherited!", "OK (1 test)")
+                .doesNotContain("initializationError");
+    }
+
+    @Test
+    public void runs_the_tests_of_a_scanned_named_module_on_the_module_path_opened_to_the_framework() throws Exception {
+        List<Path> modulePath = new ArrayList<>(bootModuleJars());
+        modulePath.add(downloadJar(Files.createTempFile(compiled, "apiguardian", ".jar"),
+                "https://repo1.maven.org/maven2/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar",
+                "b509448ac506d607319f182537f0b35d71007582ec741832a1f111e5b5b70b38"));
+        scannedJar(scanned, "main/runtime/module/org.example.tck/1.0", modulePath, Map.of(
+                "module-info", "module org.example.tck { requires org.junit.jupiter.api; }",
+                "tck/ConformanceTest", """
+                        package tck;
+                        class ConformanceTest {
+                            @org.junit.jupiter.api.Test
+                            void test() { System.out.println("Scanned from a module!"); }
+                        }
+                        """));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("scanned", scanned);
+        executor.addModule("test",
+                scanning().jarsOnly(true).pathPlacement(PathPlacement.INFERRED).scan(List.of("org.example.tck")),
+                "dependencies", "scanned");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("java.args"))
+                .as("the scanned module is resolved and its packages are opened to the framework that reflects on them")
+                .content()
+                .contains("\"--add-modules\"", "\"org.example.tck\"")
+                .contains("org.example.tck/tck=");
+        assertThat(supplement.resolve("output")).content().contains("Scanned from a module!");
+    }
+
+    @Test
+    public void refuses_to_scan_a_dependency_that_is_not_on_the_test_path() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule("test", scanning().scan(List.of("org.example/tck")), "dependencies", "classes");
+
+        assertThatThrownBy(executor::execute)
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .rootCause()
+                .hasMessageContaining("scan org.example/tck for test classes, but no jar of it is on their test path")
+                .hasMessageContaining("a <dependency> on org.example:tck");
+    }
+
+    @Test
+    public void refuses_a_scanned_dependency_named_neither_as_a_module_nor_as_a_maven_coordinate() {
+        assertThatThrownBy(() -> new TestModule(Map.of(), Map.of()).scan(List.of("org.example/tck/1.0")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("as org.example.tck or org.example/tck: org.example/tck/1.0");
+        assertThatThrownBy(() -> new TestModule(Map.of(), Map.of()).scan(List.of("org.example:tck")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(": org.example:tck");
+    }
+
+    @Test
+    public void reruns_the_scanned_tests_when_the_scanned_jar_changes_and_reuses_them_when_it_does_not()
+            throws IOException {
+        scannedJar(scanned, "main/runtime/maven/org.example/tck/1.0", bootModuleJars(), Map.of(
+                "tck/ConformanceTest", """
+                        package tck;
+                        public class ConformanceTest {
+                            @org.junit.jupiter.api.Test
+                            public void test() { System.out.println("First!"); }
+                        }
+                        """));
+        assertThat(executeScanning()).contains(EXECUTED);
+        assertThat(executeScanning())
+                .as("an unchanged scanned jar leaves the test result cached, as unchanged own tests do")
+                .doesNotContain(EXECUTED);
+        scannedJar(scanned, "main/runtime/maven/org.example/tck/1.0", bootModuleJars(), Map.of(
+                "tck/ConformanceTest", """
+                        package tck;
+                        public class ConformanceTest {
+                            @org.junit.jupiter.api.Test
+                            public void test() { System.out.println("Second!"); }
+                        }
+                        """));
+        assertThat(executeScanning())
+                .as("a changed scanned jar is a changed input of the tests")
+                .contains(EXECUTED);
+        assertThat(root.resolve("test").resolve(TestModule.EXECUTED).resolve("supplement").resolve("output"))
+                .content().contains("Second!");
+    }
+
+    @Test
+    public void selects_the_scanned_tests_a_change_of_the_scanned_jar_reaches_when_incremental_is_true()
+            throws IOException {
+        settings.put("test.incremental", "true");
+        for (String value : List.of("first", "second")) {
+            scannedJar(scanned, "main/runtime/maven/org.example/tck/1.0", bootModuleJars(), Map.of(
+                    "tck/Alpha", """
+                            package tck;
+                            public class Alpha {
+                                public String value() { return "%s"; }
+                            }
+                            """.formatted(value),
+                    "tck/Beta", """
+                            package tck;
+                            public class Beta {
+                                public String value() { return "beta"; }
+                            }
+                            """,
+                    "tck/AlphaTest", """
+                            package tck;
+                            public class AlphaTest {
+                                @org.junit.jupiter.api.Test
+                                public void test() { System.out.println("Alpha " + new Alpha().value() + "!"); }
+                            }
+                            """,
+                    "tck/BetaTest", """
+                            package tck;
+                            public class BetaTest {
+                                @org.junit.jupiter.api.Test
+                                public void test() { System.out.println("Beta " + new Beta().value() + "!"); }
+                            }
+                            """));
+            executeScanning();
+        }
+
+        assertThat(root.resolve("test").resolve(TestModule.EXECUTED).resolve("supplement").resolve("output"))
+                .as("only the scanned test that reaches the changed class of the scanned jar runs again")
+                .content()
+                .contains("Alpha second!")
+                .doesNotContain("Beta beta!", "Hello world!");
+    }
+
+    @Test
     public void throws_when_no_framework_found() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", emptyDependencies);
@@ -1718,6 +1969,82 @@ public class TestModuleTest {
         executor.addModule("test", force == null ? module : module.force(force), "dependencies", "classes");
         executor.execute();
         return executed;
+    }
+
+    private SequencedSet<String> executeScanning() throws IOException {
+        SequencedSet<String> executed = new LinkedHashSet<>();
+        BuildExecutor executor = BuildExecutor.of(root,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                new BuildExecutorCallback() {
+                    @Override
+                    public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
+                        return (applied, _) -> {
+                            if (identity != null && Boolean.TRUE.equals(applied)) {
+                                executed.add(identity);
+                            }
+                        };
+                    }
+                },
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addSource("scanned", scanned);
+        executor.addModule("test", scanning().scan(List.of("org.example/tck")), "dependencies", "classes", "scanned");
+        executor.execute();
+        return executed;
+    }
+
+    private TestModule scanning() {
+        return TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                .jarsOnly(false);
+    }
+
+    private void scannedJar(Path folder, String key, List<Path> path, Map<String, String> sources) throws IOException {
+        Path output = Files.createTempDirectory(compiled, "classes");
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        try (StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, null)) {
+            fileManager.setLocationFromPaths(StandardLocation.CLASS_OUTPUT, List.of(output));
+            fileManager.setLocationFromPaths(sources.containsKey("module-info")
+                    ? StandardLocation.MODULE_PATH
+                    : StandardLocation.CLASS_PATH, path);
+            List<JavaFileObject> units = new ArrayList<>();
+            for (Map.Entry<String, String> source : sources.entrySet()) {
+                units.add(new SimpleJavaFileObject(
+                        URI.create("string:///" + source.getKey() + ".java"),
+                        JavaFileObject.Kind.SOURCE) {
+                    @Override
+                    public CharSequence getCharContent(boolean ignoreEncodingErrors) {
+                        return source.getValue();
+                    }
+                });
+            }
+            StringWriter diagnostics = new StringWriter();
+            assertThat(compiler.getTask(diagnostics, fileManager, null, null, null, units).call())
+                    .as(diagnostics::toString)
+                    .isTrue();
+        }
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(folder.resolve("tck.jar")));
+             Stream<Path> files = Files.walk(output)) {
+            for (Path file : files.filter(Files::isRegularFile).sorted().toList()) {
+                jar.putNextEntry(new JarEntry(output.relativize(file).toString().replace(File.separatorChar, '/')));
+                jar.write(Files.readAllBytes(file));
+                jar.closeEntry();
+            }
+        }
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty(key, "tck.jar");
+        index.store(folder.resolve(BuildStep.DEPENDENCIES));
     }
 
     private BuildExecutor newExecutor() throws IOException {
