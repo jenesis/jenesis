@@ -77,7 +77,29 @@ public class PalantirJavaFormatModuleRunTest {
         assertThat(command).as("the formatter is not forked again when nothing changed").doesNotExist();
     }
 
+    @Test
+    public void keeps_long_strings_and_imports_as_told() throws IOException {
+        SequencedProperties versions = new SequencedProperties();
+        versions.load(new StringReader(PINS));
+        versions.store(project.resolve(BuildStep.VERSIONS));
+        Path sample = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java");
+        String literal = "\"" + "a long string literal ".repeat(8) + "\"";
+        Files.writeString(sample, "package sample;\nimport java.util.Map;\nimport java.util.List;\nclass Sample{\n"
+                + "String f(){return " + literal + ";}}\n");
+
+        newExecutor(module -> module.reflow(false).sortImports(false).removeUnusedImports(false)).execute();
+
+        assertThat(Files.readString(sample))
+                .as("the imports stay in their order, unused, and the long string on one line")
+                .contains("import java.util.Map;\nimport java.util.List;")
+                .contains(literal);
+    }
+
     private BuildExecutor newExecutor() throws IOException {
+        return newExecutor(module -> module);
+    }
+
+    private BuildExecutor newExecutor(UnaryOperator<PalantirJavaFormatModule> configuration) throws IOException {
         BuildExecutor executor = BuildExecutor.of(root,
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
@@ -90,7 +112,7 @@ public class PalantirJavaFormatModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "palantir-java-format",
-                new PalantirJavaFormatModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                configuration.apply(new PalantirJavaFormatModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT)),
                 "project");
         return executor;
     }
