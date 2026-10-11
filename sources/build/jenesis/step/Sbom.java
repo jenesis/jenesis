@@ -142,12 +142,18 @@ public class Sbom implements BuildStep {
                     ? SequencedProperties.ofFiles(located)
                     : new SequencedProperties();
             Set<Path> runtime = new HashSet<>();
+            Map<Path, String> recorded = new HashMap<>();
             for (String key : dependencies.stringPropertyNames()) {
                 int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+                String value = dependencies.getProperty(key);
+                int space = value.indexOf(' ');
+                Path jar = argument.folder().resolve(space < 0 ? value : value.substring(0, space)).normalize();
                 if (second > 0 && key.substring(first + 1, second).equals("runtime")) {
-                    String value = dependencies.getProperty(key);
-                    int space = value.indexOf(' ');
-                    runtime.add(argument.folder().resolve(space < 0 ? value : value.substring(0, space)).normalize());
+                    runtime.add(jar);
+                }
+                int slash = space < 0 ? -1 : value.indexOf('/', space + 1);
+                if (slash > 0 && value.substring(space + 1, slash).equalsIgnoreCase(hash.algorithm())) {
+                    recorded.putIfAbsent(jar, HexFormat.of().formatHex(HexFormat.of().parseHex(value, slash + 1, value.length())));
                 }
             }
             for (boolean maven : new boolean[] {true, false}) {
@@ -164,7 +170,9 @@ public class Sbom implements BuildStep {
                         continue;
                     }
                     CycloneDx.Component component = component(coordinate,
-                            Files.exists(jar) ? HexFormat.of().formatHex(hash.hash(jar)) : null,
+                            !Files.exists(jar) ? null
+                                    : recorded.containsKey(jar) ? recorded.get(jar)
+                                    : HexFormat.of().formatHex(hash.hash(jar)),
                             readLicenses(licenses, licenseKey)).scope(runtime.contains(jar) ? "required" : "excluded");
                     String source = archives.getProperty(licenseKey);
                     components.put(coordinate, source == null
