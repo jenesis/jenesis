@@ -399,10 +399,14 @@ public class MavenProject implements BuildExecutorModule {
                                     .map(testProperties::getProperty)
                                     .filter(folder -> !folder.isEmpty())
                                     .anyMatch(folder -> Files.exists(base.resolve(folder)))
+                                    || testProperties.value("scan") != null
+                                    || scans(base)
                                     || configuresPlugin(base.resolve("src/test/build.jenesis"));
                         }
                         if (!active && name.startsWith("test-" + SIBLING_MODULE_PREFIX)) {
-                            active = configuresPlugin(base.resolve("src/test/build.jenesis"));
+                            active = properties.value("scan") != null
+                                    || scans(base)
+                                    || configuresPlugin(base.resolve("src/test/build.jenesis"));
                         }
                         if (!active && name.startsWith(SIBLING_MODULE_PREFIX)) {
                             active = configuresPlugin(base.resolve("src/main/build.jenesis"))
@@ -662,6 +666,9 @@ public class MavenProject implements BuildExecutorModule {
                                 descriptor.setProperty("modular", "false");
                                 if (testsOf != null) {
                                     descriptor.setProperty("test", testsOf);
+                                    if (properties.value("scan") != null) {
+                                        descriptor.setProperty("scan", properties.value("scan"));
+                                    }
                                 }
                                 String mainClass = properties.getProperty("mainClass");
                                 if (mainClass != null && testsOf == null) {
@@ -714,6 +721,16 @@ public class MavenProject implements BuildExecutorModule {
             }
         }
         return metadata;
+    }
+
+    private static boolean scans(Path base) throws IOException {
+        for (Path configuration : List.of(base.resolve("src/test/build.jenesis"), base.resolve("build.jenesis"))) {
+            Path file = configuration.resolve("test.properties");
+            if (Files.isRegularFile(file) && SequencedProperties.ofFiles(file).value("scan") != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean configuresPlugin(Path configuration) throws IOException {
@@ -1090,6 +1107,9 @@ public class MavenProject implements BuildExecutorModule {
                 properties.setProperty("dependencies.test", testDependencies.isEmpty()
                         ? coordinate
                         : testDependencies + "\t" + coordinate);
+                if (value.dependenciesToScan() != null && !value.dependenciesToScan().isEmpty()) {
+                    properties.setProperty("scan", String.join(",", value.dependenciesToScan()));
+                }
             } else {
                 for (MavenDependencyScope scope : List.of(
                         MavenDependencyScope.COMPILE,

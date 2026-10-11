@@ -4445,6 +4445,131 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_reads_the_dependencies_to_scan_of_surefire_inheriting_the_parents_plugin_management()
+            throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <tck>conformance</tck>
+                    </properties>
+                    <modules>
+                        <module>inheriting</module>
+                        <module>declaring</module>
+                    </modules>
+                    <build>
+                        <pluginManagement>
+                            <plugins>
+                                <plugin>
+                                    <groupId>org.apache.maven.plugins</groupId>
+                                    <artifactId>maven-surefire-plugin</artifactId>
+                                    <configuration>
+                                        <dependenciesToScan>
+                                            <dependency>group:${tck}</dependency>
+                                        </dependenciesToScan>
+                                    </configuration>
+                                </plugin>
+                            </plugins>
+                        </pluginManagement>
+                    </build>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("inheriting")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>inheriting</artifactId>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("declaring")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>declaring</artifactId>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <artifactId>maven-surefire-plugin</artifactId>
+                                <configuration>
+                                    <dependenciesToScan>
+                                        <dependency>group:suite</dependency>
+                                        <dependency>other:suite</dependency>
+                                    </dependenciesToScan>
+                                </configuration>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("inheriting")).dependenciesToScan())
+                .as("a module that declares no surefire configuration of its own takes its parent's plugin management")
+                .containsExactly("group/conformance");
+        assertThat(poms.get(Path.of("declaring")).dependenciesToScan())
+                .as("a module's own list replaces the one it would inherit, as Maven merges a plugin's configuration")
+                .containsExactly("group/suite", "other/suite");
+    }
+
+    @Test
+    public void local_pom_refuses_a_dependency_to_scan_that_is_not_named_by_its_group_and_artifact() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <artifactId>maven-surefire-plugin</artifactId>
+                                <configuration>
+                                    <dependenciesToScan>
+                                        <dependency>group:*</dependency>
+                                    </dependenciesToScan>
+                                </configuration>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names group:*")
+                .hasMessageContaining("by its <groupId>:<artifactId> alone");
+    }
+
+    @Test
+    public void local_pom_without_surefire_configuration_scans_nothing() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        assertThat(mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of("")).dependenciesToScan())
+                .isNull();
+    }
+
+    @Test
     public void local_pom_inherits_the_metadata_of_its_parent_in_the_project_as_maven_does() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

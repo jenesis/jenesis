@@ -832,7 +832,19 @@ public class MavenPomResolver implements MavenResolver {
                             property(pom.relocation().groupId(), pom.properties()),
                             property(pom.relocation().artifactId(), pom.properties()),
                             property(pom.relocation().version(), pom.properties()),
-                            property(pom.relocation().message(), pom.properties()))));
+                            property(pom.relocation().message(), pom.properties())),
+                    pom.dependenciesToScan() == null ? null : pom.dependenciesToScan().stream().map(declared -> {
+                        String dependency = property(declared, pom.properties());
+                        int colon = dependency.indexOf(':');
+                        if (colon < 1 || colon == dependency.length() - 1 || dependency.indexOf(':', colon + 1) >= 0
+                                || dependency.contains("*") || dependency.contains("/")) {
+                            throw new IllegalArgumentException("The dependenciesToScan of maven-surefire-plugin in "
+                                    + module.resolve("pom.xml") + " names " + dependency + ", but a dependency is"
+                                    + " scanned by its <groupId>:<artifactId> alone, with no wildcard, type, classifier"
+                                    + " or version, which takes every jar of it on the test path - name it so");
+                        }
+                        return dependency.substring(0, colon) + "/" + dependency.substring(colon + 1);
+                    }).toList()));
         }
         return results;
     }
@@ -917,6 +929,7 @@ public class MavenPomResolver implements MavenResolver {
                         parentAliases = Collections.emptyNavigableMap();
                 MavenPomEmitter.Metadata parentMetadata = MavenPomEmitter.Metadata.NONE;
                 Set<String> parentVerbatim = Set.of();
+                List<String> parentDependenciesToScan = null;
                 String groupId = null, artifactId = null, version = null;
                 UnresolvedPom localParent = null;
                 if (parent != null) {
@@ -994,6 +1007,7 @@ public class MavenPomResolver implements MavenResolver {
                     parentLicenses = resolution.licenses();
                     parentMetadata = resolution.metadata();
                     parentVerbatim = resolution.verbatim();
+                    parentDependenciesToScan = resolution.dependenciesToScan();
                 }
                 IMPLICITS.forEach(property -> toElements(document.getDocumentElement(), property)
                         .findFirst()
@@ -1191,6 +1205,13 @@ public class MavenPomResolver implements MavenResolver {
                                         toElementText(relocation, "artifactId").orElse(null),
                                         toElementText(relocation, "version").orElse(null),
                                         toElementText(relocation, "message").orElse(null)))
+                                .orElse(null),
+                        Stream.of(toDependenciesToScan(builds.stream()),
+                                        toDependenciesToScan(builds.stream()
+                                                .flatMap(model -> toElements(model, "pluginManagement").limit(1))),
+                                        parentDependenciesToScan)
+                                .filter(Objects::nonNull)
+                                .findFirst()
                                 .orElse(null));
             }
             default -> throw new IllegalArgumentException("Unknown namespace: " + namespace);
@@ -1240,6 +1261,7 @@ public class MavenPomResolver implements MavenResolver {
                             Set.of(),
                             null,
                             true,
+                            null,
                             null);
                 } else {
                     Path localPath = candidate.file().map(Path::getParent).orElse(null);
@@ -1421,6 +1443,18 @@ public class MavenPomResolver implements MavenResolver {
     private static Stream<Node> toElements(Node node, String name) {
         return toChildren(node).filter(child -> child.getNodeType() == Node.ELEMENT_NODE
                 && child.getNodeName().equals(name));
+    }
+
+    private static List<String> toDependenciesToScan(Stream<Node> containers) {
+        return containers.flatMap(container -> toElements(container, "plugins").limit(1))
+                .flatMap(plugins -> toElements(plugins, "plugin"))
+                .filter(plugin -> toElementText(plugin, "artifactId").filter("maven-surefire-plugin"::equals).isPresent()
+                        && toElementText(plugin, "groupId").map("org.apache.maven.plugins"::equals).orElse(true))
+                .flatMap(plugin -> toElements(plugin, "configuration").limit(1))
+                .flatMap(configuration -> toElements(configuration, "dependenciesToScan").limit(1))
+                .map(declared -> toElements(declared, "dependency").map(node -> node.getTextContent().trim()).toList())
+                .reduce((_, last) -> last)
+                .orElse(null);
     }
 
     private static List<String> toDirectories(List<Node> builds, String list, String element) {
@@ -2142,7 +2176,8 @@ public class MavenPomResolver implements MavenResolver {
                                  Set<String> verbatim,
                                  Map<DependencyKey, DependencyValue> bom,
                                  boolean missing,
-                                 MavenPomEmitter.Relocation relocation) {
+                                 MavenPomEmitter.Relocation relocation,
+                                 List<String> dependenciesToScan) {
     }
 
     private record ResolvedPom(Map<MavenDependencyKey, MavenDependencyValue> managedDependencies,

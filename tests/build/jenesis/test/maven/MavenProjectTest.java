@@ -2133,6 +2133,56 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void builds_and_describes_the_tests_of_a_module_whose_surefire_scans_a_dependency_alone() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>21</maven.compiler.release>
+                    </properties>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <artifactId>maven-surefire-plugin</artifactId>
+                                <configuration>
+                                    <dependenciesToScan>
+                                        <dependency>org.example:tck</dependency>
+                                        <dependency>org.example:suite</dependency>
+                                    </dependenciesToScan>
+                                </configuration>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results)
+                .as("a module whose tests are all scanned from a dependency builds them, as Maven runs Surefire on it")
+                .containsKeys("maven/test-module-/manifests", "maven/module-/manifests");
+        assertThat(SequencedProperties.ofFiles(results.get("maven/test-module-/manifests").resolve(BuildStep.MODULE))
+                .getProperty("scan"))
+                .isEqualTo("org.example/tck,org.example/suite");
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.MODULE))
+                .getProperty("scan"))
+                .as("the main half runs no tests, so it scans nothing")
+                .isNull();
+    }
+
+    @Test
     public void builds_a_bundle_as_a_jar_and_names_a_module_whose_packaging_it_does_not_build() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
