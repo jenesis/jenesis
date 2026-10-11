@@ -8,6 +8,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.SequencedProperties;
 import build.jenesis.project.LicenseHeaderModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,22 +33,20 @@ public class LicenseHeaderModuleTest {
 
     @Test
     public void accepts_a_source_that_starts_with_the_header_as_written() throws IOException {
-        Files.writeString(project.resolve(LicenseHeaderModule.HEADER), TEMPLATE);
         source("sample/Sample.java", HEADER + "\n\npackage sample;\n\nclass Sample {}\n");
         source("sample/Other.kt", HEADER + "\npackage sample\n");
 
-        newExecutor(new LicenseHeaderModule().verify(true)).execute();
+        newExecutor(new LicenseHeaderModule().text(TEMPLATE).verify(true)).execute();
     }
 
     @Test
     public void verify_fails_naming_each_source_without_the_header_and_rewrites_nothing() throws IOException {
-        Files.writeString(project.resolve(LicenseHeaderModule.HEADER), TEMPLATE);
         Path missing = source("sample/Missing.java", "package sample;\n\nclass Missing {}\n");
         Path different = source("sample/Different.scala", "/*\n * Copyright 2020 Someone Else, licensed otherwise.\n */\npackage sample\n");
         Path dated = source("sample/Dated.java", HEADER.replace("2026", "2016-2023") + "\n\npackage sample;\n");
         source("sample/Present.groovy", HEADER + "\npackage sample\n");
 
-        assertThatThrownBy(newExecutor(new LicenseHeaderModule().verify(true))::execute)
+        assertThatThrownBy(newExecutor(new LicenseHeaderModule().text(TEMPLATE).verify(true))::execute)
                 .rootCause()
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Not every source starts with the license header")
@@ -63,26 +62,24 @@ public class LicenseHeaderModuleTest {
 
     @Test
     public void rewrite_inserts_the_header_as_written() throws IOException {
-        Files.writeString(project.resolve(LicenseHeaderModule.HEADER), TEMPLATE);
         Path missing = source("sample/package-info.java", "/** The sample package. */\npackage sample;\n");
         Path descriptor = source("module-info.java", "\n\nmodule sample {\n}\n");
 
-        newExecutor(new LicenseHeaderModule()).execute();
+        newExecutor(new LicenseHeaderModule().text(TEMPLATE)).execute();
 
         assertThat(missing)
                 .as("a leading comment that is no license header stays below the inserted header")
                 .hasContent(HEADER + "\n\n/** The sample package. */\npackage sample;\n");
         assertThat(descriptor).hasContent(HEADER + "\n\nmodule sample {\n}\n");
-        newExecutor(new LicenseHeaderModule().verify(true)).execute();
+        newExecutor(new LicenseHeaderModule().text(TEMPLATE).verify(true)).execute();
     }
 
     @Test
     public void rewrite_replaces_a_different_license_header_with_the_header_as_written() throws IOException {
-        Files.writeString(project.resolve(LicenseHeaderModule.HEADER), TEMPLATE);
         Path different = source("sample/Different.kt", "// Copyright 2019-2021 Someone Else\n// All rights reserved.\npackage sample\n");
         Path windows = source("sample/Windows.java", "/* Copyright 2018 Someone Else */\r\npackage sample;\r\n");
 
-        newExecutor(new LicenseHeaderModule()).execute();
+        newExecutor(new LicenseHeaderModule().text(TEMPLATE)).execute();
 
         assertThat(different)
                 .as("a header of line comments is replaced")
@@ -91,18 +88,43 @@ public class LicenseHeaderModuleTest {
                 .as("a source keeps its line separator")
                 .hasContent(HEADER.replace("\n", "\r\n") + "\r\npackage sample;\r\n");
 
-        newExecutor(new LicenseHeaderModule().verify(true)).execute();
+        newExecutor(new LicenseHeaderModule().text(TEMPLATE).verify(true)).execute();
     }
 
     @Test
     public void takes_a_template_that_is_a_comment_already_as_it_stands() throws IOException {
-        Files.writeString(project.resolve(LicenseHeaderModule.HEADER), "// SPDX-License-Identifier: Apache-2.0\n");
         Path sample = source("sample/Sample.java", "package sample;\n");
 
-        newExecutor(new LicenseHeaderModule()).execute();
+        newExecutor(new LicenseHeaderModule().text("// SPDX-License-Identifier: Apache-2.0\n")).execute();
 
         assertThat(sample).hasContent("// SPDX-License-Identifier: Apache-2.0\n\npackage sample;\n");
-        newExecutor(new LicenseHeaderModule().verify(true)).execute();
+        newExecutor(new LicenseHeaderModule().text("// SPDX-License-Identifier: Apache-2.0\n").verify(true)).execute();
+    }
+
+    @Test
+    public void reads_the_header_from_the_text_of_licenseheader_properties() throws IOException {
+        Path configuration = Files.writeString(project.resolve(LicenseHeaderModule.CONFIGURATION), """
+                text=Copyright 2026 the original author or authors.\\n\\n\\
+                  Licensed under the Apache License, Version 2.0.
+                """);
+        Path sample = source("sample/Sample.java", "package sample;\n");
+
+        newExecutor(new LicenseHeaderModule().configuration(SequencedProperties.ofFiles(configuration))).execute();
+
+        assertThat(sample).hasContent(HEADER + "\n\npackage sample;\n");
+    }
+
+    @Test
+    public void refuses_a_licenseheader_properties_without_text_or_with_another_key() {
+        SequencedProperties empty = new SequencedProperties(), other = new SequencedProperties();
+        other.setProperty("text", "Copyright 2026 the authors.");
+        other.setProperty("year", "2026");
+        assertThatThrownBy(() -> new LicenseHeaderModule().configuration(empty))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names no header");
+        assertThatThrownBy(() -> new LicenseHeaderModule().configuration(other))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names year");
     }
 
     private Path source(String name, String content) throws IOException {
