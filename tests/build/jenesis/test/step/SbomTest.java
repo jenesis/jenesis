@@ -334,6 +334,41 @@ public class SbomTest {
                         + "      \"scope\": \"excluded\"");
     }
 
+    @Test
+    public void takes_the_checksum_the_resolution_recorded_rather_than_hashing_the_jar_again() throws Exception {
+        Files.writeString(Files.createDirectories(argument.resolve("resolved")).resolve("lib-1.0.jar"), "lib");
+        String recorded = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest("recorded".getBytes(StandardCharsets.UTF_8)));
+        SequencedProperties dependencies = new SequencedProperties();
+        dependencies.setProperty("main/runtime/maven/org.example/lib/1.0", "resolved/lib-1.0.jar SHA-256/" + recorded);
+        dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+
+        assertThat(sbom(Map.of()))
+                .as("the resolution verified the jar against the checksum it recorded")
+                .contains("\"content\": \"" + recorded + "\"");
+    }
+
+    @Test
+    public void describes_a_jar_with_a_recorded_checksum_byte_for_byte_as_one_it_hashes() throws Exception {
+        byte[] jar = "lib".getBytes(StandardCharsets.UTF_8);
+        Files.write(Files.createDirectories(argument.resolve("resolved")).resolve("lib-1.0.jar"), jar);
+        String sha256 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(jar)),
+                sha1 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-1").digest(jar));
+        List<String> documents = new ArrayList<>();
+        for (String checksum : List.of("", " SHA-256/" + sha256.toUpperCase(Locale.ROOT), " SHA-1/" + sha1)) {
+            SequencedProperties dependencies = new SequencedProperties();
+            dependencies.setProperty("main/runtime/maven/org.example/lib/1.0", "resolved/lib-1.0.jar" + checksum);
+            dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+            next = Files.createDirectory(root.resolve("next-" + documents.size()));
+            documents.add(sbom(Map.of()));
+        }
+
+        assertThat(documents.getFirst()).contains("\"content\": \"" + sha256 + "\"");
+        assertThat(documents)
+                .as("a recorded SHA-256 is taken as it stands, and a checksum of another algorithm is hashed again")
+                .containsOnly(documents.getFirst());
+    }
+
     private String sbom(Map<String, String> scm) throws Exception {
         return sbom(new Sbom(), scm);
     }
