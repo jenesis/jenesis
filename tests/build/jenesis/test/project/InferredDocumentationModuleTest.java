@@ -153,7 +153,7 @@ public class InferredDocumentationModuleTest {
         assertThat(requires.stringPropertyNames()).containsExactlyInAnyOrder(
                 "dokka/runtime/maven/org.jetbrains.dokka/dokka-cli/RELEASE",
                 "dokka/runtime/maven/org.jetbrains.dokka/dokka-base/RELEASE",
-                "dokka/runtime/maven/org.jetbrains.dokka/analysis-kotlin-descriptors/RELEASE");
+                "dokka/runtime/maven/org.jetbrains.dokka/analysis-kotlin-symbols/RELEASE");
     }
 
     @Test
