@@ -80,28 +80,28 @@ public class Bind implements BuildStep {
         };
     }
 
-    public static <M extends BuildExecutorModule> void configured(BuildExecutor buildExecutor,
-                                                                  SequencedSet<String> inputs,
-                                                                  String name,
-                                                                  Function<M, BuildExecutorModule> configurator,
-                                                                  Path configurationFile,
-                                                                  Supplier<M> module) {
-        configured(buildExecutor, inputs, name, configurator, configurationFile, Collections.emptyNavigableSet(), module);
+    public static <M extends BuildExecutorModule> boolean configured(BuildExecutor buildExecutor,
+                                                                     SequencedSet<String> inputs,
+                                                                     String name,
+                                                                     Function<M, BuildExecutorModule> configurator,
+                                                                     Path configurationFile,
+                                                                     Supplier<M> module) {
+        return configured(buildExecutor, inputs, name, configurator, configurationFile, Collections.emptyNavigableSet(), module);
     }
 
-    public static <M extends BuildExecutorModule> void configured(BuildExecutor buildExecutor,
-                                                                  SequencedSet<String> inputs,
-                                                                  String name,
-                                                                  Function<M, BuildExecutorModule> configurator,
-                                                                  Path configurationFile,
-                                                                  SequencedSet<Path> siblings,
-                                                                  Supplier<M> module) {
+    public static <M extends BuildExecutorModule> boolean configured(BuildExecutor buildExecutor,
+                                                                     SequencedSet<String> inputs,
+                                                                     String name,
+                                                                     Function<M, BuildExecutorModule> configurator,
+                                                                     Path configurationFile,
+                                                                     SequencedSet<Path> siblings,
+                                                                     Supplier<M> module) {
         if (configurator == null || configurationFile == null) {
-            return;
+            return false;
         }
         BuildExecutorModule configured = configurator.apply(module.get());
         if (configured == null) {
-            return;
+            return false;
         }
         buildExecutor.addModule(name, (nested, inherited) -> {
             if (siblings.isEmpty()) {
@@ -122,6 +122,7 @@ public class Bind implements BuildStep {
             toolInputs.addAll(inherited.sequencedKeySet());
             nested.addModule("tool", configured, toolInputs);
         }, inputs);
+        return true;
     }
 
     public static <M extends BuildExecutorModule> void configuredByProperties(BuildExecutor buildExecutor,
