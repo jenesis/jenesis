@@ -1289,6 +1289,25 @@ public record Project(
                       fewer dependencies   publish the dependency as a dependency, and make a
                                            `requires static` on it a `requires`
 
+                    One module compiled at two releases is not supported either: javac compiles a
+                    module once, at its release, and only META-INF/versions/<N>/ adds a newer one, a
+                    class there replacing the class of the same name the base compiles. A pom.xml
+                    with a second compiler execution at another release, or a jar plugin excluding
+                    classes it compiled, is converted, and the conversion named to the user:
+
+                      an entry class at a lower release than the rest, so callers on the older JVM
+                      are told the feature is unavailable rather than failing to link
+                                           compile the module at the lower release, against API
+                                           stubs for the newer JDK types it uses, and route each
+                                           call that needs the newer JVM through a class of one
+                                           name in the base and in META-INF/versions/<N>/, the
+                                           base answering what the older JVM can (demo 11);
+                                           a public class only META-INF/versions/<N>/ holds makes
+                                           a jar the JDK's jar tool refuses
+                      classes compiled against but never shipped, API stubs above all
+                                           a module of their own, `requires static` in
+                                           module-info.java, <scope>provided</scope> in a pom.xml
+
                     jenesis.test.filter matches the whole class name and replaces the default naming
                     (Test*, *Test, *Tests, *TestCase, IT*, *IT, *ITCase, never a nested class), which
                     under JUnit 4, as in Surefire, takes a class only where it or a superclass
@@ -1481,6 +1500,9 @@ public record Project(
                           <dependencyManagement> and no modules, staged as that POM
                       moditect / an extra-java-module-info plugin
                           -> @jenesis.alias, modules.properties (21)
+                      a second maven-compiler-plugin execution at another release, or
+                          maven-jar-plugin <excludes> of compiled stubs -> not supported:
+                          skill/migrate says how one release and a stub module replace it
                       a relocating shade / shadow -> not supported, nothing is relocated: a
                           layer, @jenesis.layer in module-info.java, keeps a private dependency
                           and its version apart at run time (24, 25); a fat jar is launcher=true;
