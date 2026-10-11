@@ -827,7 +827,12 @@ public class MavenPomResolver implements MavenResolver {
                     pom.signatures(),
                     property(pom.properties().get("mainClass"), pom.properties()),
                     pom.metadata().expand(value -> property(value, pom.properties())),
-                    expressions));
+                    expressions,
+                    pom.relocation() == null ? null : new MavenPomEmitter.Relocation(
+                            property(pom.relocation().groupId(), pom.properties()),
+                            property(pom.relocation().artifactId(), pom.properties()),
+                            property(pom.relocation().version(), pom.properties()),
+                            property(pom.relocation().message(), pom.properties()))));
         }
         return results;
     }
@@ -1181,10 +1186,11 @@ public class MavenPomResolver implements MavenResolver {
                         toElements(project, "distributionManagement")
                                 .flatMap(management -> toElements(management, "relocation"))
                                 .findFirst()
-                                .map(relocation -> new DependencyCoordinate(
+                                .map(relocation -> new MavenPomEmitter.Relocation(
                                         toElementText(relocation, "groupId").orElse(null),
                                         toElementText(relocation, "artifactId").orElse(null),
-                                        toElementText(relocation, "version").orElse(null)))
+                                        toElementText(relocation, "version").orElse(null),
+                                        toElementText(relocation, "message").orElse(null)))
                                 .orElse(null));
             }
             default -> throw new IllegalArgumentException("Unknown namespace: " + namespace);
@@ -2136,7 +2142,7 @@ public class MavenPomResolver implements MavenResolver {
                                  Set<String> verbatim,
                                  Map<DependencyKey, DependencyValue> bom,
                                  boolean missing,
-                                 DependencyCoordinate relocation) {
+                                 MavenPomEmitter.Relocation relocation) {
     }
 
     private record ResolvedPom(Map<MavenDependencyKey, MavenDependencyValue> managedDependencies,

@@ -13,12 +13,12 @@ of an existing module, **L** a new mechanism.
 
 ## Status
 
-About 108 gaps found along the way are fixed in the tool, among them forking `javac`, `--source`/`--target`, modular
+About 110 gaps found along the way are fixed in the tool, among them forking `javac`, `--source`/`--target`, modular
 Javadoc, resources in the sources jar, a check for a module declared twice, `kotlinc` arguments, scope and exclusions
 on a pin, the operating system family as a platform token, bytecode transforms at `binary/transform` (bnd, AspectJ),
 `tar.gz` dependencies, Docker arguments, reusing a dependency resolution whose inputs did not change, generated
-sources in the `ide` project files, and classifier variants (`classifiers.properties`,
-`@jenesis.pin <module> :<classifier>`).
+sources in the `ide` project files, relocation POMs, `Implementation-*` manifest entries, and classifier variants
+(`classifiers.properties`, `@jenesis.pin <module> :<classifier>`).
 
 30 more are answered by the migration briefing (`skill/migrate`, `skill/registry`) rather than by the tool, because a
 plugin or a small change to the project covers them: OSGi manifests from a `binary/transform` plugin, resource
@@ -36,7 +36,6 @@ What follows is what remains.
 | **No compile avoidance.** A dependency's jar is compared by its bytes, so any change to it recompiles every module that depends on it, even when its API is unchanged. | L | gson, caffeine, micrometer, moshi |
 | **Formatters take no options.** A line of `process-*.properties` becomes a JVM option, not a formatter option: no AOSP style, no reflow switch, no Eclipse formatter, no ktfmt, no licence headers. | M | moshi, mockito, junit-pioneer, hibernate-validator, jline3, JSqlParser |
 | **Tests always run on the build's JDK.** A test run on another Java version, as a CI matrix does, cannot be declared. | M | JavaHamcrest, JsonPath, junit-pioneer, jsoup, commons-lang, jjwt |
-| **The manifest cannot carry the version.** `Implementation-*` and `Specification-*` entries need the version, which a static `MANIFEST.MF` cannot hold. | S | five projects wrote a plugin; javapoet dropped the entries |
 | **One test run per module.** No second run of the same tests with other JVM options or another selection, as a second Surefire execution does. | M | micrometer, junit-framework, mockito (sibling modules instead), netty |
 
 Compile avoidance matters most: it is the largest share of the difference to Gradle on a build after an edit
@@ -59,7 +58,6 @@ Compile avoidance matters most: it is the largest share of the difference to Gra
 |---|---|---|
 | Documentation is switched on or off for the whole project; `packaging.properties` has no key for one module. | S | netty |
 | No development-only scope, for a dependency the application runs with locally but never ships. | S | spring-petclinic (DevTools kept in a Maven profile) |
-| A relocation POM is followed when read but cannot be published. | S | mapstruct (`mapstruct-jdk8`), picocli |
 
 ## Compilers
 
@@ -116,9 +114,8 @@ These are decisions rather than gaps. The briefing says so and names the change 
 
 ## Suggested order
 
-1. **The small items, in one change.** Version-stamped manifest entries, a per-module coordinate variable, a
-   per-module documentation switch, and failing on a class-less Kotlin Multiplatform
-   root.
+1. **The small items, in one change.** A per-module coordinate variable, a per-module documentation switch, and
+   failing on a class-less Kotlin Multiplatform root.
 2. **Test JDK and test runs.** Choosing the JDK a test run uses, and declaring more than one run per module, belong
    together: a second run on another Java version is the most common reason for a second run. About eight
    projects.

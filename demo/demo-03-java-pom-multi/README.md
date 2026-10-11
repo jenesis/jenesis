@@ -30,7 +30,8 @@ The project is an aggregator `pom.xml` over two module directories:
     |-- app/                the consumer module
     |   |-- pom.xml          depends on greeter + commons-lang3
     |   `-- sources/sample/app/App.java   uses Greeter + StringUtils
-    `-- bom/pom.xml          a bill of materials over greeter and app (packaging pom)
+    |-- bom/pom.xml          a bill of materials over greeter and app (packaging pom)
+    `-- hello/pom.xml        the library's former coordinate, relocated to greeter
 
 The root `pom.xml` carries `<packaging>pom</packaging>`, so Jenesis treats it as
 an aggregator and never builds it as a jar; its presence is what selects the
@@ -60,6 +61,29 @@ The staged POM carries the BOM's coordinate, its packaging and its metadata, and
 its own `<dependencyManagement>` with every `${...}` resolved. It names no parent
 and leaves out the parent's managed versions, since the aggregator is never
 published. `export` installs it and `release` publishes it like any staged POM.
+
+Relocating a former coordinate
+------------------------------
+
+`hello/pom.xml` stands for a coordinate the library was once published under. It
+declares no sources, only where the artifact went:
+
+    <distributionManagement>
+        <relocation>
+            <artifactId>greeter</artifactId>
+            <message>hello is published as greeter</message>
+        </relocation>
+    </distributionManagement>
+
+A module that relocates its artifact is published as its POM alone, the relocation
+kept, so a build that still depends on `build.jenesis.demo:hello` is sent to
+`greeter` of the same version:
+
+    target/stage/maven/output/build/jenesis/demo/hello/1.0.0/hello-1.0.0.pom
+
+What the relocation leaves out - here the group and the version - stays that of
+`hello`. A module that relocates its artifact and holds sources fails the build,
+since nothing would compile them.
 
 Tests
 -----
