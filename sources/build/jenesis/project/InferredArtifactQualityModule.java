@@ -13,7 +13,7 @@ import build.jenesis.step.Bind;
 
 public class InferredArtifactQualityModule implements BuildExecutorModule {
 
-    public static final String JAPICMP = "japicmp";
+    public static final String JAPICMP = "japicmp", REVAPI = "revapi";
     private static final Set<String> JAPICMP_KEYS = Set.of("baseline",
             "access",
             "include",
@@ -32,6 +32,8 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final JApiCmpModule japicmpModule;
     private final Function<JApiCmpModule, BuildExecutorModule> japicmp;
+    private final RevapiModule revapiModule;
+    private final Function<RevapiModule, BuildExecutorModule> revapi;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredArtifactQualityModule(SequencedSet<Path> configuration,
@@ -40,6 +42,8 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
         this(configuration,
                 null,
                 new JApiCmpModule(repositories, resolvers),
+                value -> value,
+                new RevapiModule(repositories, resolvers),
                 value -> value,
                 Collections.emptyNavigableMap());
     }
@@ -52,10 +56,15 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
                 null,
                 JApiCmpModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
+                RevapiModule.ofEnvironment(environment, repositories, resolvers),
+                value -> value,
                 Collections.emptyNavigableMap());
         Boolean japicmp = environment.flagOrNull("artifact.japicmp");
         if (japicmp != null) {
             module = module.japicmp(japicmp ? value -> value : null);
+        }
+        if (Enforcement.ofEnvironment(environment, "artifact.revapi") == Enforcement.IGNORE) {
+            module = module.revapi(null);
         }
         return module;
     }
@@ -64,11 +73,15 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
                                           Pinning pinning,
                                           JApiCmpModule japicmpModule,
                                           Function<JApiCmpModule, BuildExecutorModule> japicmp,
+                                          RevapiModule revapiModule,
+                                          Function<RevapiModule, BuildExecutorModule> revapi,
                                           SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
         this.pinning = pinning;
         this.japicmpModule = japicmpModule;
         this.japicmp = japicmp;
+        this.revapiModule = revapiModule;
+        this.revapi = revapi;
         this.custom = custom;
     }
 
@@ -77,6 +90,8 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
                 pinning,
                 japicmpModule,
                 japicmp,
+                revapiModule,
+                revapi,
                 custom);
     }
 
@@ -85,6 +100,18 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
                 pinning,
                 japicmpModule,
                 japicmp,
+                revapiModule,
+                revapi,
+                custom);
+    }
+
+    public InferredArtifactQualityModule revapi(Function<RevapiModule, BuildExecutorModule> revapi) {
+        return new InferredArtifactQualityModule(configuration,
+                pinning,
+                japicmpModule,
+                japicmp,
+                revapiModule,
+                revapi,
                 custom);
     }
 
@@ -93,6 +120,8 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
                 pinning,
                 japicmpModule,
                 japicmp,
+                revapiModule,
+                revapi,
                 custom);
     }
 
@@ -113,10 +142,11 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
         Path described = BuildStep.locate(new LinkedHashSet<>(inherited.values()), BuildStep.MODULE);
+        boolean test = described != null && SequencedProperties.ofFiles(described).getProperty("test") != null;
         Bind.configuredByProperties(buildExecutor,
                 inherited.sequencedKeySet(),
                 JAPICMP,
-                described != null && SequencedProperties.ofFiles(described).getProperty("test") != null ? null : japicmp,
+                test ? null : japicmp,
                 BuildStep.locate(configuration, "japicmp.properties"),
                 properties -> {
                     for (String key : properties.stringPropertyNames()) {
@@ -130,6 +160,13 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
                     }
                     return japicmpModule.pinning(pinning).config(properties);
                 });
+        Path revapiFile = RevapiModule.configurationFile(configuration);
+        Bind.configuredByProperties(buildExecutor,
+                inherited.sequencedKeySet(),
+                REVAPI,
+                test ? null : revapi,
+                revapiFile,
+                properties -> revapiModule.pinning(pinning).configuration(revapiFile, properties));
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
                     nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());

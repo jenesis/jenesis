@@ -46,7 +46,8 @@ Layout
     |   `-- Demo.java          publishes 1.0.0, then builds 1.1.0 against it
     |-- pom.xml                this module: build.jenesis.demo:api-compatibility:1.1.0
     |-- build.jenesis
-    |   `-- japicmp.properties activates japicmp; names no baseline
+    |   |-- japicmp.properties activates japicmp; names no baseline
+    |   `-- revapi.properties  activates revapi; reports non-breaking differences too
     |-- released               the previous release, built and published by Demo.java
     |   |-- .jenesis.skip      keeps this project out of the outer build's module scan
     |   |-- pom.xml            the same coordinate at 1.0.0
@@ -111,6 +112,32 @@ Switching it off
 
 `-Djenesis.artifact.japicmp=false` keeps `japicmp.properties` in place and skips the comparison,
 the same opt-out every inferred tool has.
+
+revapi beside japicmp
+---------------------
+
+A `revapi.properties` beside `japicmp.properties` runs [revapi](https://revapi.org) against the same
+baseline, read the same way. revapi classifies every difference by how severe it is for a caller,
+binary and source alike, and reports those that reach the `severity` the file names:
+
+    severity=non-breaking
+
+`equivalent`, `non-breaking`, `potentially-breaking` (the default) and `breaking` are the levels, so the
+demo's `non-breaking` reports the added overload, which the default leaves out. The report is revapi's
+own JSON, one entry per difference with its code and classification:
+
+    target/build/.../assemble/artifact/revapi/compare/output/reports/revapi/revapi.json
+
+    "code" : "java.method.added",
+    "new" : "method java.lang.String library.Library::greet(java.lang.String, java.lang.String)",
+
+revapi's own configuration, as a `revapi.differences` list of the differences a release accepts, stays in
+revapi's JSON: `configuration=revapi.json` names such a file beside `revapi.properties`, an array of
+`{"extension": ..., "configuration": ...}` objects as revapi documents it. Any other key fails the build.
+
+Like a linter, revapi reports and keeps the build green; `-Djenesis.artifact.revapi=strict` fails it on
+any difference reported, and `ignore` skips it. revapi resolves in its own `revapi` group: `revapi-java`,
+`revapi-basic-features` and `revapi-reporter-json` with what they depend on, beside the baseline.
 
 Pinning
 -------

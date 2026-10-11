@@ -1572,6 +1572,14 @@ public record Project(
                           with values from plugin-<name>.properties, and runs them with Plugin.Engine
                           over the module's compiled classes and its compile class path (59)
                       japicmp-maven-plugin / me.champeau.gradle.japicmp -> japicmp.properties (40)
+                      revapi-maven-plugin / org.revapi.revapi-gradle-plugin -> revapi.properties (40):
+                          oldArtifacts -> baseline=<groupId>/<artifactId>[/<version>], the last
+                          release by default; failSeverity -> severity=equivalent|non-breaking|
+                          potentially-breaking|breaking, the least severe difference reported;
+                          analysisConfiguration or analysisConfigurationFiles -> configuration=<a JSON
+                          file beside it>, revapi's own configuration as an array of extensions, as
+                          revapi.differences ignores; failing the build ->
+                          jenesis.artifact.revapi=strict
 
                     ## Dependencies
 
@@ -2138,6 +2146,11 @@ public record Project(
                                                 (access, include, exclude, format, ignore-missing-classes,
                                                 only-incompatible, only-modified, semantic-versioning,
                                                 error-on-binary-incompatibility, ...)
+                      revapi.properties         revapi compares the built jar against the same
+                                                baseline as japicmp, reporting what reaches severity
+                                                (potentially-breaking by default) in
+                                                reports/revapi/revapi.json; configuration=<file> merges
+                                                revapi's own JSON; a test module is never compared
                       dokka.properties          configures Dokka, which documents a module's Kotlin
                                                 sources under -Djenesis.project.documentation=true;
                                                 the files it names are resolved against the
@@ -2522,7 +2535,7 @@ public record Project(
                                              place of a bytecode enhancer
                       binary/validate        a verdict on the compiled classes, beside SpotBugs
                                              and jdeps
-                      artifact               a step over the jar, beside japicmp
+                      artifact               a step over the jar, beside japicmp and revapi
                       observed               a step over the tests' run, beside JaCoCo and PIT
                       package                packages/, staged in stage/packages
                       documentation          beside javadoc
@@ -2609,7 +2622,7 @@ public record Project(
                       Trusting them      28 pinning (versions and checksums), 29 openpgp (a declared
                                          key), 30 sigstore (a declared identity, no key at all),
                                          31 sbom, 32 compliance (licenses), 33 vulnerabilities (OSV)
-                      Quality gates      34 java-quality, 40 api-compatibility (japicmp),
+                      Quality gates      34 java-quality, 40 api-compatibility (japicmp, revapi),
                                          42 kotlin-quality, 45 scala-quality, 47 groovy-quality
                       Tests              35 test-framework (what the tests are written against),
                                          36 code-coverage (JaCoCo), 37 test-selection (incremental),
@@ -4330,6 +4343,7 @@ public record Project(
                 observe.jfr|true|Java Flight Recorder in the test JVM, activated by a jfr.properties whose lines are the options of the recording
                 mutate.pitest|true|PIT mutation testing, activated by a pitest.properties
                 artifact.japicmp|true|japicmp API comparison, activated by a japicmp.properties
+                artifact.revapi|report|ignore|report|strict: revapi API comparison, activated by a revapi.properties; ignore skips it, report records the differences that reach its severity, strict fails the build on any of them
                 jarsigner.keystore||Key store jarsigner signs the produced jar with, in place of the unsigned one; a release machine supplies it, and a build that names any jarsigner setting without it fails rather than shipping unsigned; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jarsigner.alias||Name of the key within that store; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jarsigner.storepass||Where that store's password is read from: env <variable>, or file <path>; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
