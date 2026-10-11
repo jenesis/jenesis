@@ -12,6 +12,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.project.InferredSourceFormattingModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class InferredSourceFormattingModuleTest {
 
@@ -68,6 +69,79 @@ public class InferredSourceFormattingModuleTest {
 
         assertThat(coordinates("java"))
                 .containsExactly("palantir-java-format/runtime/maven/com.palantir.javaformat/palantir-java-format/RELEASE");
+    }
+
+    @Test
+    public void refuses_a_key_the_selected_java_formatter_does_not_take() throws IOException {
+        Files.writeString(project.resolve("javaformat.properties"), "formatter=palantir\njavadoc=false\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("javadoc")
+                .hasMessageContaining("palantir-java-format")
+                .hasMessageContaining("[formatter, imports, reflow]");
+    }
+
+    @Test
+    public void refuses_a_style_google_java_format_does_not_know() throws IOException {
+        Files.writeString(project.resolve("javaformat.properties"), "formatter=google\nstyle=palantir\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("style=palantir")
+                .hasMessageContaining("google or aosp");
+    }
+
+    @Test
+    public void refuses_an_imports_value_other_than_sort_remove_or_none() throws IOException {
+        Files.writeString(project.resolve("javaformat.properties"), "formatter=google\nimports=sort,order\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("imports=sort,order");
+    }
+
+    @Test
+    public void refuses_a_flag_that_is_neither_true_nor_false() throws IOException {
+        Files.writeString(project.resolve("javaformat.properties"), "formatter=google\nreflow=never\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reflow");
+    }
+
+    @Test
+    public void refuses_formatter_options_that_name_no_formatter() throws IOException {
+        Files.writeString(project.resolve("javaformat.properties"), "style=aosp\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no formatter");
     }
 
     @Test

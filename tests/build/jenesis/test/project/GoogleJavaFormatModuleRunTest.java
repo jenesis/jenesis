@@ -86,7 +86,51 @@ public class GoogleJavaFormatModuleRunTest {
                 .doesNotExist();
     }
 
+    @Test
+    public void formats_in_aosp_style_and_leaves_long_strings_javadoc_and_imports_as_told() throws IOException {
+        SequencedProperties versions = new SequencedProperties();
+        versions.load(new StringReader(PINS));
+        versions.store(project.resolve(BuildStep.VERSIONS));
+        Path sample = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java");
+        String literal = "\"" + "a long string literal ".repeat(6) + "\"";
+        Files.writeString(sample, "package sample;\nimport java.util.List;\nclass Sample{\n"
+                + "/** Kept   as   written. */\nString f(){return " + literal + ";}}\n");
+
+        newExecutor(false, module -> module.aosp(true)
+                .reflow(false)
+                .javadoc(false)
+                .removeUnusedImports(false)).execute();
+
+        assertThat(Files.readString(sample))
+                .as("the AOSP style indents by four, and the options leave the rest as written")
+                .contains("    String f() {")
+                .contains("import java.util.List;")
+                .contains(literal)
+                .contains("Kept   as   written.");
+    }
+
+    @Test
+    public void verifies_again_when_an_option_changes() throws IOException {
+        SequencedProperties versions = new SequencedProperties();
+        versions.load(new StringReader(PINS));
+        versions.store(project.resolve(BuildStep.VERSIONS));
+        Path sample = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java");
+        Files.writeString(sample, "package sample;\n\nclass Sample {\n  int f() {\n    return 42;\n  }\n}\n");
+
+        newExecutor(true).execute();
+
+        assertThatThrownBy(newExecutor(true, module -> module.aosp(true))::execute)
+                .as("the unchanged source is verified again once the style changes")
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .rootCause()
+                .hasMessageContaining("Unexpected exit code");
+    }
+
     private BuildExecutor newExecutor(boolean verify) throws IOException {
+        return newExecutor(verify, module -> module);
+    }
+
+    private BuildExecutor newExecutor(boolean verify, UnaryOperator<GoogleJavaFormatModule> configuration) throws IOException {
         BuildExecutor executor = BuildExecutor.of(root,
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
@@ -99,8 +143,8 @@ public class GoogleJavaFormatModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "google-java-format",
-                new GoogleJavaFormatModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT)
-                        .verify(verify),
+                configuration.apply(new GoogleJavaFormatModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT)
+                        .verify(verify)),
                 "project");
         return executor;
     }

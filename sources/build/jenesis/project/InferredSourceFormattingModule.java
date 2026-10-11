@@ -16,6 +16,10 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     private static final String JAVA = "java",
             KTLINT = "ktlint",
             SCALAFMT = "scalafmt";
+    private static final String FORMATTER = "formatter", STYLE = "style", REFLOW = "reflow", JAVADOC = "javadoc",
+            IMPORTS = "imports", SORT = "sort", REMOVE = "remove", NONE = "none";
+    private static final Set<String> GOOGLE_KEYS = Set.of(FORMATTER, STYLE, REFLOW, JAVADOC, IMPORTS);
+    private static final Set<String> PALANTIR_KEYS = Set.of(FORMATTER, REFLOW, IMPORTS);
 
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
@@ -208,11 +212,41 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 JAVA,
                 java,
                 BuildStep.locate(configuration, "javaformat.properties"),
-                properties -> switch (properties.value("formatter")) {
-                    case "google" -> googleModule.pinning(pinning).verify(verify);
-                    case "palantir" -> palantirModule.pinning(pinning).verify(verify);
-                    case null -> null;
-                    default -> throw new IllegalArgumentException("Unknown Java format: " + properties.value("formatter"));
+                properties -> switch (properties.value(FORMATTER)) {
+                    case "google" -> {
+                        Set<String> imports = javaFormat(properties, "google-java-format", GOOGLE_KEYS);
+                        yield googleModule.pinning(pinning)
+                                .verify(verify)
+                                .aosp(switch (properties.value(STYLE, "google")) {
+                                    case "google" -> false;
+                                    case "aosp" -> true;
+                                    default -> throw new IllegalArgumentException("javaformat.properties names "
+                                            + STYLE + "=" + properties.value(STYLE)
+                                            + ", which google-java-format does not know - google or aosp");
+                                })
+                                .reflow(properties.flag(REFLOW, true))
+                                .javadoc(properties.flag(JAVADOC, true))
+                                .sortImports(imports.contains(SORT))
+                                .removeUnusedImports(imports.contains(REMOVE));
+                    }
+                    case "palantir" -> {
+                        Set<String> imports = javaFormat(properties, "palantir-java-format", PALANTIR_KEYS);
+                        yield palantirModule.pinning(pinning)
+                                .verify(verify)
+                                .reflow(properties.flag(REFLOW, true))
+                                .sortImports(imports.contains(SORT))
+                                .removeUnusedImports(imports.contains(REMOVE));
+                    }
+                    case null -> {
+                        if (!properties.stringPropertyNames().isEmpty()) {
+                            throw new IllegalArgumentException("javaformat.properties names "
+                                    + new TreeSet<>(properties.stringPropertyNames())
+                                    + " but no formatter - add formatter=google, palantir or eclipse");
+                        }
+                        yield null;
+                    }
+                    default -> throw new IllegalArgumentException("javaformat.properties names formatter="
+                            + properties.value(FORMATTER) + ", which is no Java formatter - google, palantir or eclipse");
                 });
         Bind.configured(buildExecutor,
                 inherited.sequencedKeySet(),
@@ -230,5 +264,28 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
                     nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());
         }
+    }
+
+    private static Set<String> javaFormat(SequencedProperties properties, String formatter, Set<String> keys) {
+        for (String key : properties.stringPropertyNames()) {
+            if (!keys.contains(key)) {
+                throw new IllegalArgumentException("javaformat.properties names " + key + ", which " + formatter
+                        + " does not take - its keys are " + new TreeSet<>(keys));
+            }
+        }
+        List<String> imports = properties.entries(IMPORTS);
+        if (imports == null) {
+            return Set.of(SORT, REMOVE);
+        } else if (imports.equals(List.of(NONE))) {
+            return Set.of();
+        }
+        for (String entry : imports) {
+            if (!entry.equals(SORT) && !entry.equals(REMOVE)) {
+                throw new IllegalArgumentException("javaformat.properties names " + IMPORTS + "="
+                        + properties.value(IMPORTS) + ", but " + formatter + " takes " + SORT + ", " + REMOVE
+                        + " or both, comma-separated, for what it does to the imports, or " + NONE);
+            }
+        }
+        return Set.copyOf(imports);
     }
 }
