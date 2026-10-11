@@ -1428,8 +1428,12 @@ public record Project(
                           -> errorprone.properties with @jenesis.plugin javac <coordinate> (14), in
                           a pom.xml <!--jenesis.plugin javac maven/<groupId>/<artifactId>-->
                       kotlin-maven-plugin / kotlin("jvm") -> .kt sources, found on their own (41, 43)
-                      scala-maven-plugin / scala -> .scala sources, compiled by Scala 3 (44)
-                      gmavenplus / groovy -> .groovy sources (46)
+                      scala-maven-plugin / scala -> .scala sources, compiled by Scala 3 (44); Scala 2
+                          is not supported
+                      gmavenplus / groovy -> .groovy sources, compiled by Groovy 4 or newer after
+                          javac (46), so Groovy uses Java types and Java no Groovy type: gmavenplus
+                          stubs for a joint compilation have no counterpart, and Java code that uses
+                          Groovy moves to a module that requires the Groovy one
                       jaxb2-maven-plugin / a JAXB plugin -> xjc.properties (16)
                       protobuf-maven-plugin / com.google.protobuf -> protoc.properties (16)
                       avro-maven-plugin / an Avro plugin -> avro.properties (16)
@@ -1478,6 +1482,10 @@ public record Project(
                       codenarc / codenarc -> codenarc.xml (47)
                       maven-surefire-plugin / test -> on by default; test.properties names the
                           framework where inference does not (35), and only changed tests re-run (37)
+                      surefire systemPropertyVariables of ${project.artifactId} or ${project.version}
+                          -> read at run time from the tested jar's META-INF/maven/<groupId>/
+                          <artifactId>/pom.properties or its Implementation-* manifest entries, or a
+                          process-test.properties of the module's own
                       surefire rerunFailingTestsCount / org.gradle.test-retry -> none in the build:
                           a retry belongs to the test, as JUnit Pioneer's @RetryingTest,
                           rerunner-jupiter or TestNG's IRetryAnalyzer, declared as a test dependency
