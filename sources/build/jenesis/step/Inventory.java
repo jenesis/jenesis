@@ -109,7 +109,6 @@ public class Inventory implements BuildStep {
                 Path.of(ARTIFACTS),
                 Path.of(Bom.BOM),
                 Path.of(SOURCES),
-                Path.of(Javac.GENERATED),
                 Path.of(DOCUMENTATION),
                 Path.of(DEPENDENCIES),
                 Path.of(BOMS),
@@ -233,9 +232,6 @@ public class Inventory implements BuildStep {
             collect(folder.resolve(SOURCES), sources);
             if (holdsSources(folder.resolve(SOURCES))) {
                 generated.add(folder.resolve(SOURCES));
-            }
-            if (Files.isDirectory(folder.resolve(CLASSES)) && holdsSources(folder.resolve(Javac.GENERATED))) {
-                generated.add(folder.resolve(Javac.GENERATED));
             }
             collect(folder.resolve(DOCUMENTATION), documentation);
             Path packages = folder.resolve(JPackage.PACKAGES);
@@ -459,7 +455,9 @@ public class Inventory implements BuildStep {
         writePaths(inventory, context, prefix + "artifacts", artifacts);
         writePaths(inventory, context, prefix + "process", processes);
         writePaths(inventory, context, prefix + "bomfile", bomArtifacts);
-        writePaths(inventory, context, prefix + "sources", sources);
+        writePaths(inventory, context, prefix + "sources", sources.stream()
+                .filter(file -> archived(file.getParent(), file))
+                .toList());
         writePaths(inventory, context, prefix + "generated", generated);
         writePaths(inventory, context, prefix + "documentation", documentation);
         writePaths(inventory, context, prefix + "jmod", jmods);
@@ -793,14 +791,13 @@ public class Inventory implements BuildStep {
         if (!Files.isDirectory(folder)) {
             return false;
         }
-        try (Stream<Path> files = Files.list(folder)) {
-            if (files.anyMatch(file -> file.getFileName().toString().endsWith(".jar"))) {
-                return false;
-            }
-        }
         try (Stream<Path> files = Files.walk(folder)) {
-            return files.anyMatch(Files::isRegularFile);
+            return files.anyMatch(file -> Files.isRegularFile(file) && !archived(folder, file));
         }
+    }
+
+    private static boolean archived(Path folder, Path file) {
+        return folder.equals(file.getParent()) && file.getFileName().toString().endsWith(".jar");
     }
 
     private static void collect(Path folder, SequencedSet<Path> sink) throws IOException {

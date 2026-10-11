@@ -1051,8 +1051,8 @@ public class JavacTest {
                     .as("a generated source is no class of the module and stays out of what is archived")
                     .isEmpty();
         }
-        assertThat(next.resolve(Javac.GENERATED + "gen/GeneratedOne.java")).isNotEmptyFile();
-        assertThat(next.resolve(Javac.GENERATED + "META-INF/versions/21/gen/GeneratedOne.java")).isNotEmptyFile();
+        assertThat(next.resolve(Javac.SOURCES + "gen/GeneratedOne.java")).isNotEmptyFile();
+        assertThat(next.resolve(Javac.SOURCES + "META-INF/versions/21/gen/GeneratedOne.java")).isNotEmptyFile();
     }
 
     @ParameterizedTest
