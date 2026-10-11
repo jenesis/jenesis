@@ -23,8 +23,8 @@ variants (`classifiers.properties`, `@jenesis.pin <module> :<classifier>`).
 plugin or a small change to the project covers them: OSGi manifests from a `binary/transform` plugin, resource
 filtering and extra source roots from a plugin at `binary/compiled` or `binary/generated`, a tool whose packages split
 across a plugin layer forked instead, `os-maven-plugin`, the git revision, pinning every profile, `test-jpms`
-suites that run on the class path, and pointing Spring Boot's actuator at the SBOM each jar embeds under
-`META-INF/sbom/<groupId>/<artifactId>.cdx.json`.
+suites that run on the class path, and where each jar embeds its SBOM
+(`META-INF/sbom/<groupId>/<artifactId>.cdx.json`) compared to the CycloneDX plugins.
 
 What follows is what remains.
 

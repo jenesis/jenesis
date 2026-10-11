@@ -1513,10 +1513,11 @@ public record Project(
                           -> @jenesis.signature (29, 30)
                       maven-enforcer-plugin / dependency constraints -> -Djenesis.dependency.pin,
                           jenesis.resolver.maven=fail, jenesis.toolchain.version
-                      cyclonedx-maven-plugin / org.cyclonedx.bom -> on by default (31); every jar
-                          embeds its own at META-INF/sbom/<groupId>/<artifactId>.cdx.json, or
-                          <module>.cdx.json with no group, so Spring Boot's actuator is pointed at
-                          it with management.endpoint.sbom.application.location=classpath:<path>
+                      cyclonedx-maven-plugin / org.cyclonedx.bom -> on by default (31); published
+                          beside the jar with the cyclonedx classifier, as the plugins attach it,
+                          and embedded in every jar, not only an application's, at
+                          META-INF/sbom/<groupId>/<artifactId>.cdx.json (<module>.cdx.json without
+                          a group), which the manifest's Sbom-Location names
                       license-maven-plugin / a license report plugin -> licensing.properties (32)
                       dependency-check-maven / org.owasp.dependencycheck
                           -> vulnerability.properties, checked against OSV (33)
