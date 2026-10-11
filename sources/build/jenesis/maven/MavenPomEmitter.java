@@ -37,6 +37,17 @@ public class MavenPomEmitter {
                            SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies,
                            SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies,
                            Metadata metadata) {
+        return emit(groupId, artifactId, version, packaging, dependencies, managedDependencies, metadata, null);
+    }
+
+    public IOConsumer emit(String groupId,
+                           String artifactId,
+                           String version,
+                           String packaging,
+                           SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies,
+                           SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies,
+                           Metadata metadata,
+                           Relocation relocation) {
         Document document;
         try {
             document = documentBuilderFactory.newDocumentBuilder().newDocument();
@@ -148,6 +159,21 @@ public class MavenPomEmitter {
                 appendManagement(document, project, "ciManagement", metadata.ciManagement());
             }
         }
+        if (relocation != null) {
+            Node node = appendChild(document, appendChild(document, project, "distributionManagement"), "relocation");
+            if (relocation.groupId() != null) {
+                appendText(document, node, "groupId", relocation.groupId());
+            }
+            if (relocation.artifactId() != null) {
+                appendText(document, node, "artifactId", relocation.artifactId());
+            }
+            if (relocation.version() != null) {
+                appendText(document, node, "version", relocation.version());
+            }
+            if (relocation.message() != null) {
+                appendText(document, node, "message", relocation.message());
+            }
+        }
         if (!managedDependencies.isEmpty()) {
             Node wrapper = appendChild(document, appendChild(document, project, "dependencyManagement"), "dependencies");
             managedDependencies.forEach((key, value) -> appendDependency(document, wrapper, key, value));
@@ -234,6 +260,9 @@ public class MavenPomEmitter {
 
     private static void appendText(Document document, Node parent, String name, String text) {
         appendChild(document, parent, name).setTextContent(text);
+    }
+
+    public record Relocation(String groupId, String artifactId, String version, String message) implements Serializable {
     }
 
     @FunctionalInterface

@@ -1573,6 +1573,9 @@ public record Project(
                           installed apart from the build. It runs with --dry-run, publishing
                           nothing, unless -Djenesis.jreleaser.dry=false, as jenesis.jreleaser.dry
                           defaults to true
+                      distributionManagement <relocation> / a relocated publication -> kept: a
+                          module that relocates its artifact is staged as its POM alone, the
+                          relocation in it, and fails the build if it holds sources (03)
                       maven.deploy.skip, maven.install.skip / a skipped publication task
                           -> stage=false in the module's packaging.properties, which keeps it out of
                           `export` and `release` alike

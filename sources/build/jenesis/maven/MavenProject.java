@@ -45,7 +45,8 @@ public class MavenProject implements BuildExecutorModule {
 
     public static final String POM = "pom/", MAVEN = "maven/", BOM = "bom/";
     public static final String EXPRESSIONS = "expressions.properties", SCOPES = "scopes.properties";
-    private static final String SCAN = "scan", POM_METADATA = "metadata.", BOMS = "boms", POMS = "poms", SKIPPED = "skipped.properties";
+    private static final String SCAN = "scan", POM_METADATA = "metadata.", RELOCATION = "relocation.", BOMS = "boms",
+            POMS = "poms", SKIPPED = "skipped.properties";
     private static final Set<String> JARS = Set.of("jar", "bundle"), AGGREGATES = Set.of("pom", "bom");
     private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-";
     private static final Set<String> COMMANDED = Set.of("version", "scm.tag", "scm.revision", "scm.tree");
@@ -280,7 +281,21 @@ public class MavenProject implements BuildExecutorModule {
             if (Files.isDirectory(descriptors)) {
                 try (DirectoryStream<Path> files = Files.newDirectoryStream(descriptors, "*.properties")) {
                     for (Path file : files) {
-                        String name = file.getFileName().toString(), path = SequencedProperties.ofFiles(file).getProperty("path");
+                        SequencedProperties descriptor = SequencedProperties.ofFiles(file);
+                        String name = file.getFileName().toString(), path = descriptor.getProperty("path");
+                        if (descriptor.stringPropertyNames().stream().anyMatch(key -> key.startsWith(RELOCATION))) {
+                            Path sources = root.resolve(path).resolve(descriptor.getProperty("sources"));
+                            boolean compiled;
+                            try (Stream<Path> found = Files.isDirectory(sources) ? Files.walk(sources) : Stream.empty()) {
+                                compiled = found.anyMatch(Files::isRegularFile);
+                            }
+                            if (compiled) {
+                                throw new IllegalArgumentException("The pom.xml in " + root.resolve(path)
+                                        + " relocates its artifact with <distributionManagement><relocation>, which"
+                                        + " publishes the POM alone, but " + sources + " holds sources: move them to"
+                                        + " the module the relocation names, or remove the relocation");
+                            }
+                        }
                         Path packaging = BuildStep.locate(configurations.apply(new MavenModuleDescriptor(
                                 name.substring(0, name.length() - ".properties".length()),
                                 Collections.emptyNavigableSet(),
@@ -757,6 +772,7 @@ public class MavenProject implements BuildExecutorModule {
                 String name = file.getFileName().toString(), path = properties.getProperty("path");
                 Path pom = Files.createDirectory(context.next().resolve(name.substring(0, name.length() - ".properties".length())))
                         .resolve(Pom.POM);
+                boolean relocated = properties.stringPropertyNames().stream().anyMatch(key -> key.startsWith(RELOCATION));
                 try (Writer writer = Files.newBufferedWriter(pom)) {
                     emitter.emit(metadata.getProperty("project"),
                             metadata.getProperty("artifact"),
@@ -764,7 +780,11 @@ public class MavenProject implements BuildExecutorModule {
                             "pom",
                             Collections.emptyNavigableMap(),
                             managed,
-                            MavenPomEmitter.Metadata.of(metadata)).accept(writer);
+                            MavenPomEmitter.Metadata.of(metadata),
+                            relocated ? new MavenPomEmitter.Relocation(properties.value(RELOCATION + "groupId"),
+                                    properties.value(RELOCATION + "artifactId"),
+                                    properties.value(RELOCATION + "version"),
+                                    properties.value(RELOCATION + "message")) : null).accept(writer);
                 }
                 String prefix = Inventory.prefixOf(path);
                 inventory.setProperty(prefix + "path", path);
@@ -890,7 +910,7 @@ public class MavenProject implements BuildExecutorModule {
                         }
                     }
                 }
-                if (value.bom() != null) {
+                if (value.bom() != null || value.relocation() != null) {
                     writeBom(Files.createDirectories(context.next().resolve(BOM)), value, entry.getKey());
                     continue;
                 } else if (value.packaging() != null && !JARS.contains(value.packaging())) {
@@ -953,8 +973,25 @@ public class MavenProject implements BuildExecutorModule {
             properties.setProperty("groupId", value.groupId());
             properties.setProperty("artifactId", value.artifactId());
             properties.setProperty("version", value.version());
+            if (value.relocation() != null) {
+                properties.setProperty("sources", value.sourceDirectory() == null
+                        ? "src/main/java"
+                        : value.sourceDirectory().replace(File.separatorChar, '/'));
+                SequencedMap<String, String> relocation = new LinkedHashMap<>();
+                relocation.put("groupId", value.relocation().groupId());
+                relocation.put("artifactId", value.relocation().artifactId());
+                relocation.put("version", value.relocation().version());
+                relocation.put("message", value.relocation().message());
+                relocation.forEach((key, declared) -> {
+                    if (declared != null) {
+                        properties.setProperty(RELOCATION + key, declared);
+                    }
+                });
+            }
             int index = 0;
-            for (Map.Entry<MavenDependencyKey, MavenDependencyValue> managed : value.bom().entrySet()) {
+            for (Map.Entry<MavenDependencyKey, MavenDependencyValue> managed : (value.bom() == null
+                    ? Collections.<MavenDependencyKey, MavenDependencyValue>emptyNavigableMap()
+                    : value.bom()).entrySet()) {
                 String prefix = "managed." + index++;
                 properties.setProperty(prefix, managed.getKey().coordinate(null, managed.getValue().version()));
                 if (managed.getValue().scope() != null) {

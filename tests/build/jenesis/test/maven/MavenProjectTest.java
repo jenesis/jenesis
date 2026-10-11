@@ -1314,6 +1314,89 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void stages_a_module_that_relocates_its_artifact_as_its_pom_alone_with_the_relocation() throws IOException {
+        relocating();
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results.keySet())
+                .as("a module that relocates its artifact compiles nothing")
+                .noneMatch(key -> key.contains("module-"));
+        Path boms = results.get("maven/boms");
+        SequencedProperties inventory = SequencedProperties.ofFiles(boms.resolve("inventory.properties"));
+        assertThat(inventory).containsEntry("module-old.path", "old").containsEntry("module-old.packaging", "pom");
+        String pom = Files.readString(boms.resolve(inventory.getProperty("module-old.pom")));
+        assertThat(pom)
+                .contains("<artifactId>old</artifactId>", "<version>1</version>", "<packaging>pom</packaging>")
+                .contains("<distributionManagement>", "<relocation>", "<artifactId>new</artifactId>",
+                        "<message>Moved to new</message>")
+                .as("an element the relocation leaves out keeps meaning the relocated artifact's own")
+                .doesNotContain("<groupId>other</groupId>");
+    }
+
+    @Test
+    public void refuses_sources_in_a_module_that_relocates_its_artifact() throws IOException {
+        relocating();
+        Files.writeString(Files.createDirectories(project.resolve("old/src/main/java/sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .hasStackTraceContaining("relocates its artifact")
+                .hasStackTraceContaining("holds sources");
+    }
+
+    private void relocating() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>old</module>
+                    </modules>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("old")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>old</artifactId>
+                    <distributionManagement>
+                        <relocation>
+                            <artifactId>new</artifactId>
+                            <message>Moved to new</message>
+                        </relocation>
+                    </distributionManagement>
+                </project>
+                """);
+    }
+
+    @Test
     public void describes_a_bom_by_its_own_dependency_management_with_its_properties_resolved() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
