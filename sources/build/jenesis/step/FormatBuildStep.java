@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.HashFunction;
 
@@ -74,9 +75,14 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
         if (current.isEmpty()) {
             return CompletableFuture.completedStage(null);
         }
-        Map<Path, byte[]> stored = context.previous() != null && Files.exists(context.previous().resolve(FORMATTED))
-                ? HashFunction.read(context.previous().resolve(FORMATTED))
-                : Map.of();
+        boolean reconfigured = arguments.values().stream().anyMatch(argument -> argument.files().entrySet().stream()
+                .anyMatch(entry -> entry.getValue().status() != ChecksumStatus.RETAINED
+                        && !(entry.getKey().startsWith(Bind.SOURCES) && isFormattable(entry.getKey()))));
+        Map<Path, byte[]> stored = !reconfigured
+                && context.previous() != null
+                && Files.exists(context.previous().resolve(FORMATTED))
+                        ? HashFunction.read(context.previous().resolve(FORMATTED))
+                        : Map.of();
         List<String> files = new ArrayList<>();
         for (Map.Entry<Path, byte[]> entry : current.entrySet()) {
             byte[] prior = stored.get(entry.getKey());
@@ -100,7 +106,7 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         return super.apply(executor, context, arguments).thenCompose(result -> {
-            if (!result.next() || verify) {
+            if (!result.next()) {
                 return CompletableFuture.completedStage(result);
             }
             try {
