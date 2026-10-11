@@ -1478,6 +1478,11 @@ public record Project(
                       codenarc / codenarc -> codenarc.xml (47)
                       maven-surefire-plugin / test -> on by default; test.properties names the
                           framework where inference does not (35), and only changed tests re-run (37)
+                      surefire rerunFailingTestsCount / org.gradle.test-retry -> none in the build:
+                          a retry belongs to the test, as JUnit Pioneer's @RetryingTest,
+                          rerunner-jupiter or TestNG's IRetryAnalyzer, declared as a test dependency
+                      surefire forkCount with reuseForks=false / forkEvery -> one JVM per test
+                          module: a test that needs a JVM of its own goes to a module of its own
                       maven-failsafe-plugin / an integration test task
                           -> no phase of its own: -Djenesis.test.tag, or a @jenesis.test module
                       jacoco-maven-plugin / jacoco -> jacoco.properties, a report (36)
