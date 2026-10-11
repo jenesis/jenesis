@@ -44,7 +44,6 @@ Compile avoidance matters most: it is the largest share of the difference to Gra
 
 | Gap | Size | Projects |
 |---|---|---|
-| A process file's `@<key>` reads only the global `jenesis.variable.*`; there is no variable for the module's own coordinates. | S | netty |
 | Tests shipped in a dependency's jar do not run; only the module's own compiled tests are selected. | S | caffeine (JCache conformance suite) |
 | No location for configuration that only the tests, or only the main code, of every module should see. | S | jline3 (copied into 16 test modules), hibernate-validator |
 | A plugin cannot hand a file it produced to the test JVM; the path of its step has to be written into `process-test.properties`. | S | quarkus, mockito (OSGi tests dropped) |
@@ -61,8 +60,6 @@ Compile avoidance matters most: it is the largest share of the difference to Gra
 
 | Gap | Size | Projects |
 |---|---|---|
-| Groovy is compiled after `javac`, against its classes; Java and Groovy sources that refer to each other cannot be compiled jointly. | M | jline3 (stub plugin) |
-| Only Groovy 4 or newer and Scala 3 are supported. | M | junit-framework (Spock 1.3 fixture filtered out), picocli (68 Groovy tests and the Scala examples dropped) |
 | Kotlin: no `-Xfriend-paths` for tests (S), no KSP (M), and `.kt` sources below `META-INF/versions` are compiled into the base release (S). | S/M | moshi (version-coupled workaround, KSP and multi-release plugins) |
 | An annotation processor falls back to the class path in a module build only when module resolution fails outright. | S | jhipster (hibernate-processor and the JPA metamodel lost) |
 | No native compilation (C, Rust, JNI). Prebuilt libraries can be published as a classifier variant, but not built. | L | netty (natives stay on Maven) |
@@ -105,6 +102,12 @@ These are decisions rather than gaps. The briefing says so and names the change 
 - a Java 8 or older base built from `module-info.java`;
 - white-box tests through `--patch-module`;
 - Gradle's highest-version conflict resolution;
+- Groovy before 4 and Scala 2 (junit-framework, picocli);
+- Java code that uses Groovy types: Groovy compiles after `javac`, so Groovy uses Java and not the reverse, and such
+  Java moves to a module that requires the Groovy one (jline3);
+- a variable for the module's own coordinates in `process-*.properties` - a test reads them at run time from the
+  tested jar's `pom.properties` or `Implementation-*` manifest entries, or the module carries a
+  `process-test.properties` of its own (netty);
 - tests on a JDK other than the build's - a CI matrix runs the whole build again with `jenesis.toolchain.version`
   (JavaHamcrest, JsonPath, junit-pioneer, jsoup, commons-lang, jjwt);
 - retrying a failed test, which belongs to the test framework (JUnit Pioneer's `@RetryingTest`, TestNG's
@@ -115,11 +118,10 @@ These are decisions rather than gaps. The briefing says so and names the change 
 
 ## Suggested order
 
-1. **The small items, in one change.** A per-module coordinate variable, a per-module documentation switch, and
-   failing on a class-less Kotlin Multiplatform root.
+1. **The small items, in one change.** A per-module documentation switch, and failing on a class-less Kotlin
+   Multiplatform root.
 2. **Kotlin.** Friend paths for tests and multi-release Kotlin sources, then KSP.
 3. **The annotation-processor fallback** to the class path in a module build.
-4. **The medium compiler and test items.** Joint Java and Groovy compilation, Groovy before 4 and Scala 2, and a
-   test module that keeps a jar without a module identity on the class path.
+4. **A test module that keeps a jar without a module identity on the class path.**
 5. **Compile avoidance.** Compare a dependency by a fingerprint of its API rather than its bytes. The largest change,
    and the one a build after an edit shows most.
