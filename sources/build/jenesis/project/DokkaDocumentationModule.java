@@ -31,7 +31,7 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
             PACKAGE_LIST = ".package-list";
     private static final String MAVEN_GROUP = "org.jetbrains.dokka", JAVADOC_PLUGIN = "javadoc-plugin";
     private static final List<String> CLI_ARTIFACTS = List.of(
-            "dokka-cli", "dokka-base", "analysis-kotlin-descriptors");
+            "dokka-cli", "dokka-base", "analysis-kotlin-symbols");
     private static final Set<String> KEYS = Set.of("module-name",
             "includes",
             "format",

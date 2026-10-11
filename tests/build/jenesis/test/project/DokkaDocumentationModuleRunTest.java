@@ -28,7 +28,7 @@ public class DokkaDocumentationModuleRunTest {
             dokka/maven/com.fasterxml.jackson.module/jackson-module-kotlin 2.15.3 SHA-256/8f72e6b99e6145e3284a5224355ca8ee6030afa8c1d6a3395b530d29026f8d52
             dokka/maven/com.soywiz.korlibs.korte/korte-jvm 4.0.10 SHA-256/b9b983817a80dbb5f9b599b508616115c1e8e1e3f1fccc301695f4530792690f
             dokka/maven/org.freemarker/freemarker 2.3.32 SHA-256/04d65ec1bde6cea20e3495d5e78ef96ab774d9936434861d3254bd88e7e94f92
-            dokka/maven/org.jetbrains.dokka/analysis-kotlin-descriptors 2.2.0 SHA-256/21ef1f4ebe7dd028b0ee3a6b398ca478e265e4073c45747611959295b6da3208
+            dokka/maven/org.jetbrains.dokka/analysis-kotlin-symbols 2.2.0 SHA-256/31b4eabf7436083ae33200da6be7203675fb1fcdcd34d2f394f55e822dac8f0f
             dokka/maven/org.jetbrains.dokka/analysis-markdown 2.2.0 SHA-256/7070de21dc5078013b53cc9c139321cceaf476c1630711cc5bda6d96e9da2087
             dokka/maven/org.jetbrains.dokka/dokka-base 2.2.0 SHA-256/721c5a1647dc49d1680d884350b438a039b2426aec65b696baee8e5aeb6442f5
             dokka/maven/org.jetbrains.dokka/dokka-cli 2.2.0 SHA-256/b8c8aba823c0ac0e173af52abf2808aa692809a40b79f63828798bb77518324a
