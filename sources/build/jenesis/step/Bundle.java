@@ -14,6 +14,7 @@ import build.jenesis.SequencedProperties;
 public class Bundle implements BuildStep {
 
     public static final String BUNDLE = "bundle/";
+    private static final Set<String> ARCHIVES = Set.of(".jar", ".zip", ".jmod", ".war", ".ear", ".gz", ".tgz", ".xz", ".bz2");
 
     private final String group;
     private final OffsetDateTime timestamp;
@@ -255,6 +256,16 @@ public class Bundle implements BuildStep {
             entry.setTime(Files.getLastModifiedTime(file).toMillis());
         } else {
             entry.setTimeLocal(timestamp.toLocalDateTime());
+        }
+        int dot = name.lastIndexOf('.');
+        if (dot >= 0 && ARCHIVES.contains(name.substring(dot).toLowerCase(Locale.ROOT))) {
+            try (CheckedInputStream in = new CheckedInputStream(Files.newInputStream(file), new CRC32())) {
+                long size = in.transferTo(OutputStream.nullOutputStream());
+                entry.setMethod(ZipEntry.STORED);
+                entry.setSize(size);
+                entry.setCompressedSize(size);
+                entry.setCrc(in.getChecksum().getValue());
+            }
         }
         out.putNextEntry(entry);
         Files.copy(file, out);
