@@ -45,7 +45,6 @@ Compile avoidance matters most: it is the largest share of the difference to Gra
 | Gap | Size | Projects |
 |---|---|---|
 | Tests shipped in a dependency's jar do not run; only the module's own compiled tests are selected. | S | caffeine (JCache conformance suite) |
-| No location for configuration that only the tests, or only the main code, of every module should see. | S | jline3 (copied into 16 test modules), hibernate-validator |
 | A plugin cannot hand a file it produced to the test JVM; the path of its step has to be written into `process-test.properties`. | S | quarkus, mockito (OSGi tests dropped) |
 | A test module cannot keep a jar without a module identity on the class path. | M | JSqlParser (JavaCC tests stay on Maven) |
 
@@ -102,6 +101,8 @@ These are decisions rather than gaps. The briefing says so and names the change 
 - a Java 8 or older base built from `module-info.java`;
 - white-box tests through `--patch-module`;
 - Gradle's highest-version conflict resolution;
+- a root location for configuration of the tests alone or the main code alone - a file that differs for the tests
+  sits in each test half's `src/test/build.jenesis/` (jline3, caffeine, hibernate-validator);
 - Groovy before 4 and Scala 2 (junit-framework, picocli);
 - Java code that uses Groovy types: Groovy compiles after `javac`, so Groovy uses Java and not the reverse, and such
   Java moves to a module that requires the Groovy one (jline3);

@@ -2039,7 +2039,10 @@ public record Project(
                     an active profile inside any location comes first, then the module's own
                     locations, then the root's. So a module's process-javac.properties replaces the
                     root's rather than adding to it, and repeats the lines of the root's it still
-                    needs. Generators read their inputs from META-INF/build.jenesis/ in the
+                    needs. The root has no location for the tests or the main code alone, since a
+                    module's halves are configured where the module is: a file that differs for the
+                    tests sits in each src/test/build.jenesis/, or in each test module's own folder.
+                    Generators read their inputs from META-INF/build.jenesis/ in the
                     sources, which the compiler never copies into the artifact, unless folders=<paths>
                     names other folders, found among the sources and the resources alike; each reads
                     only the file kinds it compiles. In the maven layout only a resource directory
