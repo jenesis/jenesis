@@ -15,12 +15,14 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
 
     private static final String JAVA = "java",
             KTLINT = "ktlint",
+            KTFMT = "ktfmt",
             SCALAFMT = "scalafmt";
     private static final String FORMATTER = "formatter", STYLE = "style", REFLOW = "reflow", JAVADOC = "javadoc",
             IMPORTS = "imports", SORT = "sort", REMOVE = "remove", NONE = "none", PROFILE = "profile";
     private static final Set<String> GOOGLE_KEYS = Set.of(FORMATTER, STYLE, REFLOW, JAVADOC, IMPORTS);
     private static final Set<String> PALANTIR_KEYS = Set.of(FORMATTER, REFLOW, IMPORTS);
     private static final Set<String> ECLIPSE_KEYS = Set.of(FORMATTER, PROFILE);
+    private static final Set<String> KTFMT_KEYS = Set.of(STYLE, IMPORTS);
 
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
@@ -29,9 +31,11 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     private final PalantirJavaFormatModule palantirModule;
     private final EclipseJavaFormatModule eclipseModule;
     private final KtlintFormatModule ktlintModule;
+    private final KtfmtFormatModule ktfmtModule;
     private final ScalafmtFormatModule scalafmtModule;
     private final Function<BuildExecutorModule, BuildExecutorModule> java;
     private final Function<KtlintFormatModule, BuildExecutorModule> ktlint;
+    private final Function<KtfmtFormatModule, BuildExecutorModule> ktfmt;
     private final Function<ScalafmtFormatModule, BuildExecutorModule> scalafmt;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
@@ -45,7 +49,9 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 new PalantirJavaFormatModule(repositories, resolvers),
                 new EclipseJavaFormatModule(repositories, resolvers),
                 new KtlintFormatModule(repositories, resolvers),
+                new KtfmtFormatModule(repositories, resolvers),
                 new ScalafmtFormatModule(repositories, resolvers),
+                value -> value,
                 value -> value,
                 value -> value,
                 value -> value,
@@ -63,7 +69,9 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 PalantirJavaFormatModule.ofEnvironment(environment, repositories, resolvers),
                 EclipseJavaFormatModule.ofEnvironment(environment, repositories, resolvers),
                 KtlintFormatModule.ofEnvironment(environment, repositories, resolvers),
+                KtfmtFormatModule.ofEnvironment(environment, repositories, resolvers),
                 ScalafmtFormatModule.ofEnvironment(environment, repositories, resolvers),
+                value -> value,
                 value -> value,
                 value -> value,
                 value -> value,
@@ -80,6 +88,10 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         if (ktlint != null) {
             module = module.ktlint(ktlint ? value -> value : null);
         }
+        Boolean ktfmt = environment.flagOrNull("format.ktfmt");
+        if (ktfmt != null) {
+            module = module.ktfmt(ktfmt ? value -> value : null);
+        }
         Boolean scalafmt = environment.flagOrNull("format.scalafmt");
         if (scalafmt != null) {
             module = module.scalafmt(scalafmt ? value -> value : null);
@@ -94,9 +106,11 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                                            PalantirJavaFormatModule palantirModule,
                                            EclipseJavaFormatModule eclipseModule,
                                            KtlintFormatModule ktlintModule,
+                                           KtfmtFormatModule ktfmtModule,
                                            ScalafmtFormatModule scalafmtModule,
                                            Function<BuildExecutorModule, BuildExecutorModule> java,
                                            Function<KtlintFormatModule, BuildExecutorModule> ktlint,
+                                           Function<KtfmtFormatModule, BuildExecutorModule> ktfmt,
                                            Function<ScalafmtFormatModule, BuildExecutorModule> scalafmt,
                                            SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
@@ -106,9 +120,11 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         this.palantirModule = palantirModule;
         this.eclipseModule = eclipseModule;
         this.ktlintModule = ktlintModule;
+        this.ktfmtModule = ktfmtModule;
         this.scalafmtModule = scalafmtModule;
         this.java = java;
         this.ktlint = ktlint;
+        this.ktfmt = ktfmt;
         this.scalafmt = scalafmt;
         this.custom = custom;
     }
@@ -121,9 +137,11 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 palantirModule,
                 eclipseModule,
                 ktlintModule,
+                ktfmtModule,
                 scalafmtModule,
                 java,
                 ktlint,
+                ktfmt,
                 scalafmt,
                 custom);
     }
@@ -136,9 +154,11 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 palantirModule,
                 eclipseModule,
                 ktlintModule,
+                ktfmtModule,
                 scalafmtModule,
                 java,
                 ktlint,
+                ktfmt,
                 scalafmt,
                 custom);
     }
@@ -151,9 +171,11 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 palantirModule,
                 eclipseModule,
                 ktlintModule,
+                ktfmtModule,
                 scalafmtModule,
                 java,
                 ktlint,
+                ktfmt,
                 scalafmt,
                 custom);
     }
@@ -166,9 +188,28 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 palantirModule,
                 eclipseModule,
                 ktlintModule,
+                ktfmtModule,
                 scalafmtModule,
                 java,
                 ktlint,
+                ktfmt,
+                scalafmt,
+                custom);
+    }
+
+    public InferredSourceFormattingModule ktfmt(Function<KtfmtFormatModule, BuildExecutorModule> ktfmt) {
+        return new InferredSourceFormattingModule(configuration,
+                pinning,
+                verify,
+                googleModule,
+                palantirModule,
+                eclipseModule,
+                ktlintModule,
+                ktfmtModule,
+                scalafmtModule,
+                java,
+                ktlint,
+                ktfmt,
                 scalafmt,
                 custom);
     }
@@ -181,9 +222,11 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 palantirModule,
                 eclipseModule,
                 ktlintModule,
+                ktfmtModule,
                 scalafmtModule,
                 java,
                 ktlint,
+                ktfmt,
                 scalafmt,
                 custom);
     }
@@ -196,9 +239,11 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 palantirModule,
                 eclipseModule,
                 ktlintModule,
+                ktfmtModule,
                 scalafmtModule,
                 java,
                 ktlint,
+                ktfmt,
                 scalafmt,
                 custom);
     }
@@ -280,6 +325,44 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                     }
                     default -> throw new IllegalArgumentException("javaformat.properties names formatter="
                             + properties.value(FORMATTER) + ", which is no Java formatter - google, palantir or eclipse");
+                });
+        Path ktfmtFile = ktfmt == null ? null : KtfmtFormatModule.configurationFile(configuration);
+        if (ktfmtFile != null && ktlint != null && KtlintFormatModule.configurationFile(configuration) != null) {
+            throw new IllegalArgumentException(ktfmtFile + " selects ktfmt while "
+                    + KtlintFormatModule.configurationFile(configuration) + " selects ktlint to format the same Kotlin"
+                    + " sources - set jenesis.format.ktlint=false to format with ktfmt alone, or remove ktfmt.properties");
+        }
+        Bind.configuredByProperties(buildExecutor,
+                inherited.sequencedKeySet(),
+                KTFMT,
+                ktfmt,
+                ktfmtFile,
+                properties -> {
+                    for (String key : properties.stringPropertyNames()) {
+                        if (!KTFMT_KEYS.contains(key)) {
+                            throw new IllegalArgumentException("ktfmt.properties names " + key
+                                    + ", which ktfmt does not take - its keys are " + new TreeSet<>(KTFMT_KEYS));
+                        }
+                    }
+                    List<String> imports = properties.entries(IMPORTS);
+                    if (imports != null
+                            && !imports.equals(List.of(SORT))
+                            && !Set.copyOf(imports).equals(Set.of(SORT, REMOVE))) {
+                        throw new IllegalArgumentException("ktfmt.properties names " + IMPORTS + "="
+                                + properties.value(IMPORTS) + ", but ktfmt always sorts the imports - " + SORT + ","
+                                + REMOVE + " to remove the unused ones as well, or " + SORT + " to keep them");
+                    }
+                    return ktfmtModule.pinning(pinning)
+                            .verify(verify)
+                            .style(switch (properties.value(STYLE, "meta")) {
+                                case "meta" -> KtfmtFormatModule.Style.META;
+                                case "google" -> KtfmtFormatModule.Style.GOOGLE;
+                                case "kotlinlang" -> KtfmtFormatModule.Style.KOTLINLANG;
+                                default -> throw new IllegalArgumentException("ktfmt.properties names " + STYLE + "="
+                                        + properties.value(STYLE) + ", which ktfmt does not know - meta, google or"
+                                        + " kotlinlang");
+                            })
+                            .removeUnusedImports(imports == null || imports.contains(REMOVE));
                 });
         Bind.configured(buildExecutor,
                 inherited.sequencedKeySet(),

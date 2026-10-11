@@ -33,6 +33,77 @@ public class InferredSourceFormattingModuleTest {
     }
 
     @Test
+    public void wires_ktfmt_when_ktfmt_properties_is_present_even_when_empty() throws IOException {
+        Files.writeString(project.resolve("ktfmt.properties"), "");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+        executor.execute("format/ktfmt/required");
+
+        assertThat(coordinates("ktfmt"))
+                .containsExactly("ktfmt-format/runtime/maven/com.facebook/ktfmt/RELEASE");
+    }
+
+    @Test
+    public void refuses_ktfmt_and_ktlint_formatting_the_same_sources() throws IOException {
+        Files.writeString(project.resolve("ktfmt.properties"), "style=google\n");
+        Files.writeString(project.resolve(".editorconfig"), "root = true\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.format.ktlint=false");
+    }
+
+    @Test
+    public void formats_with_ktfmt_alone_once_ktlint_formatting_is_switched_off() throws IOException {
+        Files.writeString(project.resolve("ktfmt.properties"), "style=kotlinlang\nimports=sort\n");
+        Files.writeString(project.resolve(".editorconfig"), "root = true\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()).ktlint(null),
+                "project");
+        executor.execute("format/ktfmt/required");
+
+        assertThat(root.resolve("format").resolve("ktlint")).doesNotExist();
+        assertThat(coordinates("ktfmt"))
+                .containsExactly("ktfmt-format/runtime/maven/com.facebook/ktfmt/RELEASE");
+    }
+
+    @Test
+    public void refuses_a_ktfmt_style_or_imports_ktfmt_does_not_know() throws IOException {
+        Files.writeString(project.resolve("ktfmt.properties"), "style=dropbox\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("style=dropbox")
+                .hasMessageContaining("meta, google or kotlinlang");
+
+        Files.writeString(project.resolve("ktfmt.properties"), "imports=remove\n");
+
+        BuildExecutor again = newExecutor();
+        again.addSource("project", project);
+        again.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(again::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("always sorts");
+    }
+
+    @Test
     public void wires_scalafmt_format_when_scalafmt_conf_is_present() throws IOException {
         Files.writeString(project.resolve(".scalafmt.conf"), "version = \"3.8.3\"\n");
 
