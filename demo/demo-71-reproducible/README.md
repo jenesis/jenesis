@@ -19,7 +19,7 @@ From this directory:
 
 which builds the module and prints
 
-    demo.reproducible-0-SNAPSHOT.jar has the recorded SHA-256 a7e0af811917a9afbfdc9b792cff0edd3e887295051e9332e65715d5f0c51693
+    demo.reproducible-0-SNAPSHOT.jar has the recorded SHA-256 6da78ffee2facbe32ce1693c001c2b678b47c325369a32f691eaadfab1495c25
 
 Layout
 ------
@@ -65,9 +65,10 @@ A release can record the time of its commit instead, with
 When the digest does not match
 ------------------------------
 
-A deliberate change changes the digest: to the sources, to the second paragraph
-of the module's documentation comment (which becomes the SBOM's description), or
-to what Jenesis writes into a jar. Record the new digest in `build/Demo.java`. A
+A deliberate change changes the digest: to the sources, to the module's
+documentation comment (whose first paragraph becomes the manifest's
+`Implementation-Title` and second the SBOM's description), or to what Jenesis
+writes into a jar. Record the new digest in `build/Demo.java`. A
 mismatch on only one runner means something about that runner reached the jar;
 `unzip -Z -v` of the jar from two machines, side by side, shows which entry
 differs.
