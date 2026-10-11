@@ -1700,6 +1700,9 @@ public record Project(
                           bootstrap over the jar, and the tests are handed the model its test
                           support reads; @QuarkusTest runs on the class path only
                       war, ear -> none; a war module is skipped with a [SKIPPED] line
+                      GWT, Android, Angular or Node front ends, Asciidoctor -> none; the tool keeps
+                          to general-purpose functions, so a framework's or platform's build is a
+                          plugin, published as a module and named in jenesis.plugins.properties
                       git-commit-id, buildnumber -> none; pass -Djenesis.project.revision,
                           project.tag and project.tree, which the POM and SBOM record and a
                           plugin reads as scm.revision, scm.tag and scm.tree of the
