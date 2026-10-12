@@ -113,8 +113,7 @@ Every jar is stored once under `jars/`, and the argument file is the launch itse
     "sample.Sample"
 
 What `process-java.properties` gives the program's JVM leads both argument files, as it
-leads the JVM `Execute` starts, and `stage` collects the zip into `stage/packages/` as
-`<artifact>.zip`, so `export` and `release` ship it like any other package.
+leads the JVM `Execute` starts.
 
 Unzipped onto a JRE base, it needs no JDK, no jpackage and no descriptor reader:
 
@@ -229,8 +228,7 @@ own `packaging.properties`, then the demo builds and runs the produced jar:
 
     java build/DemoLauncher.java ada lovelace
 
-`stage` collects the jar into `stage/packages/` as `<artifact>.jar`. Every jar it stores
-keeps its directory entries, so a scan of a package on the class path finds them as it
+Every jar it stores keeps its directory entries, so a scan of a package on the class path finds them as it
 would in the original jar. Of `process-java.properties`, the jar carries the
 `--add-reads`, `--add-exports`, `--add-opens` and `--enable-native-access` lines, which the
 launcher applies as it builds the module graph. Any other JVM option does not travel with

@@ -2121,9 +2121,7 @@ public record Project(
                     only the file kinds it compiles. In the maven layout only a resource directory
                     ships what such a folder holds.
 
-                      packaging.properties      jmod/jlink/bundle/launcher/native booleans, a bundle
-                                                staged as <artifact>.zip and a launcher jar as
-                                                <artifact>.jar in stage/packages,
+                      packaging.properties      jmod/jlink/bundle/launcher/native booleans,
                                                 jpackage=<type>[,<type>...] packaging and staging each,
                                                 a deb with dpkg-deb alone, no fakeroot,
                                                 docker=<image> with docker.label.<name>=<value> lines,
