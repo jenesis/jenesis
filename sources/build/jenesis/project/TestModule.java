@@ -1129,17 +1129,37 @@ public class TestModule implements BuildExecutorModule {
             List<TestTags> covered = new ArrayList<>(ran);
             covered.add(requested);
             new Scope(filter, exclude, covered).store(context.next().resolve("testscope.properties"));
+            SequencedMap<String, String> handed = BuildStep.listing(arguments);
+            CompletionStage<BuildStepResult> result;
             if (directory == null) {
-                return super.apply(executor, context, arguments);
+                result = super.apply(executor, context, arguments);
+            } else {
+                SequencedMap<String, BuildStepArgument> absolute = new LinkedHashMap<>();
+                arguments.forEach((name, argument) -> absolute.put(name, argument.removed()
+                        ? argument
+                        : new BuildStepArgument(argument.folder().toAbsolutePath(), argument.files())));
+                result = super.apply(executor, new BuildStepContext(
+                        context.previous() == null ? null : context.previous().toAbsolutePath(),
+                        context.next().toAbsolutePath(),
+                        context.supplement().toAbsolutePath()), absolute);
             }
-            SequencedMap<String, BuildStepArgument> absolute = new LinkedHashMap<>();
-            arguments.forEach((name, argument) -> absolute.put(name, argument.removed()
-                    ? argument
-                    : new BuildStepArgument(argument.folder().toAbsolutePath(), argument.files())));
-            return super.apply(executor, new BuildStepContext(
-                    context.previous() == null ? null : context.previous().toAbsolutePath(),
-                    context.next().toAbsolutePath(),
-                    context.supplement().toAbsolutePath()), absolute);
+            return result.thenApply(completed -> {
+                SequencedMap<String, String> left;
+                try {
+                    left = BuildStep.listing(arguments);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                if (!handed.equals(left)) {
+                    SequencedSet<String> written = new TreeSet<>(handed.keySet());
+                    written.addAll(left.keySet());
+                    written.removeIf(key -> Objects.equals(handed.get(key), left.get(key)));
+                    throw new IllegalStateException("The tests wrote into the folders the build handed them: "
+                            + written + " - a test writes into its working directory or a temporary folder, never"
+                            + " beside what it tests, as the steps after it read those folders as they were built");
+                }
+                return completed;
+            });
         }
 
         @Override
