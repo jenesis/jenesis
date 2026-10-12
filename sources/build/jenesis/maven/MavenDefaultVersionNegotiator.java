@@ -16,12 +16,7 @@ public class MavenDefaultVersionNegotiator implements MavenVersionNegotiator {
     }
 
     static DocumentBuilderFactory toDocumentBuilderFactory() {
-        return toDocumentBuilderFactory(true);
-    }
-
-    static DocumentBuilderFactory toDocumentBuilderFactory(boolean namespaceAware) {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        factory.setNamespaceAware(namespaceAware);
         try {
             factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -304,26 +299,26 @@ public class MavenDefaultVersionNegotiator implements MavenVersionNegotiator {
             metadata = switch (document.getDocumentElement().getAttribute("modelVersion")) {
                 case "", "1.1.0" -> {
                     Node versioning = toChildren(document.getDocumentElement())
-                            .filter(node -> Objects.equals(node.getLocalName(), "versioning"))
+                            .filter(node -> Objects.equals(node.getNodeName(), "versioning"))
                             .findFirst()
                             .orElseThrow(missing("versioning"));
                     yield new Metadata(
                             toChildren(versioning)
-                                    .filter(node -> Objects.equals(node.getLocalName(), "latest"))
+                                    .filter(node -> Objects.equals(node.getNodeName(), "latest"))
                                     .findFirst()
                                     .map(Node::getTextContent)
                                     .orElse(null),
                             toChildren(versioning)
-                                    .filter(node -> Objects.equals(node.getLocalName(), "release"))
+                                    .filter(node -> Objects.equals(node.getNodeName(), "release"))
                                     .findFirst()
                                     .map(Node::getTextContent)
                                     .orElse(null),
                             toChildren(versioning)
-                                    .filter(node -> Objects.equals(node.getLocalName(), "versions"))
+                                    .filter(node -> Objects.equals(node.getNodeName(), "versions"))
                                     .findFirst()
                                     .stream()
                                     .flatMap(MavenPomResolver::toChildren)
-                                    .filter(node -> Objects.equals(node.getLocalName(), "version"))
+                                    .filter(node -> Objects.equals(node.getNodeName(), "version"))
                                     .map(Node::getTextContent)
                                     .toList());
                 }

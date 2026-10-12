@@ -36,7 +36,7 @@ public class MavenPomResolver implements MavenResolver {
     private final transient Consumer<String> printing;
     private final transient Palette palette;
     private final transient Set<String> printed;
-    private final transient DocumentBuilderFactory factory = MavenDefaultVersionNegotiator.toDocumentBuilderFactory(false);
+    private final transient DocumentBuilderFactory factory = MavenDefaultVersionNegotiator.toDocumentBuilderFactory();
 
     public MavenPomResolver() {
         this(MavenDefaultVersionNegotiator.maven());
