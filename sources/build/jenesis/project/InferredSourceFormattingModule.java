@@ -20,6 +20,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
             LICENSE = "license";
     private static final String FORMATTER = "formatter", STYLE = "style", REFLOW = "reflow", JAVADOC = "javadoc", IMPORTS = "imports", PROFILE = "profile";
     private static final String SORT = "sort", REMOVE = "remove", NONE = "none";
+    private static final String TEXT = "text";
     private static final Set<String> GOOGLE_KEYS = Set.of(FORMATTER, STYLE, REFLOW, JAVADOC, IMPORTS);
     private static final Set<String> PALANTIR_KEYS = Set.of(FORMATTER, REFLOW, IMPORTS);
     private static final Set<String> ECLIPSE_KEYS = Set.of(FORMATTER, PROFILE);
@@ -318,7 +319,15 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 LICENSE,
                 license,
                 LicenseHeaderModule.configurationFile(configuration),
-                properties -> licenseModule.verify(verify).configuration(properties))) {
+                properties -> {
+                    for (String key : properties.stringPropertyNames()) {
+                        if (!key.equals(TEXT)) {
+                            throw new IllegalArgumentException(LicenseHeaderModule.CONFIGURATION + " names " + key
+                                    + ", but takes " + TEXT + "=<the header> alone");
+                        }
+                    }
+                    return licenseModule.verify(verify).text(properties.value(TEXT));
+                })) {
             inputs.add(LICENSE);
         }
         Path javaFormat = BuildStep.locate(configuration, "javaformat.properties");

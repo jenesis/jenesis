@@ -13,7 +13,7 @@ import build.jenesis.step.Dependencies;
 
 public class LicenseHeaderModule implements BuildExecutorModule {
 
-    public static final String FORMAT = "format", CONFIGURATION = "licenseheader.properties", TEXT = "text";
+    public static final String FORMAT = "format", CONFIGURATION = "licenseheader.properties";
     private static final Set<String> EXTENSIONS = Set.of(".java", ".kt", ".scala", ".groovy");
 
     private final boolean verify;
@@ -38,16 +38,6 @@ public class LicenseHeaderModule implements BuildExecutorModule {
 
     public LicenseHeaderModule text(String text) {
         return new LicenseHeaderModule(verify, text);
-    }
-
-    public LicenseHeaderModule configuration(SequencedProperties configuration) {
-        for (String key : configuration.stringPropertyNames()) {
-            if (!key.equals(TEXT)) {
-                throw new IllegalArgumentException(CONFIGURATION + " names " + key + ", but takes " + TEXT
-                        + "=<the header> alone");
-            }
-        }
-        return text(configuration.value(TEXT));
     }
 
     @Override
@@ -92,11 +82,11 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                     }
                 }
                 if (declared.size() != 1) {
-                    throw new IllegalStateException("A license header without " + TEXT + " in " + CONFIGURATION
-                            + " names the one license the project declares, but it declares "
+                    throw new IllegalStateException("A license header without a text names the one license the project"
+                            + " declares, but it declares "
                             + (declared.isEmpty() ? "none" : declared.size() + " (" + String.join(", ", declared) + ")")
                             + " - declare one in the <licenses> of the pom.xml or as license.<id>.name in project.properties,"
-                            + " or set " + TEXT + "=<the header>");
+                            + " or set text=<the header> in " + CONFIGURATION);
                 }
                 License license = new License(null,
                         null,
@@ -105,7 +95,7 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                 if (license.id() == null) {
                     throw new IllegalStateException("The declared license " + license.label() + " has no SPDX identifier"
                             + " to name in a license header - map it with alias/<license name>=<SPDX id> in spdx.properties,"
-                            + " or set " + TEXT + "=<the header> in " + CONFIGURATION);
+                            + " or set text=<the header> in " + CONFIGURATION);
                 }
                 String copyright = metadata.value("copyright");
                 header = (copyright == null ? "" : "// SPDX-FileCopyrightText: " + copyright + "\n")

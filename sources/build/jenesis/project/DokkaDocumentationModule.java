@@ -23,34 +23,9 @@ import build.jenesis.step.ProcessHandler;
 public class DokkaDocumentationModule implements BuildExecutorModule {
 
     public static final String DOCUMENTED = "documented";
-    private static final String REQUIRED = "required",
-            ARTIFACTS = "artifacts",
-            DEPENDENCIES = "dependencies",
-            FILES = "dokka/",
-            EXTERNAL_LINK = "external-link.",
-            PACKAGE_LIST = ".package-list";
+    private static final String REQUIRED = "required", ARTIFACTS = "artifacts", DEPENDENCIES = "dependencies", FILES = "dokka/";
     private static final String MAVEN_GROUP = "org.jetbrains.dokka", JAVADOC_PLUGIN = "javadoc-plugin";
-    private static final List<String> CLI_ARTIFACTS = List.of(
-            "dokka-cli", "dokka-base", "analysis-kotlin-symbols");
-    private static final Set<String> KEYS = Set.of("module-name",
-            "includes",
-            "format",
-            "documented-visibilities",
-            "suppress-obvious-functions",
-            "suppress-inherited-members",
-            "skip-empty-packages",
-            "skip-deprecated",
-            "report-undocumented",
-            "suppressed-packages",
-            "fail-on-warning",
-            "jdk-version",
-            "source-link",
-            "source-link-suffix",
-            "custom-assets",
-            "custom-styles",
-            "footer-message");
-    private static final Set<String> VISIBILITIES = Set.of("public", "protected", "internal", "private", "package");
-    private static final Set<String> FORMATS = Set.of("html", "javadoc");
+    private static final List<String> CLI_ARTIFACTS = List.of("dokka-cli", "dokka-base", "analysis-kotlin-symbols");
 
     private final Map<String, Resolver> resolvers;
     private final Dependencies dependencies;
@@ -60,8 +35,24 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
     private final String within;
     private final Function<List<String>, ? extends ProcessHandler> factory;
     private final ProcessBuildStep.Terms terms;
-    private final SequencedProperties config;
-    private final Path location;
+    private final String moduleName;
+    private final Format format;
+    private final List<Path> includes;
+    private final Set<Visibility> documentedVisibilities;
+    private final boolean suppressObviousFunctions;
+    private final boolean suppressInheritedMembers;
+    private final boolean skipEmptyPackages;
+    private final boolean skipDeprecated;
+    private final boolean reportUndocumented;
+    private final List<Pattern> suppressedPackages;
+    private final boolean failOnWarning;
+    private final Integer jdkVersion;
+    private final URI sourceLink;
+    private final String sourceLinkSuffix;
+    private final SequencedMap<URI, URI> externalLinks;
+    private final List<Path> customAssets;
+    private final List<Path> customStyles;
+    private final String footerMessage;
 
     public DokkaDocumentationModule(Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) {
@@ -73,13 +64,29 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
              null,
              null,
              new ProcessBuildStep.Terms(),
-             new SequencedProperties(),
+             "documentation",
+             Format.HTML,
+             List.of(),
+             Collections.emptySet(),
+             true,
+             false,
+             true,
+             false,
+             false,
+             List.of(),
+             false,
+             null,
+             null,
+             "#L",
+             Collections.emptyNavigableMap(),
+             List.of(),
+             List.of(),
              null);
     }
 
     public static DokkaDocumentationModule ofEnvironment(Environment environment,
-                                                  Map<String, Repository> repositories,
-                                                  Map<String, Resolver> resolvers) {
+                                                         Map<String, Repository> repositories,
+                                                         Map<String, Resolver> resolvers) {
         return new DokkaDocumentationModule(resolvers,
                 Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
@@ -88,7 +95,23 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
                 null,
                 null,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "dokka"),
-                new SequencedProperties(),
+                "documentation",
+                Format.HTML,
+                List.of(),
+                Collections.emptySet(),
+                true,
+                false,
+                true,
+                false,
+                false,
+                List.of(),
+                false,
+                null,
+                null,
+                "#L",
+                Collections.emptyNavigableMap(),
+                List.of(),
+                List.of(),
                 null);
     }
 
@@ -100,8 +123,24 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
                                      String within,
                                      Function<List<String>, ? extends ProcessHandler> factory,
                                      ProcessBuildStep.Terms terms,
-                                     SequencedProperties config,
-                                     Path location) {
+                                     String moduleName,
+                                     Format format,
+                                     List<Path> includes,
+                                     Set<Visibility> documentedVisibilities,
+                                     boolean suppressObviousFunctions,
+                                     boolean suppressInheritedMembers,
+                                     boolean skipEmptyPackages,
+                                     boolean skipDeprecated,
+                                     boolean reportUndocumented,
+                                     List<Pattern> suppressedPackages,
+                                     boolean failOnWarning,
+                                     Integer jdkVersion,
+                                     URI sourceLink,
+                                     String sourceLinkSuffix,
+                                     SequencedMap<URI, URI> externalLinks,
+                                     List<Path> customAssets,
+                                     List<Path> customStyles,
+                                     String footerMessage) {
         this.resolvers = resolvers;
         this.dependencies = dependencies;
         this.pinning = pinning;
@@ -110,129 +149,270 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
         this.within = within;
         this.factory = factory;
         this.terms = terms;
-        this.config = config;
-        this.location = location;
+        this.moduleName = moduleName;
+        this.format = format;
+        this.includes = includes;
+        this.documentedVisibilities = documentedVisibilities;
+        this.suppressObviousFunctions = suppressObviousFunctions;
+        this.suppressInheritedMembers = suppressInheritedMembers;
+        this.skipEmptyPackages = skipEmptyPackages;
+        this.skipDeprecated = skipDeprecated;
+        this.reportUndocumented = reportUndocumented;
+        this.suppressedPackages = suppressedPackages;
+        this.failOnWarning = failOnWarning;
+        this.jdkVersion = jdkVersion;
+        this.sourceLink = sourceLink;
+        this.sourceLinkSuffix = sourceLinkSuffix;
+        this.externalLinks = externalLinks;
+        this.customAssets = customAssets;
+        this.customStyles = customStyles;
+        this.footerMessage = footerMessage;
     }
 
     public DokkaDocumentationModule factory(Function<List<String>, ? extends ProcessHandler> factory) {
-        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms, config, location);
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
     }
 
     public DokkaDocumentationModule pinning(Pinning pinning) {
-        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms, config, location);
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
     }
 
     public DokkaDocumentationModule tool(String tool) {
-        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms, config, location);
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
     }
 
     public DokkaDocumentationModule group(String group) {
-        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms, config, location);
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
     }
 
     public DokkaDocumentationModule within(String within) {
-        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms, config, location);
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
     }
 
     public DokkaDocumentationModule printing(BiConsumer<Boolean, String> printing) {
-        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms.printing(printing), config, location);
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory,
+                terms.printing(printing), moduleName, format, includes, documentedVisibilities,
+                suppressObviousFunctions, suppressInheritedMembers, skipEmptyPackages, skipDeprecated,
+                reportUndocumented, suppressedPackages, failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix,
+                externalLinks, customAssets, customStyles, footerMessage);
     }
 
-    public DokkaDocumentationModule config(SequencedProperties config) {
-        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms, config, location);
+    public DokkaDocumentationModule moduleName(String moduleName) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
     }
 
-    public DokkaDocumentationModule location(Path location) {
-        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms, config, location);
+    public DokkaDocumentationModule format(Format format) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
+    }
+
+    public DokkaDocumentationModule includes(List<Path> includes) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, List.copyOf(includes), documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
+    }
+
+    public DokkaDocumentationModule documentedVisibilities(Set<Visibility> documentedVisibilities) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, Set.copyOf(documentedVisibilities), suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
+    }
+
+    public DokkaDocumentationModule suppressObviousFunctions(boolean suppressObviousFunctions) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
+    }
+
+    public DokkaDocumentationModule suppressInheritedMembers(boolean suppressInheritedMembers) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
+    }
+
+    public DokkaDocumentationModule skipEmptyPackages(boolean skipEmptyPackages) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
+    }
+
+    public DokkaDocumentationModule skipDeprecated(boolean skipDeprecated) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
+    }
+
+    public DokkaDocumentationModule reportUndocumented(boolean reportUndocumented) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
+    }
+
+    public DokkaDocumentationModule suppressedPackages(List<Pattern> suppressedPackages) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented,
+                List.copyOf(suppressedPackages), failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks,
+                customAssets, customStyles, footerMessage);
+    }
+
+    public DokkaDocumentationModule failOnWarning(boolean failOnWarning) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
+    }
+
+    public DokkaDocumentationModule jdkVersion(Integer jdkVersion) {
+        if (jdkVersion != null && jdkVersion < 1) {
+            throw new IllegalArgumentException("The JDK version " + jdkVersion + " is no feature release of the JDK"
+                    + " whose documentation Dokka links to, expected one such as 17");
+        }
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
+    }
+
+    public DokkaDocumentationModule sourceLink(URI sourceLink) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
+    }
+
+    public DokkaDocumentationModule sourceLinkSuffix(String sourceLinkSuffix) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
+    }
+
+    public DokkaDocumentationModule externalLinks(SequencedMap<URI, URI> externalLinks) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix,
+                Collections.unmodifiableSequencedMap(new LinkedHashMap<>(externalLinks)), customAssets, customStyles,
+                footerMessage);
+    }
+
+    public DokkaDocumentationModule externalLink(URI url, URI packageList) {
+        SequencedMap<URI, URI> added = new LinkedHashMap<>(externalLinks);
+        added.put(url, packageList);
+        return externalLinks(added);
+    }
+
+    public DokkaDocumentationModule externalLink(URI url) {
+        String root = url.toString();
+        return externalLink(url, URI.create((root.endsWith("/") ? root : root + "/") + "package-list"));
+    }
+
+    public DokkaDocumentationModule customAssets(List<Path> customAssets) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, List.copyOf(customAssets),
+                customStyles, footerMessage);
+    }
+
+    public DokkaDocumentationModule customStyles(List<Path> customStyles) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets,
+                List.copyOf(customStyles), footerMessage);
+    }
+
+    public DokkaDocumentationModule footerMessage(String footerMessage) {
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms,
+                moduleName, format, includes, documentedVisibilities, suppressObviousFunctions,
+                suppressInheritedMembers, skipEmptyPackages, skipDeprecated, reportUndocumented, suppressedPackages,
+                failOnWarning, jdkVersion, sourceLink, sourceLinkSuffix, externalLinks, customAssets, customStyles,
+                footerMessage);
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        for (String key : config.stringPropertyNames()) {
-            String link = key.startsWith(EXTERNAL_LINK) ? key.substring(EXTERNAL_LINK.length()) : null;
-            if (link != null && link.endsWith(PACKAGE_LIST)) {
-                link = link.substring(0, link.length() - PACKAGE_LIST.length());
-                if (config.value(EXTERNAL_LINK + link) == null) {
-                    throw new IllegalArgumentException("The dokka property " + key + " names the package-list of no"
-                            + " link - declare " + EXTERNAL_LINK + link + "=<url> beside it");
-                }
-            }
-            if (!KEYS.contains(key) && (link == null || link.isEmpty() || link.contains("."))) {
-                throw new IllegalArgumentException("Unknown dokka property: " + key + " (expected one of "
-                        + new TreeSet<>(KEYS) + ", " + EXTERNAL_LINK + "<name> or " + EXTERNAL_LINK + "<name>"
-                        + PACKAGE_LIST + ")");
-            }
-        }
-        String format = config.value("format", "html");
-        if (!FORMATS.contains(format)) {
-            throw new IllegalArgumentException("Unknown dokka format: " + format + " (expected one of "
-                    + new TreeSet<>(FORMATS) + ")");
-        }
-        List<String> visibilities = new ArrayList<>();
-        for (String visibility : Objects.requireNonNullElse(config.entries("documented-visibilities"), List.<String>of())) {
-            if (!VISIBILITIES.contains(visibility.toLowerCase(Locale.ROOT))) {
-                throw new IllegalArgumentException("Unknown dokka visibility in documented-visibilities: " + visibility
-                        + " (expected one of " + new TreeSet<>(VISIBILITIES) + ")");
-            }
-            visibilities.add(visibility.toUpperCase(Locale.ROOT));
-        }
-        String jdk = config.value("jdk-version");
-        if (jdk != null && !jdk.matches("[1-9][0-9]{0,3}")) {
-            throw new IllegalArgumentException("The dokka property jdk-version is " + jdk + ", but names the feature"
-                    + " release of the JDK whose documentation Dokka links to, such as 17");
-        }
-        String sourceLink = config.value("source-link");
-        if (sourceLink == null && config.value("source-link-suffix") != null) {
-            throw new IllegalArgumentException("The dokka property source-link-suffix names the line suffix of a"
-                    + " source link, but source-link names none - declare source-link=<url of the source folder>");
-        }
-        SequencedMap<String, String> externalLinks = new LinkedHashMap<>();
-        for (String key : new TreeSet<>(config.stringPropertyNames())) {
-            if (key.startsWith(EXTERNAL_LINK) && !key.endsWith(PACKAGE_LIST)) {
-                String url = config.value(key);
-                if (url == null) {
-                    throw new IllegalArgumentException("The dokka property " + key + " names no URL - name the root"
-                            + " of the documentation to link to");
-                }
-                externalLinks.put(url, config.value(key + PACKAGE_LIST,
-                        (url.endsWith("/") ? url : url + "/") + "package-list"));
-            }
-        }
         SequencedMap<String, Path> bound = new LinkedHashMap<>();
         SequencedMap<String, List<String>> files = new LinkedHashMap<>();
-        for (String key : List.of("includes", "custom-assets", "custom-styles")) {
+        for (Map.Entry<String, List<Path>> kind : List.of(Map.entry("includes", includes),
+                Map.entry("assets", customAssets),
+                Map.entry("styles", customStyles))) {
             List<String> targets = new ArrayList<>();
-            for (String value : Objects.requireNonNullElse(config.entries(key), List.<String>of())) {
-                Path source = location == null ? Path.of(value) : location.resolve(value);
+            for (Path source : kind.getValue()) {
                 if (!Files.isRegularFile(source)) {
-                    throw new IllegalArgumentException("The dokka property " + key + " names " + value + ", but "
-                            + source.toAbsolutePath().normalize() + " is no file - name a file relative to the"
-                            + " module's folder" + (location == null ? "" : " " + location));
+                    throw new IllegalArgumentException("Dokka is handed " + source.toAbsolutePath().normalize()
+                            + " among its " + kind.getKey() + ", but it is no file - name an existing file");
                 }
-                String target = FILES + key + "/" + targets.size() + "/" + source.getFileName();
+                String target = FILES + kind.getKey() + "/" + targets.size() + "/" + source.getFileName();
                 bound.put(target, source);
                 targets.add(target);
             }
-            files.put(key, targets);
+            files.put(kind.getKey(), targets);
         }
-        Options options = new Options(config.value("module-name", "documentation"),
-                format,
+        Options options = new Options(moduleName,
                 files.get("includes"),
-                visibilities,
-                config.flag("suppress-obvious-functions", true),
-                config.flag("suppress-inherited-members", false),
-                config.flag("skip-empty-packages", true),
-                config.flag("skip-deprecated", false),
-                config.flag("report-undocumented", false),
-                Objects.requireNonNullElse(config.entries("suppressed-packages"), List.of()),
-                config.flag("fail-on-warning", false),
-                jdk == null ? null : Integer.valueOf(jdk),
+                Arrays.stream(Visibility.values()).filter(documentedVisibilities::contains).toList(),
+                suppressObviousFunctions,
+                suppressInheritedMembers,
+                skipEmptyPackages,
+                skipDeprecated,
+                reportUndocumented,
+                suppressedPackages,
+                failOnWarning,
+                jdkVersion,
                 sourceLink,
-                config.value("source-link-suffix", "#L"),
-                externalLinks,
-                files.get("custom-assets"),
-                files.get("custom-styles"),
-                config.value("footer-message"));
+                sourceLinkSuffix,
+                new LinkedHashMap<>(externalLinks),
+                files.get("assets"),
+                files.get("styles"),
+                footerMessage);
         SequencedSet<String> upstream = inherited.sequencedKeySet();
         buildExecutor.addStep(REQUIRED, new Requires(resolvers.containsKey("maven"), tool, format), upstream);
         SequencedSet<String> resolveInputs = new LinkedHashSet<>();
@@ -268,26 +448,25 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
     }
 
     private record Options(String moduleName,
-                           String format,
                            List<String> includes,
-                           List<String> documentedVisibilities,
+                           List<Visibility> documentedVisibilities,
                            boolean suppressObviousFunctions,
                            boolean suppressInheritedMembers,
                            boolean skipEmptyPackages,
                            boolean skipDeprecated,
                            boolean reportUndocumented,
-                           List<String> suppressedPackages,
+                           List<Pattern> suppressedPackages,
                            boolean failOnWarning,
                            Integer jdkVersion,
-                           String sourceLink,
+                           URI sourceLink,
                            String sourceLinkSuffix,
-                           SequencedMap<String, String> externalLinks,
+                           LinkedHashMap<URI, URI> externalLinks,
                            List<String> customAssets,
                            List<String> customStyles,
                            String footerMessage) implements Serializable {
     }
 
-    private record Requires(boolean maven, String tool, String format) implements BuildStep {
+    private record Requires(boolean maven, String tool, Format format) implements BuildStep {
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -296,7 +475,7 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
                 throws IOException {
             SequencedProperties requires = new SequencedProperties();
             if (maven) {
-                for (String artifact : format.equals("javadoc")
+                for (String artifact : format == Format.JAVADOC
                         ? Stream.concat(CLI_ARTIFACTS.stream(), Stream.of(JAVADOC_PLUGIN)).toList()
                         : CLI_ARTIFACTS) {
                     requires.setProperty(tool + "/runtime/maven/" + MAVEN_GROUP + "/" + artifact + "/RELEASE", "");
@@ -416,7 +595,7 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
                     .toList()) {
                 if (!files.containsKey(file)) {
                     throw new IllegalStateException("No input of the Dokka step binds " + file
-                            + ", which dokka.properties names");
+                            + ", which it is configured to hand to Dokka");
                 }
             }
             StringBuilder base = new StringBuilder();
@@ -456,7 +635,7 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
                 sourceSet.append(",\n    \"suppressedFiles\": ").append(strings(versioned));
             }
             if (!options.documentedVisibilities().isEmpty()) {
-                sourceSet.append(",\n    \"documentedVisibilities\": ").append(strings(options.documentedVisibilities()));
+                sourceSet.append(",\n    \"documentedVisibilities\": ").append(strings(options.documentedVisibilities().stream().map(Visibility::name).toList()));
             }
             if (options.jdkVersion() != null) {
                 sourceSet.append(",\n    \"jdkVersion\": ").append(options.jdkVersion());
@@ -465,7 +644,7 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
                 sourceSet.append(",\n    \"sourceLinks\": [")
                         .append(sources.stream()
                                 .map(root -> "{\"localDirectory\": \"" + Json.escaped(Path.of(root).toAbsolutePath().toString())
-                                        + "\", \"remoteUrl\": \"" + Json.escaped(options.sourceLink())
+                                        + "\", \"remoteUrl\": \"" + Json.escaped(options.sourceLink().toString())
                                         + "\", \"remoteLineSuffix\": \"" + Json.escaped(options.sourceLinkSuffix())
                                         + "\"}")
                                 .collect(Collectors.joining(", ")))
@@ -474,15 +653,15 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
             if (!options.externalLinks().isEmpty()) {
                 sourceSet.append(",\n    \"externalDocumentationLinks\": [")
                         .append(options.externalLinks().entrySet().stream()
-                                .map(link -> "{\"url\": \"" + Json.escaped(link.getKey())
-                                        + "\", \"packageListUrl\": \"" + Json.escaped(link.getValue()) + "\"}")
+                                .map(link -> "{\"url\": \"" + Json.escaped(link.getKey().toString())
+                                        + "\", \"packageListUrl\": \"" + Json.escaped(link.getValue().toString()) + "\"}")
                                 .collect(Collectors.joining(", ")))
                         .append(']');
             }
             if (!options.suppressedPackages().isEmpty()) {
                 sourceSet.append(",\n    \"perPackageOptions\": [")
                         .append(options.suppressedPackages().stream()
-                                .map(pattern -> "{\"matchingRegex\": \"" + Json.escaped(pattern)
+                                .map(pattern -> "{\"matchingRegex\": \"" + Json.escaped(pattern.pattern())
                                         + "\", \"suppress\": true, \"includeNonPublic\": false,"
                                         + " \"skipDeprecated\": false, \"documentedVisibilities\": []}")
                                 .collect(Collectors.joining(", ")))
@@ -512,5 +691,15 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
                     .map(value -> "\"" + Json.escaped(value) + "\"")
                     .collect(Collectors.joining(", ", "[", "]"));
         }
+    }
+
+    public enum Format {
+
+        HTML, JAVADOC
+    }
+
+    public enum Visibility {
+
+        PUBLIC, PROTECTED, INTERNAL, PRIVATE, PACKAGE
     }
 }

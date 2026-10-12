@@ -136,6 +136,47 @@ public class InferredSourceFormattingModuleTest {
     }
 
     @Test
+    public void writes_the_header_the_text_of_licenseheader_properties_holds() throws IOException {
+        Files.writeString(project.resolve("licenseheader.properties"), """
+                text=Copyright 2026 the original author or authors.\\n\\n\\
+                  Licensed under the Apache License, Version 2.0.
+                """);
+        Path sample = Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"))
+                .resolve("Sample.java"), "package sample;\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()).verify(false),
+                "project");
+        executor.execute();
+
+        assertThat(sample).hasContent("""
+                /*
+                 * Copyright 2026 the original author or authors.
+                 *
+                 * Licensed under the Apache License, Version 2.0.
+                 */
+
+                package sample;
+                """);
+    }
+
+    @Test
+    public void refuses_a_licenseheader_properties_with_another_key_than_text() throws IOException {
+        Files.writeString(project.resolve("licenseheader.properties"), "text=Copyright 2026 the authors.\nyear=2026\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("licenseheader.properties names year, but takes text=<the header> alone");
+    }
+
+    @Test
     public void wires_scalafmt_format_when_scalafmt_conf_is_present() throws IOException {
         Files.writeString(project.resolve(".scalafmt.conf"), "version = \"3.8.3\"\n");
 

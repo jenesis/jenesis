@@ -20,6 +20,42 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
     public static final String JAVADOC = "javadoc", GROOVYDOC = "groovydoc", SCALADOC = "scaladoc", DOKKA = "dokka";
     public static final String DOCUMENT = "document", AGGREGATE = "aggregate";
     private static final String SCAN = "scan", SCAN_FILE = "scan.properties";
+    private static final String MODULE_NAME = "module-name",
+            INCLUDES = "includes",
+            FORMAT = "format",
+            DOCUMENTED_VISIBILITIES = "documented-visibilities",
+            SUPPRESS_OBVIOUS_FUNCTIONS = "suppress-obvious-functions",
+            SUPPRESS_INHERITED_MEMBERS = "suppress-inherited-members",
+            SKIP_EMPTY_PACKAGES = "skip-empty-packages",
+            SKIP_DEPRECATED = "skip-deprecated",
+            REPORT_UNDOCUMENTED = "report-undocumented",
+            SUPPRESSED_PACKAGES = "suppressed-packages",
+            FAIL_ON_WARNING = "fail-on-warning",
+            JDK_VERSION = "jdk-version",
+            SOURCE_LINK = "source-link",
+            SOURCE_LINK_SUFFIX = "source-link-suffix",
+            CUSTOM_ASSETS = "custom-assets",
+            CUSTOM_STYLES = "custom-styles",
+            FOOTER_MESSAGE = "footer-message",
+            EXTERNAL_LINK = "external-link.",
+            PACKAGE_LIST = ".package-list";
+    private static final Set<String> DOKKA_KEYS = Set.of(MODULE_NAME,
+            INCLUDES,
+            FORMAT,
+            DOCUMENTED_VISIBILITIES,
+            SUPPRESS_OBVIOUS_FUNCTIONS,
+            SUPPRESS_INHERITED_MEMBERS,
+            SKIP_EMPTY_PACKAGES,
+            SKIP_DEPRECATED,
+            REPORT_UNDOCUMENTED,
+            SUPPRESSED_PACKAGES,
+            FAIL_ON_WARNING,
+            JDK_VERSION,
+            SOURCE_LINK,
+            SOURCE_LINK_SUFFIX,
+            CUSTOM_ASSETS,
+            CUSTOM_STYLES,
+            FOOTER_MESSAGE);
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
@@ -264,9 +300,7 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                         resolvers,
                         pinning,
                         javadocStep,
-                        dokkaModule.location(location).config(dokkaProperties == null
-                                ? new SequencedProperties()
-                                : SequencedProperties.ofFiles(dokkaProperties)),
+                        dokkaProperties == null ? dokkaModule : configured(dokkaModule, dokkaProperties, location),
                         scaladocModule,
                         groovydocModule,
                         javadoc,
@@ -283,6 +317,154 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
     @Override
     public Optional<String> resolve(String path) {
         return path.equals(SCAN) ? Optional.empty() : Optional.of(path);
+    }
+
+    private static DokkaDocumentationModule configured(DokkaDocumentationModule module, Path file, Path location)
+            throws IOException {
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        for (String key : properties.stringPropertyNames()) {
+            String link = key.startsWith(EXTERNAL_LINK) ? key.substring(EXTERNAL_LINK.length()) : null;
+            if (link != null && link.endsWith(PACKAGE_LIST)) {
+                link = link.substring(0, link.length() - PACKAGE_LIST.length());
+                if (properties.value(EXTERNAL_LINK + link) == null) {
+                    throw new IllegalArgumentException("The dokka property " + key + " of " + file + " names the"
+                            + " package-list of no link - declare " + EXTERNAL_LINK + link + "=<url> beside it");
+                }
+            }
+            if (!DOKKA_KEYS.contains(key) && (link == null || link.isEmpty() || link.contains("."))) {
+                throw new IllegalArgumentException("Unknown dokka property: " + key + " in " + file + " (expected one of "
+                        + new TreeSet<>(DOKKA_KEYS) + ", " + EXTERNAL_LINK + "<name> or " + EXTERNAL_LINK + "<name>"
+                        + PACKAGE_LIST + ")");
+            }
+        }
+        String moduleName = properties.value(MODULE_NAME);
+        if (moduleName != null) {
+            module = module.moduleName(moduleName);
+        }
+        String format = properties.value(FORMAT);
+        if (format != null) {
+            module = module.format(Arrays.stream(DokkaDocumentationModule.Format.values())
+                    .filter(candidate -> candidate.name().toLowerCase(Locale.ROOT).equals(format))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown dokka format: " + format + " in " + file
+                            + " (expected one of " + Arrays.stream(DokkaDocumentationModule.Format.values())
+                                    .map(candidate -> candidate.name().toLowerCase(Locale.ROOT))
+                                    .toList() + ")")));
+        }
+        List<String> visibilities = properties.entries(DOCUMENTED_VISIBILITIES);
+        if (visibilities != null) {
+            Set<DokkaDocumentationModule.Visibility> documented = new LinkedHashSet<>();
+            for (String visibility : visibilities) {
+                documented.add(Arrays.stream(DokkaDocumentationModule.Visibility.values())
+                        .filter(candidate -> candidate.name().equalsIgnoreCase(visibility))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Unknown dokka visibility in "
+                                + DOCUMENTED_VISIBILITIES + " of " + file + ": " + visibility + " (expected one of "
+                                + Arrays.stream(DokkaDocumentationModule.Visibility.values())
+                                        .map(candidate -> candidate.name().toLowerCase(Locale.ROOT))
+                                        .sorted()
+                                        .toList() + ")")));
+            }
+            module = module.documentedVisibilities(documented);
+        }
+        Boolean suppressObviousFunctions = properties.flagOrNull(SUPPRESS_OBVIOUS_FUNCTIONS);
+        if (suppressObviousFunctions != null) {
+            module = module.suppressObviousFunctions(suppressObviousFunctions);
+        }
+        Boolean suppressInheritedMembers = properties.flagOrNull(SUPPRESS_INHERITED_MEMBERS);
+        if (suppressInheritedMembers != null) {
+            module = module.suppressInheritedMembers(suppressInheritedMembers);
+        }
+        Boolean skipEmptyPackages = properties.flagOrNull(SKIP_EMPTY_PACKAGES);
+        if (skipEmptyPackages != null) {
+            module = module.skipEmptyPackages(skipEmptyPackages);
+        }
+        Boolean skipDeprecated = properties.flagOrNull(SKIP_DEPRECATED);
+        if (skipDeprecated != null) {
+            module = module.skipDeprecated(skipDeprecated);
+        }
+        Boolean reportUndocumented = properties.flagOrNull(REPORT_UNDOCUMENTED);
+        if (reportUndocumented != null) {
+            module = module.reportUndocumented(reportUndocumented);
+        }
+        Boolean failOnWarning = properties.flagOrNull(FAIL_ON_WARNING);
+        if (failOnWarning != null) {
+            module = module.failOnWarning(failOnWarning);
+        }
+        List<String> suppressed = properties.entries(SUPPRESSED_PACKAGES);
+        if (suppressed != null) {
+            List<Pattern> patterns = new ArrayList<>();
+            for (String pattern : suppressed) {
+                try {
+                    patterns.add(Pattern.compile(pattern));
+                } catch (PatternSyntaxException e) {
+                    throw new IllegalArgumentException("The dokka property " + SUPPRESSED_PACKAGES + " of " + file
+                            + " names " + pattern + ", which is no regular expression of package names: "
+                            + e.getDescription());
+                }
+            }
+            module = module.suppressedPackages(patterns);
+        }
+        String jdk = properties.value(JDK_VERSION);
+        if (jdk != null) {
+            if (!jdk.matches("[1-9][0-9]{0,3}")) {
+                throw new IllegalArgumentException("The dokka property " + JDK_VERSION + " of " + file + " is " + jdk
+                        + ", but names the feature release of the JDK whose documentation Dokka links to, such as 17");
+            }
+            module = module.jdkVersion(Integer.valueOf(jdk));
+        }
+        String sourceLink = properties.value(SOURCE_LINK), sourceLinkSuffix = properties.value(SOURCE_LINK_SUFFIX);
+        if (sourceLink == null && sourceLinkSuffix != null) {
+            throw new IllegalArgumentException("The dokka property " + SOURCE_LINK_SUFFIX + " of " + file + " names"
+                    + " the line suffix of a source link, but " + SOURCE_LINK + " names none - declare " + SOURCE_LINK
+                    + "=<url of the source folder>");
+        }
+        if (sourceLink != null) {
+            module = module.sourceLink(url(file, SOURCE_LINK, sourceLink));
+        }
+        if (sourceLinkSuffix != null) {
+            module = module.sourceLinkSuffix(sourceLinkSuffix);
+        }
+        for (String key : new TreeSet<>(properties.stringPropertyNames())) {
+            if (key.startsWith(EXTERNAL_LINK) && !key.endsWith(PACKAGE_LIST)) {
+                String url = properties.value(key), packageList = properties.value(key + PACKAGE_LIST);
+                if (url == null) {
+                    throw new IllegalArgumentException("The dokka property " + key + " of " + file + " names no URL"
+                            + " - name the root of the documentation to link to");
+                }
+                module = packageList == null
+                        ? module.externalLink(url(file, key, url))
+                        : module.externalLink(url(file, key, url), url(file, key + PACKAGE_LIST, packageList));
+            }
+        }
+        SequencedMap<String, List<Path>> files = new LinkedHashMap<>();
+        for (String key : List.of(INCLUDES, CUSTOM_ASSETS, CUSTOM_STYLES)) {
+            List<Path> sources = new ArrayList<>();
+            for (String value : Objects.requireNonNullElse(properties.entries(key), List.<String>of())) {
+                Path source = location == null ? Path.of(value) : location.resolve(value);
+                if (!Files.isRegularFile(source)) {
+                    throw new IllegalArgumentException("The dokka property " + key + " of " + file + " names " + value
+                            + ", but " + source.toAbsolutePath().normalize() + " is no file - name a file relative to"
+                            + " the module's folder" + (location == null ? "" : " " + location));
+                }
+                sources.add(source);
+            }
+            files.put(key, sources);
+        }
+        String footerMessage = properties.value(FOOTER_MESSAGE);
+        return (footerMessage == null ? module : module.footerMessage(footerMessage))
+                .includes(files.get(INCLUDES))
+                .customAssets(files.get(CUSTOM_ASSETS))
+                .customStyles(files.get(CUSTOM_STYLES));
+    }
+
+    private static URI url(Path file, String key, String value) {
+        try {
+            return new URI(value);
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("The dokka property " + key + " of " + file + " names " + value
+                    + ", which is no URL: " + e.getReason());
+        }
     }
 
     private static class Scan implements BuildStep {
