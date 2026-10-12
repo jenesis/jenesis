@@ -5275,6 +5275,100 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_gives_a_plugin_comment_naming_a_subproject_the_subprojects_version() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>2.0.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>processor</module>
+                        <module>app</module>
+                    </modules>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("processor")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>2.0.0-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>processor</artifactId>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("app")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>2.0.0-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>app</artifactId>
+                    <!--jenesis.plugin ksp maven/group/processor
+                        maven/org.example/external-->
+                </project>
+                """);
+        assertThat(mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of("app")).plugins())
+                .as("a subproject resolves from the build at its own version, in any group, as a dependency on it does")
+                .containsExactly(
+                        Map.entry("maven/group/processor/2.0.0-SNAPSHOT", "ksp"),
+                        Map.entry("maven/org.example/external", "plugin"));
+    }
+
+    @Test
+    public void refuses_a_plugin_comment_that_names_one_coordinate_in_two_groups() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.plugin maven/org.example/processor/1
+                        ksp maven/org.example/processor/1-->
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed jenesis.plugin declaration 'ksp maven/org.example/processor/1'")
+                .hasMessageContaining("named in the group plugin already");
+    }
+
+    @Test
+    public void refuses_a_processor_dependency_that_a_plugin_comment_names_in_another_group() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.plugin ksp maven/org.example/processor/1-->
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>processor</artifactId>
+                            <version>1</version>
+                            <type>processor</type>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The processor maven/org.example/processor/1")
+                .hasMessageContaining("in the group ksp");
+    }
+
+    @Test
     public void refuses_a_module_alias_comment_that_names_no_coordinate() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

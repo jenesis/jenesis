@@ -1908,8 +1908,10 @@ public record Project(
                           compilers' plugins, any other name a group a plugin of the project reads.
                           A version is written into the token, as maven/<groupId>/<artifactId>/<ver>,
                           or pinned as <group>/maven/<groupId>/<artifactId>; else the newest release
-                          resolves. MAVEN modules declare the same lines in a <!--jenesis.plugin ...-->
-                          comment, where a processor without a version takes <dependencyManagement>'s.
+                          resolves. A module of the project resolves from the build, in any group.
+                          MAVEN modules declare the same lines in a <!--jenesis.plugin ...--> comment,
+                          where a processor without a version takes <dependencyManagement>'s, and a
+                          module of the project its own. One coordinate resolves in one group only.
                       @jenesis.test [<module>|abstract]
                           Test variant of <module>. `abstract` supplies infrastructure only: declares
                           no tests, runs none, is staged only with the test modules.

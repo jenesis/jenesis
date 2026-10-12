@@ -240,7 +240,13 @@ public class ModuleInfoParser {
                                             + " with a version written into the coordinate, as"
                                             + " maven/<groupId>/<artifactId>/<version>, or left to pin");
                                 }
-                                plugins.put(token.indexOf('/') < 0 ? "module/" + token : token, group);
+                                String previous = plugins.put(token.indexOf('/') < 0 ? "module/" + token : token, group);
+                                if (previous != null && !previous.equals(group)) {
+                                    throw new IllegalArgumentException("Malformed @jenesis.plugin declaration '"
+                                            + content
+                                            + "': " + token + " is named in the group " + previous + " already,"
+                                            + " and a coordinate resolves in one group of a module only");
+                                }
                             }
                             case "jenesis.layer" -> {
                                 if (content.isEmpty()) {

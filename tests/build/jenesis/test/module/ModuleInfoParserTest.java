@@ -750,6 +750,22 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_plugin_refuses_one_coordinate_in_two_groups() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.plugin some.processor
+                 * @jenesis.plugin ksp some.processor
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.plugin declaration 'ksp some.processor'")
+                .hasMessageContaining("named in the group plugin already");
+    }
+
+    @Test
     public void no_javadoc_yields_empty_versions() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 module foo {
