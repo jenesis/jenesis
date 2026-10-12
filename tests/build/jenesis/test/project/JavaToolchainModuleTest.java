@@ -110,6 +110,27 @@ public class JavaToolchainModuleTest {
     }
 
     @Test
+    public void the_resources_a_generator_writes_join_the_jar() throws IOException {
+        Path sources = Files.createDirectories(input.resolve(BuildStep.SOURCES + "other"));
+        Files.writeString(sources.resolve("Sample.java"), "package other; public class Sample { }\n");
+        buildExecutor.addSource("input", input);
+        buildExecutor.addModule("output", new JavaToolchainModule().generator(GENERATOR), "input");
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        try (JarInputStream inputStream = new JarInputStream(Files.newInputStream(steps.get("output/artifacts")
+                .resolve(BuildStep.ARTIFACTS)
+                .resolve("classes.jar")))) {
+            Set<String> names = new LinkedHashSet<>();
+            for (JarEntry entry = inputStream.getNextJarEntry(); entry != null; entry = inputStream.getNextJarEntry()) {
+                names.add(entry.getName());
+            }
+            assertThat(names)
+                    .as("a generator hands its sources to the compilers and its resources to the jar")
+                    .contains("other/Sample.class", "generated/Generated.class", "META-INF/services/generated.Service")
+                    .doesNotContain("generated/Generated.java");
+        }
+    }
+
+    @Test
     public void validator_consumes_classes_as_independent_side_step() throws IOException {
         Path sources = Files.createDirectories(input.resolve(BuildStep.SOURCES + "other"));
         try (BufferedWriter writer = Files.newBufferedWriter(sources.resolve("Sample.java"))) {
@@ -341,6 +362,14 @@ public class JavaToolchainModuleTest {
         Files.writeString(classes.resolve("transformed.marker"), "transformed");
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }).asModule("transform");
+
+    private static final BuildExecutorModule GENERATOR = ((BuildStep) (_, context, _) -> {
+        Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.SOURCES + "generated"))
+                .resolve("Generated.java"), "package generated; public class Generated { }\n");
+        Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.RESOURCES + "META-INF/services"))
+                .resolve("generated.Service"), "generated.Generated\n");
+        return CompletableFuture.completedStage(new BuildStepResult(true));
+    }).asModule("generate");
 
     private static final BuildExecutorModule VALIDATOR = ((BuildStep) (_, context, arguments) -> {
         List<String> names = new ArrayList<>();

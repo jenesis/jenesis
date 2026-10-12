@@ -91,6 +91,7 @@ public record JavaToolchainModule(BuildExecutorModule generator,
             buildExecutor.addModule(ARTIFACTS, archiver, Stream.of(
                     Stream.of(classes),
                     classpath == null ? Stream.<String>empty() : Stream.of(CLASSPATH),
+                    generator == null ? Stream.<String>empty() : Stream.of(GENERATED),
                     inherited.sequencedKeySet().stream()).flatMap(Function.identity()));
         }
     }
