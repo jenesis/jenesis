@@ -98,6 +98,9 @@ public record JavaToolchainModule(BuildExecutorModule generator,
 
     @Override
     public Optional<String> resolve(String path) {
+        if (path.startsWith(COMPILED + "/")) {
+            return Optional.empty();
+        }
         return switch (path) {
             case COMPILED -> Optional.empty();
             case TRANSFORM -> Optional.of(CLASSES);
