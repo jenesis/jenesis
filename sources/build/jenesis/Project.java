@@ -2579,7 +2579,8 @@ public record Project(
 
                       binary/generated       sources/ that the module compiles with its own, the
                                              place of a code generator; javadoc and the sources
-                                             jar carry them too
+                                             jar carry them too, and the resources/ it writes,
+                                             as a service file, join the module's jar
                       check, format          a verdict on the sources, beside Checkstyle and the
                                              formatters
                       compliance             a verdict on the resolved dependencies
