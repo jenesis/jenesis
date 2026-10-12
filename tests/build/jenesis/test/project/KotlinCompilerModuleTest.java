@@ -156,14 +156,19 @@ public class KotlinCompilerModuleTest {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
         properties.store(project.resolve(BuildStep.VERSIONS));
-        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.kt"), """
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Sample.kt"), """
                 package sample
                 class Sample { fun name(): String = "base" }
+                """);
+        Files.writeString(sampleDir.resolve("Greeting.kt"), """
+                package sample
+                internal fun greeting(): String = "hello"
                 """);
         Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "META-INF/versions/17/sample"))
                 .resolve("Sample.kt"), """
                 package sample
-                class Sample { fun name(): String = "17" }
+                class Sample { fun name(): String = greeting() + " 17" }
                 """);
         Path processFolder = Files.createDirectories(project.resolve("process"));
         SequencedProperties javacProperties = new SequencedProperties();
