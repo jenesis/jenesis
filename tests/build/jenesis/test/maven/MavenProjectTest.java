@@ -2133,7 +2133,7 @@ public class MavenProjectTest {
     }
 
     @Test
-    public void builds_and_describes_the_tests_of_a_module_whose_surefire_scans_a_dependency_alone() throws IOException {
+    public void builds_the_tests_of_a_module_whose_test_properties_scan_a_dependency_alone_and_reads_no_surefire_block() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0">
@@ -2159,6 +2159,8 @@ public class MavenProjectTest {
                     </build>
                 </project>
                 """);
+        Files.writeString(Files.createDirectories(project.resolve("src/test/build.jenesis")).resolve("test.properties"),
+                "scan=org.example/tck\n");
         BuildExecutor executor = BuildExecutor.of(build,
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
@@ -2175,10 +2177,7 @@ public class MavenProjectTest {
                 .containsKeys("maven/test-module-/manifests", "maven/module-/manifests");
         assertThat(SequencedProperties.ofFiles(results.get("maven/test-module-/manifests").resolve(BuildStep.MODULE))
                 .getProperty("scan"))
-                .isEqualTo("org.example/tck,org.example/suite");
-        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.MODULE))
-                .getProperty("scan"))
-                .as("the main half runs no tests, so it scans nothing")
+                .as("the dependencies a test module scans are its test.properties' own, never a plugin block's")
                 .isNull();
     }
 
@@ -2387,6 +2386,7 @@ public class MavenProjectTest {
                                     "../dependencies/artifacts",
                                     "../../module-foo/dependencies/prepare",
                                     "../../module-foo/dependencies/artifacts",
+                                    "../../module-foo/produce/java/processed",
                                     "../../module-foo/produce/java/classes",
                                     "../../module-foo/produce/java/artifacts",
                                     "../../module-foo/assign",

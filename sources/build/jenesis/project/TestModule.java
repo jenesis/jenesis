@@ -1214,8 +1214,7 @@ public class TestModule implements BuildExecutorModule {
                                     ? "as requires " + dependency + "; in their module-info.java"
                                     : "as a <dependency> on " + dependency.replace('/', ':') + " in their pom.xml,"
                                             + " or by requiring the module it holds")
-                            + ", or remove it from the scan key of test.properties or the dependenciesToScan of"
-                            + " maven-surefire-plugin");
+                            + ", or remove it from the scan key of test.properties");
                 }
                 scanned.addAll(held);
             }

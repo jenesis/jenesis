@@ -26,8 +26,7 @@ public record MavenLocalPom(String groupId,
                             String mainClass,
                             MavenPomEmitter.Metadata metadata,
                             SequencedMap<MavenDependencyKey, MavenDependencyKey.Versioned> expressions,
-                            MavenPomEmitter.Relocation relocation,
-                            List<String> dependenciesToScan) {
+                            MavenPomEmitter.Relocation relocation) {
 
     public MavenLocalPom version(String version) {
         return new MavenLocalPom(groupId,
@@ -54,8 +53,7 @@ public record MavenLocalPom(String groupId,
                 mainClass,
                 metadata,
                 expressions,
-                relocation,
-                dependenciesToScan);
+                relocation);
     }
 
     public MavenLocalPom dependencies(SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies) {
@@ -83,8 +81,7 @@ public record MavenLocalPom(String groupId,
                 mainClass,
                 metadata,
                 expressions,
-                relocation,
-                dependenciesToScan);
+                relocation);
     }
 
     public MavenLocalPom managedDependencies(SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies) {
@@ -112,8 +109,7 @@ public record MavenLocalPom(String groupId,
                 mainClass,
                 metadata,
                 expressions,
-                relocation,
-                dependenciesToScan);
+                relocation);
     }
 
     public MavenLocalPom bom(SequencedMap<MavenDependencyKey, MavenDependencyValue> bom) {
@@ -141,7 +137,6 @@ public record MavenLocalPom(String groupId,
                 mainClass,
                 metadata,
                 expressions,
-                relocation,
-                dependenciesToScan);
+                relocation);
     }
 }

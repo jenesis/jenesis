@@ -279,21 +279,6 @@ public class InferredTestObservationModuleTest {
     }
 
     @Test
-    public void scans_what_the_module_description_names_from_a_pom_xml() throws IOException {
-        Files.writeString(project.resolve(BuildStep.MODULE), "test=\nscan=org.example/surefire\n");
-        Files.writeString(project.resolve("test.properties"), "framework=junit-platform\n");
-        Files.createDirectories(project.resolve(BuildStep.ARTIFACTS));
-        BuildExecutor executor = newExecutor();
-        executor.addSource("project", project);
-        executor.addModule("observed", resolving().test(module -> module.jarsOnly(false)), "project");
-
-        assertThatThrownBy(executor::execute)
-                .hasRootCauseInstanceOf(IllegalStateException.class)
-                .rootCause()
-                .hasMessageContaining("scan org.example/surefire for test classes");
-    }
-
-    @Test
     public void the_scan_of_a_test_properties_file_wins_over_the_one_of_the_module_description() throws IOException {
         Files.writeString(project.resolve(BuildStep.MODULE), "test=\nscan=org.example/surefire\n");
         Files.writeString(project.resolve("test.properties"), "framework=junit-platform\nscan=org.example/tck\n");

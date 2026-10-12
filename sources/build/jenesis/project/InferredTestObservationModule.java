@@ -396,10 +396,6 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                     .pinning(pinning)
                     .pathPlacement(pathPlacement)
                     .moduleName(moduleName == null && description != null ? description.getProperty("module") : moduleName);
-            List<String> scanned = description == null ? null : description.entries(SCAN);
-            if (scanned != null) {
-                module = module.scan(scanned);
-            }
             BuildExecutorModule executed = test.apply(declared(module, BuildStep.locate(configuration, "test.properties")));
             if (executed != null) {
                 buildExecutor.addModule(TEST, executed, inherited.sequencedKeySet().stream().filter(identity ->

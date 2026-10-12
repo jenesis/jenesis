@@ -90,27 +90,19 @@ The pom.xml build
 
 `maven/` holds the same three modules as a Maven project. There, `suite` keeps
 its tests in `src/main/java`, so they ship in its jar, and `fast` and `slow`
-declare the dependency on it and name it to Surefire, as a Maven build does:
+declare the dependency on it. The build reads no plugin block of a `pom.xml`, so
+Surefire's `<dependenciesToScan>`, which the POMs keep for Maven, is not what
+selects the tests: each module names the dependency in the `scan` key of its
+`src/test/build.jenesis/test.properties`, as `<groupId>/<artifactId>`:
 
-    <plugin>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-            <dependenciesToScan>
-                <dependency>demo:suite</dependency>
-            </dependenciesToScan>
-        </configuration>
-    </plugin>
+    scan=demo/suite
 
-The build reads that list as the `scan` key, from the module's own POM or
-inherited from a parent's `<pluginManagement>`, so the project builds
-unchanged. A `scan` key in the module's `test.properties` replaces what the POM
-declares. A module whose tests are all scanned needs no test sources of its own:
+A module whose tests are all scanned needs no test sources of its own:
 
     cd maven
     java -Djenesis.print.tests=true build/jenesis/Make.java
 
-Each entry names a dependency as `<groupId>:<artifactId>`, which scans every jar
-of it on the test path, its `tests` jar included; a wildcard, a type, a
-classifier or a version is refused. So the tests of a module repeat with other
-flags in a sibling that declares a `<type>test-jar</type>` dependency on it and
-scans it, where Maven would add a second Surefire execution.
+An entry scans every jar of that dependency on the test path, its `tests` jar
+included. So the tests of a module repeat with other flags in a sibling that
+declares a `<type>test-jar</type>` dependency on it and scans it, where Maven
+would add a second Surefire execution.
