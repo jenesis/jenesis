@@ -27,7 +27,7 @@ public class KotlinCompilerModuleTest {
     private static final String KOTLIN_VERSION = "2.2.0";
 
     @TempDir
-    private Path root, project;
+    private Path root, project, tests, testRoot;
 
     @Test
     public void compiles_a_kotlin_source_against_a_downloaded_compiler() throws IOException, ReflectiveOperationException {
@@ -186,6 +186,61 @@ public class KotlinCompilerModuleTest {
         assertThat(majorVersion(base)).as("the base is compiled for the module's release").isEqualTo(55);
         assertThat(majorVersion(versioned)).as("the overlay is compiled for its own release").isEqualTo(61);
         assertThat(output.resolve("manifest.mf")).content().contains("Multi-Release: true");
+    }
+
+    @Test
+    public void the_tests_of_a_module_see_its_internal_declarations() throws IOException {
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
+        versions.store(project.resolve(BuildStep.VERSIONS));
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Shout.kt"), """
+                package sample
+                internal fun shout(text: String): String = text.uppercase()
+                """);
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("kotlin", new KotlinCompilerModule(
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))), "project");
+        executor.execute();
+        Path classes = root.resolve("kotlin").resolve(KotlinCompilerModule.CLASSES).resolve("output").resolve(BuildStep.CLASSES);
+        Path jar = Files.createDirectories(tests.resolve("resolved")).resolve("sample.jar");
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar));
+             Stream<Path> files = Files.walk(classes)) {
+            for (Path file : files.filter(Files::isRegularFile).sorted().toList()) {
+                out.putNextEntry(new JarEntry(classes.relativize(file).toString().replace(File.separatorChar, '/')));
+                Files.copy(file, out);
+                out.closeEntry();
+            }
+        }
+        versions.store(tests.resolve(BuildStep.VERSIONS));
+        Files.writeString(Files.createDirectories(tests.resolve(BuildStep.SOURCES + "sample")).resolve("ShoutTest.kt"), """
+                package sample
+                class ShoutTest { fun shouts(): String = shout("hi") }
+                """);
+        Files.writeString(tests.resolve(BuildStep.MODULE), "test=sample\n");
+        Files.writeString(tests.resolve(BuildStep.METADATA), "project=demo\nartifact=sample\nversion=1.0.0\n");
+        Files.writeString(tests.resolve(BuildStep.DEPENDENCIES), "main/compile/maven/demo/sample/1.0.0=resolved/sample.jar\n");
+        Files.writeString(tests.resolve(Dependencies.GRAPH),
+                "vertex/main/compile/maven/demo/sample=1.0.0\\t\\tfalse\\ttrue\n");
+        BuildExecutor testExecutor = BuildExecutor.of(testRoot,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        testExecutor.addSource("tests", tests);
+        testExecutor.addModule("kotlin", new KotlinCompilerModule(
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))), "tests");
+        testExecutor.execute();
+        assertThat(testRoot.resolve("kotlin").resolve(KotlinCompilerModule.CLASSES).resolve("output")
+                .resolve(BuildStep.CLASSES + "sample/ShoutTest.class"))
+                .as("the tested jar is a friend of the test half, so its internal function is visible")
+                .isNotEmptyFile();
     }
 
     private static int majorVersion(Path file) throws IOException {
