@@ -84,6 +84,77 @@ public class JavadocTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void documents_sources_at_the_release_they_were_compiled_for(boolean process) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "java/lang/invoke")).resolve("VarHandle.java"), """
+                package java.lang.invoke;
+                /** A stub of a type a later release declares. */
+                public abstract class VarHandle { }
+                """);
+        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javac.properties"),
+                "--module-version=1\n");
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        Javac.writeRelease(manifests, "8", Runtime.version().feature());
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(
+                sources,
+                Map.of(Path.of("java/lang/invoke/VarHandle.java"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("manifests", new BuildStepArgument(
+                manifests,
+                Map.of(Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE,
+                process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                arguments).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javadoc.JAVADOC + "java/lang/invoke/VarHandle.html"))
+                .as("before Java 9, no module of the JDK owns the package the stub declares")
+                .content().contains("A stub of a type a later release declares.");
+    }
+
+    @Test
+    public void documents_the_base_sources_as_they_were_compiled_rather_than_what_a_later_release_adds() throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; /** Documented at release 8. */ public class Sample { }\n");
+        Path versions = Files.createDirectories(sources.resolve(Javac.SOURCES + "META-INF/versions/11"));
+        Files.writeString(versions.resolve("module-info.java"), "module sample { exports sample; }\n");
+        Files.writeString(Files.createDirectories(versions.resolve("sample")).resolve("Sample.java"),
+                "package sample; /** Documented at release 11. */ public class Sample { }\n");
+        Javac.writeRelease(sources, "8", Runtime.version().feature());
+        BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javadoc.JAVADOC + "sample/Sample.html"))
+                .as("javac compiles the base sources at release 8 without the descriptor it compiles for release 11")
+                .content().contains("Documented at release 8.");
+    }
+
+    @Test
+    public void a_configured_release_replaces_the_one_the_sources_were_compiled_for() throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; /** Documented. */ public class Sample { }\n");
+        Javac.writeRelease(sources, "8", Runtime.version().feature());
+        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javadoc.properties"),
+                "--release=17\n");
+        BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(Files.readString(supplement.resolve("command"))).contains("--release");
+        assertThat(Files.readString(supplement.resolve("javadoc.args")))
+                .as("the release the configuration names is the only one javadoc is handed")
+                .doesNotContain("\"--release\"");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void a_configured_doclint_flag_replaces_the_build_default(boolean process) throws IOException {
         Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"),
                 "package sample; /** Links {@link Missing}. */ public class Sample { }\n");

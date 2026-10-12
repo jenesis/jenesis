@@ -13,13 +13,13 @@ of an existing module, **L** a new mechanism.
 
 ## Status
 
-About 119 gaps found along the way are fixed in the tool, among them forking `javac`, `--source`/`--target`, modular
+About 120 gaps found along the way are fixed in the tool, among them forking `javac`, `--source`/`--target`, modular
 Javadoc, resources in the sources jar, a check for a module declared twice, `kotlinc` arguments, scope and exclusions
 on a pin, the operating system family as a platform token, bytecode transforms at `binary/transform` (bnd, AspectJ),
 `tar.gz` dependencies, Docker arguments, reusing a dependency resolution whose inputs did not change, generated
 sources in the `ide` project files, relocation POMs, `Implementation-*` manifest entries, JaCoCo coverage limits,
 Dokka options, tests scanned in a dependency's jar, which also run a module's tests a second time with other settings,
-formatter options with the Eclipse formatter, ktfmt and licence headers, forbiddenapis, jdeps, jdeprscan and revapi checks, Kotlin sources below `META-INF/versions`, and classifier variants
+formatter options with the Eclipse formatter, ktfmt and licence headers, forbiddenapis, jdeps, jdeprscan and revapi checks, Kotlin sources below `META-INF/versions`, Javadoc at the release the sources are compiled for, and classifier variants
 (`classifiers.properties`, `@jenesis.pin <module> :<classifier>`).
 
 30 more are answered by the migration briefing (`skill/migrate`, `skill/registry`) rather than by the tool, because a
@@ -39,12 +39,6 @@ What follows is what remains.
 
 Compile avoidance matters most: it is the largest share of the difference to Gradle on a build after an edit
 (caffeine 16 min against 13, micrometer 11 min against 7:40, moshi 238 s against 67 s).
-
-## Packaging and publishing
-
-| Gap | Size | Projects |
-|---|---|---|
-| Documentation is switched on or off for the whole project; `packaging.properties` has no key for one module. | S | netty |
 
 ## Compilers
 
@@ -109,8 +103,7 @@ These are decisions rather than gaps. The briefing says so and names the change 
 
 ## Suggested order
 
-1. **The small items, in one change.** A per-module documentation switch, and failing on a class-less Kotlin
-   Multiplatform root.
+1. **Failing on a class-less Kotlin Multiplatform root.**
 2. **Kotlin.** Friend paths for tests, then KSP.
 3. **The annotation-processor fallback** to the class path in a module build.
 4. **Compile avoidance.** Compare a dependency by a fingerprint of its API rather than its bytes. The largest change,

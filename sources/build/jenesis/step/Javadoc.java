@@ -115,17 +115,19 @@ public class Javadoc extends ProcessBuildStep {
                 .map(String::strip)
                 .filter(name -> !name.isEmpty())
                 .toList();
-        String preview = null;
+        String release = null;
+        boolean preview = false;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
             }
             Path javac = argument.folder().resolve(ProcessBuildStep.PROCESS + "javac.properties");
-            if (preview == null && Files.isRegularFile(javac)) {
-                SequencedProperties release = SequencedProperties.ofFiles(javac);
-                if (release.containsKey("--enable-preview")) {
-                    preview = release.value("--release");
+            if (Files.isRegularFile(javac)) {
+                SequencedProperties compiled = SequencedProperties.ofFiles(javac);
+                if (release == null) {
+                    release = compiled.value("--release");
                 }
+                preview |= compiled.containsKey("--enable-preview");
             }
             Path sources = argument.folder().resolve(BuildStep.SOURCES),
                     classes = argument.folder().resolve(BuildStep.CLASSES);
@@ -144,7 +146,13 @@ public class Javadoc extends ProcessBuildStep {
                 path.add(jar.toString());
             }
             if (Files.exists(sources)) {
+                Path versions = sources.resolve("META-INF/versions");
                 Files.walkFileTree(sources, new SimpleFileVisitor<>() {
+                    @Override
+                    public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) {
+                        return directory.equals(versions) ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+                    }
+
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                         String name = file.toString(),
@@ -159,9 +167,6 @@ public class Javadoc extends ProcessBuildStep {
                 });
             }
         }
-        if (preview != null) {
-            commands.addAll(List.of("--enable-preview", "--release", preview));
-        }
         files.sort(null);
         if (properties.values().stream().noneMatch(folder -> folder.keySet().stream()
                 .anyMatch(key -> key.equals("-package") || key.equals("-private") || key.startsWith("--show-types")))
@@ -174,6 +179,15 @@ public class Javadoc extends ProcessBuildStep {
                 .findFirst()
                 .orElse(null);
         String module = moduleInfo == null ? null : MODULE_INFO_PARSER.identify(Path.of(moduleInfo)).coordinate();
+        if (release != null && properties.values().stream()
+                .noneMatch(folder -> folder.containsKey("--release")
+                        || folder.containsKey("--source")
+                        || folder.containsKey("-source"))) {
+            if (preview) {
+                commands.add("--enable-preview");
+            }
+            commands.addAll(List.of("--release", release));
+        }
         if (!path.isEmpty()) {
             for (String entry : path) {
                 if (entry.indexOf(File.pathSeparatorChar) != -1) {
