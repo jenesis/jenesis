@@ -31,6 +31,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
     private final UnaryOperator<Jfr> jfr;
     private final Function<PiTestModule, BuildExecutorModule> pitest;
     private final SequencedMap<String, BuildExecutorModule> custom;
+    private final SequencedSet<String> untested;
 
     public InferredTestObservationModule(SequencedSet<Path> configuration,
                                          Map<String, Repository> repositories,
@@ -47,7 +48,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 value -> value,
                 value -> value,
                 value -> value,
-                Collections.emptyNavigableMap());
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableSet());
     }
 
     public static InferredTestObservationModule ofEnvironment(Environment environment,
@@ -66,7 +68,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 value -> value,
                 value -> value,
                 value -> value,
-                Collections.emptyNavigableMap());
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableSet());
         Boolean jacoco = environment.flagOrNull("observe.jacoco");
         if (jacoco != null) {
             module = module.jacoco(jacoco ? value -> value : null);
@@ -115,7 +118,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                                           Function<NativeImageAgentModule, BuildExecutorModule> nativeImage,
                                           UnaryOperator<Jfr> jfr,
                                           Function<PiTestModule, BuildExecutorModule> pitest,
-                                          SequencedMap<String, BuildExecutorModule> custom) {
+                                          SequencedMap<String, BuildExecutorModule> custom,
+                                          SequencedSet<String> untested) {
         this.configuration = configuration;
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
@@ -129,6 +133,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         this.jfr = jfr;
         this.pitest = pitest;
         this.custom = custom;
+        this.untested = untested;
     }
 
     public InferredTestObservationModule pinning(Pinning pinning) {
@@ -144,7 +149,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule pathPlacement(PathPlacement pathPlacement) {
@@ -160,7 +166,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule moduleName(String moduleName) {
@@ -176,7 +183,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule test(Function<TestModule, BuildExecutorModule> test) {
@@ -192,7 +200,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule jacoco(Function<JaCoCoModule, BuildExecutorModule> jacoco) {
@@ -208,7 +217,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule nativeImage(Function<NativeImageAgentModule, BuildExecutorModule> nativeImage) {
@@ -224,7 +234,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule jfr(UnaryOperator<Jfr> jfr) {
@@ -240,7 +251,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule pitest(Function<PiTestModule, BuildExecutorModule> pitest) {
@@ -256,7 +268,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule custom(SequencedMap<String, BuildExecutorModule> custom) {
@@ -272,7 +285,25 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
+    }
+
+    public InferredTestObservationModule untested(SequencedSet<String> untested) {
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                jfr,
+                pitest,
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule custom(String name, BuildExecutorModule module) {
@@ -335,7 +366,9 @@ public class InferredTestObservationModule implements BuildExecutorModule {
             }
             BuildExecutorModule executed = test.apply(declared(module, BuildStep.locate(configuration, "test.properties")));
             if (executed != null) {
-                buildExecutor.addModule(TEST, executed, inherited.sequencedKeySet());
+                buildExecutor.addModule(TEST, executed, inherited.sequencedKeySet().stream().filter(identity ->
+                        untested.stream().noneMatch(input -> identity.equals(PREVIOUS + input)
+                                || identity.startsWith(PREVIOUS + input + "/"))));
                 SequencedSet<String> reportInputs = new LinkedHashSet<>();
                 reportInputs.add(TEST);
                 reportInputs.addAll(inherited.sequencedKeySet());
