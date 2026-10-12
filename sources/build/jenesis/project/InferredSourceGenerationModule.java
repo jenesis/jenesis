@@ -18,7 +18,8 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
             AVRO = "avro",
             WSIMPORT = "wsimport",
             OPENAPI = "openapi",
-            ANTLR = "antlr";
+            ANTLR = "antlr",
+            KSP = "ksp";
     public static final String PREPARE = "prepare", TOOL = "tool";
     private static final String FOLDERS = "META-INF/build.jenesis";
     private static final Set<String> XJC_KEYS = Set.of("folders", "package", "catalog", "arguments");
@@ -36,12 +37,14 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     private final WsImportModule wsimportModule;
     private final OpenApiModule openapiModule;
     private final AntlrModule antlrModule;
+    private final KspModule kspModule;
     private final Function<XjcModule, BuildExecutorModule> xjc;
     private final Function<ProtocModule, BuildExecutorModule> protoc;
     private final Function<AvroModule, BuildExecutorModule> avro;
     private final Function<WsImportModule, BuildExecutorModule> wsimport;
     private final Function<OpenApiModule, BuildExecutorModule> openapi;
     private final Function<AntlrModule, BuildExecutorModule> antlr;
+    private final Function<KspModule, BuildExecutorModule> ksp;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredSourceGenerationModule(SequencedSet<Path> configuration,
@@ -55,6 +58,8 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                 new WsImportModule(repositories, resolvers),
                 new OpenApiModule(repositories, resolvers),
                 new AntlrModule(repositories, resolvers),
+                new KspModule(repositories, resolvers),
+                value -> value,
                 value -> value,
                 value -> value,
                 value -> value,
@@ -76,6 +81,8 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                 WsImportModule.ofEnvironment(environment, repositories, resolvers),
                 OpenApiModule.ofEnvironment(environment, repositories, resolvers),
                 AntlrModule.ofEnvironment(environment, repositories, resolvers),
+                KspModule.ofEnvironment(environment, repositories, resolvers),
+                value -> value,
                 value -> value,
                 value -> value,
                 value -> value,
@@ -107,6 +114,10 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
         if (antlr != null) {
             module = module.antlr(antlr ? value -> value : null);
         }
+        Boolean ksp = environment.flagOrNull("generate.ksp");
+        if (ksp != null) {
+            module = module.ksp(ksp ? value -> value : null);
+        }
         return module;
     }
 
@@ -118,12 +129,14 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                                            WsImportModule wsimportModule,
                                            OpenApiModule openapiModule,
                                            AntlrModule antlrModule,
+                                           KspModule kspModule,
                                            Function<XjcModule, BuildExecutorModule> xjc,
                                            Function<ProtocModule, BuildExecutorModule> protoc,
                                            Function<AvroModule, BuildExecutorModule> avro,
                                            Function<WsImportModule, BuildExecutorModule> wsimport,
                                            Function<OpenApiModule, BuildExecutorModule> openapi,
                                            Function<AntlrModule, BuildExecutorModule> antlr,
+                                           Function<KspModule, BuildExecutorModule> ksp,
                                            SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
         this.pinning = pinning;
@@ -133,12 +146,14 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
         this.wsimportModule = wsimportModule;
         this.openapiModule = openapiModule;
         this.antlrModule = antlrModule;
+        this.kspModule = kspModule;
         this.xjc = xjc;
         this.protoc = protoc;
         this.avro = avro;
         this.wsimport = wsimport;
         this.openapi = openapi;
         this.antlr = antlr;
+        this.ksp = ksp;
         this.custom = custom;
     }
 
@@ -151,12 +166,14 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                 wsimportModule,
                 openapiModule,
                 antlrModule,
+                kspModule,
                 xjc,
                 protoc,
                 avro,
                 wsimport,
                 openapi,
                 antlr,
+                ksp,
                 custom);
     }
 
@@ -169,12 +186,14 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                 wsimportModule,
                 openapiModule,
                 antlrModule,
+                kspModule,
                 xjc,
                 protoc,
                 avro,
                 wsimport,
                 openapi,
                 antlr,
+                ksp,
                 custom);
     }
 
@@ -187,12 +206,14 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                 wsimportModule,
                 openapiModule,
                 antlrModule,
+                kspModule,
                 xjc,
                 protoc,
                 avro,
                 wsimport,
                 openapi,
                 antlr,
+                ksp,
                 custom);
     }
 
@@ -205,12 +226,14 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                 wsimportModule,
                 openapiModule,
                 antlrModule,
+                kspModule,
                 xjc,
                 protoc,
                 avro,
                 wsimport,
                 openapi,
                 antlr,
+                ksp,
                 custom);
     }
 
@@ -223,12 +246,14 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                 wsimportModule,
                 openapiModule,
                 antlrModule,
+                kspModule,
                 xjc,
                 protoc,
                 avro,
                 wsimport,
                 openapi,
                 antlr,
+                ksp,
                 custom);
     }
 
@@ -241,12 +266,14 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                 wsimportModule,
                 openapiModule,
                 antlrModule,
+                kspModule,
                 xjc,
                 protoc,
                 avro,
                 wsimport,
                 openapi,
                 antlr,
+                ksp,
                 custom);
     }
 
@@ -259,12 +286,34 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                 wsimportModule,
                 openapiModule,
                 antlrModule,
+                kspModule,
                 xjc,
                 protoc,
                 avro,
                 wsimport,
                 openapi,
                 antlr,
+                ksp,
+                custom);
+    }
+
+    public InferredSourceGenerationModule ksp(Function<KspModule, BuildExecutorModule> ksp) {
+        return new InferredSourceGenerationModule(configuration,
+                pinning,
+                xjcModule,
+                protocModule,
+                avroModule,
+                wsimportModule,
+                openapiModule,
+                antlrModule,
+                kspModule,
+                xjc,
+                protoc,
+                avro,
+                wsimport,
+                openapi,
+                antlr,
+                ksp,
                 custom);
     }
 
@@ -277,12 +326,14 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                 wsimportModule,
                 openapiModule,
                 antlrModule,
+                kspModule,
                 xjc,
                 protoc,
                 avro,
                 wsimport,
                 openapi,
                 antlr,
+                ksp,
                 custom);
     }
 
@@ -393,6 +444,15 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                             .pinning(pinning)
                             .packageName(properties.value("package"))
                             .arguments(properties.words("arguments"))));
+        }
+        Path symbols = KspModule.configurationFile(configuration);
+        if (ksp != null && symbols != null) {
+            SequencedMap<String, String> options = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(symbols).forEachProperty(options::put);
+            BuildExecutorModule module = ksp.apply(kspModule.pinning(pinning).options(options));
+            if (module != null) {
+                buildExecutor.addModule(KSP, module, inherited.sequencedKeySet());
+            }
         }
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
