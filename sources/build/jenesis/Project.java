@@ -1129,10 +1129,9 @@ public record Project(
                     The pins `pin` wrote into pom.xml do not carry over: until `pin` runs again, the
                     module build resolves the newest versions. Write a bare @jenesis.pin <module>
                     <version> for each required module whose version to keep, and @jenesis.pin
-                    <groupId>/<artifactId> <version> for one only a dependency's POM brings in -
-                    a module name reaches only a module that is required by it, and the build
-                    refuses one naming a module the closure reaches by its coordinate. Then run
-                    `pin`, which adds the checksums and the closure.
+                    <groupId>/<artifactId> <version> for one only a dependency's POM brings in, as
+                    a module name pins only a module that is required by it. Then run `pin`, which
+                    adds the checksums and the closure.
                     The old build's javadoc fails on the @jenesis tags of a module-info.java as
                     unknown, so register each tag the module uses as disabled there - javadoc takes
                     no wildcard: `-tag jenesis.pin:X` on its command line, Gradle's
@@ -1921,8 +1920,7 @@ public record Project(
                       @jenesis.pin <token> <ver> [<algo>/<hex>] [(<guard>)]
                           Pin a version and optionally a content checksum. A module name pins a
                           module that is required by that name; one a dependency's POM brings in is
-                          pinned by <groupId>/<artifactId>, and the build fails on a module name
-                          the closure reaches only that way.
+                          pinned by <groupId>/<artifactId>.
                       @jenesis.signature <algo>/<hex> | Sigstore/<host>/<path> <token>... | [<group>/]signature-<name>.properties
                           Declare the OpenPGP key that signs these coordinates' artifacts - the
                           fingerprint first, because one key normally signs many. A Maven token may

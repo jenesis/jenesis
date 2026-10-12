@@ -19,7 +19,6 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class DependenciesModulePinTest {
 
@@ -50,22 +49,16 @@ public class DependenciesModulePinTest {
     }
 
     @Test
-    public void rejects_a_module_name_pin_for_a_module_a_pom_brings_in_under_its_coordinate() throws IOException {
-        assertThatThrownBy(() -> resolve(null, Map.of("main/module/lib.leaf", "2.0"), "lib.root"))
-                .hasStackTraceContaining(IllegalArgumentException.class.getName())
-                .hasStackTraceContaining("@jenesis.pin lib.leaf 2.0 matches no dependency")
-                .hasStackTraceContaining("org.example/leaf-lib in version 1.0")
-                .hasStackTraceContaining("@jenesis.pin org.example/leaf-lib 2.0");
+    public void a_module_name_pin_reaches_no_artifact_a_pom_brings_in() throws IOException {
+        Path next = resolve(null, Map.of("main/module/lib.leaf", "2.0"), "lib.root");
+
+        assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
+                .as("a module name pins a module that is required by that name, and a POM names its artifacts by coordinate")
+                .contains("main/compile/maven/org.example/leaf-lib/1.0");
     }
 
     @Test
-    public void rejects_a_misplaced_module_name_pin_whatever_the_pinning_mode_that_applies_pins() throws IOException {
-        assertThatThrownBy(() -> resolve(Pinning.VERSIONS, Map.of("main/module/lib.leaf", "2.0"), "lib.root"))
-                .hasStackTraceContaining("@jenesis.pin lib.leaf 2.0 matches no dependency");
-    }
-
-    @Test
-    public void applies_the_coordinate_pin_the_failure_names() throws IOException {
+    public void applies_a_coordinate_pin_to_an_artifact_a_pom_brings_in() throws IOException {
         Path next = resolve(null, Map.of("main/maven/org.example/leaf-lib", "2.0"), "lib.root");
 
         assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
