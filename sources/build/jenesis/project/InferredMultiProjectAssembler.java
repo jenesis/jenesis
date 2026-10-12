@@ -532,29 +532,23 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         images.add("native");
                     }
                 }
-                SequencedSet<String> packaged = new LinkedHashSet<>();
-                if (images.contains("jpackage")) {
-                    packaged.add("jpackage");
-                }
-                if (packaging.bundle()) {
-                    packaged.add("bundle");
-                }
-                if (packaging.launcher()) {
-                    packaged.add("launcher");
-                }
                 if (!packagers.isEmpty()) {
                     SequencedSet<String> handed = new LinkedHashSet<>(linked);
                     handed.addAll(images);
-                    handed.addAll(packaged);
+                    if (packaging.bundle()) {
+                        handed.add("bundle");
+                    }
+                    if (packaging.launcher()) {
+                        handed.add("launcher");
+                    }
                     sub.addModule("custom", (nested, nestedInherited) -> packagers.forEach((name, module) ->
                             nested.addModule(name, module, nestedInherited.sequencedKeySet())), handed);
-                    packaged.add("custom");
-                    images.add("custom");
-                }
-                if (!packaged.isEmpty() && !packaged.equals(Set.of("jpackage"))) {
-                    sub.addStep("packaged", new Packaged(), packaged.stream());
+                    sub.addStep("packaged", new Packaged(), images.contains("jpackage")
+                            ? Stream.of("jpackage", "custom")
+                            : Stream.of("custom"));
                     images.remove("jpackage");
                     images.addFirst("packaged");
+                    images.add("custom");
                 }
                 if (packaging.launcher()) {
                     images.add("launcher");

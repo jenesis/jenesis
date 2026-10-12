@@ -12,7 +12,6 @@ import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bundle;
-import build.jenesis.step.JPackage;
 import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -92,7 +91,7 @@ public class BundleTest {
     }
 
     @Test
-    public void carries_the_java_options_of_the_module_and_offers_itself_as_a_package_named_after_it() throws IOException {
+    public void carries_the_java_options_of_the_module() throws IOException {
         writePlainJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"));
         SequencedProperties launcher = new SequencedProperties();
         launcher.setProperty("mainClass", "sample.Sample");
@@ -117,9 +116,6 @@ public class BundleTest {
                         "--class-path",
                         "jars/app.jar",
                         "sample.Sample");
-        assertThat(next.resolve(JPackage.PACKAGES).resolve("app.zip"))
-                .as("the bundle is a deliverable, staged with the packages under the application's name")
-                .hasSameBinaryContentAs(zip);
     }
 
     @Test

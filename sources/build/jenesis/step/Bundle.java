@@ -186,8 +186,6 @@ public class Bundle implements BuildStep {
                 writeEntry(out, "jars/" + entry.getKey(), entry.getValue());
             }
         }
-        BuildStep.linkOrCopy(Files.createDirectory(context.next().resolve(JPackage.PACKAGES))
-                .resolve((artifact == null ? "application" : artifact) + ".zip"), zip);
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
