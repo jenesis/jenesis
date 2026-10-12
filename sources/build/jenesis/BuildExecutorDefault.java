@@ -224,6 +224,9 @@ class BuildExecutorDefault implements BuildExecutor {
                             HashFunction.write(previous.outputChecksums(), checksums);
                             SequencedProperties stepProperties = new SequencedProperties();
                             stepProperties.setProperty("serialization", HexFormat.of().formatHex(currentStepHash));
+                            if (!step.shouldReproduce()) {
+                                stepProperties.setProperty("reproduce", "false");
+                            }
                             stepProperties.storeAtomically(previous.stepFile());
                             if (cache.stores() && !fromCache && result.next()) {
                                 String stored = location + identity;

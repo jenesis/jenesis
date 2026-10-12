@@ -42,6 +42,7 @@ import javax.lang.model.SourceVersion;
 public record Project(
         Path root,
         Path target,
+        Path reproduce,
         Path artifacts,
         SequencedSet<Path> metadata,
         SequencedSet<Path> configuration,
@@ -1632,6 +1633,9 @@ public record Project(
 
                       maven-jar-plugin / jar -> on by default; archives are reproducible unless
                           jenesis.archive.timestamp is emptied (71)
+                      maven-artifact-plugin / artifact:compare -> -Djenesis.project.reproduce=<folder>
+                          builds again into that folder without a cache and names the step whose
+                          output differs, then prints a fingerprint of the whole build (71)
                       maven-jar-plugin manifestEntries / jar.manifest.attributes -> a
                           META-INF/MANIFEST.MF among the resources, the basis of the jar's manifest
                           (12); addDefaultImplementationEntries -> on by default: Implementation-Title
@@ -2720,7 +2724,8 @@ public record Project(
                                          68 module-convention (resolving what you published),
                                          69, 70 discovery (a dependency resolved from its
                                          publisher's own domain, as a module or by coordinate),
-                                         71 reproducible (a jar checked against a recorded digest),
+                                         71 reproducible (a jar checked against a recorded digest,
+                                         and a build compared with a second one),
                                          73 jpx (run a released program without building)
                       Extending it       55 custom-assembler, 56 custom-jmod, 57 internal-module,
                                          58 external-module,
@@ -3132,6 +3137,7 @@ public record Project(
                 new LinkedHashSet<>(List.of(resolved.resolve("build.jenesis"))));
         this(resolved,
                 Path.of("target"),
+                null,
                 Path.of(".jenesis", "artifacts"),
                 null,
                 configuration,
@@ -3388,6 +3394,10 @@ public record Project(
         if (target != null) {
             project = project.target(Path.of(target));
         }
+        String reproduce = environment.getProperty("project.reproduce");
+        if (reproduce != null) {
+            project = project.reproduce(Path.of(reproduce));
+        }
         String artifacts = environment.getProperty("project.artifacts");
         if (artifacts != null) {
             project = project.artifacts(Path.of(artifacts));
@@ -3506,6 +3516,7 @@ public record Project(
     public Project root(Path root) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3535,6 +3546,7 @@ public record Project(
     public Project configuration(Path... configuration) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 new LinkedHashSet<>(List.of(configuration)),
@@ -3564,6 +3576,7 @@ public record Project(
     public Project signatures(Path... signatures) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3593,6 +3606,7 @@ public record Project(
     public Project boms(Path... boms) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3622,6 +3636,7 @@ public record Project(
     public Project profiles(Path... profiles) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3651,6 +3666,37 @@ public record Project(
     public Project target(Path target) {
         return new Project(root,
                 target,
+                reproduce,
+                artifacts,
+                metadata,
+                configuration,
+                boms,
+                signatures,
+                profiles,
+                cache,
+                hashFunction,
+                layout,
+                tests,
+                sources,
+                documentation,
+                pinning,
+                version,
+                tag,
+                revision,
+                tree,
+                defaultTarget,
+                assembler,
+                configurator,
+                repositories,
+                resolvers,
+                plugins,
+                environment);
+    }
+
+    public Project reproduce(Path reproduce) {
+        return new Project(root,
+                target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3680,6 +3726,7 @@ public record Project(
     public Project artifacts(Path artifacts) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3709,6 +3756,7 @@ public record Project(
     public Project cache(BuildExecutorCache cache) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3738,6 +3786,7 @@ public record Project(
     public Project hashFunction(HashDigestFunction hashFunction) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3767,6 +3816,7 @@ public record Project(
     public Project layout(Layout layout) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3796,6 +3846,7 @@ public record Project(
     public Project tests(boolean tests) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3825,6 +3876,7 @@ public record Project(
     public Project sources(boolean sources) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3854,6 +3906,7 @@ public record Project(
     public Project documentation(boolean documentation) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3883,6 +3936,7 @@ public record Project(
     public Project pinning(Pinning pinning) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3912,6 +3966,7 @@ public record Project(
     public Project metadata(Path... metadata) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 new LinkedHashSet<>(List.of(metadata)),
                 configuration,
@@ -3941,6 +3996,7 @@ public record Project(
     public Project version(String version) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3970,6 +4026,7 @@ public record Project(
     public Project tag(String tag) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -3999,6 +4056,7 @@ public record Project(
     public Project revision(String revision) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -4028,6 +4086,7 @@ public record Project(
     public Project tree(String tree) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -4057,6 +4116,7 @@ public record Project(
     public Project defaultTarget(String... defaultTarget) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -4086,6 +4146,7 @@ public record Project(
     public Project assembler(MultiProjectAssembler<? super ProjectModuleDescriptor> assembler) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -4115,6 +4176,7 @@ public record Project(
     public Project repositories(Map<String, Repository> repositories) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -4144,6 +4206,7 @@ public record Project(
     public Project resolvers(Map<String, Resolver> resolvers) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -4173,6 +4236,7 @@ public record Project(
     public Project plugins(ProjectPlugins plugins) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -4202,6 +4266,7 @@ public record Project(
     public Project configurator(Supplier<BuildExecutor.Configuration> configurator) {
         return new Project(root,
                 target,
+                reproduce,
                 artifacts,
                 metadata,
                 configuration,
@@ -4229,6 +4294,64 @@ public record Project(
     }
 
     public SequencedMap<String, Path> build(String... selectors) throws IOException {
+        if (reproduce == null) {
+            return build(BuildExecutorCallback.nop(), selectors);
+        }
+        Path first = target.toAbsolutePath().normalize(), second = reproduce.toAbsolutePath().normalize();
+        if (first.startsWith(second) || second.startsWith(first)) {
+            throw new IllegalArgumentException("jenesis.project.reproduce names " + reproduce + ", which overlaps the"
+                    + " target folder " + target + " - name a folder beside it, such as target-reproduced");
+        }
+        if (Files.exists(second)) {
+            boolean empty;
+            try (Stream<Path> files = Files.isDirectory(second) ? Files.list(second) : Stream.of(second)) {
+                empty = files.findAny().isEmpty();
+            }
+            if (!empty) {
+                throw new IllegalArgumentException("jenesis.project.reproduce names " + reproduce + ", which is not an"
+                        + " empty folder - delete it or name an absent one, as the second build must run every step");
+            }
+        }
+        Path marker = Files.createDirectories(reproduce).resolve(BuildExecutor.SKIP_MARKER);
+        if (!Files.exists(marker)) {
+            Files.createFile(marker);
+        }
+        SequencedSet<String> firstSteps = new ConcurrentSkipListSet<>(), secondSteps = new ConcurrentSkipListSet<>();
+        SequencedMap<String, Path> built = build((identity, _) -> (_, throwable) -> {
+            if (identity != null && throwable == null) {
+                firstSteps.add(identity);
+            }
+        }, selectors);
+        environment.out().accept("Building again into " + reproduce + ", without a build cache, to check that the"
+                + " build reproduces");
+        BuildExecutor.Configuration configuration = configurator.get().cache(null);
+        target(reproduce).reproduce(null).cache(null).configurator(() -> configuration)
+                .build((identity, _) -> (_, throwable) -> {
+                    if (identity != null && throwable == null) {
+                        secondSteps.add(identity);
+                    }
+                }, selectors);
+        environment.out().accept(new Reproduction(target, firstSteps, reproduce, secondSteps).verify());
+        Files.walkFileTree(reproduce, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                Files.delete(file);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path directory, IOException exception) throws IOException {
+                if (exception != null) {
+                    throw exception;
+                }
+                Files.delete(directory);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return built;
+    }
+
+    private SequencedMap<String, Path> build(BuildExecutorCallback callback, String... selectors) throws IOException {
         BuildExecutor.Configuration configuration = configurator.get();
         if (cache != null) {
             BuildExecutorCache configured = configuration.cache();
@@ -4240,7 +4363,7 @@ public record Project(
                 || selector.startsWith(PROMPT + "/"))) {
             configuration = configuration.progress(false).events(false);
         }
-        BuildExecutor executor = configuration.of(target);
+        BuildExecutor executor = configuration.of(target, callback);
         Function<String, String> resolver = layout.apply(executor, this, assembler);
         return executor.execute(Arrays.stream(selectors.length == 0 ? defaultTarget.toArray(String[]::new) : selectors)
                 .map(selector -> selector.startsWith("+") ? resolver.apply(selector.substring(1)) : selector)
@@ -4265,6 +4388,7 @@ public record Project(
 
     private static final String CATALOGUE = """
                 project.target|target|Folder the build writes its outputs to; a file a project provides names only a folder inside the project
+                project.reproduce||Build the selection a second time into this folder, which must be absent or empty, consulting and filling no build cache, then compare what every step wrote in both builds: a difference fails the build naming the steps that wrote a different output from the same input first, and the steps handed that output after them, while a clean comparison prints a fingerprint over every step's output and deletes the folder; read by Make.java and jenesis-make, not by Execute.java; a file a project provides names only a folder inside the project
                 project.artifacts||Folder resolved dependencies and repository metadata are cached in; a file a project provides names only a folder inside the project
                 project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project
                 project.sources|false|Assemble a sources jar for every module
@@ -4485,7 +4609,9 @@ public record Project(
             String image = environment.getProperty("project.image");
             Path root = this.root().toAbsolutePath().normalize();
             DockerizedJava docker = image == null ? new DockerizedJava(root) : new DockerizedJava(root, image);
-            for (Path path : List.of(this.target(), this.artifacts())) {
+            for (Path path : Stream.of(this.target(), this.reproduce(), this.artifacts())
+                    .filter(Objects::nonNull)
+                    .toList()) {
                 Path absolute = (path.isAbsolute() ? path : root.resolve(path)).normalize();
                 if (!absolute.startsWith(root)) {
                     docker = docker.mount(absolute, absolute.toString(), false);

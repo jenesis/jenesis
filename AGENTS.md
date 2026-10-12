@@ -287,7 +287,11 @@ serialisable functional interface - so those types are `Serializable` too, and t
 factory, a lookup cache) is `transient` rather than left to drift into the key. A module is not serialisable
 and never reaches a key at all, so a field of one is never `transient`.
 Steps compose by folder conventions - `sources/`, `classes/`, `artifacts/` - never by inspecting predecessor
-names. A step that forks a JDK tool extends `ProcessBuildStep` and thereby accepts `process-<tool>.properties`.
+names. Two builds of the same inputs write the same bytes, which `jenesis.project.reproduce` checks step by step:
+a step whose output cannot repeat by its nature - a report that records when it ran, coverage data, a recording -
+says so with `shouldReproduce`, and anything else that differs, a path into the target folder above all, is a
+defect of the step. A step that forks a JDK tool extends `ProcessBuildStep` and thereby accepts
+`process-<tool>.properties`.
 A forked process is handed the platform's own variables (`PATH`, `HOME`, `LANG`, `TMPDIR`, Windows' `SystemRoot`
 and its kin) and nothing else of the build's environment, because a variable is no input of its step. A step that
 runs a program - `java`, the tests, an external binary - extends `EnvironmentalProcessBuildStep` and so also

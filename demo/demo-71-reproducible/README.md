@@ -26,6 +26,7 @@ Layout
 
     demo/demo-71-reproducible
     |-- build/Demo.java            builds, then compares the jar's SHA-256 with the recorded one
+    |-- build/Planted.java         the same build with a step added that writes the current time
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
     `-- sources
         |-- module-info.java       demo.reproducible, compiled for release 25
@@ -72,3 +73,49 @@ writes into a jar. Record the new digest in `build/Demo.java`. A
 mismatch on only one runner means something about that runner reached the jar;
 `unzip -Z -v` of the jar from two machines, side by side, shows which entry
 differs.
+
+Building twice and comparing
+----------------------------
+
+The recorded digest checks the one jar. To check every step of the build, build
+it twice:
+
+    java -Djenesis.project.reproduce=target-reproduced build/jenesis/Make.java
+
+builds into `target` as usual, then builds the same again into
+`target-reproduced`, which must be absent or empty, consulting and filling no
+build cache. It compares what every step wrote in the two builds and ends with
+
+    The build reproduced: 19 steps wrote the same output into target-reproduced as into target - fingerprint SHA-256:401a4f13dd00c7b7d7eeee6579468ca7200b1e62fa3380a036c1e1a678f0bb49
+
+and deletes `target-reproduced` again. The second build writes into another
+folder on purpose: a step that records where it writes differs between the two
+builds, as it would on another machine. The fingerprint is a digest of what every
+step wrote, so two machines that print the same one built the same bytes in every
+step, not only in the jar.
+
+Some outputs carry a time by nature: JaCoCo's coverage data, the report of PIT
+and those of SpotBugs, PMD, CodeNarc and japicmp. The steps that write them are left out of the
+comparison and of the fingerprint, as are the steps that are handed what they
+wrote, and the summary counts them.
+
+`build/Planted.java` builds the same module with one step added. It copies the
+sources and writes the current time beside them, into
+`demo/reproducible/built.txt`, which the jar then holds:
+
+    java -Djenesis.project.reproduce=target-reproduced build/Planted.java
+
+fails, naming the step that wrote a different output from the same input first,
+and the steps that were handed that output after it:
+
+    The build did not reproduce: building again into target-reproduced wrote a different output than building into target
+    Caused by these steps, whose output differs although they were handed the same input in both builds, in the files named:
+      build/modules/compose/module/module-sources/produce/assemble/stamp: sources/demo/reproducible/built.txt
+    As a consequence, these steps were handed a different input:
+      build/modules/compose/module/module-sources/produce/assemble/binary/artifacts/jar
+      build/modules/compose/module/module-sources/produce/assemble/binary/classes
+      build/modules/compose/module/module-sources/produce/assemble/binary/compiled/compile/javac
+
+Both folders are kept, so `diff -r` of the `output` folder of a step named in
+`target` and in `target-reproduced` shows what differs. Delete
+`target-reproduced` before checking again.

@@ -9,4 +9,8 @@ public interface ObservabilityEngine extends Serializable {
     SequencedMap<String, String> coordinates();
 
     List<String> commands(SequencedMap<String, Path> resolved, Path output);
+
+    default boolean shouldReproduce() {
+        return true;
+    }
 }

@@ -26,6 +26,7 @@ class JenesisClassLoaderBridge {
     private final MethodHandle foreignApply;
     private final MethodHandle foreignShouldRun;
     private final MethodHandle foreignShouldCacheRemotely;
+    private final MethodHandle foreignShouldReproduce;
 
     private final MethodHandle foreignContextCtor;
     private final MethodHandle foreignArgumentCtor;
@@ -80,6 +81,17 @@ class JenesisClassLoaderBridge {
         foreignShouldCacheRemotely = lookup.findVirtual(foreignBuildStep,
                 "shouldCacheRemotely",
                 MethodType.methodType(boolean.class));
+        MethodHandle shouldReproduce;
+        try {
+            shouldReproduce = lookup.findVirtual(foreignBuildStep,
+                    "shouldReproduce",
+                    MethodType.methodType(boolean.class));
+        } catch (NoSuchMethodException _) {
+            shouldReproduce = MethodHandles.dropArguments(MethodHandles.constant(boolean.class, true),
+                    0,
+                    foreignBuildStep);
+        }
+        foreignShouldReproduce = shouldReproduce;
         foreignContextCtor = lookup.findConstructor(foreignBuildStepContext,
                 MethodType.methodType(void.class, Path.class, Path.class, Path.class));
         foreignArgumentCtor = lookup.findConstructor(foreignBuildStepArgument,
@@ -254,6 +266,17 @@ class JenesisClassLoaderBridge {
         public boolean shouldCacheRemotely() {
             try {
                 return (boolean) bridge.foreignShouldCacheRemotely.invoke(foreignStep);
+            } catch (RuntimeException | Error e) {
+                throw e;
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+
+        @Override
+        public boolean shouldReproduce() {
+            try {
+                return (boolean) bridge.foreignShouldReproduce.invoke(foreignStep);
             } catch (RuntimeException | Error e) {
                 throw e;
             } catch (Throwable t) {

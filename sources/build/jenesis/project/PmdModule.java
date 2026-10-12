@@ -159,6 +159,11 @@ public class PmdModule implements BuildExecutorModule {
         }
 
         @Override
+        public boolean shouldReproduce() {
+            return false;
+        }
+
+        @Override
         public boolean acceptableExitCode(int code,
                                           Executor executor,
                                           BuildStepContext context,
