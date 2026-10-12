@@ -36,6 +36,31 @@ public class InferredTestObservationModuleTest {
     }
 
     @Test
+    public void hands_the_test_run_everything_but_what_it_is_told_to_leave_untested() throws IOException {
+        Path classes = Files.createDirectory(root.resolve("compiled")), artifacts = Files.createDirectory(root.resolve("packaged"));
+        List<String> tested = new ArrayList<>(), observed = new ArrayList<>();
+        BuildExecutor executor = newExecutor();
+        executor.addModule("binary", (binary, _) -> {
+            binary.addSource("classes", classes);
+            binary.addSource("artifacts", artifacts);
+        });
+        executor.addModule("observed", observation()
+                .untested(new LinkedHashSet<>(List.of("binary/artifacts")))
+                .test(_ -> (_, inherited) -> tested.addAll(inherited.sequencedKeySet()))
+                .custom("report", (_, inherited) -> observed.addAll(inherited.sequencedKeySet())), "binary");
+        executor.execute();
+
+        assertThat(tested)
+                .as("the tests run against the classes alone, never beside the jar packaging them")
+                .anyMatch(identity -> identity.endsWith("binary/classes"))
+                .noneMatch(identity -> identity.endsWith("binary/artifacts"));
+        assertThat(observed)
+                .as("what observes the run still reads both")
+                .anyMatch(identity -> identity.endsWith("binary/classes"))
+                .anyMatch(identity -> identity.endsWith("binary/artifacts"));
+    }
+
+    @Test
     public void does_not_wire_an_engine_without_a_config_file() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);

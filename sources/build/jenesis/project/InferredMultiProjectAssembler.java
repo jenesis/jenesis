@@ -377,6 +377,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         InferredTestObservationModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
                                 .pinning(descriptor.pinning())
                                 .pathPlacement(descriptor.pathPlacement())
+                                .untested(environment.flag("test.jars", true)
+                                        ? Collections.emptyNavigableSet()
+                                        : new LinkedHashSet<>(List.of("binary/" + JavaToolchainModule.ARTIFACTS)))
                                 .custom(hooks.getOrDefault("observed", none))),
                         Stream.of(descriptor.resources().stream(),
                                         resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"),
