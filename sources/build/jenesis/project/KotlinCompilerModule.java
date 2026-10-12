@@ -420,8 +420,6 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                     }
                 }
             }
-            List<String> userClasspath = new ArrayList<>(sources.jars());
-            userClasspath.addAll(classpath);
             List<String> commands = new ArrayList<>(), options = new ArrayList<>();
             for (String option : prepended(properties)) {
                 if (option.startsWith("-J")) {
@@ -439,7 +437,7 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                     "-d", target.toString(),
                     "-no-stdlib",
                     "-no-reflect",
-                    "-classpath", String.join(File.pathSeparator, userClasspath)));
+                    "-classpath", String.join(File.pathSeparator, classpath)));
             if (release != null) {
                 commands.add("-jvm-target");
                 commands.add(Integer.parseInt(release) < 9 ? "1." + release : release);

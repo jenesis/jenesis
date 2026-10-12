@@ -49,7 +49,7 @@ public class KotlinCompilerModuleTest {
                 new KotlinCompilerModule(
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         Path classes = root
@@ -98,7 +98,7 @@ public class KotlinCompilerModuleTest {
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)))
                         .includeResources(false),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         Path classes = root
@@ -135,7 +135,7 @@ public class KotlinCompilerModuleTest {
                 new KotlinCompilerModule(
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         Path classes = root
@@ -177,7 +177,7 @@ public class KotlinCompilerModuleTest {
                 new KotlinCompilerModule(
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         Path output = root.resolve("kotlin").resolve(KotlinCompilerModule.CLASSES).resolve("output");
@@ -201,7 +201,7 @@ public class KotlinCompilerModuleTest {
         executor.addSource("project", project);
         executor.addModule("kotlin", new KotlinCompilerModule(
                 Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
-                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))), "project");
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))), "project", standardLibrary(executor, project, "project"));
         executor.execute();
         Path classes = root.resolve("kotlin").resolve(KotlinCompilerModule.CLASSES).resolve("output").resolve(BuildStep.CLASSES);
         Path jar = Files.createDirectories(tests.resolve("resolved")).resolve("sample.jar");
@@ -235,12 +235,33 @@ public class KotlinCompilerModuleTest {
         testExecutor.addSource("tests", tests);
         testExecutor.addModule("kotlin", new KotlinCompilerModule(
                 Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
-                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))), "tests");
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))), "tests", standardLibrary(testExecutor, tests, "tests"));
         testExecutor.execute();
         assertThat(testRoot.resolve("kotlin").resolve(KotlinCompilerModule.CLASSES).resolve("output")
                 .resolve(BuildStep.CLASSES + "sample/ShoutTest.class"))
                 .as("the tested jar is a friend of the test half, so its internal function is visible")
                 .isNotEmptyFile();
+    }
+
+    @Test
+    public void compiles_against_the_declared_dependencies_and_not_the_compiler_runtime() throws IOException {
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
+        versions.store(project.resolve(BuildStep.VERSIONS));
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.kt"), """
+                package sample
+                import kotlinx.coroutines.runBlocking
+                fun answer(): Int = runBlocking { 42 }
+                """);
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("kotlin", new KotlinCompilerModule(
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
+                "project", standardLibrary(executor, project, "project"));
+        assertThatThrownBy(executor::execute)
+                .as("the coroutines library kotlinc runs on is no dependency the module declared")
+                .hasStackTraceContaining("kotlinx");
     }
 
     private static int majorVersion(Path file) throws IOException {
@@ -270,7 +291,7 @@ public class KotlinCompilerModuleTest {
                 new KotlinCompilerModule(
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         Path classes = root
@@ -308,7 +329,7 @@ public class KotlinCompilerModuleTest {
                 new KotlinCompilerModule(
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         byte[] bytes = Files.readAllBytes(root
@@ -349,7 +370,7 @@ public class KotlinCompilerModuleTest {
                 new KotlinCompilerModule(
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         Path classes = root
@@ -406,7 +427,7 @@ public class KotlinCompilerModuleTest {
                 new KotlinCompilerModule(
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         Path classes = root
@@ -434,7 +455,7 @@ public class KotlinCompilerModuleTest {
                 new KotlinCompilerModule(
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         Path artifacts = root
@@ -555,6 +576,17 @@ public class KotlinCompilerModuleTest {
         SequencedMap<String, Path> outputs = executor.execute();
 
         assertThat(outputs).containsKeys("kotlin/classes", "kotlin/artifacts");
+    }
+
+    private static String standardLibrary(BuildExecutor executor, Path folder, String source) throws IOException {
+        Path file = folder.resolve(BuildStep.REQUIRES);
+        SequencedProperties requires = Files.exists(file) ? SequencedProperties.ofFiles(file) : new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.jetbrains.kotlin/kotlin-stdlib/" + KOTLIN_VERSION, "");
+        requires.store(file);
+        executor.addModule(source + "-libraries", new Dependencies(
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).group("main"), source);
+        return source + "-libraries";
     }
 
     private BuildExecutor newExecutor() throws IOException {
