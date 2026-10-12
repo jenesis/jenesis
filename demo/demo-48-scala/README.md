@@ -69,6 +69,25 @@ empty aggregator, so nothing splits `package scala` across two modules and the
 Java module system accepts it on the module path. That is why this demo builds as a
 plain module on the module path with no hand-written build script.
 
+Compiling incrementally
+-----------------------
+
+With `-Djenesis.scala.incremental=true`, Scala compiles incrementally with
+Zinc, the incremental compiler sbt is built on:
+
+    java -Djenesis.scala.incremental=true build/jenesis/Make.java
+
+The first build compiles every source. After an edit, the next build recompiles
+the sources the change reaches and keeps every other class: a changed method body
+recompiles its own file, and a changed signature also the files that use it. Zinc
+also compiles the `.java` sources to follow what they declare, but the module's
+Java classes still come from `javac`, as without the setting. Each compile runs
+in a JVM of its own, as `scalac` does without the setting.
+
+Zinc resolves as `org.scala-sbt:zinc_2.13` in a `zinc` group of its own, and drives
+the compiler through `org.scala-lang:scala3-sbt-bridge`, which the module pins in
+the `scalac` group at the compiler's version.
+
 Pinning
 -------
 
@@ -77,7 +96,8 @@ declaration: the module's own dependency in the default `main` group
 (the bare `scala.library` Java module name, plus its `org.scala-lang/scala-library`
 Maven coordinate) and
 the Scala compiler toolchain in its own `scalac` group (each
-`scalac/maven/...` coordinate with a version and SHA-256 checksum). The latest
+`scalac/maven/...` coordinate with a version and SHA-256 checksum), and Zinc in its
+`zinc` group. The latest
 Scala `<release>` on Maven Central is often a release candidate, so pinning is
 what keeps an otherwise floating build from drifting onto a fresh `-RC`. Run
 `java build/jenesis/Make.java pin` to record or refresh the tags; re-running
