@@ -52,6 +52,7 @@ public class Pom implements BuildStep {
                 Path.of(REQUIRES),
                 Path.of(EXCLUSIONS),
                 Path.of(OPTIONALS),
+                Path.of(OVERRIDES),
                 Path.of(Dependencies.GRAPH),
                 Path.of(METADATA)));
     }
@@ -69,6 +70,19 @@ public class Pom implements BuildStep {
         SequencedProperties exclusions = SequencedProperties.ofFolders(folders, EXCLUSIONS);
         SequencedProperties optionals = SequencedProperties.ofFolders(folders, OPTIONALS);
         SequencedProperties metadata = SequencedProperties.ofFolders(folders, METADATA);
+        SequencedProperties overrides = SequencedProperties.ofFolders(folders, OVERRIDES);
+        SequencedSet<MavenDependencyName> dropped = new LinkedHashSet<>();
+        SequencedProperties recorded = SequencedProperties.ofFolders(folders, Dependencies.GRAPH);
+        for (String key : recorded.stringPropertyNames()) {
+            if (key.startsWith("overridden/" + group + "/")) {
+                String coordinate = key.substring(key.indexOf('/', "overridden/".length() + group.length() + 1) + 1);
+                int prefix = coordinate.indexOf('/'), separator = coordinate.indexOf('/', prefix + 1);
+                if (prefixes.contains(coordinate.substring(0, prefix))) {
+                    dropped.add(new MavenDependencyName(coordinate.substring(prefix + 1, separator),
+                            coordinate.substring(separator + 1)));
+                }
+            }
+        }
         SequencedMap<String, Resolver.Resolution> graph = Dependencies.graph(folders.stream()
                 .map(folder -> folder.resolve(Dependencies.GRAPH))
                 .toList(), List.of());
@@ -83,7 +97,7 @@ public class Pom implements BuildStep {
             int first = key.indexOf('/');
             int second = key.indexOf('/', first + 1);
             String coordinate = key.substring(second + 1), scope = key.substring(first + 1, second);
-            if (!key.startsWith(group + "/")) {
+            if (!key.startsWith(group + "/") || overrides.getProperty(group + "/" + coordinate) != null) {
                 continue;
             }
             coordinateScopes.computeIfAbsent(coordinate, _ -> new LinkedHashSet<>()).add(scope);
@@ -139,17 +153,18 @@ public class Pom implements BuildStep {
             MavenDependencyScope scope = inCompile && inRuntime
                     ? MavenDependencyScope.COMPILE
                     : inCompile ? MavenDependencyScope.PROVIDED : MavenDependencyScope.RUNTIME;
-            List<MavenDependencyName> excludes = null;
+            SequencedSet<MavenDependencyName> excluded = new LinkedHashSet<>();
             String exclusionList = coordinateExclusions.get(name);
             if (exclusionList != null && !exclusionList.isEmpty()) {
-                excludes = new ArrayList<>();
                 for (String entry : exclusionList.split(",")) {
                     int slash = entry.indexOf('/');
                     if (slash > 0) {
-                        excludes.add(new MavenDependencyName(entry.substring(0, slash), entry.substring(slash + 1)));
+                        excluded.add(new MavenDependencyName(entry.substring(0, slash), entry.substring(slash + 1)));
                     }
                 }
             }
+            excluded.addAll(dropped);
+            List<MavenDependencyName> excludes = excluded.isEmpty() ? null : List.copyOf(excluded);
             deps.putIfAbsent(parsed.key(), new MavenDependencyValue(
                     parsed.version(),
                     scope,

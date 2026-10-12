@@ -180,6 +180,50 @@ public class PomTest {
     }
 
     @Test
+    public void leaves_out_an_overridden_module_and_excludes_what_the_override_dropped_from_each_dependency()
+            throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        for (String scope : List.of("compile", "runtime")) {
+            requires.setProperty("main/" + scope + "/module/org.example.api", "");
+            requires.setProperty("main/" + scope + "/module/org.example.lib", "");
+            requires.setProperty("main/" + scope + "/module/org.example.carrier", "");
+        }
+        requires.store(argument.resolve(BuildStep.REQUIRES));
+        SequencedProperties overrides = new SequencedProperties();
+        overrides.setProperty("main/module/org.example.api", "org.example.carrier");
+        overrides.store(argument.resolve(BuildStep.OVERRIDES));
+        SequencedProperties graph = new SequencedProperties();
+        for (String scope : List.of("compile", "runtime")) {
+            graph.setProperty("vertex/main/" + scope + "/maven/org.example/lib", "1.0\torg.example.lib\tfalse\tfalse");
+            graph.setProperty("vertex/main/" + scope + "/maven/org.example/carrier", "2.0\torg.example.carrier\tfalse\tfalse");
+            graph.setProperty("overridden/main/" + scope + "/maven/org.example/api", "org.example.api");
+        }
+        graph.store(argument.resolve(Dependencies.GRAPH));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(argument, Map.of(
+                                Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.OVERRIDES), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(Dependencies.GRAPH), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        String pom = Files.readString(next.resolve(Pom.POM));
+        assertThat(pom)
+                .as("the carrier stands in for the module it overrides")
+                .contains("<artifactId>lib</artifactId>", "<artifactId>carrier</artifactId>")
+                .doesNotContain("<artifactId>org.example.api</artifactId>");
+        assertThat(pom.split("<artifactId>api</artifactId>", -1))
+                .as("a consumer's resolution drops the overridden artifact wherever the build dropped it")
+                .hasSize(3);
+    }
+
+    @Test
     public void writes_the_pom_and_its_coordinate_where_a_jar_carries_them() throws IOException {
         SequencedProperties metadata = new SequencedProperties();
         metadata.setProperty("project", "build.jenesis");
