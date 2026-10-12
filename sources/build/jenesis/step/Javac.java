@@ -15,6 +15,7 @@ import java.util.jar.Attributes;
 
 public class Javac extends ProcessBuildStep {
 
+    public static final String HEADERS = "headers/";
     private static final String PROCESSOR = "javax.annotation.processing.Processor",
             PROCESSOR_SERVICE = "META-INF/services/" + PROCESSOR;
     private static final Pattern VERSIONED = Pattern.compile("META-INF/versions/(\\d+)/.+");
@@ -26,12 +27,14 @@ public class Javac extends ProcessBuildStep {
     private final boolean includeResources;
     private final PathPlacement pathPlacement;
     private final String group;
+    private final boolean headers;
 
     public Javac(ProcessHandler.Factory factory) {
         this(factory.apply("javac", "bin/javac"),
              true,
              PathPlacement.INFERRED,
              "main",
+             false,
              new Terms());
     }
 
@@ -41,6 +44,7 @@ public class Javac extends ProcessBuildStep {
                 true,
                 PathPlacement.INFERRED,
                 "main",
+                false,
                 Terms.ofEnvironment(environment, "javac"));
     }
 
@@ -48,11 +52,13 @@ public class Javac extends ProcessBuildStep {
                   boolean includeResources,
                   PathPlacement pathPlacement,
                   String group,
+                  boolean headers,
                   Terms terms) {
         super("javac", factory, terms);
         this.includeResources = includeResources;
         this.pathPlacement = pathPlacement;
         this.group = group;
+        this.headers = headers;
     }
 
     public static void writeRelease(Path folder, String release, int feature) throws IOException {
@@ -80,23 +86,27 @@ public class Javac extends ProcessBuildStep {
     }
 
     public Javac factory(ProcessHandler.Factory factory) {
-        return new Javac(factory.apply("javac", "bin/javac"), includeResources, pathPlacement, group, terms);
+        return new Javac(factory.apply("javac", "bin/javac"), includeResources, pathPlacement, group, headers, terms);
     }
 
     public Javac includeResources(boolean includeResources) {
-        return new Javac(factory, includeResources, pathPlacement, group, terms);
+        return new Javac(factory, includeResources, pathPlacement, group, headers, terms);
     }
 
     public Javac pathPlacement(PathPlacement pathPlacement) {
-        return new Javac(factory, includeResources, pathPlacement, group, terms);
+        return new Javac(factory, includeResources, pathPlacement, group, headers, terms);
     }
 
     public Javac group(String group) {
-        return new Javac(factory, includeResources, pathPlacement, group, terms);
+        return new Javac(factory, includeResources, pathPlacement, group, headers, terms);
+    }
+
+    public Javac headers(boolean headers) {
+        return new Javac(factory, includeResources, pathPlacement, group, headers, terms);
     }
 
     public Javac verbose(BiConsumer<Boolean, String> printing) {
-        return new Javac(factory, includeResources, pathPlacement, group, terms.printing(printing));
+        return new Javac(factory, includeResources, pathPlacement, group, headers, terms.printing(printing));
     }
 
     @Override
@@ -204,6 +214,9 @@ public class Javac extends ProcessBuildStep {
                 processorPath = new ArrayList<>(),
                 siblingClasses = new ArrayList<>(),
                 options = new ArrayList<>(List.of("-d", target.toString(), "-s", generated.toString()));
+        if (headers) {
+            options.addAll(List.of("-h", Files.createDirectory(context.next().resolve(HEADERS)).toString()));
+        }
         boolean compilerPlugins = false;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
