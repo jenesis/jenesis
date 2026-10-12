@@ -238,6 +238,7 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                     sources.release(),
                     sources,
                     sources.classpath(),
+                    sources.friends(),
                     sources.files()));
         }
 
@@ -265,12 +266,15 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                     }
                 }
                 classpath.add(base.toString());
+                List<String> friends = new ArrayList<>(classpath);
+                friends.addAll(sources.friends());
                 classpath.addAll(sources.classpath());
                 List<String> commands = command(properties(arguments),
                         target,
                         Integer.toString(release),
                         sources,
                         classpath,
+                        friends,
                         files);
                 chain = chain.thenComposeAsync(_ -> {
                     try {
@@ -407,6 +411,7 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                                      String release,
                                      Sources sources,
                                      List<String> classpath,
+                                     List<String> friends,
                                      List<String> files) {
             if (sources.jars().isEmpty()) {
                 throw new IllegalStateException(
@@ -445,8 +450,8 @@ public class KotlinCompilerModule implements BuildExecutorModule {
             for (String plugin : sources.plugins()) {
                 commands.add("-Xplugin=" + plugin);
             }
-            if (!sources.friends().isEmpty() && options.stream().noneMatch(option -> option.startsWith("-Xfriend-paths"))) {
-                commands.add("-Xfriend-paths=" + String.join(",", sources.friends()));
+            if (!friends.isEmpty() && options.stream().noneMatch(option -> option.startsWith("-Xfriend-paths"))) {
+                commands.add("-Xfriend-paths=" + String.join(",", friends));
             }
             commands.addAll(options);
             commands.addAll(files);
