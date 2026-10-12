@@ -39,7 +39,7 @@ public class ProtocModule implements BuildExecutorModule {
              "protoc",
              "main",
              classifier(),
-             new LinkedHashMap<>(),
+             Collections.emptyNavigableMap(),
              List.of(),
              new ProcessBuildStep.Terms());
     }
@@ -52,7 +52,7 @@ public class ProtocModule implements BuildExecutorModule {
                 "protoc",
                 "main",
                 classifier(),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 List.of(),
                 ProcessBuildStep.Terms.ofEnvironment(environment, "protoc"));
     }
