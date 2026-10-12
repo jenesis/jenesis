@@ -1439,7 +1439,9 @@ public record Project(
                           JVM variant, <artifactId>-jvm, where its root artifact holds no class and its
                           POM does not depend on that variant, as Gradle module metadata is not read
                       scala-maven-plugin / scala -> .scala sources, compiled by Scala 3 (48); Scala 2
-                          is not supported
+                          is not supported; the incremental compilation of Zinc, which sbt, Gradle and
+                          the plugin's recompileMode=incremental use, is
+                          jenesis.scala.incremental=true
                       gmavenplus / groovy -> .groovy sources, compiled by Groovy 4 or newer after
                           javac (50), so Groovy uses Java types and Java no Groovy type: gmavenplus
                           stubs for a joint compilation have no counterpart, and Java code that uses
@@ -4517,6 +4519,7 @@ public record Project(
                 source.scalafmt|report|ignore|report|strict: scalafmt checking, activated by a .scalafmt.conf; ignore skips it, report lists a source it would format differently, strict fails the build on one
                 source.codenarc|report|ignore|report|strict: CodeNarc, activated by a codenarc.xml; ignore skips it, report records its findings, strict fails the build on any of them
                 compile.errorprone|true|Error Prone over the javac plugin declared with @jenesis.plugin javac, activated by an errorprone.properties; javac forks to grant it the compiler internals it reads
+                scala.incremental|false|Compile Scala incrementally with Zinc, resolved as org.scala-sbt:zinc_2.13 in a zinc group and driving the compiler through org.scala-lang:scala3-sbt-bridge at the compiler's version, in a JVM forked per compile, which recompiles only what a change reaches; the lines of process-scalac.properties configure that JVM
                 format.java|true|The Java formatter a javaformat.properties selects - google, palantir or eclipse - with its options
                 format.ktlint|true|ktlint formatting, activated by an .editorconfig
                 format.ktfmt|true|ktfmt formatting, activated by a ktfmt.properties, which names its style and what it does to the imports; refused beside ktlint formatting the same sources
