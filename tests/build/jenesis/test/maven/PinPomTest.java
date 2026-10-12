@@ -94,6 +94,38 @@ public class PinPomTest {
     }
 
     @Test
+    public void pins_past_a_predecessor_that_vanished_since_the_previous_run() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.pin
+                    org.foo/bar 2.0.0 SHA-256/stale
+                    -->
+                </project>
+                """);
+        writeResolved(Map.of("maven/org.foo/bar", "3.0.0 SHA-256/fresh"));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("input", new BuildStepArgument(
+                input,
+                Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("vanished", new BuildStepArgument(null, Checksum.removed(Set.of(Path.of(Inventory.INVENTORY)))));
+        new PinPom("maven", "", List.of(pom), new HashDigestFunction("SHA-256"))
+                .platform(Platform.of("linux,x86_64"))
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture()
+                .join();
+        assertThat(Files.readString(pom))
+                .as("a predecessor that no longer exists is skipped rather than read")
+                .contains("<version>3.0.0</version>", "Checksum/SHA-256/fresh")
+                .doesNotContain("SHA-256/stale");
+    }
+
+    @Test
     public void pin_rewrite_preserves_attach_comments() throws IOException {
         Path pom = root.resolve("pom.xml");
         Files.writeString(pom, """
