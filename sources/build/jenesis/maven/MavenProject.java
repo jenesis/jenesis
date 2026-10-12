@@ -284,7 +284,7 @@ public class MavenProject implements BuildExecutorModule {
                         SequencedProperties descriptor = SequencedProperties.ofFiles(file);
                         String name = file.getFileName().toString(), path = descriptor.getProperty("path");
                         if (descriptor.stringPropertyNames().stream().anyMatch(key -> key.startsWith(RELOCATION))) {
-                            Path sources = root.resolve(path).resolve(descriptor.getProperty("sources"));
+                            Path sources = root.resolve(path).resolve(descriptor.getProperty("sources.0"));
                             boolean compiled;
                             try (Stream<Path> found = Files.isDirectory(sources) ? Files.walk(sources) : Stream.empty()) {
                                 compiled = found.anyMatch(Files::isRegularFile);
@@ -335,13 +335,13 @@ public class MavenProject implements BuildExecutorModule {
                         SequencedProperties properties = SequencedProperties.ofFiles(file);
                         boolean active = false;
                         Path base = root.resolve(properties.getProperty("path"));
-                        String sourcesProperty = properties.getProperty("sources");
+                        String sourcesProperty = properties.getProperty("sources.0");
                         Path sources = sourcesProperty.isEmpty() ? null : base.resolve(sourcesProperty);
                         if (sources != null && Files.exists(sources)) {
                             active = true;
                         }
                         SequencedSet<Path> languages = new LinkedHashSet<>();
-                        for (int languageIndex = 0; ; languageIndex++) {
+                        for (int languageIndex = 1; ; languageIndex++) {
                             String language = properties.getProperty("sources." + languageIndex);
                             if (language == null) {
                                 break;
@@ -393,9 +393,7 @@ public class MavenProject implements BuildExecutorModule {
                         if (!active && name.startsWith(SIBLING_MODULE_PREFIX) && Files.exists(tests)) {
                             SequencedProperties testProperties = SequencedProperties.ofFiles(tests);
                             active = testProperties.stringPropertyNames().stream()
-                                    .filter(key -> key.equals("sources")
-                                            || key.startsWith("sources.")
-                                            || key.startsWith("resources."))
+                                    .filter(key -> key.startsWith("sources.") || key.startsWith("resources."))
                                     .map(testProperties::getProperty)
                                     .filter(folder -> !folder.isEmpty())
                                     .anyMatch(folder -> Files.exists(base.resolve(folder)))
@@ -662,7 +660,7 @@ public class MavenProject implements BuildExecutorModule {
                                 Javac.writeRelease(context.next(), properties.getProperty("release"), feature);
                                 SequencedProperties descriptor = new SequencedProperties();
                                 descriptor.setProperty("path", properties.getProperty("path"));
-                                descriptor.setProperty("sources", properties.getProperty("sources"));
+                                descriptor.setProperty("sources", properties.getProperty("sources.0"));
                                 descriptor.setProperty("modular", "false");
                                 if (testsOf != null) {
                                     descriptor.setProperty("test", testsOf);
@@ -991,7 +989,7 @@ public class MavenProject implements BuildExecutorModule {
             properties.setProperty("artifactId", value.artifactId());
             properties.setProperty("version", value.version());
             if (value.relocation() != null) {
-                properties.setProperty("sources", value.sourceDirectory() == null
+                properties.setProperty("sources.0", value.sourceDirectory() == null
                         ? "src/main/java"
                         : value.sourceDirectory().replace(File.separatorChar, '/'));
                 SequencedMap<String, String> relocation = new LinkedHashMap<>();
@@ -1250,12 +1248,12 @@ public class MavenProject implements BuildExecutorModule {
                                     + "=" + dep.getValue().checksum())
                             .collect(Collectors.joining("\t")));
             String sourceDirectory = test ? value.testSourceDirectory() : value.sourceDirectory();
-            properties.setProperty("sources", sourceDirectory == null
+            properties.setProperty("sources.0", sourceDirectory == null
                     ? (test ? "src/test/java" : "src/main/java")
                     : sourceDirectory.replace(File.separatorChar, '/'));
             List<String> languages = List.of("kotlin", "groovy");
             for (int index = 0; index < languages.size(); index++) {
-                properties.setProperty("sources." + index, "src/" + (test ? "test" : "main") + "/" + languages.get(index));
+                properties.setProperty("sources." + (index + 1), "src/" + (test ? "test" : "main") + "/" + languages.get(index));
             }
             List<String> resourceDirectories = test ? value.testResourceDirectories() : value.resourceDirectories();
             List<String> resources = resourceDirectories == null

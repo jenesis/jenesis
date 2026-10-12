@@ -577,8 +577,8 @@ public record Project(
                                     jenesis.deploy.uri, and by a jreleaser.yml
                       %{name}plugin/<name>%{reset} Run a plugin the project names under the hook point plugin, on demand
                       %{name}pin%{reset}           Rewrite version/checksum pins into pom.xml or module-info.java
-                      %{name}dependencies%{reset}  Print each module's resolved dependency graph, compiling but
-                                    running no tests unless %{name}-Djenesis.test.skip=false%{reset} asks
+                      %{name}dependencies%{reset}  Print each module's resolved dependency graph; with
+                                    %{name}-Djenesis.test.skip=true%{reset} it runs no tests on the way
                       %{name}ide%{reset}           Generate IntelliJ IDEA, VS Code, and Eclipse project metadata
                       %{name}metadata%{reset}      Refresh the metadata module outputs
                       %{name}configuration%{reset} Print every setting with the value in force, one per line
@@ -4691,12 +4691,6 @@ public record Project(
                                                      Path root,
                                                      SequencedSet<Path> profiles,
                                                      String... selectors) {
-        if (selectors.length > 0 && environment.getProperty("test.skip") == null && Arrays.stream(selectors)
-                .allMatch(selector -> selector.equals(DEPENDENCIES) || selector.startsWith(DEPENDENCIES + "/"))) {
-            Map<String, String> keys = new HashMap<>(environment.keys());
-            keys.put("test.skip", "true");
-            environment = environment.keys(keys);
-        }
         try {
             return ofEnvironment(environment, root).profiles(profiles.toArray(Path[]::new)).doMain(selectors);
         } catch (Throwable t) {
