@@ -35,11 +35,6 @@ public class Planted {
                     }, descriptor.sources().stream());
                     build.accept(sub, inherited);
                 }));
-        try {
-            project.build(args);
-        } catch (IllegalStateException e) {
-            System.err.println(e.getMessage());
-            System.exit(1);
-        }
+        project.build(args);
     }
 }

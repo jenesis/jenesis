@@ -119,7 +119,7 @@ Quick index
 | 68 | [`module-convention`](demo-68-module-convention/README.md)        | Resolve your own modules from your own Maven repository                      | `java build/Demo.java`            |
 | 69 | [`discovery-module`](demo-69-discovery-module/README.md)          | Resolve a module by what its domain says it is published as                  | `java build/jenesis/Execute.java` |
 | 70 | [`discovery-maven`](demo-70-discovery-maven/README.md)            | The same for a Maven dependency, from a release or a Maven repository        | `java build/jenesis/Execute.java` |
-| 71 | [`reproducible`](demo-71-reproducible/README.md)                  | Build the same bytes on every machine, checked against a recorded digest     | `java build/Demo.java`            |
+| 71 | [`reproducible`](demo-71-reproducible/README.md)                  | Build twice and compare every step, with a fingerprint over all of them      | `java -Djenesis.project.reproduce=target-reproduced build/jenesis/Make.java` |
 | 72 | [`native-image`](demo-72-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
 | 73 | [`jpx`](demo-73-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
 | 74 | [`test-runs`](demo-74-test-runs/README.md)                        | Run the tests a dependency's jar holds, once per module that scans it        | `java build/jenesis/Make.java`    |
@@ -1078,24 +1078,20 @@ names no remote either.
 ## 53. The same bytes on every machine - [`reproducible`](demo-71-reproducible/README.md)
 
 What you publish, anyone holding the sources should be able to build again and
-get the same bytes. `reproducible` turns that into a check: it builds a module
-and compares the jar's `SHA-256` with a digest recorded in the demo. CI runs it
-on Linux, macOS and Windows, each on whatever update of JDK 25 the runner
-provides, so a match everywhere shows that nothing about the machine reaches the
-jar.
-
-Nothing has to be configured for it. The one setting involved is the timestamp
-every archive entry records, which you can point at something meaningful such as
-the time of the release commit - and the recorded digest moves with it:
-
-    jenesis.archive.timestamp=2026-09-01T12:00:00Z
-
-To check every step rather than the one jar, build twice. The second build goes
-into a folder of its own and uses no build cache, and a step that wrote something
-else from the same input fails the build, named before the steps it changed. A
-clean comparison prints a fingerprint of everything the build wrote:
+get the same bytes. `reproducible` checks that by building twice: the second
+build goes into a folder of its own and uses no build cache, and every step's
+output is compared with the first build's.
 
     java -Djenesis.project.reproduce=target-reproduced build/jenesis/Make.java
+
+A clean comparison prints a fingerprint of everything the build wrote, which two
+machines can compare. A step that wrote something else from the same input is
+named, before the steps it changed, without failing the build. Nothing has to be
+configured for it; the one setting involved is the timestamp every archive entry
+records, which you can point at something meaningful such as the time of the
+release commit - and the fingerprint moves with it:
+
+    jenesis.archive.timestamp=2026-09-01T12:00:00Z
 
 ## 54. Ahead-of-time native image - [`native-image`](demo-72-native-image/README.md)
 

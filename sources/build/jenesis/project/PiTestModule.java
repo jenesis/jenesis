@@ -162,11 +162,6 @@ public class PiTestModule implements BuildExecutorModule {
         }
 
         @Override
-        public boolean shouldReproduce() {
-            return false;
-        }
-
-        @Override
         public CompletionStage<List<String>> process(Executor executor,
                                                      BuildStepContext context,
                                                      SequencedMap<String, BuildStepArgument> arguments,

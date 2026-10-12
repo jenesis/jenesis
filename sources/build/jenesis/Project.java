@@ -2708,8 +2708,8 @@ public record Project(
                                          68 module-convention (resolving what you published),
                                          69, 70 discovery (a dependency resolved from its
                                          publisher's own domain, as a module or by coordinate),
-                                         71 reproducible (a jar checked against a recorded digest,
-                                         and a build compared with a second one),
+                                         71 reproducible (a build compared with a second one,
+                                         step by step, with a fingerprint over all of them),
                                          73 jpx (run a released program without building)
                       Extending it       55 custom-assembler, 56 custom-jmod, 57 internal-module,
                                          58 external-module,
@@ -4308,23 +4308,25 @@ public record Project(
                         secondSteps.add(identity);
                     }
                 }, selectors);
-        environment.out().accept(new Reproduction(target, firstSteps, reproduce, secondSteps).verify());
-        Files.walkFileTree(reproduce, new SimpleFileVisitor<>() {
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                Files.delete(file);
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult postVisitDirectory(Path directory, IOException exception) throws IOException {
-                if (exception != null) {
-                    throw exception;
+        if (new Reproduction(target, firstSteps, reproduce, secondSteps).verify(environment.out(),
+                environment.flag("print.reproduce", true))) {
+            Files.walkFileTree(reproduce, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                    Files.delete(file);
+                    return FileVisitResult.CONTINUE;
                 }
-                Files.delete(directory);
-                return FileVisitResult.CONTINUE;
-            }
-        });
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path directory, IOException exception) throws IOException {
+                    if (exception != null) {
+                        throw exception;
+                    }
+                    Files.delete(directory);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
         return built;
     }
 
@@ -4361,7 +4363,7 @@ public record Project(
 
     private static final String CATALOGUE = """
                 project.target|target|Folder the build writes its outputs to; a file a project provides names only a folder inside the project
-                project.reproduce||Build the selection a second time into this folder, which must be absent or empty, consulting and filling no build cache, then compare what every step wrote in both builds: a difference fails the build naming the steps that wrote a different output from the same input first, and the steps handed that output after them, while a clean comparison prints a fingerprint over every step's output and deletes the folder; read by Make.java and jenesis-make, not by Execute.java; a file a project provides names only a folder inside the project
+                project.reproduce||Build the selection a second time into this folder, which must be absent or empty, consulting and filling no build cache, then compare what every step wrote in both builds, printing a fingerprint over every step's output: a clean comparison deletes the folder, while a difference keeps it, without failing the build, and names the steps that wrote a different output from the same input first, and the steps handed that output after them, as jenesis.print.reproduce asks; read by Make.java and jenesis-make, not by Execute.java; a file a project provides names only a folder inside the project
                 project.artifacts||Folder resolved dependencies and repository metadata are cached in; a file a project provides names only a folder inside the project
                 project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project
                 project.sources|false|Assemble a sources jar for every module
@@ -4431,6 +4433,7 @@ public record Project(
                 print.aliases|false|Each module alias whose target already declares that name
                 print.docker|true|The image notice when a build or run is containerized
                 print.jreleaser|true|The JReleaser command line when a release runs
+                print.reproduce|true|The steps that did not reproduce when jenesis.project.reproduce builds twice, beside the summary line
                 dependency.pin||strict|versions|ignore; unset keeps existing pins and tolerates missing ones
                 dependency.native|ignore|ignore|warn|strict: what to do when a module runs a jar whose Jenesis-Native-Access names a module it does not grant with @jenesis.native; warn reports it, strict fails the build
                 resolver.maven|maven|maven|closest|latest|release|stable|fail|managed: which version a Maven coordinate resolves to; stable skips pre-release qualifiers, fail rejects a coordinate two dependencies require at different versions, managed rejects that and any version only a dependency's POM names

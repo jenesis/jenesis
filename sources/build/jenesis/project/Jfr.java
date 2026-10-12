@@ -32,11 +32,6 @@ public record Jfr(SequencedMap<String, String> options) implements Observability
     }
 
     @Override
-    public boolean shouldReproduce() {
-        return false;
-    }
-
-    @Override
     public String name() {
         return "jfr";
     }

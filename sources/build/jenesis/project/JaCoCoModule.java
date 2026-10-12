@@ -173,11 +173,6 @@ public class JaCoCoModule implements BuildExecutorModule {
         }
 
         @Override
-        public boolean shouldReproduce() {
-            return false;
-        }
-
-        @Override
         public boolean acceptableExitCode(int code,
                                           Executor executor,
                                           BuildStepContext context,
