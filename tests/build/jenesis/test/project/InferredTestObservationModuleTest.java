@@ -11,6 +11,8 @@ import build.jenesis.HashDigestFunction;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.InferredTestObservationModule;
+import build.jenesis.project.Jfr;
+import build.jenesis.project.PiTestModule;
 import build.jenesis.project.TestModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -142,6 +144,41 @@ public class InferredTestObservationModuleTest {
     }
 
     @Test
+    public void refuses_a_recording_option_of_a_jfr_properties_file_that_has_no_value_or_holds_a_comma()
+            throws IOException {
+        Files.writeString(project.resolve("jfr.properties"), "settings");
+        BuildExecutor empty = newExecutor();
+        empty.addSource("project", project);
+        empty.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+        assertThatThrownBy(empty::execute)
+                .hasStackTraceContaining("jfr.properties gives settings no value");
+        Files.writeString(project.resolve("jfr.properties"), "settings=default,profile");
+        BuildExecutor split = newExecutor();
+        split.addSource("project", project);
+        split.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+        assertThatThrownBy(split::execute)
+                .hasStackTraceContaining("jfr.properties gives settings the value default,profile")
+                .hasStackTraceContaining("holds no comma");
+    }
+
+    @Test
+    public void hands_the_recording_options_of_a_jfr_properties_file_to_the_recording() throws IOException {
+        Files.writeString(project.resolve("jfr.properties"), "settings=profile\nmaxsize=10M\n");
+        List<Jfr> recorded = new ArrayList<>();
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", observation().test(_ -> (_, _) -> {}).jfr(jfr -> {
+            recorded.add(jfr);
+            return jfr;
+        }), "project");
+        executor.execute();
+
+        assertThat(recorded).singleElement()
+                .extracting(Jfr::options)
+                .isEqualTo(Map.of("settings", "profile", "maxsize", "10M"));
+    }
+
+    @Test
     public void the_observe_override_switches_off_the_recording() throws IOException {
         Files.writeString(project.resolve("jfr.properties"), "filename=elsewhere.jfr");
         BuildExecutor executor = newExecutor();
@@ -195,6 +232,56 @@ public class InferredTestObservationModuleTest {
                 .containsExactlyInAnyOrder(
                         "pitest/runtime/maven/org.pitest/pitest-command-line/RELEASE",
                         "pitest/runtime/maven/org.pitest/pitest-junit5-plugin/RELEASE");
+    }
+
+    @Test
+    public void refuses_a_key_of_pitest_properties_that_names_no_option_of_the_mutation() throws IOException {
+        Files.writeString(project.resolve("pitest.properties"), "targetClass=sample.*\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+        assertThatThrownBy(executor::execute)
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("Unknown key targetClass in " + project.resolve("pitest.properties"))
+                .hasMessageContaining("[targetClasses, targetTests, outputFormats, mutators, failWhenNoMutations]");
+    }
+
+    @Test
+    public void refuses_an_output_format_or_a_flag_of_pitest_properties_that_pit_does_not_know() throws IOException {
+        Files.writeString(project.resolve("pitest.properties"), "outputFormats=XML,PDF\n");
+        BuildExecutor format = newExecutor();
+        format.addSource("project", project);
+        format.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+        assertThatThrownBy(format::execute)
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("Unknown format PDF of outputFormats")
+                .hasMessageContaining("[XML, HTML, CSV]");
+        Files.writeString(project.resolve("pitest.properties"), "failWhenNoMutations=yes\n");
+        BuildExecutor flag = newExecutor();
+        flag.addSource("project", project);
+        flag.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+        assertThatThrownBy(flag::execute)
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("The value yes of failWhenNoMutations")
+                .hasMessageContaining("expected true, false");
+    }
+
+    @Test
+    public void reads_an_output_format_of_pitest_properties_whatever_its_case() throws IOException {
+        Files.writeString(project.resolve("pitest.properties"), "outputFormats=xml,Html\nfailWhenNoMutations\n");
+        List<PiTestModule> configured = new ArrayList<>();
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", observation().test(_ -> (_, _) -> {}).pitest(module -> {
+            configured.add(module);
+            return null;
+        }), "project");
+        executor.execute();
+
+        assertThat(configured).as("the file is read into the typed module rather than refused").hasSize(1);
     }
 
     @Test

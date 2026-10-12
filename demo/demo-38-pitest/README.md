@@ -47,3 +47,10 @@ configuration rather than an empty marker:
 PIT runs in the test module's context, where the production module is on the
 classpath as a dependency and the test classes are local: `targetClasses` selects
 the production class to mutate and `targetTests` the tests that must catch it.
+
+Each of the two takes comma-separated globs and defaults to `*`. `outputFormats`
+names some of `XML` (the default), `HTML` and `CSV`; an optional `mutators` key
+lists PIT's mutators or mutator groups, such as `STRONGER`, and
+`failWhenNoMutations` fails the run when PIT finds nothing to mutate. Any other
+key, or a format PIT does not write, fails the build naming the file and the
+valid ones.

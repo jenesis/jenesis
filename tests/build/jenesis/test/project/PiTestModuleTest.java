@@ -163,6 +163,85 @@ public class PiTestModuleTest {
                 .contains(project.resolve("library.jar").toString());
     }
 
+    @Test
+    public void mutate_step_hands_pit_the_typed_selection_of_classes_tests_formats_and_mutators()
+            throws IOException {
+        Files.createDirectory(project.resolve(BuildStep.SOURCES));
+        jar(project.resolve("app.jar"), "app/App.class");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/runtime/maven/org.example/app/1.0", "app.jar");
+        index.store(project.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("vertex/main/runtime/maven/org.example/app", "1.0\t\tfalse\ttrue");
+        graph.store(project.resolve(Dependencies.GRAPH));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "pitest",
+                new PiTestModule(Map.of("maven", serving(cli())), Map.of("maven", Resolver.identity()))
+                        .targetClasses(List.of("app.*", "lib.*"))
+                        .targetTests(List.of("app.*"))
+                        .outputFormats(List.of(PiTestModule.OutputFormat.XML, PiTestModule.OutputFormat.HTML))
+                        .mutators(List.of("STRONGER", "REMOVE_CONDITIONALS"))
+                        .failWhenNoMutations(true),
+                "project");
+        executor.execute("pitest/mutate");
+
+        assertThat(Files.readString(root.resolve("pitest").resolve("mutate").resolve("supplement").resolve("command")))
+                .contains("app.*,lib.*")
+                .contains("XML,HTML")
+                .contains("STRONGER,REMOVE_CONDITIONALS")
+                .contains("--failWhenNoMutations");
+    }
+
+    @Test
+    public void mutate_step_runs_nothing_when_no_class_matches_the_target_tests() throws IOException {
+        Files.createDirectory(project.resolve(BuildStep.SOURCES));
+        jar(project.resolve("app.jar"), "app/App.class");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/runtime/maven/org.example/app/1.0", "app.jar");
+        index.store(project.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("vertex/main/runtime/maven/org.example/app", "1.0\t\tfalse\ttrue");
+        graph.store(project.resolve(Dependencies.GRAPH));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "pitest",
+                new PiTestModule(Map.of("maven", serving(cli())), Map.of("maven", Resolver.identity()))
+                        .targetTests(List.of("other.*")),
+                "project");
+        executor.execute("pitest/mutate");
+
+        assertThat(root.resolve("pitest").resolve("mutate").resolve("supplement").resolve("command"))
+                .as("PIT is not started when the target tests select no class")
+                .doesNotExist();
+    }
+
+    @Test
+    public void refuses_a_selection_of_classes_or_tests_without_a_glob_or_with_a_comma_in_one() {
+        PiTestModule module = new PiTestModule(Map.of(), Map.of());
+        assertThatThrownBy(() -> module.targetClasses(List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at least one glob");
+        assertThatThrownBy(() -> module.targetTests(List.of("a.*,b.*")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("'a.*,b.*'");
+    }
+
+    @Test
+    public void refuses_no_output_format_and_a_mutator_that_is_no_single_name() {
+        PiTestModule module = new PiTestModule(Map.of(), Map.of());
+        assertThatThrownBy(() -> module.outputFormats(List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("[XML, HTML, CSV]");
+        assertThatThrownBy(() -> module.mutators(List.of(" ")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("such as DEFAULTS");
+    }
+
     private static void jar(Path jar, String entry) throws IOException {
         try (JarOutputStream stream = new JarOutputStream(Files.newOutputStream(jar))) {
             stream.putNextEntry(new JarEntry(entry));
