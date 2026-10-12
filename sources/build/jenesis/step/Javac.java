@@ -15,6 +15,8 @@ import java.util.jar.Attributes;
 
 public class Javac extends ProcessBuildStep {
 
+    private static final String PROCESSOR = "javax.annotation.processing.Processor",
+            PROCESSOR_SERVICE = "META-INF/services/" + PROCESSOR;
     private static final Pattern VERSIONED = Pattern.compile("META-INF/versions/(\\d+)/.+");
     private static final Set<String> SYSTEM_MODULE_OPTIONS = Set.of("--add-exports", "--add-reads", "--patch-module");
     private static final Set<String> SOURCE_OPTIONS = Set.of("--source", "-source");
@@ -349,15 +351,59 @@ public class Javac extends ProcessBuildStep {
         return false;
     }
 
-    private static List<String> processorPath(List<String> processorPath, boolean processorModules) {
+    private static List<String> processorPath(List<String> processorPath, boolean processorModules)
+            throws IOException {
         if (processorPath.isEmpty()) {
             return List.of();
         }
         if (processorModules) {
+            Set<ModuleReference> references;
+            List<String> unresolved;
             try {
-                ModuleFinder.of(processorPath.stream().map(Path::of).toArray(Path[]::new)).findAll();
-            } catch (FindException _) {
+                ModuleFinder finder = ModuleFinder.of(processorPath.stream().map(Path::of).toArray(Path[]::new));
+                references = finder.findAll();
+                Set<String> resolved = ModuleLayer.boot().configuration()
+                        .resolveAndBind(ModuleFinder.of(), finder, Set.of())
+                        .modules()
+                        .stream()
+                        .map(ResolvedModule::name)
+                        .collect(Collectors.toSet());
+                unresolved = references.stream()
+                        .map(reference -> reference.descriptor().name())
+                        .filter(name -> !resolved.contains(name))
+                        .sorted()
+                        .toList();
+            } catch (FindException | ResolutionException _) {
+                references = Set.of();
+                unresolved = List.of();
                 processorModules = false;
+            }
+            if (processorModules && !unresolved.isEmpty()) {
+                processorModules = false;
+                for (ModuleReference reference : references) {
+                    if (!reference.descriptor().isAutomatic()
+                            && reference.descriptor().provides().stream()
+                            .anyMatch(provides -> provides.service().equals(PROCESSOR))
+                            && reference.location().isPresent()) {
+                        Path location = Path.of(reference.location().get());
+                        boolean declared;
+                        if (Files.isDirectory(location)) {
+                            declared = Files.exists(location.resolve(PROCESSOR_SERVICE));
+                        } else {
+                            try (JarFile jar = new JarFile(location.toFile())) {
+                                declared = jar.getEntry(PROCESSOR_SERVICE) != null;
+                            }
+                        }
+                        if (!declared) {
+                            throw new IllegalStateException("The annotation processors run on the class path, as"
+                                    + " nothing on the processor module path requires " + String.join(", ", unresolved)
+                                    + ", which javac would therefore leave out of the processors' module graph, but "
+                                    + reference.descriptor().name() + " declares its processor in its module-info.java"
+                                    + " alone, without " + PROCESSOR_SERVICE + ", so the class path cannot find it:"
+                                    + " compile with these processors in modules of their own");
+                        }
+                    }
+                }
             }
         }
         return List.of(processorModules ? "--processor-module-path" : "--processor-path",

@@ -1207,6 +1207,80 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void runs_a_processor_on_the_class_path_where_it_uses_a_module_nothing_requires(boolean process)
+            throws IOException {
+        Files.createDirectories(sources.resolve(BuildStep.SOURCES));
+        Files.writeString(sources.resolve(BuildStep.SOURCES).resolve("module-info.java"),
+                "module sample { exports sample; }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }\n");
+        Path processorRoot = Files.createDirectories(root.resolve("processor").resolve("resolved"));
+        Path library = Files.copy(buildLibraryJar(Files.createDirectories(root.resolve("library"))),
+                processorRoot.resolve("library.jar"));
+        Files.copy(buildProcessorJar(Files.createDirectories(root.resolve("plain")), "plain", "Plain", null, library),
+                processorRoot.resolve("plain.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("plugin/plugin/maven/plain", "resolved/plain.jar");
+        index.setProperty("plugin/plugin/maven/library", "resolved/library.jar");
+        index.store(root.resolve("processor").resolve(BuildStep.DEPENDENCIES));
+
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("processors/artifacts", new BuildStepArgument(root.resolve("processor"), Map.of(
+                Path.of("resolved/plain.jar"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("resolved/library.jar"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "gen/GeneratedPlain.class"))
+                .as("a processor without a module-info.java requires nothing, so javac would leave the library"
+                        + " module out of the processors' module graph, where the class path holds it")
+                .isNotEmptyFile();
+        assertThat(Files.readString(supplement.resolve("javac.args")))
+                .contains("--processor-path")
+                .doesNotContain("--processor-module-path");
+    }
+
+    @Test
+    public void refuses_a_processor_the_class_path_cannot_find_where_another_needs_the_class_path() throws IOException {
+        Files.createDirectories(sources.resolve(BuildStep.SOURCES));
+        Files.writeString(sources.resolve(BuildStep.SOURCES).resolve("module-info.java"),
+                "module sample { exports sample; }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }\n");
+        Path processorRoot = Files.createDirectories(root.resolve("processor").resolve("resolved"));
+        Path library = Files.copy(buildLibraryJar(Files.createDirectories(root.resolve("library"))),
+                processorRoot.resolve("library.jar"));
+        Files.copy(buildProcessorJar(Files.createDirectories(root.resolve("plain")), "plain", "Plain", null, library),
+                processorRoot.resolve("plain.jar"));
+        Files.copy(buildProcessorJar(Files.createDirectories(root.resolve("modular")), "modular", "Modular", "proc.modular"),
+                processorRoot.resolve("modular.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("plugin/plugin/maven/plain", "resolved/plain.jar");
+        index.setProperty("plugin/plugin/maven/library", "resolved/library.jar");
+        index.setProperty("plugin/plugin/maven/modular", "resolved/modular.jar");
+        index.store(root.resolve("processor").resolve(BuildStep.DEPENDENCIES));
+
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("processors/artifacts", new BuildStepArgument(root.resolve("processor"), Map.of(
+                Path.of("resolved/plain.jar"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("resolved/library.jar"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("resolved/modular.jar"), Checksum.of(ChecksumStatus.ADDED))));
+        assertThatThrownBy(() -> new Javac(ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture().join())
+                .hasMessageContaining("requires library")
+                .hasMessageContaining("proc.modular declares its processor in its module-info.java alone");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void leaves_the_build_folder_out_of_the_classes_entirely(boolean process) throws IOException {
         Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(folder.resolve("Sample.java"), "package sample;\npublic class Sample { }\n");
@@ -1311,7 +1385,35 @@ public class JavacTest {
         return jar;
     }
 
+    private Path buildLibraryJar(Path dir) throws IOException {
+        Path classes = Files.createDirectories(dir.resolve("library-classes"));
+        Path source = Files.createDirectories(dir.resolve("library")).resolve("Library.java");
+        Files.writeString(source, "package library; public class Library { public static String name() { return \"library\"; } }\n");
+        Path moduleInfo = Files.writeString(dir.resolve("module-info.java"), "module library { exports library; }\n");
+        ToolProvider javac = ToolProvider.findFirst("javac").orElseThrow();
+        assertThat(javac.run(System.out, System.err, "-d", classes.toString(), source.toString(), moduleInfo.toString()))
+                .isZero();
+        Path jar = dir.resolve("library.jar");
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+            List<Path> entries;
+            try (Stream<Path> walk = Files.walk(classes)) {
+                entries = walk.filter(Files::isRegularFile).sorted().toList();
+            }
+            for (Path file : entries) {
+                out.putNextEntry(new JarEntry(classes.relativize(file).toString().replace(File.separatorChar, '/')));
+                Files.copy(file, out);
+                out.closeEntry();
+            }
+        }
+        return jar;
+    }
+
     private Path buildProcessorJar(Path dir, String pkg, String suffix, String moduleName) throws IOException {
+        return buildProcessorJar(dir, pkg, suffix, moduleName, null);
+    }
+
+    private Path buildProcessorJar(Path dir, String pkg, String suffix, String moduleName, Path library)
+            throws IOException {
         Path classes = Files.createDirectories(dir.resolve("proc-classes"));
         List<String> files = new ArrayList<>();
         Path src = dir.resolve("Gen" + suffix + ".java");
@@ -1335,7 +1437,7 @@ public class JavacTest {
                             try {
                                 JavaFileObject file = processingEnv.getFiler().createSourceFile("gen.Generated%2$s");
                                 try (Writer writer = file.openWriter()) {
-                                    writer.write("package gen; public class Generated%2$s { }");
+                                    writer.write("package gen; public class Generated%2$s { }%3$s");
                                 }
                             } catch (Exception e) {
                                 throw new RuntimeException(e);
@@ -1344,7 +1446,7 @@ public class JavacTest {
                         return false;
                     }
                 }
-                """.formatted(pkg, suffix));
+                """.formatted(pkg, suffix, library == null ? "" : " // \" + library.Library.name() + \""));
         files.add(src.toString());
         if (moduleName != null) {
             Path moduleInfo = dir.resolve("module-info.java");
@@ -1358,6 +1460,9 @@ public class JavacTest {
         }
         ToolProvider javac = ToolProvider.findFirst("javac").orElseThrow();
         List<String> command = new ArrayList<>(List.of("-d", classes.toString()));
+        if (library != null) {
+            command.addAll(List.of("--class-path", library.toString()));
+        }
         command.addAll(files);
         assertThat(javac.run(System.out, System.err, command.toArray(String[]::new))).isZero();
         if (moduleName == null) {

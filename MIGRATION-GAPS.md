@@ -13,13 +13,13 @@ of an existing module, **L** a new mechanism.
 
 ## Status
 
-About 120 gaps found along the way are fixed in the tool, among them forking `javac`, `--source`/`--target`, modular
+About 121 gaps found along the way are fixed in the tool, among them forking `javac`, `--source`/`--target`, modular
 Javadoc, resources in the sources jar, a check for a module declared twice, `kotlinc` arguments, scope and exclusions
 on a pin, the operating system family as a platform token, bytecode transforms at `binary/transform` (bnd, AspectJ),
 `tar.gz` dependencies, Docker arguments, reusing a dependency resolution whose inputs did not change, generated
 sources in the `ide` project files, relocation POMs, `Implementation-*` manifest entries, JaCoCo coverage limits,
 Dokka options, tests scanned in a dependency's jar, which also run a module's tests a second time with other settings,
-formatter options with the Eclipse formatter, ktfmt and licence headers, forbiddenapis, jdeps, jdeprscan and revapi checks, Kotlin sources below `META-INF/versions`, Javadoc at the release the sources are compiled for, and classifier variants
+formatter options with the Eclipse formatter, ktfmt and licence headers, forbiddenapis, jdeps, jdeprscan and revapi checks, Kotlin sources below `META-INF/versions`, Javadoc at the release the sources are compiled for, annotation processors that need a module nothing requires, and classifier variants
 (`classifiers.properties`, `@jenesis.pin <module> :<classifier>`).
 
 30 more are answered by the migration briefing (`skill/migrate`, `skill/registry`) rather than by the tool, because a
@@ -45,7 +45,6 @@ Compile avoidance matters most: it is the largest share of the difference to Gra
 | Gap | Size | Projects |
 |---|---|---|
 | Kotlin: no `-Xfriend-paths` for tests (S), no KSP (M). | S/M | moshi (version-coupled workaround, KSP plugin) |
-| An annotation processor falls back to the class path in a module build only when module resolution fails outright. | S | jhipster (hibernate-processor and the JPA metamodel lost) |
 | No native compilation (C, Rust, JNI). Prebuilt libraries can be published as a classifier variant, but not built. | L | netty (natives stay on Maven) |
 
 ## Dependency resolution
@@ -105,6 +104,5 @@ These are decisions rather than gaps. The briefing says so and names the change 
 
 1. **Failing on a class-less Kotlin Multiplatform root.**
 2. **Kotlin.** Friend paths for tests, then KSP.
-3. **The annotation-processor fallback** to the class path in a module build.
-4. **Compile avoidance.** Compare a dependency by a fingerprint of its API rather than its bytes. The largest change,
+3. **Compile avoidance.** Compare a dependency by a fingerprint of its API rather than its bytes. The largest change,
    and the one a build after an edit shows most.
