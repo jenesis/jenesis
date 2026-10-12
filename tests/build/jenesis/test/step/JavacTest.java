@@ -53,6 +53,44 @@ public class JavacTest {
         assertThat(next.resolve(Javac.CLASSES + "sample/Sample.class")).isNotEmptyFile();
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void writes_the_jni_headers_of_the_classes_with_native_methods_where_asked(boolean process)
+            throws IOException {
+        Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(folder.resolve("Native.java"), "package sample; public class Native { public static native int add(int a, int b); }\n");
+        Files.writeString(folder.resolve("Plain.java"), "package sample; public class Plain { }\n");
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .headers(true)
+                .apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                                sources,
+                                Map.of(Path.of("sources/sample/Native.java"), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of("sources/sample/Plain.java"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "sample/Native.class")).isNotEmptyFile();
+        assertThat(next.resolve(Javac.HEADERS + "sample_Native.h")).content().contains("Java_sample_Native_add");
+        assertThat(next.resolve(Javac.HEADERS))
+                .as("javac writes a header only for a class that declares a native method")
+                .isDirectoryNotContaining("glob:**/sample_Plain.h");
+    }
+
+    @Test
+    public void writes_no_jni_headers_unless_asked() throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Native.java"),
+                "package sample; public class Native { public static native int add(int a, int b); }\n");
+        BuildStepResult result = new Javac(ProcessHandler.Factory.TOOL).apply(Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/sample/Native.java"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.HEADERS)).doesNotExist();
+    }
+
     @Test
     public void writeRelease_writes_process_javac_properties_with_release_flag() throws IOException {
         Path folder = Files.createDirectory(root.resolve("write-release"));
