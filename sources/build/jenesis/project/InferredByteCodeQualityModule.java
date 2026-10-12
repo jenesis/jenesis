@@ -15,6 +15,12 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
 
     public static final String SPOTBUGS = "spotbugs", FORBIDDENAPIS = "forbiddenapis", JDEPS = "jdeps",
             JDEPRSCAN = "jdeprscan";
+    private static final String BUNDLED = "bundled", SIGNATURES = "signatures", SUPPRESS = "suppress",
+            INCLUDES = "includes", EXCLUDES = "excludes", WARN = "warn", ALLOW_MISSING_CLASSES = "allowmissingclasses",
+            IGNORE_SIGNATURES_OF_MISSING_CLASSES = "ignoresignaturesofmissingclasses";
+    private static final String ACCEPT = "accept", REMOVAL = "removal", RELEASE = "release";
+    private static final Set<String> FORBIDDENAPIS_KEYS = Set.of(BUNDLED, SIGNATURES, SUPPRESS, INCLUDES, EXCLUDES, WARN,
+            ALLOW_MISSING_CLASSES, IGNORE_SIGNATURES_OF_MISSING_CLASSES);
 
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
@@ -204,29 +210,117 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 spotbugs,
                 SpotBugsModule.configurationFile(configuration),
                 () -> spotbugsModule.pinning(pinning));
-        Path forbiddenapisFile = ForbiddenApisModule.configurationFile(configuration);
-        Bind.configured(buildExecutor,
+        forbidding(buildExecutor,
                 inherited.sequencedKeySet(),
-                FORBIDDENAPIS,
                 forbiddenapis,
-                forbiddenapisFile,
-                forbiddenapis == null ? Collections.emptyNavigableSet() : ForbiddenApisModule.siblings(forbiddenapisFile),
-                () -> forbiddenapisModule.pinning(pinning));
-        Bind.configured(buildExecutor,
+                forbiddenapisModule.pinning(pinning),
+                ForbiddenApisModule.configurationFile(configuration));
+        Path jdepsFile = JDepsModule.configurationFile(configuration);
+        Bind.configuredByProperties(buildExecutor,
                 inherited.sequencedKeySet(),
                 JDEPS,
                 jdeps,
-                JDepsModule.configurationFile(configuration),
-                () -> jdepsModule);
-        Bind.configured(buildExecutor,
+                jdepsFile,
+                properties -> accepting(jdepsModule, jdepsFile, properties));
+        Path jdeprscanFile = JDeprScanModule.configurationFile(configuration);
+        Bind.configuredByProperties(buildExecutor,
                 inherited.sequencedKeySet(),
                 JDEPRSCAN,
                 jdeprscan,
-                JDeprScanModule.configurationFile(configuration),
-                () -> jdeprscanModule);
+                jdeprscanFile,
+                properties -> scanning(jdeprscanModule, jdeprscanFile, properties));
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
                     nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());
         }
+    }
+
+    private static void forbidding(BuildExecutor buildExecutor,
+                                   SequencedSet<String> inputs,
+                                   Function<ForbiddenApisModule, BuildExecutorModule> forbiddenapis,
+                                   ForbiddenApisModule module,
+                                   Path file) throws IOException {
+        if (forbiddenapis == null || file == null) {
+            return;
+        }
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        for (String key : properties.stringPropertyNames()) {
+            if (!FORBIDDENAPIS_KEYS.contains(key)) {
+                throw new IllegalArgumentException(file + " names " + key + ", but takes "
+                        + String.join(", ", new TreeSet<>(FORBIDDENAPIS_KEYS)));
+            }
+        }
+        List<Path> signatures = new ArrayList<>();
+        for (String name : Objects.requireNonNullElse(properties.entries(SIGNATURES), List.<String>of())) {
+            Path signature = Path.of(name).normalize();
+            if (signature.isAbsolute() || signature.startsWith("..")) {
+                throw new IllegalArgumentException(file + " names the signatures " + name
+                        + ", which is not beside or below it - place the file in the folder of " + file.getFileName());
+            }
+            if (!Files.isRegularFile(file.resolveSibling(signature))) {
+                throw new IllegalArgumentException(file + " names the signatures " + name
+                        + ", which does not exist beside it");
+            }
+            signatures.add(signature);
+        }
+        List<String> bundled = Objects.requireNonNullElse(properties.entries(BUNDLED), List.of());
+        if (signatures.isEmpty() && bundled.isEmpty()) {
+            throw new IllegalArgumentException(file + " names no signatures - set " + BUNDLED
+                    + "=<bundled signatures, as jdk-unsafe,jdk-deprecated> or " + SIGNATURES
+                    + "=<files of signatures beside it>");
+        }
+        BuildExecutorModule configured = forbiddenapis.apply(module.bundled(bundled)
+                .signatures(signatures)
+                .suppress(Objects.requireNonNullElse(properties.entries(SUPPRESS), List.of()))
+                .includes(Objects.requireNonNullElse(properties.entries(INCLUDES), List.of()))
+                .excludes(Objects.requireNonNullElse(properties.entries(EXCLUDES), List.of()))
+                .warn(Objects.requireNonNullElse(properties.entries(WARN), List.of()))
+                .allowMissingClasses(properties.flag(ALLOW_MISSING_CLASSES, false))
+                .ignoreSignaturesOfMissingClasses(properties.flag(IGNORE_SIGNATURES_OF_MISSING_CLASSES, false)));
+        if (configured == null) {
+            return;
+        }
+        buildExecutor.addModule(FORBIDDENAPIS, (nested, inherited) -> {
+            SequencedSet<String> toolInputs = new LinkedHashSet<>();
+            if (!signatures.isEmpty()) {
+                SequencedSet<String> sources = new LinkedHashSet<>();
+                for (Path signature : signatures) {
+                    String source = SIGNATURES + "-" + sources.size();
+                    nested.addSource(source, new Bind(Map.of(Path.of(""), signature)), file.resolveSibling(signature));
+                    sources.add(source);
+                }
+                nested.addStep(SIGNATURES, new Bind(Map.of(Path.of(""), Path.of(""))), sources);
+                toolInputs.add(SIGNATURES);
+            }
+            toolInputs.addAll(inherited.sequencedKeySet());
+            nested.addModule("tool", configured, toolInputs);
+        }, inputs);
+    }
+
+    private static JDepsModule accepting(JDepsModule module, Path file, SequencedProperties properties) {
+        for (String key : properties.stringPropertyNames()) {
+            if (!key.equals(ACCEPT)) {
+                throw new IllegalArgumentException(file + " names " + key + ", but takes " + ACCEPT
+                        + "=<the JDK internal classes or packages the classes may use> alone");
+            }
+        }
+        return module.accepted(Objects.requireNonNullElse(properties.entries(ACCEPT), List.of()));
+    }
+
+    private static JDeprScanModule scanning(JDeprScanModule module, Path file, SequencedProperties properties) {
+        for (String key : properties.stringPropertyNames()) {
+            if (!key.equals(REMOVAL) && !key.equals(RELEASE)) {
+                throw new IllegalArgumentException(file + " names " + key + ", but takes " + REMOVAL
+                        + "=false to report every deprecated API rather than those deprecated for removal, and "
+                        + RELEASE + "=<the Java release whose deprecations to check>");
+            }
+        }
+        String release = properties.value(RELEASE);
+        if (release != null && !release.matches("[0-9]+")) {
+            throw new IllegalArgumentException(file + " names the release " + release
+                    + ", but takes a Java release as a number, as 21");
+        }
+        return module.forRemoval(properties.flag(REMOVAL, true))
+                .release(release == null ? null : Integer.valueOf(release));
     }
 }

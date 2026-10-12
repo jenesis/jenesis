@@ -26,50 +26,39 @@ public class ModularizeModule implements BuildExecutorModule {
     private static final String PREPARE = "prepare", DESCRIBE = "describe", MODULARIZE = "modularize";
     private static final String STAGED = "staged.properties", IDENTITY = "identity.properties";
 
-    private final boolean synthetic;
+    private final Mode mode;
     private final OffsetDateTime timestamp;
     private final JDeps describe;
 
-    public ModularizeModule(ProcessHandler.Factory factory, boolean synthetic) {
-        this(synthetic, BuildStep.timestamp(), new JDeps(factory));
+    public ModularizeModule(ProcessHandler.Factory factory) {
+        this(Mode.DECLARED, BuildStep.timestamp(), new JDeps(factory));
     }
 
-    public static ModularizeModule ofEnvironment(Environment environment,
-                                                 ProcessHandler.Factory factory,
-                                                 boolean synthetic) {
-        return new ModularizeModule(synthetic, BuildStep.timestamp(environment), JDeps.ofEnvironment(environment, factory));
+    public static ModularizeModule ofEnvironment(Environment environment, ProcessHandler.Factory factory) {
+        return new ModularizeModule(Mode.DECLARED, BuildStep.timestamp(environment), JDeps.ofEnvironment(environment, factory));
     }
 
-    private ModularizeModule(boolean synthetic, OffsetDateTime timestamp, JDeps describe) {
-        this.synthetic = synthetic;
+    private ModularizeModule(Mode mode, OffsetDateTime timestamp, JDeps describe) {
+        this.mode = mode;
         this.timestamp = timestamp;
         this.describe = describe;
     }
 
+    public ModularizeModule mode(Mode mode) {
+        return new ModularizeModule(mode, timestamp, describe);
+    }
+
     public ModularizeModule timestamp(OffsetDateTime timestamp) {
-        return new ModularizeModule(synthetic, timestamp, describe);
+        return new ModularizeModule(mode, timestamp, describe);
     }
 
     public ModularizeModule describe(JDeps describe) {
-        return new ModularizeModule(synthetic, timestamp, describe);
-    }
-
-    public static Boolean configured(Path properties) throws IOException {
-        if (properties == null) {
-            return null;
-        }
-        String mode = SequencedProperties.ofFiles(properties).value("mode", "declared");
-        return switch (mode.toLowerCase(Locale.ROOT)) {
-            case "declared" -> false;
-            case "synthetic" -> true;
-            case "none" -> null;
-            default -> throw new IllegalArgumentException("Unknown module mode: " + mode);
-        };
+        return new ModularizeModule(mode, timestamp, describe);
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        buildExecutor.addStep(PREPARE, new Prepare(synthetic), inherited.sequencedKeySet());
+        buildExecutor.addStep(PREPARE, new Prepare(mode), inherited.sequencedKeySet());
         buildExecutor.addStep(DESCRIBE, describe, PREPARE);
         buildExecutor.addStep(MODULARIZE, new Modularize(timestamp), PREPARE, DESCRIBE);
     }
@@ -103,10 +92,10 @@ public class ModularizeModule implements BuildExecutorModule {
         @SuppressWarnings("unused")
         private final String version = Runtime.version().toString();
 
-        private final boolean synthetic;
+        private final Mode mode;
 
-        private Prepare(boolean synthetic) {
-            this.synthetic = synthetic;
+        private Prepare(Mode mode) {
+            this.mode = mode;
         }
 
         @Override
@@ -150,7 +139,7 @@ public class ModularizeModule implements BuildExecutorModule {
                         ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
                         String module;
                         if (descriptor == null) {
-                            if (!synthetic) {
+                            if (mode == Mode.DECLARED) {
                                 throw new IllegalArgumentException("No module name is declared by "
                                         + key
                                         + ": require an upstream Automatic-Module-Name, declare @jenesis.alias"
@@ -521,5 +510,10 @@ public class ModularizeModule implements BuildExecutorModule {
                     || file.endsWith(".EC")
                     || file.startsWith("SIG-");
         }
+    }
+
+    public enum Mode {
+
+        DECLARED, SYNTHETIC
     }
 }

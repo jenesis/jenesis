@@ -197,7 +197,8 @@ The name is stable across builds and machines, but it is not one anything should
 
 `none` is what an absent file already means, so it exists for one reason: the file
 is located per module and the first match wins, so `mode=none` is how one module
-opts out of a project-wide file that would otherwise rewrite it.
+opts out of a project-wide file that would otherwise rewrite it. Any other mode,
+or any key besides `mode`, fails the build, naming the file and what it takes.
 
 What the generated descriptor says
 ----------------------------------

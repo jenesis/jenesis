@@ -20,7 +20,7 @@ public class JDeprScanModuleTest {
 
     @Test
     public void reports_the_apis_deprecated_for_removal_alone_by_default() throws IOException {
-        compile("");
+        compile();
 
         newExecutor(new JDeprScanModule()).execute();
 
@@ -33,9 +33,9 @@ public class JDeprScanModuleTest {
 
     @Test
     public void reports_every_deprecated_api_when_removal_is_switched_off() throws IOException {
-        compile("removal=false\n");
+        compile();
 
-        newExecutor(new JDeprScanModule()).execute();
+        newExecutor(new JDeprScanModule().forRemoval(false)).execute();
 
         assertThat(report())
                 .content()
@@ -45,7 +45,7 @@ public class JDeprScanModuleTest {
 
     @Test
     public void fails_the_build_on_an_api_deprecated_for_removal_when_strict() throws IOException {
-        compile("");
+        compile();
 
         assertThatThrownBy(newExecutor(new JDeprScanModule().strict(true))::execute)
                 .rootCause()
@@ -55,23 +55,26 @@ public class JDeprScanModuleTest {
     }
 
     @Test
-    public void refuses_an_unknown_key_and_a_release_that_is_no_number() throws IOException {
-        compile("target=21\n");
-        assertThatThrownBy(newExecutor(new JDeprScanModule())::execute)
-                .rootCause()
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("jdeprscan.properties names target");
+    public void checks_against_the_deprecations_of_the_release_it_is_given() throws IOException {
+        compile();
 
-        Files.writeString(project.resolve(JDeprScanModule.CONFIGURATION), "release=latest\n");
-        assertThatThrownBy(newExecutor(new JDeprScanModule())::execute)
-                .rootCause()
+        newExecutor(new JDeprScanModule().release(17)).execute();
+
+        assertThat(report())
+                .as("Thread.stop() was scheduled for removal only in Java 18")
+                .content()
+                .doesNotContain("Thread::stop()V");
+    }
+
+    @Test
+    public void refuses_a_release_that_is_no_java_release() {
+        assertThatThrownBy(() -> new JDeprScanModule().release(0))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("names the release latest");
+                .hasMessageContaining("The release 0 is no Java release");
     }
 
     @Test
     public void fails_rather_than_leave_a_class_unscanned_whose_dependency_is_missing() throws IOException {
-        Files.writeString(project.resolve(JDeprScanModule.CONFIGURATION), "");
         Path library = Files.createDirectories(sources.resolve("library")).resolve("Library.java");
         Files.writeString(library, "package library;\npublic class Library {}\n");
         Path source = Files.createDirectories(sources.resolve("sample")).resolve("Sample.java");
@@ -89,8 +92,7 @@ public class JDeprScanModuleTest {
                 .hasMessageContaining("library/Library");
     }
 
-    private void compile(String configuration) throws IOException {
-        Files.writeString(project.resolve(JDeprScanModule.CONFIGURATION), configuration);
+    private void compile() throws IOException {
         Path source = Files.createDirectories(sources.resolve("sample")).resolve("Sample.java");
         Files.writeString(source, """
                 package sample;

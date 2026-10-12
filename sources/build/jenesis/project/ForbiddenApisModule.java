@@ -19,21 +19,11 @@ import build.jenesis.step.ProcessHandler;
 
 public class ForbiddenApisModule implements BuildExecutorModule {
 
-    public static final String CHECK = "check", CONFIGURATION = "forbiddenapis.properties";
-    public static final String BUNDLED = "bundled", SIGNATURE_FILES = "signatures", SUPPRESS = "suppress",
-            INCLUDES = "includes", EXCLUDES = "excludes", WARN = "warn",
-            ALLOW_MISSING_CLASSES = "allowmissingclasses",
-            IGNORE_SIGNATURES_OF_MISSING_CLASSES = "ignoresignaturesofmissingclasses";
+    public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
     private static final String SETTING = "validator.forbiddenapis";
     private static final String REPORT = BuildStep.REPORTS + "forbiddenapis/forbiddenapis.txt";
     private static final String MAVEN_GROUP = "de.thetaphi", MAVEN_ARTIFACT = "forbiddenapis";
-    private static final Set<String> KEYS = Set.of(BUNDLED, SIGNATURE_FILES, SUPPRESS, INCLUDES, EXCLUDES, WARN,
-            ALLOW_MISSING_CLASSES, IGNORE_SIGNATURES_OF_MISSING_CLASSES);
-    private static final Map<String, String> OPTIONS = Map.of(SUPPRESS, "--suppressannotation",
-            INCLUDES, "--includes",
-            EXCLUDES, "--excludes",
-            WARN, "--signatureswithseveritywarn");
     private static final Set<String> VERSIONED = Set.of("jdk-unsafe", "jdk-deprecated", "jdk-internal");
 
     private final Dependencies dependencies;
@@ -41,6 +31,14 @@ public class ForbiddenApisModule implements BuildExecutorModule {
     private final String tool;
     private final String group;
     private final boolean strict;
+    private final List<String> bundled;
+    private final List<Path> signatures;
+    private final List<String> suppress;
+    private final List<String> includes;
+    private final List<String> excludes;
+    private final List<String> warn;
+    private final boolean allowMissingClasses;
+    private final boolean ignoreSignaturesOfMissingClasses;
     private final ProcessBuildStep.Terms terms;
 
     public ForbiddenApisModule(Map<String, Repository> repositories,
@@ -49,6 +47,14 @@ public class ForbiddenApisModule implements BuildExecutorModule {
              null,
              "forbiddenapis",
              "main",
+             false,
+             List.of(),
+             List.of(),
+             List.of(),
+             List.of(),
+             List.of(),
+             List.of(),
+             false,
              false,
              new ProcessBuildStep.Terms());
     }
@@ -61,6 +67,14 @@ public class ForbiddenApisModule implements BuildExecutorModule {
                 "forbiddenapis",
                 "main",
                 Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                false,
+                false,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "forbiddenapis"));
     }
 
@@ -69,75 +83,115 @@ public class ForbiddenApisModule implements BuildExecutorModule {
                                 String tool,
                                 String group,
                                 boolean strict,
+                                List<String> bundled,
+                                List<Path> signatures,
+                                List<String> suppress,
+                                List<String> includes,
+                                List<String> excludes,
+                                List<String> warn,
+                                boolean allowMissingClasses,
+                                boolean ignoreSignaturesOfMissingClasses,
                                 ProcessBuildStep.Terms terms) {
         this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.group = group;
         this.strict = strict;
+        this.bundled = bundled;
+        this.signatures = signatures;
+        this.suppress = suppress;
+        this.includes = includes;
+        this.excludes = excludes;
+        this.warn = warn;
+        this.allowMissingClasses = allowMissingClasses;
+        this.ignoreSignaturesOfMissingClasses = ignoreSignaturesOfMissingClasses;
         this.terms = terms;
     }
 
     public static Path configurationFile(SequencedSet<Path> configuration) {
-        return BuildStep.locate(configuration, CONFIGURATION);
-    }
-
-    public static SequencedSet<Path> siblings(Path configurationFile) throws IOException {
-        SequencedSet<Path> siblings = new LinkedHashSet<>();
-        if (configurationFile == null) {
-            return siblings;
-        }
-        SequencedProperties properties = SequencedProperties.ofFiles(configurationFile);
-        for (String key : properties.stringPropertyNames()) {
-            if (!KEYS.contains(key)) {
-                throw new IllegalArgumentException(configurationFile + " names " + key + ", but takes "
-                        + String.join(", ", new TreeSet<>(KEYS)));
-            }
-        }
-        properties.flag(ALLOW_MISSING_CLASSES, false);
-        properties.flag(IGNORE_SIGNATURES_OF_MISSING_CLASSES, false);
-        for (String file : Objects.requireNonNullElse(properties.entries(SIGNATURE_FILES), List.<String>of())) {
-            Path sibling = Path.of(file).normalize();
-            if (sibling.isAbsolute() || sibling.startsWith("..")) {
-                throw new IllegalArgumentException(configurationFile + " names the signatures " + file
-                        + ", which is not beside or below it - place the file in the folder of " + CONFIGURATION);
-            }
-            if (!Files.isRegularFile(configurationFile.resolveSibling(sibling))) {
-                throw new IllegalArgumentException(configurationFile + " names the signatures " + file
-                        + ", which does not exist beside it");
-            }
-            siblings.add(sibling);
-        }
-        if (siblings.isEmpty() && properties.value(BUNDLED) == null) {
-            throw new IllegalArgumentException(configurationFile + " names no signatures - set " + BUNDLED
-                    + "=<bundled signatures, as jdk-unsafe,jdk-deprecated> or " + SIGNATURE_FILES
-                    + "=<files of signatures beside it>");
-        }
-        return siblings;
+        return BuildStep.locate(configuration, "forbiddenapis.properties");
     }
 
     public ForbiddenApisModule pinning(Pinning pinning) {
-        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, terms);
+        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, bundled, signatures, suppress,
+                includes, excludes, warn, allowMissingClasses, ignoreSignaturesOfMissingClasses, terms);
     }
 
     public ForbiddenApisModule tool(String tool) {
-        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, terms);
+        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, bundled, signatures, suppress,
+                includes, excludes, warn, allowMissingClasses, ignoreSignaturesOfMissingClasses, terms);
     }
 
     public ForbiddenApisModule group(String group) {
-        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, terms);
+        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, bundled, signatures, suppress,
+                includes, excludes, warn, allowMissingClasses, ignoreSignaturesOfMissingClasses, terms);
     }
 
     public ForbiddenApisModule strict(boolean strict) {
-        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, terms);
+        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, bundled, signatures, suppress,
+                includes, excludes, warn, allowMissingClasses, ignoreSignaturesOfMissingClasses, terms);
+    }
+
+    public ForbiddenApisModule bundled(List<String> bundled) {
+        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, List.copyOf(bundled), signatures,
+                suppress, includes, excludes, warn, allowMissingClasses, ignoreSignaturesOfMissingClasses, terms);
+    }
+
+    public ForbiddenApisModule signatures(List<Path> signatures) {
+        for (Path signature : signatures) {
+            Path normalized = signature.normalize();
+            if (signature.isAbsolute() || normalized.startsWith("..") || normalized.toString().isEmpty()) {
+                throw new IllegalArgumentException("The signatures file " + signature + " is no path below the folders"
+                        + " the check reads - name it relative to the folder it is bound into");
+            }
+        }
+        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, bundled, List.copyOf(signatures),
+                suppress, includes, excludes, warn, allowMissingClasses, ignoreSignaturesOfMissingClasses, terms);
+    }
+
+    public ForbiddenApisModule suppress(List<String> suppress) {
+        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, bundled, signatures,
+                List.copyOf(suppress), includes, excludes, warn, allowMissingClasses, ignoreSignaturesOfMissingClasses,
+                terms);
+    }
+
+    public ForbiddenApisModule includes(List<String> includes) {
+        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, bundled, signatures, suppress,
+                List.copyOf(includes), excludes, warn, allowMissingClasses, ignoreSignaturesOfMissingClasses, terms);
+    }
+
+    public ForbiddenApisModule excludes(List<String> excludes) {
+        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, bundled, signatures, suppress,
+                includes, List.copyOf(excludes), warn, allowMissingClasses, ignoreSignaturesOfMissingClasses, terms);
+    }
+
+    public ForbiddenApisModule warn(List<String> warn) {
+        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, bundled, signatures, suppress,
+                includes, excludes, List.copyOf(warn), allowMissingClasses, ignoreSignaturesOfMissingClasses, terms);
+    }
+
+    public ForbiddenApisModule allowMissingClasses(boolean allowMissingClasses) {
+        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, bundled, signatures, suppress,
+                includes, excludes, warn, allowMissingClasses, ignoreSignaturesOfMissingClasses, terms);
+    }
+
+    public ForbiddenApisModule ignoreSignaturesOfMissingClasses(boolean ignoreSignaturesOfMissingClasses) {
+        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, bundled, signatures, suppress,
+                includes, excludes, warn, allowMissingClasses, ignoreSignaturesOfMissingClasses, terms);
     }
 
     public ForbiddenApisModule printing(BiConsumer<Boolean, String> printing) {
-        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, terms.printing(printing));
+        return new ForbiddenApisModule(dependencies, pinning, tool, group, strict, bundled, signatures, suppress,
+                includes, excludes, warn, allowMissingClasses, ignoreSignaturesOfMissingClasses,
+                terms.printing(printing));
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
+        if (bundled.isEmpty() && signatures.isEmpty()) {
+            throw new IllegalStateException("forbiddenapis is given no signatures to check against - name bundled"
+                    + " signatures, as jdk-unsafe, or files of signatures the check is handed");
+        }
         buildExecutor.addStep(REQUIRED, new Requires(tool), inherited.sequencedKeySet());
         SequencedSet<String> resolveInputs = new LinkedHashSet<>();
         resolveInputs.add(REQUIRED);
@@ -148,7 +202,18 @@ public class ForbiddenApisModule implements BuildExecutorModule {
         SequencedSet<String> checkInputs = new LinkedHashSet<>();
         checkInputs.add(DEPENDENCIES);
         checkInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(CHECK, new Check(terms, tool, group, strict), checkInputs);
+        buildExecutor.addStep(CHECK, new Check(terms,
+                tool,
+                group,
+                strict,
+                bundled,
+                signatures,
+                suppress,
+                includes,
+                excludes,
+                warn,
+                allowMissingClasses,
+                ignoreSignaturesOfMissingClasses), checkInputs);
     }
 
     private record Requires(String tool) implements BuildStep {
@@ -175,15 +240,39 @@ public class ForbiddenApisModule implements BuildExecutorModule {
         private final String tool;
         private final String group;
         private final boolean strict;
+        private final List<String> bundled;
+        private final List<Path> signatures;
+        private final List<String> suppress;
+        private final List<String> includes;
+        private final List<String> excludes;
+        private final List<String> warn;
+        private final boolean allowMissingClasses;
+        private final boolean ignoreSignaturesOfMissingClasses;
 
         private Check(ProcessBuildStep.Terms terms,
                       String tool,
                       String group,
-                      boolean strict) {
+                      boolean strict,
+                      List<String> bundled,
+                      List<Path> signatures,
+                      List<String> suppress,
+                      List<String> includes,
+                      List<String> excludes,
+                      List<String> warn,
+                      boolean allowMissingClasses,
+                      boolean ignoreSignaturesOfMissingClasses) {
             super("forbiddenapis", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.group = group;
             this.strict = strict;
+            this.bundled = bundled;
+            this.signatures = signatures;
+            this.suppress = suppress;
+            this.includes = includes;
+            this.excludes = excludes;
+            this.warn = warn;
+            this.allowMissingClasses = allowMissingClasses;
+            this.ignoreSignaturesOfMissingClasses = ignoreSignaturesOfMissingClasses;
         }
 
         @Override
@@ -219,7 +308,7 @@ public class ForbiddenApisModule implements BuildExecutorModule {
                                                      SequencedMap<String, SequencedMap<String, String>> properties)
                 throws IOException {
             List<String> jars = new ArrayList<>(), classes = new ArrayList<>(), auxiliary = new ArrayList<>();
-            Path config = null;
+            SequencedMap<Path, Path> signed = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
@@ -230,9 +319,11 @@ public class ForbiddenApisModule implements BuildExecutorModule {
                 for (Path jar : Dependencies.select(argument.folder(), group, "compile")) {
                     auxiliary.add(jar.toString());
                 }
-                Path candidate = argument.folder().resolve(CONFIGURATION);
-                if (Files.isRegularFile(candidate)) {
-                    config = candidate;
+                for (Path signature : signatures) {
+                    Path candidate = argument.folder().resolve(signature);
+                    if (Files.isRegularFile(candidate)) {
+                        signed.putIfAbsent(signature, candidate);
+                    }
                 }
                 Path compiled = argument.folder().resolve(BuildStep.CLASSES);
                 if (Files.isDirectory(compiled)) {
@@ -245,10 +336,12 @@ public class ForbiddenApisModule implements BuildExecutorModule {
             if (jars.isEmpty()) {
                 throw new IllegalStateException("No forbiddenapis jars resolved upstream of the forbiddenapis step");
             }
-            if (config == null) {
-                throw new IllegalStateException("No " + CONFIGURATION + " bound upstream of the forbiddenapis step");
+            for (Path signature : signatures) {
+                if (!signed.containsKey(signature)) {
+                    throw new IllegalStateException("No signatures file " + signature + " bound upstream of the"
+                            + " forbiddenapis step - bind it into a folder the step reads");
+                }
             }
-            SequencedProperties configuration = SequencedProperties.ofFiles(config);
             String release = null;
             for (String folder : classes) {
                 try (Stream<Path> files = Files.walk(Path.of(folder))) {
@@ -273,24 +366,34 @@ public class ForbiddenApisModule implements BuildExecutorModule {
             List<String> commands = new ArrayList<>(List.of(
                     "-cp", String.join(File.pathSeparator, jars),
                     "de.thetaphi.forbiddenapis.cli.CliMain"));
-            for (String bundled : Objects.requireNonNullElse(configuration.entries(BUNDLED), List.<String>of())) {
+            for (String name : bundled) {
                 commands.add("--bundledsignatures");
-                commands.add(VERSIONED.contains(bundled) ? bundled + "-" + release : bundled);
+                commands.add(VERSIONED.contains(name) ? name + "-" + release : name);
             }
-            for (String file : Objects.requireNonNullElse(configuration.entries(SIGNATURE_FILES), List.<String>of())) {
+            for (Path file : signed.values()) {
                 commands.add("--signaturesfile");
-                commands.add(config.resolveSibling(file).toString());
+                commands.add(file.toString());
             }
-            for (String key : List.of(SUPPRESS, INCLUDES, EXCLUDES, WARN)) {
-                for (String value : Objects.requireNonNullElse(configuration.entries(key), List.<String>of())) {
-                    commands.add(OPTIONS.get(key));
-                    commands.add(value);
-                }
+            for (String annotation : suppress) {
+                commands.add("--suppressannotation");
+                commands.add(annotation);
             }
-            if (configuration.flag(ALLOW_MISSING_CLASSES, false)) {
+            for (String pattern : includes) {
+                commands.add("--includes");
+                commands.add(pattern);
+            }
+            for (String pattern : excludes) {
+                commands.add("--excludes");
+                commands.add(pattern);
+            }
+            for (String signature : warn) {
+                commands.add("--signatureswithseveritywarn");
+                commands.add(signature);
+            }
+            if (allowMissingClasses) {
                 commands.add("--allowmissingclasses");
             }
-            if (configuration.flag(IGNORE_SIGNATURES_OF_MISSING_CLASSES, false)) {
+            if (ignoreSignaturesOfMissingClasses) {
                 commands.add("--ignoresignaturesofmissingclasses");
             }
             if (!auxiliary.isEmpty()) {

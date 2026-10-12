@@ -23,7 +23,9 @@ public class ForbiddenApisModuleTest {
     public void requires_step_emits_the_forbiddenapis_maven_coordinate() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("forbiddenapis", new ForbiddenApisModule(Map.of(), Map.of()), "project");
+        executor.addModule("forbiddenapis",
+                new ForbiddenApisModule(Map.of(), Map.of()).bundled(List.of("jdk-unsafe")),
+                "project");
         executor.execute("forbiddenapis/required");
 
         Path requiredOutput = root.resolve("forbiddenapis").resolve("required").resolve("output");
@@ -33,50 +35,23 @@ public class ForbiddenApisModuleTest {
     }
 
     @Test
-    public void hands_over_the_signatures_files_beside_the_configuration() throws IOException {
-        Path configuration = Files.writeString(project.resolve(ForbiddenApisModule.CONFIGURATION), """
-                bundled=jdk-unsafe
-                signatures=forbidden.txt, rules/more.txt
-                """);
-        Files.writeString(project.resolve("forbidden.txt"), "java.lang.Thread#<init>(java.lang.Runnable)\n");
-        Files.writeString(Files.createDirectories(project.resolve("rules")).resolve("more.txt"), "java.util.Vector\n");
+    public void refuses_to_check_against_no_signatures() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("forbiddenapis", new ForbiddenApisModule(Map.of(), Map.of()), "project");
 
-        assertThat(ForbiddenApisModule.siblings(configuration))
-                .containsExactly(Path.of("forbidden.txt"), Path.of("rules", "more.txt"));
+        assertThatThrownBy(executor::execute)
+                .hasStackTraceContaining("forbiddenapis is given no signatures to check against");
     }
 
     @Test
-    public void refuses_a_configuration_with_an_unknown_key_or_without_signatures() throws IOException {
-        Path configuration = project.resolve(ForbiddenApisModule.CONFIGURATION);
-
-        Files.writeString(configuration, "bundled=jdk-unsafe\ntarget=17\n");
-        assertThatThrownBy(() -> ForbiddenApisModule.siblings(configuration))
+    public void refuses_a_signatures_file_that_is_no_path_below_the_folders_it_reads() {
+        assertThatThrownBy(() -> new ForbiddenApisModule(Map.of(), Map.of()).signatures(List.of(Path.of("../outside.txt"))))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("names target");
-
-        Files.writeString(configuration, "suppress=**.SuppressForbidden\n");
-        assertThatThrownBy(() -> ForbiddenApisModule.siblings(configuration))
+                .hasMessageContaining("../outside.txt is no path below the folders the check reads");
+        assertThatThrownBy(() -> new ForbiddenApisModule(Map.of(), Map.of()).signatures(List.of(project.resolve("forbidden.txt"))))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("names no signatures");
-
-        Files.writeString(configuration, "bundled=jdk-unsafe\nallowmissingclasses=yes\n");
-        assertThatThrownBy(() -> ForbiddenApisModule.siblings(configuration))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    public void refuses_a_signatures_file_that_is_missing_or_outside_the_configuration_folder() throws IOException {
-        Path configuration = project.resolve(ForbiddenApisModule.CONFIGURATION);
-
-        Files.writeString(configuration, "signatures=missing.txt\n");
-        assertThatThrownBy(() -> ForbiddenApisModule.siblings(configuration))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("missing.txt, which does not exist");
-
-        Files.writeString(configuration, "signatures=../outside.txt\n");
-        assertThatThrownBy(() -> ForbiddenApisModule.siblings(configuration))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("not beside or below it");
+                .hasMessageContaining("is no path below the folders the check reads");
     }
 
     private BuildExecutor newExecutor() throws IOException {
