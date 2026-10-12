@@ -1452,6 +1452,10 @@ public record Project(
                       openapi-generator-maven-plugin / org.openapi.generator
                           -> openapi.properties (17)
                       antlr4-maven-plugin / antlr -> antlr.properties (18)
+                      com.google.devtools.ksp / ksp(...) dependencies -> ksp.properties, each ksp(...)
+                          processor as @jenesis.plugin ksp <coordinate> or a pom.xml
+                          <!--jenesis.plugin ksp maven/<groupId>/<artifactId>-->, and ksp { arg(...) }
+                          as the lines of ksp.properties
                       javacc-maven-plugin, JJTree / org.javacc.javacc -> no built-in; a plugin at
                           binary/generated that forks JavaCC, which the project resolves with
                           @jenesis.plugin javacc maven/<groupId>/<artifactId>, in a pom.xml
@@ -2217,6 +2221,10 @@ public record Project(
                       antlr.properties          ANTLR: every .g4 compiled into package=<name>, which
                                                 also decides where the sources land
                                                 (folders, package, arguments)
+                      ksp.properties            KSP over the module's own Kotlin and Java sources,
+                                                each line an option handed to the processors, which
+                                                @jenesis.plugin ksp <coordinate> names; the sources
+                                                they write are compiled and their resources jarred
                       wsimport.properties       JAX-WS client from .wsdl; location=<url> is required
                                                 and states where the description is served at run time
                                                 (folders, package, catalog, arguments)
@@ -4404,6 +4412,7 @@ public record Project(
                 generate.wsimport|true|JAX-WS generation, activated by a wsimport.properties
                 generate.openapi|true|OpenAPI generation, activated by an openapi.properties
                 generate.antlr|true|ANTLR generation, activated by an antlr.properties
+                generate.ksp|true|Kotlin Symbol Processing over the module's sources, activated by a ksp.properties, with the processors named by @jenesis.plugin ksp <coordinate>
                 generate.classpath|true|META-INF/services entries generated from a module-info's provides, and Enable-Native-Access for a module granting itself, so its jar also serves the class path, activated by a classpath.properties
                 observe.jacoco|true|JaCoCo coverage, activated by a jacoco.properties
                 observe.native|true|native-image reachability agent, activated by a graal.properties

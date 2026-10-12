@@ -69,6 +69,24 @@ public class InferredSourceGenerationModuleTest {
     }
 
     @Test
+    public void wires_ksp_over_the_module_sources_when_its_properties_file_is_present() throws IOException {
+        Files.writeString(project.resolve("ksp.properties"), "moshi.generated=javax.annotation.processing.Generated\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("generated", generation(), "project");
+        executor.execute("generated/ksp/required");
+
+        assertThat(SequencedProperties.ofFiles(root.resolve("generated")
+                .resolve("ksp")
+                .resolve("required")
+                .resolve("output")
+                .resolve(BuildStep.REQUIRES)).stringPropertyNames())
+                .as("KSP resolves apart from the processors, which bring a Kotlin standard library of their own")
+                .containsExactly("ksp-runtime/runtime/maven/com.google.devtools.ksp/symbol-processing-aa-embeddable/RELEASE");
+    }
+
+    @Test
     public void binds_the_configured_folders_into_the_tool_folder() throws IOException {
         Files.writeString(project.resolve("xjc.properties"), "folders=contracts\n");
         Files.writeString(
