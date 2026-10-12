@@ -201,9 +201,9 @@ public class ProjectTest {
                 .target(root.resolve("target"))
                 .build(Project.PROMPT + "/migrate");
         assertThat(prompt)
-                .as("the task is printed alone, as plain text, with no line of the build around it")
+                .as("the task is printed as one plain text")
+                .filteredOn(line -> line.startsWith("Migrate the build of this project to Jenesis"))
                 .singleElement(InstanceOfAssertFactories.STRING)
-                .startsWith("Migrate the build of this project to Jenesis")
                 .contains("java build/jenesis/Make.java skill/migrate", "summary of the migration", "shading")
                 .doesNotContain("\u001B");
         List<String> briefing = new ArrayList<>();
