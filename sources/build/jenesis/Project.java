@@ -1438,7 +1438,9 @@ public record Project(
                           a pom.xml <!--jenesis.plugin javac maven/<groupId>/<artifactId>-->
                       kotlin-maven-plugin / kotlin("jvm") -> .kt sources, found on their own (41, 43);
                           the tests see the tested module's internal declarations, as the tested jar
-                          is their friend path, so no -Xfriend-paths is written
+                          is their friend path, so no -Xfriend-paths is written; kotlin-stdlib, which
+                          kotlin("jvm") adds on its own, is declared, as kotlinc compiles against the
+                          module's dependencies alone
                       scala-maven-plugin / scala -> .scala sources, compiled by Scala 3 (44); Scala 2
                           is not supported
                       gmavenplus / groovy -> .groovy sources, compiled by Groovy 4 or newer after
