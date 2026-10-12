@@ -174,7 +174,7 @@ public class Javac extends ProcessBuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         return super.apply(executor, context, arguments).thenComposeAsync(result -> {
-            if (!result.next()) {
+            if (!result.next() || headers) {
                 return CompletableFuture.completedStage(result);
             }
             try {
@@ -207,8 +207,9 @@ public class Javac extends ProcessBuildStep {
                 }
             }
         }
-        Path target = Files.createDirectory(context.next().resolve(CLASSES)),
-                generated = Files.createDirectory(context.next().resolve(SOURCES));
+        Path output = headers ? context.supplement() : context.next(),
+                target = Files.createDirectory(output.resolve(CLASSES)),
+                generated = Files.createDirectory(output.resolve(SOURCES));
         List<String> files = new ArrayList<>(),
                 path = new ArrayList<>(),
                 processorPath = new ArrayList<>(),
