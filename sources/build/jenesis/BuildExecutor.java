@@ -110,6 +110,10 @@ public interface BuildExecutor {
         }
 
         public BuildExecutor of(Path target) throws IOException {
+            return of(target, BuildExecutorCallback.nop());
+        }
+
+        public BuildExecutor of(Path target, BuildExecutorCallback callback) throws IOException {
             BuildExecutorCallback printing = progress && out != null
                     ? BuildExecutorCallback.printing(out, palette, verbose, cacheHits, target, events)
                     : BuildExecutorCallback.nop();
@@ -117,7 +121,7 @@ public interface BuildExecutor {
                     timeout,
                     new HashDigestFunction(digest),
                     BuildStepHashFunction.ofSerializationDigest(digest),
-                    events ? printing.andThen(BuildExecutorCallback.events(target)) : printing,
+                    (events ? printing.andThen(BuildExecutorCallback.events(target)) : printing).andThen(callback),
                     cache == null ? BuildExecutorCache.nop() : cache,
                     rebuild,
                     aggregate,

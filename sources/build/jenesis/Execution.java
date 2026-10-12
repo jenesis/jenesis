@@ -45,7 +45,7 @@ public record Execution(Project project, String mainClass, String module, Contai
     }
 
     public int execute(String... arguments) throws IOException, InterruptedException {
-        return execute(project.build(module == null
+        return execute(project.reproduce(null).build(module == null
                 ? Project.BUILD
                 : "+" + module.replace('/', '+')), arguments);
     }
@@ -293,6 +293,9 @@ public record Execution(Project project, String mainClass, String module, Contai
                           Path root,
                           SequencedSet<Path> profiles,
                           String... arguments) throws IOException, InterruptedException {
+        Map<String, String> keys = new HashMap<>(environment.keys());
+        keys.remove("project.reproduce");
+        environment = environment.keys(keys);
         SequencedMap<String, Path> outputs = Project.perform(environment, root, profiles, Project.BUILD);
         if (outputs == null) {
             return 1;

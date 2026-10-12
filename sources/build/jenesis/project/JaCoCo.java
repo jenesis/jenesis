@@ -5,6 +5,11 @@ import module java.base;
 public record JaCoCo() implements ObservabilityEngine {
 
     @Override
+    public boolean shouldReproduce() {
+        return false;
+    }
+
+    @Override
     public String name() {
         return "jacoco";
     }

@@ -169,6 +169,40 @@ public class CheckstyleModule implements BuildExecutorModule {
         }
 
         @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            List<String> folders = arguments.values().stream()
+                    .filter(argument -> !argument.removed())
+                    .map(argument -> "name=\"" + (argument.folder().resolve(Bind.SOURCES).toAbsolutePath()
+                            + File.separator)
+                            .replace("&", "&amp;")
+                            .replace("<", "&lt;")
+                            .replace(">", "&gt;")
+                            .replace("\"", "&quot;")
+                            .replace("'", "&apos;"))
+                    .toList();
+            return super.apply(executor, context, arguments).thenApply(result -> {
+                Path report = context.next().resolve(REPORT);
+                try {
+                    if (Files.isRegularFile(report)) {
+                        String content = Files.readString(report), named = content;
+                        for (String folder : folders) {
+                            named = named.replace(folder, "name=\"");
+                        }
+                        if (!named.equals(content)) {
+                            Files.writeString(report, named);
+                        }
+                    }
+                    return result;
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        }
+
+        @Override
         public boolean acceptableExitCode(int code,
                                           Executor executor,
                                           BuildStepContext context,

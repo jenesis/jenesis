@@ -1090,6 +1090,13 @@ the time of the release commit - and the recorded digest moves with it:
 
     jenesis.archive.timestamp=2026-09-01T12:00:00Z
 
+To check every step rather than the one jar, build twice. The second build goes
+into a folder of its own and uses no build cache, and a step that wrote something
+else from the same input fails the build, named before the steps it changed. A
+clean comparison prints a fingerprint of everything the build wrote:
+
+    java -Djenesis.project.reproduce=target-reproduced build/jenesis/Make.java
+
 ## 54. Ahead-of-time native image - [`native-image`](demo-72-native-image/README.md)
 
 Where `jpackage` bundles your bytecode with a trimmed JVM, GraalVM

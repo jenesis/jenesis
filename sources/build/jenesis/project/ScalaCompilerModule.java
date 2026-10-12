@@ -216,6 +216,7 @@ public class ScalaCompilerModule implements BuildExecutorModule {
                     classpath = new ArrayList<>(),
                     plugins = new ArrayList<>();
             String release = null;
+            Path sourceroot = null;
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
@@ -243,6 +244,9 @@ public class ScalaCompilerModule implements BuildExecutorModule {
                 }
                 Path sources = argument.folder().resolve(Bind.SOURCES);
                 if (Files.exists(sources)) {
+                    if (sourceroot == null) {
+                        sourceroot = sources;
+                    }
                     Files.walkFileTree(sources, new SimpleFileVisitor<>() {
                         @Override
                         public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
@@ -294,7 +298,8 @@ public class ScalaCompilerModule implements BuildExecutorModule {
                     "-cp", String.join(File.pathSeparator, jars),
                     "dotty.tools.dotc.Main",
                     "-d", target.toString(),
-                    "-classpath", String.join(File.pathSeparator, userClasspath)));
+                    "-classpath", String.join(File.pathSeparator, userClasspath),
+                    "-sourceroot", sourceroot.toString()));
             if (release != null) {
                 commands.add("-release");
                 commands.add(release);

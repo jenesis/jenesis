@@ -63,6 +63,7 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
         List<String> jars = new ArrayList<>();
         Path config = null;
         Map<Path, byte[]> current = new LinkedHashMap<>();
+        Map<Path, Path> located = new HashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -74,7 +75,10 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
             if (candidate != null) {
                 config = candidate;
             }
-            current.putAll(formattable(argument.folder(), hash, executor));
+            Map<Path, byte[]> formattable = formattable(argument.folder(), hash, executor);
+            current.putAll(formattable);
+            Path sources = argument.folder().resolve(Bind.SOURCES);
+            formattable.keySet().forEach(file -> located.put(file, sources.resolve(file)));
         }
         if (current.isEmpty()) {
             return CompletableFuture.completedStage(null);
@@ -91,7 +95,7 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
         for (Map.Entry<Path, byte[]> entry : current.entrySet()) {
             byte[] prior = stored.get(entry.getKey());
             if (prior == null || !Arrays.equals(prior, entry.getValue())) {
-                files.add(entry.getKey().toString());
+                files.add(located.get(entry.getKey()).toString());
             }
         }
         if (files.isEmpty()) {
@@ -137,9 +141,8 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
         }
         Map<Path, byte[]> formattable = new LinkedHashMap<>();
         for (Map.Entry<Path, byte[]> entry : HashFunction.read(sources, hash, executor).entrySet()) {
-            Path file = sources.resolve(entry.getKey());
-            if (isFormattable(file)) {
-                formattable.put(file, entry.getValue());
+            if (isFormattable(sources.resolve(entry.getKey()))) {
+                formattable.put(entry.getKey(), entry.getValue());
             }
         }
         return formattable;

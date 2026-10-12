@@ -21,6 +21,7 @@ public final class Make {
             "jenesis.sigstore.uri",
             "jenesis.sigstore.issuers");
     private static final List<String> CONFINED = List.of("jenesis.project.target",
+            "jenesis.project.reproduce",
             "jenesis.project.artifacts",
             "jenesis.project.cache",
             "jenesis.openpgp.local",
