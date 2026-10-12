@@ -116,7 +116,7 @@ still leaked. To sandbox the build too, run it in a container as well - but with
 one extra flag in this repository, explained next:
 
     java -Djenesis.project.docker=true \
-         -Djenesis.project.docker.readable=../../sources \
+         -Djenesis.project.readable=../../sources \
          build/jenesis/Make.java
 
 `jenesis.project.docker` runs the whole build - the test included - inside the
@@ -131,8 +131,8 @@ is up and the isolation is in place. The engine that does this has to be the tru
 one, as the last section of this page explains.
 
 The project also cannot undo the isolation. Its `jenesis.properties` and its
-profiles are refused if they set any `jenesis.project.docker*` or
-`jenesis.execute.docker*` key, so a project can neither switch Docker off nor
+profiles are refused if they set `jenesis.project.docker` or `jenesis.execute.docker`,
+or the `image`, `readable`, `writable` or `env` of either, so a project can neither switch Docker off nor
 widen the container with a mount or an environment variable. Only your command
 line or your own `~/.jenesis/jenesis.properties` configures Docker. Put
 `jenesis.project.docker=true` in that file to isolate every build you run.
@@ -141,7 +141,7 @@ Why the extra mount is needed here. The demos share one engine through the
 `build/jenesis -> ../../../sources/build/jenesis` symlink, which points outside
 the project root. `jenesis.project.docker` mounts only the project root, so inside
 the container that symlink dangles and the build cannot even start
-(`ClassNotFoundException: build.jenesis.Project.java`). `jenesis.project.docker.readable`
+(`ClassNotFoundException: build.jenesis.Project.java`). `jenesis.project.readable`
 adds bind mounts to the container; pointing it at the shared `sources/` tree
 (`../../sources`, resolved against the project root) makes the symlink target
 present at the same path inside the container, so the engine resolves. The mount
@@ -155,12 +155,12 @@ A normally vendored project (a real `build/jenesis/` directory inside the root,
 from the curl or SDKMAN install) has the engine under the mounted root and needs
 no extra mount. `jenesis.execute.docker` is unaffected here either way, since the
 build runs on the host and only the finished artifact is launched in the
-container. The same `jenesis.execute.docker.readable` flag exists for symmetry when a
+container. The same `jenesis.execute.readable` flag exists for symmetry when a
 launched program needs a host path made visible.
 
 When a sandboxed build or program legitimately needs to *write* to a host path -
 say a generated-output directory you want to keep after the container exits -
-`jenesis.project.docker.writable` (and its `jenesis.execute.docker.writable`
+`jenesis.project.writable` (and its `jenesis.execute.writable`
 twin) add **read-write** bind mounts, the counterpart to the read-only `.mount`
 above. Reach for it sparingly: every writable mount is a hole in the very
 confinement this demo is about, so widen the sandbox only for the exact path that

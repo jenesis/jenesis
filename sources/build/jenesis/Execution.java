@@ -23,10 +23,10 @@ public record Execution(Project project, String mainClass, String module, Contai
 
         public static Container ofEnvironment(Environment environment) {
             return environment.flag("execute.docker")
-                    ? new Container(environment.getProperty("execute.docker.image"),
-                                    environment.getProperty("execute.docker.readable"),
-                                    environment.getProperty("execute.docker.writable"),
-                                    environment.getProperty("execute.docker.env"),
+                    ? new Container(environment.getProperty("execute.image"),
+                                    environment.getProperty("execute.readable"),
+                                    environment.getProperty("execute.writable"),
+                                    environment.getProperty("execute.env"),
                                     environment.flag("print.docker", true))
                     : null;
         }

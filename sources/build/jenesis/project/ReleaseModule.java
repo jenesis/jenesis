@@ -87,7 +87,7 @@ public class ReleaseModule implements BuildExecutorModule {
             if (!inherited.containsKey(maven)) {
                 throw new IllegalStateException("A Maven repository is configured to release to, but this layout"
                         + " stages no Maven tree: build with the maven or modular_to_maven layout, or unset"
-                        + " jenesis.release.maven.uri");
+                        + " jenesis.deploy.uri");
             }
             buildExecutor.addStep(MAVEN, mavenRepositoryRelease, maven);
         }

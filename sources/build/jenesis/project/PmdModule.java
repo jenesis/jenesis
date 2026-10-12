@@ -22,7 +22,7 @@ public class PmdModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-    private static final String SETTING = "source.pmd", PRIORITY = "source.pmd.priority";
+    private static final String SETTING = "source.pmd", PRIORITY = "pmd.priority";
     private static final String REPORT = BuildStep.REPORTS + "pmd/pmd-report.xml";
     private static final String MAVEN_GROUP = "net.sourceforge.pmd", MAVEN_ARTIFACT = "pmd-dist";
 

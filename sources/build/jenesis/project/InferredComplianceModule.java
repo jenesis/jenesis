@@ -38,11 +38,11 @@ public class InferredComplianceModule implements BuildExecutorModule {
                 value -> value,
                 value -> value,
                 Collections.emptyNavigableMap());
-        Boolean license = environment.flagOrNull("compliance");
+        Boolean license = environment.flagOrNull("compliance.license");
         if (license != null) {
             module = module.license(license ? value -> value : null);
         }
-        Boolean vulnerability = environment.flagOrNull("compliance");
+        Boolean vulnerability = environment.flagOrNull("compliance.vulnerability");
         if (vulnerability != null) {
             module = module.vulnerability(vulnerability ? value -> value : null);
         }

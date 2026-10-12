@@ -36,7 +36,7 @@ public class MavenRepositoryRelease implements BuildStep {
     }
 
     public static URI configured(Environment environment) {
-        String location = environment.value("release.maven.uri");
+        String location = environment.value("deploy.uri");
         if (location == null) {
             location = System.getenv("MAVEN_RELEASE_URI");
         }
@@ -44,11 +44,11 @@ public class MavenRepositoryRelease implements BuildStep {
     }
 
     public static MavenRepositoryRelease ofEnvironment(Environment environment, URI repository) {
-        Repository.Origin origin = environment.getProperty("release.maven.uri") != null
-                ? Repository.Origin.of(environment, "release.maven.uri")
+        Repository.Origin origin = environment.getProperty("deploy.uri") != null
+                ? Repository.Origin.of(environment, "deploy.uri")
                 : System.getenv("MAVEN_RELEASE_URI") != null ? Repository.Origin.ENVIRONMENT : Repository.Origin.USER;
         return new MavenRepositoryRelease(repository,
-                Repository.Credential.of(environment, "release.maven.token", "MAVEN_RELEASE_TOKEN").grant(origin),
+                Repository.Credential.of(environment, "deploy.token", "MAVEN_RELEASE_TOKEN").grant(origin),
                 Repository.Connection.ofEnvironment(environment),
                 environment.out(),
                 Palette.ofEnvironment(environment));
@@ -68,7 +68,7 @@ public class MavenRepositoryRelease implements BuildStep {
             throw new IllegalArgumentException("Cannot release to " + repository
                     + ": Maven Central takes a release signed and through its own publishing service, which"
                     + " JReleaser handles - describe that release in a jreleaser.yml at the project root, which adds"
-                    + " the release/jreleaser step, and name only a repository of your own in jenesis.release.maven.uri");
+                    + " the release/jreleaser step, and name only a repository of your own in jenesis.deploy.uri");
         }
         String text = repository.toString();
         this.repository = text.endsWith("/") ? repository : URI.create(text + "/");
@@ -378,7 +378,7 @@ public class MavenRepositoryRelease implements BuildStep {
             if (status == 401 || status == 403) {
                 throw new IllegalStateException("The repository refused " + method + " " + target
                         + " with status " + status + detail
-                        + ": set jenesis.release.maven.token to an Authorization header value that may publish"
+                        + ": set jenesis.deploy.token to an Authorization header value that may publish"
                         + " to it, as Basic <credentials> or Bearer <token>");
             }
             if (status == 409) {

@@ -148,7 +148,7 @@ Releasing to a Maven repository of your own
 
 An internal Maven repository - a Nexus, an Artifactory, a Reposilite, a Jenesis
 Repository's `java` repository - takes the staged Maven tree from `release` itself
-once `jenesis.release.maven.uri` names it, as its `release/maven` step. This is
+once `jenesis.deploy.uri` names it, as its `release/maven` step. This is
 what `maven-deploy-plugin` does with a `<distributionManagement>` repository, or
 Gradle's `maven-publish` with one of its repositories.
 
@@ -162,7 +162,7 @@ Then release a version into it. The address is plain `http:`, so the release has
 to be allowed to use one:
 
     java -Djenesis.project.version=1.0.0 \
-         -Djenesis.release.maven.uri=http://localhost:8642/ \
+         -Djenesis.deploy.uri=http://localhost:8642/ \
          -Djenesis.repository.insecure=true \
          build/jenesis/Make.java release
 
@@ -197,14 +197,14 @@ the time and a build number that counts on from the one the repository holds, an
 a `maven-metadata.xml` in the version's folder naming them, so a Maven or Gradle
 build that requires `0-SNAPSHOT` resolves the newest:
 
-    java -Djenesis.release.maven.uri=http://localhost:8642/ \
+    java -Djenesis.deploy.uri=http://localhost:8642/ \
          -Djenesis.repository.insecure=true \
          build/jenesis/Make.java release
 
     target/repository/build/jenesis/build.jenesis.demo.publishing/0-SNAPSHOT/build.jenesis.demo.publishing-0-20261010.120053-1.jar
     target/repository/build/jenesis/build.jenesis.demo.publishing/0-SNAPSHOT/maven-metadata.xml
 
-A real repository asks for a key. `jenesis.release.maven.token` is sent as the
+A real repository asks for a key. `jenesis.deploy.token` is sent as the
 `Authorization` header exactly as given, so it names its scheme - `Basic` and the
 Base64 of `<user>:<password>` for a Nexus or an Artifactory user, `Bearer <token>`
 where the repository hands out tokens. Where the settings are not given, a release
@@ -221,7 +221,7 @@ without `-Djenesis.repository.insecure=true`. Nothing is signed. Maven Central i
 refused by name, because it takes a signed bundle through its own publishing
 service - which is the next section's job:
 
-    java -Djenesis.release.maven.uri=https://repo1.maven.org/maven2/ build/jenesis/Make.java release
+    java -Djenesis.deploy.uri=https://repo1.maven.org/maven2/ build/jenesis/Make.java release
 
     Cannot release to https://repo1.maven.org/maven2/: Maven Central takes a release signed and
     through its own publishing service, which JReleaser handles - describe that release in a

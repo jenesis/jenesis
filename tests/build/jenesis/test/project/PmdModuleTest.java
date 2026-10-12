@@ -35,9 +35,9 @@ public class PmdModuleTest {
 
     @Test
     public void refuses_a_rule_priority_that_pmd_does_not_know() {
-        assertThatThrownBy(() -> PmdModule.ofEnvironment(new Environment(Map.of("source.pmd.priority", "6")), Map.of(), Map.of()))
+        assertThatThrownBy(() -> PmdModule.ofEnvironment(new Environment(Map.of("pmd.priority", "6")), Map.of(), Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("jenesis.source.pmd.priority")
+                .hasMessageContaining("jenesis.pmd.priority")
                 .hasMessageContaining("from 1, the highest, to 5, the lowest");
     }
 
