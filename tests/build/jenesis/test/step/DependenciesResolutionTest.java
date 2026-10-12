@@ -119,6 +119,47 @@ public class DependenciesResolutionTest {
     }
 
     @Test
+    public void lists_only_what_the_resolutions_it_is_handed_do_not_hold_already() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("main/compile/foo/qux", "");
+        properties.setProperty("main/compile/foo/baz", "");
+        properties.store(dependencies.resolve(BuildStep.REQUIRES));
+        Path handed = Files.createDirectory(root.resolve("handed"));
+        SequencedProperties resolved = new SequencedProperties();
+        resolved.setProperty("main/compile/foo/qux", "resolved/foo-qux.jar");
+        resolved.setProperty("main/compile/foo/transitive/qux", "resolved/foo-transitive-qux.jar");
+        resolved.store(handed.resolve(BuildStep.DEPENDENCIES));
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("handed", handed);
+        executor.addModule("resolved", new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (resolving, prefix, repositories, descriptors, _, _) -> {
+                    SequencedMap<String, String> transitive = new LinkedHashMap<>();
+                    descriptors.sequencedKeySet().forEach(descriptor -> {
+                        transitive.put(prefix + "/" + descriptor, "");
+                        transitive.put(prefix + "/transitive/" + descriptor, "");
+                    });
+                    return new Resolver.Resolution(Resolver.materializeAll(resolving, repositories, prefix, transitive), List.of(), new LinkedHashMap<>());
+                })), new LinkedHashSet<>(List.of("dependencies", "handed")));
+        next = executor.execute().get("resolved");
+        assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
+                .as("a coordinate a handed resolution resolved already is that resolution's to name on a path")
+                .containsExactlyInAnyOrder("main/compile/foo/baz", "main/compile/foo/transitive/baz");
+        try (Stream<Path> files = Files.list(next.resolve("resolved"))) {
+            assertThat(files.map(file -> file.getFileName().toString()))
+                    .as("nothing is kept that the index no longer names")
+                    .containsExactlyInAnyOrder("baz.jar", "transitive%2Fbaz.jar");
+        }
+    }
+
+    @Test
     public void a_scoped_step_resolves_nothing_but_its_own_group() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/qux", "");

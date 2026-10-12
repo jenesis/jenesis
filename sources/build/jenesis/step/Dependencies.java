@@ -248,9 +248,14 @@ public class Dependencies implements BuildExecutorModule {
             SequencedMap<String, String> bomTokens = new LinkedHashMap<>();
             SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedSet<String>>>>> exclusions = new LinkedHashMap<>();
             SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedSet<String>>>> managedExclusions = new LinkedHashMap<>();
+            Set<String> handed = new HashSet<>();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
+                }
+                Path handedFile = argument.folder().resolve(DEPENDENCIES);
+                if (Files.exists(handedFile)) {
+                    handed.addAll(SequencedProperties.ofFiles(handedFile).stringPropertyNames());
                 }
                 Path requiresFile = argument.folder().resolve(REQUIRES);
                 if (Files.exists(requiresFile)) {
@@ -1089,6 +1094,17 @@ public class Dependencies implements BuildExecutorModule {
                         new TreeMap<>(aliases), versions, moduleAliases, moduleOverrides, bomTokens, exclusions,
                         managedExclusions));
                 resolution.store(context.next().resolve(RESOLUTION));
+            }
+            Set<String> listed = new HashSet<>(), dropped = new HashSet<>();
+            for (String key : index.stringPropertyNames()) {
+                String value = index.getProperty(key);
+                int space = value.indexOf(' ');
+                (handed.contains(key) ? dropped : listed).add(space < 0 ? value : value.substring(0, space));
+            }
+            handed.forEach(index::remove);
+            dropped.removeAll(listed);
+            for (String relative : dropped) {
+                Files.deleteIfExists(context.next().resolve(relative));
             }
             index.store(context.next().resolve(DEPENDENCIES));
             graph.store(context.next().resolve(GRAPH));
