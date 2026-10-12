@@ -1468,7 +1468,11 @@ public record Project(
                           -> sourceDirectory in pom.xml, or a plugin at binary/generated
                       multi-release jar configuration -> sources/META-INF/versions/<N>/ (11), Java
                           and Kotlin alike: kotlinc compiles a .kt there for release <N> into the
-                          jar's META-INF/versions/<N>/, as javac does a .java (41)
+                          jar's META-INF/versions/<N>/, as javac does a .java, and sees the module's
+                          internal declarations (41). No second source root is read, so the sources
+                          of a src/main/java<N> folder, a compiler execution with multiReleaseOutput
+                          or a Gradle java<N> source set move below META-INF/versions/<N>/ of the
+                          module's sources - src/main/java/META-INF/versions/<N>/ in a pom.xml
                       moditect add-module-info, a descriptor for a Java 8 base
                           -> module-info.java in sources/META-INF/versions/9/ (11)
                       replacer, templating, a generated version class
