@@ -1104,11 +1104,12 @@ public record Project(
                                            module, as java.compiler's Element, needs to read that
                                            module: `--add-reads=<library module>=java.compiler`
                                            in process-test.properties, naming the module concerned
-                      a jar that is no     a dependency with a class in the unnamed package
-                      module               fails the tests' module path with a
-                                           FindException, and nothing keeps one dependency of a
-                                           module on the class path: move the tests that need
-                                           it to a test source folder only the old build compiles
+                      a jar that is no     a dependency that names a module but holds a class
+                      module               outside any package fails the tests' module path with
+                                           a FindException, and nothing keeps one dependency of
+                                           a module on the class path: move the tests that need
+                                           it to a test source folder only the old build
+                                           compiles; skill/execute lists what else stops a JVM
                       a test resource      one that shadows a main resource of the same name puts
                       overriding           its folder into two modules, which no module path
                                            allows: move it to a test-only folder whose name is no
@@ -2352,6 +2353,51 @@ public record Project(
                     -Djenesis.execute.docker=true, plus .docker.image, .docker.readable,
                     .docker.writable and .docker.env. Execute is its own entry point: build
                     selectors do not apply to it, nor its properties to a plain build.
+
+                    ## When the JVM will not start
+
+                    The JVM checks the module graph before any code runs, the program's and the
+                    tests' alike, and names what it refused. Read its first line and its Caused by:
+
+                      Module <m> not found, required by <n>
+                                           nothing resolved holds <m>: a requires without a
+                                           dependency, a scope that leaves it out at run time, or a
+                                           jar that names no module, which @jenesis.alias names
+                      Unable to derive module descriptor for <jar>, Caused by ... Invalid module name
+                                           the name derived from the file is no Java name, as one
+                                           holding abstract: name it with @jenesis.alias
+                      Unable to derive module descriptor for <jar>, Caused by ... found in top-level
+                      directory (unnamed package not allowed in module)
+                                           the jar names a module but holds a class outside any
+                                           package, so it can be no module at all: exclude it with
+                                           @jenesis.exclude where nothing needs it at run time, ask
+                                           its maintainers to drop the module name, or keep the
+                                           code that uses it out of the module build
+                      Package <p> in both module <a> and module <b>
+                      Module <m> reads package <p> from both <a> and <b>
+                                           a split package: exclude the jar that duplicates it with
+                                           @jenesis.exclude, or replace a module whose packages
+                                           others carry with @jenesis.override
+                      ... cannot access class ... because module <a> does not export <p> to module <b>
+                                           an internal package: --add-exports=<a>/<p>=<b> in
+                                           process-java.properties, or process-test.properties
+                      Unable to make ... accessible: module <a> does not "opens <p>" to module <b>
+                                           reflection into a package: opens <p> in the
+                                           module-info.java of <a> where it is yours, or
+                                           --add-opens=<a>/<p>=<b> in the process file
+                      ... has been compiled by a more recent version of the Java Runtime
+                                           a class newer than the JVM: run on that release, with
+                                           -Djenesis.toolchain.version=<n>, or compile for this one
+                      Preview features are not enabled for ...
+                                           declare the release as <n>-preview, as
+                                           @jenesis.release <n>-preview
+                      ServiceConfigurationError: <service>: module <m> does not declare `uses`
+                                           uses <service>; in the module-info.java of <m>
+                      A restricted method ... has been called
+                                           native access: @jenesis.native names the module
+
+                    A jar the JVM refuses is no jar the build can repair: the fix is a tag, a process
+                    file, or the dependency itself.
 
                     To run a build, or a published program, inside your own JVM rather than as a
                     process of its own, the same three commands are java.util.spi.ToolProvider
