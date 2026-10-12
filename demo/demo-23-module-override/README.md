@@ -94,11 +94,13 @@ same way.
 What consumers see
 ------------------
 
-Because the generated pom is the resolved closure, the drop reaches a consumer
-too: a Maven build flattening this project's dependencies onto a class path gets
-Tomcat's copy of `jakarta.servlet` and no second one. The declaration also travels
-to Jenesis consumers through the `Jenesis-Overrides` manifest header of the
-produced jar.
+The generated pom names what the module requires, with the carrier in place of
+the module it overrides: `jakarta.servlet.jsp-api`, `tomcat-embed-core` and
+`tomcat-embed-el`, and no `jakarta.servlet-api`. Where a dependency's own pom would
+hand a consumer an artifact the override dropped, that dependency carries an
+exclusion of it, so a Maven build gets Tomcat's copy of `jakarta.servlet` and no
+second one. The declaration also travels to Jenesis consumers through the
+`Jenesis-Overrides` manifest header of the produced jar.
 
 The module descriptor still says `requires jakarta.servlet`, which is the point:
 the published contract names the API, not the server that happens to implement it

@@ -776,7 +776,10 @@ public class Dependencies implements BuildExecutorModule {
                                     String artifact = coordinate.substring(coordinate.indexOf('/') + 1);
                                     int slash = artifact.indexOf('/');
                                     int second = slash < 0 ? -1 : artifact.indexOf('/', slash + 1);
-                                    overridden.add(second < 0 ? artifact : artifact.substring(0, second));
+                                    String name = second < 0 ? artifact : artifact.substring(0, second);
+                                    overridden.add(name);
+                                    graph.setProperty("overridden/" + group + "/" + scope + "/"
+                                            + coordinate.substring(0, coordinate.indexOf('/') + 1) + name, node.module());
                                 }
                             });
                             if (!overridden.isEmpty()) {
