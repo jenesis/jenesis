@@ -13,7 +13,6 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.project.ClassTransformModule;
 import build.jenesis.step.Versions;
-import java.util.jar.Attributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,26 +22,13 @@ public class ClassTransformModuleTest {
     private Path build;
 
     @Test
-    public void merges_the_manifest_a_transform_writes_into_the_one_it_was_handed() throws IOException {
+    public void replaces_the_manifest_it_was_handed_with_the_one_a_transform_writes() throws IOException {
         Manifest manifest = transformed(Versions.MANIFEST);
-        assertThat(manifest.getMainAttributes().getValue("Multi-Release"))
-                .as("an attribute of the compiled manifest that the transform does not set reaches the jar")
-                .isEqualTo("true");
-        assertThat(manifest.getMainAttributes().getValue("Bundle-SymbolicName"))
-                .as("an attribute only the transform sets is added")
-                .isEqualTo("sample");
-        assertThat(manifest.getMainAttributes().getValue("Implementation-Version"))
-                .as("the transform's value wins for an attribute it sets")
-                .isEqualTo("2");
-        assertThat(manifest.getAttributes("sample/").getValue("Sealed")).isEqualTo("true");
-    }
-
-    @Test
-    public void merges_a_resource_manifest_a_transform_writes_into_the_one_it_was_handed() throws IOException {
-        Manifest manifest = transformed(BuildStep.CLASSES + JarFile.MANIFEST_NAME);
-        assertThat(manifest.getMainAttributes().getValue("Multi-Release")).isEqualTo("true");
         assertThat(manifest.getMainAttributes().getValue("Bundle-SymbolicName")).isEqualTo("sample");
         assertThat(manifest.getMainAttributes().getValue("Implementation-Version")).isEqualTo("2");
+        assertThat(manifest.getMainAttributes().getValue("Multi-Release"))
+                .as("the transform carries what it keeps of the manifest it was handed, and it kept nothing")
+                .isNull();
     }
 
     private Manifest transformed(String file) throws IOException {
