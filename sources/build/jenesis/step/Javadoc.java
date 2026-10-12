@@ -7,7 +7,6 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
-import build.jenesis.module.ModuleInfoParser;
 import com.sun.source.tree.ClassTree;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.Tree;
@@ -20,7 +19,6 @@ import javax.tools.ToolProvider;
 public class Javadoc extends ProcessBuildStep {
 
     public static final String JAVADOC = "javadoc/";
-    private static final ModuleInfoParser MODULE_INFO_PARSER = new ModuleInfoParser();
 
     private final String within;
     private final String group;
@@ -85,6 +83,7 @@ public class Javadoc extends ProcessBuildStep {
                 : Files.createDirectories(context.next().resolve(JAVADOC).resolve(within));
         List<String> files = new ArrayList<>(),
                 path = new ArrayList<>(),
+                binaries = new ArrayList<>(),
                 commands = new ArrayList<>(List.of(
                         "-d", documentation.toString(),
                         "-quiet",
@@ -132,13 +131,13 @@ public class Javadoc extends ProcessBuildStep {
             Path sources = argument.folder().resolve(BuildStep.SOURCES),
                     classes = argument.folder().resolve(BuildStep.CLASSES);
             if (Files.exists(classes)) {
-                path.add(classes.toString());
+                binaries.add(classes.toString());
             }
             Path artifacts = argument.folder().resolve(BuildStep.ARTIFACTS);
             if (Files.isDirectory(artifacts)) {
                 try (DirectoryStream<Path> stream = Files.newDirectoryStream(artifacts)) {
                     for (Path file : stream) {
-                        path.add(file.toString());
+                        binaries.add(file.toString());
                     }
                 }
             }
@@ -173,12 +172,21 @@ public class Javadoc extends ProcessBuildStep {
                 && !declaresPublicType(files)) {
             return CompletableFuture.completedStage(null);
         }
+        boolean module = !classpath && files.stream().anyMatch(file -> file.endsWith(File.separator + "module-info.java"));
+        binaries.sort(null);
+        String patched = null;
+        if (module) {
+            for (String binary : binaries) {
+                ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(Path.of(binary));
+                if (descriptor != null) {
+                    patched = descriptor.name();
+                    break;
+                }
+            }
+        } else {
+            path.addAll(binaries);
+        }
         path.sort(null);
-        String moduleInfo = classpath ? null : files.stream()
-                .filter(file -> file.endsWith(File.separator + "module-info.java"))
-                .findFirst()
-                .orElse(null);
-        String module = moduleInfo == null ? null : MODULE_INFO_PARSER.identify(Path.of(moduleInfo)).coordinate();
         if (release != null && properties.values().stream()
                 .noneMatch(folder -> folder.containsKey("--release")
                         || folder.containsKey("--source")
@@ -188,6 +196,10 @@ public class Javadoc extends ProcessBuildStep {
             }
             commands.addAll(List.of("--release", release));
         }
+        if (patched != null) {
+            commands.add("--patch-module");
+            commands.add(patched + "=" + String.join(File.pathSeparator, binaries));
+        }
         if (!path.isEmpty()) {
             for (String entry : path) {
                 if (entry.indexOf(File.pathSeparatorChar) != -1) {
@@ -195,22 +207,19 @@ public class Javadoc extends ProcessBuildStep {
                             "Path entry contains separator '" + File.pathSeparator + "': " + entry);
                 }
             }
-            List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>(), patched = new ArrayList<>();
+            List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
             for (String entry : path) {
-                ModuleDescriptor descriptor = module == null ? null : PathPlacement.moduleDescriptor(Path.of(entry));
-                (descriptor == null
-                        ? classPath
-                        : descriptor.name().equals(module) ? patched : modulePath).add(entry);
+                (module && PathPlacement.moduleDescriptor(Path.of(entry)) != null
+                        ? modulePath
+                        : classPath).add(entry);
             }
             for (Map.Entry<String, List<String>> paths : List.of(
                     Map.entry("--module-path", modulePath),
-                    Map.entry("--class-path", classPath),
-                    Map.entry("--patch-module", patched)
+                    Map.entry("--class-path", classPath)
             )) {
                 if (!paths.getValue().isEmpty()) {
                     commands.add(paths.getKey());
-                    commands.add((paths.getKey().equals("--patch-module") ? module + "=" : "")
-                            + String.join(File.pathSeparator, paths.getValue()));
+                    commands.add(String.join(File.pathSeparator, paths.getValue()));
                 }
             }
         }
