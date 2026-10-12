@@ -45,7 +45,6 @@ Compile avoidance matters most: it is the largest share of the difference to Gra
 | Gap | Size | Projects |
 |---|---|---|
 | A plugin cannot hand a file it produced to the test JVM; the path of its step has to be written into `process-test.properties`. | S | quarkus, mockito (OSGi tests dropped) |
-| A test module cannot keep a jar without a module identity on the class path. | M | JSqlParser (JavaCC tests stay on Maven) |
 
 ## Packaging and publishing
 
@@ -87,6 +86,9 @@ These are decisions rather than gaps. The briefing says so and names the change 
   for the community to publish (guava, mockito, jhipster, picocli, hibernate-validator, quarkus);
 - Apache RAT, the release audit of one foundation's policy, which a plugin runs; and animal-sniffer, whose JDK
   signatures are what `--release` checks as it compiles, while its Android signatures are Android's concern;
+- checking a dependency's jar for what the module path refuses, as a jar that names a module but holds a class
+  outside any package: the JVM names the jar and the cause before any code runs, and `skill/execute` lists the
+  common causes with the fix for each (JSqlParser, whose JavaCC fork does this);
 - white-box tests through `--patch-module`;
 - Gradle's highest-version conflict resolution;
 - a root location for configuration of the tests alone or the main code alone - a file that differs for the tests
@@ -109,8 +111,7 @@ These are decisions rather than gaps. The briefing says so and names the change 
 
 1. **The small items, in one change.** A per-module documentation switch, and failing on a class-less Kotlin
    Multiplatform root.
-2. **Kotlin.** Friend paths for tests and multi-release Kotlin sources, then KSP.
+2. **Kotlin.** Friend paths for tests, then KSP.
 3. **The annotation-processor fallback** to the class path in a module build.
-4. **A test module that keeps a jar without a module identity on the class path.**
-5. **Compile avoidance.** Compare a dependency by a fingerprint of its API rather than its bytes. The largest change,
+4. **Compile avoidance.** Compare a dependency by a fingerprint of its API rather than its bytes. The largest change,
    and the one a build after an edit shows most.
