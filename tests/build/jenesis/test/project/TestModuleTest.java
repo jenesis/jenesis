@@ -211,6 +211,38 @@ public class TestModuleTest {
     }
 
     @Test
+    public void fails_where_a_test_writes_into_a_folder_the_build_handed_it() throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "StrayTest", """
+                package sample;
+                public class StrayTest {
+                    @org.junit.jupiter.api.Test
+                    public void test() throws Exception {
+                        java.nio.file.Files.writeString(java.nio.file.Path.of(getClass().getProtectionDomain()
+                                .getCodeSource().getLocation().toURI()).resolve("stray.txt"), "written");
+                    }
+                }
+                """, bootModuleJars());
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .isTest(candidate -> candidate.endsWith("StrayTest")).jarsOnly(false),
+                "dependencies", "classes");
+        assertThatThrownBy(executor::execute)
+                .as("a file a test leaves beside what it tests would otherwise reach the steps that read that folder")
+                .hasStackTraceContaining("The tests wrote into the folders the build handed them")
+                .hasStackTraceContaining("classes/stray.txt");
+    }
+
+    @Test
     public void a_failed_run_names_its_failed_tests_even_when_the_tests_swallow_the_output() throws IOException {
         compileSource(classes.resolve(Javac.CLASSES + "sample"), "SilentTest", """
                 package sample;

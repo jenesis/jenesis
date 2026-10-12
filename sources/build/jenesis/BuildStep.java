@@ -124,6 +124,23 @@ public interface BuildStep extends Serializable {
         return null;
     }
 
+    static SequencedMap<String, String> listing(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+        SequencedMap<String, String> listing = new TreeMap<>();
+        for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
+            Path folder = argument.getValue().folder();
+            if (argument.getValue().removed() || !Files.isDirectory(folder)) {
+                continue;
+            }
+            try (Stream<Path> files = Files.walk(folder)) {
+                for (Path file : files.filter(Files::isRegularFile).toList()) {
+                    listing.put(argument.getKey() + "/" + folder.relativize(file).toString().replace(File.separatorChar, '/'),
+                            Files.size(file) + " " + Files.getLastModifiedTime(file).toMillis());
+                }
+            }
+        }
+        return listing;
+    }
+
     static OffsetDateTime timestamp() {
         return timestamp(Environment.NONE);
     }
