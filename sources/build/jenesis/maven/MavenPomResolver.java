@@ -716,14 +716,16 @@ public class MavenPomResolver implements MavenResolver {
             SequencedMap<String, String> plugins = new LinkedHashMap<>(), pluginExclusions = new LinkedHashMap<>();
             pom.plugins().forEach((plugin, group) -> {
                 String[] segments = plugin.split("/");
-                MavenDependencyValue managedPlugin = Dependencies.PROCESSOR_PATH.contains(group)
-                        && segments.length == 3
-                        && segments[0].equals("maven")
-                        ? managedDependencies.get(new MavenDependencyKey(segments[1], segments[2], "jar", null))
-                        : null;
-                plugins.put(managedPlugin == null || managedPlugin.version() == null
-                        ? plugin
-                        : plugin + "/" + managedPlugin.version(), group);
+                String version = null;
+                if (segments.length == 3 && segments[0].equals("maven")) {
+                    MavenDependencyValue managedPlugin = Dependencies.PROCESSOR_PATH.contains(group)
+                            ? managedDependencies.get(new MavenDependencyKey(segments[1], segments[2], "jar", null))
+                            : null;
+                    version = managedPlugin == null || managedPlugin.version() == null
+                            ? subprojects.get(new MavenDependencyName(segments[1], segments[2]))
+                            : managedPlugin.version();
+                }
+                plugins.put(version == null ? plugin : plugin + "/" + version, group);
             });
             SequencedMap<String, String> testPlugins = new LinkedHashMap<>(plugins);
             pom.dependencies().forEach((key, value) -> {
@@ -750,7 +752,13 @@ public class MavenPomResolver implements MavenResolver {
                         String version = managedJar == null ? resolved.version() : managedJar.version();
                         String plugin = "maven/" + resolvedKey.groupId() + "/" + resolvedKey.artifactId()
                                 + (version == null ? "" : "/" + version);
-                        (resolved.scope() == MavenDependencyScope.TEST ? testPlugins : plugins).put(plugin, "plugin");
+                        String declared = (resolved.scope() == MavenDependencyScope.TEST ? testPlugins : plugins).put(plugin, "plugin");
+                        if (declared != null && !declared.equals("plugin")) {
+                            throw new IllegalArgumentException("The processor " + plugin + " in " + module.resolve("pom.xml")
+                                    + " is also named by a jenesis.plugin comment in the group " + declared
+                                    + ", but a coordinate resolves in one group of a module only: drop the comment"
+                                    + " or the dependency");
+                        }
                         if (resolved.exclusions() != null && !resolved.exclusions().isEmpty()) {
                             pluginExclusions.put(plugin, resolved.exclusions().stream()
                                     .map(name -> name.groupId() + "/" + name.artifactId())
@@ -1873,7 +1881,13 @@ public class MavenPomResolver implements MavenResolver {
                                     + " maven/<groupId>/<artifactId>/<version>, or left to pin."
                                     + " Every line inside a jenesis.plugin comment is a declaration of its own");
                         }
-                        entries.put(token.indexOf('/') < 0 ? "module/" + token : token, group);
+                        String previous = entries.put(token.indexOf('/') < 0 ? "module/" + token : token, group);
+                        if (previous != null && !previous.equals(group)) {
+                            throw new IllegalArgumentException("Malformed jenesis.plugin declaration '"
+                                    + trimmed
+                                    + "': " + token + " is named in the group " + previous + " already,"
+                                    + " and a coordinate resolves in one group of a module only");
+                        }
                     }
                 });
         return entries;
