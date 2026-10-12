@@ -136,6 +136,26 @@ line on GitHub, and carry the footer. The other keys are `documented-visibilitie
 `custom-styles`; an unknown key fails the build, and so does Dokka when it
 fails, as javadoc does.
 
+Compiling incrementally
+-----------------------
+
+With `-Djenesis.kotlin.incremental=true`, Kotlin compiles incrementally, as
+Gradle compiles it by default:
+
+    java -Djenesis.kotlin.incremental=true build/jenesis/Make.java
+
+The first build compiles every source. After an edit, the next build recompiles
+the sources the change reaches and keeps every other class: a changed function body
+recompiles its own file, and a changed signature also the files that use it. A
+module that depends on this one recompiles only what uses a changed declaration.
+The compiler runs in the Kotlin daemon, a JVM of its own that outlives the build,
+so it stays loaded from one module and one build to the next. A `-J` line of
+`process-kotlinc.properties` configures that daemon's JVM.
+
+This needs Kotlin 2.3 or newer, whose compiler is driven through the Kotlin Build
+Tools API, `org.jetbrains.kotlin:kotlin-build-tools-impl`. The module pins it in the
+`kotlinc` group beside the compiler, at the compiler's version.
+
 Pinning
 -------
 
@@ -144,7 +164,8 @@ declaration: the module's own dependencies in the default `main` group (the Java
 module `kotlin.stdlib`, plus the non-modular transitives as
 `org.jetbrains.kotlin/kotlin-stdlib` and `org.jetbrains/annotations`) and the
 Kotlin compiler toolchain in its own `kotlinc` group (each
-`kotlinc/maven/...` coordinate with a version and SHA-256 checksum), and Dokka
+`kotlinc/maven/...` coordinate with a version and SHA-256 checksum, the Build Tools
+API included), and Dokka
 in its `dokka` group. Because the groups are separate, the running compiler is
 locked independently of the `kotlin.stdlib` the module ships against. Run
 `java build/jenesis/Make.java pin` to record or refresh the tags; re-running
