@@ -682,9 +682,7 @@ public record Project(
                     When you are done, give me a summary of the migration: what replaced each part of
                     the old build, what was dropped and why, how the two builds compare - the tests
                     run, the jar contents, the dependency tree and the published POM - and where a
-                    layer or packaging replaced shading, which keeps each library visible to licence
-                    and compliance checks and to the usage detection open source projects rely on for
-                    their funding.
+                    layer or packaging replaced shading.
                     """));
         }
     }
@@ -3445,10 +3443,6 @@ public record Project(
         }
         String version = environment.getProperty("project.version");
         if (version != null) {
-            if (version.isBlank()) {
-                throw new IllegalArgumentException("jenesis.project.version is set but empty: leave the setting out"
-                        + " for an unversioned build, or name a module version such as 1.2.0");
-            }
             try {
                 ModuleDescriptor.Version.parse(version);
             } catch (IllegalArgumentException e) {

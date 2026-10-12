@@ -1088,7 +1088,7 @@ public class ProjectTest {
     public void refuses_an_empty_project_version() {
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.version", "")), root))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("jenesis.project.version is set but empty");
+                .hasMessageContaining("which is no module version");
     }
 
     @Test
