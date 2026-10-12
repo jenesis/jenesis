@@ -528,7 +528,7 @@ public class ProjectTest {
         assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).out(printed::add), root, new LinkedHashSet<>(), Project.SKILL + "/registry")).isEmpty();
         assertThat(String.join("\n", printed))
                 .as("a migrating build is read plugin by plugin, so each line starts from the plugin it replaces")
-                .contains("maven-checkstyle-plugin / checkstyle -> checkstyle.xml (34)", "skill/extend");
+                .contains("maven-checkstyle-plugin / checkstyle -> checkstyle.xml (37)", "skill/extend");
     }
 
     @Test
