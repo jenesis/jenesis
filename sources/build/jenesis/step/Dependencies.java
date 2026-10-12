@@ -1544,6 +1544,17 @@ public class Dependencies implements BuildExecutorModule {
         return new ArrayList<>(selected);
     }
 
+    public static List<Path> paths(SequencedMap<String, BuildStepArgument> arguments, String group, String scope)
+            throws IOException {
+        SequencedSet<Path> paths = new LinkedHashSet<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            if (!argument.removed()) {
+                paths.addAll(select(argument.folder(), group, scope));
+            }
+        }
+        return List.copyOf(paths);
+    }
+
     public static Path runtime(Path folder, String key) throws IOException {
         Path file = index(folder);
         if (file == null) {
