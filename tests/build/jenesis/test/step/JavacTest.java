@@ -55,7 +55,7 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    public void writes_the_jni_headers_of_the_classes_with_native_methods_where_asked(boolean process)
+    public void writes_only_the_jni_headers_of_the_classes_with_native_methods_where_asked(boolean process)
             throws IOException {
         Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(folder.resolve("Native.java"), "package sample; public class Native { public static native int add(int a, int b); }\n");
@@ -70,7 +70,9 @@ public class JavacTest {
                                         Path.of("sources/sample/Plain.java"), Checksum.of(ChecksumStatus.ADDED))))))
                 .toCompletableFuture().join();
         assertThat(result.next()).isTrue();
-        assertThat(next.resolve(Javac.CLASSES + "sample/Native.class")).isNotEmptyFile();
+        assertThat(next.resolve(Javac.CLASSES))
+                .as("a header step beside the compiler writes no classes the module's jar would take twice")
+                .doesNotExist();
         assertThat(next.resolve(Javac.HEADERS + "sample_Native.h")).content().contains("Java_sample_Native_add");
         assertThat(next.resolve(Javac.HEADERS))
                 .as("javac writes a header only for a class that declares a native method")
