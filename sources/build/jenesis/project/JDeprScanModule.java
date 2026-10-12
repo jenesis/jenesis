@@ -7,7 +7,6 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Environment;
-import build.jenesis.SequencedProperties;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
@@ -15,60 +14,85 @@ import build.jenesis.step.ProcessHandler;
 
 public class JDeprScanModule implements BuildExecutorModule {
 
-    public static final String CHECK = "check", CONFIGURATION = "jdeprscan.properties",
-            REMOVAL = "removal", RELEASE = "release";
+    public static final String CHECK = "check";
     private static final String SETTING = "validator.jdeprscan", REPORT = BuildStep.REPORTS + "jdeprscan/jdeprscan.txt";
 
     private final String group;
     private final boolean strict;
+    private final boolean forRemoval;
+    private final Integer release;
     private final ProcessBuildStep.Terms terms;
 
     public JDeprScanModule() {
-        this("main", false, new ProcessBuildStep.Terms());
+        this("main", false, true, null, new ProcessBuildStep.Terms());
     }
 
     public static JDeprScanModule ofEnvironment(Environment environment) {
         return new JDeprScanModule("main",
                 Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
+                true,
+                null,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "jdeprscan"));
     }
 
-    private JDeprScanModule(String group, boolean strict, ProcessBuildStep.Terms terms) {
+    private JDeprScanModule(String group,
+                            boolean strict,
+                            boolean forRemoval,
+                            Integer release,
+                            ProcessBuildStep.Terms terms) {
         this.group = group;
         this.strict = strict;
+        this.forRemoval = forRemoval;
+        this.release = release;
         this.terms = terms;
     }
 
     public static Path configurationFile(SequencedSet<Path> configuration) {
-        return BuildStep.locate(configuration, CONFIGURATION);
+        return BuildStep.locate(configuration, "jdeprscan.properties");
     }
 
     public JDeprScanModule group(String group) {
-        return new JDeprScanModule(group, strict, terms);
+        return new JDeprScanModule(group, strict, forRemoval, release, terms);
     }
 
     public JDeprScanModule strict(boolean strict) {
-        return new JDeprScanModule(group, strict, terms);
+        return new JDeprScanModule(group, strict, forRemoval, release, terms);
+    }
+
+    public JDeprScanModule forRemoval(boolean forRemoval) {
+        return new JDeprScanModule(group, strict, forRemoval, release, terms);
+    }
+
+    public JDeprScanModule release(Integer release) {
+        if (release != null && release < 1) {
+            throw new IllegalArgumentException("The release " + release + " is no Java release - name one as a"
+                    + " number, as 21, or none for the deprecations of the JDK the build runs on");
+        }
+        return new JDeprScanModule(group, strict, forRemoval, release, terms);
     }
 
     public JDeprScanModule printing(BiConsumer<Boolean, String> printing) {
-        return new JDeprScanModule(group, strict, terms.printing(printing));
+        return new JDeprScanModule(group, strict, forRemoval, release, terms.printing(printing));
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        buildExecutor.addStep(CHECK, new Check(terms, group, strict), inherited.sequencedKeySet());
+        buildExecutor.addStep(CHECK, new Check(terms, group, strict, forRemoval, release), inherited.sequencedKeySet());
     }
 
     private static class Check extends ProcessBuildStep {
 
         private final String group;
         private final boolean strict;
+        private final boolean forRemoval;
+        private final Integer release;
 
-        private Check(ProcessBuildStep.Terms terms, String group, boolean strict) {
+        private Check(ProcessBuildStep.Terms terms, String group, boolean strict, boolean forRemoval, Integer release) {
             super("jdeprscan", ProcessHandler.OfProcess.ofJavaHome("bin/jdeprscan"), terms);
             this.group = group;
             this.strict = strict;
+            this.forRemoval = forRemoval;
+            this.release = release;
         }
 
         @Override
@@ -109,14 +133,9 @@ public class JDeprScanModule implements BuildExecutorModule {
                 throws IOException {
             List<String> classes = new ArrayList<>();
             SequencedSet<String> jars = new LinkedHashSet<>();
-            SequencedProperties configuration = new SequencedProperties();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
-                }
-                Path file = argument.folder().resolve(CONFIGURATION);
-                if (Files.isRegularFile(file)) {
-                    configuration = SequencedProperties.ofFiles(file);
                 }
                 for (Path jar : Dependencies.select(argument.folder(), group, "compile")) {
                     jars.add(jar.toString());
@@ -126,28 +145,16 @@ public class JDeprScanModule implements BuildExecutorModule {
                     classes.add(compiled.toString());
                 }
             }
-            for (String key : configuration.stringPropertyNames()) {
-                if (!key.equals(REMOVAL) && !key.equals(RELEASE)) {
-                    throw new IllegalArgumentException(CONFIGURATION + " names " + key + ", but takes " + REMOVAL
-                            + "=false to report every deprecated API rather than those deprecated for removal, and "
-                            + RELEASE + "=<the Java release whose deprecations to check>");
-                }
-            }
             if (classes.isEmpty()) {
                 return CompletableFuture.completedStage(null);
             }
             List<String> commands = new ArrayList<>();
-            if (configuration.flag(REMOVAL, true)) {
+            if (forRemoval) {
                 commands.add("--for-removal");
             }
-            String release = configuration.value(RELEASE);
             if (release != null) {
-                if (!release.matches("[0-9]+")) {
-                    throw new IllegalArgumentException(CONFIGURATION + " names the release " + release
-                            + ", but takes a Java release as a number, as 21");
-                }
                 commands.add("--release");
-                commands.add(release);
+                commands.add(release.toString());
             }
             if (!jars.isEmpty()) {
                 commands.add("--class-path");

@@ -248,12 +248,13 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                     Map<String, Resolver> resolvers) throws IOException {
         Packaging packaging = Packaging.configured(
                 BuildStep.locate(descriptor.configuration(), "packaging.properties"));
-        Boolean modules = descriptor.pathPlacement() == PathPlacement.MODULE_PATH
-                ? null
-                : ModularizeModule.configured(BuildStep.locate(descriptor.configuration(), "modules.properties"));
         SequencedMap<String, SequencedMap<String, String>> overrides = perTool(descriptor.configuration(), "process-"),
                 environments = perTool(descriptor.configuration(), "environment-");
         ProcessHandler.Factory factory = ProcessHandler.Factory.ofEnvironment(environment);
+        ModularizeModule modules = descriptor.pathPlacement() == PathPlacement.MODULE_PATH
+                ? null
+                : modularized(ModularizeModule.ofEnvironment(environment, factory),
+                        BuildStep.locate(descriptor.configuration(), "modules.properties"));
         SequencedMap<String, SequencedMap<String, BuildExecutorModule>> hooks = new LinkedHashMap<>();
         hooks.put("", new LinkedHashMap<>(custom));
         for (Map.Entry<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugin : plugins.entrySet()) {
@@ -280,9 +281,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         AssemblyDescriptor assembly = new AssemblyDescriptor((sub, outerInherited) -> {
             SequencedSet<String> closure = new LinkedHashSet<>(descriptor.artifacts());
             if (modules != null) {
-                sub.addModule("modules",
-                        ModularizeModule.ofEnvironment(environment, factory, modules),
-                        descriptor.artifacts().stream());
+                sub.addModule("modules", modules, descriptor.artifacts().stream());
                 closure = new LinkedHashSet<>(Set.of("modules"));
             }
             sub.addStep("prepare",
@@ -728,6 +727,28 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     dockerJPackage,
                     labels);
         }
+    }
+
+    private static ModularizeModule modularized(ModularizeModule module, Path file) throws IOException {
+        if (file == null) {
+            return null;
+        }
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        for (String key : properties.stringPropertyNames()) {
+            if (!key.equals("mode")) {
+                throw new IllegalArgumentException(file + " names " + key + ", but takes mode=declared, synthetic"
+                        + " or none alone");
+            }
+        }
+        String mode = properties.value("mode", "declared");
+        return switch (mode.toLowerCase(Locale.ROOT)) {
+            case "declared" -> module.mode(ModularizeModule.Mode.DECLARED);
+            case "synthetic" -> module.mode(ModularizeModule.Mode.SYNTHETIC);
+            case "none" -> null;
+            default -> throw new IllegalArgumentException(file + " names the mode " + mode + ", but takes declared to"
+                    + " fail on a jar that declares no module name, synthetic to derive one, or none to leave the"
+                    + " closure as it is");
+        };
     }
 
     private static String local(String identity) {

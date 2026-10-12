@@ -56,6 +56,38 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void rewrites_the_closure_into_named_modules_where_modules_properties_is_present() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("modules.properties"), "");
+        assertThat(fixture.execute("sub/modules"))
+                .as("an empty modules.properties is the declared mode")
+                .containsKey("sub/modules");
+    }
+
+    @Test
+    public void leaves_the_closure_as_it_is_where_modules_properties_names_the_mode_none() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("modules.properties"), "mode=none\n");
+        fixture.execute("sub/prepare");
+        assertThat(fixture.build().resolve("sub").resolve("modules")).doesNotExist();
+    }
+
+    @Test
+    public void refuses_a_modules_properties_with_an_unknown_mode_or_key() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("modules.properties"), "mode=other\n");
+        assertThatThrownBy(() -> fixture.execute("sub/prepare"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("modules.properties names the mode other, but takes declared")
+                .hasMessageContaining("synthetic")
+                .hasMessageContaining("none");
+        Files.writeString(fixture.configuration().resolve("modules.properties"), "synthetic=true\n");
+        assertThatThrownBy(() -> fixture.execute("sub/prepare"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("modules.properties names synthetic, but takes mode=");
+    }
+
+    @Test
     public void marks_no_module_unstaged_by_default() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         assertThat(fixture.execute("sub/prepare").get("sub/prepare").resolve(Inventory.UNSTAGED)).doesNotExist();

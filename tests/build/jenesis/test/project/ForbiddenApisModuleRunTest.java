@@ -31,7 +31,7 @@ public class ForbiddenApisModuleRunTest {
     public void reports_the_calls_that_the_bundled_and_the_project_signatures_forbid() throws IOException {
         compile();
 
-        newExecutor(new ForbiddenApisModule(repositories(), resolvers()).pinning(Pinning.STRICT)).execute();
+        newExecutor(forbidding().pinning(Pinning.STRICT)).execute();
 
         Path report = root.resolve("forbiddenapis").resolve("check").resolve("output")
                 .resolve("reports").resolve("forbiddenapis").resolve("forbiddenapis.txt");
@@ -47,7 +47,7 @@ public class ForbiddenApisModuleRunTest {
     public void fails_the_build_on_a_finding_when_strict() throws IOException {
         compile();
 
-        assertThatThrownBy(newExecutor(new ForbiddenApisModule(repositories(), resolvers())
+        assertThatThrownBy(newExecutor(forbidding()
                 .pinning(Pinning.STRICT)
                 .strict(true))::execute)
                 .rootCause()
@@ -60,10 +60,6 @@ public class ForbiddenApisModuleRunTest {
         SequencedProperties versions = new SequencedProperties();
         versions.load(new StringReader(PINS));
         versions.store(project.resolve(BuildStep.VERSIONS));
-        Files.writeString(project.resolve(ForbiddenApisModule.CONFIGURATION), """
-                bundled=jdk-unsafe
-                signatures=forbidden.txt
-                """);
         Files.writeString(project.resolve("forbidden.txt"), """
                 @defaultMessage Name the thread
                 java.lang.Thread#<init>(java.lang.Runnable)
@@ -82,6 +78,12 @@ public class ForbiddenApisModuleRunTest {
         int rc = javax.tools.ToolProvider.getSystemJavaCompiler()
                 .run(null, null, null, "-d", classes.toString(), "--release", "17", source.toString());
         assertThat(rc).as("the sample compiles").isZero();
+    }
+
+    private static ForbiddenApisModule forbidding() {
+        return new ForbiddenApisModule(repositories(), resolvers())
+                .bundled(List.of("jdk-unsafe"))
+                .signatures(List.of(Path.of("forbidden.txt")));
     }
 
     private static Map<String, build.jenesis.Repository> repositories() {

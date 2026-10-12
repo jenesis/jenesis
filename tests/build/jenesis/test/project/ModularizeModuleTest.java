@@ -36,22 +36,10 @@ public class ModularizeModuleTest {
     }
 
     @Test
-    public void reads_its_mode_from_a_properties_file() throws IOException {
-        assertThat(ModularizeModule.configured(null)).isNull();
-        assertThat(ModularizeModule.configured(mode(""))).isFalse();
-        assertThat(ModularizeModule.configured(mode("mode=declared\n"))).isFalse();
-        assertThat(ModularizeModule.configured(mode("mode=synthetic\n"))).isTrue();
-        assertThat(ModularizeModule.configured(mode("mode=none\n"))).isNull();
-        assertThatThrownBy(() -> ModularizeModule.configured(mode("mode=other\n")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("other");
-    }
-
-    @Test
     public void copies_a_named_module_byte_for_byte() throws IOException {
         Path source = named();
         automatic();
-        Path modularized = modularize(false);
+        Path modularized = modularize(ModularizeModule.Mode.DECLARED);
         Path target = modularized.resolve(Dependencies.MODULAR_PATH + "demo.named.jar");
         assertThat(target).hasBinaryContent(Files.readAllBytes(source));
         SequencedProperties index = SequencedProperties.ofFiles(modularized.resolve(Dependencies.MODULAR));
@@ -62,7 +50,7 @@ public class ModularizeModuleTest {
     public void leaves_the_resolved_closure_untouched() throws IOException {
         named();
         automatic();
-        Path modularized = modularize(false);
+        Path modularized = modularize(ModularizeModule.Mode.DECLARED);
         assertThat(modularized.resolve(BuildStep.DEPENDENCIES)).doesNotExist();
         assertThat(modularized.resolve(Dependencies.RESOLVED)).doesNotExist();
         assertThat(SequencedProperties.ofFiles(closure.resolve(BuildStep.DEPENDENCIES)).getProperty(NAMED))
@@ -73,7 +61,7 @@ public class ModularizeModuleTest {
     public void injects_a_descriptor_into_a_candidate() throws IOException {
         named();
         automatic();
-        Path modularized = modularize(false);
+        Path modularized = modularize(ModularizeModule.Mode.DECLARED);
         ModuleDescriptor descriptor = describe(modularized.resolve(Dependencies.MODULAR_PATH + "demo.automatic.jar"));
         assertThat(descriptor.name()).isEqualTo("demo.automatic");
         assertThat(descriptor.isOpen()).isTrue();
@@ -96,7 +84,7 @@ public class ModularizeModuleTest {
         named();
         automatic();
         plain();
-        assertThatThrownBy(() -> modularize(false))
+        assertThatThrownBy(() -> modularize(ModularizeModule.Mode.DECLARED))
                 .hasStackTraceContaining(PLAIN)
                 .hasStackTraceContaining(ModularizeModule.PSEUDO);
     }
@@ -107,7 +95,7 @@ public class ModularizeModuleTest {
         automatic();
         Path source = plain();
         String digest = HexFormat.of().formatHex(new HashDigestFunction("SHA-256").hash(source));
-        Path modularized = modularize(true);
+        Path modularized = modularize(ModularizeModule.Mode.SYNTHETIC);
         SequencedProperties index = SequencedProperties.ofFiles(modularized.resolve(Dependencies.MODULAR));
         assertThat(index.getProperty(PLAIN)).isEqualTo(
                 Dependencies.MODULAR_PATH + ModularizeModule.PSEUDO + digest.substring(0, 32) + ".jar");
@@ -127,7 +115,7 @@ public class ModularizeModuleTest {
         Path manifest = root.resolve("split.mf");
         Files.writeString(manifest, "Automatic-Module-Name: demo.split\n");
         archive(classes, "demo/split/1.0", "main/compile/maven/demo/split/1.0", "", manifest);
-        assertThatThrownBy(() -> modularize(false))
+        assertThatThrownBy(() -> modularize(ModularizeModule.Mode.DECLARED))
                 .hasStackTraceContaining("demo.named")
                 .hasStackTraceContaining("split between");
     }
@@ -143,7 +131,7 @@ public class ModularizeModuleTest {
             Files.writeString(manifest, Files.readString(manifest)
                     + "\nName: demo/automatic/Provider.class\nSHA-256-Digest: aGVsbG8=\n\n");
         }
-        Path modularized = modularize(false);
+        Path modularized = modularize(ModularizeModule.Mode.DECLARED);
         try (JarFile file = new JarFile(
                 modularized.resolve(Dependencies.MODULAR_PATH + "demo.automatic.jar").toFile(), false)) {
             assertThat(file.stream().map(JarEntry::getName)).doesNotContain("META-INF/DEMO.SF", "META-INF/DEMO.RSA");
@@ -157,7 +145,7 @@ public class ModularizeModuleTest {
     public void stamps_every_entry_of_a_rewritten_jar_with_a_fixed_time() throws IOException {
         named();
         automatic();
-        Path modularized = modularize(false);
+        Path modularized = modularize(ModularizeModule.Mode.DECLARED);
         try (ZipFile jar = new ZipFile(
                 modularized.resolve(Dependencies.MODULAR_PATH + "demo.automatic.jar").toFile())) {
             assertThat(jar.stream().map(ZipEntry::getTimeLocal))
@@ -173,7 +161,7 @@ public class ModularizeModuleTest {
         Path modularized;
         settings.put("archive.timestamp", "");
         try {
-            modularized = modularize(false);
+            modularized = modularize(ModularizeModule.Mode.DECLARED);
         } finally {
             settings.remove("archive.timestamp");
         }
@@ -189,7 +177,7 @@ public class ModularizeModuleTest {
         named();
         automatic();
         plain();
-        Path modularized = modularize(true);
+        Path modularized = modularize(ModularizeModule.Mode.SYNTHETIC);
         SequencedProperties index = SequencedProperties.ofFiles(modularized.resolve(Dependencies.MODULAR));
         Path image = root.resolve("image");
         int linked = ToolProvider.findFirst("jlink").orElseThrow().run(System.out,
@@ -204,7 +192,7 @@ public class ModularizeModuleTest {
         assertThat(image.resolve("release")).isRegularFile();
     }
 
-    private Path modularize(boolean synthetic) throws IOException {
+    private Path modularize(ModularizeModule.Mode mode) throws IOException {
         BuildExecutor buildExecutor = BuildExecutor.of(Files.createDirectory(root.resolve("build")),
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
@@ -216,16 +204,10 @@ public class ModularizeModuleTest {
                 0);
         buildExecutor.addSource("closure", closure);
         buildExecutor.addModule("modules",
-                ModularizeModule.ofEnvironment(new Environment(settings), ProcessHandler.Factory.TOOL, synthetic),
+                ModularizeModule.ofEnvironment(new Environment(settings), ProcessHandler.Factory.TOOL).mode(mode),
                 "closure");
         SequencedMap<String, Path> steps = buildExecutor.execute();
         return steps.get("modules");
-    }
-
-    private Path mode(String content) throws IOException {
-        Path properties = Files.createTempFile(root, "modules", ".properties");
-        Files.writeString(properties, content);
-        return properties;
     }
 
     private static ModuleDescriptor describe(Path jar) throws IOException {

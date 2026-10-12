@@ -8,7 +8,6 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
-import build.jenesis.SequencedProperties;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
@@ -16,7 +15,7 @@ import build.jenesis.step.ProcessHandler;
 
 public class JDepsModule implements BuildExecutorModule {
 
-    public static final String CHECK = "check", CONFIGURATION = "jdeps.properties", ACCEPT = "accept";
+    public static final String CHECK = "check";
     private static final String SETTING = "validator.jdeps", REPORT = BuildStep.REPORTS + "jdeps/jdeps.txt";
     private static final Pattern FINDING = Pattern.compile("^\\s+(\\S+)\\s+->\\s+(\\S+)\\s+(JDK (?:removed )?internal API.*?)\\s*$"),
             REPLACEMENT = Pattern.compile("^(\\S+)\\s{2,}(\\S.*?)\\s*$");
@@ -24,49 +23,60 @@ public class JDepsModule implements BuildExecutorModule {
     private final ProcessHandler.Factory factory;
     private final String group;
     private final boolean strict;
+    private final List<String> accepted;
     private final ProcessBuildStep.Terms terms;
 
     public JDepsModule() {
-        this(ProcessHandler.Factory.of(), "main", false, new ProcessBuildStep.Terms());
+        this(ProcessHandler.Factory.of(), "main", false, List.of(), new ProcessBuildStep.Terms());
     }
 
     public static JDepsModule ofEnvironment(Environment environment) {
         return new JDepsModule(ProcessHandler.Factory.ofEnvironment(environment),
                 "main",
                 Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
+                List.of(),
                 ProcessBuildStep.Terms.ofEnvironment(environment, "jdeps"));
     }
 
-    private JDepsModule(ProcessHandler.Factory factory, String group, boolean strict, ProcessBuildStep.Terms terms) {
+    private JDepsModule(ProcessHandler.Factory factory,
+                        String group,
+                        boolean strict,
+                        List<String> accepted,
+                        ProcessBuildStep.Terms terms) {
         this.factory = factory;
         this.group = group;
         this.strict = strict;
+        this.accepted = accepted;
         this.terms = terms;
     }
 
     public static Path configurationFile(SequencedSet<Path> configuration) {
-        return BuildStep.locate(configuration, CONFIGURATION);
+        return BuildStep.locate(configuration, "jdeps.properties");
     }
 
     public JDepsModule factory(ProcessHandler.Factory factory) {
-        return new JDepsModule(factory, group, strict, terms);
+        return new JDepsModule(factory, group, strict, accepted, terms);
     }
 
     public JDepsModule group(String group) {
-        return new JDepsModule(factory, group, strict, terms);
+        return new JDepsModule(factory, group, strict, accepted, terms);
     }
 
     public JDepsModule strict(boolean strict) {
-        return new JDepsModule(factory, group, strict, terms);
+        return new JDepsModule(factory, group, strict, accepted, terms);
+    }
+
+    public JDepsModule accepted(List<String> accepted) {
+        return new JDepsModule(factory, group, strict, List.copyOf(accepted), terms);
     }
 
     public JDepsModule printing(BiConsumer<Boolean, String> printing) {
-        return new JDepsModule(factory, group, strict, terms.printing(printing));
+        return new JDepsModule(factory, group, strict, accepted, terms.printing(printing));
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        buildExecutor.addStep(CHECK, new Check(factory.apply("jdeps", "bin/jdeps"), terms, group, strict),
+        buildExecutor.addStep(CHECK, new Check(factory.apply("jdeps", "bin/jdeps"), terms, group, strict, accepted),
                 inherited.sequencedKeySet());
     }
 
@@ -74,14 +84,17 @@ public class JDepsModule implements BuildExecutorModule {
 
         private final String group;
         private final boolean strict;
+        private final List<String> accepted;
 
         private Check(Function<List<String>, ? extends ProcessHandler> factory,
                       ProcessBuildStep.Terms terms,
                       String group,
-                      boolean strict) {
+                      boolean strict,
+                      List<String> accepted) {
             super("jdeps", factory, terms);
             this.group = group;
             this.strict = strict;
+            this.accepted = accepted;
         }
 
         @Override
@@ -91,13 +104,6 @@ public class JDepsModule implements BuildExecutorModule {
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             if (code != 0) {
                 return false;
-            }
-            List<String> accepted = List.of();
-            for (BuildStepArgument argument : arguments.values()) {
-                Path file = argument.folder().resolve(CONFIGURATION);
-                if (!argument.removed() && Files.isRegularFile(file)) {
-                    accepted = Objects.requireNonNullElse(SequencedProperties.ofFiles(file).entries(ACCEPT), List.of());
-                }
             }
             List<String> lines = Files.readAllLines(context.supplement().resolve("output"));
             Map<String, String> replacements = new HashMap<>();
@@ -145,15 +151,6 @@ public class JDepsModule implements BuildExecutorModule {
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
-                }
-                Path file = argument.folder().resolve(CONFIGURATION);
-                if (Files.isRegularFile(file)) {
-                    for (String key : SequencedProperties.ofFiles(file).stringPropertyNames()) {
-                        if (!key.equals(ACCEPT)) {
-                            throw new IllegalArgumentException(CONFIGURATION + " names " + key + ", but takes " + ACCEPT
-                                    + "=<the JDK internal classes or packages the classes may use> alone");
-                        }
-                    }
                 }
                 jars.addAll(Dependencies.select(argument.folder(), group, "compile"));
                 Path compiled = argument.folder().resolve(BuildStep.CLASSES);
