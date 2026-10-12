@@ -120,7 +120,86 @@ public class InferredArtifactQualityModuleTest {
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .rootCause()
                 .hasMessageContaining("Unknown japicmp property: breakBuild")
+                .hasMessageContaining(project.resolve("japicmp.properties").toString())
                 .hasMessageContaining("error-on-binary-incompatibility");
+    }
+
+    @Test
+    public void an_unknown_format_or_access_names_the_file_and_the_ones_that_exist() throws IOException {
+        Files.writeString(project.resolve("japicmp.properties"), "baseline=com.example/library\nformat=xml,pdf\n");
+        assertThatThrownBy(() -> wired("artifact/japicmp/required"))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("japicmp.properties names the format pdf")
+                .hasMessageContaining("[xml, html]");
+
+        Files.writeString(project.resolve("japicmp.properties"), "baseline=com.example/library\naccess=internal\n");
+        assertThatThrownBy(() -> wired("artifact/japicmp/required"))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("japicmp.properties names the access internal")
+                .hasMessageContaining("[public, protected, package, private]");
+    }
+
+    @Test
+    public void reads_the_revapi_configuration_and_the_json_of_revapi_s_own_beside_it() throws IOException {
+        Files.writeString(project.resolve("revapi.properties"), "baseline=com.example/library/1.0.0\n"
+                + "severity=breaking\nconfiguration=revapi.json\n");
+        Files.writeString(project.resolve("revapi.json"),
+                "[{\"extension\": \"revapi.differences\", \"configuration\": {}}]");
+
+        wired("artifact/revapi/required");
+
+        SequencedProperties requires = SequencedProperties.ofFiles(root.resolve("artifact").resolve("revapi")
+                .resolve("required").resolve("output").resolve(BuildStep.REQUIRES));
+        assertThat(requires.stringPropertyNames()).contains("revapi/baseline/maven/com.example/library/1.0.0");
+    }
+
+    @Test
+    public void refuses_an_unknown_revapi_key_and_an_unknown_severity() throws IOException {
+        Files.writeString(project.resolve("revapi.properties"), "failSeverity=breaking\n");
+        assertThatThrownBy(() -> wired("artifact/revapi/required"))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("names failSeverity")
+                .hasMessageContaining("severity=<equivalent|non-breaking|potentially-breaking|breaking>");
+
+        Files.writeString(project.resolve("revapi.properties"), "severity=fatal\n");
+        assertThatThrownBy(() -> wired("artifact/revapi/required"))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("names the severity fatal")
+                .hasMessageContaining("potentially-breaking");
+    }
+
+    @Test
+    public void refuses_a_revapi_configuration_that_is_missing_outside_the_folder_or_no_json_array() throws IOException {
+        Files.writeString(project.resolve("revapi.properties"), "configuration=revapi.json\n");
+        assertThatThrownBy(() -> wired("artifact/revapi/required"))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("does not exist beside it");
+
+        Files.writeString(project.resolve("revapi.properties"), "configuration=../revapi.json\n");
+        assertThatThrownBy(() -> wired("artifact/revapi/required"))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("not beside or below it");
+
+        Files.writeString(project.resolve("revapi.properties"), "configuration=revapi.json\n");
+        Files.writeString(project.resolve("revapi.json"), "{\"revapi\": {}}");
+        assertThatThrownBy(() -> wired("artifact/revapi/required"))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining(project.resolve("revapi.json").toString())
+                .hasMessageContaining("is no JSON array");
+    }
+
+    private void wired(String selector) throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("artifact", artifact(), "project");
+        executor.execute(selector);
     }
 
     private InferredArtifactQualityModule artifact() {

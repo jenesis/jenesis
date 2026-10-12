@@ -11,7 +11,6 @@ import build.jenesis.Json;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
-import build.jenesis.SequencedProperties;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
@@ -19,16 +18,11 @@ import build.jenesis.step.ProcessHandler;
 
 public class RevapiModule implements BuildExecutorModule {
 
-    public static final String COMPARE = "compare", CONFIGURATION = "revapi.properties",
-            BASELINE = "baseline", SEVERITY = "severity", ANALYSIS = "configuration";
+    public static final String COMPARE = "compare", CONFIGURATION = "revapi.properties";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
     private static final String SETTING = "artifact.revapi", REPORT = BuildStep.REPORTS + "revapi/revapi.json";
     private static final String MAVEN_GROUP = "org.revapi";
     private static final List<String> EXTENSIONS = List.of("revapi-java", "revapi-basic-features", "revapi-reporter-json");
-    private static final Map<String, String> SEVERITIES = Map.of("equivalent", "EQUIVALENT",
-            "non-breaking", "NON_BREAKING",
-            "potentially-breaking", "POTENTIALLY_BREAKING",
-            "breaking", "BREAKING");
     private static final String LAUNCHER = "RevapiCheck.java", SOURCE = """
             import com.fasterxml.jackson.databind.ObjectMapper;
             import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -74,7 +68,7 @@ public class RevapiModule implements BuildExecutorModule {
     private final String tool;
     private final String group;
     private final String baseline;
-    private final String severity;
+    private final Severity severity;
     private final String analysis;
     private final boolean strict;
     private final ProcessBuildStep.Terms terms;
@@ -86,7 +80,7 @@ public class RevapiModule implements BuildExecutorModule {
                 "revapi",
                 "main",
                 null,
-                "POTENTIALLY_BREAKING",
+                Severity.POTENTIALLY_BREAKING,
                 null,
                 false,
                 new ProcessBuildStep.Terms());
@@ -100,7 +94,7 @@ public class RevapiModule implements BuildExecutorModule {
                 "revapi",
                 "main",
                 null,
-                "POTENTIALLY_BREAKING",
+                Severity.POTENTIALLY_BREAKING,
                 null,
                 Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "revapi"));
@@ -111,7 +105,7 @@ public class RevapiModule implements BuildExecutorModule {
                          String tool,
                          String group,
                          String baseline,
-                         String severity,
+                         Severity severity,
                          String analysis,
                          boolean strict,
                          ProcessBuildStep.Terms terms) {
@@ -146,11 +140,15 @@ public class RevapiModule implements BuildExecutorModule {
         return new RevapiModule(dependencies, pinning, tool, group, baseline, severity, analysis, strict, terms);
     }
 
-    public RevapiModule severity(String severity) {
+    public RevapiModule severity(Severity severity) {
         return new RevapiModule(dependencies, pinning, tool, group, baseline, severity, analysis, strict, terms);
     }
 
     public RevapiModule analysis(String analysis) {
+        if (analysis != null && !(Json.parse(analysis) instanceof List<?>)) {
+            throw new IllegalArgumentException("The revapi analysis configuration is no JSON array - write revapi's"
+                    + " configuration as an array of {\"extension\": ..., \"configuration\": ...} objects");
+        }
         return new RevapiModule(dependencies, pinning, tool, group, baseline, severity, analysis, strict, terms);
     }
 
@@ -161,45 +159,6 @@ public class RevapiModule implements BuildExecutorModule {
     public RevapiModule printing(BiConsumer<Boolean, String> printing) {
         return new RevapiModule(dependencies, pinning, tool, group, baseline, severity, analysis, strict,
                 terms.printing(printing));
-    }
-
-    public RevapiModule configuration(Path file, SequencedProperties configuration) {
-        for (String key : configuration.stringPropertyNames()) {
-            if (!key.equals(BASELINE) && !key.equals(SEVERITY) && !key.equals(ANALYSIS)) {
-                throw new IllegalArgumentException(file + " names " + key + ", but takes " + BASELINE
-                        + "=<groupId>/<artifactId>[/<version>], " + SEVERITY + "=<"
-                        + String.join("|", new TreeSet<>(SEVERITIES.keySet())) + "> and " + ANALYSIS
-                        + "=<a JSON file of revapi's own configuration beside it>");
-            }
-        }
-        String level = configuration.value(SEVERITY, "potentially-breaking");
-        if (!SEVERITIES.containsKey(level)) {
-            throw new IllegalArgumentException(file + " names the severity " + level + ", but takes one of "
-                    + new TreeSet<>(SEVERITIES.keySet()));
-        }
-        String json = null, name = configuration.value(ANALYSIS);
-        if (name != null) {
-            Path sibling = Path.of(name).normalize();
-            if (sibling.isAbsolute() || sibling.startsWith("..")) {
-                throw new IllegalArgumentException(file + " names the configuration " + name
-                        + ", which is not beside or below it - place the file in the folder of " + CONFIGURATION);
-            }
-            Path resolved = file.resolveSibling(sibling);
-            if (!Files.isRegularFile(resolved)) {
-                throw new IllegalArgumentException(file + " names the configuration " + name
-                        + ", which does not exist beside it");
-            }
-            try {
-                json = Files.readString(resolved);
-            } catch (IOException e) {
-                throw new UncheckedIOException("Cannot read the revapi configuration " + resolved, e);
-            }
-            if (!(Json.parse(json) instanceof List<?>)) {
-                throw new IllegalArgumentException(resolved + " is no JSON array - write revapi's configuration as"
-                        + " an array of {\"extension\": ..., \"configuration\": ...} objects");
-            }
-        }
-        return baseline(configuration.value(BASELINE)).severity(SEVERITIES.get(level)).analysis(json);
     }
 
     @Override
@@ -224,14 +183,14 @@ public class RevapiModule implements BuildExecutorModule {
 
         private final String tool;
         private final String group;
-        private final String severity;
+        private final Severity severity;
         private final String analysis;
         private final boolean strict;
 
         private Compare(ProcessBuildStep.Terms terms,
                         String tool,
                         String group,
-                        String severity,
+                        Severity severity,
                         String analysis,
                         boolean strict) {
             super("revapi", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
@@ -306,12 +265,17 @@ public class RevapiModule implements BuildExecutorModule {
                     "-cp", String.join(File.pathSeparator, jars),
                     launcher.toString(),
                     report.toString(),
-                    severity,
+                    severity.name(),
                     configuration,
                     baselines.getFirst(),
                     artifact.toString()));
             commands.addAll(support);
             return CompletableFuture.completedStage(commands);
         }
+    }
+
+    public enum Severity {
+
+        EQUIVALENT, NON_BREAKING, POTENTIALLY_BREAKING, BREAKING
     }
 }
