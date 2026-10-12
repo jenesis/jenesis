@@ -276,6 +276,10 @@ public class ModularProject implements BuildExecutorModule {
                 });
     }
 
+    public static BuildStep manifests(String group, String prefix, Platform platform) {
+        return new Manifests(group, prefix, "", true, platform, Runtime.version().feature(), 0, false);
+    }
+
     private record Coordinates(String prefix) implements BuildStep {
 
         @Override
@@ -307,9 +311,12 @@ public class ModularProject implements BuildExecutorModule {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            ModuleInfo info = new ModuleInfoParser(group).identify(arguments.get("sources").folder()
-                    .resolve(BuildStep.SOURCES)
-                    .resolve("module-info.java"));
+            Path descriptor = arguments.get("sources").folder().resolve(BuildStep.SOURCES).resolve("module-info.java");
+            if (!Files.isRegularFile(descriptor)) {
+                throw new IllegalStateException("The sources of " + arguments.get("sources").folder()
+                        + " are not modular (missing module-info.java): declare the module in a module-info.java");
+            }
+            ModuleInfo info = new ModuleInfoParser(group).identify(descriptor);
             if (info.testOf() != null && !info.testOf().isEmpty() && !info.requires().contains(info.testOf())) {
                 throw new IllegalStateException("Test module '"
                         + info.coordinate()

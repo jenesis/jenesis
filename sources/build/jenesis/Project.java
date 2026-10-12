@@ -2635,10 +2635,11 @@ public record Project(
 
                     Prefer a tool's Java API to a process: require it in the plugin's module-info.java
                     and it resolves by module name into the plugin's own layer, pinned as
-                    plugin-<name>/module/<module>. A tool the module index does not serve, as one
-                    named by an Automatic-Module-Name alone, is required through
-                    @jenesis.alias <module> <groupId>/<artifactId>, with @jenesis.exclude and
-                    @jenesis.pin as in a project. Every jar of that layer is a module of its own, so a
+                    plugin-<name>/module/<module>. The plugin's module-info.java takes every tag a
+                    project's does, and none of the project's own apply to it: a tool the module
+                    index does not serve, as one named by an Automatic-Module-Name alone, is
+                    required through @jenesis.alias <module> <groupId>/<artifactId>, with
+                    @jenesis.exclude and @jenesis.pin as in a project. Every jar of that layer is a module of its own, so a
                     dependency without a module name, or two jars sharing a package, cannot load:
                     name it with @jenesis.alias, exclude it, or pin a version of it that names its
                     module. Configure the tool in that code, too: where a Maven
@@ -3217,6 +3218,12 @@ public record Project(
                 throw new UncheckedIOException("Cannot read " + file, e);
             }
             boolean switchedOn = environment.flag("project.plugins", true);
+            Map<String, Repository> pluginRepositories = Map.of(
+                    "module", JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE),
+                    "maven", MavenDefaultRepository.ofEnvironment(environment));
+            Map<String, Resolver> pluginResolvers = Map.of(
+                    "module", ModularJarResolver.ofEnvironment(environment, true),
+                    "maven", MavenPomResolver.ofEnvironment(environment));
             declared.forEachProperty((key, value) -> {
                 String name = key.indexOf('+') == -1 ? key : key.substring(0, key.indexOf('+'));
                 String hook = key.indexOf('+') == -1 ? "" : key.substring(key.indexOf('+') + 1);
@@ -3249,7 +3256,9 @@ public record Project(
                         ? InternalModule.ofEnvironment(environment,
                                         "module",
                                         group,
-                                        contained(root, root.resolve(location), "The plugin " + key + " in " + file))
+                                        contained(root, root.resolve(location), "The plugin " + key + " in " + file),
+                                        pluginRepositories,
+                                        pluginResolvers)
                                 .buildModuleName(provider)
                         : null;
                 ExternalModule external = folder
@@ -3257,8 +3266,8 @@ public record Project(
                         : ExternalModule.ofEnvironment(environment,
                                         "module/" + location,
                                         group,
-                                        Map.of("module", JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE)),
-                                        Map.of("module", ModularJarResolver.ofEnvironment(environment, true)))
+                                        pluginRepositories,
+                                        pluginResolvers)
                                 .buildModuleName(provider);
                 BuildExecutorModule resolution = folder ? internal.resolution() : external.resolution();
                 BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule> plugin = (base, given) -> {
