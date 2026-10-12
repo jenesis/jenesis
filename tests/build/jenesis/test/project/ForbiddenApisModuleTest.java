@@ -48,7 +48,7 @@ public class ForbiddenApisModuleTest {
     public void refuses_a_signatures_file_that_is_no_path_below_the_folders_it_reads() {
         assertThatThrownBy(() -> new ForbiddenApisModule(Map.of(), Map.of()).signatures(List.of(Path.of("../outside.txt"))))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("../outside.txt is no path below the folders the check reads");
+                .hasMessageContaining(Path.of("../outside.txt") + " is no path below the folders the check reads");
         assertThatThrownBy(() -> new ForbiddenApisModule(Map.of(), Map.of()).signatures(List.of(project.resolve("forbidden.txt"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("is no path below the folders the check reads");
