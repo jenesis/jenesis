@@ -1158,8 +1158,8 @@ as the module's own, and a change to the jar re-runs them. That runs a test
 suite shipped in a jar, and it is how the same tests run twice with other JVM
 flags: `fast` and `slow` both scan `suite`, each with a `process-test.properties`
 of its own. A second run is a module, selected, cached and reported on its own.
-A `pom.xml` build declares the same as Surefire's `<dependenciesToScan>`, which
-the demo's `maven/` folder shows.
+A `pom.xml` build names the scanned dependency in the same `scan` key, as
+`<groupId>/<artifactId>`, which the demo's `maven/` folder shows.
 
 Cross-cutting concepts
 ----------------------

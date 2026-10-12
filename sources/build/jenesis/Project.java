@@ -1208,8 +1208,8 @@ public record Project(
                                                            as .*IntegrationTest, after the default
                                                            naming or the filter
                       argLine, jvmArgs of the tests        process-test.properties
-                      surefire dependenciesToScan,         read from the pom.xml, or the scan key of
-                      testClassesDirs += zipTree(<jar>)    test.properties: the jar's test classes
+                      surefire dependenciesToScan,         the scan key of test.properties, as no
+                      testClassesDirs += zipTree(<jar>)    plugin block is read: the jar's test classes
                                                            run among the module's own
                       a second surefire <execution>, an    a sibling module that requires the tests,
                       extra Test task with other flags     scans them and carries its own
@@ -1562,9 +1562,9 @@ public record Project(
                       surefire forkCount with reuseForks=false / forkEvery -> one JVM per test
                           module: a test that needs a JVM of its own goes to a module of its own
                       maven-surefire-plugin dependenciesToScan / testClassesDirs += zipTree(<jar>)
-                          -> read from the pom.xml as it stands; scan=<module>|<groupId>/<artifactId>
-                          in the module's test.properties, which replaces it, runs the test
-                          classes of those dependencies of the tests among the module's own (74)
+                          -> scan=<module>|<groupId>/<artifactId> in the module's test.properties,
+                          as no plugin block of a pom.xml is read, runs the test classes of those
+                          dependencies of the tests among the module's own (74)
                       a second surefire <execution> with another argLine / an extra Test task
                           -> a sibling module that requires the first one's tests, by a
                           <type>test-jar</type> dependency in a pom.xml, and scans them, with
@@ -1837,7 +1837,7 @@ public record Project(
                                             developers as a whole, and the version, tag, revision
                                             and tree of the command line win over both.
                       module.properties     graph state: path, sources (below path, in a pom.xml build),
-                                            module, test, main, scan (a pom.xml's dependenciesToScan)
+                                            module, test, main
                       identity.properties   <repository>/<coordinate> -> path or empty
                       requires.properties   <group>/<scope>/<repository>/<coordinate> -> empty, or
                                             <algo>/<hex> when pinned
@@ -2137,8 +2137,7 @@ public record Project(
                                                 test resources register for a test of their own;
                                                 scan=<module>|<groupId>/<artifactId>,... runs the test
                                                 classes of those jars on the test path as well,
-                                                chosen by the module's naming rules and filters,
-                                                in place of a pom.xml's Surefire dependenciesToScan
+                                                chosen by the module's naming rules and filters
                       sbom.properties           CycloneDX format=json|xml|none; the SBOM is on by
                                                 default, -Djenesis.sbom.cyclonedx=false disables it
                       bom.properties            publish the resolved closure as a repository BOM

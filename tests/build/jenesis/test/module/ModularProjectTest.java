@@ -1024,6 +1024,7 @@ public class ModularProjectTest {
                                     "../dependencies/artifacts",
                                     "../../module-foo/dependencies/prepare",
                                     "../../module-foo/dependencies/artifacts",
+                                    "../../module-foo/produce/java/processed",
                                     "../../module-foo/produce/java/classes",
                                     "../../module-foo/produce/java/artifacts",
                                     "../../module-foo/assign",
