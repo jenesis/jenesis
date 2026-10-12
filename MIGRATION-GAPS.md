@@ -40,12 +40,6 @@ What follows is what remains.
 Compile avoidance matters most: it is the largest share of the difference to Gradle on a build after an edit
 (caffeine 16 min against 13, micrometer 11 min against 7:40, moshi 238 s against 67 s).
 
-## Testing
-
-| Gap | Size | Projects |
-|---|---|---|
-| A plugin cannot hand a file it produced to the test JVM; the path of its step has to be written into `process-test.properties`. | S | quarkus, mockito (OSGi tests dropped) |
-
 ## Packaging and publishing
 
 | Gap | Size | Projects |
@@ -89,6 +83,10 @@ These are decisions rather than gaps. The briefing says so and names the change 
 - checking a dependency's jar for what the module path refuses, as a jar that names a module but holds a class
   outside any package: the JVM names the jar and the cause before any code runs, and `skill/execute` lists the
   common causes with the fix for each (JSqlParser, whose JavaCC fork does this);
+- a path below `target/` in `process-test.properties`: a plugin hands the tests a file as a resource of the test
+  module, written below `classes/` at its `binary/compiled`, and a framework that wants a file path in a system
+  property gets one from a `LauncherSessionListener` of the tests that copies the resource out
+  (`skill/extend`; quarkus, mockito);
 - white-box tests through `--patch-module`;
 - Gradle's highest-version conflict resolution;
 - a root location for configuration of the tests alone or the main code alone - a file that differs for the tests

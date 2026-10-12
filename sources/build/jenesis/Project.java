@@ -2592,6 +2592,17 @@ public record Project(
                       export, release        delivering what was staged
                       plugin                 a task that runs only when named, like an exec goal
 
+                    A file the tests need, as a model a framework builds for them or a bundle they
+                    install, is a resource of the test module: a plugin at the test module's
+                    binary/compiled writes it below classes/, where only the tests' jar holds it, with
+                    its plugin-<name>.properties in src/test/build.jenesis/ or the test module's own
+                    configuration folder, and the tests read it with getResource. A framework that
+                    wants a file path in a system property, as @QuarkusTest wants its application
+                    model, is handed one by a LauncherSessionListener of the test module, declared as
+                    a service of org.junit.platform.launcher.LauncherSessionListener: it copies the
+                    resource to a temporary file and sets the property before the first test runs.
+                    process-test.properties names no path below target/, which is the build's own.
+
                     A verdict is a throw: a step that finds a violation fails the build with a message
                     that names the file and the fix.
 
