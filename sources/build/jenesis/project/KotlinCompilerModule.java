@@ -8,6 +8,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
@@ -304,7 +305,8 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                     classpath = new ArrayList<>(),
                     plugins = new ArrayList<>();
             NavigableMap<Integer, List<String>> versioned = new TreeMap<>();
-            String release = null;
+            SequencedMap<String, Path> internal = new LinkedHashMap<>();
+            String release = null, tested = null, project = null, artifact = null;
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
@@ -317,6 +319,17 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                 }
                 for (Path jar : Dependencies.select(argument.folder(), group, "compile")) {
                     classpath.add(jar.toString());
+                }
+                Dependencies.internal(argument.folder()).forEach(internal::putIfAbsent);
+                Path module = argument.folder().resolve(BuildStep.MODULE);
+                if (Files.isRegularFile(module)) {
+                    tested = SequencedProperties.ofFiles(module).value("test");
+                }
+                Path metadata = argument.folder().resolve(BuildStep.METADATA);
+                if (Files.isRegularFile(metadata)) {
+                    SequencedProperties loaded = SequencedProperties.ofFiles(metadata);
+                    project = loaded.value("project");
+                    artifact = loaded.value("artifact");
                 }
                 Path javacProperties = argument.folder().resolve(ProcessBuildStep.PROCESS + "javac.properties");
                 if (Files.exists(javacProperties)) {
@@ -372,7 +385,21 @@ public class KotlinCompilerModule implements BuildExecutorModule {
             }
             files.sort(null);
             versioned.values().forEach(names -> names.sort(null));
-            return new Sources(files, jars, classpath, plugins, versioned, release);
+            List<String> friends = new ArrayList<>();
+            if (tested != null) {
+                String coordinate = "maven/" + project + "/" + artifact + "/";
+                for (Map.Entry<String, Path> entry : internal.entrySet()) {
+                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(entry.getValue());
+                    if ((project != null && artifact != null && entry.getKey().startsWith(coordinate))
+                            || descriptor != null && descriptor.name().equals(tested)) {
+                        String friend = entry.getValue().toString();
+                        if (classpath.contains(friend)) {
+                            friends.add(friend);
+                        }
+                    }
+                }
+            }
+            return new Sources(files, jars, classpath, plugins, friends, versioned, release);
         }
 
         private List<String> command(SequencedMap<String, SequencedMap<String, String>> properties,
@@ -420,6 +447,9 @@ public class KotlinCompilerModule implements BuildExecutorModule {
             for (String plugin : sources.plugins()) {
                 commands.add("-Xplugin=" + plugin);
             }
+            if (!sources.friends().isEmpty() && options.stream().noneMatch(option -> option.startsWith("-Xfriend-paths"))) {
+                commands.add("-Xfriend-paths=" + String.join(",", sources.friends()));
+            }
             commands.addAll(options);
             commands.addAll(files);
             return commands;
@@ -430,6 +460,7 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                            List<String> jars,
                            List<String> classpath,
                            List<String> plugins,
+                           List<String> friends,
                            NavigableMap<Integer, List<String>> versioned,
                            String release) {
     }

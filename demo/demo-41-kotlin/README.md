@@ -38,7 +38,8 @@ sources out under one package:
     |           `-- Pure.kt        a pure-Kotlin package, exported with no Java type
     `-- test
         |-- module-info.java       module sample.kotlin.test (@jenesis.test sample.kotlin)
-        `-- sampletest/SampleTest.java   asserts the greeting comes from the resource
+        |-- sampletest/SampleTest.java   asserts the greeting comes from the resource
+        `-- sampletest/ShoutTest.kt      calls an internal function of sample.kotlin
 
 How Jenesis builds it
 ---------------------
@@ -79,6 +80,15 @@ it with a Kotlin suffix, so one greeting crosses Java -> resource -> Kotlin. The
 packaged into the mixed jar and is loadable. (Files under `META-INF/` are always
 copied this way too, except the `META-INF/versions/` multi-release overlay, which is
 compiled - see `../demo-11-java-multi-release`.)
+
+Tests that see internal declarations
+------------------------------------
+
+`Sample.kt` declares `internal fun shout`, visible within its own module alone, and
+`ShoutTest.kt` in the test module calls it. A test module is the tested module's
+friend, as Gradle and the Kotlin Maven plugin make it: the build hands Kotlin the
+tested module's jar as a friend path, so its internal declarations compile in the
+tests and nowhere else.
 
 A multi-release overlay in Kotlin
 ---------------------------------
