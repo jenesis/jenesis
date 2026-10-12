@@ -14,36 +14,33 @@ public class JfrTest {
     private Path root;
 
     @Test
-    public void records_into_the_reports_of_the_test_step_with_the_options_of_the_file() throws IOException {
-        Path file = Files.writeString(root.resolve("jfr.properties"), "settings=profile");
+    public void records_into_the_reports_of_the_test_step_with_the_options_it_is_given() throws IOException {
         Path output = Files.createDirectory(root.resolve("output"));
-        assertThat(Jfr.ofFile(file).commands(new LinkedHashMap<>(), output)).containsExactly("-XX:StartFlightRecording=filename="
-                + output.resolve(BuildStep.REPORTS + "jfr").resolve("tests.jfr").toAbsolutePath()
-                + ",dumponexit=true,settings=profile");
+        assertThat(new Jfr(new LinkedHashMap<>(Map.of("settings", "profile"))).commands(new LinkedHashMap<>(), output))
+                .containsExactly("-XX:StartFlightRecording=filename="
+                        + output.resolve(BuildStep.REPORTS + "jfr").resolve("tests.jfr").toAbsolutePath()
+                        + ",dumponexit=true,settings=profile");
         assertThat(output.resolve(BuildStep.REPORTS + "jfr")).isDirectory();
     }
 
     @Test
-    public void refuses_a_filename_which_the_build_sets() throws IOException {
-        Path file = Files.writeString(root.resolve("jfr.properties"), "filename=elsewhere.jfr");
-        assertThatThrownBy(() -> Jfr.ofFile(file))
+    public void refuses_a_filename_which_the_build_sets() {
+        assertThatThrownBy(() -> new Jfr(new LinkedHashMap<>(Map.of("filename", "elsewhere.jfr"))))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("remove the filename line");
+                .hasMessageContaining("leave filename out of the options");
     }
 
     @Test
-    public void refuses_an_option_that_would_split_the_recording_options() throws IOException {
-        Path file = Files.writeString(root.resolve("jfr.properties"), "settings=default,profile");
-        assertThatThrownBy(() -> Jfr.ofFile(file))
+    public void refuses_an_option_that_would_split_the_recording_options() {
+        assertThatThrownBy(() -> new Jfr(new LinkedHashMap<>(Map.of("settings", "default,profile"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("holds no comma");
     }
 
     @Test
-    public void refuses_an_option_without_a_value() throws IOException {
-        Path file = Files.writeString(root.resolve("jfr.properties"), "settings");
-        assertThatThrownBy(() -> Jfr.ofFile(file))
+    public void refuses_an_option_without_a_value() {
+        assertThatThrownBy(() -> new Jfr(new LinkedHashMap<>(Map.of("settings", ""))))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("gives settings no value");
+                .hasMessageContaining("'settings='");
     }
 }

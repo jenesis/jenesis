@@ -17,7 +17,9 @@ public class InferredTestObservationModule implements BuildExecutorModule {
     public static final String TEST = "test", MUTATE = "mutate";
     private static final String FRAMEWORK = "framework", ENGINES = "engines", SCAN = "scan";
     private static final String MINIMUM = "minimum.", MAXIMUM_MISSED = "maximum.missed.";
+    private static final String TARGET_CLASSES = "targetClasses", TARGET_TESTS = "targetTests", OUTPUT_FORMATS = "outputFormats", MUTATORS = "mutators", FAIL_WHEN_NO_MUTATIONS = "failWhenNoMutations";
     private static final Set<String> TEST_KEYS = Set.of(FRAMEWORK, ENGINES, SCAN);
+    private static final List<String> PITEST_KEYS = List.of(TARGET_CLASSES, TARGET_TESTS, OUTPUT_FORMATS, MUTATORS, FAIL_WHEN_NO_MUTATIONS);
 
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
@@ -125,6 +127,62 @@ public class InferredTestObservationModule implements BuildExecutorModule {
             }
         }
         return module.minimum(minimum).maximumMissed(maximumMissed);
+    }
+
+    private static PiTestModule mutating(PiTestModule module, SequencedProperties properties, Path file) {
+        for (String key : properties.stringPropertyNames()) {
+            if (!PITEST_KEYS.contains(key)) {
+                throw new IllegalArgumentException("Unknown key " + key + " in " + file + ", expected one of "
+                        + PITEST_KEYS);
+            }
+        }
+        List<String> targetClasses = properties.entries(TARGET_CLASSES), targetTests = properties.entries(TARGET_TESTS);
+        List<String> outputFormats = properties.entries(OUTPUT_FORMATS), mutators = properties.entries(MUTATORS);
+        PiTestModule mutating = targetClasses == null ? module : module.targetClasses(targetClasses);
+        mutating = targetTests == null ? mutating : mutating.targetTests(targetTests);
+        mutating = mutators == null ? mutating : mutating.mutators(mutators);
+        if (outputFormats != null) {
+            List<PiTestModule.OutputFormat> formats = new ArrayList<>();
+            for (String format : outputFormats) {
+                formats.add(Arrays.stream(PiTestModule.OutputFormat.values())
+                        .filter(candidate -> candidate.name().equalsIgnoreCase(format))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Unknown format " + format + " of "
+                                + OUTPUT_FORMATS + " in " + file + ", expected some of "
+                                + List.of(PiTestModule.OutputFormat.values()))));
+            }
+            mutating = mutating.outputFormats(formats);
+        }
+        String failWhenNoMutations = properties.getProperty(FAIL_WHEN_NO_MUTATIONS);
+        if (failWhenNoMutations != null) {
+            try {
+                mutating = mutating.failWhenNoMutations(properties.flag(FAIL_WHEN_NO_MUTATIONS));
+            } catch (IllegalArgumentException _) {
+                throw new IllegalArgumentException("The value " + failWhenNoMutations + " of " + FAIL_WHEN_NO_MUTATIONS
+                        + " in " + file + " is no flag, expected true, false, or the key named with no value at all");
+            }
+        }
+        return mutating;
+    }
+
+    private static Jfr recorded(Path file) throws IOException {
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        SequencedMap<String, String> options = new TreeMap<>();
+        for (String key : properties.stringPropertyNames()) {
+            String value = properties.value(key);
+            if (key.equals("filename")) {
+                throw new IllegalArgumentException(file + " names a filename, which the build sets to the recording"
+                        + " in the test step's reports/jfr/ - remove the filename line");
+            } else if (value == null) {
+                throw new IllegalArgumentException(file + " gives " + key + " no value, but an option of the recording"
+                        + " is <key>=<value>");
+            } else if (value.contains(",")) {
+                throw new IllegalArgumentException(file + " gives " + key + " the value " + value + ", but the value of"
+                        + " an option of the recording holds no comma");
+            }
+            options.put(key, value);
+        }
+        return new Jfr(options);
     }
 
     private static TestModule declared(TestModule module, Path file) throws IOException {
@@ -386,7 +444,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         }
         Path recording = BuildStep.locate(configuration, "jfr.properties");
         if (jfr != null && recording != null) {
-            Jfr engine = jfr.apply(Jfr.ofFile(recording));
+            Jfr engine = jfr.apply(recorded(recording));
             if (engine != null) {
                 engines.add(engine);
             }
@@ -407,12 +465,13 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 reports.forEach((name, report) -> buildExecutor.addModule(name, report, reportInputs));
             }
         }
+        Path mutation = BuildStep.locate(configuration, "pitest.properties");
         Bind.configuredByProperties(buildExecutor,
                 inherited.sequencedKeySet(),
                 MUTATE,
                 pitest,
-                BuildStep.locate(configuration, "pitest.properties"),
-                properties -> pitestModule.pinning(pinning).config(properties));
+                mutation,
+                properties -> mutating(pitestModule.pinning(pinning), properties, mutation));
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
                     nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());
