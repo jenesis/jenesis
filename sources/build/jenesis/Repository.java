@@ -374,8 +374,8 @@ public interface Repository {
             this(environment.number("repository.retries", 2),
                  Duration.ofMillis(environment.number("repository.backoff", 125)),
                  environment.flag("repository.insecure"),
-                 environment.number("repository.connect.timeout", 10_000),
-                 environment.number("repository.read.timeout", 30_000),
+                 environment.number("repository.connect", 10_000),
+                 environment.number("repository.read", 30_000),
                  environment.flag("repository.offline"));
         }
 

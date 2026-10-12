@@ -205,7 +205,7 @@ public class PmdModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "pmd",
-                PmdModule.ofEnvironment(new Environment(Map.of("source.pmd.priority", "2", "source.pmd", "strict")),
+                PmdModule.ofEnvironment(new Environment(Map.of("pmd.priority", "2", "source.pmd", "strict")),
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
                 "project");

@@ -60,7 +60,7 @@ one whose domain publishes nothing resolves exactly as it would without the sett
 Each domain is asked once, however many modules and artifacts it serves, and what it
 answered - its file, or that it publishes none - is kept in your local module
 repository, under `well-known/` in `~/.jenesis` or where `jenesis.module.local`
-points, for 24 hours, so the builds of that day ask it nothing. `jenesis.repository.discovery.ttl` sets the hours, `0` keeps nothing,
+points, for 24 hours, so the builds of that day ask it nothing. `jenesis.discovery.ttl` sets the hours, `0` keeps nothing,
 and only the command line or your own `~/.jenesis/jenesis.properties` may set it. No
 switch asks again sooner; delete `well-known/` for that. A build with
 `jenesis.repository.offline=true` asks no domain and reads what is kept, however old.
@@ -236,7 +236,7 @@ A file that cannot be fetched counts as absent - a domain without the file, a ho
 that does not exist, one a proxy cannot reach, or one that resets or refuses the
 TLS handshake - so the build carries on with the module repository. A domain is
 asked once, without the retries a repository is given, and has five seconds to
-connect and to answer each read, which `jenesis.repository.discovery.timeout` sets in
+connect and to answer each read, which `jenesis.discovery.timeout` sets in
 milliseconds; one that does not answer in time counts as absent as well, and since
 it may answer the next build, it is not kept as one that publishes nothing. A
 certificate that does not verify, or that names another host, fails the build

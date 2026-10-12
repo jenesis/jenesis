@@ -1014,7 +1014,7 @@ The signed upload to Central is left to a release tool pointed at the staged
 tree - which is how Jenesis itself releases - so the demo needs no credentials, no
 key and no network. A `jreleaser.yml` at the project root adds that step to the
 `release` goal, a rehearsal unless told otherwise. A Maven repository of your own
-is reached by `release` itself once `jenesis.release.maven.uri` names it, as
+is reached by `release` itself once `jenesis.deploy.uri` names it, as
 `maven-deploy-plugin` reaches one: every staged file with its checksums, the
 `maven-metadata.xml` merged with the repository's, a SNAPSHOT under a unique
 timestamped name. The demo releases into a small repository on this machine.

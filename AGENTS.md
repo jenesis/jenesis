@@ -60,8 +60,8 @@ changes after construction. Each exposes one method per component, named exactly
 returns a new instance with that value replaced (`new Project(Path.of(".")).version("1.0.0").sources(true)`,
 `new BuildExecutor.Configuration().concurrency(4)`). No setters, no builders, no `with` prefix.
 
-**System properties are the defaults.** Every setting is a `jenesis.<area>.<name>` system property, read
-once where the object is built:
+**System properties are the defaults.** Every setting is a `jenesis.<group>.<key>` system property - three
+elements, never two and never a nested group - read once where the object is built:
 
 - `ofEnvironment(environment, …)` is the static factory that reads every setting from the `Environment` it is
   given (`environment.value("executor.digest", "MD5")`, `environment.number("executor.concurrency", 0)`,
@@ -105,8 +105,8 @@ A process the build hands a command line to - a container, the daemon - is given
 read the JVM, because a setting a `jenesis.properties` or a profile supplied was never in the JVM to begin with.
 `Make.Settings` therefore names the keys its layers declare, the daemon is handed their values with every request
 and keys its fingerprint on the JVM it would otherwise have to fork rather than on them, and what `Project`
-forwards into a container is every setting the environment holds, save the `jenesis.project.docker*` keys that
-start the container.
+forwards into a container is every setting the environment holds, save the keys that start the container -
+`jenesis.project.docker` and its `image`, `readable`, `writable` and `env`.
 
 **A command line can live in a file.** `Make`, `Execute`, `Jpx` and the three tools read `@<file>` as the
 arguments it holds and `@@<text>` as an argument starting with an `@`, with `#` to the end of a line a comment
@@ -263,9 +263,9 @@ compiled classes, in the order they are named, each handed what the one before w
 the class file of that name - bytecode enhancement, and nothing else. Any other change to what the stock steps do is
 an entry point of its own that wires its assembler in code. A plugin runs the project's code, as its tests and annotation processors do, so the project
 names it itself; what isolates an untrusted project is `jenesis.project.docker`, under which the host runs no
-build, `watch` included, before the container is up, and `Make.settings` refuses every `jenesis.project.docker*`
-and `jenesis.execute.docker*` key in a file the project provides, so a project can neither switch the isolation
-off nor widen it.
+build, `watch` included, before the container is up, and `Make.settings` refuses `jenesis.project.docker` and
+`jenesis.execute.docker` and the `image`, `readable`, `writable` and `env` of either group in a file the project
+provides, so a project can neither switch the isolation off nor widen it.
 
 **Configuration files are read through `SequencedProperties`.** A file is read with the type's own accessors -
 `value`, `value(key, default)`, `flag`, `flag(key, default)`, `flagOrNull`, `entries` for a comma-separated

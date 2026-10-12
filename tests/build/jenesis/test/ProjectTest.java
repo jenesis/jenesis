@@ -952,7 +952,7 @@ public class ProjectTest {
         });
         server.start();
         try {
-            settings.put("release.maven.uri", "http://localhost:" + server.getAddress().getPort() + "/repository/");
+            settings.put("deploy.uri", "http://localhost:" + server.getAddress().getPort() + "/repository/");
             settings.put("repository.insecure", "true");
             List<String> printed = new ArrayList<>();
             Project.ofEnvironment(new Environment(settings).out(printed::add), root)
@@ -975,14 +975,14 @@ public class ProjectTest {
     @Test
     public void refuses_to_release_into_a_maven_repository_from_a_layout_that_stages_no_maven_tree() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
-        settings.put("release.maven.uri", "https://repository.invalid/repository/");
+        settings.put("deploy.uri", "https://repository.invalid/repository/");
         Project project = Project.ofEnvironment(new Environment(settings), root)
                 .target(root.resolve("target"))
                 .version("1.0.0")
                 .layout(Project.Layout.MODULAR);
         assertThatThrownBy(() -> project.build(Project.RELEASE))
                 .rootCause()
-                .hasMessageContaining("jenesis.release.maven.uri");
+                .hasMessageContaining("jenesis.deploy.uri");
     }
 
     @Test
@@ -1560,10 +1560,10 @@ public class ProjectTest {
     @Test
     public void the_layered_settings_rejects_docker_settings_in_a_profile() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
-        Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.execute.docker.writable=/\n");
+        Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.execute.writable=/\n");
         assertThatThrownBy(() -> Make.settings(root, Map.of()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.execute.docker.writable cannot be set in");
+                .hasMessageContaining("jenesis.execute.writable cannot be set in");
     }
 
     @Test
@@ -1622,10 +1622,10 @@ public class ProjectTest {
 
     @Test
     public void the_layered_settings_rejects_the_maven_release_token_in_a_file_the_project_provides() throws IOException {
-        Files.writeString(root.resolve("jenesis.properties"), "jenesis.release.maven.token=Basic c2VjcmV0\n");
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.deploy.token=Basic c2VjcmV0\n");
         assertThatThrownBy(() -> Make.settings(root, settings))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.release.maven.token cannot be set in");
+                .hasMessageContaining("jenesis.deploy.token cannot be set in");
     }
 
     @Test
@@ -1647,11 +1647,11 @@ public class ProjectTest {
 
     @Test
     public void the_layered_settings_rejects_the_time_discovery_keeps_an_answer_in_the_project_file() throws IOException {
-        Files.writeString(root.resolve("jenesis.properties"), "jenesis.repository.discovery.ttl=100000\n");
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.discovery.ttl=100000\n");
         assertThatThrownBy(() -> Make.settings(root, settings))
                 .as("what a domain answered is kept for every project of the machine, which a project cannot prolong")
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.repository.discovery.ttl cannot be set in");
+                .hasMessageContaining("jenesis.discovery.ttl cannot be set in");
     }
 
     @Test

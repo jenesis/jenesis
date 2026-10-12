@@ -31,11 +31,11 @@ public final class Discovery {
         String local = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
         return new Discovery(LOCATION,
                 Repository.Connection.ofEnvironment(environment),
-                environment.number("repository.discovery.timeout", 5_000),
+                environment.number("discovery.timeout", 5_000),
                 (local == null
                         ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
                         : Path.of(local)).resolve(ANSWERS),
-                Duration.ofHours(environment.number("repository.discovery.ttl", 24)));
+                Duration.ofHours(environment.number("discovery.ttl", 24)));
     }
 
     public Discovery(String uri, Repository.Connection connection, int timeout, Path cache, Duration ttl) {

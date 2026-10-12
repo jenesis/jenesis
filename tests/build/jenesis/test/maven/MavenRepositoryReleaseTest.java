@@ -232,8 +232,8 @@ public class MavenRepositoryReleaseTest {
     @Test
     public void sends_the_token_to_a_repository_the_command_line_named() throws IOException {
         stage("1.0.0", "greeter-1.0.0.jar", "classes");
-        Environment environment = new Environment(Map.of("release.maven.uri", uri(),
-                "release.maven.token", "Bearer secret",
+        Environment environment = new Environment(Map.of("deploy.uri", uri(),
+                "deploy.token", "Bearer secret",
                 "repository.insecure", "true"));
 
         run(MavenRepositoryRelease.ofEnvironment(environment, MavenRepositoryRelease.configured(environment)).printing(null, Palette.ANSI));
@@ -244,10 +244,10 @@ public class MavenRepositoryReleaseTest {
     @Test
     public void sends_no_token_to_a_repository_the_project_named_itself() throws IOException {
         stage("1.0.0", "greeter-1.0.0.jar", "classes");
-        Environment environment = new Environment(Map.of("release.maven.uri", uri(),
-                "release.maven.token", "Bearer secret",
+        Environment environment = new Environment(Map.of("deploy.uri", uri(),
+                "deploy.token", "Bearer secret",
                 "repository.insecure", "true",
-                "make.provided", "release.maven.uri"));
+                "make.provided", "deploy.uri"));
 
         run(MavenRepositoryRelease.ofEnvironment(environment, MavenRepositoryRelease.configured(environment)).printing(null, Palette.ANSI));
 
@@ -299,7 +299,7 @@ public class MavenRepositoryReleaseTest {
         assertThatThrownBy(() -> run(release()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("status 401")
-                .hasMessageContaining("jenesis.release.maven.token");
+                .hasMessageContaining("jenesis.deploy.token");
     }
 
     @Test
