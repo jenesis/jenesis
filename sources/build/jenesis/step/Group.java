@@ -60,7 +60,8 @@ public class Group implements BuildStep {
         for (Map.Entry<String, Set<String>> entry : to.entrySet()) {
             SequencedProperties properties = new SequencedProperties();
             entry.getValue().stream()
-                    .flatMap(dependency -> from.getOrDefault(dependency, Set.of()).stream())
+                    .flatMap(dependency -> from.getOrDefault(dependency,
+                            from.getOrDefault(Assign.unclassified(dependency), Set.of())).stream())
                     .distinct()
                     .filter(name -> !name.equals(entry.getKey()))
                     .forEach(name -> properties.setProperty(name, ""));
