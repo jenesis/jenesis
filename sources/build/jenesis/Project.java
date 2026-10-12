@@ -133,7 +133,6 @@ public record Project(
             MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler,
                     null,
                     null,
-                    false,
                     project.environment().flag("maven.embed", true));
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
@@ -327,7 +326,6 @@ public record Project(
             MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler,
                     BuildExecutorModule.PREVIOUS.repeat(2) + MultiProjectModule.MANIFESTS,
                     "module",
-                    true,
                     project.environment().flag("maven.embed", true));
             MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(pomAware, project.hashFunction());
             executor.addModule(BUILD, (sub, inherited) -> {
@@ -1361,7 +1359,7 @@ public record Project(
                     them switches on stays unpinned. Then build with -Djenesis.dependency.pin=strict, as CI should. Before retiring the old build, compare what both produce: the jar
                     contents, the dependency tree (`dependencies` against mvn dependency:tree or
                     gradle dependencies), the number of tests run, and the POM a consumer receives,
-                    which is generated and flattened here rather than copied from yours.
+                    which is generated here rather than copied from yours.
                     A pom.xml resolves a conflict as Maven does, the version nearest the root
                     winning, where Gradle takes the highest version requested. No setting of
                     jenesis.resolver.maven does the latter: latest takes the newest version the
@@ -1705,8 +1703,9 @@ public record Project(
                           -> stage=false in the module's packaging.properties, which keeps it out of
                           `export` and `release` alike
                       flatten-maven-plugin with flattenDependencyMode=all / a published POM of
-                          the resolved closure -> flatten=true in the module's packaging.properties
-                          (04); its other modes are what a published POM is without it
+                          the resolved closure -> none: a published POM names what the module
+                          declares, at the versions resolved, so a consumer's own resolution decides
+                          the rest; drop the plugin
                       maven-toolchains-plugin / java toolchains -> jenesis.toolchain.version (07)
                       a test run on another JDK, as Surefire's jvm or a Test task's javaLauncher
                           -> the whole build again with -Djenesis.toolchain.version=<feature>, as a
@@ -2016,9 +2015,8 @@ public record Project(
                           lines add up. Excluding from a module that is not required is an error.
                           It is scoped to the path through <module>, as in Maven, so a coordinate
                           reached by two paths needs an exclusion on each. A sibling project module
-                          is one such path: its generated pom is flat unless its packaging.properties
-                          sets flatten=false, so a consumer meets that closure again through the
-                          sibling and excludes it there as well.
+                          is one such path, and a consumer meets the coordinate again through the
+                          sibling's POM and excludes it there as well.
                       @jenesis.override <module> <carrier>...
                           Replace a module with the modules already carrying its packages, for a
                           dependency that shades another module, as a server that bundles the API
@@ -2131,15 +2129,7 @@ public record Project(
                                                 stage=false to build and test the module but keep
                                                 its jar, POM, sources and documentation out of the
                                                 staged repositories, so neither export nor release
-                                                ships them,
-                                                flatten=true for a published POM that names the
-                                                resolved closure, each entry excluding what it would
-                                                bring, as the module-info.java layouts do by default,
-                                                and flatten=false for one that names what the module
-                                                declares, at the versions resolved, as a pom.xml does
-                                                by default; what only an optional dependency brings
-                                                is left out of a flattened POM, as Maven leaves it to
-                                                a consumer that declares that dependency itself
+                                                ships them
                       test.properties           framework=junit-platform|junit4|testng, naming what
                                                 this module's tests are written against; absent, it is
                                                 inferred from the resolved dependencies;
@@ -3049,15 +3039,12 @@ public record Project(
     private record PomAwareAssembler(MultiProjectAssembler<? super ProjectModuleDescriptor> base,
                                      String manifests,
                                      String prefix,
-                                     boolean flatten,
                                      boolean embed) implements MultiProjectAssembler<ProjectModuleDescriptor> {
 
         @Override
         public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
                                         Map<String, Repository> repositories,
                                         Map<String, Resolver> resolvers) throws IOException {
-            Path packaging = BuildStep.locate(descriptor.configuration(), "packaging.properties");
-            boolean flattened = packaging == null ? flatten : SequencedProperties.ofFiles(packaging).flag("flatten", flatten);
             ProjectModuleDescriptor nested = descriptor.toInherited();
             SequencedSet<String> synthetics = new LinkedHashSet<>(nested.synthetics());
             if (embed) {
@@ -3070,7 +3057,7 @@ public record Project(
                 sub.addModule("describe",
                         (describe, describeInherited) -> {
                             describe.addStep("pom",
-                                    new Pom().resolved(flattened).embedded(embed),
+                                    new Pom().embedded(embed),
                                     describeInherited.sequencedKeySet().stream());
                             if (manifests != null) {
                                 describe.addStep("identity", new MavenIdentity(prefix, manifests), "pom", manifests);

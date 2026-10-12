@@ -1813,19 +1813,7 @@ public class ProjectTest {
     }
 
     @Test
-    public void the_pom_of_a_maven_module_lists_its_resolved_closure_where_its_packaging_properties_sets_flatten()
-            throws IOException {
-        writeMavenProjectWithSibling();
-        Files.writeString(Files.createDirectories(root.resolve("user/build.jenesis")).resolve("packaging.properties"),
-                "flatten=true\n");
-        assertThat(publishedPom(Project.Layout.MAVEN))
-                .as("a flattened POM names the whole closure and excludes what each entry would bring")
-                .contains("<artifactId>base</artifactId>", "<artifactId>library</artifactId>", "<groupId>*</groupId>");
-    }
-
-    @Test
-    public void the_pom_of_a_modular_module_lists_its_resolved_closure_unless_its_packaging_properties_sets_flatten_false()
-            throws IOException {
+    public void the_pom_of_a_modular_module_names_what_it_requires_by_the_artifact_it_resolved_to() throws IOException {
         writeLibrary();
         Files.writeString(Files.createDirectories(root.resolve("base/base")).resolve("Type.java"),
                 "package base; public class Type { }\n");
@@ -1850,12 +1838,8 @@ public class ProjectTest {
         settings.put("maven.uri", elsewhere.resolve("repository").toUri().toString());
         settings.put("maven.local", Files.createDirectories(elsewhere.resolve("local")).toString());
         assertThat(publishedPom(Project.Layout.MODULAR_TO_MAVEN))
-                .as("a module declaration publishes the flattened closure by default")
-                .contains("<artifactId>base</artifactId>", "<artifactId>library</artifactId>", "<groupId>*</groupId>");
-        Files.writeString(Files.createDirectories(root.resolve("user/META-INF/build.jenesis")).resolve("packaging.properties"),
-                "flatten=false\n");
-        assertThat(publishedPom(Project.Layout.MODULAR_TO_MAVEN))
-                .as("flatten=false publishes what the module requires, named by the artifact it resolved to")
+                .as("a module declaration publishes what it requires, and what a required module brings is left to"
+                        + " that module's own POM")
                 .contains("<artifactId>base</artifactId>")
                 .doesNotContain("<artifactId>library</artifactId>", "<groupId>*</groupId>");
     }
