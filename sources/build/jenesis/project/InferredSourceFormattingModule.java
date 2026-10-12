@@ -18,8 +18,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
             KTFMT = "ktfmt",
             SCALAFMT = "scalafmt",
             LICENSE = "license";
-    private static final String FORMATTER = "formatter", STYLE = "style", REFLOW = "reflow", JAVADOC = "javadoc",
-            IMPORTS = "imports", SORT = "sort", REMOVE = "remove", NONE = "none", PROFILE = "profile";
+    private static final String FORMATTER = "formatter", STYLE = "style", REFLOW = "reflow", JAVADOC = "javadoc", IMPORTS = "imports", PROFILE = "profile";
+    private static final String SORT = "sort", REMOVE = "remove", NONE = "none";
     private static final Set<String> GOOGLE_KEYS = Set.of(FORMATTER, STYLE, REFLOW, JAVADOC, IMPORTS);
     private static final Set<String> PALANTIR_KEYS = Set.of(FORMATTER, REFLOW, IMPORTS);
     private static final Set<String> ECLIPSE_KEYS = Set.of(FORMATTER, PROFILE);

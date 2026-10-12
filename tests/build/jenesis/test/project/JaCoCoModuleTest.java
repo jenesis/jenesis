@@ -29,19 +29,11 @@ public class JaCoCoModuleTest {
     private Path root, project, tool;
 
     @Test
-    public void refuses_a_key_of_jacoco_properties_that_names_no_limit_of_a_counter() {
-        assertThatThrownBy(() -> new JaCoCoModule(Map.of(), Map.of()).limits(new LinkedHashMap<>(Map.of("minimum.lines", "0.8"))))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("minimum.lines")
-                .hasMessageContaining("line");
-    }
-
-    @Test
-    public void refuses_a_limit_of_jacoco_properties_that_is_no_ratio_or_count() {
-        assertThatThrownBy(() -> new JaCoCoModule(Map.of(), Map.of()).limits(new LinkedHashMap<>(Map.of("minimum.line", "80%"))))
+    public void refuses_a_minimum_that_is_no_ratio_and_a_maximum_that_is_no_count() {
+        assertThatThrownBy(() -> new JaCoCoModule(Map.of(), Map.of()).minimum(JaCoCoModule.Counter.LINE, 80))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("from 0 to 1");
-        assertThatThrownBy(() -> new JaCoCoModule(Map.of(), Map.of()).limits(new LinkedHashMap<>(Map.of("maximum.missed.class", "-1"))))
+        assertThatThrownBy(() -> new JaCoCoModule(Map.of(), Map.of()).maximumMissed(JaCoCoModule.Counter.CLASS, -1))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("at least 0");
     }

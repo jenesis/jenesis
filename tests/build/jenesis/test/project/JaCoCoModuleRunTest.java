@@ -41,7 +41,7 @@ public class JaCoCoModuleRunTest {
 
     @Test
     public void collects_coverage_and_renders_a_report() throws Exception {
-        cover(new LinkedHashMap<>());
+        cover(UnaryOperator.identity());
 
         Path exec = root.resolve("test").resolve("executed").resolve("output").resolve("jacoco.exec");
         assertThat(exec).as("the agent wrote its execution data into the test step output").isNotEmptyFile();
@@ -58,26 +58,26 @@ public class JaCoCoModuleRunTest {
     }
 
     @Test
-    public void passes_a_coverage_the_limits_of_jacoco_properties_admit() throws Exception {
-        cover(new LinkedHashMap<>(Map.of("minimum.method", "0.5", "maximum.missed.method", "1")));
+    public void passes_a_coverage_its_limits_admit() throws Exception {
+        cover(module -> module.minimum(JaCoCoModule.Counter.METHOD, 0.5).maximumMissed(JaCoCoModule.Counter.METHOD, 1));
 
         assertThat(root.resolve("coverage").resolve("report").resolve("output")
                 .resolve("reports").resolve("jacoco").resolve("jacoco.xml")).isNotEmptyFile();
     }
 
     @Test
-    public void fails_the_build_on_a_coverage_below_a_minimum_of_jacoco_properties() {
-        assertThatThrownBy(() -> cover(new LinkedHashMap<>(Map.of("minimum.method", "0.9"))))
-                .hasStackTraceContaining("minimum.method=0.9 is not met: 4 of 5 covered");
+    public void fails_the_build_on_a_coverage_below_a_minimum() {
+        assertThatThrownBy(() -> cover(module -> module.minimum(JaCoCoModule.Counter.METHOD, 0.9)))
+                .hasStackTraceContaining("a covered ratio of 0.9 of methods is not met: 4 of 5 covered");
     }
 
     @Test
-    public void fails_the_build_on_more_missed_items_than_a_maximum_of_jacoco_properties() {
-        assertThatThrownBy(() -> cover(new LinkedHashMap<>(Map.of("maximum.missed.method", "0"))))
-                .hasStackTraceContaining("maximum.missed.method=0 is not met: 1 missed");
+    public void fails_the_build_on_more_missed_items_than_a_maximum() {
+        assertThatThrownBy(() -> cover(module -> module.maximumMissed(JaCoCoModule.Counter.METHOD, 0)))
+                .hasStackTraceContaining("at most 0 missed methods is not met: 1 missed");
     }
 
-    private void cover(SequencedMap<String, String> limits) throws Exception {
+    private void cover(UnaryOperator<JaCoCoModule> limits) throws Exception {
         Path artifacts = Files.createDirectory(dependencies.resolve(BuildStep.ARTIFACTS));
         for (Path path : bootModuleJars()) {
             String fileName = path.getFileName().toString();
@@ -154,7 +154,7 @@ public class JaCoCoModuleRunTest {
                 "dependencies", "classes");
         executor.addModule(
                 "coverage",
-                new JaCoCoModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT).classes(true).limits(limits),
+                limits.apply(new JaCoCoModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT).classes(true)),
                 "test", "classes", "sources", "dependencies");
         executor.execute();
     }
