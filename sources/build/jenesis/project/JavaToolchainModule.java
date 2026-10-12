@@ -104,7 +104,7 @@ public record JavaToolchainModule(BuildExecutorModule generator,
 
     @Override
     public Optional<String> resolve(String path) {
-        if (path.startsWith(COMPILED + "/")) {
+        if (path.startsWith(COMPILED + "/") && !path.startsWith(COMPILED + "/custom/")) {
             return Optional.empty();
         }
         return switch (path) {

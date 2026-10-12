@@ -44,6 +44,17 @@ public class JavaToolchainModuleTest {
     }
 
     @Test
+    public void exports_what_a_plugin_of_the_compilers_writes_but_not_what_the_stock_compilers_write() {
+        JavaToolchainModule module = new JavaToolchainModule();
+        assertThat(module.resolve("compiled/compile/javac"))
+                .as("the stock compilers' classes reach the module through the merged classes alone")
+                .isEmpty();
+        assertThat(module.resolve("compiled/custom/library/compile"))
+                .as("what a plugin at binary/compiled writes beside its classes stays visible to the module's other steps")
+                .contains("compiled/custom/library/compile");
+    }
+
+    @Test
     public void can_build_java() throws IOException {
         Path sources = Files.createDirectories(input.resolve(BuildStep.SOURCES + "other"));
         try (BufferedWriter writer = Files.newBufferedWriter(sources.resolve("Sample.java"))) {
