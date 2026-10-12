@@ -16,6 +16,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
 
     public static final String TEST = "test", MUTATE = "mutate";
     private static final String FRAMEWORK = "framework", ENGINES = "engines", SCAN = "scan";
+    private static final String MINIMUM = "minimum.", MAXIMUM_MISSED = "maximum.missed.";
     private static final Set<String> TEST_KEYS = Set.of(FRAMEWORK, ENGINES, SCAN);
 
     private final SequencedSet<Path> configuration;
@@ -87,6 +88,43 @@ public class InferredTestObservationModule implements BuildExecutorModule {
             module = module.pitest(pitest ? value -> value : null);
         }
         return module;
+    }
+
+    private static JaCoCoModule limited(JaCoCoModule module, Path file) throws IOException {
+        SequencedMap<JaCoCoModule.Counter, Double> minimum = new LinkedHashMap<>();
+        SequencedMap<JaCoCoModule.Counter, Long> maximumMissed = new LinkedHashMap<>();
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        for (String key : properties.stringPropertyNames()) {
+            boolean ratio = key.startsWith(MINIMUM);
+            String name = ratio ? key.substring(MINIMUM.length())
+                    : key.startsWith(MAXIMUM_MISSED) ? key.substring(MAXIMUM_MISSED.length())
+                    : null;
+            JaCoCoModule.Counter counter = name == null ? null : Arrays.stream(JaCoCoModule.Counter.values())
+                    .filter(candidate -> candidate.name().toLowerCase(Locale.ROOT).equals(name))
+                    .findFirst()
+                    .orElse(null);
+            if (counter == null) {
+                throw new IllegalArgumentException("Unknown key " + key + " in " + file + ", expected " + MINIMUM
+                        + "<counter> or " + MAXIMUM_MISSED + "<counter> for a counter of "
+                        + Arrays.stream(JaCoCoModule.Counter.values())
+                                .map(candidate -> candidate.name().toLowerCase(Locale.ROOT))
+                                .toList());
+            }
+            String value = properties.value(key, "");
+            try {
+                if (ratio) {
+                    minimum.put(counter, Double.parseDouble(value));
+                } else {
+                    maximumMissed.put(counter, Long.parseLong(value));
+                }
+            } catch (NumberFormatException _) {
+                throw new IllegalArgumentException("The value " + value + " of " + key + " in " + file + " is "
+                        + (ratio
+                                ? "no covered ratio, expected a number from 0 to 1, such as 0.8"
+                                : "no count of missed items, expected a whole number of at least 0"));
+            }
+        }
+        return module.minimum(minimum).maximumMissed(maximumMissed);
     }
 
     private static TestModule declared(TestModule module, Path file) throws IOException {
@@ -331,9 +369,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         List<ObservabilityEngine> engines = new ArrayList<>();
         Path coverage = BuildStep.locate(configuration, "jacoco.properties");
         if (jacoco != null && coverage != null) {
-            SequencedMap<String, String> limits = new LinkedHashMap<>();
-            SequencedProperties.ofFiles(coverage).forEachProperty(limits::put);
-            BuildExecutorModule report = jacoco.apply(jacocoModule.pinning(pinning).limits(limits));
+            BuildExecutorModule report = jacoco.apply(limited(jacocoModule.pinning(pinning), coverage));
             if (report != null) {
                 JaCoCo engine = new JaCoCo();
                 engines.add(engine);

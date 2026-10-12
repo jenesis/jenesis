@@ -61,6 +61,31 @@ public class InferredTestObservationModuleTest {
     }
 
     @Test
+    public void refuses_a_key_of_jacoco_properties_that_names_no_limit_of_a_counter() throws IOException {
+        Files.writeString(project.resolve("jacoco.properties"), "minimum.lines=0.8\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+        assertThatThrownBy(executor::execute)
+                .hasStackTraceContaining("minimum.lines")
+                .hasStackTraceContaining("line");
+    }
+
+    @Test
+    public void refuses_a_limit_of_jacoco_properties_that_is_no_ratio_or_count() throws IOException {
+        Files.writeString(project.resolve("jacoco.properties"), "minimum.line=80%\n");
+        BuildExecutor ratio = newExecutor();
+        ratio.addSource("project", project);
+        ratio.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+        assertThatThrownBy(ratio::execute).hasStackTraceContaining("from 0 to 1");
+        Files.writeString(project.resolve("jacoco.properties"), "maximum.missed.class=-1\n");
+        BuildExecutor count = newExecutor();
+        count.addSource("project", project);
+        count.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+        assertThatThrownBy(count::execute).hasStackTraceContaining("at least 0");
+    }
+
+    @Test
     public void does_not_wire_an_engine_without_a_config_file() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);

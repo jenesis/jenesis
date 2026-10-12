@@ -100,7 +100,7 @@ two of the three methods of `Calculator` are covered, and the file's
 holds. Raise it to `0.9` and the build fails after rendering the report, naming the
 limit and what the tests reached:
 
-    minimum.method=0.9 is not met: 2 of 3 covered, a ratio of 0.6667
+    a covered ratio of 0.9 of methods is not met: 2 of 3 covered, a ratio of 0.6667
 
 A counter with nothing to count, such as `branch` in a class without a branch,
 meets every limit, and an unknown key or value fails the build naming the valid
