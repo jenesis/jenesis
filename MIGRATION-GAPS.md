@@ -46,12 +46,6 @@ Compile avoidance matters most: it is the largest share of the difference to Gra
 |---|---|---|
 | No native compilation (C, Rust, JNI). Prebuilt libraries can be published as a classifier variant, but not built. | L | netty (natives stay on Maven) |
 
-## Dependency resolution
-
-| Gap | Size | Projects |
-|---|---|---|
-| A Kotlin Multiplatform artifact resolves to its root jar, which holds no classes, and nothing reports it. Without Gradle module metadata the platform variant is not found; at the least, the build should fail and name the variant to depend on. | M | spring-boot-realworld-example-app (clikt), micrometer, moshi |
-
 ## Partial or unconfirmed
 
 - When a test JVM writes outside its own folder, the build names the folder it wrote to but does not prevent the
@@ -97,10 +91,13 @@ These are decisions rather than gaps. The briefing says so and names the change 
   `IRetryAnalyzer`), and a JVM per test class - each test module runs in a JVM of its own, so a test that needs one
   becomes a module (micrometer, mockito, caffeine);
 - overriding a `pom.xml` `${...}` property from the command line;
+- the platform variant of a Kotlin Multiplatform library: its root artifact holds Kotlin metadata and no class, and
+  only Gradle module metadata maps it to `<artifactId>-jvm`. A current library's POM depends on that variant, so
+  the classes arrive as they do with Maven; an older one's does not, and the project names `<artifactId>-jvm`
+  itself, as a Maven build does (spring-boot-realworld-example-app, micrometer, moshi);
 - Gradle module metadata, war and ear archives, and running Docker containers as part of a build.
 
 ## Suggested order
 
-1. **Failing on a class-less Kotlin Multiplatform root.**
-2. **Compile avoidance.** Compare a dependency by a fingerprint of its API rather than its bytes. The largest change,
+1. **Compile avoidance.** Compare a dependency by a fingerprint of its API rather than its bytes. The largest change,
    and the one a build after an edit shows most.

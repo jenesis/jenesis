@@ -1440,7 +1440,9 @@ public record Project(
                           the tests see the tested module's internal declarations, as the tested jar
                           is their friend path, so no -Xfriend-paths is written; kotlin-stdlib, which
                           kotlin("jvm") adds on its own, is declared, as kotlinc compiles against the
-                          module's dependencies alone
+                          module's dependencies alone; a Kotlin Multiplatform library is named by its
+                          JVM variant, <artifactId>-jvm, where its root artifact holds no class and its
+                          POM does not depend on that variant, as Gradle module metadata is not read
                       scala-maven-plugin / scala -> .scala sources, compiled by Scala 3 (44); Scala 2
                           is not supported
                       gmavenplus / groovy -> .groovy sources, compiled by Groovy 4 or newer after
