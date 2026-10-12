@@ -72,7 +72,7 @@ public class JApiCmpModuleRunTest {
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("japicmp", module(new SequencedProperties()), "project");
+        executor.addModule("japicmp", module(), "project");
         executor.execute();
 
         Path report = root.resolve("japicmp").resolve("compare").resolve("output")
@@ -90,7 +90,7 @@ public class JApiCmpModuleRunTest {
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("japicmp", module(new SequencedProperties()), "project");
+        executor.addModule("japicmp", module(), "project");
         executor.execute();
 
         Path report = root.resolve("japicmp").resolve("compare").resolve("output")
@@ -103,12 +103,12 @@ public class JApiCmpModuleRunTest {
     @Test
     public void the_binary_incompatibility_gate_fails_the_build_on_a_removed_method() throws IOException {
         writeProject(BREAKING);
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("error-on-binary-incompatibility", "true");
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("japicmp", module(config), "project");
+        executor.addModule("japicmp",
+                module().errorOn(EnumSet.of(JApiCmpModule.Failure.BINARY_INCOMPATIBILITY)),
+                "project");
 
         assertThatThrownBy(executor::execute)
                 .hasRootCauseInstanceOf(IllegalStateException.class)
@@ -126,7 +126,7 @@ public class JApiCmpModuleRunTest {
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("japicmp", module(new SequencedProperties()), "project");
+        executor.addModule("japicmp", module(), "project");
         executor.execute();
 
         String command = Files.readString(root.resolve("japicmp").resolve("compare").resolve("supplement").resolve("command"));
@@ -137,13 +137,12 @@ public class JApiCmpModuleRunTest {
         assertThat(command.substring(0, command.indexOf("japicmp.JApiCmp"))).contains(" -Xmx256m ");
     }
 
-    private JApiCmpModule module(SequencedProperties config) {
-        config.setProperty("baseline", BASELINE);
+    private JApiCmpModule module() {
         return new JApiCmpModule(
                 Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                 Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)))
                 .pinning(Pinning.STRICT)
-                .config(config);
+                .baseline(BASELINE);
     }
 
     private void writeProject(String annotation) throws IOException {

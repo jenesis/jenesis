@@ -11,7 +11,6 @@ import build.jenesis.Environment;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
-import build.jenesis.SequencedProperties;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
@@ -26,7 +25,16 @@ public class JApiCmpModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final String tool;
     private final String group;
-    private final SequencedProperties config;
+    private final String baseline;
+    private final Access access;
+    private final List<String> include;
+    private final List<String> exclude;
+    private final Set<Format> formats;
+    private final boolean ignoreMissingClasses;
+    private final boolean onlyIncompatible;
+    private final boolean onlyModified;
+    private final boolean semanticVersioning;
+    private final Set<Failure> errorOn;
     private final ProcessBuildStep.Terms terms;
 
     public JApiCmpModule(Map<String, Repository> repositories,
@@ -35,7 +43,16 @@ public class JApiCmpModule implements BuildExecutorModule {
              null,
              "japicmp",
              "main",
-             new SequencedProperties(),
+             null,
+             null,
+             List.of(),
+             List.of(),
+             Collections.unmodifiableSet(EnumSet.of(Format.XML)),
+             true,
+             false,
+             false,
+             false,
+             Collections.unmodifiableSet(EnumSet.noneOf(Failure.class)),
              new ProcessBuildStep.Terms());
     }
 
@@ -46,7 +63,16 @@ public class JApiCmpModule implements BuildExecutorModule {
                 null,
                 "japicmp",
                 "main",
-                new SequencedProperties(),
+                null,
+                null,
+                List.of(),
+                List.of(),
+                Collections.unmodifiableSet(EnumSet.of(Format.XML)),
+                true,
+                false,
+                false,
+                false,
+                Collections.unmodifiableSet(EnumSet.noneOf(Failure.class)),
                 ProcessBuildStep.Terms.ofEnvironment(environment, "japicmp"));
     }
 
@@ -54,40 +80,115 @@ public class JApiCmpModule implements BuildExecutorModule {
                           Pinning pinning,
                           String tool,
                           String group,
-                          SequencedProperties config,
+                          String baseline,
+                          Access access,
+                          List<String> include,
+                          List<String> exclude,
+                          Set<Format> formats,
+                          boolean ignoreMissingClasses,
+                          boolean onlyIncompatible,
+                          boolean onlyModified,
+                          boolean semanticVersioning,
+                          Set<Failure> errorOn,
                           ProcessBuildStep.Terms terms) {
         this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.group = group;
-        this.config = config;
+        this.baseline = baseline;
+        this.access = access;
+        this.include = include;
+        this.exclude = exclude;
+        this.formats = formats;
+        this.ignoreMissingClasses = ignoreMissingClasses;
+        this.onlyIncompatible = onlyIncompatible;
+        this.onlyModified = onlyModified;
+        this.semanticVersioning = semanticVersioning;
+        this.errorOn = errorOn;
         this.terms = terms;
     }
 
     public JApiCmpModule pinning(Pinning pinning) {
-        return new JApiCmpModule(dependencies, pinning, tool, group, config, terms);
+        return new JApiCmpModule(dependencies, pinning, tool, group, baseline, access, include, exclude, formats,
+                ignoreMissingClasses, onlyIncompatible, onlyModified, semanticVersioning, errorOn, terms);
     }
 
     public JApiCmpModule tool(String tool) {
-        return new JApiCmpModule(dependencies, pinning, tool, group, config, terms);
+        return new JApiCmpModule(dependencies, pinning, tool, group, baseline, access, include, exclude, formats,
+                ignoreMissingClasses, onlyIncompatible, onlyModified, semanticVersioning, errorOn, terms);
     }
 
     public JApiCmpModule group(String group) {
-        return new JApiCmpModule(dependencies, pinning, tool, group, config, terms);
+        return new JApiCmpModule(dependencies, pinning, tool, group, baseline, access, include, exclude, formats,
+                ignoreMissingClasses, onlyIncompatible, onlyModified, semanticVersioning, errorOn, terms);
     }
 
-    public JApiCmpModule config(SequencedProperties config) {
-        return new JApiCmpModule(dependencies, pinning, tool, group, config, terms);
+    public JApiCmpModule baseline(String baseline) {
+        return new JApiCmpModule(dependencies, pinning, tool, group, baseline, access, include, exclude, formats,
+                ignoreMissingClasses, onlyIncompatible, onlyModified, semanticVersioning, errorOn, terms);
+    }
+
+    public JApiCmpModule access(Access access) {
+        return new JApiCmpModule(dependencies, pinning, tool, group, baseline, access, include, exclude, formats,
+                ignoreMissingClasses, onlyIncompatible, onlyModified, semanticVersioning, errorOn, terms);
+    }
+
+    public JApiCmpModule include(List<String> include) {
+        return new JApiCmpModule(dependencies, pinning, tool, group, baseline, access, List.copyOf(include), exclude,
+                formats, ignoreMissingClasses, onlyIncompatible, onlyModified, semanticVersioning, errorOn, terms);
+    }
+
+    public JApiCmpModule exclude(List<String> exclude) {
+        return new JApiCmpModule(dependencies, pinning, tool, group, baseline, access, include, List.copyOf(exclude),
+                formats, ignoreMissingClasses, onlyIncompatible, onlyModified, semanticVersioning, errorOn, terms);
+    }
+
+    public JApiCmpModule formats(Set<Format> formats) {
+        EnumSet<Format> copied = EnumSet.noneOf(Format.class);
+        copied.addAll(formats);
+        return new JApiCmpModule(dependencies, pinning, tool, group, baseline, access, include, exclude,
+                Collections.unmodifiableSet(copied), ignoreMissingClasses, onlyIncompatible, onlyModified,
+                semanticVersioning, errorOn, terms);
+    }
+
+    public JApiCmpModule ignoreMissingClasses(boolean ignoreMissingClasses) {
+        return new JApiCmpModule(dependencies, pinning, tool, group, baseline, access, include, exclude, formats,
+                ignoreMissingClasses, onlyIncompatible, onlyModified, semanticVersioning, errorOn, terms);
+    }
+
+    public JApiCmpModule onlyIncompatible(boolean onlyIncompatible) {
+        return new JApiCmpModule(dependencies, pinning, tool, group, baseline, access, include, exclude, formats,
+                ignoreMissingClasses, onlyIncompatible, onlyModified, semanticVersioning, errorOn, terms);
+    }
+
+    public JApiCmpModule onlyModified(boolean onlyModified) {
+        return new JApiCmpModule(dependencies, pinning, tool, group, baseline, access, include, exclude, formats,
+                ignoreMissingClasses, onlyIncompatible, onlyModified, semanticVersioning, errorOn, terms);
+    }
+
+    public JApiCmpModule semanticVersioning(boolean semanticVersioning) {
+        return new JApiCmpModule(dependencies, pinning, tool, group, baseline, access, include, exclude, formats,
+                ignoreMissingClasses, onlyIncompatible, onlyModified, semanticVersioning, errorOn, terms);
+    }
+
+    public JApiCmpModule errorOn(Set<Failure> errorOn) {
+        EnumSet<Failure> copied = EnumSet.noneOf(Failure.class);
+        copied.addAll(errorOn);
+        return new JApiCmpModule(dependencies, pinning, tool, group, baseline, access, include, exclude, formats,
+                ignoreMissingClasses, onlyIncompatible, onlyModified, semanticVersioning,
+                Collections.unmodifiableSet(copied), terms);
     }
 
     public JApiCmpModule printing(BiConsumer<Boolean, String> printing) {
-        return new JApiCmpModule(dependencies, pinning, tool, group, config, terms.printing(printing));
+        return new JApiCmpModule(dependencies, pinning, tool, group, baseline, access, include, exclude, formats,
+                ignoreMissingClasses, onlyIncompatible, onlyModified, semanticVersioning, errorOn,
+                terms.printing(printing));
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
         buildExecutor.addStep(REQUIRED,
-                new Baseline(tool, config.value("baseline"), List.of(MAVEN_GROUP + "/" + MAVEN_ARTIFACT), "japicmp.properties"),
+                new Baseline(tool, baseline, List.of(MAVEN_GROUP + "/" + MAVEN_ARTIFACT), "japicmp.properties"),
                 inherited.sequencedKeySet());
         SequencedSet<String> resolveInputs = new LinkedHashSet<>();
         resolveInputs.add(REQUIRED);
@@ -98,23 +199,58 @@ public class JApiCmpModule implements BuildExecutorModule {
         SequencedSet<String> compareInputs = new LinkedHashSet<>();
         compareInputs.add(DEPENDENCIES);
         compareInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(COMPARE, new Compare(terms, tool, group, config), compareInputs);
+        buildExecutor.addStep(COMPARE, new Compare(terms,
+                tool,
+                group,
+                access,
+                include,
+                exclude,
+                List.copyOf(formats),
+                ignoreMissingClasses,
+                onlyIncompatible,
+                onlyModified,
+                semanticVersioning,
+                List.copyOf(errorOn)), compareInputs);
     }
 
     private static class Compare extends ProcessBuildStep {
 
         private final String tool;
         private final String group;
-        private final SequencedProperties config;
+        private final Access access;
+        private final List<String> include;
+        private final List<String> exclude;
+        private final List<Format> formats;
+        private final boolean ignoreMissingClasses;
+        private final boolean onlyIncompatible;
+        private final boolean onlyModified;
+        private final boolean semanticVersioning;
+        private final List<Failure> errorOn;
 
         private Compare(ProcessBuildStep.Terms terms,
                         String tool,
                         String group,
-                        SequencedProperties config) {
+                        Access access,
+                        List<String> include,
+                        List<String> exclude,
+                        List<Format> formats,
+                        boolean ignoreMissingClasses,
+                        boolean onlyIncompatible,
+                        boolean onlyModified,
+                        boolean semanticVersioning,
+                        List<Failure> errorOn) {
             super("japicmp", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.group = group;
-            this.config = config;
+            this.access = access;
+            this.include = include;
+            this.exclude = exclude;
+            this.formats = formats;
+            this.ignoreMissingClasses = ignoreMissingClasses;
+            this.onlyIncompatible = onlyIncompatible;
+            this.onlyModified = onlyModified;
+            this.semanticVersioning = semanticVersioning;
+            this.errorOn = errorOn;
         }
 
         @Override
@@ -165,35 +301,21 @@ public class JApiCmpModule implements BuildExecutorModule {
                     "japicmp.JApiCmp",
                     "-o", baselines.getFirst(),
                     "-n", artifact.toString()));
-            List<String> formats = config.entries("format");
-            for (String format : formats == null ? List.of("xml") : formats) {
-                switch (format) {
-                    case "xml" -> {
-                        commands.add("--xml-file");
-                        commands.add(report.resolve("japicmp-report.xml").toString());
-                    }
-                    case "html" -> {
-                        commands.add("--html-file");
-                        commands.add(report.resolve("japicmp-report.html").toString());
-                    }
-                    default -> throw new IllegalArgumentException("Unknown japicmp format: "
-                            + format
-                            + " (expected one of [html, xml])");
-                }
+            for (Format format : formats) {
+                commands.add("--" + format.name().toLowerCase(Locale.ROOT) + "-file");
+                commands.add(report.resolve("japicmp-report." + format.name().toLowerCase(Locale.ROOT)).toString());
             }
-            String access = config.value("access");
             if (access != null) {
                 commands.add("-a");
-                commands.add(access);
+                commands.add(access.name().toLowerCase(Locale.ROOT));
             }
-            List<String> included = config.entries("include"), excluded = config.entries("exclude");
-            if (included != null) {
+            if (!include.isEmpty()) {
                 commands.add("-i");
-                commands.add(String.join(";", included));
+                commands.add(String.join(";", include));
             }
-            if (excluded != null) {
+            if (!exclude.isEmpty()) {
                 commands.add("-e");
-                commands.add(String.join(";", excluded));
+                commands.add(String.join(";", exclude));
             }
             if (!classPath.isEmpty()) {
                 String joined = String.join(File.pathSeparator, classPath);
@@ -202,28 +324,38 @@ public class JApiCmpModule implements BuildExecutorModule {
                 commands.add("--new-classpath");
                 commands.add(joined);
             }
-            if (config.flag("ignore-missing-classes", true)) {
+            if (ignoreMissingClasses) {
                 commands.add("--ignore-missing-classes");
             }
-            if (config.flag("only-incompatible")) {
+            if (onlyIncompatible) {
                 commands.add("-b");
             }
-            if (config.flag("only-modified")) {
+            if (onlyModified) {
                 commands.add("-m");
             }
-            if (config.flag("semantic-versioning")) {
+            if (semanticVersioning) {
                 commands.add("-s");
             }
-            for (String failure : List.of("binary-incompatibility",
-                    "source-incompatibility",
-                    "modifications",
-                    "semantic-incompatibility")) {
-                if (config.flag("error-on-" + failure)) {
-                    commands.add("--error-on-" + failure);
-                }
+            for (Failure failure : errorOn) {
+                commands.add("--error-on-" + failure.name().toLowerCase(Locale.ROOT).replace('_', '-'));
             }
             commands.addAll(options);
             return CompletableFuture.completedStage(commands);
         }
+    }
+
+    public enum Access {
+
+        PUBLIC, PROTECTED, PACKAGE, PRIVATE
+    }
+
+    public enum Format {
+
+        XML, HTML
+    }
+
+    public enum Failure {
+
+        BINARY_INCOMPATIBILITY, SOURCE_INCOMPATIBILITY, MODIFICATIONS, SEMANTIC_INCOMPATIBILITY
     }
 }
