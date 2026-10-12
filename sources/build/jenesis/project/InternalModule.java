@@ -14,13 +14,10 @@ import build.jenesis.Platform;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
-import build.jenesis.maven.MavenDefaultRepository;
-import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisRepository;
 import build.jenesis.module.ModularJarResolver;
-import build.jenesis.module.ModuleInfo;
-import build.jenesis.module.ModuleInfoParser;
+import build.jenesis.module.ModularProject;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Javac;
@@ -28,11 +25,11 @@ import build.jenesis.step.ProcessHandler;
 
 public class InternalModule implements BuildExecutorModule {
 
-    public static final String SOURCE = "source",
+    public static final String SOURCE = "sources",
             JAVA = "java",
             DELEGATE = "delegate",
             INPUTS = "inputs";
-    private static final String DEPENDENCIES = "dependencies", REQUIRES = "requires";
+    private static final String DEPENDENCIES = "dependencies", MANIFESTS = "manifests", REQUIRES = "requires";
     private static final String MAIN_ARTIFACTS = JAVA + "/" + JavaToolchainModule.ARTIFACTS;
 
     private final String prefix;
@@ -50,9 +47,8 @@ public class InternalModule implements BuildExecutorModule {
     public InternalModule(String prefix, String group, Path source) {
         this(prefix,
                 source,
-                aliased(prefix, JenesisModuleRepository.of(JenesisRepository.Scope.MODULE),
-                        MavenDefaultRepository.ofEnvironment(Environment.NONE)),
-                aliased(prefix, new ModularJarResolver(true), new MavenPomResolver()),
+                Map.of(prefix, JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)),
+                Map.of(prefix, new ModularJarResolver(true)),
                 group == null ? "main" : group);
     }
 
@@ -77,13 +73,9 @@ public class InternalModule implements BuildExecutorModule {
     public static InternalModule ofEnvironment(Environment environment,
                                                String prefix,
                                                String group,
-                                               Path source) {
-        Map<String, Repository> repositories = aliased(prefix,
-                JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE),
-                MavenDefaultRepository.ofEnvironment(environment));
-        Map<String, Resolver> resolvers = aliased(prefix,
-                ModularJarResolver.ofEnvironment(environment, true),
-                MavenPomResolver.ofEnvironment(environment));
+                                               Path source,
+                                               Map<String, Repository> repositories,
+                                               Map<String, Resolver> resolvers) {
         return new InternalModule(prefix,
                 source,
                 Dependencies.ofEnvironment(environment, repositories, resolvers),
@@ -95,13 +87,6 @@ public class InternalModule implements BuildExecutorModule {
                 Platform.ofEnvironment(environment),
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap());
-    }
-
-    private static <T> Map<String, T> aliased(String prefix, T module, T maven) {
-        SequencedMap<String, T> resolution = new LinkedHashMap<>();
-        resolution.put(prefix, module);
-        resolution.putIfAbsent("maven", maven);
-        return resolution;
     }
 
     public InternalModule repositories(Map<String, Repository> repositories) {
@@ -285,11 +270,11 @@ public class InternalModule implements BuildExecutorModule {
     public BuildExecutorModule resolution() {
         return (buildExecutor, inherited) -> {
             buildExecutor.addSource(SOURCE, Bind.asSources(), source);
-            buildExecutor.addStep(REQUIRES,
-                    new ParseModuleInfo(group, prefix, additionalDependencies, platform),
-                    Stream.concat(Stream.of(SOURCE), inherited.sequencedKeySet().stream()));
+            buildExecutor.addStep(MANIFESTS, ModularProject.manifests(group, prefix, platform), SOURCE);
+            buildExecutor.addStep(REQUIRES, new Inherited(group, additionalDependencies), inherited.sequencedKeySet());
             buildExecutor.addModule(DEPENDENCIES,
                     dependencyModule.pinning(pinning).pathPlacement(PathPlacement.MODULE_PATH),
+                    MANIFESTS,
                     REQUIRES);
         };
     }
@@ -300,6 +285,7 @@ public class InternalModule implements BuildExecutorModule {
         buildExecutor.addModule(JAVA,
                 new JavaToolchainModule().compiler(javacStep.group(group).asModule("javac")),
                 SOURCE,
+                MANIFESTS,
                 DEPENDENCIES);
         if (!inputs.isEmpty()) {
             buildExecutor.addModule(INPUTS, Bind.asInputs(inputs));
@@ -330,22 +316,11 @@ public class InternalModule implements BuildExecutorModule {
                 .flatMap(Function.identity()));
     }
 
-    private record ParseModuleInfo(String group,
-                                   String prefix,
-                                   SequencedSet<String> additionalDependencies,
-                                   Platform platform) implements BuildStep {
+    private record Inherited(String group, SequencedSet<String> additionalDependencies) implements BuildStep {
 
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
-            if (arguments.get(SOURCE).hasChanged(Path.of(BuildStep.SOURCES + "module-info.java"))) {
-                return true;
-            }
-            for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
-                if (!argument.getKey().equals(SOURCE) && argument.getValue().hasChanged(Path.of(BuildStep.VERSIONS))) {
-                    return true;
-                }
-            }
-            return false;
+            return arguments.values().stream().anyMatch(argument -> argument.hasChanged(Path.of(BuildStep.VERSIONS)));
         }
 
         @Override
@@ -353,71 +328,13 @@ public class InternalModule implements BuildExecutorModule {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            Path moduleInfo = arguments.get(SOURCE).folder()
-                    .resolve(BuildStep.SOURCES)
-                    .resolve("module-info.java");
-            if (!Files.isRegularFile(moduleInfo)) {
-                throw new IllegalStateException(
-                        "Internal module source is not modular (missing module-info.java)");
-            }
-            ModuleInfo info = new ModuleInfoParser(group).identify(moduleInfo);
-            SequencedMap<String, String> pinned = new LinkedHashMap<>(info.versions());
-            for (Map.Entry<String, SequencedMap<String, String>> variant : info.variants().entrySet()) {
-                String selected = platform.select(variant.getKey(),
-                        pinned.get(variant.getKey()),
-                        variant.getValue());
-                if (selected != null) {
-                    pinned.put(variant.getKey(), selected);
-                }
-            }
-            SequencedMap<String, String> coordinates = new LinkedHashMap<>();
-            for (String dependency : info.requires()) {
-                String target = info.aliases().get(dependency);
-                if (target == null) {
-                    coordinates.put(dependency, prefix + "/" + dependency);
-                } else {
-                    String version = pinned.getOrDefault(group + "/maven/" + target, "").split(" ", 2)[0];
-                    coordinates.put(dependency, "maven/" + target
-                            + (version.isEmpty() || version.startsWith(":") ? "" : "/" + version));
-                }
-            }
-            SequencedProperties properties = new SequencedProperties();
-            coordinates.forEach((dependency, coordinate) -> {
-                properties.setProperty(group + "/compile/" + coordinate, "");
-                if (info.runtimeRequires().contains(dependency)) {
-                    properties.setProperty(group + "/runtime/" + coordinate, "");
-                }
-            });
+            SequencedProperties requires = new SequencedProperties();
             for (String dependency : additionalDependencies) {
-                properties.setProperty(group + "/compile/" + dependency, "");
-                properties.setProperty(group + "/runtime/" + dependency, "");
+                requires.setProperty(group + "/compile/" + dependency, "");
+                requires.setProperty(group + "/runtime/" + dependency, "");
             }
-            info.plugins().forEach((coordinate, group) -> properties.setProperty(group + "/plugin/" + coordinate, ""));
-            properties.store(context.next().resolve(BuildStep.REQUIRES));
-            if (!info.aliases().isEmpty()) {
-                SequencedProperties aliases = new SequencedProperties();
-                info.aliases().forEach((alias, target) -> aliases.setProperty(group + "/" + prefix + "/" + alias, target));
-                aliases.store(context.next().resolve(BuildStep.ALIASES));
-            }
-            if (!info.excludes().isEmpty()) {
-                SequencedProperties exclusions = new SequencedProperties();
-                for (Map.Entry<String, SequencedSet<String>> entry : info.excludes().entrySet()) {
-                    String coordinate = coordinates.get(entry.getKey());
-                    if (coordinate == null) {
-                        throw new IllegalArgumentException("Cannot apply @jenesis.exclude to " + entry.getKey()
-                                + ", which the plugin " + info.coordinate() + " does not require (declared requires: "
-                                + info.requires() + ")");
-                    }
-                    exclusions.setProperty(group + "/compile/" + coordinate, String.join(",", entry.getValue()));
-                    if (info.runtimeRequires().contains(entry.getKey())) {
-                        exclusions.setProperty(group + "/runtime/" + coordinate, String.join(",", entry.getValue()));
-                    }
-                }
-                exclusions.store(context.next().resolve(BuildStep.EXCLUSIONS));
-            }
-            SequencedProperties versions = new SequencedProperties();
-            pinned.forEach(versions::setProperty);
-            pinnedVersions(arguments).forEachProperty(versions::putIfAbsent);
+            requires.store(context.next().resolve(BuildStep.REQUIRES));
+            SequencedProperties versions = pinnedVersions(arguments);
             if (!versions.isEmpty()) {
                 versions.store(context.next().resolve(BuildStep.VERSIONS));
             }
@@ -430,9 +347,6 @@ public class InternalModule implements BuildExecutorModule {
         SequencedProperties versions = new SequencedProperties();
         for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
             if (argument.getValue().removed()) {
-                continue;
-            }
-            if (argument.getKey().equals(SOURCE)) {
                 continue;
             }
             Path file = argument.getValue().folder().resolve(BuildStep.VERSIONS);
