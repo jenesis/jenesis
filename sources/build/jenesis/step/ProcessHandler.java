@@ -191,7 +191,6 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
         private final List<String> commands;
         private final SortedMap<String, String> environment;
-        private final Path directory;
         private final Charset output, error;
 
         private OfProcess(List<String> commands) {
@@ -205,17 +204,15 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     environment.put(name, value);
                 }
             });
-            this(commands, environment, null, output, error);
+            this(commands, environment, output, error);
         }
 
         private OfProcess(List<String> commands,
                           SortedMap<String, String> environment,
-                          Path directory,
                           Charset output,
                           Charset error) {
             this.commands = commands;
             this.environment = Collections.unmodifiableSortedMap(environment);
-            this.directory = directory;
             this.output = output;
             this.error = error;
         }
@@ -345,15 +342,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess environment(SortedMap<String, String> environment) {
-            return new OfProcess(commands, new TreeMap<>(environment), directory, output, error);
-        }
-
-        public Path directory() {
-            return directory;
-        }
-
-        public OfProcess directory(Path directory) {
-            return new OfProcess(commands, new TreeMap<>(environment), directory, output, error);
+            return new OfProcess(commands, new TreeMap<>(environment), output, error);
         }
 
         @Override
@@ -364,9 +353,6 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         @Override
         public int execute(Path output, Path error, Tee tee) throws IOException {
             ProcessBuilder builder = new ProcessBuilder(commands);
-            if (directory != null) {
-                builder.directory(directory.toFile());
-            }
             builder.environment().clear();
             builder.environment().putAll(environment);
             builder.environment().putIfAbsent("COLUMNS", "80");

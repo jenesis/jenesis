@@ -170,7 +170,6 @@ public record Project(
                                                          (descriptor, mergedRepos, mergedResolvers) -> pomAware.apply(
                                         new ProjectModuleDescriptor(descriptor)
                                                 .location(descriptor.location())
-                                                .directory(descriptor.location())
                                                 .configuration(locations.apply(descriptor.configurations()))
                                                 .test(project.tests())
                                                 .source(project.sources())
@@ -1001,14 +1000,14 @@ public record Project(
                     A source directory gives the jar only what its compilers read - .java, .kt,
                     .scala, .groovy - as Maven's does, so a template beside the sources stays
                     out of it, and a file that must ship moves to a resource directory.
+                    A module's tests do not run in its folder and see no basedir property, as
+                    Surefire's do, so a test that opens src/test/... by a relative path is changed
+                    to read the file as a test resource.
                     A module inherits its parents' metadata as Maven's model does: the url and the
                     scm locations with the module's artifactId appended, unless the parent sets
                     child.*.inherit.append.path="false", and licenses or developers only as a whole.
                     What a module declares or inherits wins; project.properties at the root, which
                     skill/target lists the keys of, fills in only what the POMs leave out.
-                    A module's tests run in its own folder, with the basedir property set to it, as
-                    Surefire runs them, so a test that reads src/test/... by a relative path finds
-                    the file with no -Dbasedir in process-test.properties.
 
                     ## 3b. Or declare the build in module-info.java
 
