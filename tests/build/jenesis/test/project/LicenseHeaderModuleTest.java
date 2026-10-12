@@ -8,7 +8,6 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
-import build.jenesis.SequencedProperties;
 import build.jenesis.project.LicenseHeaderModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -102,29 +101,6 @@ public class LicenseHeaderModuleTest {
     }
 
     @Test
-    public void reads_the_header_from_the_text_of_licenseheader_properties() throws IOException {
-        Path configuration = Files.writeString(project.resolve(LicenseHeaderModule.CONFIGURATION), """
-                text=Copyright 2026 the original author or authors.\\n\\n\\
-                  Licensed under the Apache License, Version 2.0.
-                """);
-        Path sample = source("sample/Sample.java", "package sample;\n");
-
-        newExecutor(new LicenseHeaderModule().configuration(SequencedProperties.ofFiles(configuration))).execute();
-
-        assertThat(sample).hasContent(HEADER + "\n\npackage sample;\n");
-    }
-
-    @Test
-    public void refuses_a_licenseheader_properties_with_another_key_than_text() {
-        SequencedProperties other = new SequencedProperties();
-        other.setProperty("text", "Copyright 2026 the authors.");
-        other.setProperty("year", "2026");
-        assertThatThrownBy(() -> new LicenseHeaderModule().configuration(other))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("names year");
-    }
-
-    @Test
     public void derives_the_header_from_the_declared_license_and_copyright_without_text() throws IOException {
         Files.writeString(project.resolve(BuildStep.METADATA), """
                 license.0.name=The Apache Software License, Version 2.0
@@ -133,7 +109,7 @@ public class LicenseHeaderModuleTest {
                 """);
         Path sample = source("sample/Sample.java", "/* Copyright 2019 Someone Else */\npackage sample;\n");
 
-        newExecutor(new LicenseHeaderModule().configuration(new SequencedProperties())).execute();
+        newExecutor(new LicenseHeaderModule()).execute();
 
         assertThat(sample).hasContent("""
                 // SPDX-FileCopyrightText: 2026 the original author or authors

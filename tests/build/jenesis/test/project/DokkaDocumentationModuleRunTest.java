@@ -50,7 +50,7 @@ public class DokkaDocumentationModuleRunTest {
     private Path root, project, module;
 
     @Test
-    public void renders_html_with_the_options_of_dokka_properties() throws IOException {
+    public void renders_html_with_the_options_it_is_configured_with() throws IOException {
         sources("""
                 package sample
 
@@ -75,15 +75,14 @@ public class DokkaDocumentationModuleRunTest {
                 The module documentation, read from Module.md.
                 """);
         Files.writeString(module.resolve("sample.css"), ".sample-marker { color: teal; }\n");
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("module-name", "Sample module");
-        config.setProperty("includes", "Module.md");
-        config.setProperty("documented-visibilities", "public,internal");
-        config.setProperty("suppress-inherited-members", "true");
-        config.setProperty("source-link", "https://github.com/example/sample/tree/main/src");
-        config.setProperty("custom-styles", "sample.css");
-        config.setProperty("footer-message", "Rendered by Dokka for Jenesis");
-        document(config);
+        document(dokka -> dokka.moduleName("Sample module")
+                .includes(List.of(module.resolve("Module.md")))
+                .documentedVisibilities(Set.of(DokkaDocumentationModule.Visibility.PUBLIC,
+                        DokkaDocumentationModule.Visibility.INTERNAL))
+                .suppressInheritedMembers(true)
+                .sourceLink(URI.create("https://github.com/example/sample/tree/main/src"))
+                .customStyles(List.of(module.resolve("sample.css")))
+                .footerMessage("Rendered by Dokka for Jenesis"));
         Path output = output();
         assertThat(output.resolve("index.html")).content()
                 .contains("Rendered by Dokka for Jenesis")
@@ -108,9 +107,7 @@ public class DokkaDocumentationModuleRunTest {
                     fun greet(): String = "hello"
                 }
                 """);
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("format", "javadoc");
-        document(config);
+        document(dokka -> dokka.format(DokkaDocumentationModule.Format.JAVADOC));
         assertThat(output().resolve("sample/Sample.html")).content().contains("greet");
         assertThat(output().resolve("element-list")).content().contains("sample");
     }
@@ -124,10 +121,7 @@ public class DokkaDocumentationModuleRunTest {
                     fun nothing(): Int = 1
                 }
                 """);
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("report-undocumented", "true");
-        config.setProperty("fail-on-warning", "true");
-        assertThatThrownBy(() -> document(config))
+        assertThatThrownBy(() -> document(dokka -> dokka.reportUndocumented(true).failOnWarning(true)))
                 .as("a warning Dokka reports fails the build as a javadoc error does")
                 .rootCause()
                 .hasMessageContaining("Unexpected exit code: 1")
@@ -142,7 +136,7 @@ public class DokkaDocumentationModuleRunTest {
                 source);
     }
 
-    private void document(SequencedProperties config) throws IOException {
+    private void document(UnaryOperator<DokkaDocumentationModule> configuration) throws IOException {
         BuildExecutor executor = BuildExecutor.of(root,
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
@@ -154,11 +148,9 @@ public class DokkaDocumentationModuleRunTest {
                 0);
         executor.addSource("project", project);
         executor.addModule("dokka",
-                new DokkaDocumentationModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)))
-                        .pinning(Pinning.STRICT)
-                        .config(config)
-                        .location(module),
+                configuration.apply(new DokkaDocumentationModule(
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT)),
                 "project");
         executor.execute();
     }

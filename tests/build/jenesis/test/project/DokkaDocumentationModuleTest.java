@@ -75,7 +75,7 @@ public class DokkaDocumentationModuleTest {
 
     @Test
     public void hands_dokka_a_json_configuration_with_the_defaults_of_the_dokka_plugins() throws IOException {
-        Map<String, Object> configuration = document(new SequencedProperties());
+        Map<String, Object> configuration = document(dokka());
         assertThat(configuration)
                 .containsEntry("moduleName", "documentation")
                 .containsEntry("failOnWarning", false)
@@ -100,18 +100,18 @@ public class DokkaDocumentationModuleTest {
     }
 
     @Test
-    public void hands_dokka_the_module_name_visibilities_and_flags_dokka_properties_sets() throws IOException {
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("module-name", "Sample \"API\"");
-        config.setProperty("documented-visibilities", "public, Protected,INTERNAL");
-        config.setProperty("suppress-obvious-functions", "false");
-        config.setProperty("suppress-inherited-members", "true");
-        config.setProperty("skip-empty-packages", "false");
-        config.setProperty("skip-deprecated", "true");
-        config.setProperty("report-undocumented", "true");
-        config.setProperty("fail-on-warning", "true");
-        config.setProperty("jdk-version", "17");
-        Map<String, Object> configuration = document(config);
+    public void hands_dokka_the_module_name_visibilities_and_flags_it_is_configured_with() throws IOException {
+        Map<String, Object> configuration = document(dokka().moduleName("Sample \"API\"")
+                .documentedVisibilities(Set.of(DokkaDocumentationModule.Visibility.INTERNAL,
+                        DokkaDocumentationModule.Visibility.PUBLIC,
+                        DokkaDocumentationModule.Visibility.PROTECTED))
+                .suppressObviousFunctions(false)
+                .suppressInheritedMembers(true)
+                .skipEmptyPackages(false)
+                .skipDeprecated(true)
+                .reportUndocumented(true)
+                .failOnWarning(true)
+                .jdkVersion(17));
         assertThat(configuration)
                 .containsEntry("moduleName", "Sample \"API\"")
                 .containsEntry("failOnWarning", true)
@@ -129,15 +129,14 @@ public class DokkaDocumentationModuleTest {
     @Test
     public void links_every_source_folder_to_the_repository_with_the_line_suffix_of_the_dokka_plugins()
             throws IOException {
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("source-link", "https://github.com/example/sample/tree/main/src/main/kotlin");
-        Map<String, Object> sourceSet = sourceSet(document(config));
+        DokkaDocumentationModule linked = dokka()
+                .sourceLink(URI.create("https://github.com/example/sample/tree/main/src/main/kotlin"));
+        Map<String, Object> sourceSet = sourceSet(document(linked));
         assertThat(list(sourceSet.get("sourceLinks"))).singleElement().isEqualTo(Map.of(
                 "localDirectory", list(sourceSet.get("sourceRoots")).getFirst(),
                 "remoteUrl", "https://github.com/example/sample/tree/main/src/main/kotlin",
                 "remoteLineSuffix", "#L"));
-        config.setProperty("source-link-suffix", "#lines-");
-        Map<String, Object> suffixed = sourceSet(document(config));
+        Map<String, Object> suffixed = sourceSet(document(linked.sourceLinkSuffix("#lines-")));
         assertThat(list(suffixed.get("sourceLinks"))).singleElement().isEqualTo(Map.of(
                 "localDirectory", list(suffixed.get("sourceRoots")).getFirst(),
                 "remoteUrl", "https://github.com/example/sample/tree/main/src/main/kotlin",
@@ -146,11 +145,11 @@ public class DokkaDocumentationModuleTest {
 
     @Test
     public void links_external_documentation_with_its_package_list_or_the_one_beside_it() throws IOException {
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("external-link.okio", "https://square.github.io/okio/3.x/okio/");
-        config.setProperty("external-link.okio.package-list", "https://square.github.io/okio/3.x/okio/okio/package-list");
-        config.setProperty("external-link.coroutines", "https://kotlinlang.org/api/kotlinx.coroutines");
-        assertThat(list(sourceSet(document(config)).get("externalDocumentationLinks"))).containsExactly(
+        assertThat(list(sourceSet(document(dokka()
+                .externalLink(URI.create("https://kotlinlang.org/api/kotlinx.coroutines"))
+                .externalLink(URI.create("https://square.github.io/okio/3.x/okio/"),
+                        URI.create("https://square.github.io/okio/3.x/okio/okio/package-list"))))
+                .get("externalDocumentationLinks"))).containsExactly(
                 Map.of("url", "https://kotlinlang.org/api/kotlinx.coroutines",
                         "packageListUrl", "https://kotlinlang.org/api/kotlinx.coroutines/package-list"),
                 Map.of("url", "https://square.github.io/okio/3.x/okio/",
@@ -159,24 +158,21 @@ public class DokkaDocumentationModuleTest {
 
     @Test
     public void suppresses_every_package_a_pattern_of_suppressed_packages_matches() throws IOException {
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("suppressed-packages", "sample\\.internal.*,sample\\.impl");
-        assertThat(list(sourceSet(document(config)).get("perPackageOptions"))).containsExactly(
+        assertThat(list(sourceSet(document(dokka().suppressedPackages(List.of(Pattern.compile("sample\\.internal.*"),
+                Pattern.compile("sample\\.impl"))))).get("perPackageOptions"))).containsExactly(
                 suppressed("sample\\.internal.*"),
                 suppressed("sample\\.impl"));
     }
 
     @Test
-    public void binds_includes_assets_and_styles_from_the_module_folder_for_the_base_plugin() throws IOException {
+    public void binds_includes_assets_and_styles_for_the_base_plugin() throws IOException {
         Files.writeString(Files.createDirectories(module.resolve("docs")).resolve("Module.md"), "# Module sample\n");
         Files.writeString(module.resolve("docs/logo.svg"), "<svg/>");
         Files.writeString(module.resolve("docs/custom.css"), ".custom {}");
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("includes", "docs/Module.md");
-        config.setProperty("custom-assets", "docs/logo.svg");
-        config.setProperty("custom-styles", "docs/custom.css");
-        config.setProperty("footer-message", "(c) \"Sample\"");
-        Map<String, Object> configuration = document(config);
+        Map<String, Object> configuration = document(dokka().includes(List.of(module.resolve("docs/Module.md")))
+                .customAssets(List.of(module.resolve("docs/logo.svg")))
+                .customStyles(List.of(module.resolve("docs/custom.css")))
+                .footerMessage("(c) \"Sample\""));
         assertThat(list(sourceSet(configuration).get("includes"))).singleElement().satisfies(file -> {
             assertThat(Path.of(file.toString()).startsWith(module))
                     .as("Dokka reads a copy bound into the build, so its content is an input of the step")
@@ -199,26 +195,22 @@ public class DokkaDocumentationModuleTest {
     public void runs_dokka_again_when_an_included_file_or_an_option_changes() throws IOException {
         sources();
         Path include = Files.writeString(module.resolve("Module.md"), "# Module sample\n\nFirst.\n");
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("includes", "Module.md");
-        run(config);
-        run(config);
+        DokkaDocumentationModule included = dokka().includes(List.of(include));
+        run(included);
+        run(included);
         assertThat(CONFIGURATIONS).as("nothing changed, so Dokka does not run again").hasSize(1);
         Files.writeString(include, "# Module sample\n\nSecond.\n");
-        run(config);
+        run(included);
         assertThat(CONFIGURATIONS).as("an included file is an input of the step").hasSize(2);
-        config.setProperty("footer-message", "Changed");
-        run(config);
+        run(included.footerMessage("Changed"));
         assertThat(CONFIGURATIONS).as("an option is part of the step's cache key").hasSize(3);
     }
 
     @Test
     public void requires_the_javadoc_plugin_only_for_the_javadoc_format() throws IOException {
-        assertThat(required(new SequencedProperties())).doesNotContain(
+        assertThat(required(dokka())).doesNotContain(
                 "dokka/runtime/maven/org.jetbrains.dokka/javadoc-plugin/RELEASE");
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("format", "javadoc");
-        assertThat(required(config)).contains(
+        assertThat(required(dokka().format(DokkaDocumentationModule.Format.JAVADOC))).contains(
                 "dokka/runtime/maven/org.jetbrains.dokka/dokka-cli/RELEASE",
                 "dokka/runtime/maven/org.jetbrains.dokka/dokka-base/RELEASE",
                 "dokka/runtime/maven/org.jetbrains.dokka/javadoc-plugin/RELEASE");
@@ -229,7 +221,18 @@ public class DokkaDocumentationModuleTest {
             throws IOException {
         sources();
         Path configuration = Files.createDirectories(root.resolve("configuration"));
-        Files.writeString(configuration.resolve("dokka.properties"), "module-name=Configured\nincludes=Module.md\n");
+        Files.writeString(configuration.resolve("dokka.properties"), """
+                module-name=Configured
+                includes=Module.md
+                documented-visibilities=public, Protected
+                skip-deprecated=true
+                suppressed-packages=sample\\\\.internal.*
+                jdk-version=17
+                source-link=https://github.com/example/sample/tree/main/src
+                external-link.okio=https://square.github.io/okio/3.x/okio/
+                external-link.okio.package-list=https://square.github.io/okio/3.x/okio/okio/package-list
+                external-link.coroutines=https://kotlinlang.org/api/kotlinx.coroutines
+                """);
         Files.writeString(module.resolve("Module.md"), "# Module Configured\n");
         Path jar = jar();
         BuildExecutor executor = newExecutor();
@@ -244,97 +247,50 @@ public class DokkaDocumentationModuleTest {
         executor.execute();
         Map<String, Object> recorded = recorded();
         assertThat(recorded).containsEntry("moduleName", "Configured");
-        assertThat(list(sourceSet(recorded).get("includes"))).singleElement()
+        Map<String, Object> sourceSet = sourceSet(recorded);
+        assertThat(list(sourceSet.get("includes"))).singleElement()
                 .satisfies(file -> assertThat(Path.of(file.toString())).hasContent("# Module Configured"));
-    }
-
-    @Test
-    public void refuses_a_key_dokka_properties_does_not_know() {
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("moduleName", "sample");
-        assertThatThrownBy(() -> document(config))
-                .hasRootCauseInstanceOf(IllegalArgumentException.class)
-                .rootCause()
-                .hasMessageContaining("Unknown dokka property: moduleName")
-                .hasMessageContaining("module-name")
-                .hasMessageContaining("external-link.<name>.package-list");
-    }
-
-    @Test
-    public void refuses_a_format_the_dokka_plugins_do_not_render() {
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("format", "gfm");
-        assertThatThrownBy(() -> document(config))
-                .hasRootCauseInstanceOf(IllegalArgumentException.class)
-                .rootCause()
-                .hasMessageContaining("Unknown dokka format: gfm (expected one of [html, javadoc])");
-    }
-
-    @Test
-    public void refuses_a_visibility_dokka_does_not_know() {
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("documented-visibilities", "public,friends");
-        assertThatThrownBy(() -> document(config))
-                .hasRootCauseInstanceOf(IllegalArgumentException.class)
-                .rootCause()
-                .hasMessageContaining("Unknown dokka visibility in documented-visibilities: friends")
-                .hasMessageContaining("[internal, package, private, protected, public]");
+        assertThat(sourceSet)
+                .containsEntry("documentedVisibilities", List.of("PUBLIC", "PROTECTED"))
+                .containsEntry("skipDeprecated", true)
+                .containsEntry("jdkVersion", 17.0);
+        assertThat(list(sourceSet.get("perPackageOptions"))).containsExactly(suppressed("sample\\.internal.*"));
+        assertThat(list(sourceSet.get("sourceLinks"))).singleElement()
+                .satisfies(link -> assertThat(map(link)).containsEntry("remoteLineSuffix", "#L"));
+        assertThat(list(sourceSet.get("externalDocumentationLinks"))).containsExactly(
+                Map.of("url", "https://kotlinlang.org/api/kotlinx.coroutines",
+                        "packageListUrl", "https://kotlinlang.org/api/kotlinx.coroutines/package-list"),
+                Map.of("url", "https://square.github.io/okio/3.x/okio/",
+                        "packageListUrl", "https://square.github.io/okio/3.x/okio/okio/package-list"));
     }
 
     @Test
     public void refuses_a_jdk_version_that_is_no_feature_release() {
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("jdk-version", "1.8");
-        assertThatThrownBy(() -> document(config))
-                .hasRootCauseInstanceOf(IllegalArgumentException.class)
-                .rootCause()
-                .hasMessageContaining("The dokka property jdk-version is 1.8");
+        assertThatThrownBy(() -> dokka().jdkVersion(0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The JDK version 0 is no feature release");
     }
 
     @Test
-    public void refuses_a_line_suffix_without_a_source_link() {
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("source-link-suffix", "#L");
-        assertThatThrownBy(() -> document(config))
+    public void refuses_an_include_that_is_no_file() {
+        assertThatThrownBy(() -> document(dokka().includes(List.of(module.resolve("docs/Missing.md")))))
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .rootCause()
-                .hasMessageContaining("declare source-link=");
+                .hasMessageContaining(module.resolve("docs/Missing.md").toString())
+                .hasMessageContaining("among its includes, but it is no file");
     }
 
-    @Test
-    public void refuses_a_package_list_without_its_external_link() {
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("external-link.okio.package-list", "https://square.github.io/okio/3.x/okio/okio/package-list");
-        assertThatThrownBy(() -> document(config))
-                .hasRootCauseInstanceOf(IllegalArgumentException.class)
-                .rootCause()
-                .hasMessageContaining("declare external-link.okio=<url>");
-    }
-
-    @Test
-    public void refuses_an_include_the_module_folder_does_not_hold() {
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty("includes", "docs/Missing.md");
-        assertThatThrownBy(() -> document(config))
-                .hasRootCauseInstanceOf(IllegalArgumentException.class)
-                .rootCause()
-                .hasMessageContaining("The dokka property includes names docs/Missing.md")
-                .hasMessageContaining("name a file relative to the module's folder");
-    }
-
-    private Map<String, Object> document(SequencedProperties config) throws IOException {
+    private Map<String, Object> document(DokkaDocumentationModule dokka) throws IOException {
         sources();
         CONFIGURATIONS.clear();
-        run(config);
+        run(dokka);
         return recorded();
     }
 
-    private void run(SequencedProperties config) throws IOException {
+    private void run(DokkaDocumentationModule dokka) throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("dokka",
-                dokka().config(config).location(module).factory(ProcessHandler.OfTool.of(new Recording())),
-                "project");
+        executor.addModule("dokka", dokka.factory(ProcessHandler.OfTool.of(new Recording())), "project");
         executor.execute();
     }
 
@@ -365,10 +321,10 @@ public class DokkaDocumentationModuleTest {
                 "documentedVisibilities", List.of());
     }
 
-    private Set<String> required(SequencedProperties config) throws IOException {
+    private Set<String> required(DokkaDocumentationModule dokka) throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("dokka", dokka().config(config), "project");
+        executor.addModule("dokka", dokka, "project");
         executor.execute("dokka/required");
         return SequencedProperties.ofFiles(root.resolve("dokka").resolve("required").resolve("output")
                 .resolve(BuildStep.REQUIRES)).stringPropertyNames();
