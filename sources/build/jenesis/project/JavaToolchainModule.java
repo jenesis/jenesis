@@ -123,8 +123,11 @@ public record JavaToolchainModule(BuildExecutorModule generator,
                                                       SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path target = context.next().resolve(SOURCES);
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
                 Path generated = argument.folder().resolve(SOURCES);
-                if (argument.removed() || !Files.isDirectory(generated)) {
+                if (!Files.isDirectory(generated)) {
                     continue;
                 }
                 try (Stream<Path> files = Files.walk(generated)) {
