@@ -377,7 +377,6 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         InferredTestObservationModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
                                 .pinning(descriptor.pinning())
                                 .pathPlacement(descriptor.pathPlacement())
-                                .directory(descriptor.directory())
                                 .custom(hooks.getOrDefault("observed", none))),
                         Stream.of(descriptor.resources().stream(),
                                         resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"),
