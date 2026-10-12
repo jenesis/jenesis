@@ -45,7 +45,7 @@ public class InferredCompilerChainModuleTest {
                         Collections.emptyNavigableSet(),
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor));
         executor.execute();
 
         Path javaClasses = root
@@ -90,7 +90,7 @@ public class InferredCompilerChainModuleTest {
                         Collections.emptyNavigableSet(),
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor));
         executor.execute();
 
         Path javaClasses = root
@@ -183,7 +183,7 @@ public class InferredCompilerChainModuleTest {
                                 Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                                 Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))))
                         .archiver(null),
-                "project");
+                "project", standardLibrary(executor));
         executor.execute();
 
         Path classes = root.resolve("toolchain")
@@ -227,7 +227,7 @@ public class InferredCompilerChainModuleTest {
                         Collections.emptyNavigableSet(),
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor));
         executor.execute();
 
         Path kotlinClasses = root
@@ -261,7 +261,7 @@ public class InferredCompilerChainModuleTest {
                         Collections.emptyNavigableSet(),
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor));
         executor.execute();
 
         Path resourceOutput = root
@@ -296,7 +296,7 @@ public class InferredCompilerChainModuleTest {
                         Collections.emptyNavigableSet(),
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor));
         executor.execute();
 
         assertThat(root.resolve("chain").resolve(InferredCompilerChainModule.COMPILE).resolve(InferredCompilerChainModule.RESOURCE))
@@ -378,7 +378,7 @@ public class InferredCompilerChainModuleTest {
                         Collections.emptyNavigableSet(),
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor));
         executor.execute();
 
         Path resourceOutput = root
@@ -573,7 +573,7 @@ public class InferredCompilerChainModuleTest {
                         Collections.emptyNavigableSet(),
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor));
         executor.execute();
     }
 
@@ -620,6 +620,16 @@ public class InferredCompilerChainModuleTest {
             cursor = cursor.getParent();
         }
         return false;
+    }
+
+    private String standardLibrary(BuildExecutor executor) throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.jetbrains.kotlin/kotlin-stdlib/" + KOTLIN_VERSION, "");
+        requires.store(project.resolve(BuildStep.REQUIRES));
+        executor.addModule("libraries", new Dependencies(
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).group("main"), "project");
+        return "libraries";
     }
 
     private BuildExecutor newExecutor() throws IOException {
