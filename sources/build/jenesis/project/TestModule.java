@@ -984,11 +984,6 @@ public class TestModule implements BuildExecutorModule {
         }
 
         @Override
-        public boolean shouldReproduce() {
-            return observers.stream().allMatch(ObservabilityEngine::shouldReproduce);
-        }
-
-        @Override
         protected List<String> configurations() {
             return List.of("java", "test");
         }

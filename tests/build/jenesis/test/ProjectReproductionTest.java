@@ -43,25 +43,24 @@ public class ProjectReproductionTest {
     }
 
     @Test
-    public void reports_a_step_writing_a_random_value_as_the_cause_and_the_steps_after_it_as_consequences() throws IOException {
-        Project project = project(new Stamp(true), "target");
-        assertThatThrownBy(project::build)
-                .isInstanceOf(IllegalStateException.class)
-                .satisfies(error -> {
-                    String message = error.getMessage();
-                    assertThat(message).containsPattern("Caused by [^\\n]*\\n  [^\\n]*/stamp: value\\.txt\\n");
-                    String consequences = message.substring(message.indexOf("handed a different input"));
-                    assertThat(consequences).containsPattern("\\n  [^\\n]*/copy(\\n|$)").containsPattern("\\n  [^\\n]*/archive(\\n|$)");
-                    assertThat(message.indexOf("/stamp")).isLessThan(message.indexOf("handed a different input"));
-                });
+    public void reports_a_step_writing_a_random_value_as_the_cause_and_the_steps_after_it_as_consequences_without_failing() throws IOException {
+        project(new Stamp(true), "target").build();
+        String message = printed.stream().filter(line -> line.startsWith("The build did not reproduce")).findFirst().orElseThrow();
+        assertThat(message)
+                .containsPattern("3 of \\d+ steps wrote a different output")
+                .containsPattern("fingerprint SHA-256:[0-9a-f]{64}\\n")
+                .containsPattern("Caused by [^\\n]*\\n  [^\\n]*/stamp: value\\.txt\\n");
+        String consequences = message.substring(message.indexOf("handed a different input"));
+        assertThat(consequences).containsPattern("\\n  [^\\n]*/copy(\\n|$)").containsPattern("\\n  [^\\n]*/archive(\\n|$)");
+        assertThat(message.indexOf("/stamp")).isLessThan(message.indexOf("handed a different input"));
         assertThat(root.resolve("reproduced")).as("a difference keeps the second tree to inspect").isDirectory();
     }
 
     @Test
-    public void leaves_out_a_step_declaring_its_output_not_reproducible_and_the_steps_handed_that_output() throws IOException {
-        project(new Unreproducible(), "target").build();
-        assertThat(printed).anyMatch(line -> line.startsWith("The build reproduced")
-                && line.contains("whose output is not reproducible by nature or follows from such a step"));
+    public void prints_the_summary_alone_when_asked_not_to_name_the_steps() throws IOException {
+        project(new Environment(Map.of("print.reproduce", "false")), new Stamp(true), "target").build();
+        assertThat(printed)
+                .anyMatch(line -> line.startsWith("The build did not reproduce") && !line.contains("\n"));
     }
 
     @Test
@@ -91,8 +90,12 @@ public class ProjectReproductionTest {
     }
 
     private Project project(BuildStep stamp, String target) throws IOException {
+        return project(Environment.NONE, stamp, target);
+    }
+
+    private Project project(Environment environment, BuildStep stamp, String target) throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module sample { }\n");
-        return Project.ofEnvironment(Environment.NONE.out(printed::add), root)
+        return Project.ofEnvironment(environment.out(printed::add), root)
                 .target(root.resolve(target))
                 .reproduce(root.resolve("reproduced"))
                 .layout(Project.Layout.MODULAR)
@@ -110,22 +113,6 @@ public class ProjectReproductionTest {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Files.writeString(context.next().resolve("value.txt"), random ? UUID.randomUUID().toString() : "value");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
-        }
-    }
-
-    record Unreproducible() implements BuildStep {
-
-        @Override
-        public boolean shouldReproduce() {
-            return false;
-        }
-
-        @Override
-        public CompletionStage<BuildStepResult> apply(Executor executor,
-                                                      BuildStepContext context,
-                                                      SequencedMap<String, BuildStepArgument> arguments) throws IOException {
-            Files.writeString(context.next().resolve("value.txt"), UUID.randomUUID().toString());
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }
