@@ -45,7 +45,6 @@ Compile avoidance matters most: it is the largest share of the difference to Gra
 | Gap | Size | Projects |
 |---|---|---|
 | Documentation is switched on or off for the whole project; `packaging.properties` has no key for one module. | S | netty |
-| No development-only scope, for a dependency the application runs with locally but never ships. | S | spring-petclinic (DevTools kept in a Maven profile) |
 
 ## Compilers
 
@@ -87,6 +86,9 @@ These are decisions rather than gaps. The briefing says so and names the change 
   module, written below `classes/` at its `binary/compiled`, and a framework that wants a file path in a system
   property gets one from a `LauncherSessionListener` of the tests that copies the resource out
   (`skill/extend`; quarkus, mockito);
+- a development-only scope: Maven has none, and what keeps Spring DevTools out of a deliverable is Spring Boot's
+  own plugins (`excludeDevtools` of `repackage`, Gradle's `developmentOnly`), so it stays in a Maven profile that
+  a property activates, which Jenesis does not read (spring-petclinic);
 - white-box tests through `--patch-module`;
 - Gradle's highest-version conflict resolution;
 - a root location for configuration of the tests alone or the main code alone - a file that differs for the tests

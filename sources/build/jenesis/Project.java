@@ -1712,6 +1712,11 @@ public record Project(
                           bootstrap over the jar, and the tests are handed the model its test
                           support reads; @QuarkusTest runs on the class path only
                       war, ear -> none; a war module is skipped with a [SKIPPED] line
+                      spring-boot-devtools, kept out by repackage's excludeDevtools or Gradle's
+                          developmentOnly -> none; declare it in a pom.xml profile activated by a
+                          property, as <property><name>!noDevtools</name></property>, which Maven
+                          activates by default and Jenesis does not read, so no bundle, launcher jar
+                          or published POM carries it
                       apache-rat-plugin -> none; the release audit of one foundation's policy is
                           a plugin's
                       GWT, Android, Angular or Node front ends, Asciidoctor -> none; the tool keeps
