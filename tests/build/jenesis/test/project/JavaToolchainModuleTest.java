@@ -8,6 +8,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
+import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
@@ -41,6 +42,45 @@ public class JavaToolchainModuleTest {
                 false,
                 false,
                 0);
+    }
+
+    @Test
+    public void hands_on_the_generated_sources_of_the_compilers_that_remain_when_one_is_removed() throws IOException {
+        buildExecutor.addSource("input", input);
+        buildExecutor.addModule("output", new JavaToolchainModule().compiler((executor, _) -> {
+            executor.addStep("first", new Generating("First"));
+            executor.addStep("second", new Generating("Second"));
+        }).archiver(null), "input");
+        assertThat(buildExecutor.execute().get("output/processed").resolve(BuildStep.SOURCES))
+                .isDirectoryContaining(path -> path.getFileName().toString().equals("Second.java"));
+        BuildExecutor again = BuildExecutor.of(root,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        again.addSource("input", input);
+        again.addModule("output", new JavaToolchainModule().compiler((executor, _) ->
+                executor.addStep("first", new Generating("First"))).archiver(null), "input");
+        Path sources = again.execute().get("output/processed").resolve(BuildStep.SOURCES);
+        assertThat(sources.resolve("First.java")).exists();
+        assertThat(sources.resolve("Second.java")).as("a compiler no longer wired generates nothing").doesNotExist();
+    }
+
+    record Generating(String name) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.SOURCES)).resolve(name + ".java"),
+                    "class " + name + " { }");
+            Files.createDirectories(context.next().resolve(BuildStep.CLASSES));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
     }
 
     @Test
