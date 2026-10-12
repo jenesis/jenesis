@@ -9,6 +9,8 @@ import build.jenesis.SequencedProperties;
 
 public class Assign implements BuildStep {
 
+    public static final String VARIANTS = "variants.properties", INACTIVE = "inactive.properties";
+
     private final BiFunction<Set<String>, SequencedSet<Path>, Map<String, Path>> assigner;
 
     public Assign() {
@@ -46,7 +48,11 @@ public class Assign implements BuildStep {
     @Override
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
         return arguments.values().stream().anyMatch(argument ->
-                argument.hasChanged(Path.of(ARTIFACTS), Path.of(IDENTITY), Path.of(JMod.JMODS)));
+                argument.hasChanged(Path.of(ARTIFACTS),
+                        Path.of(IDENTITY),
+                        Path.of(JMod.JMODS),
+                        Path.of(Classifiers.CLASSIFIERS),
+                        Path.of(Classifiers.DORMANT)));
     }
 
     @Override
@@ -57,6 +63,8 @@ public class Assign implements BuildStep {
         SequencedProperties assignments = new SequencedProperties();
         SequencedSet<Path> files = new TreeSet<>();
         SequencedSet<Path> jmods = new TreeSet<>();
+        SequencedMap<String, Path> classified = new TreeMap<>();
+        SequencedMap<String, String> dormant = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -76,6 +84,19 @@ public class Assign implements BuildStep {
                         jmods.add(archive);
                     }
                 }
+            }
+            Path variants = argument.folder().resolve(Classifiers.CLASSIFIERS);
+            if (Files.isDirectory(variants)) {
+                try (DirectoryStream<Path> stream = Files.newDirectoryStream(variants, "*.jar")) {
+                    for (Path variant : stream) {
+                        String name = variant.getFileName().toString();
+                        classified.put(name.substring(0, name.length() - ".jar".length()), variant);
+                    }
+                }
+            }
+            Path profiles = argument.folder().resolve(Classifiers.DORMANT);
+            if (Files.isRegularFile(profiles)) {
+                SequencedProperties.ofFiles(profiles).forEachProperty(dormant::putIfAbsent);
             }
             Path coordinates = argument.folder().resolve(IDENTITY);
             if (Files.exists(coordinates)) {
@@ -116,7 +137,66 @@ public class Assign implements BuildStep {
                 assignments.setProperty(coordinate + ":jmod", archive);
             }
         }
+        SequencedProperties variants = new SequencedProperties(), inactive = new SequencedProperties();
+        for (String coordinate : assigned.keySet()) {
+            classified.forEach((classifier, variant) -> {
+                String derived = classified(coordinate, classifier);
+                if (derived != null) {
+                    assignments.setProperty(derived, context.next()
+                            .relativize(variant)
+                            .toString()
+                            .replace(File.separatorChar, '/'));
+                    variants.setProperty(derived, coordinate);
+                }
+            });
+            dormant.forEach((classifier, profile) -> {
+                String derived = classified(coordinate, classifier);
+                if (derived != null) {
+                    inactive.setProperty(derived, profile);
+                }
+            });
+        }
         assignments.store(context.next().resolve(IDENTITY));
+        if (!variants.isEmpty()) {
+            variants.store(context.next().resolve(VARIANTS));
+        }
+        if (!inactive.isEmpty()) {
+            inactive.store(context.next().resolve(INACTIVE));
+        }
         return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    public static String classified(String coordinate, String classifier) {
+        int slash = coordinate.indexOf('/');
+        if (slash < 1 || coordinate.indexOf(':') >= 0) {
+            return null;
+        }
+        String repository = coordinate.substring(0, slash + 1);
+        String[] segments = coordinate.substring(slash + 1).split("/");
+        return switch (segments.length) {
+            case 1 -> repository + segments[0] + "-" + classifier;
+            case 2 -> repository + segments[0] + "-" + classifier + "/" + segments[1];
+            case 3 -> repository + segments[0] + "/" + segments[1] + "/jar/" + classifier + "/" + segments[2];
+            case 4 -> segments[2].equals("jar")
+                    ? repository + segments[0] + "/" + segments[1] + "/jar/" + classifier + "/" + segments[3]
+                    : null;
+            default -> null;
+        };
+    }
+
+    public static String unclassified(String coordinate) {
+        int slash = coordinate.indexOf('/');
+        if (slash < 1 || coordinate.indexOf(':') >= 0) {
+            return null;
+        }
+        String repository = coordinate.substring(0, slash + 1);
+        String[] segments = coordinate.substring(slash + 1).split("/");
+        int dash = segments[0].indexOf('-');
+        return switch (segments.length) {
+            case 1 -> dash > 0 ? repository + segments[0].substring(0, dash) : null;
+            case 2 -> dash > 0 ? repository + segments[0].substring(0, dash) + "/" + segments[1] : null;
+            case 5 -> segments[2].equals("jar") ? repository + segments[0] + "/" + segments[1] + "/" + segments[4] : null;
+            default -> null;
+        };
     }
 }

@@ -813,6 +813,62 @@ public class MavenModuleResolverTest {
                 DependencyScope.COMPILE).artifacts();
     }
 
+    @Test
+    public void a_classifier_pin_resolves_the_jar_of_that_classifier_in_place_of_the_artifact_s_own() throws IOException {
+        addJarToMavenRepository("org.example", "example-core", "1.2.3");
+        byte[] variant = "linux".getBytes(StandardCharsets.UTF_8);
+        Files.write(mavenRepoFolder.resolve("org/example/example-core/1.2.3/example-core-1.2.3-linux.jar"), variant);
+        String checksum;
+        try {
+            checksum = "SHA-256/" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(variant));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar/1.2.3:pom", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>1.2.3</version>
+                </project>"""));
+
+        SequencedMap<String, Resolver.Resolved> resolved = new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
+                Runnable::run,
+                "module",
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
+                new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(Map.of("foo.bar", ":linux:1.2.3 " + checksum)),
+                DependencyScope.COMPILE).artifacts();
+
+        assertThat(resolved)
+                .as("the classified jar replaces the artifact's own, which is not resolved beside it")
+                .containsOnlyKeys("maven/org.example/example-core/jar/linux/1.2.3", "module/foo.bar/1.2.3");
+        assertThat(resolved.get("maven/org.example/example-core/jar/linux/1.2.3").file()).hasBinaryContent(variant);
+        assertThat(resolved.get("maven/org.example/example-core/jar/linux/1.2.3").checksum())
+                .as("the checksum of a classifier pin describes the classified jar")
+                .isEqualTo(checksum);
+    }
+
+    @Test
+    public void a_classifier_pin_refuses_a_classified_jar_whose_checksum_differs() throws IOException {
+        addJarToMavenRepository("org.example", "example-core", "1.2.3");
+        Files.writeString(mavenRepoFolder.resolve("org/example/example-core/1.2.3/example-core-1.2.3-linux.jar"), "linux");
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar/1.2.3:pom", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>1.2.3</version>
+                </project>"""));
+
+        assertThatThrownBy(() -> new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
+                Runnable::run,
+                "module",
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
+                new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(Map.of("foo.bar", ":linux:1.2.3 SHA-256/0000")),
+                DependencyScope.COMPILE))
+                .hasStackTraceContaining("example-core/jar/linux/1.2.3");
+    }
+
     private static Repository stubRepository(Map<String, String> fetched, Map<String, String> bodies) {
         return (_, coordinate, _) -> {
             fetched.put(coordinate, "");

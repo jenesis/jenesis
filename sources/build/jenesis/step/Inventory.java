@@ -107,6 +107,7 @@ public class Inventory implements BuildStep {
                 Path.of(NATIVES),
                 Path.of(POM),
                 Path.of(ARTIFACTS),
+                Path.of(Classifiers.CLASSIFIERS),
                 Path.of(Bom.BOM),
                 Path.of(SOURCES),
                 Path.of(DOCUMENTATION),
@@ -147,6 +148,7 @@ public class Inventory implements BuildStep {
         Path metadataImage = null;
         Path dockerContext = null;
         SequencedSet<Path> artifacts = new LinkedHashSet<>();
+        SequencedSet<Path> classified = new LinkedHashSet<>();
         SequencedSet<Path> processes = new LinkedHashSet<>();
         SequencedSet<Path> bomArtifacts = new LinkedHashSet<>();
         SequencedSet<Path> sources = new LinkedHashSet<>(), generated = new LinkedHashSet<>();
@@ -228,6 +230,7 @@ public class Inventory implements BuildStep {
                 pomFile = pomCandidate;
             }
             collect(folder.resolve(ARTIFACTS), artifacts);
+            collect(folder.resolve(Classifiers.CLASSIFIERS), classified);
             collect(folder.resolve(Bom.BOM), bomArtifacts);
             collect(folder.resolve(SOURCES), sources);
             if (holdsSources(folder.resolve(SOURCES))) {
@@ -453,6 +456,11 @@ public class Inventory implements BuildStep {
             inventory.setProperty(prefix + "bom." + bomIndex++, entry.getKey() + " " + entry.getValue());
         }
         writePaths(inventory, context, prefix + "artifacts", artifacts);
+        for (Path jar : classified) {
+            String name = jar.getFileName().toString();
+            inventory.setProperty(prefix + "attachment." + name.substring(0, name.length() - ".jar".length()),
+                    relativize(context, jar));
+        }
         writePaths(inventory, context, prefix + "process", processes);
         writePaths(inventory, context, prefix + "bomfile", bomArtifacts);
         writePaths(inventory, context, prefix + "sources", sources.stream()
