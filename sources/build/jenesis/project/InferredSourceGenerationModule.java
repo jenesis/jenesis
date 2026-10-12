@@ -380,7 +380,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                     prepare(properties,
                             ProtocModule.FOLDER,
                             Set.of(ProtocModule.DEFINITION),
-                            new LinkedHashMap<>()),
+                            Collections.emptyNavigableMap()),
                     protoc.apply(classifier == null ? module : module.classifier(classifier)));
         }
         properties = read(AVRO, AVRO_KEYS, avro);
@@ -391,7 +391,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                     prepare(properties,
                             AvroModule.FOLDER,
                             Set.of(AvroModule.SCHEMA, AvroModule.PROTOCOL),
-                            new LinkedHashMap<>()),
+                            Collections.emptyNavigableMap()),
                      avro.apply(avroModule
                             .pinning(pinning)
                             .arguments(properties.words("arguments"))));
@@ -439,7 +439,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                     prepare(properties,
                             AntlrModule.FOLDER,
                             Set.of(AntlrModule.GRAMMAR),
-                            new LinkedHashMap<>()),
+                            Collections.emptyNavigableMap()),
                      antlr.apply(antlrModule
                             .pinning(pinning)
                             .packageName(properties.value("package"))

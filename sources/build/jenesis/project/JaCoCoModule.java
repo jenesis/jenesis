@@ -37,7 +37,7 @@ public class JaCoCoModule implements BuildExecutorModule {
              null,
              "jacoco",
              false,
-             new LinkedHashMap<>(),
+             Collections.emptyNavigableMap(),
              new ProcessBuildStep.Terms());
     }
 
@@ -48,7 +48,7 @@ public class JaCoCoModule implements BuildExecutorModule {
                 null,
                 "jacoco",
                 false,
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 ProcessBuildStep.Terms.ofEnvironment(environment, "jacoco"));
     }
 
