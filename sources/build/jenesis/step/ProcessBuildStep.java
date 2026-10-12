@@ -202,6 +202,24 @@ public abstract class ProcessBuildStep implements BuildStep {
         return properties;
     }
 
+    protected static ForkedOptions forked(SequencedMap<String, SequencedMap<String, String>> properties) {
+        List<String> jvm = new ArrayList<>(), program = new ArrayList<>();
+        for (String option : prepended(properties)) {
+            if (option.startsWith("-J")) {
+                jvm.add(option.substring(2));
+            } else if (option.startsWith("-D")) {
+                jvm.add(option);
+            } else {
+                program.add(option);
+            }
+        }
+        properties.values().forEach(Map::clear);
+        return new ForkedOptions(jvm, program);
+    }
+
+    protected record ForkedOptions(List<String> jvm, List<String> program) {
+    }
+
     protected static List<String> prepended(SequencedMap<String, SequencedMap<String, String>> properties) {
         List<String> prepended = new ArrayList<>();
         for (SequencedMap<String, String> folderMap : properties.values()) {

@@ -210,15 +210,8 @@ public class KspModule implements BuildExecutorModule {
                         + " name one with @jenesis.plugin " + processors + " <coordinate> in module-info.java, or"
                         + " <!--jenesis.plugin " + processors + " maven/<groupId>/<artifactId>--> in pom.xml");
             }
-            List<String> commands = new ArrayList<>(), declared = new ArrayList<>();
-            for (String option : prepended(properties)) {
-                if (option.startsWith("-J")) {
-                    commands.add(option.substring(2));
-                } else {
-                    declared.add(option);
-                }
-            }
-            properties.values().forEach(Map::clear);
+            ForkedOptions forked = forked(properties);
+            List<String> commands = new ArrayList<>(forked.jvm()), declared = forked.program();
             Path supplement = context.supplement();
             String sourceRoots = String.join(File.pathSeparator, roots);
             commands.addAll(List.of(

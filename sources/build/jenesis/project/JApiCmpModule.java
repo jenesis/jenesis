@@ -163,17 +163,8 @@ public class JApiCmpModule implements BuildExecutorModule {
                         + baselines);
             }
             Path report = Files.createDirectories(context.next().resolve(BuildStep.REPORTS + "japicmp"));
-            List<String> commands = new ArrayList<>(), options = new ArrayList<>();
-            for (String option : prepended(properties)) {
-                if (option.startsWith("-J")) {
-                    commands.add(option.substring(2));
-                } else if (option.startsWith("-D")) {
-                    commands.add(option);
-                } else {
-                    options.add(option);
-                }
-            }
-            properties.values().forEach(Map::clear);
+            ForkedOptions forked = forked(properties);
+            List<String> commands = new ArrayList<>(forked.jvm()), options = forked.program();
             commands.addAll(List.of(
                     "-cp", String.join(File.pathSeparator, jars),
                     "japicmp.JApiCmp",
