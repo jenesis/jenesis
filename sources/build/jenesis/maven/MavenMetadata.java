@@ -27,7 +27,7 @@ public record MavenMetadata(String groupId,
                 versioning == null ? null : text(versioning, "release"),
                 versioning == null ? null : text(versioning, "lastUpdated"),
                 versions == null ? List.of() : MavenPomResolver.toChildren(versions)
-                        .filter(node -> Objects.equals(node.getLocalName(), "version"))
+                        .filter(node -> Objects.equals(node.getNodeName(), "version"))
                         .map(node -> node.getTextContent().trim())
                         .filter(value -> !value.isEmpty())
                         .toList());
@@ -106,7 +106,7 @@ public record MavenMetadata(String groupId,
 
     private static Node child(Node parent, String name) {
         return MavenPomResolver.toChildren(parent)
-                .filter(node -> Objects.equals(node.getLocalName(), name))
+                .filter(node -> Objects.equals(node.getNodeName(), name))
                 .findFirst()
                 .orElse(null);
     }

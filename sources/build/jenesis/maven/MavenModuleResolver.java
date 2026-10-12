@@ -57,7 +57,7 @@ public class MavenModuleResolver implements Resolver {
     private static String pomVersion(InputStream stream, String coordinate) throws IOException {
         Document document;
         try (stream) {
-            document = MavenDefaultVersionNegotiator.toDocumentBuilderFactory(false).newDocumentBuilder().parse(stream);
+            document = MavenDefaultVersionNegotiator.toDocumentBuilderFactory().newDocumentBuilder().parse(stream);
         } catch (SAXException | ParserConfigurationException e) {
             throw new IllegalStateException("Failed to parse discovery POM for " + coordinate, e);
         }

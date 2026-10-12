@@ -373,7 +373,7 @@ public class MavenDefaultRepository implements MavenRepository {
     }
 
     private static Stream<Node> children(Node node, String name) {
-        return MavenPomResolver.toChildren(node).filter(child -> name.equals(child.getLocalName()));
+        return MavenPomResolver.toChildren(node).filter(child -> name.equals(child.getNodeName()));
     }
 
     private static String text(Node node, String name) {
