@@ -13,6 +13,7 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Launcher;
+import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -250,14 +251,13 @@ public class LauncherTest {
         application.setProperty("mainModule", "sample");
         application.setProperty("name", "sample");
         application.store(input.resolve("launcher.properties"));
-        Files.createDirectory(input.resolve("process"));
-        Files.writeString(input.resolve("process/java.properties"), """
-                --add-reads=sample=java.sql
-                --add-exports=sample/sample=ALL-UNNAMED
-                --add-opens sample/sample=java.base
-                --enable-native-access=sample,ALL-UNNAMED
-                -Xmx1g
-                """);
+        SequencedProperties java = new SequencedProperties();
+        java.setProperty("--add-reads", "sample=java.sql");
+        java.setProperty("--add-exports", "sample/sample=ALL-UNNAMED");
+        java.setProperty("--add-opens", "sample/sample=java.base");
+        java.setProperty("--enable-native-access", "sample,ALL-UNNAMED");
+        java.setProperty("-Xmx1g", "");
+        ProcessBuildStep.store(input, ProcessBuildStep.PROCESS, "java", java);
         List<String> printed = new ArrayList<>();
 
         BuildStepResult result = Launcher.ofEnvironment(Environment.NONE.out(printed::add), "launcher", PathPlacement.INFERRED).apply(

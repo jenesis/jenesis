@@ -17,6 +17,7 @@ import build.jenesis.project.JavaToolchainModule;
 import build.jenesis.project.KotlinCompilerModule;
 import build.jenesis.project.ScalaCompilerModule;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -315,8 +316,9 @@ public class InferredCompilerChainModuleTest {
     public void javac_runs_in_a_process_of_its_own_when_the_process_factory_is_fork() throws IOException {
         Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(sampleDir.resolve("OnlyJava.java"), "package sample; public class OnlyJava { }\n");
-        Path process = Files.createDirectories(project.resolve("process"));
-        Files.writeString(process.resolve("javac.properties"), "-J-Xss4M=\n");
+        SequencedProperties javac = new SequencedProperties();
+        javac.setProperty("-J-Xss4M", "");
+        ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "javac", javac);
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);

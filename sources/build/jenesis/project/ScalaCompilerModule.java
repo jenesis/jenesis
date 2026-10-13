@@ -197,10 +197,10 @@ public class ScalaCompilerModule implements BuildExecutorModule {
         }
 
         @Override
-        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             return Javac.hasRelevantChange(arguments,
                     Set.of(".scala", ".java"),
-                    Set.of("scalac.properties", "javac.properties"),
+                    Set.of("scalac", "javac"),
                     includeResources);
         }
 
@@ -230,8 +230,8 @@ public class ScalaCompilerModule implements BuildExecutorModule {
                 for (Path jar : Dependencies.select(argument.folder(), group, "compile")) {
                     classpath.add(jar.toString());
                 }
-                Path javacProperties = argument.folder().resolve(ProcessBuildStep.PROCESS + "javac.properties");
-                if (Files.exists(javacProperties)) {
+                Path javacProperties = ProcessBuildStep.locate(argument.folder(), ProcessBuildStep.PROCESS, "javac");
+                if (javacProperties != null) {
                     SequencedProperties loaded = SequencedProperties.ofFiles(javacProperties);
                     String value = loaded.value("--release");
                     if (value != null) {

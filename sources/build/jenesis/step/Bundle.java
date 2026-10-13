@@ -192,8 +192,11 @@ public class Bundle implements BuildStep {
     static List<String> javaOptions(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
         List<String> javaOptions = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
-            Path process = argument.folder().resolve(ProcessBuildStep.PROCESS + "java.properties");
-            if (!argument.removed() && Files.isRegularFile(process)) {
+            if (argument.removed()) {
+                continue;
+            }
+            Path process = ProcessBuildStep.locate(argument.folder(), ProcessBuildStep.PROCESS, "java");
+            if (process != null) {
                 SequencedProperties.ofFiles(process).forEachProperty((option, values) -> {
                     for (String value : values.split("\n")) {
                         javaOptions.add(option);

@@ -13,6 +13,7 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.GroovyDocumentationModule;
 import build.jenesis.step.ProcessHandler;
+import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,10 +26,9 @@ public class GroovyDocumentationModuleTest {
     public void honors_release_from_upstream_javac_properties() throws IOException {
         Path sample = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(sample.resolve("Sample.groovy"), "package sample\nclass Sample {}");
-        Path process = Files.createDirectories(project.resolve("process"));
         SequencedProperties javac = new SequencedProperties();
         javac.setProperty("--release", "11");
-        javac.store(process.resolve("javac.properties"));
+        ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "javac", javac);
         Path groovydocJar = Files.createFile(project.resolve("groovydoc.jar"));
 
         List<String> captured = new ArrayList<>();
@@ -67,7 +67,6 @@ public class GroovyDocumentationModuleTest {
     public void documents_again_when_the_upstream_release_changes() throws IOException {
         Path sample = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(sample.resolve("Sample.groovy"), "package sample\nclass Sample {}");
-        Path process = Files.createDirectories(project.resolve("process"));
         Path groovydocJar = Files.createFile(project.resolve("groovydoc.jar"));
         ToolProvider noop = new ToolProvider() {
             @Override
@@ -84,7 +83,7 @@ public class GroovyDocumentationModuleTest {
         for (String release : List.of("11", "17")) {
             SequencedProperties javac = new SequencedProperties();
             javac.setProperty("--release", release);
-            javac.store(process.resolve("javac.properties"));
+            ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "javac", javac);
             captured.clear();
             BuildExecutor executor = newExecutor();
             executor.addSource("project", project);
