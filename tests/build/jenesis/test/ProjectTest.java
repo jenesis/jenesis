@@ -185,7 +185,7 @@ public class ProjectTest {
 
     @Test
     public void prints_the_briefing_before_a_descriptor_is_written() throws IOException {
-        List<String> printed = new ArrayList<>();
+        List<String> printed = new CopyOnWriteArrayList<>();
         Project.ofEnvironment(new Environment(settings).out(printed::add), root)
                 .target(root.resolve("target"))
                 .build(Project.SKILL + "/migrate", Project.HELP);
@@ -206,7 +206,7 @@ public class ProjectTest {
                 .singleElement(InstanceOfAssertFactories.STRING)
                 .contains("java build/jenesis/Make.java skill/migrate", "summary of the migration", "shading")
                 .doesNotContain("\u001B");
-        List<String> briefing = new ArrayList<>();
+        List<String> briefing = new CopyOnWriteArrayList<>();
         Project.ofEnvironment(new Environment(settings).out(briefing::add), root)
                 .target(root.resolve("target"))
                 .build(Project.SKILL);
@@ -217,7 +217,7 @@ public class ProjectTest {
 
     @Test
     public void every_page_and_demo_a_skill_page_names_exists() throws IOException {
-        List<String> printed = new ArrayList<>();
+        List<String> printed = new CopyOnWriteArrayList<>();
         Project.ofEnvironment(new Environment(settings).out(printed::add), root)
                 .target(root.resolve("target"))
                 .build(Project.SKILL);
