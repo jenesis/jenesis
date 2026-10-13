@@ -47,6 +47,22 @@ public class BuildExecutorTest implements Serializable {
                 .toList());
     }
 
+    private static void record(Path checksum, String key, Map<Path, byte[]> checksums) throws IOException {
+        HashFunction.write(checksum.resolve("recorded-" + key + ".properties"), checksums);
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty(key, "recorded-" + key + ".properties");
+        index.store(checksum.resolve("arguments.properties"));
+    }
+
+    private static SequencedProperties recorded(Path step) throws IOException {
+        Path index = step.resolve("checksum").resolve("arguments.properties");
+        return Files.isRegularFile(index) ? SequencedProperties.ofFiles(index) : new SequencedProperties();
+    }
+
+    private static Path argument(Path step, String key) throws IOException {
+        return step.resolve("checksum").resolve(recorded(step).getProperty(key));
+    }
+
     private static Map<Path, ChecksumStatus> statuses(Map<Path, Checksum> files) {
         Map<Path, ChecksumStatus> statuses = new LinkedHashMap<>();
         files.forEach((path, checksum) -> statuses.put(path, checksum.status()));
@@ -227,8 +243,7 @@ public class BuildExecutorTest implements Serializable {
 
     @Test
     public void reruns_a_step_whose_argument_checksums_were_not_written() throws IOException {
-        assertThat(interrupted(step -> Files.delete(
-                step.resolve("checksum").resolve("argument.source.properties")))).content().isEqualTo("value2");
+        assertThat(interrupted(step -> Files.delete(argument(step, "source")))).content().isEqualTo("value2");
     }
 
     @Test
@@ -316,7 +331,7 @@ public class BuildExecutorTest implements Serializable {
         Path checksum = step.resolve("checksum");
         assertThat(checksum.resolve("output.properties")).isRegularFile();
         assertThat(checksum.resolve("step.properties")).isRegularFile();
-        assertThat(checksum.resolve("argument.source.properties")).isRegularFile();
+        assertThat(argument(step, "source")).isRegularFile();
         try (Stream<Path> files = Files.list(checksum)) {
             assertThat(files.map(file -> file.getFileName().toString()))
                     .noneMatch(name -> name.endsWith("~"));
@@ -580,7 +595,7 @@ public class BuildExecutorTest implements Serializable {
                 checksum = Files.createDirectory(step.resolve("checksum")),
                 output = Files.createDirectory(step.resolve("output"));
         Files.writeString(source.resolve("file"), "foo");
-        HashFunction.write(checksum.resolve("argument.source.properties"), HashFunction.read(source, hash, Runnable::run));
+        record(checksum, "source", HashFunction.read(source, hash, Runnable::run));
         Files.writeString(output.resolve("file"), "foo");
         HashFunction.write(checksum.resolve("output.properties"), HashFunction.read(output, hash, Runnable::run));
         BuildStep buildStep = (_, _, _) -> {
@@ -603,7 +618,7 @@ public class BuildExecutorTest implements Serializable {
                 checksum = Files.createDirectory(step.resolve("checksum")),
                 output = Files.createDirectory(step.resolve("output"));
         Files.writeString(source.resolve("file"), "foo");
-        HashFunction.write(checksum.resolve("argument.source.properties"), HashFunction.read(source, _ -> new byte[0], Runnable::run));
+        record(checksum, "source", HashFunction.read(source, _ -> new byte[0], Runnable::run));
         Files.writeString(output.resolve("file"), "bar");
         HashFunction.write(checksum.resolve("output.properties"), HashFunction.read(output, hash, Runnable::run));
         BuildStep buildStep = (_, context, arguments) -> {
@@ -634,7 +649,7 @@ public class BuildExecutorTest implements Serializable {
                 checksum = Files.createDirectory(step.resolve("checksum")),
                 output = Files.createDirectory(step.resolve("output"));
         Files.writeString(source.resolve("file"), "foo");
-        HashFunction.write(checksum.resolve("argument.source.properties"), HashFunction.read(source, hash, Runnable::run));
+        record(checksum, "source", HashFunction.read(source, hash, Runnable::run));
         Files.writeString(output.resolve("file"), "foo");
         HashFunction.write(checksum.resolve("output.properties"), HashFunction.read(output, hash, Runnable::run));
         BuildStep buildStep = new BuildStep() {
@@ -676,7 +691,7 @@ public class BuildExecutorTest implements Serializable {
                 checksum = Files.createDirectory(step.resolve("checksum")),
                 output = Files.createDirectory(step.resolve("output"));
         Files.writeString(source.resolve("file"), "foo");
-        HashFunction.write(checksum.resolve("argument.source.properties"), HashFunction.read(source, _ -> new byte[0], Runnable::run));
+        record(checksum, "source", HashFunction.read(source, _ -> new byte[0], Runnable::run));
         Files.writeString(output.resolve("file"), "qux");
         HashFunction.write(checksum.resolve("output.properties"), HashFunction.read(output, hash, Runnable::run));
         BuildStep buildStep = (_, context, arguments) -> {
@@ -707,7 +722,7 @@ public class BuildExecutorTest implements Serializable {
                 checksum = Files.createDirectory(step.resolve("checksum")),
                 output = Files.createDirectory(step.resolve("output"));
         Files.writeString(source.resolve("file"), "foo");
-        HashFunction.write(checksum.resolve("argument.source.properties"), HashFunction.read(source, hash, Runnable::run));
+        record(checksum, "source", HashFunction.read(source, hash, Runnable::run));
         Files.writeString(output.resolve("file"), "qux");
         HashFunction.write(checksum.resolve("output.properties"), HashFunction.read(output, _ -> new byte[0], Runnable::run));
         buildExecutor.addSource("source", source);
@@ -820,9 +835,16 @@ public class BuildExecutorTest implements Serializable {
         assertThat(vanished.folder()).isNull();
         assertThat(statuses(vanished.files())).isEqualTo(Map.of(Path.of("file"), ChecksumStatus.REMOVED));
         assertThat(vanished.hasChanged()).isTrue();
-        assertThat(root.resolve("step").resolve("checksum").resolve("argument.source2.properties"))
+        assertThat(recorded(root.resolve("step")))
                 .as("the vanished argument's checksum must not linger to mask a later re-addition")
-                .doesNotExist();
+                .doesNotContainKey("source2");
+        try (Stream<Path> files = Files.list(root.resolve("step").resolve("checksum"))) {
+            assertThat(files.map(file -> file.getFileName().toString()))
+                    .containsExactlyInAnyOrder("arguments.properties",
+                            recorded(root.resolve("step")).getProperty("source1"),
+                            "output.properties",
+                            "step.properties");
+        }
     }
 
     @Test
@@ -870,9 +892,16 @@ public class BuildExecutorTest implements Serializable {
         assertThat(root.resolve("step").resolve("output").resolve("file"))
                 .as("a step that considers the lost argument irrelevant stays up to date")
                 .content().isEqualTo("source1,source2");
-        assertThat(root.resolve("step").resolve("checksum").resolve("argument.source2.properties"))
+        assertThat(recorded(root.resolve("step")))
                 .as("the vanished argument's checksum is cleaned up even when the step is skipped")
-                .doesNotExist();
+                .doesNotContainKey("source2");
+        try (Stream<Path> files = Files.list(root.resolve("step").resolve("checksum"))) {
+            assertThat(files.map(file -> file.getFileName().toString()))
+                    .containsExactlyInAnyOrder("arguments.properties",
+                            recorded(root.resolve("step")).getProperty("source1"),
+                            "output.properties",
+                            "step.properties");
+        }
         BuildExecutor third = BuildExecutor.of(root,
                 Duration.ZERO,
                 hash,

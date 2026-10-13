@@ -185,8 +185,7 @@ public class ModularizeModule implements BuildExecutorModule {
             SequencedProperties options = new SequencedProperties();
             options.setProperty("--multi-release", String.valueOf(Runtime.version().feature()));
             options.setProperty("--ignore-missing-deps", "");
-            options.store(Files.createDirectories(context.next().resolve(ProcessBuildStep.PROCESS))
-                    .resolve("jdeps.properties"));
+            ProcessBuildStep.store(context.next(), ProcessBuildStep.PROCESS, "jdeps", options);
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
 

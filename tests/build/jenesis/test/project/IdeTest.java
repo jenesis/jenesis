@@ -273,10 +273,10 @@ public class IdeTest {
         Path test = inventory("test-module-greeter", properties -> {
             properties.setProperty("module-greeter.path", "greeter");
             properties.setProperty("module-greeter.test", "greeter");
-            properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
+            properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/any-name.jar");
             properties.setProperty("module-greeter.dependency.1", "maven/org.example/testing/1.0 lib/testing.jar");
         });
-        library(test, "lib.jar");
+        library(test, "any-name.jar");
         library(test, "testing.jar");
 
         run(Ide.IDEA, main, test);

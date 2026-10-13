@@ -42,7 +42,7 @@ public class InferredMultiProjectAssemblerTest {
     public void main_in_module_properties_yields_main_class_argument_for_jar() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        SequencedProperties jarArguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jar.properties"));
+        SequencedProperties jarArguments = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "jar"));
         assertThat(jarArguments.getProperty("--main-class")).isEqualTo("com.example.Entry");
     }
 
@@ -97,14 +97,14 @@ public class InferredMultiProjectAssemblerTest {
     public void absent_main_in_module_properties_yields_no_jar_arguments() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        assertThat(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jar.properties")).doesNotExist();
+        assertThat(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "jar")).isNull();
     }
 
     @Test
     public void empty_main_in_module_properties_yields_no_jar_arguments() throws IOException {
         Fixture fixture = setUp("main=\n", false, false, false);
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        assertThat(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jar.properties")).doesNotExist();
+        assertThat(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "jar")).isNull();
     }
 
     @Test
@@ -112,7 +112,7 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "artifact=demo\n");
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        SequencedProperties jpackageArguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"));
+        SequencedProperties jpackageArguments = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "jpackage"));
         assertThat(jpackageArguments.getProperty("--name")).isEqualTo("demo");
         assertThat(jpackageArguments.getProperty("--main-jar")).isEqualTo("demo.jar");
         assertThat(jpackageArguments.getProperty("--main-class")).isEqualTo("com.example.Entry");
@@ -123,7 +123,7 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "artifact=demo\nversion=0-SNAPSHOT\n");
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        SequencedProperties jpackageArguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"));
+        SequencedProperties jpackageArguments = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "jpackage"));
         assertThat(jpackageArguments.getProperty("--app-version"))
                 .as("the version is the project's to get right, so a qualifier reaches jpackage and fails there")
                 .isEqualTo("0-SNAPSHOT");
@@ -134,7 +134,7 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "artifact=demo\nversion=RELEASE\n");
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        SequencedProperties jpackageArguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"));
+        SequencedProperties jpackageArguments = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "jpackage"));
         assertThat(jpackageArguments.getProperty("--app-version"))
                 .as("nothing is invented for a version jpackage cannot parse; it is reported by jpackage itself")
                 .isEqualTo("RELEASE");
@@ -204,9 +204,9 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     private static SequencedProperties formatted(Path prepareOutput, String type) throws IOException {
-        SequencedProperties properties = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"));
-        Path typed = prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage-" + type + ".properties");
-        if (Files.isRegularFile(typed)) {
+        SequencedProperties properties = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "jpackage"));
+        Path typed = ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "jpackage-" + type);
+        if (typed != null) {
             SequencedProperties.ofFiles(typed).forEachProperty(properties::setProperty);
         }
         return properties;
@@ -223,15 +223,15 @@ public class InferredMultiProjectAssemblerTest {
                 developer.dev.email=dev@example.com
                 license.mit.name=MIT
                 """);
-        Path process = fixture.execute("sub/prepare").get("sub/prepare").resolve(ProcessBuildStep.PROCESS);
-        assertThat(readProperties(process.resolve("jpackage.properties")).stringPropertyNames())
+        Path prepared = fixture.execute("sub/prepare").get("sub/prepare");
+        assertThat(readProperties(ProcessBuildStep.locate(prepared, ProcessBuildStep.PROCESS, "jpackage")).stringPropertyNames())
                 .as("what one format takes and another refuses stays out of the options every format reads")
                 .contains("--name")
                 .doesNotContain("--about-url", "--linux-deb-maintainer", "--linux-rpm-license-type");
-        assertThat(process.resolve("jpackage-app-image.properties")).doesNotExist();
-        assertThat(readProperties(process.resolve("jpackage-deb.properties")).stringPropertyNames())
+        assertThat(ProcessBuildStep.locate(prepared, ProcessBuildStep.PROCESS, "jpackage-app-image")).isNull();
+        assertThat(readProperties(ProcessBuildStep.locate(prepared, ProcessBuildStep.PROCESS, "jpackage-deb")).stringPropertyNames())
                 .containsExactlyInAnyOrder("--about-url", "--linux-deb-maintainer");
-        assertThat(readProperties(process.resolve("jpackage-rpm.properties")).stringPropertyNames())
+        assertThat(readProperties(ProcessBuildStep.locate(prepared, ProcessBuildStep.PROCESS, "jpackage-rpm")).stringPropertyNames())
                 .as("the format the image installs is described like any other")
                 .containsExactlyInAnyOrder("--about-url", "--linux-rpm-license-type");
     }
@@ -240,7 +240,7 @@ public class InferredMultiProjectAssemblerTest {
     public void absent_main_in_module_properties_yields_no_jpackage_arguments() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        assertThat(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties")).doesNotExist();
+        assertThat(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "jpackage")).isNull();
     }
 
     @Test
@@ -264,7 +264,7 @@ public class InferredMultiProjectAssemblerTest {
     public void modular_main_yields_module_jpackage_argument() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\nmodule=com.example.foo\n", false, false, false);
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        SequencedProperties jpackageArguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"));
+        SequencedProperties jpackageArguments = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "jpackage"));
         assertThat(jpackageArguments.getProperty("--module")).isEqualTo("com.example.foo/com.example.Entry");
         assertThat(jpackageArguments.stringPropertyNames())
                 .as("modular launch uses --module, not the classpath --main-jar/--main-class")
@@ -275,7 +275,7 @@ public class InferredMultiProjectAssemblerTest {
     public void module_in_module_properties_yields_add_modules_for_jlink() throws IOException {
         Fixture fixture = setUp("module=foo\n", false, false, false);
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        SequencedProperties jlinkArguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jlink.properties"));
+        SequencedProperties jlinkArguments = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "jlink"));
         assertThat(jlinkArguments.getProperty("--add-modules")).isEqualTo("foo");
     }
 
@@ -283,7 +283,7 @@ public class InferredMultiProjectAssemblerTest {
     public void absent_module_in_module_properties_yields_no_jlink_arguments() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        assertThat(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jlink.properties")).doesNotExist();
+        assertThat(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "jlink")).isNull();
     }
 
     @Test
@@ -291,7 +291,7 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("main=\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("process-javac.properties"), "-g=\n-parameters=\n");
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        SequencedProperties javacArguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("javac.properties"));
+        SequencedProperties javacArguments = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "javac"));
         assertThat(javacArguments.getProperty("-g")).isEqualTo("");
         assertThat(javacArguments.getProperty("-parameters")).isEqualTo("");
     }
@@ -302,12 +302,12 @@ public class InferredMultiProjectAssemblerTest {
         Files.writeString(fixture.configuration().resolve("environment-test.properties"), "SAMPLE=value\nINHERITED\n");
         Files.writeString(fixture.profile().resolve("environment-java.properties"), "OTHER=value\n");
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        SequencedProperties variables = readProperties(prepareOutput.resolve(ProcessBuildStep.ENVIRONMENT).resolve("test.properties"));
+        SequencedProperties variables = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.ENVIRONMENT, "test"));
         assertThat(variables.getProperty("SAMPLE")).isEqualTo("value");
         assertThat(variables.getProperty("INHERITED"))
                 .as("a variable without a value is taken from the build's environment when the tool runs")
                 .isEqualTo("");
-        assertThat(readProperties(prepareOutput.resolve(ProcessBuildStep.ENVIRONMENT).resolve("java.properties"))
+        assertThat(readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.ENVIRONMENT, "java"))
                 .getProperty("OTHER")).isEqualTo("value");
     }
 
@@ -319,16 +319,16 @@ public class InferredMultiProjectAssemblerTest {
                 "GREETING=@greeting/Hello\nLITERAL=@@literal\n");
         Path prepareOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
                 new Environment(Map.of("variable.warnings", "500"))), "sub/prepare").get("sub/prepare");
-        assertThat(readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("javac.properties"))
+        assertThat(readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "javac"))
                 .getProperty("-Xmaxwarns")).isEqualTo("500");
-        SequencedProperties variables = readProperties(prepareOutput.resolve(ProcessBuildStep.ENVIRONMENT).resolve("test.properties"));
+        SequencedProperties variables = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.ENVIRONMENT, "test"));
         assertThat(variables.getProperty("GREETING"))
                 .as("a variable that is not set takes its default")
                 .isEqualTo("Hello");
         assertThat(variables.getProperty("LITERAL")).isEqualTo("@literal");
         prepareOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
                 new Environment(Map.of("variable.warnings", "600"))), "sub/prepare").get("sub/prepare");
-        assertThat(readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("javac.properties"))
+        assertThat(readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "javac"))
                 .getProperty("-Xmaxwarns"))
                 .as("a resolved variable is part of the step's key, so another value runs it again")
                 .isEqualTo("600");
@@ -341,7 +341,7 @@ public class InferredMultiProjectAssemblerTest {
                 "-Dplain=value\n-DshardCount=@shards\n-DshardIndex=@shard/0\n-Descaped\\=kept=\n-Dflag=\n");
         Path prepareOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
                 new Environment(Map.of("variable.shards", "40"))), "sub/prepare").get("sub/prepare");
-        SequencedProperties arguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("test.properties"));
+        SequencedProperties arguments = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "test"));
         assertThat(arguments.stringPropertyNames())
                 .as("a -D line is the one argument -Dkey=value the JVM reads, not -Dkey followed by value")
                 .containsExactlyInAnyOrder("-Dplain=value", "-DshardCount=40", "-DshardIndex=0", "-Descaped=kept", "-Dflag");
@@ -364,7 +364,7 @@ public class InferredMultiProjectAssemblerTest {
         Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "version=1.0\n");
         Files.writeString(fixture.configuration().resolve("process-javac.properties"), "--module-version=9.9\n-g=\n");
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        SequencedProperties javacArguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("javac.properties"));
+        SequencedProperties javacArguments = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "javac"));
         assertThat(javacArguments.getProperty("--module-version"))
                 .as("a configuration key overrides the build-generated one")
                 .isEqualTo("9.9");
@@ -376,8 +376,9 @@ public class InferredMultiProjectAssemblerTest {
     @Test
     public void a_process_command_file_refuses_an_argument_the_module_declaration_hands_the_tool() throws IOException {
         Fixture fixture = setUp("main=\n", false, false, false);
-        Files.writeString(Files.createDirectories(fixture.manifests().resolve(ProcessBuildStep.PROCESS))
-                .resolve("javac.properties"), "--release=8\n");
+        SequencedProperties declared = new SequencedProperties();
+        declared.setProperty("--release", "8");
+        ProcessBuildStep.store(fixture.manifests(), ProcessBuildStep.PROCESS, "javac", declared);
         Files.writeString(fixture.configuration().resolve("process-javac.properties"), "--release=17\n-g=\n");
         assertThatThrownBy(() -> fixture.execute("sub/prepare"))
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
@@ -391,11 +392,12 @@ public class InferredMultiProjectAssemblerTest {
     @Test
     public void a_process_command_file_sets_an_argument_that_a_module_it_depends_on_sets_as_well() throws IOException {
         Fixture fixture = setUp("main=\n", false, false, false);
-        Files.writeString(Files.createDirectories(fixture.artifacts().resolve(ProcessBuildStep.PROCESS))
-                .resolve("javac.properties"), "-g=\n");
+        SequencedProperties upstream = new SequencedProperties();
+        upstream.setProperty("-g", "");
+        ProcessBuildStep.store(fixture.artifacts(), ProcessBuildStep.PROCESS, "javac", upstream);
         Files.writeString(fixture.configuration().resolve("process-javac.properties"), "-g=\n");
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        assertThat(SequencedProperties.ofFiles(prepareOutput.resolve(ProcessBuildStep.PROCESS + "javac.properties")))
+        assertThat(SequencedProperties.ofFiles(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "javac")))
                 .as("only the module's own declaration hands javac an argument, not what an upstream module prepared")
                 .containsEntry("-g", "");
     }
@@ -407,7 +409,7 @@ public class InferredMultiProjectAssemblerTest {
         Files.writeString(fixture.configuration().resolve("process-javac.properties"), "-g=\n");
         Files.writeString(fixture.profile().resolve("process-javac.properties"), "");
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        SequencedProperties javacArguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("javac.properties"));
+        SequencedProperties javacArguments = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "javac"));
         assertThat(javacArguments.getProperty("--module-version"))
                 .as("the build-generated arguments remain")
                 .isEqualTo("1.0");
@@ -483,9 +485,9 @@ public class InferredMultiProjectAssemblerTest {
     public void a_process_command_file_for_one_format_reaches_that_format_alone() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false, "app-image,deb");
         Files.writeString(fixture.configuration().resolve("process-jpackage-deb.properties"), "--linux-app-release=3\n");
-        Path process = fixture.execute("sub/prepare").get("sub/prepare").resolve(ProcessBuildStep.PROCESS);
-        assertThat(readProperties(process.resolve("jpackage-deb.properties")).getProperty("--linux-app-release")).isEqualTo("3");
-        assertThat(readProperties(process.resolve("jpackage.properties")).getProperty("--linux-app-release")).isNull();
+        Path prepared = fixture.execute("sub/prepare").get("sub/prepare");
+        assertThat(readProperties(ProcessBuildStep.locate(prepared, ProcessBuildStep.PROCESS, "jpackage-deb")).getProperty("--linux-app-release")).isEqualTo("3");
+        assertThat(readProperties(ProcessBuildStep.locate(prepared, ProcessBuildStep.PROCESS, "jpackage")).getProperty("--linux-app-release")).isNull();
     }
 
     @Test
@@ -769,12 +771,12 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("process-javac.properties"), "-g=\n");
         Path first = fixture.execute("sub/prepare").get("sub/prepare");
-        assertThat(readProperties(first.resolve(ProcessBuildStep.PROCESS).resolve("javac.properties")).stringPropertyNames())
+        assertThat(readProperties(ProcessBuildStep.locate(first, ProcessBuildStep.PROCESS, "javac")).stringPropertyNames())
                 .contains("-g");
 
         Files.writeString(fixture.configuration().resolve("process-javac.properties"), "-verbose=\n");
         Path second = fixture.execute("sub/prepare").get("sub/prepare");
-        assertThat(readProperties(second.resolve(ProcessBuildStep.PROCESS).resolve("javac.properties")).stringPropertyNames())
+        assertThat(readProperties(ProcessBuildStep.locate(second, ProcessBuildStep.PROCESS, "javac")).stringPropertyNames())
                 .as("editing only a process override must re-run prepare, not serve the stale one")
                 .contains("-verbose")
                 .doesNotContain("-g");

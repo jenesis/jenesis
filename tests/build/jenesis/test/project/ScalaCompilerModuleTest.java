@@ -15,6 +15,7 @@ import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.ScalaCompilerModule;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -158,10 +159,9 @@ public class ScalaCompilerModuleTest {
                 package sample
                 class Sample
                 """);
-        Path processFolder = Files.createDirectories(project.resolve("process"));
         SequencedProperties javacProperties = new SequencedProperties();
         javacProperties.setProperty("--release", "11");
-        javacProperties.store(processFolder.resolve("javac.properties"));
+        ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "javac", javacProperties);
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);

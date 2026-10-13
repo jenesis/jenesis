@@ -855,8 +855,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
                 if (manifests.contains(entry.getKey())) {
                     for (Map.Entry<String, SequencedMap<String, String>> override : overrides.entrySet()) {
-                        Path generated = argument.folder().resolve(ProcessBuildStep.PROCESS + override.getKey() + ".properties");
-                        if (!Files.isRegularFile(generated)) {
+                        Path generated = ProcessBuildStep.locate(argument.folder(), ProcessBuildStep.PROCESS, override.getKey());
+                        if (generated == null) {
                             continue;
                         }
                         SequencedProperties declared = SequencedProperties.ofFiles(generated);
@@ -897,12 +897,10 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     }
                 }
             }
-            Path processFolder = null;
             if (main != null) {
-                processFolder = Files.createDirectories(context.next().resolve(ProcessBuildStep.PROCESS));
                 SequencedProperties jar = new SequencedProperties();
                 jar.setProperty("--main-class", main);
-                jar.store(processFolder.resolve("jar.properties"));
+                ProcessBuildStep.store(context.next(), ProcessBuildStep.PROCESS, "jar", jar);
                 SequencedProperties jpackage = new SequencedProperties();
                 SequencedMap<String, SequencedProperties> typed = new TreeMap<>();
                 if (artifact != null) {
@@ -967,9 +965,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         }
                     }
                 }
-                jpackage.store(processFolder.resolve("jpackage.properties"));
+                ProcessBuildStep.store(context.next(), ProcessBuildStep.PROCESS, "jpackage", jpackage);
                 for (Map.Entry<String, SequencedProperties> type : typed.entrySet()) {
-                    type.getValue().store(processFolder.resolve("jpackage-" + type.getKey() + ".properties"));
+                    ProcessBuildStep.store(context.next(), ProcessBuildStep.PROCESS, "jpackage-" + type.getKey(), type.getValue());
                 }
             }
             if (main != null || artifact != null) {
@@ -986,39 +984,25 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 launcher.store(context.next().resolve("launcher.properties"));
             }
             if (moduleName != null) {
-                if (processFolder == null) {
-                    processFolder = Files.createDirectories(context.next().resolve(ProcessBuildStep.PROCESS));
-                }
                 SequencedProperties jlink = new SequencedProperties();
                 jlink.setProperty("--add-modules", moduleName);
-                jlink.store(processFolder.resolve("jlink.properties"));
+                ProcessBuildStep.store(context.next(), ProcessBuildStep.PROCESS, "jlink", jlink);
             }
             if (version != null) {
-                if (processFolder == null) {
-                    processFolder = Files.createDirectories(context.next().resolve(ProcessBuildStep.PROCESS));
-                }
                 SequencedProperties javac = new SequencedProperties();
                 javac.setProperty("--module-version", version);
-                javac.store(processFolder.resolve("javac.properties"));
-            }
-            if (!overrides.isEmpty() && processFolder == null) {
-                processFolder = Files.createDirectories(context.next().resolve(ProcessBuildStep.PROCESS));
+                ProcessBuildStep.store(context.next(), ProcessBuildStep.PROCESS, "javac", javac);
             }
             for (Map.Entry<String, SequencedMap<String, String>> override : overrides.entrySet()) {
-                Path target = processFolder.resolve(override.getKey() + ".properties");
-                SequencedProperties merged = Files.isRegularFile(target)
-                        ? SequencedProperties.ofFiles(target)
-                        : new SequencedProperties();
+                Path target = ProcessBuildStep.locate(context.next(), ProcessBuildStep.PROCESS, override.getKey());
+                SequencedProperties merged = target == null ? new SequencedProperties() : SequencedProperties.ofFiles(target);
                 override.getValue().forEach(merged::setProperty);
-                merged.store(target);
+                ProcessBuildStep.store(context.next(), ProcessBuildStep.PROCESS, override.getKey(), merged);
             }
-            if (!environments.isEmpty()) {
-                Path environmentFolder = Files.createDirectories(context.next().resolve(ProcessBuildStep.ENVIRONMENT));
-                for (Map.Entry<String, SequencedMap<String, String>> tool : environments.entrySet()) {
-                    SequencedProperties variables = new SequencedProperties();
-                    tool.getValue().forEach(variables::setProperty);
-                    variables.store(environmentFolder.resolve(tool.getKey() + ".properties"));
-                }
+            for (Map.Entry<String, SequencedMap<String, String>> tool : environments.entrySet()) {
+                SequencedProperties variables = new SequencedProperties();
+                tool.getValue().forEach(variables::setProperty);
+                ProcessBuildStep.store(context.next(), ProcessBuildStep.ENVIRONMENT, tool.getKey(), variables);
             }
             if (!staged) {
                 Files.createFile(context.next().resolve(Inventory.UNSTAGED));

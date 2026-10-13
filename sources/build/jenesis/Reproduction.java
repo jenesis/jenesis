@@ -4,7 +4,7 @@ import module java.base;
 
 record Reproduction(Path first, SequencedSet<String> firstSteps, Path second, SequencedSet<String> secondSteps) {
 
-    private static final String CHECKSUM = "checksum", ARGUMENT = "argument.", PROPERTIES = ".properties";
+    private static final String CHECKSUM = "checksum", ARGUMENTS = "arguments.properties", PROPERTIES = ".properties";
 
     boolean verify(Consumer<String> out, boolean detailed) throws IOException {
         SortedSet<String> steps = new TreeSet<>(firstSteps);
@@ -98,11 +98,11 @@ record Reproduction(Path first, SequencedSet<String> firstSteps, Path second, Se
 
     private static SortedMap<String, SortedMap<String, String>> arguments(Path checksum) throws IOException {
         SortedMap<String, SortedMap<String, String>> arguments = new TreeMap<>();
-        if (Files.isDirectory(checksum)) {
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(checksum, ARGUMENT + "*" + PROPERTIES)) {
-                for (Path file : stream) {
-                    arguments.put(file.getFileName().toString(), digests(file));
-                }
+        Path index = checksum.resolve(ARGUMENTS);
+        if (Files.isRegularFile(index)) {
+            SequencedProperties recorded = SequencedProperties.ofFiles(index);
+            for (String key : recorded.stringPropertyNames()) {
+                arguments.put(key, digests(checksum.resolve(recorded.getProperty(key))));
             }
         }
         return arguments;

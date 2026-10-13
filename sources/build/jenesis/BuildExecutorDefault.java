@@ -131,18 +131,19 @@ class BuildExecutorDefault implements BuildExecutor {
                 boolean consistent = record.consistent();
                 SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
                 SequencedMap<String, Map<Path, byte[]>> inputs = new LinkedHashMap<>();
+                SequencedMap<String, Path> recorded = exists ? previous.arguments() : Collections.emptyNavigableMap();
                 for (Map.Entry<String, StepSummary> entry : summaries.entrySet()) {
-                    Path checksums = previous.argument(entry.getKey());
+                    Path checksums = recorded.get(entry.getKey());
                     Map<Path, byte[]> argumentChecksums = entry.getValue().checksums();
                     inputs.put(entry.getKey(), argumentChecksums);
                     arguments.put(entry.getKey(), new BuildStepArgument(
                             entry.getValue().folder(),
-                            consistent && Files.exists(checksums)
+                            consistent && checksums != null && Files.exists(checksums)
                                     ? Checksum.diff(HashFunction.read(checksums), argumentChecksums, hash)
                                     : Checksum.added(argumentChecksums, hash)));
                 }
                 SequencedMap<String, Set<Path>> vanished = consistent
-                        ? previous.vanished(summaries.keySet())
+                        ? previous.vanished(recorded, summaries.keySet())
                         : Collections.emptyNavigableMap();
                 vanished.forEach((key, paths) -> arguments.put(
                         key,
@@ -217,9 +218,7 @@ class BuildExecutorDefault implements BuildExecutor {
                             } else {
                                 throw new IllegalStateException("Cannot reuse initial run for " + location + identity);
                             }
-                            for (Map.Entry<String, StepSummary> entry : summaries.entrySet()) {
-                                HashFunction.write(previous.argument(entry.getKey()), entry.getValue().checksums());
-                            }
+                            previous.record(summaries);
                             Map<Path, byte[]> checksums = HashFunction.read(previous.output(), hash, executor);
                             HashFunction.write(previous.outputChecksums(), checksums);
                             SequencedProperties stepProperties = new SequencedProperties();
@@ -270,8 +269,8 @@ class BuildExecutorDefault implements BuildExecutor {
                         return CompletableFuture.failedStage(wrapped);
                     }, executor);
                 } else {
-                    for (String key : vanished.keySet()) {
-                        Files.deleteIfExists(previous.argument(key));
+                    if (!vanished.isEmpty()) {
+                        previous.forget(recorded, vanished.keySet());
                     }
                     completion.accept(false, null);
                     try {
@@ -759,7 +758,7 @@ class BuildExecutorDefault implements BuildExecutor {
 
     private record StepFolder(Path path, Path checksum, Path output, Path stepFile, Path outputChecksums) {
 
-        private static final String ARGUMENT = "argument.", PROPERTIES = ".properties";
+        private static final String ARGUMENT = "argument.", PROPERTIES = ".properties", ARGUMENTS = "arguments.properties";
 
         private static StepFolder of(Path path) {
             Path checksum = path.resolve("checksum");
@@ -770,21 +769,43 @@ class BuildExecutorDefault implements BuildExecutor {
                     checksum.resolve("output" + PROPERTIES));
         }
 
-        Path argument(String key) {
-            return checksum.resolve(ARGUMENT + BuildExecutorModule.encode(key) + PROPERTIES);
+        SequencedMap<String, Path> arguments() throws IOException {
+            SequencedMap<String, Path> arguments = new LinkedHashMap<>();
+            Path index = checksum.resolve(ARGUMENTS);
+            if (Files.isRegularFile(index)) {
+                SequencedProperties.ofFiles(index).forEachProperty((key, file) -> arguments.put(key, checksum.resolve(file)));
+            }
+            return arguments;
         }
 
-        SequencedMap<String, Set<Path>> vanished(Set<String> declared) throws IOException {
+        void record(Map<String, StepSummary> summaries) throws IOException {
+            SequencedProperties index = new SequencedProperties();
+            for (Map.Entry<String, StepSummary> entry : new TreeMap<>(summaries).entrySet()) {
+                String file = ARGUMENT + index.size() + PROPERTIES;
+                HashFunction.write(checksum.resolve(file), entry.getValue().checksums());
+                index.setProperty(entry.getKey(), file);
+            }
+            index.store(checksum.resolve(ARGUMENTS));
+        }
+
+        void forget(SequencedMap<String, Path> recorded, Set<String> keys) throws IOException {
+            SequencedProperties index = new SequencedProperties();
+            for (Map.Entry<String, Path> entry : recorded.entrySet()) {
+                if (keys.contains(entry.getKey())) {
+                    Files.deleteIfExists(entry.getValue());
+                } else {
+                    index.setProperty(entry.getKey(), checksum.relativize(entry.getValue()).toString());
+                }
+            }
+            index.store(checksum.resolve(ARGUMENTS));
+        }
+
+        SequencedMap<String, Set<Path>> vanished(SequencedMap<String, Path> recorded, Set<String> declared)
+                throws IOException {
             SequencedMap<String, Set<Path>> vanished = new TreeMap<>();
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(checksum, ARGUMENT + "*" + PROPERTIES)) {
-                for (Path file : stream) {
-                    String name = file.getFileName().toString();
-                    String key = BuildExecutorModule.decode(name.substring(
-                            ARGUMENT.length(),
-                            name.length() - PROPERTIES.length()));
-                    if (!declared.contains(key)) {
-                        vanished.put(key, HashFunction.read(file).keySet());
-                    }
+            for (Map.Entry<String, Path> entry : recorded.entrySet()) {
+                if (!declared.contains(entry.getKey()) && Files.isRegularFile(entry.getValue())) {
+                    vanished.put(entry.getKey(), HashFunction.read(entry.getValue()).keySet());
                 }
             }
             return vanished;
