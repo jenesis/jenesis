@@ -245,10 +245,10 @@ public class ScalaCompilerModule implements BuildExecutorModule {
             if (!incremental) {
                 return super.apply(executor, context, arguments);
             }
-            return super.apply(executor, context, arguments).thenApplyAsync(result -> {
+            return super.apply(executor, context, arguments).thenComposeAsync(result -> {
                 Path compiled = context.next().resolve(INCREMENTAL + CLASSES), target = context.next().resolve(CLASSES);
                 if (!result.next() || !Files.isDirectory(compiled)) {
-                    return result;
+                    return CompletableFuture.completedStage(result);
                 }
                 try {
                     Files.walkFileTree(compiled, new SimpleFileVisitor<>() {
@@ -268,9 +268,9 @@ public class ScalaCompilerModule implements BuildExecutorModule {
                         }
                     });
                 } catch (IOException e) {
-                    throw new UncheckedIOException(e);
+                    return CompletableFuture.failedFuture(e);
                 }
-                return result;
+                return CompletableFuture.completedStage(result);
             }, executor);
         }
 
