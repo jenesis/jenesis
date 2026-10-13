@@ -161,8 +161,8 @@ public abstract class Java extends EnvironmentalProcessBuildStep {
                     graph.enableNativeAccess(pathPlacement.modular() ? module.value("module") : null);
                 }
             }
-            Path javacFile = argument.folder().resolve(PROCESS + "javac.properties");
-            if (Files.isRegularFile(javacFile) && SequencedProperties.ofFiles(javacFile).containsKey("--enable-preview")) {
+            Path javacFile = locate(argument.folder(), PROCESS, "javac");
+            if (javacFile != null && SequencedProperties.ofFiles(javacFile).containsKey("--enable-preview")) {
                 graph.enablePreview();
             }
             Path nativesFile = argument.folder().resolve(NATIVES);

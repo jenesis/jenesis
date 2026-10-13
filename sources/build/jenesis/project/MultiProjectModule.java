@@ -32,6 +32,16 @@ public record MultiProjectModule(BuildExecutorModule identifier,
     private static final String GROUP = "group";
     public static final String IDENTIFIER_PATH = PREVIOUS.repeat(3) + IDENTIFIER + "/";
 
+    public static boolean test(SequencedMap<String, Path> arguments) throws IOException {
+        for (Map.Entry<String, Path> entry : arguments.entrySet()) {
+            if (entry.getKey().endsWith("/" + MANIFESTS)) {
+                Path module = entry.getValue().resolve(BuildStep.MODULE);
+                return Files.isRegularFile(module) && SequencedProperties.ofFiles(module).getProperty("test") != null;
+            }
+        }
+        return false;
+    }
+
     public static Path location(Path root, SequencedMap<String, Path> arguments) throws IOException {
         for (Map.Entry<String, Path> entry : arguments.entrySet()) {
             if (entry.getKey().endsWith("/" + MANIFESTS)) {
@@ -86,10 +96,10 @@ public record MultiProjectModule(BuildExecutorModule identifier,
                     modules.sequencedKeySet());
             process.addModule(MODULE, (build, paths) -> {
                 SequencedMap<String, SequencedSet<String>> projects = new LinkedHashMap<>();
-                Path groups = paths.get(PREVIOUS + GROUP).resolve(Group.GROUPS);
-                for (Map.Entry<String, SequencedSet<String>> entry : identifiers.entrySet()) {
-                    SequencedProperties properties = SequencedProperties.ofFiles(groups.resolve(entry.getKey() + ".properties"));
-                    projects.put(entry.getKey(), new LinkedHashSet<>(properties.stringPropertyNames()));
+                SequencedProperties groups = SequencedProperties.ofFiles(paths.get(PREVIOUS + GROUP).resolve(Group.GROUPS));
+                for (String module : identifiers.keySet()) {
+                    List<String> required = groups.entries(module);
+                    projects.put(module, required == null ? new LinkedHashSet<>() : new LinkedHashSet<>(required));
                 }
                 MultiProject project = factory.apply(projects);
                 SequencedMap<String, AssemblyDescriptor> assemblies = new LinkedHashMap<>();

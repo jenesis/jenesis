@@ -118,7 +118,7 @@ public class DockerTest {
         SequencedProperties java = new SequencedProperties();
         java.setProperty("--add-reads", "org.hibernate.validator=org.apache.tomcat.embed.el");
         java.setProperty("-Dsample=true", "");
-        java.store(Files.createDirectory(input.resolve(ProcessBuildStep.PROCESS)).resolve("java.properties"));
+        ProcessBuildStep.store(input, ProcessBuildStep.PROCESS, "java", java);
 
         BuildStepResult result = new Docker("example:latest").apply(
                 Runnable::run,
@@ -334,7 +334,7 @@ public class DockerTest {
         Files.writeString(Files.createDirectories(input.resolve(JPackage.PACKAGES)).resolve("sample_1.0_amd64.deb"), "package");
         SequencedProperties jpackage = new SequencedProperties();
         jpackage.setProperty("--name", "sample");
-        jpackage.store(Files.createDirectory(input.resolve("process")).resolve("jpackage.properties"));
+        ProcessBuildStep.store(input, ProcessBuildStep.PROCESS, "jpackage", jpackage);
 
         BuildStepResult result = new Docker("debian:stable-slim").jpackage("deb").apply(
                 Runnable::run,
@@ -360,13 +360,12 @@ public class DockerTest {
     @Test
     public void installs_a_jpackage_rpm_package_with_the_launcher_its_format_names() throws IOException {
         Files.writeString(Files.createDirectories(input.resolve(JPackage.PACKAGES)).resolve("sample-1.0-1.x86_64.rpm"), "package");
-        Path process = Files.createDirectory(input.resolve("process"));
         SequencedProperties shared = new SequencedProperties();
         shared.setProperty("--name", "sample");
-        shared.store(process.resolve("jpackage.properties"));
+        ProcessBuildStep.store(input, ProcessBuildStep.PROCESS, "jpackage", shared);
         SequencedProperties typed = new SequencedProperties();
         typed.setProperty("--name", "Sample's");
-        typed.store(process.resolve("jpackage-rpm.properties"));
+        ProcessBuildStep.store(input, ProcessBuildStep.PROCESS, "jpackage-rpm", typed);
 
         new Docker("fedora:latest").jpackage("rpm").apply(
                 Runnable::run,

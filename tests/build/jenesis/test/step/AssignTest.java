@@ -10,6 +10,7 @@ import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Assign;
+import build.jenesis.step.Classifiers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -133,5 +134,54 @@ public class AssignTest {
                 Map.entry("qux", next.relativize(artifact).toString().replace(File.separatorChar, '/')));
         coordinates.stringPropertyNames().forEach(name ->
                 assertThat(coordinates.getProperty(name)).doesNotStartWith("/"));
+    }
+
+    @Test
+    public void assigns_each_classifier_beside_every_coordinate_of_the_jar() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("maven/org.example/native/1.0", "");
+        properties.setProperty("module/org.example.natives", "");
+        properties.store(argument.resolve(BuildStep.IDENTITY));
+        Files.writeString(Files.createDirectory(argument.resolve(BuildStep.ARTIFACTS)).resolve("native.jar"), "jar");
+        Path classifiers = Files.createDirectory(argument.resolve(Classifiers.CLASSIFIERS));
+        Path variant = Files.writeString(classifiers.resolve("any-name.jar"), "variant");
+        SequencedProperties classified = new SequencedProperties();
+        classified.setProperty("linux", Classifiers.CLASSIFIERS + "any-name.jar");
+        classified.store(argument.resolve(Classifiers.CLASSIFIED));
+        SequencedProperties dormant = new SequencedProperties();
+        dormant.setProperty("windows", "platform-w");
+        dormant.store(argument.resolve(Classifiers.DORMANT));
+        new Assign().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        String located = next.relativize(variant).toString().replace(File.separatorChar, '/');
+        assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.IDENTITY)))
+                .as("a variant is published under the classifier of every coordinate the jar is")
+                .containsEntry("maven/org.example/native/jar/linux/1.0", located)
+                .containsEntry("module/org.example.natives-linux", located);
+        assertThat(SequencedProperties.ofFiles(next.resolve(Assign.VARIANTS)))
+                .containsEntry("maven/org.example/native/jar/linux/1.0", "maven/org.example/native/1.0")
+                .containsEntry("module/org.example.natives-linux", "module/org.example.natives");
+        assertThat(SequencedProperties.ofFiles(next.resolve(Assign.INACTIVE)))
+                .as("a classifier only an inactive profile declares is remembered with the profile that does")
+                .containsEntry("maven/org.example/native/jar/windows/1.0", "platform-w")
+                .containsEntry("module/org.example.natives-windows", "platform-w");
+    }
+
+    @Test
+    public void derives_a_classifier_coordinate_and_back() {
+        assertThat(Assign.classified("maven/org.example/native/1.0", "linux"))
+                .isEqualTo("maven/org.example/native/jar/linux/1.0");
+        assertThat(Assign.classified("module/org.example.natives", "linux")).isEqualTo("module/org.example.natives-linux");
+        assertThat(Assign.classified("maven/org.example/native/jar/tests/1.0", "linux"))
+                .as("a coordinate that is a classifier already has none of its own")
+                .isNull();
+        assertThat(Assign.unclassified("maven/org.example/native/jar/linux/1.0")).isEqualTo("maven/org.example/native/1.0");
+        assertThat(Assign.unclassified("module/org.example.natives-linux")).isEqualTo("module/org.example.natives");
+        assertThat(Assign.unclassified("maven/org.example/native/1.0")).isNull();
     }
 }

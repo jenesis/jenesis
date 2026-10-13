@@ -30,7 +30,7 @@ public class SbomTest {
     }
 
     @Test
-    public void shouldRun_fires_when_licenses_or_graph_changed() {
+    public void shouldRun_fires_when_licenses_or_graph_changed() throws IOException {
         for (Path changed : List.of(Path.of("licenses.properties"),
                 Path.of("archives.properties"),
                 Path.of("graph.properties"))) {

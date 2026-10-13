@@ -55,10 +55,10 @@ public class GroupTest {
                                 Map.of(
                                         Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED),
                                         Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        SequencedProperties leftGroup = SequencedProperties.ofFiles(next.resolve(Group.GROUPS + "left.properties"));
-        SequencedProperties rightGroup = SequencedProperties.ofFiles(next.resolve(Group.GROUPS + "right.properties"));
-        assertThat(leftGroup.stringPropertyNames()).isEmpty();
-        assertThat(rightGroup.stringPropertyNames()).containsExactly("left");
+        List<String> leftGroup = SequencedProperties.ofFiles(next.resolve(Group.GROUPS)).entries("left");
+        List<String> rightGroup = SequencedProperties.ofFiles(next.resolve(Group.GROUPS)).entries("right");
+        assertThat(leftGroup).isNull();
+        assertThat(rightGroup).containsExactly("left");
         assertThat(result.next()).isTrue();
     }
 
@@ -88,10 +88,10 @@ public class GroupTest {
                                 Map.of(
                                         Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED),
                                         Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        SequencedProperties leftGroup = SequencedProperties.ofFiles(next.resolve(Group.GROUPS + "left.properties"));
-        SequencedProperties rightGroup = SequencedProperties.ofFiles(next.resolve(Group.GROUPS + "right.properties"));
-        assertThat(leftGroup.stringPropertyNames()).isEmpty();
-        assertThat(rightGroup.stringPropertyNames()).isEmpty();
+        List<String> leftGroup = SequencedProperties.ofFiles(next.resolve(Group.GROUPS)).entries("left");
+        List<String> rightGroup = SequencedProperties.ofFiles(next.resolve(Group.GROUPS)).entries("right");
+        assertThat(leftGroup).isNull();
+        assertThat(rightGroup).isNull();
         assertThat(result.next()).isTrue();
     }
 
@@ -112,8 +112,28 @@ public class GroupTest {
                                 Map.of(
                                         Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED),
                                         Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        SequencedProperties leftGroup = SequencedProperties.ofFiles(next.resolve(Group.GROUPS + "left.properties"));
-        assertThat(leftGroup.stringPropertyNames()).isEmpty();
+        List<String> leftGroup = SequencedProperties.ofFiles(next.resolve(Group.GROUPS)).entries("left");
+        assertThat(leftGroup).isNull();
         assertThat(result.next()).isTrue();
+    }
+
+    @Test
+    public void links_a_module_that_requires_a_classifier_of_a_sibling_to_that_sibling() throws IOException {
+        SequencedProperties identity = new SequencedProperties(), requires = new SequencedProperties();
+        identity.setProperty("maven/org.example/native/1.0", "");
+        identity.store(left.resolve(BuildStep.IDENTITY));
+        requires.setProperty("main/compile/maven/org.example/native/jar/linux/1.0", "");
+        requires.store(right.resolve(BuildStep.REQUIRES));
+        new Group(Optional::of).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of(
+                        "left", new BuildStepArgument(left, Map.of(Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED))),
+                        "right", new BuildStepArgument(right, Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        assertThat(SequencedProperties.ofFiles(next.resolve(Group.GROUPS)).entries("right"))
+                .as("a classifier of a module of this build is built by that module")
+                .containsExactly("left");
     }
 }

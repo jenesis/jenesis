@@ -6,6 +6,8 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Assign;
+import build.jenesis.step.Classifiers;
 
 public class MultiProjectDependencies implements BuildStep {
 
@@ -26,6 +28,8 @@ public class MultiProjectDependencies implements BuildStep {
                 Path.of(EXCLUSIONS),
                 Path.of(OVERRIDES),
                 Path.of(IDENTITY),
+                Path.of(Assign.VARIANTS),
+                Path.of(Assign.INACTIVE),
                 Path.of(ARTIFACTS)));
     }
 
@@ -35,7 +39,8 @@ public class MultiProjectDependencies implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         SequencedMap<String, Path> coordinates = new LinkedHashMap<>();
-        SequencedMap<String, String> dependencies = new LinkedHashMap<>();
+        SequencedMap<String, String> dependencies = new LinkedHashMap<>(), variants = new TreeMap<>(), inactive = new TreeMap<>();
+        String path = null;
         SequencedMap<String, SequencedMap<String, String>> inherited = new LinkedHashMap<>();
         for (String name : List.of(VERSIONS, ALIASES, BOMS, SIGNATURES, EXCLUSIONS, OVERRIDES)) {
             inherited.put(name, new LinkedHashMap<>());
@@ -45,6 +50,10 @@ public class MultiProjectDependencies implements BuildStep {
                 continue;
             }
             if (isModule.test(entry.getKey())) {
+                Path moduleFile = entry.getValue().folder().resolve(MODULE);
+                if (path == null && Files.isRegularFile(moduleFile)) {
+                    path = SequencedProperties.ofFiles(moduleFile).value("path");
+                }
                 Path requiresPath = entry.getValue().folder().resolve(REQUIRES);
                 if (Files.exists(requiresPath)) {
                     SequencedProperties.ofFiles(requiresPath).forEachProperty(dependencies::put);
@@ -65,6 +74,14 @@ public class MultiProjectDependencies implements BuildStep {
                     }
                 }
             } else {
+                Path variantsFile = entry.getValue().folder().resolve(Assign.VARIANTS),
+                        inactiveFile = entry.getValue().folder().resolve(Assign.INACTIVE);
+                if (Files.isRegularFile(variantsFile)) {
+                    SequencedProperties.ofFiles(variantsFile).forEachProperty(variants::putIfAbsent);
+                }
+                if (Files.isRegularFile(inactiveFile)) {
+                    SequencedProperties.ofFiles(inactiveFile).forEachProperty(inactive::putIfAbsent);
+                }
                 Path file = entry.getValue().folder().resolve(IDENTITY);
                 if (Files.exists(file)) {
                     SequencedProperties properties = SequencedProperties.ofFiles(file);
@@ -79,14 +96,49 @@ public class MultiProjectDependencies implements BuildStep {
             }
         }
         SequencedProperties properties = new SequencedProperties();
+        SequencedMap<String, String> versions = inherited.get(VERSIONS);
         for (Map.Entry<String, String> entry : dependencies.entrySet()) {
             String key = entry.getKey();
-            int second = key.indexOf('/', key.indexOf('/') + 1);
-            Path candidate = coordinates.get(key.substring(second + 1));
-            properties.setProperty(entry.getKey(),
+            int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+            String coordinate = key.substring(second + 1), main = null, classifier = null;
+            String pinned = first < 0 ? "" : versions.getOrDefault(key.substring(0, first) + "/" + coordinate, "");
+            if (pinned.startsWith(":") && coordinates.containsKey(coordinate)) {
+                main = coordinate;
+                classifier = pinned.substring(1);
+                if (!Classifiers.NAME.matcher(classifier).matches()) {
+                    throw new IllegalArgumentException((path == null ? "A module" : path) + " pins "
+                            + coordinate.substring(coordinate.indexOf('/') + 1) + " to " + pinned + ", but this build"
+                            + " builds that module and resolves it as it is built - select its variant by the classifier"
+                            + " alone, as @jenesis.pin " + coordinate.substring(coordinate.indexOf('/') + 1)
+                            + " :<classifier>");
+                }
+                coordinate = Assign.classified(coordinate, classifier);
+            } else if (!coordinates.containsKey(coordinate) && coordinates.containsKey(Assign.unclassified(coordinate))) {
+                main = Assign.unclassified(coordinate);
+                String[] segments = coordinate.split("/");
+                classifier = segments.length > 4 ? segments[4] : segments[1].substring(segments[1].indexOf('-') + 1);
+            }
+            Path candidate = coordinates.get(coordinate);
+            if (candidate == null && main != null) {
+                String profiles = inactive.get(coordinate);
+                throw new IllegalArgumentException((path == null ? "A module" : path) + " asks for the classifier "
+                        + classifier + " of " + main + ", which the module of this build that builds it "
+                        + (profiles == null
+                                ? "does not declare - declare it as " + classifier + "=<folder>[,<folder>...] in a"
+                                        + " classifiers.properties of that module's configuration, or as " + classifier
+                                        + "= to publish its jar as it is under that classifier"
+                                : "declares only in the profile " + profiles + " - activate it with"
+                                        + " -Djenesis.make.profiles=" + profiles));
+            }
+            properties.setProperty(key,
                     candidate != null
                             ? fingerprint(arguments.values(), candidate)
                             : entry.getValue());
+        }
+        if (!variants.isEmpty()) {
+            SequencedProperties listed = new SequencedProperties();
+            variants.forEach(listed::setProperty);
+            listed.store(context.next().resolve(Assign.VARIANTS));
         }
         properties.store(context.next().resolve(REQUIRES));
         for (Map.Entry<String, SequencedMap<String, String>> merged : inherited.entrySet()) {

@@ -17,6 +17,7 @@ import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.KotlinCompilerModule;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.ProcessBuildStep;
 import java.lang.classfile.Attributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class KotlinCompilerModuleTest {
 
-    private static final String KOTLIN_VERSION = "2.2.0";
+    private static final String KOTLIN_VERSION = "2.2.0", INCREMENTAL_VERSION = "2.3.21";
 
     @TempDir
     private Path root, project, tests, testRoot;
@@ -170,10 +171,9 @@ public class KotlinCompilerModuleTest {
                 package sample
                 class Sample { fun name(): String = greeting() + " 17" }
                 """);
-        Path processFolder = Files.createDirectories(project.resolve("process"));
         SequencedProperties javacProperties = new SequencedProperties();
         javacProperties.setProperty("--release", "11");
-        javacProperties.store(processFolder.resolve("javac.properties"));
+        ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "javac", javacProperties);
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
@@ -284,10 +284,9 @@ public class KotlinCompilerModuleTest {
                 package sample
                 class Sample
                 """);
-        Path processFolder = Files.createDirectories(project.resolve("process"));
         SequencedProperties javacProperties = new SequencedProperties();
         javacProperties.setProperty("--release", "11");
-        javacProperties.store(processFolder.resolve("javac.properties"));
+        ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "javac", javacProperties);
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
@@ -325,7 +324,7 @@ public class KotlinCompilerModuleTest {
                 """);
         SequencedProperties javacProperties = new SequencedProperties();
         javacProperties.setProperty("--release", "8");
-        javacProperties.store(Files.createDirectories(project.resolve("process")).resolve("javac.properties"));
+        ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "javac", javacProperties);
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
@@ -349,6 +348,135 @@ public class KotlinCompilerModuleTest {
     }
 
     @Test
+    public void recompiles_incrementally_only_what_a_change_reaches() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-build-tools-impl", INCREMENTAL_VERSION);
+        properties.store(project.resolve(BuildStep.VERSIONS));
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Untouched.kt"), """
+                package sample
+                class Untouched { fun name(): String = "untouched" }
+                """);
+        Files.writeString(sampleDir.resolve("Edited.kt"), """
+                package sample
+                class Edited { fun value(): String = "first" }
+                """);
+        Files.writeString(sampleDir.resolve("User.kt"), """
+                package sample
+                class User { fun use(): String = "used " + Edited().value() }
+                """);
+        Files.writeString(sampleDir.resolve("Removed.kt"), """
+                package sample
+                class Removed
+                """);
+        Files.writeString(project.resolve(BuildStep.SOURCES + "sample/data.txt"), "data");
+        incremental();
+        Path classes = root.resolve("kotlin").resolve(KotlinCompilerModule.CLASSES).resolve("output").resolve(BuildStep.CLASSES);
+        FileTime untouched = Files.getLastModifiedTime(classes.resolve("sample/Untouched.class")),
+                user = Files.getLastModifiedTime(classes.resolve("sample/User.class"));
+        assertThat(classes.resolve("sample/Removed.class")).isNotEmptyFile();
+
+        Files.writeString(sampleDir.resolve("Edited.kt"), """
+                package sample
+                class Edited { fun value(): String = "second" }
+                """);
+        Files.delete(sampleDir.resolve("Removed.kt"));
+        incremental();
+        assertThat(Files.getLastModifiedTime(classes.resolve("sample/Untouched.class")))
+                .as("a source the change does not reach keeps the class the previous run compiled")
+                .isEqualTo(untouched);
+        assertThat(Files.getLastModifiedTime(classes.resolve("sample/User.class")))
+                .as("a body changed behind an unchanged signature leaves the class that calls it as it was")
+                .isEqualTo(user);
+        assertThat(classes.resolve("sample/Removed.class"))
+                .as("the class of a removed source is removed with it")
+                .doesNotExist();
+        assertThat(classes.resolve("sample/data.txt"))
+                .as("the resources are placed beside the classes the compiler wrote")
+                .hasContent("data");
+        assertThat(new String(Files.readAllBytes(classes.resolve("sample/Edited.class")), StandardCharsets.ISO_8859_1))
+                .as("the edited source is compiled again")
+                .contains("second");
+
+        Files.writeString(sampleDir.resolve("Edited.kt"), """
+                package sample
+                class Edited { fun value(): Int = 2 }
+                """);
+        incremental();
+        assertThat(Files.getLastModifiedTime(classes.resolve("sample/User.class")))
+                .as("a changed signature recompiles the source that uses it")
+                .isNotEqualTo(user);
+        assertThat(Files.getLastModifiedTime(classes.resolve("sample/Untouched.class"))).isEqualTo(untouched);
+    }
+
+    @Test
+    public void hands_a_jvm_option_to_the_kotlin_daemon_when_compiling_incrementally() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-build-tools-impl", INCREMENTAL_VERSION);
+        properties.store(project.resolve(BuildStep.VERSIONS));
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.kt"), """
+                package sample
+                class Sample
+                """);
+        SequencedProperties kotlincProperties = new SequencedProperties();
+        kotlincProperties.setProperty("-J-Xss4m", "");
+        ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "kotlinc", kotlincProperties);
+        incremental();
+        List<String> command = Arrays.asList(Files.readString(root
+                .resolve("kotlin")
+                .resolve("compiled")
+                .resolve("supplement")
+                .resolve("command")).split(" "));
+        assertThat(command.get(command.indexOf("-Xss4m") - 1))
+                .as("a -J line configures the JVM of the Kotlin daemon that compiles the module")
+                .isEqualTo("--jvm");
+        assertThat(root.resolve("kotlin").resolve(KotlinCompilerModule.CLASSES).resolve("output").resolve(BuildStep.CLASSES).resolve("sample/Sample.class"))
+                .isNotEmptyFile();
+    }
+
+    @Test
+    public void compiles_a_kotlin_source_below_meta_inf_versions_in_the_kotlin_daemon_when_compiling_incrementally() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-build-tools-impl", INCREMENTAL_VERSION);
+        properties.store(project.resolve(BuildStep.VERSIONS));
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.kt"), """
+                package sample
+                class Sample { fun name(): String = "base" }
+                """);
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "META-INF/versions/17/sample"))
+                .resolve("Sample.kt"), """
+                package sample
+                class Sample { fun name(): String = "17" }
+                """);
+        SequencedProperties javacProperties = new SequencedProperties();
+        javacProperties.setProperty("--release", "11");
+        ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "javac", javacProperties);
+        incremental();
+        Path output = root.resolve("kotlin").resolve(KotlinCompilerModule.CLASSES).resolve("output");
+        assertThat(majorVersion(output.resolve(BuildStep.CLASSES + "sample/Sample.class"))).isEqualTo(55);
+        assertThat(majorVersion(output.resolve(BuildStep.CLASSES + "META-INF/versions/17/sample/Sample.class")))
+                .as("the overlay is compiled for its own release")
+                .isEqualTo(61);
+        assertThat(output.resolve("manifest.mf")).content().contains("Multi-Release: true");
+        assertThat(Files.readString(root.resolve("kotlin").resolve("compiled").resolve("supplement").resolve("command-17")))
+                .as("the overlay is compiled in the Kotlin daemon rather than in a JVM of its own")
+                .contains("--tool")
+                .doesNotContain("K2JVMCompiler");
+    }
+
+    private void incremental() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "kotlin",
+                new KotlinCompilerModule(
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).incremental(true),
+                "project", standardLibrary(executor, project, "project"));
+        executor.execute();
+    }
+
+    @Test
     public void hands_the_lines_of_process_kotlinc_properties_to_kotlinc_and_its_j_lines_to_the_jvm() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
@@ -366,7 +494,7 @@ public class KotlinCompilerModuleTest {
         kotlincProperties.setProperty("-api-version", "2.0");
         kotlincProperties.setProperty("-language-version", "2.0");
         kotlincProperties.setProperty("-J-Xss4m", "");
-        kotlincProperties.store(Files.createDirectories(project.resolve("process")).resolve("kotlinc.properties"));
+        ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "kotlinc", kotlincProperties);
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);

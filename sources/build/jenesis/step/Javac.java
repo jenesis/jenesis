@@ -62,7 +62,6 @@ public class Javac extends ProcessBuildStep {
     }
 
     public static void writeRelease(Path folder, String release, int feature) throws IOException {
-        Path target = Files.createDirectories(folder.resolve(ProcessBuildStep.PROCESS));
         SequencedProperties properties = new SequencedProperties();
         if (release != null && release.endsWith("-preview")) {
             String number = release.substring(0, release.length() - "-preview".length());
@@ -82,7 +81,7 @@ public class Javac extends ProcessBuildStep {
                     ? Integer.toString(feature)
                     : release);
         }
-        properties.store(target.resolve("javac.properties"));
+        ProcessBuildStep.store(folder, ProcessBuildStep.PROCESS, "javac", properties);
     }
 
     public Javac factory(ProcessHandler.Factory factory) {
@@ -110,14 +109,14 @@ public class Javac extends ProcessBuildStep {
     }
 
     @Override
-    public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
-        return hasRelevantChange(arguments, Set.of(".java"), Set.of("javac.properties"), includeResources);
+    public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+        return hasRelevantChange(arguments, Set.of(".java"), Set.of("javac"), includeResources);
     }
 
     public static boolean hasRelevantChange(SequencedMap<String, BuildStepArgument> arguments,
                                             Set<String> sourceExtensions,
-                                            Set<String> processProperties,
-                                            boolean includeResources) {
+                                            Set<String> tools,
+                                            boolean includeResources) throws IOException {
         Path sourcesDir = Path.of(SOURCES);
         Path classesDir = Path.of(CLASSES);
         Path artifactsDir = Path.of(ARTIFACTS);
@@ -125,11 +124,15 @@ public class Javac extends ProcessBuildStep {
         Path dependencyIndex = Path.of(DEPENDENCIES);
         Path modularIndex = Path.of(Dependencies.MODULAR);
         Path modularDir = Path.of(Dependencies.MODULAR_PATH);
-        Set<Path> processFiles = new LinkedHashSet<>();
-        for (String name : processProperties) {
-            processFiles.add(Path.of(ProcessBuildStep.PROCESS + name));
-        }
         for (BuildStepArgument argument : arguments.values()) {
+            Set<Path> processFiles = new HashSet<>();
+            processFiles.add(Path.of(ProcessBuildStep.PROCESS, ProcessBuildStep.INDEX));
+            for (String tool : tools) {
+                Path located = ProcessBuildStep.locate(argument.folder(), ProcessBuildStep.PROCESS, tool);
+                if (located != null) {
+                    processFiles.add(argument.folder().relativize(located));
+                }
+            }
             for (Map.Entry<Path, Checksum> entry : argument.files().entrySet()) {
                 if (entry.getValue().status() == ChecksumStatus.RETAINED) {
                     continue;

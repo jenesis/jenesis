@@ -73,7 +73,7 @@ public class JDepsTest {
         assertThatThrownBy(() -> execute(process)).hasStackTraceContaining("Missing dependencies");
         SequencedProperties options = new SequencedProperties();
         options.setProperty("--ignore-missing-deps", "");
-        options.store(Files.createDirectory(staged.resolve(ProcessBuildStep.PROCESS)).resolve("jdeps.properties"));
+        ProcessBuildStep.store(staged, ProcessBuildStep.PROCESS, "jdeps", options);
         assertThat(execute(process).next()).isTrue();
         assertThat(descriptor("demo.plain")).contains("module demo.plain");
     }
