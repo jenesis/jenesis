@@ -46,7 +46,7 @@ public class MavenProject implements BuildExecutorModule {
     public static final String POM = "pom/", MAVEN = "maven/", BOM = "bom/";
     public static final String EXPRESSIONS = "expressions.properties", SCOPES = "scopes.properties";
     private static final String SCAN = "scan", POM_METADATA = "metadata.", RELOCATION = "relocation.", BOMS = "boms",
-            POMS = "poms", SKIPPED = "skipped.properties";
+            POMS = "poms", SKIPPED = "skipped.properties", INDEX = "index.properties";
     private static final Set<String> JARS = Set.of("jar", "bundle"), AGGREGATES = Set.of("pom", "bom");
     private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-";
     private static final Set<String> COMMANDED = Set.of("version", "scm.tag", "scm.revision", "scm.tree");
@@ -162,12 +162,13 @@ public class MavenProject implements BuildExecutorModule {
                         : Optional.of(identifier.substring(0, identifier.indexOf('/'))),
                 _ -> (name, dependencies, arguments) -> {
                     Path location = MultiProjectModule.location(root, arguments);
+                    boolean test = MultiProjectModule.test(arguments);
                     SequencedSet<String> spdxInherited = new LinkedHashSet<>();
                     for (int index = 0; index < spdx.size(); index++) {
                         spdxInherited.add(BuildExecutorModule.PREVIOUS + MultiProjectModule.SPDX + "-" + index);
                     }
                     AssemblyDescriptor packaging = assembler.apply(
-                            new MavenModuleDescriptor(name, dependencies.sequencedKeySet(), Collections.emptyNavigableSet(), spdxInherited, location),
+                            new MavenModuleDescriptor(name, dependencies.sequencedKeySet(), Collections.emptyNavigableSet(), spdxInherited, location, test),
                             repositories,
                             resolvers);
                     AssemblyDescriptor assembly = new AssemblyDescriptor((buildExecutor, inherited) -> {
@@ -209,7 +210,7 @@ public class MavenProject implements BuildExecutorModule {
                         depExec.addModule(ARTIFACTS,
                                 dependencyModule.repositories(mergedRepositories)
                                         .pinning(pinning)
-                                        .pathPlacement(name.startsWith("test-") ? PathPlacement.CLASS_PATH : PathPlacement.INFERRED),
+                                        .pathPlacement(test ? PathPlacement.CLASS_PATH : PathPlacement.INFERRED),
                                 artifactInputs);
                     }, dependencyDeps);
                     SequencedMap<String, String> produceDeps = new LinkedHashMap<>();
@@ -233,7 +234,7 @@ public class MavenProject implements BuildExecutorModule {
                         produceDeps.putIfAbsent(key, key);
                     }
                     buildExecutor.addModule(PRODUCE,
-                            assembler.apply(new MavenModuleDescriptor(name, dependencies.sequencedKeySet(), resources, spdxInherited, location),
+                            assembler.apply(new MavenModuleDescriptor(name, dependencies.sequencedKeySet(), resources, spdxInherited, location, test),
                                     mergedRepositories,
                                     resolvers).build(),
                             produceDeps);
@@ -278,33 +279,32 @@ public class MavenProject implements BuildExecutorModule {
         buildExecutor.addModule(BOMS, (boms, prepared) -> {
             SortedSet<String> unstaged = new TreeSet<>();
             Path descriptors = prepared.get(PREVIOUS + PREPARE).resolve(BOM);
-            if (Files.isDirectory(descriptors)) {
-                try (DirectoryStream<Path> files = Files.newDirectoryStream(descriptors, "*.properties")) {
-                    for (Path file : files) {
-                        SequencedProperties descriptor = SequencedProperties.ofFiles(file);
-                        String name = file.getFileName().toString(), path = descriptor.getProperty("path");
-                        if (descriptor.stringPropertyNames().stream().anyMatch(key -> key.startsWith(RELOCATION))) {
-                            Path sources = root.resolve(path).resolve(descriptor.getProperty("sources.0"));
-                            boolean compiled;
-                            try (Stream<Path> found = Files.isDirectory(sources) ? Files.walk(sources) : Stream.empty()) {
-                                compiled = found.anyMatch(Files::isRegularFile);
-                            }
-                            if (compiled) {
-                                throw new IllegalArgumentException("The pom.xml in " + root.resolve(path)
-                                        + " relocates its artifact with <distributionManagement><relocation>, which"
-                                        + " publishes the POM alone, but " + sources + " holds sources: move them to"
-                                        + " the module the relocation names, or remove the relocation");
-                            }
+            if (Files.isRegularFile(descriptors.resolve(INDEX))) {
+                SequencedProperties index = SequencedProperties.ofFiles(descriptors.resolve(INDEX));
+                for (String name : index.stringPropertyNames()) {
+                    SequencedProperties descriptor = SequencedProperties.ofFiles(descriptors.resolve(index.getProperty(name)));
+                    String path = descriptor.getProperty("path");
+                    if (descriptor.stringPropertyNames().stream().anyMatch(key -> key.startsWith(RELOCATION))) {
+                        Path sources = root.resolve(path).resolve(descriptor.getProperty("sources.0"));
+                        boolean compiled;
+                        try (Stream<Path> found = Files.isDirectory(sources) ? Files.walk(sources) : Stream.empty()) {
+                            compiled = found.anyMatch(Files::isRegularFile);
                         }
-                        Path packaging = BuildStep.locate(configurations.apply(new MavenModuleDescriptor(
-                                name.substring(0, name.length() - ".properties".length()),
-                                Collections.emptyNavigableSet(),
-                                Collections.emptyNavigableSet(),
-                                Collections.emptyNavigableSet(),
-                                root.resolve(path)).configurations()), "packaging.properties");
-                        if (packaging != null && !SequencedProperties.ofFiles(packaging).flag("stage", true)) {
-                            unstaged.add(path);
+                        if (compiled) {
+                            throw new IllegalArgumentException("The pom.xml in " + root.resolve(path)
+                                    + " relocates its artifact with <distributionManagement><relocation>, which"
+                                    + " publishes the POM alone, but " + sources + " holds sources: move them to"
+                                    + " the module the relocation names, or remove the relocation");
                         }
+                    }
+                    Path packaging = BuildStep.locate(configurations.apply(new MavenModuleDescriptor(name,
+                            Collections.emptyNavigableSet(),
+                            Collections.emptyNavigableSet(),
+                            Collections.emptyNavigableSet(),
+                            root.resolve(path),
+                            false).configurations()), "packaging.properties");
+                    if (packaging != null && !SequencedProperties.ofFiles(packaging).flag("stage", true)) {
+                        unstaged.add(path);
                     }
                 }
             }
@@ -323,360 +323,356 @@ public class MavenProject implements BuildExecutorModule {
                                         Path.of(pom),
                                         packaging)));
             }
-            try (DirectoryStream<Path> files = Files.newDirectoryStream(
-                    paths.get(PREVIOUS + PREPARE).resolve(MAVEN),
-                    "*.properties")) {
-                List<Path> descriptors = new ArrayList<>();
-                files.forEach(descriptors::add);
-                descriptors.sort(null);
-                for (Path file : descriptors) {
-                    String name = file.getFileName().toString();
-                    modules.addModule(name.substring(0, name.length() - 11), (module, modInherited) -> {
-                        SequencedProperties properties = SequencedProperties.ofFiles(file);
-                        boolean active = false;
-                        Path base = root.resolve(properties.getProperty("path"));
-                        String sourcesProperty = properties.getProperty("sources.0");
-                        Path sources = sourcesProperty.isEmpty() ? null : base.resolve(sourcesProperty);
-                        if (sources != null && Files.exists(sources)) {
+            Path described = paths.get(PREVIOUS + PREPARE).resolve(MAVEN);
+            SequencedProperties descriptors = SequencedProperties.ofFiles(described.resolve(INDEX));
+            for (String name : new TreeSet<>(descriptors.stringPropertyNames())) {
+                Path file = described.resolve(descriptors.getProperty(name));
+                modules.addModule(name, (module, modInherited) -> {
+                    SequencedProperties properties = SequencedProperties.ofFiles(file);
+                    boolean testModule = properties.flag("test", false);
+                    boolean active = false;
+                    Path base = root.resolve(properties.getProperty("path"));
+                    String sourcesProperty = properties.getProperty("sources.0");
+                    Path sources = sourcesProperty.isEmpty() ? null : base.resolve(sourcesProperty);
+                    if (sources != null && Files.exists(sources)) {
+                        active = true;
+                    }
+                    SequencedSet<Path> languages = new LinkedHashSet<>();
+                    for (int languageIndex = 1; ; languageIndex++) {
+                        String language = properties.getProperty("sources." + languageIndex);
+                        if (language == null) {
+                            break;
+                        }
+                        Path folder = base.resolve(language).normalize();
+                        if (Files.isDirectory(folder) && (sources == null || !folder.equals(sources.normalize()))) {
+                            languages.add(folder);
                             active = true;
                         }
-                        SequencedSet<Path> languages = new LinkedHashSet<>();
-                        for (int languageIndex = 1; ; languageIndex++) {
-                            String language = properties.getProperty("sources." + languageIndex);
-                            if (language == null) {
-                                break;
-                            }
-                            Path folder = base.resolve(language).normalize();
-                            if (Files.isDirectory(folder) && (sources == null || !folder.equals(sources.normalize()))) {
-                                languages.add(folder);
-                                active = true;
-                            }
+                    }
+                    int index = 0;
+                    Set<Path> directories = new HashSet<>();
+                    for (int resourceIndex = 0; ; resourceIndex++) {
+                        String resource = properties.getProperty("resources." + resourceIndex);
+                        if (resource == null) {
+                            break;
                         }
-                        int index = 0;
-                        Set<Path> directories = new HashSet<>();
-                        for (int resourceIndex = 0; ; resourceIndex++) {
-                            String resource = properties.getProperty("resources." + resourceIndex);
-                            if (resource == null) {
-                                break;
-                            }
-                            Path resources = base.resolve(resource), directory = resources.toAbsolutePath().normalize();
-                            if (Files.exists(resources) && directories.add(directory)) {
-                                for (Path owned : List.of(paths.get(PREVIOUS + PREPARE), root.resolve(".jenesis"))) {
-                                    Path normalized = owned.toAbsolutePath().normalize();
-                                    if (normalized.startsWith(directory)) {
-                                        throw new IllegalArgumentException("The resource directory " + resource
-                                                + " of " + base.resolve("pom.xml")
-                                                + " contains " + directory.relativize(normalized).getName(0)
-                                                + ", which the build writes itself; a resource directory is copied whole,"
-                                                + " without its includes, excludes or targetPath, so place a single file with"
-                                                + " -Djenesis.project.resources=<file>:<path in the jar>, as"
-                                                + " LICENSE:META-INF/LICENSE, and move that resource into a <profile> activated by"
-                                                + " a property, such as <property><name>!jenesis</name></property>, which Maven"
-                                                + " still activates and this build does not");
-                                    }
+                        Path resources = base.resolve(resource), directory = resources.toAbsolutePath().normalize();
+                        if (Files.exists(resources) && directories.add(directory)) {
+                            for (Path owned : List.of(paths.get(PREVIOUS + PREPARE), root.resolve(".jenesis"))) {
+                                Path normalized = owned.toAbsolutePath().normalize();
+                                if (normalized.startsWith(directory)) {
+                                    throw new IllegalArgumentException("The resource directory " + resource
+                                            + " of " + base.resolve("pom.xml")
+                                            + " contains " + directory.relativize(normalized).getName(0)
+                                            + ", which the build writes itself; a resource directory is copied whole,"
+                                            + " without its includes, excludes or targetPath, so place a single file with"
+                                            + " -Djenesis.project.resources=<file>:<path in the jar>, as"
+                                            + " LICENSE:META-INF/LICENSE, and move that resource into a <profile> activated by"
+                                            + " a property, such as <property><name>!jenesis</name></property>, which Maven"
+                                            + " still activates and this build does not");
                                 }
-                                module.addSource("resources-" + ++index, Bind.asResources(), resources);
-                                active = true;
-                            } else if (!Files.exists(resources)
-                                    && !Path.of(resource).normalize().equals(Path.of("src", name.startsWith("test-") ? "test" : "main", "resources"))
-                                    && printing != null) {
-                                printing.accept(("%s%-11s%s %s names the resource directory %s, which does not exist"
-                                        + " beside it, so it adds no resources")
-                                        .formatted(palette.warning(),
-                                                "[RESOURCES]",
-                                                palette.reset(),
-                                                Path.of(properties.getProperty("path")).resolve("pom.xml"),
-                                                resource));
                             }
-                        }
-                        Path tests = file.resolveSibling("test-" + name);
-                        if (!active && name.startsWith(SIBLING_MODULE_PREFIX) && Files.exists(tests)) {
-                            SequencedProperties testProperties = SequencedProperties.ofFiles(tests);
-                            active = testProperties.stringPropertyNames().stream()
-                                    .filter(key -> key.startsWith("sources.") || key.startsWith("resources."))
-                                    .map(testProperties::getProperty)
-                                    .filter(folder -> !folder.isEmpty())
-                                    .anyMatch(folder -> Files.exists(base.resolve(folder)))
-                                    || scans(base)
-                                    || configuresPlugin(base.resolve("src/test/build.jenesis"));
-                        }
-                        if (!active && name.startsWith("test-" + SIBLING_MODULE_PREFIX)) {
-                            active = scans(base)
-                                    || configuresPlugin(base.resolve("src/test/build.jenesis"));
-                        }
-                        if (!active && name.startsWith(SIBLING_MODULE_PREFIX)) {
-                            active = configuresPlugin(base.resolve("src/main/build.jenesis"))
-                                    || configuresPlugin(base.resolve("build.jenesis"));
-                            if (!active && printing != null) {
-                                printing.accept(("%s%-11s%s %s builds no jar, as %s has neither sources nor resources:"
-                                        + " a plugin that generates them is configured by a plugin-<name>.properties in"
-                                        + " %s, which builds the module")
-                                        .formatted(palette.warning(),
-                                                "[SKIPPED]",
-                                                palette.reset(),
-                                                properties.getProperty("groupId") + ":" + properties.getProperty("artifactId"),
-                                                Path.of(properties.getProperty("path")).resolve("pom.xml"),
-                                                Path.of(properties.getProperty("path")).resolve("src/main/build.jenesis")));
-                            }
-                        }
-                        if (active && printing != null && !name.startsWith("test-") && properties.getProperty("release") == null) {
-                            printing.accept(("%s%-11s%s %s compiles for release %d, the JDK the build runs on, as %s sets"
-                                    + " neither maven.compiler.release nor its target or source - maven.compiler.release sets it")
+                            module.addSource("resources-" + ++index, Bind.asResources(), resources);
+                            active = true;
+                        } else if (!Files.exists(resources)
+                                && !Path.of(resource).normalize().equals(Path.of("src", testModule ? "test" : "main", "resources"))
+                                && printing != null) {
+                            printing.accept(("%s%-11s%s %s names the resource directory %s, which does not exist"
+                                    + " beside it, so it adds no resources")
                                     .formatted(palette.warning(),
-                                            "[RELEASE]",
+                                            "[RESOURCES]",
+                                            palette.reset(),
+                                            Path.of(properties.getProperty("path")).resolve("pom.xml"),
+                                            resource));
+                        }
+                    }
+                    String tests = properties.value("tests");
+                    if (!active && !testModule && tests != null) {
+                        SequencedProperties testProperties = SequencedProperties.ofFiles(described.resolve(descriptors.getProperty(tests)));
+                        active = testProperties.stringPropertyNames().stream()
+                                .filter(key -> key.startsWith("sources.") || key.startsWith("resources."))
+                                .map(testProperties::getProperty)
+                                .filter(folder -> !folder.isEmpty())
+                                .anyMatch(folder -> Files.exists(base.resolve(folder)))
+                                || scans(base)
+                                || configuresPlugin(base.resolve("src/test/build.jenesis"));
+                    }
+                    if (!active && testModule) {
+                        active = scans(base)
+                                || configuresPlugin(base.resolve("src/test/build.jenesis"));
+                    }
+                    if (!active && !testModule) {
+                        active = configuresPlugin(base.resolve("src/main/build.jenesis"))
+                                || configuresPlugin(base.resolve("build.jenesis"));
+                        if (!active && printing != null) {
+                            printing.accept(("%s%-11s%s %s builds no jar, as %s has neither sources nor resources:"
+                                    + " a plugin that generates them is configured by a plugin-<name>.properties in"
+                                    + " %s, which builds the module")
+                                    .formatted(palette.warning(),
+                                            "[SKIPPED]",
                                             palette.reset(),
                                             properties.getProperty("groupId") + ":" + properties.getProperty("artifactId"),
-                                            Runtime.version().feature(),
-                                            Path.of(properties.getProperty("path")).resolve("pom.xml")));
+                                            Path.of(properties.getProperty("path")).resolve("pom.xml"),
+                                            Path.of(properties.getProperty("path")).resolve("src/main/build.jenesis")));
                         }
-                        if (active) {
-                            SequencedSet<Path> folders = new LinkedHashSet<>();
-                            folders.add(sources == null ? base : sources);
-                            folders.addAll(languages);
-                            module.addSource("sources", Bind.asSources(), folders);
-                            module.addStep(COORDINATES, (_, context, _) -> {
-                                SequencedProperties coordinates = new SequencedProperties();
-                                coordinates.setProperty(properties.getProperty("coordinate"), "");
-                                Path pomFile = paths.get(PREVIOUS + SCAN)
-                                        .resolve(POM)
-                                        .resolve(properties.getProperty("path"))
-                                        .resolve("pom.xml");
-                                coordinates.setProperty(properties.getProperty("pom"),
-                                        context.next().relativize(pomFile).toString().replace(File.separatorChar, '/'));
-                                coordinates.store(context.next().resolve(IDENTITY));
-                                return CompletableFuture.completedStage(new BuildStepResult(true));
-                            });
-                            int feature = Runtime.version().feature();
-                            module.addStep(MANIFESTS, (_, context, manifestArgs) -> {
-                                String[] coordinateParts = properties.getProperty("coordinate").split("/");
-                                String testsOf = coordinateParts.length == 6 && "tests".equals(coordinateParts[4])
-                                        ? coordinateParts[2]
-                                        : null;
-                                SequencedProperties requires = new SequencedProperties();
-                                String compile = properties.getProperty("dependencies.compile", "");
-                                String provided = properties.getProperty("dependencies.provided", "");
-                                String runtime = properties.getProperty("dependencies.runtime", "");
-                                String test = properties.getProperty("dependencies.test", "");
-                                String checksums = properties.getProperty("checksums", "");
-                                Map<String, String> checksumByCoordinate = new LinkedHashMap<>();
-                                for (String entry : checksums.isEmpty() ? new String[0] : checksums.split("\t")) {
+                    }
+                    if (active && printing != null && !testModule && properties.getProperty("release") == null) {
+                        printing.accept(("%s%-11s%s %s compiles for release %d, the JDK the build runs on, as %s sets"
+                                + " neither maven.compiler.release nor its target or source - maven.compiler.release sets it")
+                                .formatted(palette.warning(),
+                                        "[RELEASE]",
+                                        palette.reset(),
+                                        properties.getProperty("groupId") + ":" + properties.getProperty("artifactId"),
+                                        Runtime.version().feature(),
+                                        Path.of(properties.getProperty("path")).resolve("pom.xml")));
+                    }
+                    if (active) {
+                        SequencedSet<Path> folders = new LinkedHashSet<>();
+                        folders.add(sources == null ? base : sources);
+                        folders.addAll(languages);
+                        module.addSource("sources", Bind.asSources(), folders);
+                        module.addStep(COORDINATES, (_, context, _) -> {
+                            SequencedProperties coordinates = new SequencedProperties();
+                            coordinates.setProperty(properties.getProperty("coordinate"), "");
+                            Path pomFile = paths.get(PREVIOUS + SCAN)
+                                    .resolve(POM)
+                                    .resolve(properties.getProperty("path"))
+                                    .resolve("pom.xml");
+                            coordinates.setProperty(properties.getProperty("pom"),
+                                    context.next().relativize(pomFile).toString().replace(File.separatorChar, '/'));
+                            coordinates.store(context.next().resolve(IDENTITY));
+                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                        });
+                        int feature = Runtime.version().feature();
+                        module.addStep(MANIFESTS, (_, context, manifestArgs) -> {
+                            String[] coordinateParts = properties.getProperty("coordinate").split("/");
+                            String testsOf = coordinateParts.length == 6 && "tests".equals(coordinateParts[4])
+                                    ? coordinateParts[2]
+                                    : null;
+                            SequencedProperties requires = new SequencedProperties();
+                            String compile = properties.getProperty("dependencies.compile", "");
+                            String provided = properties.getProperty("dependencies.provided", "");
+                            String runtime = properties.getProperty("dependencies.runtime", "");
+                            String test = properties.getProperty("dependencies.test", "");
+                            String checksums = properties.getProperty("checksums", "");
+                            Map<String, String> checksumByCoordinate = new LinkedHashMap<>();
+                            for (String entry : checksums.isEmpty() ? new String[0] : checksums.split("\t")) {
+                                int split = entry.indexOf('=');
+                                if (split > 0) {
+                                    checksumByCoordinate.put(entry.substring(0, split), entry.substring(split + 1));
+                                }
+                            }
+                            for (String dependency : compile.isEmpty() ? new String[0] : compile.split("\t")) {
+                                String value = checksumByCoordinate.getOrDefault(dependency, "");
+                                requires.setProperty(group + "/compile/" + dependency, value);
+                                requires.setProperty(group + "/runtime/" + dependency, value);
+                            }
+                            for (String dependency : provided.isEmpty() ? new String[0] : provided.split("\t")) {
+                                requires.setProperty(group + "/compile/" + dependency, checksumByCoordinate.getOrDefault(dependency, ""));
+                            }
+                            for (String dependency : runtime.isEmpty() ? new String[0] : runtime.split("\t")) {
+                                requires.setProperty(group + "/runtime/" + dependency, checksumByCoordinate.getOrDefault(dependency, ""));
+                            }
+                            for (String dependency : test.isEmpty() ? new String[0] : test.split("\t")) {
+                                String value = checksumByCoordinate.getOrDefault(dependency, "");
+                                requires.setProperty(group + "/compile/" + dependency, value);
+                                requires.setProperty(group + "/runtime/" + dependency, value);
+                            }
+                            String attach = properties.getProperty("attachments", "");
+                            SequencedProperties attachments = new SequencedProperties();
+                            for (String entry : attach.isEmpty() ? new String[0] : attach.split("\t")) {
+                                int split = entry.indexOf('=');
+                                String left = entry.substring(0, split), arguments = entry.substring(split + 1);
+                                int space = left.indexOf(' ');
+                                String key = space < 0 ? left : left.substring(0, space);
+                                String version = space < 0 ? null : left.substring(space + 1);
+                                int slash = key.indexOf('/');
+                                String seeded = key.substring(0, slash) + "/agent/" + key.substring(slash + 1);
+                                String required = key.substring(0, slash)
+                                        + "/runtime/"
+                                        + key.substring(slash + 1)
+                                        + (version == null ? "" : "/" + version);
+                                if (requires.getProperty(required) == null) {
+                                    requires.setProperty(required, "");
+                                }
+                                attachments.setProperty(seeded, arguments);
+                            }
+                            String declared = properties.getProperty("plugins", "");
+                            for (String entry : declared.isEmpty() ? new String[0] : declared.split("\t")) {
+                                int split = entry.indexOf('=');
+                                String plugin = entry.substring(0, split);
+                                requires.setProperty(entry.substring(split + 1)
+                                        + "/plugin/"
+                                        + plugin
+                                        + (plugin.startsWith("maven/") && plugin.split("/").length == 3
+                                                ? "/RELEASE"
+                                                : ""), "");
+                            }
+                            requires.store(context.next().resolve(BuildStep.REQUIRES));
+                            String keys = properties.getProperty("signatures", "");
+                            if (!keys.isEmpty()) {
+                                SequencedProperties signatures = new SequencedProperties();
+                                for (String entry : keys.split("\t")) {
                                     int split = entry.indexOf('=');
-                                    if (split > 0) {
-                                        checksumByCoordinate.put(entry.substring(0, split), entry.substring(split + 1));
-                                    }
+                                    signatures.setProperty(entry.substring(0, split),
+                                            entry.substring(split + 1));
                                 }
-                                for (String dependency : compile.isEmpty() ? new String[0] : compile.split("\t")) {
-                                    String value = checksumByCoordinate.getOrDefault(dependency, "");
-                                    requires.setProperty(group + "/compile/" + dependency, value);
-                                    requires.setProperty(group + "/runtime/" + dependency, value);
-                                }
-                                for (String dependency : provided.isEmpty() ? new String[0] : provided.split("\t")) {
-                                    requires.setProperty(group + "/compile/" + dependency, checksumByCoordinate.getOrDefault(dependency, ""));
-                                }
-                                for (String dependency : runtime.isEmpty() ? new String[0] : runtime.split("\t")) {
-                                    requires.setProperty(group + "/runtime/" + dependency, checksumByCoordinate.getOrDefault(dependency, ""));
-                                }
-                                for (String dependency : test.isEmpty() ? new String[0] : test.split("\t")) {
-                                    String value = checksumByCoordinate.getOrDefault(dependency, "");
-                                    requires.setProperty(group + "/compile/" + dependency, value);
-                                    requires.setProperty(group + "/runtime/" + dependency, value);
-                                }
-                                String attach = properties.getProperty("attachments", "");
-                                SequencedProperties attachments = new SequencedProperties();
-                                for (String entry : attach.isEmpty() ? new String[0] : attach.split("\t")) {
-                                    int split = entry.indexOf('=');
-                                    String left = entry.substring(0, split), arguments = entry.substring(split + 1);
-                                    int space = left.indexOf(' ');
-                                    String key = space < 0 ? left : left.substring(0, space);
-                                    String version = space < 0 ? null : left.substring(space + 1);
+                                signatures.store(context.next().resolve(BuildStep.SIGNATURES));
+                            }
+                            if (!attachments.isEmpty()) {
+                                attachments.store(context.next().resolve(BuildStep.ATTACHMENTS));
+                            }
+                            String granted = properties.getProperty("natives", "");
+                            if (!granted.isEmpty()) {
+                                SequencedProperties natives = new SequencedProperties();
+                                for (String key : granted.split("\t")) {
                                     int slash = key.indexOf('/');
-                                    String seeded = key.substring(0, slash) + "/agent/" + key.substring(slash + 1);
-                                    String required = key.substring(0, slash)
-                                            + "/runtime/"
-                                            + key.substring(slash + 1)
-                                            + (version == null ? "" : "/" + version);
-                                    if (requires.getProperty(required) == null) {
-                                        requires.setProperty(required, "");
-                                    }
-                                    attachments.setProperty(seeded, arguments);
+                                    natives.setProperty(key.substring(0, slash) + "/native/" + key.substring(slash + 1), "");
                                 }
-                                String declared = properties.getProperty("plugins", "");
-                                for (String entry : declared.isEmpty() ? new String[0] : declared.split("\t")) {
+                                natives.store(context.next().resolve(BuildStep.NATIVES));
+                            }
+                            List<String> aliased = properties.value("aliases") == null
+                                    ? List.of()
+                                    : List.of(properties.value("aliases").split("\t"));
+                            if (!aliased.isEmpty()) {
+                                SequencedProperties aliases = new SequencedProperties();
+                                for (String entry : aliased) {
                                     int split = entry.indexOf('=');
-                                    String plugin = entry.substring(0, split);
-                                    requires.setProperty(entry.substring(split + 1)
-                                            + "/plugin/"
-                                            + plugin
-                                            + (plugin.startsWith("maven/") && plugin.split("/").length == 3
-                                                    ? "/RELEASE"
-                                                    : ""), "");
+                                    aliases.setProperty(group + "/module/" + entry.substring(0, split),
+                                            entry.substring(split + 1));
                                 }
-                                requires.store(context.next().resolve(BuildStep.REQUIRES));
-                                String keys = properties.getProperty("signatures", "");
-                                if (!keys.isEmpty()) {
-                                    SequencedProperties signatures = new SequencedProperties();
-                                    for (String entry : keys.split("\t")) {
-                                        int split = entry.indexOf('=');
-                                        signatures.setProperty(entry.substring(0, split),
-                                                entry.substring(split + 1));
-                                    }
-                                    signatures.store(context.next().resolve(BuildStep.SIGNATURES));
+                                aliases.store(context.next().resolve(BuildStep.ALIASES));
+                            }
+                            String named = properties.getProperty("named"), release = properties.getProperty("release");
+                            boolean preview = release != null && release.endsWith("-preview");
+                            if (named != null || preview || !aliased.isEmpty()) {
+                                Manifest manifest = new Manifest();
+                                manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+                                if (named != null) {
+                                    manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, named);
                                 }
-                                if (!attachments.isEmpty()) {
-                                    attachments.store(context.next().resolve(BuildStep.ATTACHMENTS));
-                                }
-                                String granted = properties.getProperty("natives", "");
-                                if (!granted.isEmpty()) {
-                                    SequencedProperties natives = new SequencedProperties();
-                                    for (String key : granted.split("\t")) {
-                                        int slash = key.indexOf('/');
-                                        natives.setProperty(key.substring(0, slash) + "/native/" + key.substring(slash + 1), "");
-                                    }
-                                    natives.store(context.next().resolve(BuildStep.NATIVES));
-                                }
-                                List<String> aliased = properties.value("aliases") == null
-                                        ? List.of()
-                                        : List.of(properties.value("aliases").split("\t"));
                                 if (!aliased.isEmpty()) {
-                                    SequencedProperties aliases = new SequencedProperties();
-                                    for (String entry : aliased) {
-                                        int split = entry.indexOf('=');
-                                        aliases.setProperty(group + "/module/" + entry.substring(0, split),
-                                                entry.substring(split + 1));
-                                    }
-                                    aliases.store(context.next().resolve(BuildStep.ALIASES));
+                                    manifest.getMainAttributes().putValue(PathPlacement.ALIASES, String.join(",", aliased));
                                 }
-                                String named = properties.getProperty("named"), release = properties.getProperty("release");
-                                boolean preview = release != null && release.endsWith("-preview");
-                                if (named != null || preview || !aliased.isEmpty()) {
-                                    Manifest manifest = new Manifest();
-                                    manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
-                                    if (named != null) {
-                                        manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, named);
-                                    }
-                                    if (!aliased.isEmpty()) {
-                                        manifest.getMainAttributes().putValue(PathPlacement.ALIASES, String.join(",", aliased));
-                                    }
-                                    if (preview) {
-                                        manifest.getMainAttributes().putValue(PathPlacement.PREVIEW,
-                                                release.substring(0, release.length() - "-preview".length()));
-                                    }
-                                    try (OutputStream out = Files.newOutputStream(context.next().resolve(Versions.MANIFEST))) {
-                                        manifest.write(out);
-                                    }
+                                if (preview) {
+                                    manifest.getMainAttributes().putValue(PathPlacement.PREVIEW,
+                                            release.substring(0, release.length() - "-preview".length()));
                                 }
-                                SequencedProperties exclusionsProperties = new SequencedProperties();
+                                try (OutputStream out = Files.newOutputStream(context.next().resolve(Versions.MANIFEST))) {
+                                    manifest.write(out);
+                                }
+                            }
+                            SequencedProperties exclusionsProperties = new SequencedProperties();
+                            for (String key : requires.stringPropertyNames()) {
+                                int scopeSlash = key.indexOf('/', key.indexOf('/') + 1);
+                                String exclusion = properties.getProperty("exclusions." + key.substring(scopeSlash + 1));
+                                if (exclusion != null) {
+                                    exclusionsProperties.setProperty(key, exclusion);
+                                }
+                            }
+                            if (!exclusionsProperties.isEmpty()) {
+                                exclusionsProperties.store(context.next().resolve(BuildStep.EXCLUSIONS));
+                            }
+                            SequencedProperties managedExclusions = new SequencedProperties();
+                            for (String key : properties.stringPropertyNames()) {
+                                if (key.startsWith("managed.exclusions.")) {
+                                    managedExclusions.setProperty(group + "/" + key.substring("managed.exclusions.".length()),
+                                            properties.getProperty(key));
+                                }
+                            }
+                            if (!managedExclusions.isEmpty()) {
+                                managedExclusions.store(context.next().resolve(BuildStep.MANAGED));
+                            }
+                            SequencedProperties managedScopes = new SequencedProperties();
+                            for (String key : properties.stringPropertyNames()) {
+                                if (key.startsWith("managed.scope.")) {
+                                    managedScopes.setProperty(group + "/" + key.substring("managed.scope.".length()),
+                                            properties.getProperty(key));
+                                }
+                            }
+                            if (!managedScopes.isEmpty()) {
+                                managedScopes.store(context.next().resolve(SCOPES));
+                            }
+                            SequencedProperties expressions = new SequencedProperties();
+                            for (String key : properties.stringPropertyNames()) {
+                                if (key.startsWith("expression.")) {
+                                    expressions.setProperty(key.substring("expression.".length()),
+                                            properties.getProperty(key));
+                                }
+                            }
+                            if (!expressions.isEmpty()) {
+                                expressions.store(context.next().resolve(EXPRESSIONS));
+                            }
+                            String optionalDependencies = properties.getProperty("optional");
+                            if (optionalDependencies != null) {
+                                List<String> optional = List.of(optionalDependencies.split("\t"));
+                                SequencedProperties optionals = new SequencedProperties();
                                 for (String key : requires.stringPropertyNames()) {
                                     int scopeSlash = key.indexOf('/', key.indexOf('/') + 1);
-                                    String exclusion = properties.getProperty("exclusions." + key.substring(scopeSlash + 1));
-                                    if (exclusion != null) {
-                                        exclusionsProperties.setProperty(key, exclusion);
+                                    if (optional.contains(key.substring(scopeSlash + 1))) {
+                                        optionals.setProperty(key, "");
                                     }
                                 }
-                                if (!exclusionsProperties.isEmpty()) {
-                                    exclusionsProperties.store(context.next().resolve(BuildStep.EXCLUSIONS));
+                                optionals.store(context.next().resolve(BuildStep.OPTIONALS));
+                            }
+                            SequencedProperties versions = new SequencedProperties();
+                            String managed = properties.getProperty("managedDependencies", "");
+                            if (!managed.isEmpty()) {
+                                for (String entry : managed.split("\t")) {
+                                    int split = entry.indexOf('=');
+                                    String coord = entry.substring(0, split), version = entry.substring(split + 1);
+                                    versions.setProperty(group + "/" + coord, version);
                                 }
-                                SequencedProperties managedExclusions = new SequencedProperties();
-                                for (String key : properties.stringPropertyNames()) {
-                                    if (key.startsWith("managed.exclusions.")) {
-                                        managedExclusions.setProperty(group + "/" + key.substring("managed.exclusions.".length()),
-                                                properties.getProperty(key));
+                            }
+                            String qualified = properties.getProperty("qualifiedDependencies", "");
+                            if (!qualified.isEmpty()) {
+                                SequencedMap<String, String> unguarded = new LinkedHashMap<>();
+                                SequencedMap<String, SequencedMap<String, String>> variants = new LinkedHashMap<>();
+                                for (String entry : qualified.split("\t")) {
+                                    int split = entry.indexOf('=');
+                                    String key = entry.substring(0, split), value = entry.substring(split + 1);
+                                    int bracket = key.indexOf('[');
+                                    if (bracket < 0) {
+                                        unguarded.put(key, value);
+                                    } else {
+                                        variants.computeIfAbsent(key.substring(0, bracket), _ -> new LinkedHashMap<>())
+                                                .put(key.substring(bracket + 1, key.length() - 1), value);
                                     }
                                 }
-                                if (!managedExclusions.isEmpty()) {
-                                    managedExclusions.store(context.next().resolve(BuildStep.MANAGED));
-                                }
-                                SequencedProperties managedScopes = new SequencedProperties();
-                                for (String key : properties.stringPropertyNames()) {
-                                    if (key.startsWith("managed.scope.")) {
-                                        managedScopes.setProperty(group + "/" + key.substring("managed.scope.".length()),
-                                                properties.getProperty(key));
+                                for (Map.Entry<String, SequencedMap<String, String>> variant : variants.entrySet()) {
+                                    String selected = platform.select(variant.getKey(),
+                                            unguarded.get(variant.getKey()),
+                                            variant.getValue());
+                                    if (selected != null) {
+                                        unguarded.put(variant.getKey(), selected);
                                     }
                                 }
-                                if (!managedScopes.isEmpty()) {
-                                    managedScopes.store(context.next().resolve(SCOPES));
-                                }
-                                SequencedProperties expressions = new SequencedProperties();
-                                for (String key : properties.stringPropertyNames()) {
-                                    if (key.startsWith("expression.")) {
-                                        expressions.setProperty(key.substring("expression.".length()),
-                                                properties.getProperty(key));
-                                    }
-                                }
-                                if (!expressions.isEmpty()) {
-                                    expressions.store(context.next().resolve(EXPRESSIONS));
-                                }
-                                String optionalDependencies = properties.getProperty("optional");
-                                if (optionalDependencies != null) {
-                                    List<String> optional = List.of(optionalDependencies.split("\t"));
-                                    SequencedProperties optionals = new SequencedProperties();
-                                    for (String key : requires.stringPropertyNames()) {
-                                        int scopeSlash = key.indexOf('/', key.indexOf('/') + 1);
-                                        if (optional.contains(key.substring(scopeSlash + 1))) {
-                                            optionals.setProperty(key, "");
-                                        }
-                                    }
-                                    optionals.store(context.next().resolve(BuildStep.OPTIONALS));
-                                }
-                                SequencedProperties versions = new SequencedProperties();
-                                String managed = properties.getProperty("managedDependencies", "");
-                                if (!managed.isEmpty()) {
-                                    for (String entry : managed.split("\t")) {
-                                        int split = entry.indexOf('=');
-                                        String coord = entry.substring(0, split), version = entry.substring(split + 1);
-                                        versions.setProperty(group + "/" + coord, version);
-                                    }
-                                }
-                                String qualified = properties.getProperty("qualifiedDependencies", "");
-                                if (!qualified.isEmpty()) {
-                                    SequencedMap<String, String> unguarded = new LinkedHashMap<>();
-                                    SequencedMap<String, SequencedMap<String, String>> variants = new LinkedHashMap<>();
-                                    for (String entry : qualified.split("\t")) {
-                                        int split = entry.indexOf('=');
-                                        String key = entry.substring(0, split), value = entry.substring(split + 1);
-                                        int bracket = key.indexOf('[');
-                                        if (bracket < 0) {
-                                            unguarded.put(key, value);
-                                        } else {
-                                            variants.computeIfAbsent(key.substring(0, bracket), _ -> new LinkedHashMap<>())
-                                                    .put(key.substring(bracket + 1, key.length() - 1), value);
-                                        }
-                                    }
-                                    for (Map.Entry<String, SequencedMap<String, String>> variant : variants.entrySet()) {
-                                        String selected = platform.select(variant.getKey(),
-                                                unguarded.get(variant.getKey()),
-                                                variant.getValue());
-                                        if (selected != null) {
-                                            unguarded.put(variant.getKey(), selected);
-                                        }
-                                    }
-                                    unguarded.forEach(versions::setProperty);
-                                }
-                                if (!versions.isEmpty()) {
-                                    versions.store(context.next().resolve(BuildStep.VERSIONS));
-                                }
-                                Javac.writeRelease(context.next(), properties.getProperty("release"), feature);
-                                SequencedProperties descriptor = new SequencedProperties();
-                                descriptor.setProperty("path", properties.getProperty("path"));
-                                descriptor.setProperty("sources", properties.getProperty("sources.0"));
-                                descriptor.setProperty("modular", "false");
-                                if (testsOf != null) {
-                                    descriptor.setProperty("test", testsOf);
-                                }
-                                String mainClass = properties.getProperty("mainClass");
-                                if (mainClass != null && testsOf == null) {
-                                    descriptor.setProperty("main", mainClass);
-                                }
-                                if (properties.flag("native")) {
-                                    descriptor.setProperty("native", "true");
-                                }
-                                descriptor.store(context.next().resolve(BuildStep.MODULE));
-                                metadata(properties, manifestArgs.values()).store(context.next().resolve(BuildStep.METADATA));
-                                return CompletableFuture.completedStage(new BuildStepResult(true));
-                            }, modInherited.sequencedKeySet());
-                        }
-                    }, paths.sequencedKeySet().stream());
-                }
+                                unguarded.forEach(versions::setProperty);
+                            }
+                            if (!versions.isEmpty()) {
+                                versions.store(context.next().resolve(BuildStep.VERSIONS));
+                            }
+                            Javac.writeRelease(context.next(), properties.getProperty("release"), feature);
+                            SequencedProperties descriptor = new SequencedProperties();
+                            descriptor.setProperty("path", properties.getProperty("path"));
+                            descriptor.setProperty("sources", properties.getProperty("sources.0"));
+                            descriptor.setProperty("modular", "false");
+                            if (testsOf != null) {
+                                descriptor.setProperty("test", testsOf);
+                            }
+                            String mainClass = properties.getProperty("mainClass");
+                            if (mainClass != null && testsOf == null) {
+                                descriptor.setProperty("main", mainClass);
+                            }
+                            if (properties.flag("native")) {
+                                descriptor.setProperty("native", "true");
+                            }
+                            descriptor.store(context.next().resolve(BuildStep.MODULE));
+                            metadata(properties, manifestArgs.values()).store(context.next().resolve(BuildStep.METADATA));
+                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                        }, modInherited.sequencedKeySet());
+                    }
+                }, paths.sequencedKeySet().stream());
             }
         }, Stream.concat(Stream.of(SCAN, PREPARE), inherited.sequencedKeySet().stream()));
     }
@@ -755,15 +751,11 @@ public class MavenProject implements BuildExecutorModule {
                     .filter(entry -> !entry.getKey().equals(PREVIOUS + PREPARE))
                     .map(Map.Entry::getValue)
                     .toList();
-            List<Path> files = new ArrayList<>();
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(descriptors, "*.properties")) {
-                stream.forEach(files::add);
-            }
-            files.sort(null);
+            SequencedProperties described = SequencedProperties.ofFiles(descriptors.resolve(INDEX));
             SequencedProperties inventory = new SequencedProperties();
             MavenPomEmitter emitter = new MavenPomEmitter();
-            for (Path file : files) {
-                SequencedProperties properties = SequencedProperties.ofFiles(file);
+            for (String name : new TreeSet<>(described.stringPropertyNames())) {
+                SequencedProperties properties = SequencedProperties.ofFiles(descriptors.resolve(described.getProperty(name)));
                 SequencedProperties metadata = metadata(properties, upstream);
                 SequencedMap<MavenDependencyKey, MavenDependencyValue> managed = new LinkedHashMap<>();
                 for (int index = 0; properties.value("managed." + index) != null; index++) {
@@ -779,8 +771,8 @@ public class MavenProject implements BuildExecutorModule {
                                     exclusion.substring(exclusion.indexOf('/') + 1))).toList(),
                             optional == null ? null : Boolean.valueOf(optional)));
                 }
-                String name = file.getFileName().toString(), path = properties.getProperty("path");
-                Path pom = Files.createDirectory(context.next().resolve(name.substring(0, name.length() - ".properties".length())))
+                String path = properties.getProperty("path");
+                Path pom = Files.createDirectory(context.next().resolve(name))
                         .resolve(Pom.POM);
                 boolean relocated = properties.stringPropertyNames().stream().anyMatch(key -> key.startsWith(RELOCATION));
                 try (Writer writer = Files.newBufferedWriter(pom)) {
@@ -867,7 +859,7 @@ public class MavenProject implements BuildExecutorModule {
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
             Path maven = Files.createDirectory(context.next().resolve(MAVEN));
-            SequencedProperties skipped = new SequencedProperties();
+            SequencedProperties skipped = new SequencedProperties(), modules = new SequencedProperties(), boms = new SequencedProperties();
             String version = null;
             for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
                 if (argument.getKey().equals(SCAN) || argument.getValue().removed()) {
@@ -921,7 +913,10 @@ public class MavenProject implements BuildExecutorModule {
                     }
                 }
                 if (value.bom() != null || value.relocation() != null) {
-                    writeBom(Files.createDirectories(context.next().resolve(BOM)), value, entry.getKey());
+                    String id = SIBLING_MODULE_PREFIX
+                            + BuildExecutorModule.encodePath(entry.getKey().toString().replace(File.separatorChar, '/'));
+                    writeBom(Files.createDirectories(context.next().resolve(BOM)).resolve(id + ".properties"), value, entry.getKey());
+                    boms.setProperty(id, id + ".properties");
                     continue;
                 } else if (value.packaging() != null && !JARS.contains(value.packaging())) {
                     if (!AGGREGATES.contains(value.packaging())) {
@@ -947,8 +942,31 @@ public class MavenProject implements BuildExecutorModule {
                 String qualifiedDependencies = value.qualifiedDependencies() == null ? "" : value.qualifiedDependencies().entrySet().stream()
                         .map(requires -> requires.getKey() + "=" + requires.getValue())
                         .collect(Collectors.joining("\t"));
-                writeModule(maven, value, relativePath, coordinate, selfPom, false, qualifiedDependencies, attachments(value, false));
-                writeModule(maven, value, relativePath, coordinate, selfPom, true, qualifiedDependencies, attachments(value, true));
+                String main = SIBLING_MODULE_PREFIX + BuildExecutorModule.encodePath(relativePath), tests = "test-" + main;
+                writeModule(maven.resolve(main + ".properties"),
+                        tests,
+                        value,
+                        relativePath,
+                        coordinate,
+                        selfPom,
+                        false,
+                        qualifiedDependencies,
+                        attachments(value, false));
+                writeModule(maven.resolve(tests + ".properties"),
+                        null,
+                        value,
+                        relativePath,
+                        coordinate,
+                        selfPom,
+                        true,
+                        qualifiedDependencies,
+                        attachments(value, true));
+                modules.setProperty(main, main + ".properties");
+                modules.setProperty(tests, tests + ".properties");
+            }
+            modules.store(maven.resolve(INDEX));
+            if (!boms.isEmpty()) {
+                boms.store(context.next().resolve(BOM).resolve(INDEX));
             }
             if (!skipped.isEmpty()) {
                 skipped.store(context.next().resolve(SKIPPED));
@@ -976,7 +994,7 @@ public class MavenProject implements BuildExecutorModule {
             return matcher.find() ? matcher.group(1) : null;
         }
 
-        private static void writeBom(Path folder, MavenLocalPom value, Path path) throws IOException {
+        private static void writeBom(Path file, MavenLocalPom value, Path path) throws IOException {
             String relativePath = path.toString().replace(File.separatorChar, '/');
             SequencedProperties properties = new SequencedProperties();
             properties.setProperty("path", relativePath);
@@ -1017,7 +1035,7 @@ public class MavenProject implements BuildExecutorModule {
                 }
             }
             value.metadata().properties().forEach((key, metadata) -> properties.setProperty(POM_METADATA + key, metadata));
-            properties.store(folder.resolve("module-" + BuildExecutorModule.encodePath(relativePath) + ".properties"));
+            properties.store(file);
         }
 
         private String attachments(MavenLocalPom value, boolean test) {
@@ -1062,7 +1080,8 @@ public class MavenProject implements BuildExecutorModule {
             return String.join("\t", entries);
         }
 
-        private void writeModule(Path maven,
+        private void writeModule(Path file,
+                                 String tests,
                                  MavenLocalPom value,
                                  String relativePath,
                                  String coordinate,
@@ -1258,8 +1277,12 @@ public class MavenProject implements BuildExecutorModule {
                 properties.setProperty("resources." + index, resources.get(index));
             }
             value.metadata().properties().forEach((key, metadata) -> properties.setProperty(POM_METADATA + key, metadata));
-            properties.store(maven.resolve((test ? "test-module-" : "module-")
-                    + BuildExecutorModule.encodePath(relativePath) + ".properties"));
+            if (test) {
+                properties.setProperty("test", "true");
+            } else {
+                properties.setProperty("tests", tests);
+            }
+            properties.store(file);
         }
     }
 
@@ -1267,7 +1290,8 @@ public class MavenProject implements BuildExecutorModule {
                                         SequencedSet<String> dependencies,
                                         SequencedSet<String> resources,
                                         SequencedSet<String> spdx,
-                                        Path location) implements ProjectModule {
+                                        Path location,
+                                        boolean test) implements ProjectModule {
 
         public List<Path> configurations() {
             if (location == null) {
@@ -1275,7 +1299,7 @@ public class MavenProject implements BuildExecutorModule {
             }
             return List.of(
                     location.resolve("src")
-                            .resolve(name.startsWith("test-") ? "test" : "main")
+                            .resolve(test ? "test" : "main")
                             .resolve("build.jenesis"),
                     location.resolve("build.jenesis"));
         }
