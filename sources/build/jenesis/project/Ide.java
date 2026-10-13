@@ -161,13 +161,12 @@ public class Ide implements BuildExecutorModule {
             SequencedSet<String> moduleDependencies = new LinkedHashSet<>();
             for (Raw half : Stream.of(raw, folded.get(raw.content())).filter(Objects::nonNull).toList()) {
                 for (int index = 0; index < half.coordinates().size(); index++) {
-                    String internal = identities.get(half.coordinates().get(index));
+                    String coordinate = half.coordinates().get(index), internal = identities.get(coordinate);
                     if (internal == null) {
-                        Path jar = half.jars().get(index);
                         if (half == raw) {
-                            libraries.add(jar);
-                        } else if (raw.jars().stream().noneMatch(main -> main.getFileName().equals(jar.getFileName()))) {
-                            testLibraries.add(jar);
+                            libraries.add(half.jars().get(index));
+                        } else if (!raw.coordinates().contains(coordinate)) {
+                            testLibraries.add(half.jars().get(index));
                         }
                     } else if (!internal.equals(raw.name())) {
                         moduleDependencies.add(internal);
