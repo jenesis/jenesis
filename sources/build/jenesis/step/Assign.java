@@ -142,10 +142,8 @@ public class Assign implements BuildStep {
             classified.forEach((classifier, variant) -> {
                 String derived = classified(coordinate, classifier);
                 if (derived != null) {
-                    assignments.setProperty(derived, context.next()
-                            .relativize(variant)
-                            .toString()
-                            .replace(File.separatorChar, '/'));
+                    assignments.setProperty(derived,
+                            context.next().relativize(variant).toString().replace(File.separatorChar, '/'));
                     variants.setProperty(derived, coordinate);
                 }
             });

@@ -277,8 +277,14 @@ public class ModularProject implements BuildExecutorModule {
     }
 
     public static BuildStep manifests(String group, String prefix, Platform platform) {
-        return new Manifests(group, prefix, "", true, platform, Runtime.version().feature(),
-                MavenModuleRepository.segments(), true);
+        return new Manifests(group,
+                prefix,
+                "",
+                true,
+                platform,
+                Runtime.version().feature(),
+                MavenModuleRepository.segments(),
+                true);
     }
 
     private record Coordinates(String prefix) implements BuildStep {
@@ -410,8 +416,8 @@ public class ModularProject implements BuildExecutorModule {
                         + "/" + classifier;
                 versions.remove(group + "/maven/" + alias.getValue());
                 if (divider > 0) {
-                    versions.put(group + "/maven/" + target, qualifier.substring(divider + 1)
-                            + (space < 0 ? "" : declared.substring(space)));
+                    versions.put(group + "/maven/" + target,
+                            qualifier.substring(divider + 1) + (space < 0 ? "" : declared.substring(space)));
                 }
                 alias.setValue(target);
             }

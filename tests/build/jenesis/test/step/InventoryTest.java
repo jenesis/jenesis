@@ -128,8 +128,8 @@ public class InventoryTest {
         module.store(manifests.resolve(BuildStep.MODULE));
         Path produce = Files.createDirectory(root.resolve("produce"));
         Files.writeString(Files.createDirectory(produce.resolve(BuildStep.ARTIFACTS)).resolve("native.jar"), "main");
-        Path variant = Files.writeString(Files.createDirectory(produce.resolve(Classifiers.CLASSIFIERS))
-                .resolve("linux-x86_64.jar"), "variant");
+        Path classifiers = Files.createDirectory(produce.resolve(Classifiers.CLASSIFIERS));
+        Path variant = Files.writeString(classifiers.resolve("linux-x86_64.jar"), "variant");
 
         run(args("manifests", manifests, "produce", produce));
 
