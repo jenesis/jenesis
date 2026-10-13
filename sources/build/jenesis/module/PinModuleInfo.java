@@ -417,6 +417,9 @@ public class PinModuleInfo implements BuildStep {
                                          Platform platform,
                                          SequencedSet<String> carried) {
         List<String> lines = new ArrayList<>(List.of(javadoc.split("\\n", -1)));
+        int opening = prefix.indexOf("/**");
+        String continuation = opening < 0 ? prefix : prefix.substring(0, opening) + " * ";
+        IntFunction<String> leads = index -> index == 0 ? prefix : continuation;
         SequencedMap<Integer, Tag> pinTags = new LinkedHashMap<>(), bomTags = new LinkedHashMap<>();
         for (Tag tag : located) {
             if (tag.line() >= lines.size()) {
@@ -429,7 +432,7 @@ public class PinModuleInfo implements BuildStep {
                 }
             }
         }
-        rewriteBoms(lines, prefix, bomTags, references, flatten, platform);
+        rewriteBoms(lines, leads, bomTags, references, flatten, platform);
         SequencedMap<String, List<PinLine>> guarded = new LinkedHashMap<>();
         for (Tag tag : pinTags.values()) {
             if (tag.rest().endsWith(")")) {
@@ -486,7 +489,7 @@ public class PinModuleInfo implements BuildStep {
             }
             PinLine winner = matched != null ? matched : fallback;
             if (winner != null) {
-                lines.set(winner.index(), prefix + "@jenesis.pin "
+                lines.set(winner.index(), leads.apply(winner.index()) + "@jenesis.pin "
                         + resolved
                         + (winner.guard() == null ? "" : " (" + winner.guard() + ")"));
             }
@@ -502,6 +505,9 @@ public class PinModuleInfo implements BuildStep {
         for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
             Tag tag = pinTags.get(lineIndex);
             if (tag != null && !guarded.containsKey(expand(tag.token()))) {
+                if (lineIndex == 0 && opening >= 0) {
+                    kept.add(prefix.stripTrailing());
+                }
                 if (insertAt < 0) {
                     insertAt = kept.size();
                 }
@@ -528,14 +534,14 @@ public class PinModuleInfo implements BuildStep {
         }
         List<String> tags = new ArrayList<>();
         for (Map.Entry<String, String> entry : merged.entrySet()) {
-            tags.add(prefix + "@jenesis.pin " + entry.getKey() + " " + entry.getValue());
+            tags.add(continuation + "@jenesis.pin " + entry.getKey() + " " + entry.getValue());
         }
         lines.addAll(insertAt, tags);
         return String.join("\n", lines);
     }
 
     private static void rewriteBoms(List<String> lines,
-                                    String prefix,
+                                    IntFunction<String> leads,
                                     SequencedMap<Integer, Tag> bomTags,
                                     SequencedMap<String, String> references,
                                     boolean flatten,
@@ -550,7 +556,8 @@ public class PinModuleInfo implements BuildStep {
                                 + lines.get(entry.getKey()).trim());
                     }
                 }
-                lines.set(entry.getKey(), null);
+                String lead = leads.apply(entry.getKey());
+                lines.set(entry.getKey(), lead.contains("/**") ? lead.stripTrailing() : null);
             }
             return;
         }
@@ -603,7 +610,7 @@ public class PinModuleInfo implements BuildStep {
             }
             PinLine winner = matched != null ? matched : fallback;
             if (winner != null) {
-                lines.set(winner.index(), prefix + "@jenesis.bom "
+                lines.set(winner.index(), leads.apply(winner.index()) + "@jenesis.bom "
                         + winner.token()
                         + " "
                         + resolved
@@ -613,11 +620,7 @@ public class PinModuleInfo implements BuildStep {
     }
 
     private static String expand(String token) {
-        int first = token.indexOf('/');
-        if (first < 0) {
-            return "main/module/" + token;
-        }
-        return token.indexOf('/', first + 1) < 0 ? "main/maven/" + token : token;
+        return ModuleInfoParser.expand("main", "jenesis.pin", token);
     }
 
     private static String renderJavadoc(SequencedMap<String, String> entries) {

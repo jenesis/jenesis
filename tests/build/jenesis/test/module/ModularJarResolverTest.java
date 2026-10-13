@@ -241,6 +241,28 @@ public class ModularJarResolverTest {
     }
 
     @Test
+    public void resolves_a_java_prefixed_module_the_jdk_does_not_hold_and_skips_one_it_does() throws IOException {
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofEnvironment(Environment.NONE, false).dependencies(
+                Runnable::run,
+                "foo",
+                Map.of("foo", (_, coordinate, _) -> {
+                    RepositoryItem item = switch (coordinate) {
+                        case "root" -> toJar("root", require("java.money", ClassFile.ACC_TRANSITIVE),
+                                require("java.sql", 0));
+                        case "java.money" -> toJar("java.money");
+                        default -> null;
+                    };
+                    return Optional.ofNullable(item);
+                }),
+                new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE).artifacts();
+        assertThat(dependencies.sequencedKeySet())
+                .as("java.money is a library's module name, java.sql one of the running JDK")
+                .containsExactly("foo/root", "foo/java.money");
+    }
+
+    @Test
     public void emits_transitive_requires_in_sorted_order_independent_of_declaration_order() throws IOException {
         SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofEnvironment(Environment.NONE, false).dependencies(
                 Runnable::run,

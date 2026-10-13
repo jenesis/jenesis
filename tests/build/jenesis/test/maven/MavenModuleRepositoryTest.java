@@ -112,6 +112,14 @@ public class MavenModuleRepositoryTest {
     }
 
     @Test
+    public void resolves_a_floating_version_past_a_pre_release_the_maven_metadata_calls_released() throws IOException {
+        writeMetadata("demo.convention", "demo.convention.greeter", "21.0-rc-1", "21.0-rc-1", "4.35.1", "21.0-rc-1");
+        writeArtifact("demo.convention", "demo.convention.greeter", "4.35.1", "jar", "newest-stable");
+
+        assertThat(content(repository().fetch(Runnable::run, "demo.convention.greeter"))).isEqualTo("newest-stable");
+    }
+
+    @Test
     public void resolves_the_latest_version_of_the_maven_metadata_on_request() throws IOException {
         writeMetadata("demo.convention", "demo.convention.greeter", "1.0.0", "2.0.0-beta", "1.0.0", "2.0.0-beta");
         writeArtifact("demo.convention", "demo.convention.greeter", "2.0.0-beta", "jar", "prerelease");

@@ -27,6 +27,16 @@ public interface Repository {
         return cached(folder, true);
     }
 
+    default Repository observed(Observer observer) {
+        return (executor, coordinate, extension) -> {
+            Optional<RepositoryItem> candidate = fetch(executor, coordinate, extension);
+            if (candidate.isPresent()) {
+                observer.fetched(coordinate, extension, candidate.get());
+            }
+            return candidate;
+        };
+    }
+
     default Repository spilled(Path folder) {
         return (executor, coordinate, extension) -> {
             Optional<RepositoryItem> candidate = fetch(executor, coordinate, extension);
@@ -185,6 +195,11 @@ public interface Repository {
                         pause(delay, uri);
                         continue attempts;
                     }
+                    if (status == 429) {
+                        throw new IOException(current + " answered 429 Too Many Requests after " + (attempt + 1)
+                                + " attempt(s): the server limits how often this machine asks, so build again later or"
+                                + " configure a mirror of this repository in its place");
+                    }
                     return http.getInputStream();
                 }
                 throw new IOException("Exceeded redirect limit fetching " + uri);
@@ -291,6 +306,12 @@ public interface Repository {
         }
     }
 
+    @FunctionalInterface
+    interface Observer {
+
+        void fetched(String coordinate, String extension, RepositoryItem item) throws IOException;
+    }
+
     record Credential(String token, Origin origin) {
 
         public static Credential of(Environment environment, String key, String variable) {
@@ -353,8 +374,8 @@ public interface Repository {
             this(environment.number("repository.retries", 2),
                  Duration.ofMillis(environment.number("repository.backoff", 125)),
                  environment.flag("repository.insecure"),
-                 environment.number("repository.connect.timeout", 10_000),
-                 environment.number("repository.read.timeout", 30_000),
+                 environment.number("repository.connect", 10_000),
+                 environment.number("repository.read", 30_000),
                  environment.flag("repository.offline"));
         }
 

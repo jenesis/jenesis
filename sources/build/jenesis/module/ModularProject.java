@@ -8,6 +8,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Platform;
@@ -168,11 +169,31 @@ public class ModularProject implements BuildExecutorModule {
                                            SequencedSet<Path> signatures,
                                            MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
         Dependencies dependencyModule = Dependencies.ofEnvironment(environment, repositories, resolvers);
+        Consumer<String> printing = environment.flag("print.progress", true) ? environment.out() : null;
+        Palette palette = Palette.ofEnvironment(environment);
         return new MultiProjectModule(ModularProject.ofEnvironment(environment, prefix, root)
                 .group(group).filter(filter).modular(modular).maven(maven).boms(boms).signatures(signatures),
                 identity -> Optional.of(identity.substring(0, identity.indexOf('/'))),
                 _ -> (name, dependencies, arguments) -> {
                     Path location = MultiProjectModule.location(root, arguments);
+                    if (printing != null) {
+                        for (Map.Entry<String, Path> argument : arguments.entrySet()) {
+                            Path module = argument.getValue().resolve(BuildStep.MODULE);
+                            if (argument.getKey().endsWith("/" + MANIFESTS) && Files.isRegularFile(module)) {
+                                SequencedProperties properties = SequencedProperties.ofFiles(module);
+                                if (properties.value("release") == null) {
+                                    printing.accept(("%s%-11s%s %s compiles for release %d, the JDK the build runs on,"
+                                            + " as %s declares no @jenesis.release - @jenesis.release sets it")
+                                            .formatted(palette.warning(),
+                                                    "[RELEASE]",
+                                                    palette.reset(),
+                                                    properties.getProperty("module"),
+                                                    Runtime.version().feature(),
+                                                    Path.of(properties.getProperty("path")).resolve("module-info.java")));
+                                }
+                            }
+                        }
+                    }
                     SequencedSet<String> spdxInherited = new LinkedHashSet<>();
                     for (int index = 0; index < spdx.size(); index++) {
                         spdxInherited.add(BuildExecutorModule.PREVIOUS + MultiProjectModule.SPDX + "-" + index);
@@ -255,6 +276,10 @@ public class ModularProject implements BuildExecutorModule {
                 });
     }
 
+    public static BuildStep manifests(String group, String prefix, Platform platform) {
+        return new Manifests(group, prefix, "", true, platform, Runtime.version().feature(), 0, false);
+    }
+
     private record Coordinates(String prefix) implements BuildStep {
 
         @Override
@@ -286,9 +311,12 @@ public class ModularProject implements BuildExecutorModule {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            ModuleInfo info = new ModuleInfoParser(group).identify(arguments.get("sources").folder()
-                    .resolve(BuildStep.SOURCES)
-                    .resolve("module-info.java"));
+            Path descriptor = arguments.get("sources").folder().resolve(BuildStep.SOURCES).resolve("module-info.java");
+            if (!Files.isRegularFile(descriptor)) {
+                throw new IllegalStateException("The sources of " + arguments.get("sources").folder()
+                        + " are not modular (missing module-info.java): declare the module in a module-info.java");
+            }
+            ModuleInfo info = new ModuleInfoParser(group).identify(descriptor);
             if (info.testOf() != null && !info.testOf().isEmpty() && !info.requires().contains(info.testOf())) {
                 throw new IllegalStateException("Test module '"
                         + info.coordinate()
@@ -371,7 +399,10 @@ public class ModularProject implements BuildExecutorModule {
                 }
             }
             info.plugins().forEach((coordinate, group) ->
-                    requires.setProperty(group + "/plugin/" + coordinate, ""));
+                    requires.setProperty(group + "/plugin/" + coordinate
+                            + (coordinate.startsWith("maven/") && coordinate.split("/").length == 3
+                                    ? "/RELEASE"
+                                    : ""), ""));
             info.layers().forEach((layer, coordinates) -> coordinates.forEach(coordinate ->
                     requires.setProperty("layer:"
                             + layer
@@ -616,6 +647,9 @@ public class ModularProject implements BuildExecutorModule {
             module.setProperty("path", path);
             module.setProperty("module", info.coordinate());
             module.setProperty("modular", Boolean.toString(modular));
+            if (info.release() != null) {
+                module.setProperty("release", info.release());
+            }
             if (info.testOf() != null) {
                 module.setProperty("test", info.testOf());
             }
@@ -649,6 +683,12 @@ public class ModularProject implements BuildExecutorModule {
                 if (Files.isRegularFile(upstream)) {
                     SequencedProperties.ofFiles(upstream).forEach(metadata::put);
                 }
+            }
+            Path own = arguments.get("sources").folder()
+                    .resolve(BuildStep.SOURCES)
+                    .resolve("META-INF/build.jenesis/project.properties");
+            if (Files.isRegularFile(own)) {
+                SequencedProperties.ofFiles(own).forEach(metadata::put);
             }
             metadata.store(context.next().resolve(BuildStep.METADATA));
             return CompletableFuture.completedStage(new BuildStepResult(true));

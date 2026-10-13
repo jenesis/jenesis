@@ -15,18 +15,27 @@ import java.util.jar.Attributes;
 
 public class Javac extends ProcessBuildStep {
 
+    public static final String HEADERS = "headers/";
+    private static final String PROCESSOR = "javax.annotation.processing.Processor",
+            PROCESSOR_SERVICE = "META-INF/services/" + PROCESSOR;
     private static final Pattern VERSIONED = Pattern.compile("META-INF/versions/(\\d+)/.+");
+    private static final Set<String> SYSTEM_MODULE_OPTIONS = Set.of("--add-exports", "--add-reads", "--patch-module");
+    private static final Set<String> SOURCE_OPTIONS = Set.of("--source", "-source");
+    private static final Set<String> TARGET_OPTIONS = Set.of("--target", "-target");
+    private static final ModuleInfoParser MODULE_INFO_PARSER = new ModuleInfoParser();
 
     private final boolean includeResources;
     private final PathPlacement pathPlacement;
     private final String group;
+    private final boolean headers;
 
     public Javac(ProcessHandler.Factory factory) {
         this(factory.apply("javac", "bin/javac"),
              true,
              PathPlacement.INFERRED,
              "main",
-             Terms.of("javac"));
+             false,
+             new Terms());
     }
 
     public static Javac ofEnvironment(Environment environment,
@@ -35,6 +44,7 @@ public class Javac extends ProcessBuildStep {
                 true,
                 PathPlacement.INFERRED,
                 "main",
+                false,
                 Terms.ofEnvironment(environment, "javac"));
     }
 
@@ -42,11 +52,13 @@ public class Javac extends ProcessBuildStep {
                   boolean includeResources,
                   PathPlacement pathPlacement,
                   String group,
+                  boolean headers,
                   Terms terms) {
         super("javac", factory, terms);
         this.includeResources = includeResources;
         this.pathPlacement = pathPlacement;
         this.group = group;
+        this.headers = headers;
     }
 
     public static void writeRelease(Path folder, String release, int feature) throws IOException {
@@ -74,23 +86,27 @@ public class Javac extends ProcessBuildStep {
     }
 
     public Javac factory(ProcessHandler.Factory factory) {
-        return new Javac(factory.apply("javac", "bin/javac"), includeResources, pathPlacement, group, terms);
+        return new Javac(factory.apply("javac", "bin/javac"), includeResources, pathPlacement, group, headers, terms);
     }
 
     public Javac includeResources(boolean includeResources) {
-        return new Javac(factory, includeResources, pathPlacement, group, terms);
+        return new Javac(factory, includeResources, pathPlacement, group, headers, terms);
     }
 
     public Javac pathPlacement(PathPlacement pathPlacement) {
-        return new Javac(factory, includeResources, pathPlacement, group, terms);
+        return new Javac(factory, includeResources, pathPlacement, group, headers, terms);
     }
 
     public Javac group(String group) {
-        return new Javac(factory, includeResources, pathPlacement, group, terms);
+        return new Javac(factory, includeResources, pathPlacement, group, headers, terms);
+    }
+
+    public Javac headers(boolean headers) {
+        return new Javac(factory, includeResources, pathPlacement, group, headers, terms);
     }
 
     public Javac verbose(BiConsumer<Boolean, String> printing) {
-        return new Javac(factory, includeResources, pathPlacement, group, terms.printing(printing));
+        return new Javac(factory, includeResources, pathPlacement, group, headers, terms.printing(printing));
     }
 
     @Override
@@ -158,7 +174,7 @@ public class Javac extends ProcessBuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         return super.apply(executor, context, arguments).thenComposeAsync(result -> {
-            if (!result.next()) {
+            if (!result.next() || headers) {
                 return CompletableFuture.completedStage(result);
             }
             try {
@@ -177,12 +193,31 @@ public class Javac extends ProcessBuildStep {
                                                  SequencedMap<String, BuildStepArgument> arguments,
                                                  SequencedMap<String, SequencedMap<String, String>> properties)
             throws IOException {
-        Path target = Files.createDirectory(context.next().resolve(CLASSES));
+        boolean sourceNamed = names(properties, SOURCE_OPTIONS), targetNamed = names(properties, TARGET_OPTIONS);
+        if (sourceNamed || targetNamed || namesSystemModule(prepended(properties))) {
+            for (SequencedMap<String, String> folder : properties.values()) {
+                String release = folder.remove("--release");
+                if (release != null) {
+                    if (!sourceNamed) {
+                        folder.put("--source", release);
+                    }
+                    if (!targetNamed) {
+                        folder.put("--target", release);
+                    }
+                }
+            }
+        }
+        Path output = headers ? context.supplement() : context.next(),
+                target = Files.createDirectory(output.resolve(CLASSES)),
+                generated = Files.createDirectory(output.resolve(SOURCES));
         List<String> files = new ArrayList<>(),
                 path = new ArrayList<>(),
                 processorPath = new ArrayList<>(),
                 siblingClasses = new ArrayList<>(),
-                commands = new ArrayList<>(List.of("-d", target.toString()));
+                options = new ArrayList<>(List.of("-d", target.toString(), "-s", generated.toString()));
+        if (headers) {
+            options.addAll(List.of("-h", Files.createDirectory(context.next().resolve(HEADERS)).toString()));
+        }
         boolean compilerPlugins = false;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -240,10 +275,27 @@ public class Javac extends ProcessBuildStep {
                 .findFirst()
                 .orElse(null);
         boolean module = moduleInfo != null;
+        if (module) {
+            List<String> declared = prepended(properties);
+            String release = null;
+            for (int index = 0; index < declared.size() - 1; index++) {
+                if (declared.get(index).equals("--release") || declared.get(index).equals("--target")) {
+                    release = declared.get(index + 1);
+                }
+            }
+            String feature = release != null && release.startsWith("1.") ? release.substring(2) : release;
+            if (feature != null && feature.matches("[0-9]+") && Integer.parseInt(feature) < 9) {
+                throw new IllegalArgumentException("A module-info.java at the root of the sources is compiled at release "
+                        + release + ", below 9, the first release of the Java Module System, so javac cannot compile"
+                        + " the descriptor there: move it into META-INF/versions/9/ of the same source folder, as"
+                        + " src/main/java/META-INF/versions/9/module-info.java, where it is compiled at release 9 into"
+                        + " a multi-release jar, or raise the release to 9 or above");
+            }
+        }
         PathPlacement pathPlacement = this.pathPlacement.forModuleInfo(module);
         String patchModule = null;
         if (module && !siblingClasses.isEmpty()) {
-            patchModule = new ModuleInfoParser().identify(Path.of(moduleInfo)).coordinate();
+            patchModule = MODULE_INFO_PARSER.identify(Path.of(moduleInfo)).coordinate();
         } else {
             path.addAll(siblingClasses);
         }
@@ -275,43 +327,101 @@ public class Javac extends ProcessBuildStep {
             for (String entry : path) {
                 (pathPlacement.test(Path.of(entry)) ? modulePath : classPath).add(entry);
             }
-            StringBuilder args = new StringBuilder();
             if (!modulePath.isEmpty()) {
-                args.append("--module-path\n\"")
-                        .append(String.join(File.pathSeparator, modulePath).replace("\\", "\\\\").replace("\"", "\\\""))
-                        .append("\"\n");
+                options.add("--module-path");
+                options.add(String.join(File.pathSeparator, modulePath));
             }
             if (!classPath.isEmpty()) {
-                args.append("--class-path\n\"")
-                        .append(String.join(File.pathSeparator, classPath).replace("\\", "\\\\").replace("\"", "\\\""))
-                        .append("\"\n");
+                options.add("--class-path");
+                options.add(String.join(File.pathSeparator, classPath));
             }
             if (patchModule != null) {
-                args.append("--patch-module\n\"")
-                        .append(patchModule)
-                        .append("=")
-                        .append(String.join(File.pathSeparator, siblingClasses).replace("\\", "\\\\").replace("\"", "\\\""))
-                        .append("\"\n");
+                options.add("--patch-module");
+                options.add(patchModule + "=" + String.join(File.pathSeparator, siblingClasses));
             }
-            if (!processorPath.isEmpty()) {
-                boolean processorModules = pathPlacement.modular() && !compilerPlugins;
-                if (processorModules) {
-                    try {
-                        ModuleFinder.of(processorPath.stream().map(Path::of).toArray(Path[]::new)).findAll();
-                    } catch (FindException _) {
-                        processorModules = false;
+            options.addAll(processorPath(processorPath, pathPlacement.modular() && !compilerPlugins));
+        }
+        options.addAll(files);
+        return CompletableFuture.completedStage(List.of("@" + argumentFile(context.supplement().resolve("javac.args"),
+                options)));
+    }
+
+    private static boolean names(SequencedMap<String, SequencedMap<String, String>> properties, Set<String> options) {
+        return properties.values().stream().anyMatch(folder -> folder.keySet().stream().anyMatch(options::contains));
+    }
+
+    private static boolean namesSystemModule(List<String> options) {
+        for (int index = 0; index < options.size(); index++) {
+            String option = options.get(index);
+            for (String name : SYSTEM_MODULE_OPTIONS) {
+                String value = option.equals(name) && index + 1 < options.size()
+                        ? options.get(index + 1)
+                        : option.startsWith(name + "=") ? option.substring(name.length() + 1) : null;
+                if (value != null && ModuleFinder.ofSystem().find(value.split("[/=]", 2)[0]).isPresent()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static List<String> processorPath(List<String> processorPath, boolean processorModules)
+            throws IOException {
+        if (processorPath.isEmpty()) {
+            return List.of();
+        }
+        if (processorModules) {
+            Set<ModuleReference> references;
+            List<String> unresolved;
+            try {
+                ModuleFinder finder = ModuleFinder.of(processorPath.stream().map(Path::of).toArray(Path[]::new));
+                references = finder.findAll();
+                Set<String> resolved = ModuleLayer.boot().configuration()
+                        .resolveAndBind(ModuleFinder.of(), finder, Set.of())
+                        .modules()
+                        .stream()
+                        .map(ResolvedModule::name)
+                        .collect(Collectors.toSet());
+                unresolved = references.stream()
+                        .map(reference -> reference.descriptor().name())
+                        .filter(name -> !resolved.contains(name))
+                        .sorted()
+                        .toList();
+            } catch (FindException | ResolutionException _) {
+                references = Set.of();
+                unresolved = List.of();
+                processorModules = false;
+            }
+            if (processorModules && !unresolved.isEmpty()) {
+                processorModules = false;
+                for (ModuleReference reference : references) {
+                    if (!reference.descriptor().isAutomatic()
+                            && reference.descriptor().provides().stream()
+                            .anyMatch(provides -> provides.service().equals(PROCESSOR))
+                            && reference.location().isPresent()) {
+                        Path location = Path.of(reference.location().get());
+                        boolean declared;
+                        if (Files.isDirectory(location)) {
+                            declared = Files.exists(location.resolve(PROCESSOR_SERVICE));
+                        } else {
+                            try (JarFile jar = new JarFile(location.toFile())) {
+                                declared = jar.getEntry(PROCESSOR_SERVICE) != null;
+                            }
+                        }
+                        if (!declared) {
+                            throw new IllegalStateException("The annotation processors run on the class path, as"
+                                    + " nothing on the processor module path requires " + String.join(", ", unresolved)
+                                    + ", which javac would therefore leave out of the processors' module graph, but "
+                                    + reference.descriptor().name() + " declares its processor in its module-info.java"
+                                    + " alone, without " + PROCESSOR_SERVICE + ", so the class path cannot find it:"
+                                    + " compile with these processors in modules of their own");
+                        }
                     }
                 }
-                args.append(processorModules ? "--processor-module-path\n\"" : "--processor-path\n\"")
-                        .append(String.join(File.pathSeparator, processorPath).replace("\\", "\\\\").replace("\"", "\\\""))
-                        .append("\"\n");
             }
-            Path file = context.supplement().resolve("javac.args");
-            Files.writeString(file, args.toString());
-            commands.add("@" + file);
         }
-        commands.addAll(files);
-        return CompletableFuture.completedStage(commands);
+        return List.of(processorModules ? "--processor-module-path" : "--processor-path",
+                String.join(File.pathSeparator, processorPath));
     }
 
     private CompletionStage<Void> compileVersioned(Executor executor,
@@ -320,7 +430,10 @@ public class Javac extends ProcessBuildStep {
             throws IOException {
         SequencedMap<Integer, List<String>> versionedFiles = new TreeMap<>();
         SequencedMap<Integer, List<String>> versionedRoots = new TreeMap<>();
-        List<String> dependencyPath = new ArrayList<>();
+        Map<Integer, String> versionedModules = new HashMap<>();
+        List<String> dependencyPath = new ArrayList<>(), processorPath = new ArrayList<>();
+        List<Path> classRoots = new ArrayList<>();
+        boolean compilerPlugins = false;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -328,15 +441,23 @@ public class Javac extends ProcessBuildStep {
             Path classes = argument.folder().resolve(CLASSES);
             if (Files.exists(classes)) {
                 dependencyPath.add(classes.toString());
+                classRoots.add(classes);
             }
             for (Path jar : Dependencies.select(argument.folder(), group, "compile")) {
                 dependencyPath.add(jar.toString());
+            }
+            for (Path jar : Dependencies.select(argument.folder(), "plugin", "plugin")) {
+                processorPath.add(jar.toString());
+            }
+            for (Path jar : Dependencies.select(argument.folder(), "javac", "plugin")) {
+                processorPath.add(jar.toString());
+                compilerPlugins = true;
             }
             Path sources = argument.folder().resolve(Bind.SOURCES);
             if (Files.exists(sources)) {
                 Files.walkFileTree(sources, new SimpleFileVisitor<>() {
                     @Override
-                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                         String name = file.toString();
                         if (!name.endsWith(".java")) {
                             return FileVisitResult.CONTINUE;
@@ -344,7 +465,11 @@ public class Javac extends ProcessBuildStep {
                         Integer release = versionOf(sources.relativize(file));
                         if (release != null) {
                             versionedFiles.computeIfAbsent(release, _ -> new ArrayList<>()).add(name);
-                            String root = sources.resolve("META-INF/versions/" + release).toString();
+                            Path versions = sources.resolve("META-INF/versions/" + release);
+                            if (versions.relativize(file).equals(Path.of("module-info.java"))) {
+                                versionedModules.put(release, MODULE_INFO_PARSER.identify(file).coordinate());
+                            }
+                            String root = versions.toString();
                             List<String> roots = versionedRoots.computeIfAbsent(release, _ -> new ArrayList<>());
                             if (!roots.contains(root)) {
                                 roots.add(root);
@@ -361,7 +486,21 @@ public class Javac extends ProcessBuildStep {
         if (versionedFiles.isEmpty()) {
             return CompletableFuture.completedStage(null);
         }
-        List<String> prepended = prepended(properties(arguments));
+        SequencedMap<String, SequencedMap<String, String>> properties = properties(arguments);
+        boolean named = names(properties, SOURCE_OPTIONS) || names(properties, TARGET_OPTIONS);
+        properties.values().forEach(folder -> folder.keySet().removeIf(option -> option.equals("--release")
+                || SOURCE_OPTIONS.contains(option)
+                || TARGET_OPTIONS.contains(option)));
+        List<String> prepended = prepended(properties);
+        SequencedMap<String, SequencedMap<String, String>> unprocessed = new LinkedHashMap<>();
+        properties.forEach((folder, options) -> {
+            SequencedMap<String, String> kept = new LinkedHashMap<>(options);
+            kept.keySet().removeIf(option -> option.startsWith("-A") || option.startsWith("-proc:"));
+            unprocessed.put(folder, kept);
+        });
+        List<String> descriptorOptions = new ArrayList<>(prepended(unprocessed));
+        descriptorOptions.add("-proc:none");
+        boolean sourceAndTarget = named || namesSystemModule(prepended);
         Path mainTarget = context.next().resolve(CLASSES);
         Path moduleInfo = mainTarget.resolve("module-info.class");
         String moduleName;
@@ -372,14 +511,39 @@ public class Javac extends ProcessBuildStep {
         } else {
             moduleName = null;
         }
+        boolean plugins = compilerPlugins;
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
         for (Map.Entry<Integer, List<String>> entry : versionedFiles.entrySet()) {
             int release = entry.getKey();
             List<String> files = entry.getValue();
             List<String> roots = versionedRoots.get(release);
+            List<String> overlays = new ArrayList<>();
+            for (Path classes : classRoots) {
+                for (int lower = release; lower >= 9; lower--) {
+                    Path overlay = classes.resolve("META-INF/versions/" + lower);
+                    if (Files.isDirectory(overlay)) {
+                        overlays.add(overlay.toString());
+                    }
+                }
+            }
             chain = chain.thenComposeAsync(_ -> {
                 try {
-                    return runVersioned(executor, context, prepended, dependencyPath, moduleName, mainTarget, roots, release, files);
+                    return runVersioned(executor,
+                            context,
+                            files.stream().allMatch(file -> Path.of(file).getFileName().toString().equals("module-info.java"))
+                                    ? descriptorOptions
+                                    : prepended,
+                            sourceAndTarget,
+                            dependencyPath,
+                            processorPath,
+                            plugins,
+                            moduleName,
+                            versionedModules.get(release),
+                            mainTarget,
+                            roots,
+                            overlays,
+                            release,
+                            files);
                 } catch (IOException e) {
                     return CompletableFuture.failedFuture(e);
                 }
@@ -400,7 +564,7 @@ public class Javac extends ProcessBuildStep {
         }, executor);
     }
 
-    private static boolean hasMultiReleaseManifest(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+    public static boolean hasMultiReleaseManifest(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -423,34 +587,52 @@ public class Javac extends ProcessBuildStep {
     private CompletionStage<Void> runVersioned(Executor executor,
                                                BuildStepContext context,
                                                List<String> prepended,
+                                               boolean sourceAndTarget,
                                                List<String> dependencyPath,
+                                               List<String> processorPath,
+                                               boolean compilerPlugins,
                                                String moduleName,
+                                               String versionedModule,
                                                Path mainTarget,
                                                List<String> versionedRoots,
+                                               List<String> overlays,
                                                int release,
                                                List<String> files) throws IOException {
         Path target = Files.createDirectories(context.next()
-                .resolve(CLASSES + "META-INF/versions/" + release));
-        List<String> commands = new ArrayList<>(prepended);
-        commands.addAll(List.of(
-                "-d", target.toString(),
-                "--release", Integer.toString(release)));
+                .resolve(CLASSES + "META-INF/versions/" + release)),
+                generated = Files.createDirectories(context.next()
+                        .resolve(SOURCES + "META-INF/versions/" + release));
+        List<String> commands = new ArrayList<>(prepended),
+                options = new ArrayList<>(List.of("-d", target.toString(), "-s", generated.toString()));
+        commands.addAll(sourceAndTarget
+                ? List.of("--source", Integer.toString(release), "--target", Integer.toString(release))
+                : List.of("--release", Integer.toString(release)));
         List<String> classPath = new ArrayList<>(), modulePath = new ArrayList<>(), patchModule = new ArrayList<>();
-        if (moduleName != null) {
-            if (Files.exists(mainTarget)) {
-                modulePath.add(mainTarget.toString());
+        String patched = versionedModule == null ? moduleName : versionedModule;
+        if (patched != null) {
+            if (versionedModule != null) {
+                if (Files.exists(mainTarget)) {
+                    patchModule.add(mainTarget.toString());
+                }
+            } else {
+                if (Files.exists(mainTarget)) {
+                    modulePath.add(mainTarget.toString());
+                }
+                patchModule.addAll(versionedRoots);
             }
+            patchModule.addAll(overlays);
+            PathPlacement pathPlacement = this.pathPlacement.forModuleInfo(true);
             for (String entry : dependencyPath) {
                 (pathPlacement.test(Path.of(entry)) ? modulePath : classPath).add(entry);
             }
-            patchModule.addAll(versionedRoots);
         } else {
+            classPath.addAll(overlays);
             if (Files.exists(mainTarget)) {
                 classPath.add(mainTarget.toString());
             }
             classPath.addAll(dependencyPath);
         }
-        for (List<String> entries : List.of(classPath, modulePath, patchModule)) {
+        for (List<String> entries : List.of(classPath, modulePath, patchModule, processorPath)) {
             for (String entry : entries) {
                 if (entry.indexOf(File.pathSeparatorChar) != -1) {
                     throw new IllegalArgumentException(
@@ -458,39 +640,26 @@ public class Javac extends ProcessBuildStep {
                 }
             }
         }
-        StringBuilder args = new StringBuilder();
         if (!modulePath.isEmpty()) {
-            String escaped = String.join(File.pathSeparator, modulePath)
-                    .replace("\\", "\\\\")
-                    .replace("\"", "\\\"");
-            args.append("--module-path\n\"").append(escaped).append("\"\n");
+            options.add("--module-path");
+            options.add(String.join(File.pathSeparator, modulePath));
         }
         if (!classPath.isEmpty()) {
-            String escaped = String.join(File.pathSeparator, classPath)
-                    .replace("\\", "\\\\")
-                    .replace("\"", "\\\"");
-            args.append("--class-path\n\"").append(escaped).append("\"\n");
+            options.add("--class-path");
+            options.add(String.join(File.pathSeparator, classPath));
         }
         if (!patchModule.isEmpty()) {
-            String escaped = String.join(File.pathSeparator, patchModule)
-                    .replace("\\", "\\\\")
-                    .replace("\"", "\\\"");
-            args.append("--patch-module\n\"")
-                    .append(moduleName)
-                    .append("=")
-                    .append(escaped)
-                    .append("\"\n");
+            options.add("--patch-module");
+            options.add(patched + "=" + String.join(File.pathSeparator, patchModule));
         }
-        if (!args.isEmpty()) {
-            Path argFile = context.supplement().resolve("javac-" + release + ".args");
-            Files.writeString(argFile, args.toString());
-            commands.add("@" + argFile);
-        }
-        commands.addAll(files);
+        options.addAll(processorPath(processorPath,
+                this.pathPlacement.forModuleInfo(patched != null).modular() && !compilerPlugins));
+        options.addAll(files);
+        commands.add("@" + argumentFile(context.supplement().resolve("javac-" + release + ".args"), options));
         Path output = context.supplement().resolve("output-" + release);
         Path error = context.supplement().resolve("error-" + release);
         ProcessHandler handler = factory.apply(commands);
-        Files.writeString(context.supplement().resolve("command-" + release), String.join(" ", handler.commands()));
+        Files.writeString(context.supplement().resolve("command-" + release), shell(handler.commands()));
         ProcessHandler.Tee tee = tee(executor, handler);
         CompletableFuture<Void> future = new CompletableFuture<>();
         executor.execute(() -> {
@@ -499,13 +668,12 @@ public class Javac extends ProcessBuildStep {
                 if (exitCode == 0) {
                     future.complete(null);
                 } else {
-                    String outputString = Files.exists(output) ? Files.readString(output) : "";
-                    String errorString = Files.exists(error) ? Files.readString(error) : "";
                     future.completeExceptionally(new IllegalStateException(
                             "Unexpected exit code: " + exitCode + " (multi-release " + release + ")\n"
-                                    + "To reproduce, execute:\n " + String.join(" ", handler.commands())
-                                    + (outputString.isBlank() ? "" : ("\n\nOutput:\n" + outputString))
-                                    + (errorString.isBlank() ? "" : ("\n\nError:\n" + errorString))));
+                                    + "To reproduce, execute:\n "
+                                    + shell(handler.commands())
+                                    + tail("Output", output)
+                                    + tail("Error", error)));
                 }
             } catch (Throwable t) {
                 future.completeExceptionally(t);
@@ -514,7 +682,7 @@ public class Javac extends ProcessBuildStep {
         return future;
     }
 
-    private static Integer versionOf(Path relative) {
+    public static Integer versionOf(Path relative) {
         String normalized = relative.toString().replace(File.separatorChar, '/');
         Matcher matcher = VERSIONED.matcher(normalized);
         return matcher.matches() ? Integer.parseInt(matcher.group(1)) : null;

@@ -16,7 +16,7 @@ public class JLink extends ProcessBuildStep {
     public JLink(ProcessHandler.Factory factory) {
         this(factory.apply("jlink", "bin/jlink"),
              "main",
-             Terms.of("jlink"));
+             new Terms());
     }
 
     public static JLink ofEnvironment(Environment environment,

@@ -1,6 +1,7 @@
 package build.jenesis.project;
 
 import module java.base;
+import module java.xml;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
@@ -17,11 +18,14 @@ import build.jenesis.step.Dependencies;
 import build.jenesis.step.Java;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
+import javax.lang.model.SourceVersion;
+import org.xml.sax.Attributes;
 
 public class TestModule implements BuildExecutorModule {
 
     public static final String REQUIRED = "required", ARTIFACTS = "artifacts", EXECUTED = "executed";
     private static final String RESOLVED = "resolved", DEPENDENCIES = "dependencies";
+    private static final int NAMED_FAILURES = 20;
 
     private final TestFramework framework;
     private final Predicate<String> isTest;
@@ -34,7 +38,10 @@ public class TestModule implements BuildExecutorModule {
     private final PathPlacement pathPlacement;
     private final String moduleName;
     private final String filter;
+    private final String exclude;
     private final String tag;
+    private final String engines;
+    private final List<String> scan;
     private final boolean force;
     private final boolean parallel;
     private final boolean reporting;
@@ -57,13 +64,16 @@ public class TestModule implements BuildExecutorModule {
                 null,
                 null,
                 null,
+                null,
+                null,
+                List.of(),
                 false,
                 false,
                 false,
                 "main",
                 List.of(),
                 null,
-                ProcessBuildStep.Terms.of("tests"),
+                new ProcessBuildStep.Terms(),
                 false);
     }
 
@@ -75,13 +85,16 @@ public class TestModule implements BuildExecutorModule {
                 null,
                 resolvers,
                 Dependencies.ofEnvironment(environment, repositories, resolvers),
-                true,
+                environment.flag("test.jars", true),
                 true,
                 null,
                 PathPlacement.CLASS_PATH,
                 null,
                 environment.getProperty("test.filter"),
+                environment.getProperty("test.exclude"),
                 environment.getProperty("test.tag"),
+                null,
+                List.of(),
                 environment.flag("test.force"),
                 environment.flag("test.parallel"),
                 environment.flag("test.reporting"),
@@ -106,9 +119,9 @@ public class TestModule implements BuildExecutorModule {
 
     private static Predicate<String> defaultIsTest() {
         List<Pattern> patterns = Stream.of(
-                        ".*\\.Test[a-zA-Z0-9$]*", ".*\\..*Test", ".*\\..*Tests", ".*\\..*TestCase",
-                        ".*\\.IT[a-zA-Z0-9$]*", ".*\\..*IT", ".*\\..*ITCase")
-                .map(Pattern::compile)
+                        "Test[a-zA-Z0-9]*", "[^.$]*Test", "[^.$]*Tests", "[^.$]*TestCase",
+                        "IT[a-zA-Z0-9]*", "[^.$]*IT", "[^.$]*ITCase")
+                .map(pattern -> Pattern.compile("(?:.*\\.)?" + pattern))
                 .toList();
         return (Predicate<String> & Serializable)
                 (name -> patterns.stream().anyMatch(pattern -> pattern.matcher(name).matches()));
@@ -125,7 +138,10 @@ public class TestModule implements BuildExecutorModule {
                        PathPlacement pathPlacement,
                        String moduleName,
                        String filter,
+                       String exclude,
                        String tag,
+                       String engines,
+                       List<String> scan,
                        boolean force,
                        boolean parallel,
                        boolean reporting,
@@ -146,7 +162,10 @@ public class TestModule implements BuildExecutorModule {
         this.pathPlacement = pathPlacement;
         this.moduleName = moduleName;
         this.filter = filter;
+        this.exclude = exclude;
         this.tag = tag;
+        this.engines = engines;
+        this.scan = scan;
         this.force = force;
         this.parallel = parallel;
         this.reporting = reporting;
@@ -168,7 +187,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -191,7 +213,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -214,7 +239,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -237,7 +265,36 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                incrementalDigest,
+                terms,
+                skip);
+    }
+
+    public TestModule exclude(String exclude) {
+        return new TestModule(framework,
+                isTest,
+                factory,
+                resolvers,
+                dependencies,
+                jarsOnly,
+                requireFramework,
+                pinning,
+                pathPlacement,
+                moduleName,
+                filter,
+                exclude,
+                tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -260,7 +317,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -283,7 +343,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -306,7 +369,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -329,7 +395,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -352,7 +421,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -375,7 +447,72 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                incrementalDigest,
+                terms,
+                skip);
+    }
+
+    public TestModule engines(String engines) {
+        return new TestModule(framework,
+                isTest,
+                factory,
+                resolvers,
+                dependencies,
+                jarsOnly,
+                requireFramework,
+                pinning,
+                pathPlacement,
+                moduleName,
+                filter,
+                exclude,
+                tag,
+                engines,
+                scan,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                incrementalDigest,
+                terms,
+                skip);
+    }
+
+    public TestModule scan(List<String> scan) {
+        for (String dependency : scan) {
+            int slash = dependency.indexOf('/');
+            if (slash < 0
+                    ? !SourceVersion.isName(dependency)
+                    : slash == 0 || slash == dependency.length() - 1 || dependency.indexOf('/', slash + 1) >= 0) {
+                throw new IllegalArgumentException("The scan key of test.properties names the dependencies whose test"
+                        + " classes run among the module's own, comma-separated, each by its module name or as"
+                        + " <groupId>/<artifactId>, as org.example.tck or org.example/tck: " + dependency);
+            }
+        }
+        return new TestModule(framework,
+                isTest,
+                factory,
+                resolvers,
+                dependencies,
+                jarsOnly,
+                requireFramework,
+                pinning,
+                pathPlacement,
+                moduleName,
+                filter,
+                exclude,
+                tag,
+                engines,
+                List.copyOf(scan),
                 force,
                 parallel,
                 reporting,
@@ -398,7 +535,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -421,7 +561,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -444,7 +587,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -467,7 +613,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -494,7 +643,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -517,7 +669,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -540,7 +695,10 @@ public class TestModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 filter,
+                exclude,
                 tag,
+                engines,
+                scan,
                 force,
                 parallel,
                 reporting,
@@ -553,6 +711,11 @@ public class TestModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        if (!jarsOnly && pathPlacement.modular() && moduleName != null) {
+            throw new IllegalArgumentException("The tests of module " + moduleName + " run on the module path, where"
+                    + " a folder of resources is no part of the module: run them against its jar, as"
+                    + " jenesis.test.jars=true does");
+        }
         TestFramework resolved = framework;
         if (resolved == null) {
             resolved = TestFramework.detect(() -> inherited.values().stream().iterator()).orElse(null);
@@ -567,11 +730,10 @@ public class TestModule implements BuildExecutorModule {
         }
         SequencedSet<String> upstream = inherited.sequencedKeySet();
         buildExecutor.addStep(RESOLVED, new Requires(group, resolved, Set.copyOf(resolvers.keySet()), observers), upstream);
-        SequencedSet<String> resolveInputs = new LinkedHashSet<>();
+        SequencedSet<String> resolveInputs = new LinkedHashSet<>(upstream);
         resolveInputs.add(RESOLVED);
-        resolveInputs.addAll(upstream);
         buildExecutor.addModule(DEPENDENCIES,
-                dependencies.pinning(pinning),
+                dependencies.pinning(pinning).pathPlacement(pathPlacement),
                 resolveInputs);
         if (skip) {
             return;
@@ -585,7 +747,10 @@ public class TestModule implements BuildExecutorModule {
                         pathPlacement,
                         moduleName,
                         filter,
+                        exclude,
                         tag,
+                        engines,
+                        scan,
                         force,
                         parallel,
                         reporting,
@@ -621,6 +786,13 @@ public class TestModule implements BuildExecutorModule {
             TestFramework resolved = framework != null ? framework : TestFramework.detect(artifacts).orElse(null);
             SequencedProperties properties = new SequencedProperties();
             SequencedProperties versions = new SequencedProperties();
+            SequencedMap<String, String> pinned = new LinkedHashMap<>();
+            for (Path folder : folders) {
+                Path versionsFile = folder.resolve(BuildStep.VERSIONS);
+                if (Files.exists(versionsFile)) {
+                    SequencedProperties.ofFiles(versionsFile).forEachProperty(pinned::putIfAbsent);
+                }
+            }
             if (resolved != null) {
                 SequencedMap<String, String> runners = resolved.missingCoordinates(artifacts);
                 String selectedPrefix = null;
@@ -635,19 +807,9 @@ public class TestModule implements BuildExecutorModule {
                     }
                 }
                 if (selectedPrefix != null) {
-                    for (BuildStepArgument argument : arguments.values()) {
-                        if (argument.removed()) {
-                            continue;
-                        }
-                        Path versionsFile = argument.folder().resolve(BuildStep.VERSIONS);
-                        if (!Files.exists(versionsFile)) {
-                            continue;
-                        }
-                        SequencedProperties upstream = SequencedProperties.ofFiles(versionsFile);
-                        for (String key : upstream.stringPropertyNames()) {
-                            if (key.startsWith(group + "/" + selectedPrefix + "/")) {
-                                versions.putIfAbsent(key, upstream.getProperty(key));
-                            }
+                    for (Map.Entry<String, String> entry : pinned.entrySet()) {
+                        if (entry.getKey().startsWith(group + "/" + selectedPrefix + "/")) {
+                            versions.putIfAbsent(entry.getKey(), entry.getValue());
                         }
                     }
                     for (Map.Entry<String, String> entry : runners.entrySet()) {
@@ -661,7 +823,11 @@ public class TestModule implements BuildExecutorModule {
             }
             for (ObservabilityEngine observer : observers) {
                 for (Map.Entry<String, String> entry : observer.coordinates().entrySet()) {
-                    properties.setProperty(group + "/runtime/" + entry.getKey() + "/" + entry.getValue(), "");
+                    properties.setProperty(observer.name()
+                            + "/runtime/"
+                            + entry.getKey()
+                            + "/"
+                            + released(pinned, observer.name(), entry.getKey(), entry.getValue()), "");
                 }
             }
             properties.store(context.next().resolve(BuildStep.REQUIRES));
@@ -670,15 +836,45 @@ public class TestModule implements BuildExecutorModule {
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
+
+        private static String released(SequencedMap<String, String> pinned,
+                                       String engine,
+                                       String coordinate,
+                                       String version) {
+            int repository = coordinate.indexOf('/'), groupId = coordinate.indexOf('/', repository + 1);
+            if (!version.equals("RELEASE") || repository < 1 || groupId < 0) {
+                return version;
+            }
+            String own = engine + "/" + coordinate, release = engine + "/" + coordinate.substring(0, groupId + 1);
+            String train = null;
+            for (Map.Entry<String, String> entry : pinned.entrySet()) {
+                String pin = entry.getValue().trim().split("\\s+", 2)[0];
+                if (pin.isEmpty() || pin.startsWith(":")) {
+                    continue;
+                }
+                if (entry.getKey().equals(own)) {
+                    return pin;
+                }
+                if (train == null && entry.getKey().startsWith(release)) {
+                    train = pin;
+                }
+            }
+            return train == null ? version : train;
+        }
     }
 
-    public record Scope(String filter, List<TestTags> covered) {
+    public record Scope(String filter, String exclude, List<TestTags> covered) {
 
-        private static final String FILTER = "filter", COVERED = "covered.";
+        private static final String FILTER = "filter", EXCLUDE = "exclude", COVERED = "covered.";
 
         public Scope {
             filter = filter == null || filter.isBlank() ? null : filter;
+            exclude = exclude == null || exclude.isBlank() ? null : exclude;
             covered = List.copyOf(covered);
+        }
+
+        public Scope(String filter, List<TestTags> covered) {
+            this(filter, null, covered);
         }
 
         public static Scope ofFile(Path file) throws IOException {
@@ -691,13 +887,16 @@ public class TestModule implements BuildExecutorModule {
             } catch (IllegalArgumentException _) {
                 covered.clear();
             }
-            return new Scope(recorded.getProperty(FILTER), covered);
+            return new Scope(recorded.getProperty(FILTER), recorded.getProperty(EXCLUDE), covered);
         }
 
         public void store(Path file) throws IOException {
             SequencedProperties recorded = new SequencedProperties();
             if (filter != null) {
                 recorded.setProperty(FILTER, filter);
+            }
+            if (exclude != null) {
+                recorded.setProperty(EXCLUDE, exclude);
             }
             for (int index = 0; index < covered.size(); index++) {
                 recorded.setProperty(COVERED + index, covered.get(index).toString());
@@ -707,6 +906,10 @@ public class TestModule implements BuildExecutorModule {
 
         public boolean filters(String requested) {
             return entries(filter).equals(entries(requested));
+        }
+
+        public boolean excludes(String requested) {
+            return entries(exclude).equals(entries(requested));
         }
 
         private static List<String> entries(String expression) {
@@ -730,7 +933,10 @@ public class TestModule implements BuildExecutorModule {
         private final Predicate<String> isTest;
         private final String moduleName;
         private final transient String filter;
+        private final transient String exclude;
         private final transient String tag;
+        private final String engines;
+        private final List<String> scan;
         private final transient boolean force;
         private final transient boolean parallel;
         private final boolean reporting;
@@ -746,7 +952,10 @@ public class TestModule implements BuildExecutorModule {
                     PathPlacement pathPlacement,
                     String moduleName,
                     String filter,
+                    String exclude,
                     String tag,
+                    String engines,
+                    List<String> scan,
                     boolean force,
                     boolean parallel,
                     boolean reporting,
@@ -762,7 +971,10 @@ public class TestModule implements BuildExecutorModule {
             this.isTest = isTest;
             this.moduleName = moduleName;
             this.filter = filter;
+            this.exclude = exclude;
             this.tag = tag;
+            this.engines = engines;
+            this.scan = scan;
             this.force = force;
             this.parallel = parallel;
             this.reporting = reporting;
@@ -774,6 +986,73 @@ public class TestModule implements BuildExecutorModule {
         @Override
         protected List<String> configurations() {
             return List.of("java", "test");
+        }
+
+        @Override
+        protected Optional<String> diagnosis(BuildStepContext context) throws IOException {
+            SequencedSet<String> failed = new LinkedHashSet<>();
+            SequencedSet<Path> reported = new LinkedHashSet<>();
+            for (Path folder : List.of(context.next().resolve(BuildStep.REPORTS + "tests"), context.supplement())) {
+                if (!Files.isDirectory(folder)) {
+                    continue;
+                }
+                List<Path> reports;
+                try (Stream<Path> files = Files.walk(folder)) {
+                    reports = files.filter(file -> file.getFileName().toString().endsWith(".xml"))
+                            .filter(Files::isRegularFile)
+                            .sorted()
+                            .toList();
+                }
+                for (Path report : reports) {
+                    if (failures(report, failed)) {
+                        reported.add(report.getParent());
+                    }
+                }
+            }
+            if (failed.isEmpty()) {
+                return Optional.empty();
+            }
+            List<String> named = failed.stream().limit(NAMED_FAILURES).map(test -> "  " + test).toList();
+            return Optional.of(failed.size()
+                    + (failed.size() == 1 ? " test failed" : " tests failed")
+                    + ", as reported in "
+                    + reported.stream().map(Path::toString).collect(Collectors.joining(", "))
+                    + ":\n"
+                    + String.join("\n", named)
+                    + (failed.size() > named.size() ? "\n  ... and " + (failed.size() - named.size()) + " more" : ""));
+        }
+
+        private static boolean failures(Path report, SequencedSet<String> failed) throws IOException {
+            int before = failed.size();
+            parsed(report, new DefaultHandler() {
+
+                private String testcase;
+
+                @Override
+                public void startElement(String uri, String localName, String qualifiedName, Attributes attributes) {
+                    switch (qualifiedName) {
+                        case "testcase" -> {
+                            String type = attributes.getValue("classname"), name = attributes.getValue("name");
+                            testcase = type == null || type.isEmpty() ? name : name == null ? type : type + "#" + name;
+                        }
+                        case "failure", "error" -> {
+                            if (testcase != null) {
+                                failed.add(testcase);
+                            }
+                        }
+                        default -> {
+                        }
+                    }
+                }
+
+                @Override
+                public void endElement(String uri, String localName, String qualifiedName) {
+                    if (qualifiedName.equals("testcase")) {
+                        testcase = null;
+                    }
+                }
+            });
+            return failed.size() > before;
         }
 
         @Override
@@ -793,8 +1072,25 @@ public class TestModule implements BuildExecutorModule {
             }
             List<TestTags> covered = new ArrayList<>(ran);
             covered.add(requested);
-            new Scope(filter, covered).store(context.next().resolve("testscope.properties"));
-            return super.apply(executor, context, arguments);
+            new Scope(filter, exclude, covered).store(context.next().resolve("testscope.properties"));
+            SequencedMap<String, String> handed = BuildStep.listing(arguments);
+            return super.apply(executor, context, arguments).thenApply(completed -> {
+                SequencedMap<String, String> left;
+                try {
+                    left = BuildStep.listing(arguments);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                if (!handed.equals(left)) {
+                    SequencedSet<String> written = new TreeSet<>(handed.keySet());
+                    written.addAll(left.keySet());
+                    written.removeIf(key -> Objects.equals(handed.get(key), left.get(key)));
+                    throw new IllegalStateException("The tests wrote into the folders the build handed them: "
+                            + written + " - a test writes into its working directory or a temporary folder, never"
+                            + " beside what it tests, as the steps after it read those folders as they were built");
+                }
+                return completed;
+            });
         }
 
         private List<TestTags> ran(BuildStepContext context, SequencedMap<String, BuildStepArgument> arguments)
@@ -807,7 +1103,7 @@ public class TestModule implements BuildExecutorModule {
                 return List.of();
             }
             Scope scope = Scope.ofFile(recorded);
-            return scope.filters(filter) ? scope.covered() : List.of();
+            return scope.filters(filter) && scope.excludes(exclude) ? scope.covered() : List.of();
         }
 
         @Override
@@ -815,21 +1111,28 @@ public class TestModule implements BuildExecutorModule {
                                                         BuildStepContext context,
                                                         SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            TestFramework resolved = framework != null
+            List<Path> folders = arguments.values().stream()
+                    .filter(argument -> !argument.removed())
+                    .map(BuildStepArgument::folder)
+                    .toList();
+            TestFramework resolved = (framework != null
                     ? framework
-                    : TestFramework.detect(() -> arguments.values().stream()
-                            .filter(argument -> !argument.removed())
-                            .map(BuildStepArgument::folder)
-                            .iterator())
-                    .orElseThrow(() -> new IllegalArgumentException("No test framework found"));
-            String path = null;
+                    : TestFramework.detect(folders)
+                            .orElseThrow(() -> new IllegalArgumentException("No test framework found")))
+                    .runningOn(TestFramework.jars(folders));
+            String path = null, compiledFrom = null;
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
                 }
                 Path module = argument.folder().resolve(BuildStep.MODULE);
                 if (Files.isRegularFile(module)) {
-                    path = SequencedProperties.ofFiles(module).getProperty("path");
+                    SequencedProperties described = SequencedProperties.ofFiles(module);
+                    path = described.getProperty("path");
+                    String sources = described.value("sources");
+                    compiledFrom = path == null || path.isEmpty() ? sources
+                            : sources == null ? path
+                            : path + "/" + sources;
                     break;
                 }
             }
@@ -842,11 +1145,21 @@ public class TestModule implements BuildExecutorModule {
             if (!requested.isEmpty() && specs.isEmpty()) {
                 return CompletableFuture.completedFuture(null);
             }
+            List<Pattern> excluded = new ArrayList<>();
+            for (TestSpec spec : TestSpec.parse(exclude)) {
+                if (spec.method() != null) {
+                    throw new IllegalArgumentException("jenesis.test.exclude names test classes, as [<module>/]<regex>,"
+                            + " but " + exclude + " names the method " + spec.method()
+                            + " - narrow a class to some of its methods with jenesis.test.filter");
+                } else if (spec.module() == null || spec.module().equals(path)) {
+                    excluded.add(spec.classPattern());
+                }
+            }
             TestTags tags = TestTags.parse(tag);
             List<TestTags> ran = ran(context, arguments);
             List<String> commands = new ArrayList<>();
             for (ObservabilityEngine observer : observers) {
-                commands.addAll(observer.commands(agentJars(arguments, observer, group), context.next()));
+                commands.addAll(observer.commands(agentJars(arguments, observer), context.next()));
             }
             SequencedMap<String, String> attachments = attachments(arguments);
             SequencedMap<String, Path> attached = attachedJars(arguments, attachments.sequencedKeySet());
@@ -870,11 +1183,51 @@ public class TestModule implements BuildExecutorModule {
             for (Map.Entry<String, String> entry : resolved.systemProperties().entrySet()) {
                 commands.add("-D" + entry.getKey() + "=" + entry.getValue());
             }
+            SequencedSet<Path> scanned = new LinkedHashSet<>();
+            for (String dependency : scan) {
+                SequencedSet<Path> held = new LinkedHashSet<>();
+                for (BuildStepArgument argument : arguments.values()) {
+                    if (argument.removed()) {
+                        continue;
+                    }
+                    if (dependency.indexOf('/') < 0) {
+                        for (Path jar : Dependencies.select(argument.folder(), group, "runtime")) {
+                            ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
+                            if (descriptor != null && descriptor.name().equals(dependency)) {
+                                held.add(jar);
+                            }
+                        }
+                    } else {
+                        held.addAll(Dependencies.select(argument.folder(), group, "runtime/maven/" + dependency));
+                    }
+                }
+                if (held.isEmpty()) {
+                    throw new IllegalStateException("The tests of " + (path == null ? "this module" : path) + " scan "
+                            + dependency + " for test classes, but no jar of it is on their test path - declare it"
+                            + " a dependency of these tests, "
+                            + (dependency.indexOf('/') < 0
+                                    ? "as requires " + dependency + "; in their module-info.java"
+                                    : "as a <dependency> on " + dependency.replace('/', ':') + " in their pom.xml,"
+                                            + " or by requiring the module it holds")
+                            + ", or remove it from the scan key of test.properties");
+                }
+                scanned.addAll(held);
+            }
             if (pathPlacement.modular() && resolved.runnerModule() != null) {
+                SequencedSet<String> added = new LinkedHashSet<>();
                 if (moduleName != null) {
+                    added.add(moduleName);
+                }
+                for (Path jar : scanned) {
+                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
+                    if (descriptor != null && pathPlacement.test(jar)) {
+                        added.add(descriptor.name());
+                    }
+                }
+                if (!added.isEmpty()) {
                     commands.add("--add-modules");
-                    commands.add(moduleName);
-                    ModuleDescriptor tested = null;
+                    commands.add(String.join(",", added));
+                    Map<String, ModuleDescriptor> opened = new HashMap<>();
                     SequencedSet<String> targets = new TreeSet<>();
                     Set<String> reflecting = resolved.reflectingModules();
                     for (BuildStepArgument argument : arguments.values()) {
@@ -898,20 +1251,26 @@ public class TestModule implements BuildExecutorModule {
                             if (descriptor == null) {
                                 continue;
                             }
-                            if (descriptor.name().equals(moduleName)) {
-                                if (tested == null) {
-                                    tested = ModuleFinder.of(file).find(moduleName).orElseThrow().descriptor();
+                            if (added.contains(descriptor.name())) {
+                                if (!descriptor.isAutomatic() && !opened.containsKey(descriptor.name())) {
+                                    opened.put(descriptor.name(), ModuleFinder.of(file)
+                                            .find(descriptor.name())
+                                            .orElseThrow()
+                                            .descriptor());
                                 }
                             } else if (reflecting.contains(descriptor.name()) && pathPlacement.test(file)) {
                                 targets.add(descriptor.name());
                             }
                         }
                     }
-                    if (tested != null && !tested.isOpen()) {
-                        String target = targets.isEmpty() ? "ALL-UNNAMED" : String.join(",", targets);
-                        for (String name : new TreeSet<>(tested.packages())) {
-                            commands.add("--add-opens");
-                            commands.add(moduleName + "/" + name + "=" + target);
+                    String target = targets.isEmpty() ? "ALL-UNNAMED" : String.join(",", targets);
+                    for (String name : added) {
+                        ModuleDescriptor described = opened.get(name);
+                        if (described != null && !described.isOpen()) {
+                            for (String opening : new TreeSet<>(described.packages())) {
+                                commands.add("--add-opens");
+                                commands.add(name + "/" + opening + "=" + target);
+                            }
                         }
                     }
                 }
@@ -920,9 +1279,77 @@ public class TestModule implements BuildExecutorModule {
             } else {
                 commands.add(resolved.runnerClass());
             }
-            SequencedSet<String> matchedClasses = new TreeSet<>();
+            SequencedSet<String> matchedClasses = new TreeSet<>(), excludedClasses = new TreeSet<>();
             SequencedMap<String, SequencedSet<String>> matchedMethods = new TreeMap<>();
             ClassFile classFile = ClassFile.of();
+            AtomicInteger compiled = new AtomicInteger();
+            List<Path> classFolders = new ArrayList<>(), jars = new ArrayList<>();
+            for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
+                Path classes = argument.folder().resolve(CLASSES), artifacts = argument.folder().resolve(ARTIFACTS);
+                if (Files.isDirectory(classes)) {
+                    classFolders.add(classes);
+                }
+                if (Files.isDirectory(artifacts)) {
+                    try (DirectoryStream<Path> stream = Files.newDirectoryStream(artifacts, "*.jar")) {
+                        stream.forEach(jars::add);
+                    }
+                }
+                jars.addAll(Dependencies.select(argument.folder(), group, "runtime"));
+            }
+            Map<String, Optional<ClassModel>> located = new HashMap<>();
+            Function<String, Optional<ClassModel>> locator = name -> located.computeIfAbsent(name, _ -> {
+                try {
+                    for (Path folder : classFolders) {
+                        Path file = folder.resolve(name + ".class");
+                        if (Files.isRegularFile(file)) {
+                            return Optional.of(classFile.parse(file));
+                        }
+                    }
+                    for (Path jar : jars) {
+                        try (JarFile file = new JarFile(jar.toFile())) {
+                            JarEntry entry = file.getJarEntry(name + ".class");
+                            if (entry != null) {
+                                try (InputStream input = file.getInputStream(entry)) {
+                                    return Optional.of(classFile.parse(input.readAllBytes()));
+                                }
+                            }
+                        }
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                return Optional.empty();
+            });
+            BiConsumer<String, ClassModel> select = (className, model) -> {
+                if ((model.flags().flagsMask() & (ClassFile.ACC_ABSTRACT | ClassFile.ACC_MODULE)) != 0) {
+                    return;
+                }
+                boolean left = excluded.stream().anyMatch(pattern -> pattern.matcher(className).matches());
+                if (specs.isEmpty()) {
+                    if (isTest.test(className) && holdsTests(resolved, model, locator)) {
+                        (left ? excludedClasses : matchedClasses).add(className);
+                    }
+                } else {
+                    SequencedSet<String> methods = new TreeSet<>();
+                    for (TestSpec spec : specs) {
+                        if (spec.classPattern.matcher(className).matches()) {
+                            if (left) {
+                                excludedClasses.add(className);
+                            } else if (spec.method == null) {
+                                matchedClasses.add(className);
+                            } else {
+                                methods.add(spec.method);
+                            }
+                        }
+                    }
+                    if (!methods.isEmpty() && !matchedClasses.contains(className)) {
+                        matchedMethods.put(className, methods);
+                    }
+                }
+            };
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
@@ -931,46 +1358,64 @@ public class TestModule implements BuildExecutorModule {
                 if (Files.exists(classes)) {
                     Files.walkFileTree(classes, new SimpleFileVisitor<>() {
                         @Override
+                        public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) {
+                            return directory.equals(classes.resolve("META-INF"))
+                                    ? FileVisitResult.SKIP_SUBTREE
+                                    : FileVisitResult.CONTINUE;
+                        }
+
+                        @Override
                         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                             if (file.toString().endsWith(".class")) {
                                 String raw = classes.relativize(file).toString();
-                                String className = raw.substring(0, raw.length() - 6).replace(File.separatorChar, '.');
-                                if ((classFile.parse(file).flags().flagsMask() & ClassFile.ACC_ABSTRACT) != 0) {
-                                    return FileVisitResult.CONTINUE;
-                                }
-                                if (specs.isEmpty()) {
-                                    if (isTest.test(className)) {
-                                        matchedClasses.add(className);
-                                    }
-                                } else {
-                                    for (TestSpec spec : specs) {
-                                        if (spec.classPattern.matcher(className).matches()) {
-                                            if (spec.method == null) {
-                                                matchedClasses.add(className);
-                                            } else {
-                                                matchedMethods
-                                                        .computeIfAbsent(className, _ -> new TreeSet<>())
-                                                        .add(spec.method);
-                                            }
-                                            break;
-                                        }
-                                    }
-                                }
+                                compiled.incrementAndGet();
+                                select.accept(raw.substring(0, raw.length() - 6).replace(File.separatorChar, '.'),
+                                        classFile.parse(file));
                             }
                             return FileVisitResult.CONTINUE;
                         }
                     });
                 }
             }
-            if (matchedClasses.isEmpty() && matchedMethods.isEmpty() && tags.all()) {
-                throw new IllegalStateException("No tests matched the requested selection"
-                        + (filter != null ? ", filter: " + filter : "")
-                        + (tag != null ? ", tag: " + tag : "")
-                        + ". Adjust jenesis.test.filter / jenesis.test.tag or the isTest predicate,"
-                        + " or set jenesis.test.skip to skip testing.");
+            int contained = 0;
+            for (Path jar : scanned) {
+                try (JarFile archive = new JarFile(jar.toFile())) {
+                    for (JarEntry entry : Collections.list(archive.entries())) {
+                        String name = entry.getName();
+                        if (name.endsWith(".class") && !name.startsWith("META-INF/") && !name.equals("module-info.class")) {
+                            contained++;
+                            try (InputStream input = archive.getInputStream(entry)) {
+                                select.accept(name.substring(0, name.length() - 6).replace('/', '.'),
+                                        classFile.parse(input.readAllBytes()));
+                            }
+                        }
+                    }
+                }
+            }
+            if (matchedClasses.isEmpty() && matchedMethods.isEmpty() && !excludedClasses.isEmpty()) {
+                return CompletableFuture.completedFuture(null);
+            } else if (matchedClasses.isEmpty() && matchedMethods.isEmpty() && tags.all()) {
+                String unmatched = "among the " + compiled.get() + " classes compiled"
+                        + (compiledFrom == null ? "" : " from " + compiledFrom + ", the folder compiled for"
+                                + " these tests beside src/test/kotlin and src/test/groovy of a pom.xml, so tests kept"
+                                + " in another one need it named as the test sources, by testSourceDirectory in a"
+                                + " pom.xml")
+                        + (scanned.isEmpty() ? "" : ", nor among the " + contained + " classes of the scanned "
+                                + scanned.stream().map(jar -> jar.getFileName().toString()).collect(Collectors.joining(", ")));
+                if (!specs.isEmpty()) {
+                    throw new IllegalStateException("No tests matched the requested selection, filter: " + filter
+                            + ", " + unmatched
+                            + ". Adjust jenesis.test.filter, or set jenesis.test.skip to skip testing.");
+                }
+                Consumer<String> reporting = terms.reporting();
+                if (reporting != null) {
+                    reporting.accept("tests ran no test, as no class " + unmatched
+                            + " is named as a test, which jenesis.test.filter can change");
+                }
+                return CompletableFuture.completedFuture(null);
             }
             SequencedSet<String> selection = matchedClasses;
-            if (incrementalDigest != null && filter == null && tags.all() && ran.isEmpty() && !matchedClasses.isEmpty()) {
+            if (incrementalDigest != null && filter == null && exclude == null && tags.all() && ran.isEmpty() && !matchedClasses.isEmpty()) {
                 SequencedSet<String> narrowed = selected(arguments, context, matchedClasses);
                 if (narrowed != null && narrowed.isEmpty()) {
                     return CompletableFuture.completedFuture(null);
@@ -978,14 +1423,32 @@ public class TestModule implements BuildExecutorModule {
                     selection = narrowed;
                 }
             }
-            commands.addAll(resolved.tags(resolved.arguments(
+            commands.addAll(resolved.engines(resolved.tags(resolved.arguments(
                     context.supplement(),
                     context.next(),
                     selection,
                     matchedMethods,
                     parallel,
-                    reporting), tags, ran));
+                    reporting), tags, ran), engines));
             return CompletableFuture.completedFuture(commands);
+        }
+
+        private static boolean holdsTests(TestFramework framework,
+                                          ClassModel type,
+                                          Function<String, Optional<ClassModel>> locator) {
+            ClassModel current = type;
+            while (!framework.holdsTests(current)) {
+                String superclass = current.superclass().map(ClassEntry::asInternalName).orElse(null);
+                if (superclass == null || superclass.startsWith("java/")) {
+                    return false;
+                }
+                Optional<ClassModel> located = locator.apply(superclass);
+                if (located.isEmpty()) {
+                    return true;
+                }
+                current = located.get();
+            }
+            return true;
         }
 
         private SequencedSet<String> selected(SequencedMap<String, BuildStepArgument> arguments,
@@ -1136,8 +1599,7 @@ public class TestModule implements BuildExecutorModule {
         }
 
         private static SequencedMap<String, Path> agentJars(SequencedMap<String, BuildStepArgument> arguments,
-                                                            ObservabilityEngine observer,
-                                                            String group) throws IOException {
+                                                            ObservabilityEngine observer) throws IOException {
             SequencedMap<String, Path> resolved = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
@@ -1149,7 +1611,7 @@ public class TestModule implements BuildExecutorModule {
                 }
                 SequencedProperties properties = SequencedProperties.ofFiles(file);
                 for (String coordinate : observer.coordinates().sequencedKeySet()) {
-                    String prefix = group + "/runtime/" + coordinate + "/";
+                    String prefix = observer.name() + "/runtime/" + coordinate + "/";
                     for (String key : properties.stringPropertyNames()) {
                         if (key.startsWith(prefix)) {
                             String value = properties.getProperty(key);

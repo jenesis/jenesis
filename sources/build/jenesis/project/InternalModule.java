@@ -8,6 +8,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Platform;
 import build.jenesis.Repository;
@@ -16,8 +17,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisRepository;
 import build.jenesis.module.ModularJarResolver;
-import build.jenesis.module.ModuleInfo;
-import build.jenesis.module.ModuleInfoParser;
+import build.jenesis.module.ModularProject;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Javac;
@@ -25,11 +25,11 @@ import build.jenesis.step.ProcessHandler;
 
 public class InternalModule implements BuildExecutorModule {
 
-    public static final String SOURCE = "source",
+    public static final String SOURCE = "sources",
             JAVA = "java",
             DELEGATE = "delegate",
             INPUTS = "inputs";
-    private static final String DEPENDENCIES = "dependencies", REQUIRES = "requires";
+    private static final String DEPENDENCIES = "dependencies", MANIFESTS = "manifests", REQUIRES = "requires";
     private static final String MAIN_ARTIFACTS = JAVA + "/" + JavaToolchainModule.ARTIFACTS;
 
     private final String prefix;
@@ -73,10 +73,9 @@ public class InternalModule implements BuildExecutorModule {
     public static InternalModule ofEnvironment(Environment environment,
                                                String prefix,
                                                String group,
-                                               Path source) {
-        Map<String, Repository> repositories = Map.of(prefix,
-                JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE));
-        Map<String, Resolver> resolvers = Map.of(prefix, ModularJarResolver.ofEnvironment(environment, true));
+                                               Path source,
+                                               Map<String, Repository> repositories,
+                                               Map<String, Resolver> resolvers) {
         return new InternalModule(prefix,
                 source,
                 Dependencies.ofEnvironment(environment, repositories, resolvers),
@@ -271,11 +270,11 @@ public class InternalModule implements BuildExecutorModule {
     public BuildExecutorModule resolution() {
         return (buildExecutor, inherited) -> {
             buildExecutor.addSource(SOURCE, Bind.asSources(), source);
-            buildExecutor.addStep(REQUIRES,
-                    new ParseModuleInfo(group, prefix, additionalDependencies, platform),
-                    Stream.concat(Stream.of(SOURCE), inherited.sequencedKeySet().stream()));
+            buildExecutor.addStep(MANIFESTS, ModularProject.manifests(group, prefix, platform), SOURCE);
+            buildExecutor.addStep(REQUIRES, new Inherited(group, additionalDependencies), inherited.sequencedKeySet());
             buildExecutor.addModule(DEPENDENCIES,
-                    dependencyModule.pinning(pinning),
+                    dependencyModule.pinning(pinning).pathPlacement(PathPlacement.MODULE_PATH),
+                    MANIFESTS,
                     REQUIRES);
         };
     }
@@ -286,6 +285,7 @@ public class InternalModule implements BuildExecutorModule {
         buildExecutor.addModule(JAVA,
                 new JavaToolchainModule().compiler(javacStep.group(group).asModule("javac")),
                 SOURCE,
+                MANIFESTS,
                 DEPENDENCIES);
         if (!inputs.isEmpty()) {
             buildExecutor.addModule(INPUTS, Bind.asInputs(inputs));
@@ -316,22 +316,11 @@ public class InternalModule implements BuildExecutorModule {
                 .flatMap(Function.identity()));
     }
 
-    private record ParseModuleInfo(String group,
-                                   String prefix,
-                                   SequencedSet<String> additionalDependencies,
-                                   Platform platform) implements BuildStep {
+    private record Inherited(String group, SequencedSet<String> additionalDependencies) implements BuildStep {
 
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
-            if (arguments.get(SOURCE).hasChanged(Path.of(BuildStep.SOURCES + "module-info.java"))) {
-                return true;
-            }
-            for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
-                if (!argument.getKey().equals(SOURCE) && argument.getValue().hasChanged(Path.of(BuildStep.VERSIONS))) {
-                    return true;
-                }
-            }
-            return false;
+            return arguments.values().stream().anyMatch(argument -> argument.hasChanged(Path.of(BuildStep.VERSIONS)));
         }
 
         @Override
@@ -339,39 +328,13 @@ public class InternalModule implements BuildExecutorModule {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            Path moduleInfo = arguments.get(SOURCE).folder()
-                    .resolve(BuildStep.SOURCES)
-                    .resolve("module-info.java");
-            if (!Files.isRegularFile(moduleInfo)) {
-                throw new IllegalStateException(
-                        "Internal module source is not modular (missing module-info.java)");
-            }
-            ModuleInfo info = new ModuleInfoParser(group).identify(moduleInfo);
-            SequencedProperties properties = new SequencedProperties();
-            for (String dependency : info.requires()) {
-                properties.setProperty(group + "/compile/" + prefix + "/" + dependency, "");
-                if (info.runtimeRequires().contains(dependency)) {
-                    properties.setProperty(group + "/runtime/" + prefix + "/" + dependency, "");
-                }
-            }
+            SequencedProperties requires = new SequencedProperties();
             for (String dependency : additionalDependencies) {
-                properties.setProperty(group + "/compile/" + dependency, "");
-                properties.setProperty(group + "/runtime/" + dependency, "");
+                requires.setProperty(group + "/compile/" + dependency, "");
+                requires.setProperty(group + "/runtime/" + dependency, "");
             }
-            info.plugins().forEach((coordinate, group) -> properties.setProperty(group + "/plugin/" + coordinate, ""));
-            properties.store(context.next().resolve(BuildStep.REQUIRES));
-            SequencedMap<String, String> pinned = new LinkedHashMap<>(info.versions());
-            for (Map.Entry<String, SequencedMap<String, String>> variant : info.variants().entrySet()) {
-                String selected = platform.select(variant.getKey(),
-                        pinned.get(variant.getKey()),
-                        variant.getValue());
-                if (selected != null) {
-                    pinned.put(variant.getKey(), selected);
-                }
-            }
-            SequencedProperties versions = new SequencedProperties();
-            pinned.forEach(versions::setProperty);
-            pinnedVersions(arguments).forEachProperty(versions::putIfAbsent);
+            requires.store(context.next().resolve(BuildStep.REQUIRES));
+            SequencedProperties versions = pinnedVersions(arguments);
             if (!versions.isEmpty()) {
                 versions.store(context.next().resolve(BuildStep.VERSIONS));
             }
@@ -384,9 +347,6 @@ public class InternalModule implements BuildExecutorModule {
         SequencedProperties versions = new SequencedProperties();
         for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
             if (argument.getValue().removed()) {
-                continue;
-            }
-            if (argument.getKey().equals(SOURCE)) {
                 continue;
             }
             Path file = argument.getValue().folder().resolve(BuildStep.VERSIONS);

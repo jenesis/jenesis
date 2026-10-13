@@ -14,6 +14,7 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -21,6 +22,8 @@ public class CodeNarcModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
+    private static final String SETTING = "source.codenarc";
+    private static final String REPORT = BuildStep.REPORTS + "codenarc/codenarc-report.xml";
 
     private final Dependencies dependencies;
     private final Pinning pinning;
@@ -36,7 +39,7 @@ public class CodeNarcModule implements BuildExecutorModule {
              "codenarc",
              "codenarc.xml",
              false,
-             ProcessBuildStep.Terms.of("codenarc"));
+             new ProcessBuildStep.Terms());
     }
 
     public static CodeNarcModule ofEnvironment(Environment environment,
@@ -46,7 +49,7 @@ public class CodeNarcModule implements BuildExecutorModule {
                 null,
                 "codenarc",
                 "codenarc.xml",
-                false,
+                Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "codenarc"));
     }
 
@@ -144,8 +147,10 @@ public class CodeNarcModule implements BuildExecutorModule {
         public boolean acceptableExitCode(int code,
                                           Executor executor,
                                           BuildStepContext context,
-                                          SequencedMap<String, BuildStepArgument> arguments) {
-            return !strict || code == 0;
+                                          SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Path report = context.next().resolve(REPORT);
+            return Findings.ofXml("codenarc", report, "Violation")
+                    .acceptable(code, context, false, strict, SETTING, terms.reporting());
         }
 
         @Override
@@ -185,7 +190,8 @@ public class CodeNarcModule implements BuildExecutorModule {
             if (config == null) {
                 throw new IllegalStateException("No " + configFile + " found among the inputs of the CodeNarc step");
             }
-            Path report = Files.createDirectories(context.next().resolve(BuildStep.REPORTS + "codenarc")).resolve("codenarc-report.xml");
+            Path report = context.next().resolve(REPORT);
+            Files.createDirectories(report.getParent());
             List<String> commands = new ArrayList<>(List.of(
                     "-cp", String.join(File.pathSeparator, jars),
                     "org.codenarc.CodeNarc",

@@ -6,6 +6,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.step.EnvironmentalProcessBuildStep;
+import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -52,6 +53,29 @@ public class ProcessBuildStepTest {
     }
 
     @Test
+    public void a_tab_in_a_value_separates_the_arguments_of_a_flag_that_takes_more_than_one() throws IOException {
+        Path folder = Files.createDirectories(root.resolve("argument/process")).getParent();
+        Files.writeString(folder.resolve("process/javadoc.properties"),
+                "-linkoffline=https\\://example.com/api/\\toffline/api\\nhttps\\://example.com/other/\\toffline/other\n");
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        AtomicReference<List<String>> captured = new AtomicReference<>();
+        Function<List<String>, ProcessHandler.OfProcess> base = ProcessHandler.OfProcess.ofJavaHome("bin/java");
+        new Program("javadoc", arguments -> {
+            captured.set(arguments);
+            return base.apply(List.of("-version"));
+        }, List.of("javadoc"), List.of())
+                .apply(Runnable::run,
+                        new BuildStepContext(null, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(folder, Map.of()))))
+                .toCompletableFuture()
+                .join();
+        assertThat(captured.get())
+                .as("a newline repeats the flag, a tab hands the same flag a further argument")
+                .containsExactly("-linkoffline", "https://example.com/api/", "offline/api",
+                        "-linkoffline", "https://example.com/other/", "offline/other");
+    }
+
+    @Test
     public void a_forked_program_receives_the_variables_of_each_of_its_configurations() throws IOException {
         Path folder = Files.createDirectories(root.resolve("argument/environment")).getParent();
         Files.writeString(folder.resolve("environment/java.properties"),
@@ -81,6 +105,148 @@ public class ProcessBuildStepTest {
                 "SAMPLE_LITERAL=java",
                 "SAMPLE_SHARED=test",
                 "SAMPLE_UNSET_IN_THE_BUILD=null");
+    }
+
+    @Test
+    public void a_failure_names_a_reproduction_quoted_for_a_shell() throws IOException {
+        Path source = root.resolve("Failing.java");
+        Files.writeString(source, """
+                public class Failing {
+                    public static void main(String[] args) {
+                        System.exit(3);
+                    }
+                }
+                """);
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        assertThatThrownBy(() -> new Program("java",
+                ProcessHandler.OfProcess.ofJavaHome("bin/java"),
+                List.of(),
+                List.of(source.toString(), "-Xplugin:Sample -XepExcludedPaths:.*/(generated)/.*", "it's"))
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .as("an argument holding spaces, parentheses or a quote stays one word when pasted into a shell")
+                .hasMessageContaining(" '-Xplugin:Sample -XepExcludedPaths:.*/(generated)/.*' 'it'\\''s'");
+    }
+
+    @Test
+    public void a_process_ending_with_the_exit_code_of_sigkill_is_named_as_possibly_killed_for_lack_of_memory() throws IOException {
+        Path source = root.resolve("Killed.java");
+        Files.writeString(source, """
+                public class Killed {
+                    public static void main(String[] args) {
+                        System.exit(137);
+                    }
+                }
+                """);
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        assertThatThrownBy(() -> new Program("java",
+                ProcessHandler.OfProcess.ofJavaHome("bin/java"),
+                List.of(),
+                List.of(source.toString()))
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .as("137 is 128 plus SIGKILL, which the out-of-memory killer sends, so the failure says how to need less")
+                .hasMessageContaining("Unexpected exit code: 137\nThe process was killed with SIGKILL")
+                .hasMessageContaining("jenesis.process.concurrency");
+    }
+
+    @Test
+    public void a_failure_prints_the_tail_of_a_long_output_and_names_the_file_that_keeps_all_of_it() throws IOException {
+        Path source = root.resolve("Verbose.java");
+        Files.writeString(source, """
+                public class Verbose {
+                    public static void main(String[] args) {
+                        for (int line = 1; line <= 5000; line++) {
+                            System.out.println("printed line " + line);
+                        }
+                        System.err.println("the reason it failed");
+                        System.exit(1);
+                    }
+                }
+                """);
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        assertThatThrownBy(() -> new Program("java",
+                ProcessHandler.OfProcess.ofJavaHome("bin/java"),
+                List.of(),
+                List.of(source.toString()))
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .as("a failing step prints a bounded tail of what it wrote, and where the rest of it is")
+                .hasMessageContaining("Output, the last 200 out of 5000 lines - " + supplement.resolve("output")
+                        + " holds all of them:\n")
+                .hasMessageContaining("printed line 5000\n")
+                .hasMessageContaining("printed line 4801\n")
+                .hasMessageNotContaining("printed line 4800\n")
+                .hasMessageContaining(supplement.resolve("output").toString())
+                .hasMessageContaining("the reason it failed")
+                .hasMessageNotContaining(supplement.resolve("error").toString());
+        assertThat(Files.readAllLines(supplement.resolve("output")))
+                .as("the supplement keeps the whole output")
+                .hasSize(5000);
+    }
+
+    @Test
+    public void a_failure_prints_as_many_lines_as_the_setting_names() throws IOException {
+        Path source = verbose(5);
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        assertThatThrownBy(() -> new Program("java",
+                ProcessHandler.OfProcess.ofJavaHome("bin/java"),
+                List.of(),
+                List.of(source.toString()),
+                ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.tail", "2")), "java"))
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .hasMessageContaining("Output, the last 2 out of 5 lines - " + supplement.resolve("output")
+                        + " holds all of them:\nprinted line 4\nprinted line 5\n")
+                .hasMessageNotContaining("printed line 3");
+    }
+
+    @Test
+    public void a_failure_prints_every_line_when_the_setting_is_0() throws IOException {
+        Path source = verbose(300);
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        assertThatThrownBy(() -> new Program("java",
+                ProcessHandler.OfProcess.ofJavaHome("bin/java"),
+                List.of(),
+                List.of(source.toString()),
+                ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.tail", "0")), "java"))
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .hasMessageContaining("Output:\nprinted line 1\n")
+                .hasMessageContaining("printed line 300\n")
+                .hasMessageNotContaining("out of");
+    }
+
+    @Test
+    public void refuses_a_negative_number_of_lines_to_print() {
+        assertThatThrownBy(() -> ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.tail", "-1")), "java"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.process.tail is -1");
+    }
+
+    private Path verbose(int lines) throws IOException {
+        Path source = root.resolve("Verbose.java");
+        Files.writeString(source, """
+                public class Verbose {
+                    public static void main(String[] args) {
+                        for (int line = 1; line <= %d; line++) {
+                            System.out.println("printed line " + line);
+                        }
+                        System.exit(1);
+                    }
+                }
+                """.formatted(lines));
+        return source;
     }
 
     @Test
@@ -206,6 +372,19 @@ public class ProcessBuildStepTest {
     }
 
     @Test
+    public void bounds_the_processes_running_at_once_to_the_processor_count_by_default() {
+        assertThat(ProcessBuildStep.Terms.ofEnvironment(Environment.NONE, "probe").permits())
+                .as("an unset limit is one process per processor, so a build of many modules forks no more JVMs than it can run")
+                .isNotNull()
+                .isSameAs(ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.concurrency",
+                        Integer.toString(Runtime.getRuntime().availableProcessors()))), "probe").permits());
+        assertThat(ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.concurrency", "0")), "probe")
+                .permits())
+                .as("0 is unbounded")
+                .isNull();
+    }
+
+    @Test
     public void runs_every_process_at_once_without_a_limit() throws Exception {
         CountDownLatch started = new CountDownLatch(4);
         run(() -> new Gated(new ToolProvider() {
@@ -226,7 +405,7 @@ public class ProcessBuildStepTest {
                 }
                 return 0;
             }
-        }));
+        }, new Environment(Map.of("process.concurrency", "0"))));
     }
 
     @Test
@@ -234,6 +413,68 @@ public class ProcessBuildStepTest {
         assertThatThrownBy(() -> new Probe(new Environment(Map.of("process.concurrency", "-1"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("-1");
+    }
+
+    @Test
+    public void a_linter_that_found_something_prints_its_findings_and_where_its_report_lands() throws IOException {
+        List<String> printed = new ArrayList<>();
+        BuildStepResult result = lint(new Linter(new Environment(Map.of()).out(printed::add), 0, false, false));
+        assertThat(result.next()).isTrue();
+        assertThat(printed).singleElement().asString()
+                .contains("[FINDINGS]")
+                .as("the line names the folder the report lands in once the step completes")
+                .contains("linter found 2 findings, reported in " + root.resolve("check").resolve("output").resolve("report.xml"));
+    }
+
+    @Test
+    public void a_report_only_linter_accepts_the_violations_its_exit_code_reports() throws IOException {
+        List<String> printed = new ArrayList<>();
+        assertThat(lint(new Linter(new Environment(Map.of()).out(printed::add), 1, true, false)).next()).isTrue();
+        assertThat(printed).singleElement().asString().contains("linter found 2 findings");
+    }
+
+    @Test
+    public void a_strict_linter_fails_the_build_on_the_violations_its_exit_code_reports() {
+        assertThatThrownBy(() -> lint(new Linter(new Environment(Map.of()).out(_ -> { }), 1, true, true)))
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("linter found 2 findings, reported in " + root.resolve("check~").resolve("output").resolve("report.xml"))
+                .hasMessageContaining("jenesis.source.linter=strict");
+    }
+
+    @Test
+    public void a_strict_linter_accepts_the_findings_its_exit_code_does_not_count_as_violations() throws IOException {
+        List<String> printed = new ArrayList<>();
+        assertThat(lint(new Linter(new Environment(Map.of()).out(printed::add), 0, true, true)).next()).isTrue();
+        assertThat(printed).singleElement().asString().contains("linter found 2 findings");
+    }
+
+    @Test
+    public void a_strict_linter_whose_exit_code_judges_nothing_fails_on_any_finding_of_its_report() {
+        assertThatThrownBy(() -> lint(new Linter(new Environment(Map.of()).out(_ -> { }), 0, false, true)))
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("linter found 2 findings");
+    }
+
+    @Test
+    public void the_findings_line_is_left_out_without_an_environment_or_when_switched_off() throws IOException {
+        List<String> printed = new ArrayList<>();
+        assertThat(lint(new Linter(new Environment(Map.of("print.findings", "false")).out(printed::add), 0, false, false)).next())
+                .isTrue();
+        assertThat(printed).isEmpty();
+        assertThat(new ProcessBuildStep.Terms().reporting())
+                .as("a step built without an environment prints nothing")
+                .isNull();
+    }
+
+    private BuildStepResult lint(Linter linter) throws IOException {
+        Path step = Files.createDirectory(root.resolve("check~"));
+        return linter.apply(Runnable::run,
+                new BuildStepContext(null,
+                        Files.createDirectory(step.resolve("output")),
+                        Files.createDirectory(step.resolve("supplement"))),
+                new LinkedHashMap<>()).toCompletableFuture().join();
     }
 
     private void run(Supplier<ProcessBuildStep> steps) throws Exception {
@@ -275,6 +516,55 @@ public class ProcessBuildStepTest {
         };
     }
 
+    private record Reporting(int code) implements ToolProvider {
+
+        @Override
+        public String name() {
+            return "linter";
+        }
+
+        @Override
+        public int run(PrintWriter out, PrintWriter err, String... arguments) {
+            try {
+                Files.writeString(Path.of(arguments[0]), """
+                        <checkstyle><file name="Sample.java"><error/><error/></file></checkstyle>
+                        """);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            return code;
+        }
+    }
+
+    private static final class Linter extends ProcessBuildStep {
+
+        private final boolean judged, strict;
+
+        private Linter(Environment environment, int code, boolean judged, boolean strict) {
+            super("linter", ProcessHandler.OfTool.of(new Reporting(code)), Terms.ofEnvironment(environment, "linter"));
+            this.judged = judged;
+            this.strict = strict;
+        }
+
+        @Override
+        protected CompletionStage<List<String>> process(Executor executor,
+                                                        BuildStepContext context,
+                                                        SequencedMap<String, BuildStepArgument> arguments,
+                                                        SequencedMap<String, SequencedMap<String, String>> properties) {
+            return CompletableFuture.completedStage(List.of(context.next().resolve("report.xml").toString()));
+        }
+
+        @Override
+        public boolean acceptableExitCode(int code,
+                                          Executor executor,
+                                          BuildStepContext context,
+                                          SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Path report = context.next().resolve("report.xml");
+            return Findings.ofXml("linter", report, "error")
+                    .acceptable(code, context, judged, strict, "source.linter", terms.reporting());
+        }
+    }
+
     private static final class Gated extends ProcessBuildStep {
 
         private Gated(ToolProvider provider) {
@@ -286,7 +576,7 @@ public class ProcessBuildStepTest {
         }
 
         private Gated(ToolProvider provider, Semaphore permits) {
-            super("gated", ProcessHandler.OfTool.of(provider), new Terms(null, permits, null));
+            super("gated", ProcessHandler.OfTool.of(provider), new Terms().permits(permits));
         }
 
         @Override
@@ -317,7 +607,7 @@ public class ProcessBuildStepTest {
         }
 
         private Probe(BiConsumer<Boolean, String> printing) {
-            super("probe", arguments -> HANDLER, Terms.of("probe").printing(printing));
+            super("probe", arguments -> HANDLER, new Terms().printing(printing));
         }
 
         private boolean streams() {
@@ -341,7 +631,15 @@ public class ProcessBuildStepTest {
                         Function<List<String>, ? extends ProcessHandler> factory,
                         List<String> configurations,
                         List<String> processed) {
-            super(command, factory);
+            this(command, factory, configurations, processed, new Terms());
+        }
+
+        private Program(String command,
+                        Function<List<String>, ? extends ProcessHandler> factory,
+                        List<String> configurations,
+                        List<String> processed,
+                        Terms terms) {
+            super(command, factory, terms);
             this.configurations = configurations;
             this.processed = processed;
         }

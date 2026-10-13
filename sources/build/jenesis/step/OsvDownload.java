@@ -64,7 +64,7 @@ public class OsvDownload implements BuildStep {
             if (offline) {
                 throw new IllegalStateException("Cannot ask " + endpoint + " for the advisories of "
                         + coordinates.size() + " dependencies while offline"
-                        + " (unset -Djenesis.repository.offline, or set -Djenesis.compliance=false)");
+                        + " (unset -Djenesis.repository.offline, or set -Djenesis.compliance.vulnerability=false)");
             }
             List<List<String>> identifiers = identifiers(request(endpoint.resolve("/v1/querybatch"), queryBatch(coordinates), insecure));
             SequencedSet<String> distinct = new LinkedHashSet<>();

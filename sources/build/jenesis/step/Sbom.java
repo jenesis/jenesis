@@ -142,12 +142,18 @@ public class Sbom implements BuildStep {
                     ? SequencedProperties.ofFiles(located)
                     : new SequencedProperties();
             Set<Path> runtime = new HashSet<>();
+            Map<Path, String> recorded = new HashMap<>();
             for (String key : dependencies.stringPropertyNames()) {
                 int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+                String value = dependencies.getProperty(key);
+                int space = value.indexOf(' ');
+                Path jar = argument.folder().resolve(space < 0 ? value : value.substring(0, space)).normalize();
                 if (second > 0 && key.substring(first + 1, second).equals("runtime")) {
-                    String value = dependencies.getProperty(key);
-                    int space = value.indexOf(' ');
-                    runtime.add(argument.folder().resolve(space < 0 ? value : value.substring(0, space)).normalize());
+                    runtime.add(jar);
+                }
+                int slash = space < 0 ? -1 : value.indexOf('/', space + 1);
+                if (slash > 0 && value.substring(space + 1, slash).equalsIgnoreCase(hash.algorithm())) {
+                    recorded.putIfAbsent(jar, HexFormat.of().formatHex(HexFormat.of().parseHex(value, slash + 1, value.length())));
                 }
             }
             for (boolean maven : new boolean[] {true, false}) {
@@ -164,7 +170,9 @@ public class Sbom implements BuildStep {
                         continue;
                     }
                     CycloneDx.Component component = component(coordinate,
-                            Files.exists(jar) ? HexFormat.of().formatHex(hash.hash(jar)) : null,
+                            !Files.exists(jar) ? null
+                                    : recorded.containsKey(jar) ? recorded.get(jar)
+                                    : HexFormat.of().formatHex(hash.hash(jar)),
                             readLicenses(licenses, licenseKey)).scope(runtime.contains(jar) ? "required" : "excluded");
                     String source = archives.getProperty(licenseKey);
                     components.put(coordinate, source == null
@@ -251,15 +259,15 @@ public class Sbom implements BuildStep {
         List<CycloneDx.Dependency> dependencies = relationships(projectRef, components.keySet(), platforms, graphFiles);
         String document = new CycloneDx().emit(format, project, new ArrayList<>(components.values()), dependencies);
 
-        Path embedded = Files.createDirectories(context.next()
-                .resolve(RESOURCES).resolve("META-INF").resolve("sbom"));
-        String base = artifactId == null ? "bom" : artifactId;
-        String fileName = base + "." + format.extension();
-        Files.writeString(embedded.resolve(fileName), document);
+        String base = artifactId == null ? "bom" : artifactId,
+                location = "META-INF/sbom/" + (groupId == null ? "" : groupId + "/") + base + "." + format.extension();
+        Path embedded = context.next().resolve(RESOURCES).resolve(location);
+        Files.createDirectories(embedded.getParent());
+        Files.writeString(embedded, document);
         Manifest manifest = new Manifest();
         manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         manifest.getMainAttributes().putValue("Sbom-Format", "CycloneDX");
-        manifest.getMainAttributes().putValue("Sbom-Location", "META-INF/sbom/" + fileName);
+        manifest.getMainAttributes().putValue("Sbom-Location", location);
         try (OutputStream out = Files.newOutputStream(context.next().resolve(Versions.MANIFEST))) {
             manifest.write(out);
         }

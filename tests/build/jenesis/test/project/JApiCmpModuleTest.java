@@ -21,7 +21,7 @@ public class JApiCmpModuleTest {
 
     @Test
     public void requires_step_emits_the_japicmp_coordinate_and_the_declared_baseline() throws IOException {
-        execute(configured("baseline", "com.example/library/1.2.3"));
+        execute(module().baseline("com.example/library/1.2.3"));
 
         assertThat(requires().stringPropertyNames()).containsExactlyInAnyOrder(
                 "japicmp/runtime/maven/com.github.siom79.japicmp/japicmp/RELEASE",
@@ -30,7 +30,7 @@ public class JApiCmpModuleTest {
 
     @Test
     public void baseline_resolves_without_its_own_dependencies() throws IOException {
-        execute(configured("baseline", "com.example/library/1.2.3"));
+        execute(module().baseline("com.example/library/1.2.3"));
 
         assertThat(exclusions())
                 .as("only the baseline artifact itself is compared, so its closure is never resolved")
@@ -39,7 +39,7 @@ public class JApiCmpModuleTest {
 
     @Test
     public void a_baseline_without_a_version_floats_the_latest_release() throws IOException {
-        execute(configured("baseline", "com.example/library"));
+        execute(module().baseline("com.example/library"));
 
         assertThat(requires().stringPropertyNames())
                 .contains("japicmp/baseline/maven/com.example/library/RELEASE");
@@ -47,7 +47,7 @@ public class JApiCmpModuleTest {
 
     @Test
     public void a_baseline_names_the_repository_it_is_served_from() throws IOException {
-        execute(configured("baseline", "modular/com.example/library/1.2.3"));
+        execute(module().baseline("modular/com.example/library/1.2.3"));
 
         assertThat(requires().stringPropertyNames())
                 .contains("japicmp/baseline/modular/com.example/library/1.2.3");
@@ -61,7 +61,7 @@ public class JApiCmpModuleTest {
         metadata.setProperty("version", "1.3.0-SNAPSHOT");
         metadata.store(project.resolve(BuildStep.METADATA));
 
-        execute(new SequencedProperties());
+        execute(module());
 
         assertThat(requires().stringPropertyNames())
                 .contains("japicmp/baseline/maven/com.example/library/RELEASE");
@@ -69,7 +69,7 @@ public class JApiCmpModuleTest {
 
     @Test
     public void a_module_without_a_maven_coordinate_must_declare_a_baseline() {
-        assertThatThrownBy(() -> execute(new SequencedProperties()))
+        assertThatThrownBy(() -> execute(module()))
                 .hasRootCauseInstanceOf(IllegalStateException.class)
                 .rootCause()
                 .hasMessageContaining("baseline=<groupId>/<artifactId>");
@@ -77,19 +77,17 @@ public class JApiCmpModuleTest {
 
     @Test
     public void a_baseline_that_is_not_a_coordinate_names_the_forms_that_are() {
-        assertThatThrownBy(() -> execute(configured("baseline", "library")))
+        assertThatThrownBy(() -> execute(module().baseline("library")))
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .rootCause()
                 .hasMessageContaining("<groupId>/<artifactId>/<version>");
     }
 
-    private static SequencedProperties configured(String key, String value) {
-        SequencedProperties config = new SequencedProperties();
-        config.setProperty(key, value);
-        return config;
+    private static JApiCmpModule module() {
+        return new JApiCmpModule(Map.of(), Map.of());
     }
 
-    private void execute(SequencedProperties config) throws IOException {
+    private void execute(JApiCmpModule module) throws IOException {
         BuildExecutor executor = BuildExecutor.of(root,
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
@@ -100,7 +98,7 @@ public class JApiCmpModuleTest {
                 false,
                 0);
         executor.addSource("project", project);
-        executor.addModule("japicmp", new JApiCmpModule(Map.of(), Map.of()).config(config), "project");
+        executor.addModule("japicmp", module, "project");
         executor.execute("japicmp/required");
     }
 

@@ -1,8 +1,11 @@
 package build.jenesis.project;
 
 import module java.base;
+import java.lang.classfile.Attributes;
 
 public record JUnit4() implements TestFramework {
+
+    private static final Set<String> MARKERS = Set.of("Lorg/junit/Test;", "Lorg/junit/runner/RunWith;");
 
     @Override
     public String runnerModule() {
@@ -17,6 +20,18 @@ public record JUnit4() implements TestFramework {
     @Override
     public Set<String> reflectingModules() {
         return Set.of("junit");
+    }
+
+    @Override
+    public boolean holdsTests(ClassModel type) {
+        return type.interfaces().stream().anyMatch(implemented -> implemented.asInternalName().equals("junit/framework/Test"))
+                || type.methods().stream().anyMatch(method -> method.methodName().equalsString("suite")
+                        && method.flags().has(AccessFlag.STATIC)
+                        && method.methodTypeSymbol().parameterCount() == 0)
+                || Stream.<AttributedElement>concat(Stream.of(type), type.methods().stream())
+                        .flatMap(element -> element.findAttribute(Attributes.runtimeVisibleAnnotations()).stream())
+                        .flatMap(annotations -> annotations.annotations().stream())
+                        .anyMatch(annotation -> MARKERS.contains(annotation.className().stringValue()));
     }
 
     @Override

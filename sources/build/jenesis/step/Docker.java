@@ -317,7 +317,7 @@ public class Docker implements BuildStep {
         for (Map.Entry<String, Path> entry : stored.entrySet()) {
             BuildStep.linkOrCopy(store.resolve(entry.getKey()), entry.getValue());
         }
-        List<String> command = new ArrayList<>();
+        List<String> command = Bundle.javaOptions(arguments);
         agents.forEach((jar, options) -> command.add("-javaagent:/app/jars/" + jar
                 + (options.isEmpty() ? "" : "=" + options)));
         layers.forEach((layer, membership) -> {

@@ -23,7 +23,7 @@ public class RepositoryTest {
         settings.remove("repository.insecure");
         settings.remove("repository.retries");
         settings.remove("repository.backoff");
-        settings.remove("repository.read.timeout");
+        settings.remove("repository.read");
     }
 
     @Test
@@ -160,9 +160,28 @@ public class RepositoryTest {
     }
 
     @Test
+    public void open_names_a_mirror_when_the_server_keeps_limiting_requests() throws IOException {
+        settings.put("repository.insecure", "true");
+        AtomicInteger hits = new AtomicInteger();
+        HttpServer server = serve(_ -> 429, Map.of(), hits);
+        try {
+            URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
+            assertThatThrownBy(() -> Repository.open(connection().retries(1).backoff(Duration.ofMillis(1)), uri, null).close())
+                    .isInstanceOf(IOException.class)
+                    .hasMessageContaining("429 Too Many Requests after 2 attempt(s)")
+                    .hasMessageContaining("configure a mirror of this repository")
+                    .as("a repository of any kind answers this way, so the advice names no repository's setting")
+                    .hasMessageNotContaining("jenesis.maven.uri");
+            assertThat(hits.get()).isEqualTo(2);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     public void open_times_out_on_a_stalled_server() throws IOException {
         settings.put("repository.insecure", "true");
-        settings.put("repository.read.timeout", "200");
+        settings.put("repository.read", "200");
         HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         CountDownLatch release = new CountDownLatch(1);
         server.createContext("/", exchange -> {
@@ -398,11 +417,11 @@ public class RepositoryTest {
 
     @Test
     public void connection_defaults_read_the_keys_they_are_given() {
-        assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000"))))
+        assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read", "5000"))))
                 .isEqualTo(new Repository.Connection(7, Duration.ofMillis(9), false, 10_000, 5_000, false));
-        assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000"))).retries(1))
+        assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read", "5000"))).retries(1))
                 .isEqualTo(new Repository.Connection(1, Duration.ofMillis(9), false, 10_000, 5_000, false));
-        assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000"))).backoff(Duration.ofMillis(2)))
+        assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read", "5000"))).backoff(Duration.ofMillis(2)))
                 .isEqualTo(new Repository.Connection(7, Duration.ofMillis(2), false, 10_000, 5_000, false));
         assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.offline", "true"))))
                 .isEqualTo(new Repository.Connection().offline(true));

@@ -60,12 +60,12 @@ changes after construction. Each exposes one method per component, named exactly
 returns a new instance with that value replaced (`new Project(Path.of(".")).version("1.0.0").sources(true)`,
 `new BuildExecutor.Configuration().concurrency(4)`). No setters, no builders, no `with` prefix.
 
-**System properties are the defaults.** Every setting is a `jenesis.<area>.<name>` system property, read
-once where the object is built:
+**System properties are the defaults.** Every setting is a `jenesis.<group>.<key>` system property - three
+elements, never two and never a nested group - read once where the object is built:
 
 - `ofEnvironment(environment, …)` is the static factory that reads every setting from the `Environment` it is
   given (`environment.value("executor.digest", "MD5")`, `environment.number("executor.concurrency", 0)`,
-  `environment.flag("source.pmd", true)`), with a value the object cannot do without following it as a
+  `environment.flag("test.skip")`), with a value the object cannot do without following it as a
   further argument (`Project.ofEnvironment(environment, root)`);
 - the public no-argument or short constructor reads nothing and takes each setting's default, exactly as
   if the environment answered for none of them - that is what `Environment.NONE` is;
@@ -105,8 +105,8 @@ A process the build hands a command line to - a container, the daemon - is given
 read the JVM, because a setting a `jenesis.properties` or a profile supplied was never in the JVM to begin with.
 `Make.Settings` therefore names the keys its layers declare, the daemon is handed their values with every request
 and keys its fingerprint on the JVM it would otherwise have to fork rather than on them, and what `Project`
-forwards into a container is every setting the environment holds, save the `jenesis.project.docker*` keys that
-start the container.
+forwards into a container is every setting the environment holds, save the keys that start the container -
+`jenesis.project.docker` and its `image`, `readable`, `writable` and `env`.
 
 **A command line can live in a file.** `Make`, `Execute`, `Jpx` and the three tools read `@<file>` as the
 arguments it holds and `@@<text>` as an argument starting with an `@`, with `#` to the end of a line a comment
@@ -258,12 +258,14 @@ fails the build by throwing, and `inspect` fails it as well when
 an inspection changed a file it was handed. The module hook point `package` is the one whose output is staged beyond the
 module: what its plugins write into `packages/` is merged with the stock `jpackage` output, refusing a name written
 twice, and staged in `stage/packages/`. A plugin adds and
-never replaces: a build that changes what the stock steps do is an entry point of its own that wires its
-assembler in code. A plugin runs the project's code, as its tests and annotation processors do, so the project
+never replaces, with one exception: the plugins of the module hook point `binary/transform` rewrite the module's
+compiled classes, in the order they are named, each handed what the one before wrote, and what one writes replaces
+the class file of that name - bytecode enhancement, and nothing else. Any other change to what the stock steps do is
+an entry point of its own that wires its assembler in code. A plugin runs the project's code, as its tests and annotation processors do, so the project
 names it itself; what isolates an untrusted project is `jenesis.project.docker`, under which the host runs no
-build, `watch` included, before the container is up, and `Make.settings` refuses every `jenesis.project.docker*`
-and `jenesis.execute.docker*` key in a file the project provides, so a project can neither switch the isolation
-off nor widen it.
+build, `watch` included, before the container is up, and `Make.settings` refuses `jenesis.project.docker` and
+`jenesis.execute.docker` and the `image`, `readable`, `writable` and `env` of either group in a file the project
+provides, so a project can neither switch the isolation off nor widen it.
 
 **Configuration files are read through `SequencedProperties`.** A file is read with the type's own accessors -
 `value`, `value(key, default)`, `flag`, `flag(key, default)`, `flagOrNull`, `entries` for a comma-separated
@@ -285,7 +287,11 @@ serialisable functional interface - so those types are `Serializable` too, and t
 factory, a lookup cache) is `transient` rather than left to drift into the key. A module is not serialisable
 and never reaches a key at all, so a field of one is never `transient`.
 Steps compose by folder conventions - `sources/`, `classes/`, `artifacts/` - never by inspecting predecessor
-names. A step that forks a JDK tool extends `ProcessBuildStep` and thereby accepts `process-<tool>.properties`.
+names. Two builds of the same inputs write the same bytes, which `jenesis.project.reproduce` checks step by step
+as a debugging aid that reports rather than fails: an output that cannot repeat by its nature - a report that
+records when it ran, coverage data, a recording - shows up there as one, and anything else that differs, a path
+into the target folder above all, is a defect of the step. A step that forks a JDK tool extends `ProcessBuildStep` and thereby accepts
+`process-<tool>.properties`.
 A forked process is handed the platform's own variables (`PATH`, `HOME`, `LANG`, `TMPDIR`, Windows' `SystemRoot`
 and its kin) and nothing else of the build's environment, because a variable is no input of its step. A step that
 runs a program - `java`, the tests, an external binary - extends `EnvironmentalProcessBuildStep` and so also
@@ -299,7 +305,8 @@ part of the key of `prepare` and of every step reading what it writes; `@@` is a
 **Modules activate on a file.** A build module under `project/` (`CheckstyleModule`, `JaCoCoModule`, …)
 switches itself on when its configuration file is present in a configuration folder
 (`configurationFile(configuration)`), resolves its tool in a dependency group named after the tool, and is
-opted out with its `jenesis.<kind>.<tool>=false` property. The inferred assembler wires the modules; a new
+switched by its `jenesis.<kind>.<tool>` property: `ignore` leaves it out, `report` (the default) records its
+findings, `strict` fails the build on them; whether they are printed is a `jenesis.print.*` flag of its own. The inferred assembler wires the modules; a new
 tool is a new module in the same shape, plus a demo.
 
 **A tool reads one folder, the inference fills it.** A generator module (`XjcModule`,

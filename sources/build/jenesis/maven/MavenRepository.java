@@ -130,6 +130,43 @@ public interface MavenRepository extends Repository {
         };
     }
 
+    @Override
+    default MavenRepository observed(Repository.Observer observer) {
+        return new MavenRepository() {
+            @Override
+            public Optional<RepositoryItem> fetch(Executor executor,
+                                                  String groupId,
+                                                  String artifactId,
+                                                  String version,
+                                                  String type,
+                                                  String classifier,
+                                                  String checksum) throws IOException {
+                Optional<RepositoryItem> candidate = MavenRepository.this.fetch(executor,
+                        groupId,
+                        artifactId,
+                        version,
+                        type,
+                        classifier,
+                        checksum);
+                if (candidate.isPresent()) {
+                    observer.fetched(new MavenDependencyKey(groupId, artifactId, type, classifier)
+                                    .coordinate(null, version),
+                            checksum,
+                            candidate.get());
+                }
+                return candidate;
+            }
+
+            @Override
+            public Optional<RepositoryItem> fetchMetadata(Executor executor,
+                                                          String groupId,
+                                                          String artifactId,
+                                                          String checksum) throws IOException {
+                return MavenRepository.this.fetchMetadata(executor, groupId, artifactId, checksum);
+            }
+        };
+    }
+
     default MavenRepository overlay(MavenRepository repository) {
         MavenRepository prepended = prepend(repository);
         return new MavenRepository() {

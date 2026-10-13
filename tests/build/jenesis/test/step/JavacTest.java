@@ -9,6 +9,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Javac;
 import build.jenesis.step.ProcessHandler;
@@ -17,6 +18,7 @@ import java.lang.classfile.ClassFile;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 public class JavacTest {
 
@@ -49,6 +51,46 @@ public class JavacTest {
                         Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         assertThat(next.resolve(Javac.CLASSES + "sample/Sample.class")).isNotEmptyFile();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void writes_only_the_jni_headers_of_the_classes_with_native_methods_where_asked(boolean process)
+            throws IOException {
+        Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(folder.resolve("Native.java"), "package sample; public class Native { public static native int add(int a, int b); }\n");
+        Files.writeString(folder.resolve("Plain.java"), "package sample; public class Plain { }\n");
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .headers(true)
+                .apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                                sources,
+                                Map.of(Path.of("sources/sample/Native.java"), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of("sources/sample/Plain.java"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES))
+                .as("a header step beside the compiler writes no classes the module's jar would take twice")
+                .doesNotExist();
+        assertThat(next.resolve(Javac.HEADERS + "sample_Native.h")).content().contains("Java_sample_Native_add");
+        assertThat(next.resolve(Javac.HEADERS))
+                .as("javac writes a header only for a class that declares a native method")
+                .isDirectoryNotContaining("glob:**/sample_Plain.h");
+    }
+
+    @Test
+    public void writes_no_jni_headers_unless_asked() throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Native.java"),
+                "package sample; public class Native { public static native int add(int a, int b); }\n");
+        BuildStepResult result = new Javac(ProcessHandler.Factory.TOOL).apply(Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/sample/Native.java"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.HEADERS)).doesNotExist();
     }
 
     @Test
@@ -91,6 +133,23 @@ public class JavacTest {
         Javac.writeRelease(folder, release, 26);
         assertThat(SequencedProperties.ofFiles(folder.resolve("process/javac.properties")))
                 .containsEntry("--release", "26");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"8", "1.8"})
+    public void refuses_a_module_descriptor_at_a_release_below_9_naming_the_multi_release_folder(String release) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES)).resolve("module-info.java"),
+                "module sample { }\n");
+        Javac.writeRelease(sources, release, Runtime.version().feature());
+        assertThatThrownBy(() -> new Javac(ProcessHandler.Factory.TOOL).apply(Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("release " + release + ", below 9")
+                .hasMessageContaining("META-INF/versions/9/");
     }
 
     @ParameterizedTest
@@ -251,6 +310,96 @@ public class JavacTest {
     }
 
     @ParameterizedTest
+    @CsvSource({"true,0", "false,0", "true,4", "false,4"})
+    public void compiles_against_jdk_internals_that_an_add_exports_names_by_passing_the_release_as_source_and_target(
+            boolean process, int older) throws IOException {
+        Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(folder.resolve("Sample.java"), """
+                package sample;
+                public class Sample {
+                    public final Object context = new com.sun.tools.javac.util.Context();
+                }
+                """);
+        int release = Runtime.version().feature() - older;
+        Javac.writeRelease(sources, Integer.toString(release), Runtime.version().feature());
+        Path configuration = Files.createDirectories(root.resolve("configuration"));
+        Files.createDirectories(configuration.resolve("process"));
+        SequencedProperties exports = new SequencedProperties();
+        exports.setProperty("--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED");
+        exports.store(configuration.resolve("process/javac.properties"));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("configuration", new BuildStepArgument(configuration, Map.of(
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        assertThat(Files.readString(supplement.resolve("command")))
+                .as("javac refuses --add-exports of a system module beside --release")
+                .doesNotContain("--release")
+                .contains("--source " + release, "--target " + release);
+        try (InputStream in = Files.newInputStream(next.resolve(Javac.CLASSES + "sample/Sample.class"))) {
+            assertThat(ClassFile.of().parse(in.readAllBytes()).majorVersion()).isEqualTo(44 + release);
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"true,--source", "false,--source", "true,-source", "true,--target", "false,-target"})
+    public void compiles_against_the_api_of_the_running_jdk_when_process_javac_properties_names_a_source_or_target(
+            boolean process, String option) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"), """
+                package sample;
+                public class Sample {
+                    public boolean blank(String value) { return value.isBlank(); }
+                }
+                """);
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/21/sample"))
+                .resolve("Sample.java"), """
+                package sample;
+                public class Sample {
+                    public boolean blank(String value) { return value.isBlank(); }
+                }
+                """);
+        Javac.writeRelease(sources, "8", Runtime.version().feature());
+        Path configuration = Files.createDirectories(root.resolve("configuration"));
+        Files.createDirectories(configuration.resolve("process"));
+        SequencedProperties options = new SequencedProperties();
+        options.setProperty(option, "8");
+        options.store(configuration.resolve("process/javac.properties"));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/META-INF/versions/21/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("configuration", new BuildStepArgument(configuration, Map.of(
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        assertThat(Files.readString(supplement.resolve("command")))
+                .as("javac refuses --source and --target beside --release, so the release fills the one not named")
+                .doesNotContain("--release")
+                .containsAnyOf("--source 8", "-source 8")
+                .containsAnyOf("--target 8", "-target 8");
+        assertThat(ClassFile.of().parse(next.resolve(Javac.CLASSES + "sample/Sample.class")).majorVersion())
+                .isEqualTo(ClassFile.JAVA_8_VERSION);
+        assertThat(Files.readString(supplement.resolve("command-21")))
+                .as("an overlay is compiled for its own release, still as source and target")
+                .doesNotContain("--release", " 8 ")
+                .contains("--source 21", "--target 21");
+        assertThat(ClassFile.of()
+                .parse(next.resolve(Javac.CLASSES + "META-INF/versions/21/sample/Sample.class"))
+                .majorVersion())
+                .isEqualTo(ClassFile.JAVA_21_VERSION);
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void stamps_module_version_when_javac_properties_contains_module_version(boolean process) throws IOException {
         Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES));
@@ -379,8 +528,150 @@ public class JavacTest {
         assertThat(ClassFile.of()
                 .parse(next.resolve(Javac.CLASSES + "META-INF/versions/21/sample/Sample.class"))
                 .majorVersion())
-                .as("the overlay's own release is appended after the supplied options, and javac honours the last --release")
+                .as("the overlay is compiled for its own release")
                 .isEqualTo(ClassFile.JAVA_21_VERSION);
+        assertThat(Files.readString(supplement.resolve("command-21")))
+                .as("the release of the main sources is not handed to the overlay's compilation")
+                .doesNotContain("--release 17");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void compiles_a_module_descriptor_only_an_overlay_declares_against_the_module_path(boolean process)
+            throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/17"))
+                .resolve("module-info.java"), "module sample { requires lib.named; exports sample; }\n");
+        modularJar(Files.createDirectories(root.resolve("library")).resolve("named.jar"), "lib.named");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/compile/maven/named", "../library/named.jar");
+        index.store(sources.resolve(BuildStep.DEPENDENCIES));
+        Javac.writeRelease(sources, "11", Runtime.version().feature());
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .pathPlacement(PathPlacement.CLASS_PATH)
+                .apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                                sources,
+                                Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of("sources/META-INF/versions/17/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "module-info.class"))
+                .as("only the overlay declares the module, so the main sources stay on the class path")
+                .doesNotExist();
+        assertThat(ClassFile.of().parse(next.resolve(Javac.CLASSES + "sample/Sample.class")).majorVersion())
+                .isEqualTo(ClassFile.JAVA_11_VERSION);
+        ModuleDescriptor descriptor;
+        try (InputStream input = Files.newInputStream(next.resolve(Javac.CLASSES + "META-INF/versions/17/module-info.class"))) {
+            descriptor = ModuleDescriptor.read(input);
+        }
+        assertThat(descriptor.name()).isEqualTo("sample");
+        assertThat(descriptor.requires()).anyMatch(requires -> requires.name().equals("lib.named"));
+        assertThat(descriptor.exports())
+                .as("the descriptor exports a package of the main sources, which the compilation patches into the module")
+                .anyMatch(exports -> exports.source().equals("sample"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void hands_a_compiler_plugin_to_the_compilation_of_an_overlay(boolean process) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/17"))
+                .resolve("module-info.java"), "module sample { exports sample; }\n");
+        Javac.writeRelease(sources, "11", Runtime.version().feature());
+        Path record = root.resolve("plugin.log");
+        SequencedProperties javac = SequencedProperties.ofFiles(sources.resolve("process/javac.properties"));
+        javac.setProperty("-Xplugin:Marker " + record, "");
+        javac.store(sources.resolve("process/javac.properties"));
+        Path pluginRoot = Files.createDirectories(root.resolve("plugin").resolve("resolved"));
+        Files.copy(buildCompilerPluginJar(Files.createDirectories(root.resolve("marker"))), pluginRoot.resolve("marker.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("javac/plugin/maven/marker", "resolved/marker.jar");
+        index.store(root.resolve("plugin").resolve(BuildStep.DEPENDENCIES));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/META-INF/versions/17/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("plugins/artifacts", new BuildStepArgument(root.resolve("plugin"), Map.of(
+                Path.of("resolved/marker.jar"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .pathPlacement(PathPlacement.CLASS_PATH)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "META-INF/versions/17/module-info.class")).isNotEmptyFile();
+        assertThat(Files.readAllLines(record))
+                .as("the plugin the options name is found for the overlay's compilation as for the main one")
+                .hasSize(2);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void compiles_an_overlay_descriptor_without_the_processor_options_of_the_main_compilation(boolean process)
+            throws IOException {
+        Path main = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(main.resolve("Marked.java"), "package sample; public @interface Marked { }\n");
+        Files.writeString(main.resolve("Sample.java"), "package sample; @Marked public class Sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/17"))
+                .resolve("module-info.java"), "module sample { exports sample; }\n");
+        Javac.writeRelease(sources, "11", Runtime.version().feature());
+        SequencedProperties javac = SequencedProperties.ofFiles(sources.resolve("process/javac.properties"));
+        javac.setProperty("-Werror", "");
+        javac.setProperty("-Aclaimed=yes", "");
+        javac.store(sources.resolve("process/javac.properties"));
+        Path classes = compile(root.resolve("claiming").resolve("classes"), "claiming/Claiming.java", """
+                package claiming;
+                import javax.annotation.processing.AbstractProcessor;
+                import javax.annotation.processing.RoundEnvironment;
+                import javax.annotation.processing.SupportedAnnotationTypes;
+                import javax.annotation.processing.SupportedOptions;
+                import javax.lang.model.SourceVersion;
+                import javax.lang.model.element.TypeElement;
+                import java.util.Set;
+                @SupportedAnnotationTypes("sample.Marked")
+                @SupportedOptions("claimed")
+                public class Claiming extends AbstractProcessor {
+                    public SourceVersion getSupportedSourceVersion() { return SourceVersion.latestSupported(); }
+                    public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+                        return false;
+                    }
+                }
+                """);
+        Files.writeString(Files.createDirectories(classes.resolve("META-INF/services"))
+                .resolve("javax.annotation.processing.Processor"), "claiming.Claiming\n");
+        Path processorRoot = Files.createDirectories(root.resolve("processor"));
+        jarOf(Files.createDirectories(processorRoot.resolve("resolved")).resolve("processor.jar"), classes);
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("plugin/plugin/maven/processor", "resolved/processor.jar");
+        index.store(processorRoot.resolve(BuildStep.DEPENDENCIES));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/Marked.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/META-INF/versions/17/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("processors/artifacts", new BuildStepArgument(processorRoot,
+                Map.of(Path.of("resolved/processor.jar"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .pathPlacement(PathPlacement.CLASS_PATH)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "META-INF/versions/17/module-info.class"))
+                .as("a descriptor alone is compiled without processing, so no processor is left to claim -Aclaimed under -Werror")
+                .isNotEmptyFile();
+        assertThat(Files.readString(supplement.resolve("command-17")))
+                .contains("-proc:none")
+                .doesNotContain("-Aclaimed");
     }
 
     @ParameterizedTest
@@ -447,6 +738,41 @@ public class JavacTest {
         assertThat(result.next()).isTrue();
         assertThat(next.resolve(Javac.CLASSES + "sample/Helper.class")).isNotEmptyFile();
         assertThat(next.resolve(Javac.CLASSES + "META-INF/versions/17/sample/Caller.class")).isNotEmptyFile();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void versioned_compilation_sees_the_classes_another_compiler_wrote_for_its_release(boolean process) throws IOException {
+        Path kotlin = Files.createDirectories(root.resolve("kotlin"));
+        compile(kotlin.resolve(BuildStep.CLASSES), "sample/Other.java", """
+                package sample;
+                public class Other { }
+                """);
+        compile(kotlin.resolve(BuildStep.CLASSES + "META-INF/versions/21"), "sample/Other.java", """
+                package sample;
+                public class Other { public static String modern() { return "modern"; } }
+                """);
+        Path main = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(main.resolve("Helper.java"), "package sample; public class Helper { }\n");
+        Path versioned = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/21/sample"));
+        Files.writeString(versioned.resolve("Caller.java"), """
+                package sample;
+                public class Caller { public String value() { return Other.modern(); } }
+                """);
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("kotlin", new BuildStepArgument(kotlin, Map.of(
+                Path.of("classes/sample/Other.class"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("classes/META-INF/versions/21/sample/Other.class"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/Helper.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/META-INF/versions/21/sample/Caller.java"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                arguments).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "META-INF/versions/21/sample/Caller.class"))
+                .as("a versioned source compiles against the versioned classes of its release ahead of their base")
+                .isNotEmptyFile();
     }
 
     @ParameterizedTest
@@ -572,6 +898,105 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void a_failure_is_reproduced_by_the_command_that_ran_with_its_argument_file(boolean process)
+            throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javac.properties"),
+                "--source-path=a b (c)\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Main.java"), """
+                package sample;
+                public class Main {
+                    Missing missing;
+                }
+                """);
+
+        Throwable thrown = catchThrowable(() -> new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/sample/Main.java"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join());
+        assertThat(thrown).rootCause()
+                .as("the reproduction is the command that ran, its process options on the line and the sources in a file")
+                .hasMessageContaining("To reproduce, execute:\n " + Files.readString(supplement.resolve("command")) + "\n")
+                .hasMessageContaining(" --source-path 'a b (c)' " + shell("@" + supplement.resolve("javac.args")))
+                .hasMessageContaining("cannot find symbol");
+        assertThat(Files.readAllLines(supplement.resolve("javac.args")))
+                .anyMatch(line -> line.endsWith("Main.java\""));
+        StringWriter errors = new StringWriter();
+        int code = ToolProvider.findFirst("javac").orElseThrow().run(new PrintWriter(Writer.nullWriter()),
+                new PrintWriter(errors),
+                "--source-path", "a b (c)", "@" + supplement.resolve("javac.args"));
+        assertThat(code).isNotZero();
+        assertThat(errors.toString()).contains("Main.java:3: error: cannot find symbol");
+    }
+
+    @Test
+    public void a_failure_is_reproduced_with_the_launcher_options_in_front_of_the_argument_file() throws Exception {
+        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javac.properties"),
+                "-J-Xmx256m=\n-J--add-exports\\=jdk.compiler/com.sun.tools.javac.api\\=ALL-UNNAMED=\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Main.java"), """
+                package sample;
+                public class Main {
+                    Missing missing;
+                }
+                """);
+        assertThatThrownBy(() -> new Javac(ProcessHandler.Factory.FORK).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/sample/Main.java"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .as("javac refuses a -J option in an argument file, so the launcher options stay on the line")
+                .hasMessageContaining(" -J-Xmx256m -J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED "
+                        + shell("@" + supplement.resolve("javac.args")));
+        assertThat(Files.readAllLines(supplement.resolve("javac.args"))).noneMatch(line -> line.contains("-J"));
+        Process process = new ProcessBuilder(
+                Path.of(System.getProperty("java.home"), "bin", File.separatorChar == '\\' ? "javac.exe" : "javac").toString(),
+                "-J-Xmx256m",
+                "-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+                "@" + supplement.resolve("javac.args"))
+                .redirectErrorStream(true)
+                .start();
+        String output = new String(process.getInputStream().readAllBytes());
+        assertThat(process.waitFor()).isNotZero();
+        assertThat(output).contains("Main.java:3: error: cannot find symbol").doesNotContain("invalid flag");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void a_failure_of_an_overlay_is_reproduced_with_the_argument_file_of_its_release(boolean process)
+            throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/21/sample"))
+                .resolve("Sample.java"), "package sample; public class Sample { Missing missing; }\n");
+        Javac.writeRelease(sources, "17", Runtime.version().feature());
+        assertThatThrownBy(() -> new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("sources/META-INF/versions/21/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .as("the overlay's sources and options go into a file of its release, as the main compilation's do")
+                .hasMessageContaining("(multi-release 21)")
+                .hasMessageContaining("@" + supplement.resolve("javac-21.args"))
+                .hasMessageContaining("cannot find symbol");
+        assertThat(Files.readAllLines(supplement.resolve("javac-21.args")))
+                .anyMatch(line -> line.contains("META-INF") && line.endsWith("Sample.java\""));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void modular_compilation_does_not_reach_a_class_path_dependency(boolean process)
             throws IOException {
         plainJar(Files.createDirectories(root.resolve("library")).resolve("plain.jar"));
@@ -668,6 +1093,41 @@ public class JavacTest {
                 .as("a non-modular compilation passes processors via --processor-path, not the compilation class path")
                 .contains("--processor-path")
                 .doesNotContain("--class-path");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void writes_the_sources_a_processor_generates_beside_the_classes_rather_than_into_them(boolean process)
+            throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/21/sample"))
+                .resolve("Sample.java"), "package sample; public class Sample { }\n");
+        Path processorRoot = Files.createDirectories(root.resolve("processor"));
+        Path jar = buildProcessorJar(Files.createDirectories(root.resolve("procbuild")), "one", "One", null);
+        Files.copy(jar, Files.createDirectories(processorRoot.resolve("resolved")).resolve("processor.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("plugin/plugin/maven/processor", "resolved/processor.jar");
+        index.store(processorRoot.resolve(BuildStep.DEPENDENCIES));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/META-INF/versions/21/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("processors/artifacts", new BuildStepArgument(processorRoot,
+                Map.of(Path.of("resolved/processor.jar"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "gen/GeneratedOne.class")).isNotEmptyFile();
+        assertThat(next.resolve(Javac.CLASSES + "META-INF/versions/21/gen/GeneratedOne.class")).isNotEmptyFile();
+        try (Stream<Path> classes = Files.walk(next.resolve(Javac.CLASSES))) {
+            assertThat(classes.filter(file -> file.toString().endsWith(".java")))
+                    .as("a generated source is no class of the module and stays out of what is archived")
+                    .isEmpty();
+        }
+        assertThat(next.resolve(Javac.SOURCES + "gen/GeneratedOne.java")).isNotEmptyFile();
+        assertThat(next.resolve(Javac.SOURCES + "META-INF/versions/21/gen/GeneratedOne.java")).isNotEmptyFile();
     }
 
     @ParameterizedTest
@@ -787,6 +1247,80 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void runs_a_processor_on_the_class_path_where_it_uses_a_module_nothing_requires(boolean process)
+            throws IOException {
+        Files.createDirectories(sources.resolve(BuildStep.SOURCES));
+        Files.writeString(sources.resolve(BuildStep.SOURCES).resolve("module-info.java"),
+                "module sample { exports sample; }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }\n");
+        Path processorRoot = Files.createDirectories(root.resolve("processor").resolve("resolved"));
+        Path library = Files.copy(buildLibraryJar(Files.createDirectories(root.resolve("library"))),
+                processorRoot.resolve("library.jar"));
+        Files.copy(buildProcessorJar(Files.createDirectories(root.resolve("plain")), "plain", "Plain", null, library),
+                processorRoot.resolve("plain.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("plugin/plugin/maven/plain", "resolved/plain.jar");
+        index.setProperty("plugin/plugin/maven/library", "resolved/library.jar");
+        index.store(root.resolve("processor").resolve(BuildStep.DEPENDENCIES));
+
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("processors/artifacts", new BuildStepArgument(root.resolve("processor"), Map.of(
+                Path.of("resolved/plain.jar"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("resolved/library.jar"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "gen/GeneratedPlain.class"))
+                .as("a processor without a module-info.java requires nothing, so javac would leave the library"
+                        + " module out of the processors' module graph, where the class path holds it")
+                .isNotEmptyFile();
+        assertThat(Files.readString(supplement.resolve("javac.args")))
+                .contains("--processor-path")
+                .doesNotContain("--processor-module-path");
+    }
+
+    @Test
+    public void refuses_a_processor_the_class_path_cannot_find_where_another_needs_the_class_path() throws IOException {
+        Files.createDirectories(sources.resolve(BuildStep.SOURCES));
+        Files.writeString(sources.resolve(BuildStep.SOURCES).resolve("module-info.java"),
+                "module sample { exports sample; }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }\n");
+        Path processorRoot = Files.createDirectories(root.resolve("processor").resolve("resolved"));
+        Path library = Files.copy(buildLibraryJar(Files.createDirectories(root.resolve("library"))),
+                processorRoot.resolve("library.jar"));
+        Files.copy(buildProcessorJar(Files.createDirectories(root.resolve("plain")), "plain", "Plain", null, library),
+                processorRoot.resolve("plain.jar"));
+        Files.copy(buildProcessorJar(Files.createDirectories(root.resolve("modular")), "modular", "Modular", "proc.modular"),
+                processorRoot.resolve("modular.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("plugin/plugin/maven/plain", "resolved/plain.jar");
+        index.setProperty("plugin/plugin/maven/library", "resolved/library.jar");
+        index.setProperty("plugin/plugin/maven/modular", "resolved/modular.jar");
+        index.store(root.resolve("processor").resolve(BuildStep.DEPENDENCIES));
+
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("processors/artifacts", new BuildStepArgument(root.resolve("processor"), Map.of(
+                Path.of("resolved/plain.jar"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("resolved/library.jar"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("resolved/modular.jar"), Checksum.of(ChecksumStatus.ADDED))));
+        assertThatThrownBy(() -> new Javac(ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture().join())
+                .hasMessageContaining("requires library")
+                .hasMessageContaining("proc.modular declares its processor in its module-info.java alone");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void leaves_the_build_folder_out_of_the_classes_entirely(boolean process) throws IOException {
         Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(folder.resolve("Sample.java"), "package sample;\npublic class Sample { }\n");
@@ -861,7 +1395,65 @@ public class JavacTest {
         }
     }
 
+    private Path buildCompilerPluginJar(Path dir) throws IOException {
+        Path classes = Files.createDirectories(dir.resolve("plugin-classes"));
+        Path source = dir.resolve("Marker.java");
+        Files.writeString(source, """
+                package marker;
+                import com.sun.source.util.JavacTask;
+                import com.sun.source.util.Plugin;
+                import java.nio.file.Files;
+                import java.nio.file.Path;
+                import java.nio.file.StandardOpenOption;
+                public class Marker implements Plugin {
+                    public String getName() { return "Marker"; }
+                    public void init(JavacTask task, String... args) {
+                        try {
+                            Files.writeString(Path.of(args[0]), "ran\\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+                """);
+        assertThat(ToolProvider.findFirst("javac").orElseThrow()
+                .run(System.out, System.err, "-d", classes.toString(), source.toString())).isZero();
+        Files.writeString(Files.createDirectories(classes.resolve("META-INF/services")).resolve("com.sun.source.util.Plugin"),
+                "marker.Marker\n");
+        Path jar = dir.resolve("marker.jar");
+        jarOf(jar, classes);
+        return jar;
+    }
+
+    private Path buildLibraryJar(Path dir) throws IOException {
+        Path classes = Files.createDirectories(dir.resolve("library-classes"));
+        Path source = Files.createDirectories(dir.resolve("library")).resolve("Library.java");
+        Files.writeString(source, "package library; public class Library { public static String name() { return \"library\"; } }\n");
+        Path moduleInfo = Files.writeString(dir.resolve("module-info.java"), "module library { exports library; }\n");
+        ToolProvider javac = ToolProvider.findFirst("javac").orElseThrow();
+        assertThat(javac.run(System.out, System.err, "-d", classes.toString(), source.toString(), moduleInfo.toString()))
+                .isZero();
+        Path jar = dir.resolve("library.jar");
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+            List<Path> entries;
+            try (Stream<Path> walk = Files.walk(classes)) {
+                entries = walk.filter(Files::isRegularFile).sorted().toList();
+            }
+            for (Path file : entries) {
+                out.putNextEntry(new JarEntry(classes.relativize(file).toString().replace(File.separatorChar, '/')));
+                Files.copy(file, out);
+                out.closeEntry();
+            }
+        }
+        return jar;
+    }
+
     private Path buildProcessorJar(Path dir, String pkg, String suffix, String moduleName) throws IOException {
+        return buildProcessorJar(dir, pkg, suffix, moduleName, null);
+    }
+
+    private Path buildProcessorJar(Path dir, String pkg, String suffix, String moduleName, Path library)
+            throws IOException {
         Path classes = Files.createDirectories(dir.resolve("proc-classes"));
         List<String> files = new ArrayList<>();
         Path src = dir.resolve("Gen" + suffix + ".java");
@@ -885,7 +1477,7 @@ public class JavacTest {
                             try {
                                 JavaFileObject file = processingEnv.getFiler().createSourceFile("gen.Generated%2$s");
                                 try (Writer writer = file.openWriter()) {
-                                    writer.write("package gen; public class Generated%2$s { }");
+                                    writer.write("package gen; public class Generated%2$s { }%3$s");
                                 }
                             } catch (Exception e) {
                                 throw new RuntimeException(e);
@@ -894,7 +1486,7 @@ public class JavacTest {
                         return false;
                     }
                 }
-                """.formatted(pkg, suffix));
+                """.formatted(pkg, suffix, library == null ? "" : " // \" + library.Library.name() + \""));
         files.add(src.toString());
         if (moduleName != null) {
             Path moduleInfo = dir.resolve("module-info.java");
@@ -908,6 +1500,9 @@ public class JavacTest {
         }
         ToolProvider javac = ToolProvider.findFirst("javac").orElseThrow();
         List<String> command = new ArrayList<>(List.of("-d", classes.toString()));
+        if (library != null) {
+            command.addAll(List.of("--class-path", library.toString()));
+        }
         command.addAll(files);
         assertThat(javac.run(System.out, System.err, command.toArray(String[]::new))).isZero();
         if (moduleName == null) {
@@ -1029,5 +1624,9 @@ public class JavacTest {
         assertThat(next.resolve(Javac.CLASSES + "META-INF/build.jenesis/checkstyle.xml"))
                 .as("the per-module META-INF/build.jenesis configuration is kept out of the classes output")
                 .doesNotExist();
+    }
+
+    private static String shell(String word) {
+        return word.matches("[A-Za-z0-9_@%+=:,./-]+") ? word : "'" + word.replace("'", "'\\''") + "'";
     }
 }

@@ -171,6 +171,24 @@ public class PinModuleInfoTest {
     }
 
     @Test
+    public void refreshes_a_classified_pin_spelt_from_its_repository() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.pin maven/org.example/lib/tests 0.9
+                 */
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib/tests", "1.0 SHA-256/cafebabe"));
+        String result = run(file);
+        assertThat(result)
+                .as("maven/<coordinate> is read in the module's group, so it names the coordinate that was resolved")
+                .contains("@jenesis.pin main/maven/org.example/lib/tests 1.0 SHA-256/cafebabe")
+                .doesNotContain("0.9");
+    }
+
+    @Test
     public void writes_qualified_dependencies_as_jenesis_pin_tags() throws IOException {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """
@@ -306,6 +324,58 @@ public class PinModuleInfoTest {
         String result = run(file);
         assertInsideJavadoc(result, "@jenesis.pin a 1.0");
         assertInsideJavadoc(result, "@jenesis.pin b 2.0");
+    }
+
+    @Test
+    public void continues_a_doc_comment_whose_text_starts_on_its_opening_line() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /** The module, described on the opening line.
+                 *
+                 * @jenesis.release 11
+                 * @jenesis.pin bar 1.0
+                 */
+                module foo {
+                  requires bar;
+                  requires qux;
+                }
+                """);
+        writeResolved(Map.of(
+                "module/bar", "1.0 SHA-256/cafebabe",
+                "module/qux", "2.0 SHA-256/beef"));
+        assertThat(run(file)).isEqualTo("""
+                /** The module, described on the opening line.
+                 *
+                 * @jenesis.release 11
+                 * @jenesis.pin bar 1.0 SHA-256/cafebabe
+                 * @jenesis.pin qux 2.0 SHA-256/beef
+                 */
+                module foo {
+                  requires bar;
+                  requires qux;
+                }
+                """);
+    }
+
+    @Test
+    public void keeps_the_opening_of_a_doc_comment_whose_first_line_is_a_pin() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /** @jenesis.pin bar 1.0
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        writeResolved(Map.of("module/bar", "1.0 SHA-256/cafebabe"));
+        assertThat(run(file)).isEqualTo("""
+                /**
+                 * @jenesis.pin bar 1.0 SHA-256/cafebabe
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
     }
 
     private static void assertInsideJavadoc(String content, String needle) {

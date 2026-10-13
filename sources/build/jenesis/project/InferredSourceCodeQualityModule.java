@@ -82,33 +82,26 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
                 value -> value,
                 value -> value,
                 Collections.emptyNavigableMap());
-        Boolean checkstyle = environment.flagOrNull("source.checkstyle");
-        if (checkstyle != null) {
-            module = module.checkstyle(checkstyle ? value -> value : null);
+        if (Enforcement.ofEnvironment(environment, "source.checkstyle") == Enforcement.IGNORE) {
+            module = module.checkstyle(null);
         }
-        Boolean pmd = environment.flagOrNull("source.pmd");
-        if (pmd != null) {
-            module = module.pmd(pmd ? value -> value : null);
+        if (Enforcement.ofEnvironment(environment, "source.pmd") == Enforcement.IGNORE) {
+            module = module.pmd(null);
         }
-        Boolean detekt = environment.flagOrNull("source.detekt");
-        if (detekt != null) {
-            module = module.detekt(detekt ? value -> value : null);
+        if (Enforcement.ofEnvironment(environment, "source.detekt") == Enforcement.IGNORE) {
+            module = module.detekt(null);
         }
-        Boolean ktlint = environment.flagOrNull("source.ktlint");
-        if (ktlint != null) {
-            module = module.ktlint(ktlint ? value -> value : null);
+        if (Enforcement.ofEnvironment(environment, "source.ktlint") == Enforcement.IGNORE) {
+            module = module.ktlint(null);
         }
-        Boolean scalastyle = environment.flagOrNull("source.scalastyle");
-        if (scalastyle != null) {
-            module = module.scalastyle(scalastyle ? value -> value : null);
+        if (Enforcement.ofEnvironment(environment, "source.scalastyle") == Enforcement.IGNORE) {
+            module = module.scalastyle(null);
         }
-        Boolean scalafmt = environment.flagOrNull("source.scalafmt");
-        if (scalafmt != null) {
-            module = module.scalafmt(scalafmt ? value -> value : null);
+        if (Enforcement.ofEnvironment(environment, "source.scalafmt") == Enforcement.IGNORE) {
+            module = module.scalafmt(null);
         }
-        Boolean codenarc = environment.flagOrNull("source.codenarc");
-        if (codenarc != null) {
-            module = module.codenarc(codenarc ? value -> value : null);
+        if (Enforcement.ofEnvironment(environment, "source.codenarc") == Enforcement.IGNORE) {
+            module = module.codenarc(null);
         }
         return module;
     }
@@ -344,12 +337,14 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
     }
 
     @Override
-    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
+    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        Path checkstyleFile = CheckstyleModule.configurationFile(configuration);
         Bind.configured(buildExecutor,
                 inherited.sequencedKeySet(),
                 CHECKSTYLE,
                 checkstyle,
-                CheckstyleModule.configurationFile(configuration),
+                checkstyleFile,
+                checkstyle == null ? Collections.emptyNavigableSet() : CheckstyleModule.siblings(checkstyleFile),
                 () -> checkstyleModule.pinning(pinning));
         Bind.configured(buildExecutor,
                 inherited.sequencedKeySet(),

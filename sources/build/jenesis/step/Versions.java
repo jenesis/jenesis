@@ -83,7 +83,9 @@ public class Versions implements BuildStep {
             Checksum status = arg.files().get(Path.of(DEPENDENCIES));
             return status != null && status.status() != ChecksumStatus.RETAINED;
         });
-        for (BuildStepArgument argument : arguments.values()) {
+        Map<Path, String> writers = new HashMap<>();
+        for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
+            BuildStepArgument argument = entry.getValue();
             if (argument.removed()) {
                 continue;
             }
@@ -101,6 +103,13 @@ public class Versions implements BuildStep {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                     Path destination = target.resolve(source.relativize(file));
+                    String writer = writers.putIfAbsent(destination, entry.getKey());
+                    if (writer != null) {
+                        throw new IllegalStateException(CLASSES + source.relativize(file).toString()
+                                .replace(File.separatorChar, '/') + " is written by both " + writer + " and "
+                                + entry.getKey() + " - a step beside the compiler adds classes and never replaces"
+                                + " one, so give what it writes a name no other step uses");
+                    }
                     if (file.getFileName().toString().equals("module-info.class")) {
                         if (!dependenciesChanged && context.previous() != null) {
                             Path argumentRelative = argument.folder().relativize(file);

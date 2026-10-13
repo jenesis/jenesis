@@ -142,16 +142,16 @@ public class DependenciesAliasTest {
     }
 
     @Test
-    public void an_alias_that_names_no_resolved_dependency_is_rejected() throws IOException {
+    public void an_alias_that_names_no_resolved_dependency_is_not_applied() throws IOException {
         plainLib();
 
-        assertThatThrownBy(() -> resolve(Map.of("toolkit.absent", "org.example/absent-lib"),
-                "org.example/plain-lib/1.0"))
-                .as("an alias renames a jar the tree already holds, it never adds one")
-                .hasStackTraceContaining(IllegalArgumentException.class.getName())
-                .hasStackTraceContaining("Module alias toolkit.absent declared by a local @jenesis.alias declaration"
-                        + " does not name a resolved dependency: org.example/absent-lib"
-                        + " - require the target or drop the alias");
+        resolve(Map.of("toolkit.absent", "org.example/absent-lib"), "org.example/plain-lib/1.0");
+
+        assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.absent-1.0.jar"))
+                .as("an alias names a jar where the tree holds it, so a parent POM's alias applies only in the"
+                        + " modules that resolve its target")
+                .doesNotExist();
+        assertThat(next.resolve(Dependencies.ALIASED)).doesNotExist();
     }
 
     @Test
@@ -167,8 +167,9 @@ public class DependenciesAliasTest {
                 "org.example/amn-lib/1.0"))
                 .as("a target that already names itself is required under that name")
                 .hasStackTraceContaining(IllegalArgumentException.class.getName())
-                .hasStackTraceContaining("Target of module alias toolkit.amn is already the automatic module lib.target"
-                        + " - require lib.target instead of aliasing org.example/amn-lib");
+                .hasStackTraceContaining("Target of module alias toolkit.amn, org.example/amn-lib 1.0, is already the"
+                        + " automatic module lib.target - require lib.target instead of aliasing org.example/amn-lib,"
+                        + " or, if a version of org.example/amn-lib other than 1.0 is meant, pin that one");
     }
 
     @Test
@@ -184,7 +185,9 @@ public class DependenciesAliasTest {
         assertThatThrownBy(() -> resolve(Map.of("toolkit.named", "org.example/named-lib"),
                 "org.example/named-lib/1.0"))
                 .hasStackTraceContaining(IllegalArgumentException.class.getName())
-                .hasStackTraceContaining("Target of module alias toolkit.named is already the named module lib.named");
+                .as("the version that declares the name is named, as the alias states none and another may not")
+                .hasStackTraceContaining("Target of module alias toolkit.named, org.example/named-lib 1.0, is already"
+                        + " the named module lib.named");
     }
 
     @Test
@@ -310,6 +313,55 @@ public class DependenciesAliasTest {
         assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar"))
                 .as("a declaration travels to every consumer through the manifest of the jar that made it")
                 .exists();
+    }
+
+    @Test
+    public void an_alias_a_dependency_declares_for_a_static_requirement_is_ignored_where_its_target_is_not_resolved()
+            throws IOException {
+        plainLib();
+        Path classes = Files.createDirectories(work.resolve("static-consumer-classes"));
+        Files.write(classes.resolve("module-info.class"), ClassFile.of().buildModule(ModuleAttribute.of(
+                ModuleDesc.of("lib.consumer"),
+                module -> module.requires(ModuleDesc.of("java.base"), ClassFile.ACC_MANDATED, null)
+                        .requires(ModuleDesc.of("toolkit.lib"), ClassFile.ACC_STATIC_PHASE, null))));
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().putValue(PathPlacement.ALIASES, "toolkit.lib=org.example/plain-lib");
+        addPom("org.example", "consumer-lib", "1.0", List.of());
+        jarOf(Files.createDirectories(mavenRepoFolder.resolve("org/example/consumer-lib/1.0"))
+                .resolve("consumer-lib-1.0.jar"), classes, manifest);
+
+        resolve(Map.of(), "org.example/consumer-lib/1.0");
+
+        assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar"))
+                .as("a consumer never resolves what the declaring module requires statically, so its alias stays"
+                        + " where the declaring module itself is built")
+                .doesNotExist();
+    }
+
+    @Test
+    public void an_alias_a_dependency_declares_is_ignored_where_a_consumer_excludes_its_target() throws IOException {
+        plainLib();
+        Path classes = Files.createDirectories(work.resolve("excluding-consumer-classes"));
+        Files.write(classes.resolve("module-info.class"), ClassFile.of().buildModule(ModuleAttribute.of(
+                ModuleDesc.of("lib.consumer"),
+                module -> module.requires(ModuleDesc.of("java.base"), ClassFile.ACC_MANDATED, null)
+                        .requires(ModuleDesc.of("toolkit.absent"), 0, null))));
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().putValue(PathPlacement.ALIASES, "toolkit.absent=org.example/absent-lib");
+        addPom("org.example", "consumer-lib", "1.0", List.of());
+        jarOf(Files.createDirectories(mavenRepoFolder.resolve("org/example/consumer-lib/1.0"))
+                .resolve("consumer-lib-1.0.jar"), classes, manifest);
+
+        resolve(Map.of("toolkit.absent", "org.example/plain-lib"),
+                "org.example/consumer-lib/1.0",
+                "org.example/plain-lib/1.0");
+
+        assertThat(SequencedProperties.ofFiles(next.resolve(Dependencies.ALIASED)))
+                .as("the declaring jar names absent-lib, which this consumer excludes, so its alias neither fails"
+                        + " the consumer nor competes with the consumer's own alias of that name")
+                .containsOnly(Map.entry("toolkit.absent", "maven/org.example/plain-lib/1.0"));
     }
 
     @Test

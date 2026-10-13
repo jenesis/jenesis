@@ -12,6 +12,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.step.Assign;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class AssignTest {
 
@@ -52,6 +53,24 @@ public class AssignTest {
                 Map.entry("bar", next.relativize(passthroughArtifact).toString().replace(File.separatorChar, '/')));
         assertThat(coordinates.getProperty("foo")).doesNotStartWith("/");
         assertThat(coordinates.getProperty("bar")).doesNotStartWith("/");
+    }
+
+    @Test
+    public void names_the_folder_and_every_file_it_found_where_it_expected_one_artifact() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("foo", "");
+        properties.store(argument.resolve(BuildStep.IDENTITY));
+        Path artifacts = Files.createDirectory(argument.resolve(BuildStep.ARTIFACTS));
+        Files.writeString(artifacts.resolve("artifact.jar"), "jar");
+        Files.createDirectory(artifacts.resolve(".index-tmp"));
+        assertThatThrownBy(() -> new Assign().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED)))))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("2 files in " + artifacts + ": .index-tmp, artifact.jar")
+                .hasMessageContaining("wrote into a folder it was handed");
     }
 
     @Test

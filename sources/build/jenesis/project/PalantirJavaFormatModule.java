@@ -26,6 +26,9 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final String group;
     private final boolean verify;
+    private final boolean reflow;
+    private final boolean sortImports;
+    private final boolean removeUnusedImports;
     private final ProcessBuildStep.Terms terms;
 
     public PalantirJavaFormatModule(Map<String, Repository> repositories,
@@ -34,7 +37,10 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
              null,
              "palantir-java-format",
              false,
-             ProcessBuildStep.Terms.of("palantir-java-format"));
+             true,
+             true,
+             true,
+             new ProcessBuildStep.Terms());
     }
 
     public static PalantirJavaFormatModule ofEnvironment(Environment environment,
@@ -44,6 +50,9 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
                 null,
                 "palantir-java-format",
                 false,
+                true,
+                true,
+                true,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "palantir-java-format"));
     }
 
@@ -51,28 +60,95 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
                                      Pinning pinning,
                                      String group,
                                      boolean verify,
+                                     boolean reflow,
+                                     boolean sortImports,
+                                     boolean removeUnusedImports,
                                      ProcessBuildStep.Terms terms) {
         this.dependencies = dependencies;
         this.pinning = pinning;
         this.group = group;
         this.verify = verify;
+        this.reflow = reflow;
+        this.sortImports = sortImports;
+        this.removeUnusedImports = removeUnusedImports;
         this.terms = terms;
     }
 
     public PalantirJavaFormatModule pinning(Pinning pinning) {
-        return new PalantirJavaFormatModule(dependencies, pinning, group, verify, terms);
+        return new PalantirJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                reflow,
+                sortImports,
+                removeUnusedImports,
+                terms);
     }
 
     public PalantirJavaFormatModule group(String group) {
-        return new PalantirJavaFormatModule(dependencies, pinning, group, verify, terms);
+        return new PalantirJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                reflow,
+                sortImports,
+                removeUnusedImports,
+                terms);
     }
 
     public PalantirJavaFormatModule verify(boolean verify) {
-        return new PalantirJavaFormatModule(dependencies, pinning, group, verify, terms);
+        return new PalantirJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                reflow,
+                sortImports,
+                removeUnusedImports,
+                terms);
+    }
+
+    public PalantirJavaFormatModule reflow(boolean reflow) {
+        return new PalantirJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                reflow,
+                sortImports,
+                removeUnusedImports,
+                terms);
+    }
+
+    public PalantirJavaFormatModule sortImports(boolean sortImports) {
+        return new PalantirJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                reflow,
+                sortImports,
+                removeUnusedImports,
+                terms);
+    }
+
+    public PalantirJavaFormatModule removeUnusedImports(boolean removeUnusedImports) {
+        return new PalantirJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                reflow,
+                sortImports,
+                removeUnusedImports,
+                terms);
     }
 
     public PalantirJavaFormatModule printing(BiConsumer<Boolean, String> printing) {
-        return new PalantirJavaFormatModule(dependencies, pinning, group, verify, terms.printing(printing));
+        return new PalantirJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                reflow,
+                sortImports,
+                removeUnusedImports,
+                terms.printing(printing));
     }
 
     @Override
@@ -87,7 +163,9 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
         SequencedSet<String> formatInputs = new LinkedHashSet<>();
         formatInputs.add(DEPENDENCIES);
         formatInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(FORMAT, new Format(terms, group, verify), formatInputs);
+        buildExecutor.addStep(FORMAT,
+                new Format(terms, group, verify, reflow, sortImports, removeUnusedImports),
+                formatInputs);
     }
 
     private record Requires(String group) implements BuildStep {
@@ -111,8 +189,18 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
 
     private static class Format extends FormatBuildStep {
 
-        private Format(ProcessBuildStep.Terms terms, String group, boolean verify) {
+        private final boolean reflow, sortImports, removeUnusedImports;
+
+        private Format(ProcessBuildStep.Terms terms,
+                       String group,
+                       boolean verify,
+                       boolean reflow,
+                       boolean sortImports,
+                       boolean removeUnusedImports) {
             super("palantir-java-format", group, verify, terms);
+            this.reflow = reflow;
+            this.sortImports = sortImports;
+            this.removeUnusedImports = removeUnusedImports;
         }
 
         @Override
@@ -122,7 +210,11 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
         }
 
         @Override
-        protected List<String> command(List<String> jars, Path config, List<String> files, boolean verify) {
+        protected List<String> command(BuildStepContext context,
+                                       List<String> jars,
+                                       Path config,
+                                       List<String> files,
+                                       boolean verify) {
             List<String> commands = new ArrayList<>(List.of(
                     "--add-exports", "jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
                     "--add-exports", "jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
@@ -132,7 +224,17 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
                     "--add-exports", "jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
                     "--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
                     "-cp", String.join(File.pathSeparator, jars),
-                    "com.palantir.javaformat.java.Main"));
+                    "com.palantir.javaformat.java.Main",
+                    "--palantir"));
+            if (!reflow) {
+                commands.add("--skip-reflowing-long-strings");
+            }
+            if (!sortImports) {
+                commands.add("--skip-sorting-imports");
+            }
+            if (!removeUnusedImports) {
+                commands.add("--skip-removing-unused-imports");
+            }
             if (verify) {
                 commands.add("--dry-run");
                 commands.add("--set-exit-if-changed");

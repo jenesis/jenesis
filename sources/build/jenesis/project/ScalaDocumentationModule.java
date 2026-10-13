@@ -48,7 +48,7 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
              "main",
              null,
              null,
-             ProcessBuildStep.Terms.of("scaladoc"));
+             new ProcessBuildStep.Terms());
     }
 
     public static ScalaDocumentationModule ofEnvironment(Environment environment,

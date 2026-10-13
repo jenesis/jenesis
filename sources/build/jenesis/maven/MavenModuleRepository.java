@@ -166,16 +166,16 @@ public class MavenModuleRepository implements JenesisRepository {
                     + groupId + ":" + artifactId, e);
         }
         Node versioning = MavenPomResolver.toChildren(document.getDocumentElement())
-                .filter(node -> Objects.equals(node.getLocalName(), "versioning"))
+                .filter(node -> Objects.equals(node.getNodeName(), "versioning"))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No versioning element in the Maven metadata of "
                         + groupId + ":" + artifactId));
         return new Metadata(element(versioning, "release"),
                 element(versioning, "latest"),
                 MavenPomResolver.toChildren(versioning)
-                        .filter(node -> Objects.equals(node.getLocalName(), "versions"))
+                        .filter(node -> Objects.equals(node.getNodeName(), "versions"))
                         .flatMap(MavenPomResolver::toChildren)
-                        .filter(node -> Objects.equals(node.getLocalName(), "version"))
+                        .filter(node -> Objects.equals(node.getNodeName(), "version"))
                         .map(node -> node.getTextContent().trim())
                         .filter(value -> !value.isEmpty())
                         .toList());
@@ -183,7 +183,7 @@ public class MavenModuleRepository implements JenesisRepository {
 
     private static String element(Node versioning, String name) {
         return MavenPomResolver.toChildren(versioning)
-                .filter(node -> Objects.equals(node.getLocalName(), name))
+                .filter(node -> Objects.equals(node.getNodeName(), name))
                 .findFirst()
                 .map(node -> node.getTextContent().trim())
                 .filter(value -> !value.isEmpty())
@@ -195,6 +195,12 @@ public class MavenModuleRepository implements JenesisRepository {
         private String resolve(String version, String groupId, String artifactId) {
             if (Objects.equals(version, "LATEST")) {
                 return latest == null ? newest(version, groupId, artifactId, _ -> true) : latest;
+            }
+            if (release != null && !MavenDefaultVersionNegotiator.isStable(release)) {
+                return versions.stream()
+                        .filter(MavenDefaultVersionNegotiator::isStable)
+                        .max(MavenDefaultVersionNegotiator::compareVersions)
+                        .orElse(release);
             }
             return release == null
                     ? newest(version, groupId, artifactId, MavenDefaultVersionNegotiator::isStable)

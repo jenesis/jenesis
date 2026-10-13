@@ -14,6 +14,7 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -21,6 +22,8 @@ public class ScalastyleModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
+    private static final String SETTING = "source.scalastyle";
+    private static final String REPORT = BuildStep.REPORTS + "scalastyle/scalastyle-report.xml";
     private static final String MAVEN_GROUP = "com.beautiful-scala", MAVEN_ARTIFACT = "scalastyle_2.13";
 
     private final Dependencies dependencies;
@@ -37,7 +40,7 @@ public class ScalastyleModule implements BuildExecutorModule {
              "scalastyle",
              "scalastyle-config.xml",
              false,
-             ProcessBuildStep.Terms.of("scalastyle"));
+             new ProcessBuildStep.Terms());
     }
 
     public static ScalastyleModule ofEnvironment(Environment environment,
@@ -47,7 +50,7 @@ public class ScalastyleModule implements BuildExecutorModule {
                 null,
                 "scalastyle",
                 "scalastyle-config.xml",
-                false,
+                Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "scalastyle"));
     }
 
@@ -143,8 +146,10 @@ public class ScalastyleModule implements BuildExecutorModule {
         public boolean acceptableExitCode(int code,
                                           Executor executor,
                                           BuildStepContext context,
-                                          SequencedMap<String, BuildStepArgument> arguments) {
-            return !strict || code == 0;
+                                          SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Path report = context.next().resolve(REPORT);
+            return Findings.ofXml("scalastyle", report, "error")
+                    .acceptable(code, context, true, strict, SETTING, terms.reporting());
         }
 
         @Override
@@ -184,7 +189,8 @@ public class ScalastyleModule implements BuildExecutorModule {
             if (config == null) {
                 throw new IllegalStateException("No " + configFile + " found among the inputs of the Scalastyle step");
             }
-            Path report = Files.createDirectories(context.next().resolve(BuildStep.REPORTS + "scalastyle")).resolve("scalastyle-report.xml");
+            Path report = context.next().resolve(REPORT);
+            Files.createDirectories(report.getParent());
             List<String> commands = new ArrayList<>(List.of(
                     "-cp", String.join(File.pathSeparator, jars),
                     "org.scalastyle.Main",

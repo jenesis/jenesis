@@ -125,7 +125,155 @@ public class CheckstyleModuleRunTest {
         assertThatThrownBy(executor::execute)
                 .hasRootCauseInstanceOf(IllegalStateException.class)
                 .rootCause()
-                .hasMessageContaining("Unexpected exit code");
+                .hasMessageContaining("checkstyle found 1 finding, reported in ");
+    }
+
+    @Test
+    public void the_strict_setting_fails_the_build_on_a_violation() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "checkstyle",
+                CheckstyleModule.ofEnvironment(new Environment(Map.of("source.checkstyle", "strict")),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .hasMessageContaining("checkstyle found 1 finding")
+                .hasMessageContaining("jenesis.source.checkstyle=strict");
+    }
+
+    @Test
+    public void a_report_only_run_prints_the_number_of_findings_and_the_report() throws IOException {
+        List<String> printed = new ArrayList<>();
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "checkstyle",
+                CheckstyleModule.ofEnvironment(new Environment(Map.of()).out(printed::add),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                "project");
+        executor.execute();
+
+        Path report = root.resolve("checkstyle").resolve("check").resolve("output").resolve("reports").resolve("checkstyle").resolve("checkstyle-report.xml");
+        assertThat(printed).anySatisfy(line -> assertThat(line)
+                .contains("[FINDINGS]")
+                .contains("checkstyle found 1 finding, reported in " + report));
+    }
+
+    @Test
+    public void fails_a_report_only_run_when_checkstyle_cannot_load_its_configuration() throws IOException {
+        Files.writeString(project.resolve("checkstyle.xml"), """
+                <?xml version="1.0"?>
+                <!DOCTYPE module PUBLIC
+                    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+                    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+                <module name="Checker">
+                    <module name="NoSuchCheck"/>
+                </module>
+                """);
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "checkstyle",
+                new CheckstyleModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .as("report-only covers findings, not a Checkstyle that never ran")
+                .hasMessageContaining("Unexpected exit code")
+                .hasMessageContaining("NoSuchCheck");
+    }
+
+    @Test
+    public void expands_config_loc_to_the_folder_of_the_configuration() throws IOException {
+        Files.writeString(project.resolve("checkstyle.xml"), """
+                <?xml version="1.0"?>
+                <!DOCTYPE module PUBLIC
+                    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+                    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+                <module name="Checker">
+                    <property name="severity" value="error"/>
+                    <module name="SuppressionFilter">
+                        <property name="file" value="${config_loc}/suppressions.xml"/>
+                    </module>
+                    <module name="TreeWalker">
+                        <module name="TypeName"/>
+                    </module>
+                </module>
+                """);
+        Files.writeString(project.resolve("suppressions.xml"), """
+                <?xml version="1.0"?>
+                <!DOCTYPE suppressions PUBLIC
+                    "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+                    "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+                <suppressions>
+                    <suppress checks="TypeName" files="badName"/>
+                </suppressions>
+                """);
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "checkstyle",
+                new CheckstyleModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT)
+                        .strict(true),
+                "project");
+        executor.execute();
+
+        Path report = root.resolve("checkstyle").resolve("check").resolve("output").resolve("reports").resolve("checkstyle").resolve("checkstyle-report.xml");
+        assertThat(report).content().doesNotContain("<error");
+    }
+
+    @Test
+    public void expands_the_properties_of_a_checkstyle_properties_beside_the_configuration() throws IOException {
+        Files.writeString(project.resolve("checkstyle.xml"), """
+                <?xml version="1.0"?>
+                <!DOCTYPE module PUBLIC
+                    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+                    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+                <module name="Checker">
+                    <property name="severity" value="error"/>
+                    <module name="TreeWalker">
+                        <module name="TypeName">
+                            <property name="format" value="${type.format}"/>
+                        </module>
+                    </module>
+                </module>
+                """);
+        Files.writeString(project.resolve("checkstyle.properties"), "type.format=^[a-z][a-zA-Z0-9]*$\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "checkstyle",
+                new CheckstyleModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT)
+                        .strict(true),
+                "project");
+        executor.execute();
+
+        Path report = root.resolve("checkstyle").resolve("check").resolve("output").resolve("reports").resolve("checkstyle").resolve("checkstyle-report.xml");
+        assertThat(report).content()
+                .as("the format the properties name accepts a type name starting in lower case")
+                .doesNotContain("<error");
+    }
+
+    @Test
+    public void refuses_a_checkstyle_properties_that_sets_config_loc() throws IOException {
+        Files.writeString(project.resolve("checkstyle.properties"), "config_loc=elsewhere\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "checkstyle",
+                new CheckstyleModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("sets config_loc, which the build sets to the folder of checkstyle.xml");
     }
 
     private BuildExecutor newExecutor() throws IOException {

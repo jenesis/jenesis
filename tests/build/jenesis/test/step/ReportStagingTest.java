@@ -60,6 +60,15 @@ public class ReportStagingTest {
     }
 
     @Test
+    public void stages_the_reports_of_a_module_whose_path_holds_dots_under_its_whole_path() throws IOException {
+        Path cli = module("org.example.cli", Map.of("tests", List.of("events-1.xml")));
+
+        run(cli);
+
+        assertThat(next.resolve("tests/org.example.cli/events-1.xml")).exists();
+    }
+
+    @Test
     public void arguments_without_inventory_are_skipped() throws IOException {
         Path stray = Files.createDirectory(source.resolve("stray"));
         Files.writeString(Files.createDirectories(stray.resolve("reports").resolve("tests"))
@@ -77,6 +86,7 @@ public class ReportStagingTest {
     public void modules_without_report_keys_stage_nothing() throws IOException {
         Path folder = Files.createDirectory(source.resolve("foo"));
         SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-foo.path", "foo");
         inventory.setProperty("module-foo.artifacts.0", "artifacts/classes.jar");
         inventory.store(folder.resolve(Inventory.INVENTORY));
 
@@ -90,6 +100,7 @@ public class ReportStagingTest {
     private Path module(String name, Map<String, List<String>> reportsByKind) throws IOException {
         Path folder = Files.createDirectory(source.resolve(name));
         SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-" + name + ".path", name);
         for (Map.Entry<String, List<String>> entry : reportsByKind.entrySet()) {
             Path reports = Files.createDirectories(folder.resolve("reports").resolve(entry.getKey()));
             for (String file : entry.getValue()) {

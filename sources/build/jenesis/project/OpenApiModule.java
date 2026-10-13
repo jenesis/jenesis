@@ -42,7 +42,7 @@ public class OpenApiModule implements BuildExecutorModule {
              null,
              "src/main/java",
              List.of(),
-             ProcessBuildStep.Terms.of("openapi"));
+             new ProcessBuildStep.Terms());
     }
 
     public static OpenApiModule ofEnvironment(Environment environment,

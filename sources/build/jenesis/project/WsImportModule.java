@@ -42,7 +42,7 @@ public class WsImportModule implements BuildExecutorModule {
              null,
              null,
              List.of(),
-             ProcessBuildStep.Terms.of("wsimport"));
+             new ProcessBuildStep.Terms());
     }
 
     public static WsImportModule ofEnvironment(Environment environment,

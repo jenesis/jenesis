@@ -52,7 +52,7 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
              false,
              BuildStep.timestamp() == null,
              null,
-             ProcessBuildStep.Terms.of("groovydoc"));
+             new ProcessBuildStep.Terms());
     }
 
     public static GroovyDocumentationModule ofEnvironment(Environment environment,

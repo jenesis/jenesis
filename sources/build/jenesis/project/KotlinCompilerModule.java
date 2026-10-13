@@ -8,6 +8,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
@@ -48,7 +49,7 @@ public class KotlinCompilerModule implements BuildExecutorModule {
              "kotlinc",
              "main",
              null,
-             ProcessBuildStep.Terms.of("kotlinc"));
+             new ProcessBuildStep.Terms());
     }
 
     public static KotlinCompilerModule ofEnvironment(Environment environment,
@@ -122,9 +123,7 @@ public class KotlinCompilerModule implements BuildExecutorModule {
         buildExecutor.addStep(COMPILED,
                 factory == null ? new Compile(terms, includeResources, tool, group) : new Compile(terms, includeResources, tool, group, factory),
                 compileInputs);
-        buildExecutor.addStep(CLASSES, new Versions(), Stream.concat(
-                Stream.of(COMPILED),
-                compileInputs.stream()));
+        buildExecutor.addStep(CLASSES, new Versions(), COMPILED);
     }
 
     @Override
@@ -207,17 +206,111 @@ public class KotlinCompilerModule implements BuildExecutorModule {
         }
 
         @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            return super.apply(executor, context, arguments).thenComposeAsync(result -> {
+                if (!result.next()) {
+                    return CompletableFuture.completedStage(result);
+                }
+                try {
+                    return compileVersioned(executor, context, arguments).thenApply(_ -> result);
+                } catch (IOException e) {
+                    return CompletableFuture.failedFuture(e);
+                }
+            }, executor);
+        }
+
+        @Override
         public CompletionStage<List<String>> process(Executor executor,
                                                      BuildStepContext context,
                                                      SequencedMap<String, BuildStepArgument> arguments,
                                                      SequencedMap<String, SequencedMap<String, String>> properties)
                 throws IOException {
             Path target = Files.createDirectory(context.next().resolve(CLASSES));
+            Sources sources = sources(arguments, target);
+            if (sources.files().stream().noneMatch(name -> name.endsWith(".kt"))) {
+                return CompletableFuture.completedStage(null);
+            }
+            return CompletableFuture.completedStage(command(properties,
+                    target,
+                    sources.release(),
+                    sources,
+                    sources.classpath(),
+                    sources.friends(),
+                    sources.files()));
+        }
+
+        private CompletionStage<Void> compileVersioned(Executor executor,
+                                                       BuildStepContext context,
+                                                       SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Sources sources = sources(arguments, null);
+            Path base = context.next().resolve(CLASSES);
+            CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
+            boolean compiled = false;
+            for (Map.Entry<Integer, List<String>> entry : sources.versioned().entrySet()) {
+                int release = entry.getKey();
+                List<String> files = entry.getValue();
+                if (files.stream().noneMatch(name -> name.endsWith(".kt"))) {
+                    continue;
+                }
+                compiled = true;
+                Path target = Files.createDirectories(base.resolve("META-INF/versions/" + release));
+                List<String> classpath = new ArrayList<>();
+                for (int lower : sources.versioned().headMap(release, false).descendingKeySet()) {
+                    Path overlay = base.resolve("META-INF/versions/" + lower);
+                    if (Files.isDirectory(overlay)) {
+                        classpath.add(overlay.toString());
+                    }
+                }
+                classpath.add(base.toString());
+                List<String> friends = new ArrayList<>(classpath);
+                friends.addAll(sources.friends());
+                classpath.addAll(sources.classpath());
+                List<String> commands = command(properties(arguments),
+                        target,
+                        Integer.toString(release),
+                        sources,
+                        classpath,
+                        friends,
+                        files);
+                chain = chain.thenComposeAsync(_ -> {
+                    try {
+                        ProcessHandler handler = handler(context, commands);
+                        Path output = context.supplement().resolve("output-" + release),
+                                error = context.supplement().resolve("error-" + release);
+                        Files.writeString(context.supplement().resolve("command-" + release), shell(handler.commands()));
+                        int exitCode = execute(handler, output, error, tee(executor, handler));
+                        if (exitCode != 0) {
+                            throw new IllegalStateException("Unexpected exit code: " + exitCode
+                                    + " (multi-release " + release + ")\n"
+                                    + "To reproduce, execute:\n "
+                                    + shell(handler.commands())
+                                    + tail("Output", output)
+                                    + tail("Error", error));
+                        }
+                        return CompletableFuture.<Void>completedFuture(null);
+                    } catch (IOException | InterruptedException e) {
+                        return CompletableFuture.<Void>failedFuture(e);
+                    }
+                }, executor);
+            }
+            if (compiled && !Javac.hasMultiReleaseManifest(arguments)) {
+                Files.writeString(context.next().resolve(Versions.MANIFEST), "Manifest-Version: 1.0\r\nMulti-Release: true\r\n");
+            }
+            return chain;
+        }
+
+        private Sources sources(SequencedMap<String, BuildStepArgument> arguments, Path target) throws IOException {
             List<String> files = new ArrayList<>(),
                     jars = new ArrayList<>(),
                     classpath = new ArrayList<>(),
                     plugins = new ArrayList<>();
-            String release = null;
+            NavigableMap<Integer, List<String>> versioned = new TreeMap<>();
+            SequencedMap<String, Path> internal = new LinkedHashMap<>();
+            String release = null, tested = null, project = null, artifact = null;
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
@@ -230,6 +323,17 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                 }
                 for (Path jar : Dependencies.select(argument.folder(), group, "compile")) {
                     classpath.add(jar.toString());
+                }
+                Dependencies.internal(argument.folder()).forEach(internal::putIfAbsent);
+                Path module = argument.folder().resolve(BuildStep.MODULE);
+                if (Files.isRegularFile(module)) {
+                    tested = SequencedProperties.ofFiles(module).value("test");
+                }
+                Path metadata = argument.folder().resolve(BuildStep.METADATA);
+                if (Files.isRegularFile(metadata)) {
+                    SequencedProperties loaded = SequencedProperties.ofFiles(metadata);
+                    project = loaded.value("project");
+                    artifact = loaded.value("artifact");
                 }
                 Path javacProperties = argument.folder().resolve(ProcessBuildStep.PROCESS + "javac.properties");
                 if (Files.exists(javacProperties)) {
@@ -252,22 +356,31 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                             if (BuildStep.underBuildJenesis(relative)) {
                                 return FileVisitResult.SKIP_SUBTREE;
                             }
-                            Files.createDirectories(target.resolve(relative));
+                            if (target != null && !BuildStep.underMetaInfVersions(relative)) {
+                                Files.createDirectories(target.resolve(relative));
+                            }
                             return FileVisitResult.CONTINUE;
                         }
 
                         @Override
                         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                             String name = file.toString();
+                            Path relative = sources.relativize(file);
                             if (name.endsWith(".kt")
                                     || (name.endsWith(".java")
                                     && !file.getFileName().toString().equals("module-info.java"))) {
-                                files.add(name);
-                            } else if (includeResources
+                                Integer version = Javac.versionOf(relative);
+                                if (version == null) {
+                                    files.add(name);
+                                } else {
+                                    versioned.computeIfAbsent(version, _ -> new ArrayList<>()).add(name);
+                                }
+                            } else if (target != null
+                                    && includeResources
                                     && !name.endsWith(".java")
-                                    && !BuildStep.underMetaInfVersions(sources.relativize(file))
-                                    && !BuildStep.underBuildJenesis(sources.relativize(file))) {
-                                BuildStep.linkOrCopy(target.resolve(sources.relativize(file)), file);
+                                    && !BuildStep.underMetaInfVersions(relative)
+                                    && !BuildStep.underBuildJenesis(relative)) {
+                                BuildStep.linkOrCopy(target.resolve(relative), file);
                             }
                             return FileVisitResult.CONTINUE;
                         }
@@ -275,14 +388,36 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                 }
             }
             files.sort(null);
-            if (files.stream().noneMatch(name -> name.endsWith(".kt"))) {
-                return CompletableFuture.completedStage(null);
+            versioned.values().forEach(names -> names.sort(null));
+            List<String> friends = new ArrayList<>();
+            if (tested != null) {
+                String coordinate = "maven/" + project + "/" + artifact + "/";
+                for (Map.Entry<String, Path> entry : internal.entrySet()) {
+                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(entry.getValue());
+                    if ((project != null && artifact != null && entry.getKey().startsWith(coordinate))
+                            || descriptor != null && descriptor.name().equals(tested)) {
+                        String friend = entry.getValue().toString();
+                        if (classpath.contains(friend)) {
+                            friends.add(friend);
+                        }
+                    }
+                }
             }
-            if (jars.isEmpty()) {
+            return new Sources(files, jars, classpath, plugins, friends, versioned, release);
+        }
+
+        private List<String> command(SequencedMap<String, SequencedMap<String, String>> properties,
+                                     Path target,
+                                     String release,
+                                     Sources sources,
+                                     List<String> classpath,
+                                     List<String> friends,
+                                     List<String> files) {
+            if (sources.jars().isEmpty()) {
                 throw new IllegalStateException(
                         "No compiler jars resolved upstream of the Kotlin compile step");
             }
-            for (List<String> entries : List.of(jars, classpath, plugins)) {
+            for (List<String> entries : List.of(sources.jars(), classpath, sources.plugins())) {
                 for (String entry : entries) {
                     if (entry.indexOf(File.pathSeparatorChar) != -1) {
                         throw new IllegalArgumentException(
@@ -290,24 +425,37 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                     }
                 }
             }
-            List<String> userClasspath = new ArrayList<>(jars);
-            userClasspath.addAll(classpath);
-            List<String> commands = new ArrayList<>(List.of(
-                    "-cp", String.join(File.pathSeparator, jars),
+            ForkedOptions forked = forked(properties);
+            List<String> commands = new ArrayList<>(forked.jvm()), options = forked.program();
+            commands.addAll(List.of(
+                    "-cp", String.join(File.pathSeparator, sources.jars()),
                     "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
                     "-d", target.toString(),
                     "-no-stdlib",
                     "-no-reflect",
-                    "-classpath", String.join(File.pathSeparator, userClasspath)));
+                    "-classpath", String.join(File.pathSeparator, classpath)));
             if (release != null) {
                 commands.add("-jvm-target");
-                commands.add(release);
+                commands.add(Integer.parseInt(release) < 9 ? "1." + release : release);
             }
-            for (String plugin : plugins) {
+            for (String plugin : sources.plugins()) {
                 commands.add("-Xplugin=" + plugin);
             }
+            if (!friends.isEmpty() && options.stream().noneMatch(option -> option.startsWith("-Xfriend-paths"))) {
+                commands.add("-Xfriend-paths=" + String.join(",", friends));
+            }
+            commands.addAll(options);
             commands.addAll(files);
-            return CompletableFuture.completedStage(commands);
+            return commands;
         }
+    }
+
+    private record Sources(List<String> files,
+                           List<String> jars,
+                           List<String> classpath,
+                           List<String> plugins,
+                           List<String> friends,
+                           NavigableMap<Integer, List<String>> versioned,
+                           String release) {
     }
 }

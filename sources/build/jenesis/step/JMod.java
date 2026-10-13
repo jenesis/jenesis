@@ -18,7 +18,7 @@ public class JMod extends ProcessBuildStep {
     public JMod(ProcessHandler.Factory factory) {
         this(factory.apply("jmod", "bin/jmod"),
              BuildStep.timestamp(),
-             Terms.of("jmod"));
+             new Terms());
     }
 
     public static JMod ofEnvironment(Environment environment,

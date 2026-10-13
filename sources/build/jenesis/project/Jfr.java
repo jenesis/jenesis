@@ -2,33 +2,25 @@ package build.jenesis.project;
 
 import module java.base;
 import build.jenesis.BuildStep;
-import build.jenesis.SequencedProperties;
 
 public record Jfr(SequencedMap<String, String> options) implements ObservabilityEngine {
 
-    public Jfr() {
-        this(Collections.emptyNavigableMap());
+    public Jfr {
+        options.forEach((key, value) -> {
+            if (key.equals("filename")) {
+                throw new IllegalArgumentException("The build sets the filename of the recording to the test step's"
+                        + " reports/jfr/ - leave filename out of the options");
+            } else if (key.isBlank() || value.isBlank() || (key + value).contains(",") || key.contains("=")) {
+                throw new IllegalArgumentException("An option of the recording is a key and a value of JFR, such as"
+                        + " settings=profile, that holds no comma, and the key no equals sign: '" + key + "=" + value
+                        + "'");
+            }
+        });
+        options = Collections.unmodifiableSequencedMap(new LinkedHashMap<>(options));
     }
 
-    public static Jfr ofFile(Path file) throws IOException {
-        SequencedProperties properties = SequencedProperties.ofFiles(file);
-        SequencedMap<String, String> options = new TreeMap<>();
-        for (String key : properties.stringPropertyNames()) {
-            if (key.equals("filename")) {
-                throw new IllegalArgumentException(file + " names a filename, which the build sets to the recording"
-                        + " in the test step's reports/jfr/ - remove the filename line");
-            }
-            String value = properties.value(key);
-            if (value == null) {
-                throw new IllegalArgumentException(file + " gives " + key + " no value, but an option of the recording"
-                        + " is <key>=<value>");
-            } else if (value.contains(",")) {
-                throw new IllegalArgumentException(file + " gives " + key + " the value " + value + ", but the value of"
-                        + " an option of the recording holds no comma");
-            }
-            options.put(key, value);
-        }
-        return new Jfr(Collections.unmodifiableSequencedMap(options));
+    public Jfr() {
+        this(Collections.emptyNavigableMap());
     }
 
     @Override

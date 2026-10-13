@@ -17,6 +17,7 @@ import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.KotlinCompilerModule;
 import build.jenesis.step.Dependencies;
+import java.lang.classfile.Attributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -26,7 +27,7 @@ public class KotlinCompilerModuleTest {
     private static final String KOTLIN_VERSION = "2.2.0";
 
     @TempDir
-    private Path root, project;
+    private Path root, project, tests, testRoot;
 
     @Test
     public void compiles_a_kotlin_source_against_a_downloaded_compiler() throws IOException, ReflectiveOperationException {
@@ -48,7 +49,7 @@ public class KotlinCompilerModuleTest {
                 new KotlinCompilerModule(
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         Path classes = root
@@ -97,7 +98,7 @@ public class KotlinCompilerModuleTest {
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)))
                         .includeResources(false),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         Path classes = root
@@ -134,7 +135,7 @@ public class KotlinCompilerModuleTest {
                 new KotlinCompilerModule(
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         Path classes = root
@@ -148,6 +149,129 @@ public class KotlinCompilerModuleTest {
         assertThat(classes.resolve("module-info.class"))
                 .as("kotlinc must not parse or emit module-info.java; javac owns it")
                 .doesNotExist();
+    }
+
+    @Test
+    public void compiles_a_kotlin_source_below_meta_inf_versions_for_its_release_into_the_versioned_classes() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
+        properties.store(project.resolve(BuildStep.VERSIONS));
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Sample.kt"), """
+                package sample
+                class Sample { fun name(): String = "base" }
+                """);
+        Files.writeString(sampleDir.resolve("Greeting.kt"), """
+                package sample
+                internal fun greeting(): String = "hello"
+                """);
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "META-INF/versions/17/sample"))
+                .resolve("Sample.kt"), """
+                package sample
+                class Sample { fun name(): String = greeting() + " 17" }
+                """);
+        Path processFolder = Files.createDirectories(project.resolve("process"));
+        SequencedProperties javacProperties = new SequencedProperties();
+        javacProperties.setProperty("--release", "11");
+        javacProperties.store(processFolder.resolve("javac.properties"));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "kotlin",
+                new KotlinCompilerModule(
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
+                "project", standardLibrary(executor, project, "project"));
+        executor.execute();
+
+        Path output = root.resolve("kotlin").resolve(KotlinCompilerModule.CLASSES).resolve("output");
+        Path base = output.resolve(BuildStep.CLASSES + "sample/Sample.class"),
+                versioned = output.resolve(BuildStep.CLASSES + "META-INF/versions/17/sample/Sample.class");
+        assertThat(majorVersion(base)).as("the base is compiled for the module's release").isEqualTo(55);
+        assertThat(majorVersion(versioned)).as("the overlay is compiled for its own release").isEqualTo(61);
+        assertThat(output.resolve("manifest.mf")).content().contains("Multi-Release: true");
+    }
+
+    @Test
+    public void the_tests_of_a_module_see_its_internal_declarations() throws IOException {
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
+        versions.store(project.resolve(BuildStep.VERSIONS));
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Shout.kt"), """
+                package sample
+                internal fun shout(text: String): String = text.uppercase()
+                """);
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("kotlin", new KotlinCompilerModule(
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))), "project", standardLibrary(executor, project, "project"));
+        executor.execute();
+        Path classes = root.resolve("kotlin").resolve(KotlinCompilerModule.CLASSES).resolve("output").resolve(BuildStep.CLASSES);
+        Path jar = Files.createDirectories(tests.resolve("resolved")).resolve("sample.jar");
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar));
+             Stream<Path> files = Files.walk(classes)) {
+            for (Path file : files.filter(Files::isRegularFile).sorted().toList()) {
+                out.putNextEntry(new JarEntry(classes.relativize(file).toString().replace(File.separatorChar, '/')));
+                Files.copy(file, out);
+                out.closeEntry();
+            }
+        }
+        versions.store(tests.resolve(BuildStep.VERSIONS));
+        Files.writeString(Files.createDirectories(tests.resolve(BuildStep.SOURCES + "sample")).resolve("ShoutTest.kt"), """
+                package sample
+                class ShoutTest { fun shouts(): String = shout("hi") }
+                """);
+        Files.writeString(tests.resolve(BuildStep.MODULE), "test=sample\n");
+        Files.writeString(tests.resolve(BuildStep.METADATA), "project=demo\nartifact=sample\nversion=1.0.0\n");
+        Files.writeString(tests.resolve(BuildStep.DEPENDENCIES), "main/compile/maven/demo/sample/1.0.0=resolved/sample.jar\n");
+        Files.writeString(tests.resolve(Dependencies.GRAPH),
+                "vertex/main/compile/maven/demo/sample=1.0.0\\t\\tfalse\\ttrue\n");
+        BuildExecutor testExecutor = BuildExecutor.of(testRoot,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        testExecutor.addSource("tests", tests);
+        testExecutor.addModule("kotlin", new KotlinCompilerModule(
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))), "tests", standardLibrary(testExecutor, tests, "tests"));
+        testExecutor.execute();
+        assertThat(testRoot.resolve("kotlin").resolve(KotlinCompilerModule.CLASSES).resolve("output")
+                .resolve(BuildStep.CLASSES + "sample/ShoutTest.class"))
+                .as("the tested jar is a friend of the test half, so its internal function is visible")
+                .isNotEmptyFile();
+    }
+
+    @Test
+    public void compiles_against_the_declared_dependencies_and_not_the_compiler_runtime() throws IOException {
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
+        versions.store(project.resolve(BuildStep.VERSIONS));
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.kt"), """
+                package sample
+                import kotlinx.coroutines.runBlocking
+                fun answer(): Int = runBlocking { 42 }
+                """);
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("kotlin", new KotlinCompilerModule(
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
+                "project", standardLibrary(executor, project, "project"));
+        assertThatThrownBy(executor::execute)
+                .as("the coroutines library kotlinc runs on is no dependency the module declared")
+                .hasStackTraceContaining("kotlinx");
+    }
+
+    private static int majorVersion(Path file) throws IOException {
+        byte[] bytes = Files.readAllBytes(file);
+        return ((bytes[6] & 0xFF) << 8) | (bytes[7] & 0xFF);
     }
 
     @Test
@@ -172,7 +296,7 @@ public class KotlinCompilerModuleTest {
                 new KotlinCompilerModule(
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         Path classes = root
@@ -187,6 +311,99 @@ public class KotlinCompilerModuleTest {
         assertThat(majorVersion)
                 .as("--release=11 propagated to -jvm-target so the .class file carries major version 55 (Java 11)")
                 .isEqualTo(55);
+    }
+
+    @Test
+    public void release_8_reaches_kotlin_as_the_jvm_target_1_8_it_names_java_8_by() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
+        properties.store(project.resolve(BuildStep.VERSIONS));
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Sample.kt"), """
+                package sample
+                class Sample
+                """);
+        SequencedProperties javacProperties = new SequencedProperties();
+        javacProperties.setProperty("--release", "8");
+        javacProperties.store(Files.createDirectories(project.resolve("process")).resolve("javac.properties"));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "kotlin",
+                new KotlinCompilerModule(
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
+                "project", standardLibrary(executor, project, "project"));
+        executor.execute();
+
+        byte[] bytes = Files.readAllBytes(root
+                .resolve("kotlin")
+                .resolve(KotlinCompilerModule.CLASSES)
+                .resolve("output")
+                .resolve(BuildStep.CLASSES)
+                .resolve("sample/Sample.class"));
+        assertThat(((bytes[6] & 0xFF) << 8) | (bytes[7] & 0xFF))
+                .as("kotlinc refuses the target 8 and takes Java 8 as 1.8, which emits major version 52")
+                .isEqualTo(52);
+    }
+
+    @Test
+    public void hands_the_lines_of_process_kotlinc_properties_to_kotlinc_and_its_j_lines_to_the_jvm() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("kotlinc/kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable", KOTLIN_VERSION);
+        properties.store(project.resolve(BuildStep.VERSIONS));
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Sample.kt"), """
+                package sample
+                class Sample {
+                    fun greet(name: String): String = "Hello " + name
+                }
+                """);
+        SequencedProperties kotlincProperties = new SequencedProperties();
+        kotlincProperties.setProperty("-module-name", "custom-name");
+        kotlincProperties.setProperty("-java-parameters", "");
+        kotlincProperties.setProperty("-api-version", "2.0");
+        kotlincProperties.setProperty("-language-version", "2.0");
+        kotlincProperties.setProperty("-J-Xss4m", "");
+        kotlincProperties.store(Files.createDirectories(project.resolve("process")).resolve("kotlinc.properties"));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "kotlin",
+                new KotlinCompilerModule(
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
+                "project", standardLibrary(executor, project, "project"));
+        executor.execute();
+
+        Path classes = root
+                .resolve("kotlin")
+                .resolve(KotlinCompilerModule.CLASSES)
+                .resolve("output")
+                .resolve(BuildStep.CLASSES);
+        assertThat(classes.resolve("META-INF/custom-name.kotlin_module"))
+                .as("-module-name reached kotlinc, which names the module file after it")
+                .isNotEmptyFile();
+        ClassModel sample = ClassFile.of().parse(classes.resolve("sample/Sample.class"));
+        assertThat(sample.methods().stream()
+                .filter(method -> method.methodName().equalsString("greet"))
+                .flatMap(method -> method.findAttribute(Attributes.methodParameters()).stream()))
+                .as("-java-parameters reached kotlinc, which then writes the MethodParameters attribute")
+                .isNotEmpty();
+        List<String> command = Arrays.asList(Files.readString(root
+                .resolve("kotlin")
+                .resolve("compiled")
+                .resolve("supplement")
+                .resolve("command")).split(" "));
+        assertThat(command.indexOf("-Xss4m"))
+                .as("a -J line goes to the JVM that runs kotlinc, ahead of its main class")
+                .isNotNegative()
+                .isLessThan(command.indexOf("org.jetbrains.kotlin.cli.jvm.K2JVMCompiler"));
+        assertThat(command.indexOf("-api-version"))
+                .as("a compiler argument follows kotlinc's main class")
+                .isGreaterThan(command.indexOf("org.jetbrains.kotlin.cli.jvm.K2JVMCompiler"));
     }
 
     @Test
@@ -215,7 +432,7 @@ public class KotlinCompilerModuleTest {
                 new KotlinCompilerModule(
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         Path classes = root
@@ -243,7 +460,7 @@ public class KotlinCompilerModuleTest {
                 new KotlinCompilerModule(
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
-                "project");
+                "project", standardLibrary(executor, project, "project"));
         executor.execute();
 
         Path artifacts = root
@@ -364,6 +581,17 @@ public class KotlinCompilerModuleTest {
         SequencedMap<String, Path> outputs = executor.execute();
 
         assertThat(outputs).containsKeys("kotlin/classes", "kotlin/artifacts");
+    }
+
+    private static String standardLibrary(BuildExecutor executor, Path folder, String source) throws IOException {
+        Path file = folder.resolve(BuildStep.REQUIRES);
+        SequencedProperties requires = Files.exists(file) ? SequencedProperties.ofFiles(file) : new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.jetbrains.kotlin/kotlin-stdlib/" + KOTLIN_VERSION, "");
+        requires.store(file);
+        executor.addModule(source + "-libraries", new Dependencies(
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).group("main"), source);
+        return source + "-libraries";
     }
 
     private BuildExecutor newExecutor() throws IOException {

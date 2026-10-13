@@ -8,6 +8,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
+import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
@@ -41,6 +42,56 @@ public class JavaToolchainModuleTest {
                 false,
                 false,
                 0);
+    }
+
+    @Test
+    public void hands_on_the_generated_sources_of_the_compilers_that_remain_when_one_is_removed() throws IOException {
+        buildExecutor.addSource("input", input);
+        buildExecutor.addModule("output", new JavaToolchainModule().compiler((executor, _) -> {
+            executor.addStep("first", new Generating("First"));
+            executor.addStep("second", new Generating("Second"));
+        }).archiver(null), "input");
+        assertThat(buildExecutor.execute().get("output/processed").resolve(BuildStep.SOURCES))
+                .isDirectoryContaining(path -> path.getFileName().toString().equals("Second.java"));
+        BuildExecutor again = BuildExecutor.of(root,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        again.addSource("input", input);
+        again.addModule("output", new JavaToolchainModule().compiler((executor, _) ->
+                executor.addStep("first", new Generating("First"))).archiver(null), "input");
+        Path sources = again.execute().get("output/processed").resolve(BuildStep.SOURCES);
+        assertThat(sources.resolve("First.java")).exists();
+        assertThat(sources.resolve("Second.java")).as("a compiler no longer wired generates nothing").doesNotExist();
+    }
+
+    record Generating(String name) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.SOURCES)).resolve(name + ".java"),
+                    "class " + name + " { }");
+            Files.createDirectories(context.next().resolve(BuildStep.CLASSES));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    @Test
+    public void exports_what_a_plugin_of_the_compilers_writes_but_not_what_the_stock_compilers_write() {
+        JavaToolchainModule module = new JavaToolchainModule();
+        assertThat(module.resolve("compiled/compile/javac"))
+                .as("the stock compilers' classes reach the module through the merged classes alone")
+                .isEmpty();
+        assertThat(module.resolve("compiled/custom/library/compile"))
+                .as("what a plugin at binary/compiled writes beside its classes stays visible to the module's other steps")
+                .contains("compiled/custom/library/compile");
     }
 
     @Test
@@ -106,6 +157,27 @@ public class JavaToolchainModuleTest {
                 names.add(entry.getName());
             }
             assertThat(names).contains("other/Sample.class", "transformed.marker");
+        }
+    }
+
+    @Test
+    public void the_resources_a_generator_writes_join_the_jar() throws IOException {
+        Path sources = Files.createDirectories(input.resolve(BuildStep.SOURCES + "other"));
+        Files.writeString(sources.resolve("Sample.java"), "package other; public class Sample { }\n");
+        buildExecutor.addSource("input", input);
+        buildExecutor.addModule("output", new JavaToolchainModule().generator(GENERATOR), "input");
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        try (JarInputStream inputStream = new JarInputStream(Files.newInputStream(steps.get("output/artifacts")
+                .resolve(BuildStep.ARTIFACTS)
+                .resolve("classes.jar")))) {
+            Set<String> names = new LinkedHashSet<>();
+            for (JarEntry entry = inputStream.getNextJarEntry(); entry != null; entry = inputStream.getNextJarEntry()) {
+                names.add(entry.getName());
+            }
+            assertThat(names)
+                    .as("a generator hands its sources to the compilers and its resources to the jar")
+                    .contains("other/Sample.class", "generated/Generated.class", "META-INF/services/generated.Service")
+                    .doesNotContain("generated/Generated.java");
         }
     }
 
@@ -341,6 +413,14 @@ public class JavaToolchainModuleTest {
         Files.writeString(classes.resolve("transformed.marker"), "transformed");
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }).asModule("transform");
+
+    private static final BuildExecutorModule GENERATOR = ((BuildStep) (_, context, _) -> {
+        Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.SOURCES + "generated"))
+                .resolve("Generated.java"), "package generated; public class Generated { }\n");
+        Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.RESOURCES + "META-INF/services"))
+                .resolve("generated.Service"), "generated.Generated\n");
+        return CompletableFuture.completedStage(new BuildStepResult(true));
+    }).asModule("generate");
 
     private static final BuildExecutorModule VALIDATOR = ((BuildStep) (_, context, arguments) -> {
         List<String> names = new ArrayList<>();

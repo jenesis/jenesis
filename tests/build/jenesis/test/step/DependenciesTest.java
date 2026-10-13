@@ -3,6 +3,7 @@ package build.jenesis.test.step;
 import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.BuildStep;
+import build.jenesis.BuildStepArgument;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Dependencies;
 
@@ -34,6 +35,25 @@ public class DependenciesTest {
                 .containsExactly(folder.resolve("libs/a.jar"), folder.resolve("libs/b.jar"));
         assertThat(Dependencies.select(folder, "main", "runtime"))
                 .containsExactly(folder.resolve("libs/c.jar"));
+    }
+
+    @Test
+    public void collects_the_jars_of_a_group_and_scope_across_the_arguments_a_step_is_handed() throws IOException {
+        jar("first/libs/a.jar");
+        jar("first/libs/b.jar");
+        jar("second/libs/c.jar");
+        SequencedProperties first = new SequencedProperties(), second = new SequencedProperties();
+        first.setProperty("main/compile/maven/a", "libs/a.jar");
+        first.setProperty("main/runtime/maven/b", "libs/b.jar");
+        first.store(folder.resolve("first").resolve(BuildStep.DEPENDENCIES));
+        second.setProperty("main/compile/maven/c", "libs/c.jar");
+        second.store(folder.resolve("second").resolve(BuildStep.DEPENDENCIES));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("first", new BuildStepArgument(folder.resolve("first"), Map.of()));
+        arguments.put("second", new BuildStepArgument(folder.resolve("second"), Map.of()));
+        arguments.put("removed", new BuildStepArgument(null, Map.of()));
+        assertThat(Dependencies.paths(arguments, "main", "compile"))
+                .containsExactly(folder.resolve("first/libs/a.jar"), folder.resolve("second/libs/c.jar"));
     }
 
     @Test

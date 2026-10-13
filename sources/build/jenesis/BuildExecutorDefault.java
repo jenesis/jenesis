@@ -667,10 +667,14 @@ class BuildExecutorDefault implements BuildExecutor {
         return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).handleAsync((_, _) -> {
             Map<String, StepSummary> merged = new LinkedHashMap<>();
             CompletionException aggregate = null;
+            Set<Throwable> reported = Collections.newSetFromMap(new IdentityHashMap<>());
             for (CompletableFuture<Map<String, Map<String, StepSummary>>> future : futures) {
                 try {
                     future.join().values().forEach(merged::putAll);
                 } catch (CompletionException e) {
+                    if (!reported.add(e.getCause() == null ? e : e.getCause())) {
+                        continue;
+                    }
                     if (aggregate == null) {
                         aggregate = e;
                     } else {

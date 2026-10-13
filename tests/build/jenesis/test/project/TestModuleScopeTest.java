@@ -159,6 +159,16 @@ public class TestModuleScopeTest {
     }
 
     @Test
+    public void a_scope_records_its_exclusion_beside_its_filter(@TempDir Path folder) throws IOException {
+        Path file = folder.resolve("testscope.properties");
+        TestModule.Scope scope = new TestModule.Scope(null, ".*SlowTest", List.of(TestTags.ALL));
+        scope.store(file);
+        assertThat(TestModule.Scope.ofFile(file)).isEqualTo(scope);
+        assertThat(scope.excludes(" .*SlowTest ")).isTrue();
+        assertThat(scope.excludes(null)).as("a run that left classes out covers none that includes them").isFalse();
+    }
+
+    @Test
     public void a_filter_is_only_matched_by_the_identical_filter() {
         assertThat(new TestModule.Scope(null, List.of()).filters(null)).isTrue();
         assertThat(new TestModule.Scope(" .*FooTest , .*BarTest ", List.of()).filters(".*FooTest,.*BarTest")).isTrue();

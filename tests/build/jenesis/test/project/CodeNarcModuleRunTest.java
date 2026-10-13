@@ -16,6 +16,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.CodeNarcModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class CodeNarcModuleRunTest {
 
@@ -81,6 +82,36 @@ public class CodeNarcModuleRunTest {
         Path report = root.resolve("codenarc").resolve("check").resolve("output").resolve("reports").resolve("codenarc").resolve("codenarc-report.xml");
         assertThat(report).isNotEmptyFile();
         assertThat(report).content().contains("EmptyIfStatement");
+    }
+
+    @Test
+    public void fails_a_report_only_run_when_codenarc_cannot_load_its_configuration() throws IOException {
+        SequencedProperties versions = new SequencedProperties();
+        versions.load(new StringReader(PINS));
+        versions.store(project.resolve(BuildStep.VERSIONS));
+        Files.writeString(project.resolve("codenarc.xml"), """
+                <ruleset xmlns="http://codenarc.org/ruleset/1.0">
+                    <rule class="org.codenarc.rule.basic.NoSuchRule"/>
+                </ruleset>
+                """);
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Sample.groovy"), """
+                package sample
+                class Sample {
+                }
+                """);
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "codenarc",
+                new CodeNarcModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .as("report-only covers findings, not a CodeNarc that never ran")
+                .hasMessageContaining("Unexpected exit code");
     }
 
     private BuildExecutor newExecutor() throws IOException {

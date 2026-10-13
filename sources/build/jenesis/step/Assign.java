@@ -13,8 +13,23 @@ public class Assign implements BuildStep {
 
     public Assign() {
         this((BiFunction<Set<String>, SequencedSet<Path>, Map<String, Path>> & Serializable) ((coordinates, files) -> {
-            if (files.size() != 1) {
-                throw new IllegalArgumentException("Expected exactly one artifact: " + files);
+            if (files.isEmpty()) {
+                throw new IllegalArgumentException("Expected exactly one artifact, found none in the "
+                        + ARTIFACTS + " folder of any step this one is handed");
+            } else if (files.size() != 1) {
+                SequencedMap<Path, List<String>> found = new TreeMap<>();
+                files.forEach(file -> found.computeIfAbsent(file.getParent(), _ -> new ArrayList<>())
+                        .add(file.getFileName().toString()));
+                throw new IllegalArgumentException("Expected exactly one artifact, found " + found.entrySet().stream()
+                        .map(folder -> folder.getValue().size() + (folder.getValue().size() == 1 ? " file in " : " files in ")
+                                + folder.getKey() + ": " + String.join(", ", folder.getValue()))
+                        .collect(Collectors.joining("; "))
+                        + (found.values().stream().anyMatch(names -> names.size() > 1)
+                                ? " - a step writes its one artifact into a folder of its own, so a file beside it was"
+                                        + " put there by a program the build ran that wrote into a folder it was handed,"
+                                        + " as a test writing beside the jar under test does: make that program write"
+                                        + " elsewhere"
+                                : ""));
             }
             return coordinates.stream().collect(Collectors.toMap(Function.identity(), _ -> files.getFirst()));
         }));

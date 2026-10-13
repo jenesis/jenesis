@@ -13,6 +13,7 @@ import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -20,6 +21,8 @@ public class SpotBugsModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
+    private static final String SETTING = "validator.spotbugs";
+    private static final String REPORT = BuildStep.REPORTS + "spotbugs/spotbugs-report.xml";
     private static final String MAVEN_GROUP = "com.github.spotbugs", MAVEN_ARTIFACT = "spotbugs";
 
     private final Dependencies dependencies;
@@ -38,7 +41,7 @@ public class SpotBugsModule implements BuildExecutorModule {
              "main",
              "spotbugs-exclude.xml",
              false,
-             ProcessBuildStep.Terms.of("spotbugs"));
+             new ProcessBuildStep.Terms());
     }
 
     public static SpotBugsModule ofEnvironment(Environment environment,
@@ -49,7 +52,7 @@ public class SpotBugsModule implements BuildExecutorModule {
                 "spotbugs",
                 "main",
                 "spotbugs-exclude.xml",
-                false,
+                Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "spotbugs"));
     }
 
@@ -154,8 +157,10 @@ public class SpotBugsModule implements BuildExecutorModule {
         public boolean acceptableExitCode(int code,
                                           Executor executor,
                                           BuildStepContext context,
-                                          SequencedMap<String, BuildStepArgument> arguments) {
-            return !strict || code == 0;
+                                          SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Path report = context.next().resolve(REPORT);
+            return Findings.ofXml("spotbugs", report, "BugInstance")
+                    .acceptable(code, context, false, strict, SETTING, terms.reporting());
         }
 
         @Override
@@ -191,7 +196,8 @@ public class SpotBugsModule implements BuildExecutorModule {
             if (jars.isEmpty()) {
                 throw new IllegalStateException("No SpotBugs jars resolved upstream of the SpotBugs step");
             }
-            Path report = Files.createDirectories(context.next().resolve(BuildStep.REPORTS + "spotbugs")).resolve("spotbugs-report.xml");
+            Path report = context.next().resolve(REPORT);
+            Files.createDirectories(report.getParent());
             List<String> commands = new ArrayList<>(List.of(
                     "-cp", String.join(File.pathSeparator, jars),
                     "edu.umd.cs.findbugs.LaunchAppropriateUI", "-textui",

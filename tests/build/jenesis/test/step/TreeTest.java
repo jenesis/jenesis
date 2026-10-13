@@ -146,6 +146,29 @@ public class TreeTest {
     }
 
     @Test
+    public void renders_the_inputs_that_remain_when_one_was_removed() throws IOException {
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
+        graph.setProperty("vertex/main/compile/maven/org.foo/bar", "1.0\torg.foo.bar\tfalse");
+        graph.store(argument.resolve("graph.properties"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module.graph.0", "graph.properties");
+        inventory.store(argument.resolve(Inventory.INVENTORY));
+
+        List<String> printed = new ArrayList<>();
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("vanished", new BuildStepArgument(null, Checksum.removed(Set.of(Path.of(Inventory.INVENTORY)))));
+        arguments.put("argument", new BuildStepArgument(
+                argument,
+                Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))));
+        Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                arguments).toCompletableFuture().join();
+        assertThat(String.join(System.lineSeparator(), printed)).contains("maven/org.foo/bar");
+    }
+
+    @Test
     public void names_a_maven_project_by_its_coordinate() throws IOException {
         SequencedProperties graph = new SequencedProperties();
         graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
@@ -306,6 +329,60 @@ public class TreeTest {
         List<String> printed = local(Map.of("tree.internal", "true"));
         assertThat(printed).containsSequence("Resolved dependencies:", "  maven/g/greeter -> 1.0 [compile]");
         assertThat(printed).contains("Licenses:");
+    }
+
+    @Test
+    public void leaves_a_group_the_build_resolves_for_itself_out_of_the_module_tree() throws IOException {
+        List<String> printed = tooled(Map.of(), tree -> tree);
+        assertThat(printed).contains("module/foo 1.0 [compile] (local ./)", "└─ maven/org.foo/bar 1.0 [compile]");
+        assertThat(printed)
+                .as("a linter's closure is no dependency of the module, so neither its tree nor the summary shows it")
+                .noneMatch(line -> line.contains("checkstyle") || line.contains("Group "));
+    }
+
+    @Test
+    public void shows_a_group_the_build_resolves_for_itself_apart_from_the_module_when_asked() throws IOException {
+        List<String> printed = tooled(Map.of("tree.tools", "true"), tree -> tree);
+        assertThat(printed).containsSequence(
+                "Group checkstyle, resolved to build module/foo 1.0:",
+                "maven/com.puppycrawl.tools/checkstyle 10.0 [runtime]");
+        assertThat(printed)
+                .as("the module's own tree does not take the tool for a dependency")
+                .doesNotContain("module/foo 1.0 [compile, runtime] (local ./)", "module/foo 1.0 [runtime] (local ./)");
+    }
+
+    @Test
+    public void renders_the_group_it_is_told_is_the_module_s_own_as_the_module_tree() throws IOException {
+        List<String> printed = tooled(Map.of(), tree -> tree.group("checkstyle"));
+        assertThat(printed).contains("module/foo 1.0 [runtime] (local ./)",
+                "└─ maven/com.puppycrawl.tools/checkstyle 10.0 [runtime]");
+        assertThat(printed)
+                .as("the main group is then one the build resolves for itself")
+                .noneMatch(line -> line.contains("org.foo/bar") || line.contains("Group "));
+    }
+
+    private List<String> tooled(Map<String, String> keys, UnaryOperator<Tree> configured) throws IOException {
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
+        graph.setProperty("edge/1", "checkstyle\truntime\tmaven\ttrue\truntime\t10.0\t\tmaven/com.puppycrawl.tools/checkstyle/10.0");
+        graph.setProperty("vertex/main/compile/maven/org.foo/bar", "1.0\t\tfalse");
+        graph.setProperty("vertex/checkstyle/runtime/maven/com.puppycrawl.tools/checkstyle", "10.0\t\tfalse");
+        graph.store(argument.resolve("graph.properties"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module.graph.0", "graph.properties");
+        inventory.setProperty("module.identity.0", "module/foo");
+        inventory.setProperty("module.version", "1.0");
+        inventory.store(argument.resolve(Inventory.INVENTORY));
+
+        List<String> printed = new ArrayList<>();
+        configured.apply(Tree.ofEnvironment(new Environment(keys, printed::add, printed::add))).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                        argument,
+                        Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        return printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")).toList();
     }
 
     private List<String> local(Map<String, String> keys) throws IOException {

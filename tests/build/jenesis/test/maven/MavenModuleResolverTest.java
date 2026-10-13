@@ -240,7 +240,7 @@ public class MavenModuleResolverTest {
     }
 
     @Test
-    public void throws_when_discovery_pom_is_missing() {
+    public void names_the_alias_that_maps_a_module_name_without_an_artifact_behind_it() {
         Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of());
 
         assertThatThrownBy(() -> new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
@@ -251,7 +251,25 @@ public class MavenModuleResolverTest {
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("No POM found for foo.bar");
+                .hasMessageContaining("The module name foo.bar has no artifact behind it")
+                .hasMessageContaining("@jenesis.alias foo.bar <groupId>/<artifactId>")
+                .hasMessageContaining("<!--jenesis.alias foo.bar <groupId>/<artifactId>-->");
+    }
+
+    @Test
+    public void names_the_pinned_version_of_a_module_name_without_an_artifact_behind_it() {
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of());
+
+        assertThatThrownBy(() -> new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
+                Runnable::run,
+                "module",
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
+                new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(Map.of("foo.bar", "9.9")),
+                DependencyScope.COMPILE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The module name foo.bar has no artifact behind it in version 9.9")
+                .hasMessageContaining("@jenesis.alias foo.bar <groupId>/<artifactId>");
     }
 
     @Test

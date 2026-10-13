@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.HashFunction;
 
@@ -15,7 +16,7 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
     private final boolean verify;
 
     protected FormatBuildStep(String command, String tool, boolean verify) {
-        this(command, tool, verify, ProcessBuildStep.Terms.of(command));
+        this(command, tool, verify, new Terms());
     }
 
     protected FormatBuildStep(String command,
@@ -29,7 +30,11 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
 
     protected abstract boolean isFormattable(Path file);
 
-    protected abstract List<String> command(List<String> jars, Path config, List<String> files, boolean verify);
+    protected abstract List<String> command(BuildStepContext context,
+                                            List<String> jars,
+                                            Path config,
+                                            List<String> files,
+                                            boolean verify) throws IOException;
 
     protected Path config(Path folder) {
         return null;
@@ -37,7 +42,7 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
 
     @Override
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
-        return true;
+        return !verify || arguments.values().stream().anyMatch(BuildStepArgument::hasChanged);
     }
 
     @Override
@@ -58,6 +63,7 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
         List<String> jars = new ArrayList<>();
         Path config = null;
         Map<Path, byte[]> current = new LinkedHashMap<>();
+        Map<Path, Path> located = new HashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -69,19 +75,27 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
             if (candidate != null) {
                 config = candidate;
             }
-            current.putAll(formattable(argument.folder(), hash, executor));
+            Map<Path, byte[]> formattable = formattable(argument.folder(), hash, executor);
+            current.putAll(formattable);
+            Path sources = argument.folder().resolve(Bind.SOURCES);
+            formattable.keySet().forEach(file -> located.put(file, sources.resolve(file)));
         }
         if (current.isEmpty()) {
             return CompletableFuture.completedStage(null);
         }
-        Map<Path, byte[]> stored = context.previous() != null && Files.exists(context.previous().resolve(FORMATTED))
-                ? HashFunction.read(context.previous().resolve(FORMATTED))
-                : Map.of();
+        boolean reconfigured = arguments.values().stream().anyMatch(argument -> argument.files().entrySet().stream()
+                .anyMatch(entry -> entry.getValue().status() != ChecksumStatus.RETAINED
+                        && !(entry.getKey().startsWith(Bind.SOURCES) && isFormattable(entry.getKey()))));
+        Map<Path, byte[]> stored = !reconfigured
+                && context.previous() != null
+                && Files.exists(context.previous().resolve(FORMATTED))
+                        ? HashFunction.read(context.previous().resolve(FORMATTED))
+                        : Map.of();
         List<String> files = new ArrayList<>();
         for (Map.Entry<Path, byte[]> entry : current.entrySet()) {
             byte[] prior = stored.get(entry.getKey());
             if (prior == null || !Arrays.equals(prior, entry.getValue())) {
-                files.add(entry.getKey().toString());
+                files.add(located.get(entry.getKey()).toString());
             }
         }
         if (files.isEmpty()) {
@@ -91,7 +105,7 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
             throw new IllegalStateException("No " + tool + " jars resolved upstream of the " + tool + " step");
         }
         files.sort(null);
-        return CompletableFuture.completedStage(command(jars, config, files, verify));
+        return CompletableFuture.completedStage(command(context, jars, config, files, verify));
     }
 
     @Override
@@ -100,7 +114,7 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         return super.apply(executor, context, arguments).thenCompose(result -> {
-            if (!result.next() || verify) {
+            if (!result.next()) {
                 return CompletableFuture.completedStage(result);
             }
             try {
@@ -127,9 +141,8 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
         }
         Map<Path, byte[]> formattable = new LinkedHashMap<>();
         for (Map.Entry<Path, byte[]> entry : HashFunction.read(sources, hash, executor).entrySet()) {
-            Path file = sources.resolve(entry.getKey());
-            if (isFormattable(file)) {
-                formattable.put(file, entry.getValue());
+            if (isFormattable(sources.resolve(entry.getKey()))) {
+                formattable.put(entry.getKey(), entry.getValue());
             }
         }
         return formattable;
