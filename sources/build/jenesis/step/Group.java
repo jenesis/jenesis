@@ -9,7 +9,7 @@ import build.jenesis.SequencedProperties;
 
 public class Group implements BuildStep {
 
-    public static final String GROUPS = "groups/";
+    public static final String GROUPS = "groups.properties";
 
     private final Function<String, Optional<String>> identification;
     private final String requiresPath;
@@ -56,17 +56,16 @@ public class Group implements BuildStep {
                 requires.add(coordinate.substring(second + 1));
             }
         }
-        Path folder = Files.createDirectory(context.next().resolve(GROUPS));
+        SequencedProperties groups = new SequencedProperties();
         for (Map.Entry<String, Set<String>> entry : to.entrySet()) {
-            SequencedProperties properties = new SequencedProperties();
-            entry.getValue().stream()
+            groups.setProperty(entry.getKey(), entry.getValue().stream()
                     .flatMap(dependency -> from.getOrDefault(dependency,
                             from.getOrDefault(Assign.unclassified(dependency), Set.of())).stream())
                     .distinct()
                     .filter(name -> !name.equals(entry.getKey()))
-                    .forEach(name -> properties.setProperty(name, ""));
-            properties.store(folder.resolve(entry.getKey() + ".properties"));
+                    .collect(Collectors.joining(",")));
         }
+        groups.store(context.next().resolve(GROUPS));
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
