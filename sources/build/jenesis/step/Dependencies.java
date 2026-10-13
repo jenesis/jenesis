@@ -20,8 +20,6 @@ import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 
-import static java.util.Objects.requireNonNull;
-
 public class Dependencies implements BuildExecutorModule {
 
     public static final String SPDX = "spdx.properties",
@@ -205,6 +203,7 @@ public class Dependencies implements BuildExecutorModule {
                     Path.of(SPDX),
                     Path.of(DEPENDENCIES),
                     Path.of(MODULAR),
+                    Path.of(Assign.VARIANTS),
                     Path.of(RESOLVED)));
         }
 
@@ -248,10 +247,15 @@ public class Dependencies implements BuildExecutorModule {
             SequencedMap<String, String> bomTokens = new LinkedHashMap<>();
             SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedSet<String>>>>> exclusions = new LinkedHashMap<>();
             SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedSet<String>>>> managedExclusions = new LinkedHashMap<>();
+            SequencedMap<String, String> variants = new TreeMap<>();
             Set<String> handed = new HashSet<>();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
+                }
+                Path variantsFile = argument.folder().resolve(Assign.VARIANTS);
+                if (Files.exists(variantsFile)) {
+                    SequencedProperties.ofFiles(variantsFile).forEachProperty(variants::putIfAbsent);
                 }
                 Path handedFile = argument.folder().resolve(DEPENDENCIES);
                 if (Files.exists(handedFile)) {
@@ -463,9 +467,17 @@ public class Dependencies implements BuildExecutorModule {
                     }
                     current.put(location, item);
                 }
-                if (reusable && key(stored, requires, new TreeMap<>(categories), new TreeMap<>(aliases), versions,
-                        moduleAliases, moduleOverrides, bomTokens, exclusions, managedExclusions)
-                        .equals(stored.getProperty("inputs"))) {
+                if (reusable && key(stored,
+                        requires,
+                        new TreeMap<>(categories),
+                        new TreeMap<>(aliases),
+                        versions,
+                        moduleAliases,
+                        moduleOverrides,
+                        bomTokens,
+                        exclusions,
+                        managedExclusions,
+                        variants).equals(stored.getProperty("inputs"))) {
                     try (Stream<Path> files = Files.walk(context.previous())) {
                         for (Path file : files.toList()) {
                             Path target = context.next().resolve(context.previous().relativize(file));
@@ -665,7 +677,19 @@ public class Dependencies implements BuildExecutorModule {
                     DependencyScope intent = scope.equals("compile") ? DependencyScope.COMPILE : DependencyScope.RUNTIME;
                     for (Map.Entry<String, SequencedMap<String, String>> repoEntry : groupEntry.getValue().get(scope).entrySet()) {
                         String repo = repoEntry.getKey();
-                        Resolver resolver = requireNonNull(resolvers.get(Resolver.base(repo)), "Unknown resolver: " + Resolver.base(repo));
+                        Resolver resolver = resolvers.get(Resolver.base(repo));
+                        if (resolver == null) {
+                            throw new IllegalArgumentException("Cannot resolve "
+                                    + repoEntry.getValue().sequencedKeySet().stream().map(coordinate -> repo + "/" + coordinate).toList()
+                                    + ": this layout resolves no " + Resolver.base(repo) + " coordinate, only those of "
+                                    + resolvers.keySet().stream().sorted().toList()
+                                    + (Resolver.base(repo).equals("maven")
+                                            ? " - a @jenesis.alias or a Maven coordinate names one, which the modular_to_maven"
+                                                    + " and maven layouts resolve, so build with"
+                                                    + " -Djenesis.project.layout=modular_to_maven or require the module by a"
+                                                    + " name the module repository serves"
+                                            : " - name a coordinate of one of those"));
+                        }
                         SequencedMap<String, SequencedSet<String>> repoExclusions = exclusions
                                 .getOrDefault(group, Collections.emptyNavigableMap())
                                 .getOrDefault(scope, Collections.emptyNavigableMap())
@@ -893,6 +917,25 @@ public class Dependencies implements BuildExecutorModule {
             if (!layers.isEmpty()) {
                 layers.store(context.next().resolve(BuildStep.LAYERS));
             }
+            UnaryOperator<String> unversioned = coordinate -> coordinate.chars().filter(character -> character == '/').count() == 3
+                    ? coordinate.substring(0, coordinate.lastIndexOf('/'))
+                    : coordinate;
+            SequencedSet<String> replaced = new LinkedHashSet<>();
+            for (String key : materialized.sequencedKeySet()) {
+                int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+                String main = variants.get(key.substring(second + 1));
+                if (main != null) {
+                    replaced.add(key.substring(0, first + 1) + unversioned.apply(main));
+                }
+            }
+            materialized.keySet().removeIf(key -> {
+                int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+                boolean main = replaced.contains(key.substring(0, first + 1) + unversioned.apply(key.substring(second + 1)));
+                if (main) {
+                    resolved.remove(key);
+                }
+                return main;
+            });
             SequencedMap<String, Path> placed = new LinkedHashMap<>();
             SequencedMap<String, SequencedSet<String>> grouped = new LinkedHashMap<>();
             SequencedMap<String, String> checksums = new LinkedHashMap<>();
@@ -1056,9 +1099,18 @@ public class Dependencies implements BuildExecutorModule {
                 for (Map.Entry<String, RepositoryItem> entry : fetched.entrySet()) {
                     resolution.setProperty("fetched/" + entry.getKey(), fingerprint(entry.getValue()));
                 }
-                resolution.setProperty("inputs", key(resolution, requires, new TreeMap<>(categories),
-                        new TreeMap<>(aliases), versions, moduleAliases, moduleOverrides, bomTokens, exclusions,
-                        managedExclusions));
+                resolution.setProperty("inputs",
+                        key(resolution,
+                                requires,
+                                new TreeMap<>(categories),
+                                new TreeMap<>(aliases),
+                                versions,
+                                moduleAliases,
+                                moduleOverrides,
+                                bomTokens,
+                                exclusions,
+                                managedExclusions,
+                                variants));
                 resolution.store(context.next().resolve(RESOLUTION));
             }
             Set<String> listed = new HashSet<>(), dropped = new HashSet<>();
