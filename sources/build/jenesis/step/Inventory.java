@@ -108,6 +108,7 @@ public class Inventory implements BuildStep {
                 Path.of(POM),
                 Path.of(ARTIFACTS),
                 Path.of(Classifiers.CLASSIFIERS),
+                Path.of(Classifiers.CLASSIFIED),
                 Path.of(Bom.BOM),
                 Path.of(SOURCES),
                 Path.of(DOCUMENTATION),
@@ -148,7 +149,7 @@ public class Inventory implements BuildStep {
         Path metadataImage = null;
         Path dockerContext = null;
         SequencedSet<Path> artifacts = new LinkedHashSet<>();
-        SequencedSet<Path> classified = new LinkedHashSet<>();
+        SequencedMap<String, Path> classified = new TreeMap<>();
         SequencedSet<Path> processes = new LinkedHashSet<>();
         SequencedSet<Path> bomArtifacts = new LinkedHashSet<>();
         SequencedSet<Path> sources = new LinkedHashSet<>(), generated = new LinkedHashSet<>();
@@ -230,7 +231,11 @@ public class Inventory implements BuildStep {
                 pomFile = pomCandidate;
             }
             collect(folder.resolve(ARTIFACTS), artifacts);
-            collect(folder.resolve(Classifiers.CLASSIFIERS), classified);
+            Path classifiedFile = folder.resolve(Classifiers.CLASSIFIED);
+            if (Files.isRegularFile(classifiedFile)) {
+                SequencedProperties.ofFiles(classifiedFile).forEachProperty((classifier, variant) ->
+                        classified.putIfAbsent(classifier, folder.resolve(variant)));
+            }
             collect(folder.resolve(Bom.BOM), bomArtifacts);
             collect(folder.resolve(SOURCES), sources);
             if (holdsSources(folder.resolve(SOURCES))) {
@@ -456,10 +461,8 @@ public class Inventory implements BuildStep {
             inventory.setProperty(prefix + "bom." + bomIndex++, entry.getKey() + " " + entry.getValue());
         }
         writePaths(inventory, context, prefix + "artifacts", artifacts);
-        for (Path jar : classified) {
-            String name = jar.getFileName().toString();
-            inventory.setProperty(prefix + "attachment." + name.substring(0, name.length() - ".jar".length()),
-                    relativize(context, jar));
+        for (Map.Entry<String, Path> variant : classified.entrySet()) {
+            inventory.setProperty(prefix + "attachment." + variant.getKey(), relativize(context, variant.getValue()));
         }
         writePaths(inventory, context, prefix + "process", processes);
         writePaths(inventory, context, prefix + "bomfile", bomArtifacts);

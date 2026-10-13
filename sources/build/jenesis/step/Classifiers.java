@@ -14,7 +14,10 @@ public record Classifiers(SequencedMap<String, SequencedMap<String, Path>> folde
                           SequencedMap<String, SequencedSet<String>> dormant,
                           OffsetDateTime timestamp) implements BuildExecutorModule {
 
-    public static final String FILE = "classifiers.properties", CLASSIFIERS = "classifiers/", DORMANT = "dormant.properties";
+    public static final String FILE = "classifiers.properties",
+            CLASSIFIERS = "classifiers/",
+            CLASSIFIED = "classified.properties",
+            DORMANT = "dormant.properties";
     public static final Set<String> RESERVED = Set.of("tests", "sources", "javadoc");
     private static final String FOLDERS = "folders/", CLASSIFY = "classify";
     public static final Pattern NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_.-]*");
@@ -115,18 +118,18 @@ public record Classifiers(SequencedMap<String, SequencedMap<String, Path>> folde
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
         SequencedSet<String> bound = new LinkedHashSet<>();
-        SequencedMap<String, List<String>> declared = new LinkedHashMap<>();
+        SequencedMap<String, List<Folder>> declared = new LinkedHashMap<>();
         for (Map.Entry<String, SequencedMap<String, Path>> classifier : folders.entrySet()) {
-            List<String> names = new ArrayList<>();
+            List<Folder> names = new ArrayList<>();
             for (Map.Entry<String, Path> folder : classifier.getValue().entrySet()) {
+                String target = null;
                 if (folder.getValue() != null) {
                     String source = "folder-" + bound.size();
-                    buildExecutor.addSource(source,
-                            new Bind(Map.of(Path.of(""), Path.of(FOLDERS + classifier.getKey() + "/" + names.size()))),
-                            folder.getValue());
+                    target = FOLDERS + bound.size();
+                    buildExecutor.addSource(source, new Bind(Map.of(Path.of(""), Path.of(target))), folder.getValue());
                     bound.add(source);
                 }
-                names.add(folder.getKey());
+                names.add(new Folder(folder.getKey(), target));
             }
             declared.put(classifier.getKey(), List.copyOf(names));
         }
@@ -142,7 +145,10 @@ public record Classifiers(SequencedMap<String, SequencedMap<String, Path>> folde
         return path.equals(CLASSIFY) ? Optional.of("") : Optional.empty();
     }
 
-    private record Classify(SequencedMap<String, List<String>> classifiers,
+    private record Folder(String name, String bound) implements Serializable {
+    }
+
+    private record Classify(SequencedMap<String, List<Folder>> classifiers,
                             SequencedMap<String, String> dormant,
                             OffsetDateTime timestamp) implements BuildStep {
 
@@ -152,8 +158,7 @@ public record Classifiers(SequencedMap<String, SequencedMap<String, Path>> folde
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
             SequencedSet<Path> jars = new TreeSet<>();
-            SequencedMap<String, SequencedMap<Integer, Path>> bound = new LinkedHashMap<>();
-            List<Path> written = new ArrayList<>();
+            List<Path> inputs = new ArrayList<>(), written = new ArrayList<>();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
@@ -162,6 +167,7 @@ public record Classifiers(SequencedMap<String, SequencedMap<String, Path>> folde
                 if (Files.isRegularFile(module) && SequencedProperties.ofFiles(module).getProperty("test") != null) {
                     return CompletableFuture.completedStage(new BuildStepResult(true));
                 }
+                inputs.add(argument.folder());
                 if (!Files.isDirectory(argument.folder().resolve(FOLDERS))) {
                     written.add(argument.folder());
                 }
@@ -169,17 +175,6 @@ public record Classifiers(SequencedMap<String, SequencedMap<String, Path>> folde
                 if (Files.isDirectory(artifacts)) {
                     try (DirectoryStream<Path> files = Files.newDirectoryStream(artifacts, "*.jar")) {
                         files.forEach(jars::add);
-                    }
-                }
-                for (String classifier : classifiers.keySet()) {
-                    Path folder = argument.folder().resolve(FOLDERS + classifier);
-                    if (Files.isDirectory(folder)) {
-                        try (DirectoryStream<Path> indices = Files.newDirectoryStream(folder)) {
-                            for (Path index : indices) {
-                                bound.computeIfAbsent(classifier, _ -> new TreeMap<>())
-                                        .put(Integer.parseInt(index.getFileName().toString()), index);
-                            }
-                        }
                     }
                 }
             }
@@ -197,18 +192,23 @@ public record Classifiers(SequencedMap<String, SequencedMap<String, Path>> folde
                         + " - declare classifiers only for a module that builds one jar");
             }
             Path jar = jars.getFirst(), target = Files.createDirectory(context.next().resolve(CLASSIFIERS));
-            for (Map.Entry<String, List<String>> classifier : classifiers.entrySet()) {
+            SequencedProperties classified = new SequencedProperties();
+            for (Map.Entry<String, List<Folder>> classifier : classifiers.entrySet()) {
                 Path variant = target.resolve(classifier.getKey() + ".jar");
                 if (classifier.getValue().isEmpty()) {
                     BuildStep.linkOrCopy(variant, jar);
                 } else {
                     SequencedMap<Path, String> folders = new LinkedHashMap<>();
-                    SequencedMap<Integer, Path> projected = bound.getOrDefault(classifier.getKey(), Collections.emptyNavigableMap());
-                    for (int index = 0; index < classifier.getValue().size(); index++) {
-                        String name = classifier.getValue().get(index);
+                    for (Folder declared : classifier.getValue()) {
+                        String name = declared.name();
                         int found = folders.size();
-                        if (projected.containsKey(index)) {
-                            folders.put(projected.get(index), name);
+                        if (declared.bound() != null) {
+                            for (Path input : inputs) {
+                                Path candidate = input.resolve(declared.bound());
+                                if (Files.isDirectory(candidate)) {
+                                    folders.put(candidate, name);
+                                }
+                            }
                         }
                         for (Path folder : written) {
                             Path candidate = folder.resolve(name).normalize();
@@ -225,7 +225,10 @@ public record Classifiers(SequencedMap<String, SequencedMap<String, Path>> folde
                     }
                     write(classifier.getKey(), folders, jar, variant);
                 }
+                classified.setProperty(classifier.getKey(),
+                        context.next().relativize(variant).toString().replace(File.separatorChar, '/'));
             }
+            classified.store(context.next().resolve(CLASSIFIED));
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
 
