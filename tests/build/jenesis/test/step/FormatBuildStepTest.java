@@ -40,19 +40,19 @@ public class FormatBuildStepTest {
     }
 
     @Test
-    public void a_verifying_formatter_is_skipped_when_none_of_its_inputs_changed() {
+    public void a_verifying_formatter_is_skipped_when_none_of_its_inputs_changed() throws IOException {
         assertThat(new Formatter(true).shouldRun(arguments(ChecksumStatus.RETAINED)))
                 .as("a check of unchanged sources has nothing new to report")
                 .isFalse();
     }
 
     @Test
-    public void a_verifying_formatter_runs_when_a_source_changed() {
+    public void a_verifying_formatter_runs_when_a_source_changed() throws IOException {
         assertThat(new Formatter(true).shouldRun(arguments(ChecksumStatus.ALTERED))).isTrue();
     }
 
     @Test
-    public void a_rewriting_formatter_runs_on_every_build() {
+    public void a_rewriting_formatter_runs_on_every_build() throws IOException {
         assertThat(new Formatter(false).shouldRun(arguments(ChecksumStatus.RETAINED))).isTrue();
     }
 

@@ -195,7 +195,7 @@ public class MavenRepositoryExportTest {
     }
 
     @Test
-    public void runs_unconditionally_even_when_arguments_unchanged() {
+    public void runs_unconditionally_even_when_arguments_unchanged() throws IOException {
         BuildStep export = new MavenRepositoryExport(target);
         assertThat(export.shouldRun(new LinkedHashMap<>())).isTrue();
     }

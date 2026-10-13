@@ -79,8 +79,7 @@ public class ErrorProne implements BuildStep {
         options.setProperty(this.arguments.isEmpty()
                 ? "-Xplugin:ErrorProne"
                 : "-Xplugin:ErrorProne " + String.join(" ", this.arguments), "");
-        Path folder = Files.createDirectories(context.next().resolve(ProcessBuildStep.PROCESS));
-        options.store(folder.resolve(compiler + ".properties"));
+        ProcessBuildStep.store(context.next(), ProcessBuildStep.PROCESS, compiler, options);
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 }

@@ -515,10 +515,10 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
         }
 
         @Override
-        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             return Javac.hasRelevantChange(arguments,
                     Set.of(".kt"),
-                    Set.of("dokka.properties"),
+                    Set.of("dokka"),
                     false)
                     || arguments.values().stream().anyMatch(argument -> argument.hasChanged(Path.of(FILES)));
         }

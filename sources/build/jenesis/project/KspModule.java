@@ -175,8 +175,8 @@ public class KspModule implements BuildExecutorModule {
                 Dependencies.select(folder, tool, "runtime").forEach(jar -> jars.add(jar.toString()));
                 Dependencies.select(folder, processors, "plugin").forEach(jar -> processorPath.add(jar.toString()));
                 Dependencies.select(folder, group, "compile").forEach(jar -> libraries.add(jar.toString()));
-                Path javac = folder.resolve(ProcessBuildStep.PROCESS + "javac.properties");
-                if (Files.isRegularFile(javac)) {
+                Path javac = ProcessBuildStep.locate(folder, ProcessBuildStep.PROCESS, "javac");
+                if (javac != null) {
                     String value = SequencedProperties.ofFiles(javac).value("--release");
                     if (value != null) {
                         release = value;

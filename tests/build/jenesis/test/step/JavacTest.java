@@ -12,6 +12,7 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Javac;
+import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 import java.lang.classfile.Attributes;
 import java.lang.classfile.ClassFile;
@@ -97,7 +98,7 @@ public class JavacTest {
     public void writeRelease_writes_process_javac_properties_with_release_flag() throws IOException {
         Path folder = Files.createDirectory(root.resolve("write-release"));
         Javac.writeRelease(folder, "21", 25);
-        Path file = folder.resolve("process/javac.properties");
+        Path file = ProcessBuildStep.locate(folder, ProcessBuildStep.PROCESS, "javac");
         assertThat(file).exists();
         SequencedProperties properties = SequencedProperties.ofFiles(file);
         assertThat(properties).containsEntry("--release", "21");
@@ -107,7 +108,7 @@ public class JavacTest {
     public void a_preview_release_compiles_with_the_preview_features_of_the_jdk() throws IOException {
         Path folder = Files.createDirectory(root.resolve("write-release-preview"));
         Javac.writeRelease(folder, "25-preview", 25);
-        assertThat(SequencedProperties.ofFiles(folder.resolve("process/javac.properties")))
+        assertThat(SequencedProperties.ofFiles(ProcessBuildStep.locate(folder, ProcessBuildStep.PROCESS, "javac")))
                 .containsEntry("--release", "25")
                 .containsEntry("--enable-preview", "");
     }
@@ -131,7 +132,7 @@ public class JavacTest {
     public void writeRelease_without_a_release_writes_the_feature_of_the_jdk(String release) throws IOException {
         Path folder = Files.createDirectory(root.resolve("write-release-running"));
         Javac.writeRelease(folder, release, 26);
-        assertThat(SequencedProperties.ofFiles(folder.resolve("process/javac.properties")))
+        assertThat(SequencedProperties.ofFiles(ProcessBuildStep.locate(folder, ProcessBuildStep.PROCESS, "javac")))
                 .containsEntry("--release", "26");
     }
 
@@ -178,7 +179,7 @@ public class JavacTest {
     }
 
     @Test
-    public void shouldRun_skips_when_only_irrelevant_files_changed() {
+    public void shouldRun_skips_when_only_irrelevant_files_changed() throws IOException {
         BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
                 Path.of("sources/sample/note.txt"), Checksum.of(ChecksumStatus.ADDED),
                 Path.of("sources/sample/Sample.kt"), Checksum.of(ChecksumStatus.ADDED),
@@ -189,7 +190,7 @@ public class JavacTest {
     }
 
     @Test
-    public void shouldRun_fires_when_a_resource_changed_and_resources_are_included() {
+    public void shouldRun_fires_when_a_resource_changed_and_resources_are_included() throws IOException {
         BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
                 Path.of("sources/sample/messages.properties"), Checksum.of(ChecksumStatus.ADDED)));
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
@@ -198,7 +199,7 @@ public class JavacTest {
     }
 
     @Test
-    public void shouldRun_skips_resource_change_when_resources_are_excluded() {
+    public void shouldRun_skips_resource_change_when_resources_are_excluded() throws IOException {
         BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
                 Path.of("sources/sample/messages.properties"), Checksum.of(ChecksumStatus.ADDED)));
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
@@ -207,7 +208,7 @@ public class JavacTest {
     }
 
     @Test
-    public void shouldRun_ignores_meta_inf_versions_and_build_jenesis_resources() {
+    public void shouldRun_ignores_meta_inf_versions_and_build_jenesis_resources() throws IOException {
         for (Path ignored : List.of(
                 Path.of("sources/META-INF/versions/17/messages.properties"),
                 Path.of("sources/META-INF/build.jenesis/marker.properties"))) {
@@ -222,7 +223,7 @@ public class JavacTest {
     }
 
     @Test
-    public void shouldRun_fires_when_a_java_source_changed() {
+    public void shouldRun_fires_when_a_java_source_changed() throws IOException {
         BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
                 Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)));
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
@@ -231,7 +232,7 @@ public class JavacTest {
     }
 
     @Test
-    public void shouldRun_fires_when_a_modularized_dependency_changed() {
+    public void shouldRun_fires_when_a_modularized_dependency_changed() throws IOException {
         for (Path changed : List.of(Path.of("modular.properties"), Path.of("modular/lib.jar"))) {
             BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
                     changed, Checksum.of(ChecksumStatus.ALTERED)));
@@ -244,7 +245,7 @@ public class JavacTest {
     }
 
     @Test
-    public void shouldRun_fires_when_upstream_classpath_or_dependencies_changed() {
+    public void shouldRun_fires_when_upstream_classpath_or_dependencies_changed() throws IOException {
         for (Path changed : List.of(Path.of("classes/x.jar"), Path.of("artifacts/x.jar"), Path.of("resolved/dep.jar"), Path.of(BuildStep.DEPENDENCIES))) {
             BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
                     changed, Checksum.of(ChecksumStatus.ADDED)));
@@ -257,7 +258,7 @@ public class JavacTest {
     }
 
     @Test
-    public void shouldRun_fires_when_a_resolved_jar_is_replaced_in_place() {
+    public void shouldRun_fires_when_a_resolved_jar_is_replaced_in_place() throws IOException {
         BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
                 Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.RETAINED),
                 Path.of("resolved/maven%2Fsample%2Fsample%2F1-SNAPSHOT.jar"), Checksum.of(ChecksumStatus.ALTERED)));
@@ -270,7 +271,8 @@ public class JavacTest {
     }
 
     @Test
-    public void shouldRun_fires_when_javac_properties_changed() {
+    public void shouldRun_fires_when_javac_properties_changed() throws IOException {
+        Javac.writeRelease(sources, "17", Runtime.version().feature());
         BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
                 Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED)));
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
@@ -279,7 +281,7 @@ public class JavacTest {
     }
 
     @Test
-    public void shouldRun_ignores_retained_files() {
+    public void shouldRun_ignores_retained_files() throws IOException {
         BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
                 Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.RETAINED),
                 Path.of("classes/Other.class"), Checksum.of(ChecksumStatus.RETAINED)));
@@ -323,10 +325,9 @@ public class JavacTest {
         int release = Runtime.version().feature() - older;
         Javac.writeRelease(sources, Integer.toString(release), Runtime.version().feature());
         Path configuration = Files.createDirectories(root.resolve("configuration"));
-        Files.createDirectories(configuration.resolve("process"));
         SequencedProperties exports = new SequencedProperties();
         exports.setProperty("--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED");
-        exports.store(configuration.resolve("process/javac.properties"));
+        ProcessBuildStep.store(configuration, ProcessBuildStep.PROCESS, "javac", exports);
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
         arguments.put("sources", new BuildStepArgument(sources, Map.of(
                 Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -366,10 +367,9 @@ public class JavacTest {
                 """);
         Javac.writeRelease(sources, "8", Runtime.version().feature());
         Path configuration = Files.createDirectories(root.resolve("configuration"));
-        Files.createDirectories(configuration.resolve("process"));
         SequencedProperties options = new SequencedProperties();
         options.setProperty(option, "8");
-        options.store(configuration.resolve("process/javac.properties"));
+        ProcessBuildStep.store(configuration, ProcessBuildStep.PROCESS, "javac", options);
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
         arguments.put("sources", new BuildStepArgument(sources, Map.of(
                 Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -409,8 +409,7 @@ public class JavacTest {
         }
         SequencedProperties javac = new SequencedProperties();
         javac.setProperty("--module-version", "1.2.3");
-        Path processFolder = Files.createDirectories(sources.resolve("process"));
-        javac.store(processFolder.resolve("javac.properties"));
+        ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javac", javac);
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
                 new BuildStepContext(this.previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
@@ -485,7 +484,7 @@ public class JavacTest {
         Files.writeString(versioned.resolve("Sample.java"), "package sample; public class Sample { }\n");
         SequencedProperties javac = new SequencedProperties();
         javac.setProperty("-g:none", "");
-        javac.store(Files.createDirectories(sources.resolve("process")).resolve("javac.properties"));
+        ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javac", javac);
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
@@ -586,9 +585,9 @@ public class JavacTest {
                 .resolve("module-info.java"), "module sample { exports sample; }\n");
         Javac.writeRelease(sources, "11", Runtime.version().feature());
         Path record = root.resolve("plugin.log");
-        SequencedProperties javac = SequencedProperties.ofFiles(sources.resolve("process/javac.properties"));
+        SequencedProperties javac = SequencedProperties.ofFiles(ProcessBuildStep.locate(sources, ProcessBuildStep.PROCESS, "javac"));
         javac.setProperty("-Xplugin:Marker " + record, "");
-        javac.store(sources.resolve("process/javac.properties"));
+        ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javac", javac);
         Path pluginRoot = Files.createDirectories(root.resolve("plugin").resolve("resolved"));
         Files.copy(buildCompilerPluginJar(Files.createDirectories(root.resolve("marker"))), pluginRoot.resolve("marker.jar"));
         SequencedProperties index = new SequencedProperties();
@@ -623,10 +622,10 @@ public class JavacTest {
         Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/17"))
                 .resolve("module-info.java"), "module sample { exports sample; }\n");
         Javac.writeRelease(sources, "11", Runtime.version().feature());
-        SequencedProperties javac = SequencedProperties.ofFiles(sources.resolve("process/javac.properties"));
+        SequencedProperties javac = SequencedProperties.ofFiles(ProcessBuildStep.locate(sources, ProcessBuildStep.PROCESS, "javac"));
         javac.setProperty("-Werror", "");
         javac.setProperty("-Aclaimed=yes", "");
-        javac.store(sources.resolve("process/javac.properties"));
+        ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javac", javac);
         Path classes = compile(root.resolve("claiming").resolve("classes"), "claiming/Claiming.java", """
                 package claiming;
                 import javax.annotation.processing.AbstractProcessor;
@@ -900,8 +899,9 @@ public class JavacTest {
     @ValueSource(booleans = {true, false})
     public void a_failure_is_reproduced_by_the_command_that_ran_with_its_argument_file(boolean process)
             throws IOException {
-        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javac.properties"),
-                "--source-path=a b (c)\n");
+        SequencedProperties javac = new SequencedProperties();
+        javac.setProperty("--source-path", "a b (c)");
+        ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javac", javac);
         Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Main.java"), """
                 package sample;
                 public class Main {
@@ -934,8 +934,10 @@ public class JavacTest {
 
     @Test
     public void a_failure_is_reproduced_with_the_launcher_options_in_front_of_the_argument_file() throws Exception {
-        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javac.properties"),
-                "-J-Xmx256m=\n-J--add-exports\\=jdk.compiler/com.sun.tools.javac.api\\=ALL-UNNAMED=\n");
+        SequencedProperties javac = new SequencedProperties();
+        javac.setProperty("-J-Xmx256m", "");
+        javac.setProperty("-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED", "");
+        ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javac", javac);
         Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Main.java"), """
                 package sample;
                 public class Main {

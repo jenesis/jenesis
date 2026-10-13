@@ -99,14 +99,15 @@ public class Inventory implements BuildStep {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(MODULE),
                 Path.of(UNSTAGED),
-                Path.of(ProcessBuildStep.PROCESS + "javac.properties"),
-                Path.of(ProcessBuildStep.PROCESS + "java.properties"),
+                Path.of(ProcessBuildStep.PROCESS),
                 Path.of(METADATA),
                 Path.of(IDENTITY),
                 Path.of(ATTACHMENTS),
                 Path.of(NATIVES),
                 Path.of(POM),
                 Path.of(ARTIFACTS),
+                Path.of(Classifiers.CLASSIFIERS),
+                Path.of(Classifiers.CLASSIFIED),
                 Path.of(Bom.BOM),
                 Path.of(SOURCES),
                 Path.of(DOCUMENTATION),
@@ -147,6 +148,7 @@ public class Inventory implements BuildStep {
         Path metadataImage = null;
         Path dockerContext = null;
         SequencedSet<Path> artifacts = new LinkedHashSet<>();
+        SequencedMap<String, Path> classified = new TreeMap<>();
         SequencedSet<Path> processes = new LinkedHashSet<>();
         SequencedSet<Path> bomArtifacts = new LinkedHashSet<>();
         SequencedSet<Path> sources = new LinkedHashSet<>(), generated = new LinkedHashSet<>();
@@ -190,12 +192,12 @@ public class Inventory implements BuildStep {
                 modular |= properties.flag("modular");
             }
             staged &= !Files.exists(folder.resolve(UNSTAGED));
-            Path javacProperties = folder.resolve(ProcessBuildStep.PROCESS + "javac.properties");
-            if (release == null && Files.isRegularFile(javacProperties)) {
+            Path javacProperties = ProcessBuildStep.locate(folder, ProcessBuildStep.PROCESS, "javac");
+            if (release == null && javacProperties != null) {
                 release = SequencedProperties.ofFiles(javacProperties).value("--release");
             }
-            Path javaProperties = folder.resolve(ProcessBuildStep.PROCESS + "java.properties");
-            if (Files.isRegularFile(javaProperties)) {
+            Path javaProperties = ProcessBuildStep.locate(folder, ProcessBuildStep.PROCESS, "java");
+            if (javaProperties != null) {
                 processes.add(javaProperties);
             }
             Path metadataFile = folder.resolve(METADATA);
@@ -228,6 +230,11 @@ public class Inventory implements BuildStep {
                 pomFile = pomCandidate;
             }
             collect(folder.resolve(ARTIFACTS), artifacts);
+            Path classifiedFile = folder.resolve(Classifiers.CLASSIFIED);
+            if (Files.isRegularFile(classifiedFile)) {
+                SequencedProperties.ofFiles(classifiedFile).forEachProperty((classifier, variant) ->
+                        classified.putIfAbsent(classifier, folder.resolve(variant)));
+            }
             collect(folder.resolve(Bom.BOM), bomArtifacts);
             collect(folder.resolve(SOURCES), sources);
             if (holdsSources(folder.resolve(SOURCES))) {
@@ -453,6 +460,9 @@ public class Inventory implements BuildStep {
             inventory.setProperty(prefix + "bom." + bomIndex++, entry.getKey() + " " + entry.getValue());
         }
         writePaths(inventory, context, prefix + "artifacts", artifacts);
+        for (Map.Entry<String, Path> variant : classified.entrySet()) {
+            inventory.setProperty(prefix + "attachment." + variant.getKey(), relativize(context, variant.getValue()));
+        }
         writePaths(inventory, context, prefix + "process", processes);
         writePaths(inventory, context, prefix + "bomfile", bomArtifacts);
         writePaths(inventory, context, prefix + "sources", sources.stream()

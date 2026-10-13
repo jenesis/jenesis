@@ -288,11 +288,7 @@ public class JavaToolchainModuleTest {
         buildExecutor.addSource("input", input);
         buildExecutor.addModule("output", new JavaToolchainModule(), "input");
         buildExecutor.addModule("output-test", new TestModule(
-                Map.of("maven", new MavenDefaultRepository(
-                        URI.create("https://repo1.maven.org/maven2/"),
-                        null,
-                        Map.of(),
-                        null)),
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                 Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))), "output", "input");
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps).containsKeys("output/classes", "output/artifacts", "output-test/executed");

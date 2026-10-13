@@ -14,6 +14,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.step.Javac;
 import build.jenesis.step.Javadoc;
 import build.jenesis.step.ProcessHandler;
+import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -90,8 +91,9 @@ public class JavadocTest {
                 /** A stub of a type a later release declares. */
                 public abstract class VarHandle { }
                 """);
-        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javac.properties"),
-                "--module-version=1\n");
+        SequencedProperties javac = new SequencedProperties();
+        javac.setProperty("--module-version", "1");
+        ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javac", javac);
         Path manifests = Files.createDirectory(root.resolve("manifests"));
         Javac.writeRelease(manifests, "8", Runtime.version().feature());
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
@@ -138,8 +140,9 @@ public class JavadocTest {
         Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"),
                 "package sample; /** Documented. */ public class Sample { }\n");
         Javac.writeRelease(sources, "8", Runtime.version().feature());
-        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javadoc.properties"),
-                "--release=17\n");
+        SequencedProperties javadoc = new SequencedProperties();
+        javadoc.setProperty("--release", "17");
+        ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javadoc", javadoc);
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
@@ -158,8 +161,9 @@ public class JavadocTest {
     public void a_configured_doclint_flag_replaces_the_build_default(boolean process) throws IOException {
         Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"),
                 "package sample; /** Links {@link Missing}. */ public class Sample { }\n");
-        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javadoc.properties"),
-                "-Xdoclint\\:all=\n");
+        SequencedProperties javadoc = new SequencedProperties();
+        javadoc.setProperty("-Xdoclint:all", "");
+        ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javadoc", javadoc);
         assertThatThrownBy(() -> Javadoc.ofEnvironment(Environment.NONE,
                         process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
@@ -183,8 +187,9 @@ public class JavadocTest {
                 "package sample.internal.deep; /** Hidden. */ public class Deeper { }\n");
         Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample/internals")).resolve("Kept.java"),
                 "package sample.internals; /** Kept. */ public class Kept { }\n");
-        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javadoc.properties"),
-                "-exclude=sample.internal:sample.other\n");
+        SequencedProperties javadoc = new SequencedProperties();
+        javadoc.setProperty("-exclude", "sample.internal:sample.other");
+        ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javadoc", javadoc);
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE,
                         process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
@@ -211,8 +216,9 @@ public class JavadocTest {
                 "package sample; /** Documented. */ public class Sample { }\n");
         Files.writeString(Files.createDirectories(folder.resolve("sample/internal")).resolve("Hidden.java"),
                 "package sample.internal; /** Hidden. */ public class Hidden { }\n");
-        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javadoc.properties"),
-                "-exclude=sample.internal\n");
+        SequencedProperties javadoc = new SequencedProperties();
+        javadoc.setProperty("-exclude", "sample.internal");
+        ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javadoc", javadoc);
         Path classes = Files.createDirectories(sources.resolve(BuildStep.CLASSES));
         assertThat(ToolProvider.findFirst("javac").orElseThrow().run(
                 new PrintWriter(Writer.nullWriter()),
@@ -242,8 +248,9 @@ public class JavadocTest {
     public void fails_where_javadoc_reports_an_error(boolean process) throws IOException {
         Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"),
                 "package sample; /** Tagged @unknown. */ public class Sample { /** @custom value */ public void run() { } }\n");
-        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javadoc.properties"),
-                "-Werror=\n");
+        SequencedProperties javadoc = new SequencedProperties();
+        javadoc.setProperty("-Werror", "");
+        ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javadoc", javadoc);
         assertThatThrownBy(() -> Javadoc.ofEnvironment(Environment.NONE,
                         process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
@@ -279,8 +286,9 @@ public class JavadocTest {
             throws IOException {
         Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("SampleTest.java"),
                 "package sample; /** Documented. */ class SampleTest { }\n");
-        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javadoc.properties"),
-                "-package=\n");
+        SequencedProperties javadoc = new SequencedProperties();
+        javadoc.setProperty("-package", "");
+        ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javadoc", javadoc);
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE,
                 process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,

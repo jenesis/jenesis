@@ -14,7 +14,7 @@ public class ProjectModuleDescriptorTest {
 
     @Test
     public void defaults_to_running_tests_without_configuration_or_attached_jars() {
-        ProjectModule base = new MavenModuleDescriptor("module-foo", Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Path.of("."));
+        ProjectModule base = new MavenModuleDescriptor("module-foo", Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Path.of("."), false);
         ProjectModuleDescriptor descriptor = new ProjectModuleDescriptor(base);
         assertThat(descriptor.configuration()).isEmpty();
         assertThat(descriptor.test()).isTrue();
@@ -26,7 +26,7 @@ public class ProjectModuleDescriptorTest {
 
     @Test
     public void replaces_one_value_per_wither() {
-        ProjectModule base = new MavenModuleDescriptor("module-foo", Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Path.of("."));
+        ProjectModule base = new MavenModuleDescriptor("module-foo", Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Path.of("."), false);
         ProjectModuleDescriptor descriptor = new ProjectModuleDescriptor(base)
                 .configuration(Path.of("config"))
                 .pinning(Pinning.STRICT)
@@ -39,7 +39,7 @@ public class ProjectModuleDescriptorTest {
 
     @Test
     public void carries_the_flags_unchanged() {
-        ProjectModule base = new MavenModuleDescriptor("module-foo", Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Path.of("."));
+        ProjectModule base = new MavenModuleDescriptor("module-foo", Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Path.of("."), false);
         ProjectModuleDescriptor descriptor = new ProjectModuleDescriptor(base).test(true).source(false).documentation(true);
         assertThat(descriptor.test()).isTrue();
         assertThat(descriptor.source()).isFalse();
@@ -49,7 +49,7 @@ public class ProjectModuleDescriptorTest {
     @Test
     public void delegates_module_descriptor_accessors_to_base() {
         LinkedHashSet<String> dependencies = new LinkedHashSet<>(List.of("module-bar"));
-        ProjectModule base = new MavenModuleDescriptor("module-foo", dependencies, Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Path.of("."));
+        ProjectModule base = new MavenModuleDescriptor("module-foo", dependencies, Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Path.of("."), false);
         ProjectModuleDescriptor descriptor = new ProjectModuleDescriptor(base);
         assertThat(descriptor.name()).isEqualTo(base.name());
         assertThat(descriptor.dependencies()).isEqualTo(base.dependencies());
@@ -62,7 +62,7 @@ public class ProjectModuleDescriptorTest {
 
     @Test
     public void to_inherited_prepends_one_parent_segment_per_call() {
-        ProjectModule base = new MavenModuleDescriptor("module-foo", Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Path.of("."));
+        ProjectModule base = new MavenModuleDescriptor("module-foo", Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Collections.emptyNavigableSet(), Path.of("."), false);
         ProjectModuleDescriptor descriptor = new ProjectModuleDescriptor(base).test(true).source(true).documentation(true);
         ProjectModuleDescriptor inherited = descriptor.toInherited();
         assertThat(inherited.name()).isEqualTo(base.name());
