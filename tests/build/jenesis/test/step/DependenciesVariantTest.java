@@ -67,7 +67,8 @@ public class DependenciesVariantTest {
         requires.store(dependencies.resolve(BuildStep.REQUIRES));
         BuildExecutor executor = executor();
         executor.addSource("dependencies", dependencies);
-        executor.addModule("resolved", new Dependencies(Map.of(), Map.of("module", new ModularJarResolver(false))),
+        executor.addModule("resolved",
+                new Dependencies(Map.of(), Map.of("module", new ModularJarResolver(false))),
                 "dependencies");
 
         assertThatThrownBy(executor::execute)
@@ -84,9 +85,9 @@ public class DependenciesVariantTest {
         requires.store(dependencies.resolve(BuildStep.REQUIRES));
         BuildExecutor executor = executor();
         executor.addSource("dependencies", dependencies);
-        executor.addModule("resolved", new Dependencies(
-                Map.of("maven", new MavenDefaultRepository(repository.toUri(), repository, Map.of(), null)),
-                Map.<String, Resolver>of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))),
+        executor.addModule("resolved",
+                new Dependencies(Map.of("maven", new MavenDefaultRepository(repository.toUri(), repository, Map.of(), null)),
+                        Map.<String, Resolver>of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))),
                 "dependencies");
         return SequencedProperties.ofFiles(executor.execute().get("resolved").resolve(BuildStep.DEPENDENCIES));
     }
@@ -104,8 +105,8 @@ public class DependenciesVariantTest {
     }
 
     private void pom(String artifactId, String dependency) throws IOException {
-        Files.writeString(Files.createDirectories(repository.resolve("org/example/" + artifactId + "/1.0"))
-                .resolve(artifactId + "-1.0.pom"), """
+        Path folder = Files.createDirectories(repository.resolve("org/example/" + artifactId + "/1.0"));
+        Files.writeString(folder.resolve(artifactId + "-1.0.pom"), """
                 <project xmlns="http://maven.apache.org/POM/4.0.0">
                     <groupId>org.example</groupId>
                     <artifactId>%s</artifactId>

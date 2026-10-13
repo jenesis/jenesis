@@ -467,9 +467,17 @@ public class Dependencies implements BuildExecutorModule {
                     }
                     current.put(location, item);
                 }
-                if (reusable && key(stored, requires, new TreeMap<>(categories), new TreeMap<>(aliases), versions,
-                        moduleAliases, moduleOverrides, bomTokens, exclusions, managedExclusions, variants)
-                        .equals(stored.getProperty("inputs"))) {
+                if (reusable && key(stored,
+                        requires,
+                        new TreeMap<>(categories),
+                        new TreeMap<>(aliases),
+                        versions,
+                        moduleAliases,
+                        moduleOverrides,
+                        bomTokens,
+                        exclusions,
+                        managedExclusions,
+                        variants).equals(stored.getProperty("inputs"))) {
                     try (Stream<Path> files = Files.walk(context.previous())) {
                         for (Path file : files.toList()) {
                             Path target = context.next().resolve(context.previous().relativize(file));
@@ -1091,9 +1099,18 @@ public class Dependencies implements BuildExecutorModule {
                 for (Map.Entry<String, RepositoryItem> entry : fetched.entrySet()) {
                     resolution.setProperty("fetched/" + entry.getKey(), fingerprint(entry.getValue()));
                 }
-                resolution.setProperty("inputs", key(resolution, requires, new TreeMap<>(categories),
-                        new TreeMap<>(aliases), versions, moduleAliases, moduleOverrides, bomTokens, exclusions,
-                        managedExclusions, variants));
+                resolution.setProperty("inputs",
+                        key(resolution,
+                                requires,
+                                new TreeMap<>(categories),
+                                new TreeMap<>(aliases),
+                                versions,
+                                moduleAliases,
+                                moduleOverrides,
+                                bomTokens,
+                                exclusions,
+                                managedExclusions,
+                                variants));
                 resolution.store(context.next().resolve(RESOLUTION));
             }
             Set<String> listed = new HashSet<>(), dropped = new HashSet<>();

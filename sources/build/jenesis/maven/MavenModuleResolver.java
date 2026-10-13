@@ -213,21 +213,22 @@ public class MavenModuleResolver implements Resolver {
                 closure.put(selected, value);
                 String pinned = versions.getOrDefault(selected.coordinate(null, null), "");
                 int space = pinned.indexOf(' ');
-                checksums.put(selected, !variant.getValue().isEmpty() || space < 0
-                        || !pinned.substring(0, space).equals(value.version())
-                        ? variant.getValue()
-                        : pinned.substring(space + 1).trim());
+                checksums.put(selected,
+                        !variant.getValue().isEmpty() || space < 0 || !pinned.substring(0, space).equals(value.version())
+                                ? variant.getValue()
+                                : pinned.substring(space + 1).trim());
             }
         });
         SequencedMap<String, MavenDependencyKey> roots = new LinkedHashMap<>();
-        resolution.roots().forEach((module, key) -> roots.put(module, classified.containsKey(module) && key.jar()
-                ? new MavenDependencyKey(key.groupId(), key.artifactId(), "jar", classified.get(module).getKey())
-                : key));
+        resolution.roots().forEach((module, key) -> roots.put(module,
+                classified.containsKey(module) && key.jar()
+                        ? new MavenDependencyKey(key.groupId(), key.artifactId(), "jar", classified.get(module).getKey())
+                        : key));
         SequencedMap<String, String> result = new LinkedHashMap<>();
         closure.forEach((key, value) -> {
             if (key.jar()) {
-                result.put(key.coordinate(mavenPrefix, value.version()), checksums.getOrDefault(key,
-                        value.checksum() == null ? "" : value.checksum()));
+                result.put(key.coordinate(mavenPrefix, value.version()),
+                        checksums.getOrDefault(key, value.checksum() == null ? "" : value.checksum()));
             }
         });
         SequencedMap<String, Resolver.Resolved> materialized = new LinkedHashMap<>(

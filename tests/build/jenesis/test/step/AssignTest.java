@@ -143,8 +143,8 @@ public class AssignTest {
         properties.setProperty("module/org.example.natives", "");
         properties.store(argument.resolve(BuildStep.IDENTITY));
         Files.writeString(Files.createDirectory(argument.resolve(BuildStep.ARTIFACTS)).resolve("native.jar"), "jar");
-        Path variant = Files.writeString(Files.createDirectory(argument.resolve(Classifiers.CLASSIFIERS))
-                .resolve("linux.jar"), "variant");
+        Path classifiers = Files.createDirectory(argument.resolve(Classifiers.CLASSIFIERS));
+        Path variant = Files.writeString(classifiers.resolve("linux.jar"), "variant");
         SequencedProperties dormant = new SequencedProperties();
         dormant.setProperty("windows", "platform-w");
         dormant.store(argument.resolve(Classifiers.DORMANT));
