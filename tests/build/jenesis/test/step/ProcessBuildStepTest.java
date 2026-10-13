@@ -23,9 +23,9 @@ public class ProcessBuildStepTest {
 
     @Test
     public void a_step_merges_the_process_properties_of_each_of_its_configurations() throws IOException {
-        Path folder = Files.createDirectories(root.resolve("argument/process")).getParent();
-        Files.writeString(folder.resolve("process/java.properties"), "-Xmx=512m\n-Dshared=java\n");
-        Files.writeString(folder.resolve("process/test.properties"), "-Dshared=test\n-Dextra=test\n");
+        Path folder = Files.createDirectories(root.resolve("argument"));
+        write(folder, ProcessBuildStep.PROCESS, "java", "-Xmx=512m\n-Dshared=java\n");
+        write(folder, ProcessBuildStep.PROCESS, "test", "-Dshared=test\n-Dextra=test\n");
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
         AtomicReference<SequencedMap<String, SequencedMap<String, String>>> captured = new AtomicReference<>();
         ProcessBuildStep step = new ProcessBuildStep("java", ProcessHandler.OfProcess.ofJavaHome("bin/java")) {
@@ -54,8 +54,8 @@ public class ProcessBuildStepTest {
 
     @Test
     public void a_tab_in_a_value_separates_the_arguments_of_a_flag_that_takes_more_than_one() throws IOException {
-        Path folder = Files.createDirectories(root.resolve("argument/process")).getParent();
-        Files.writeString(folder.resolve("process/javadoc.properties"),
+        Path folder = Files.createDirectories(root.resolve("argument"));
+        write(folder, ProcessBuildStep.PROCESS, "javadoc",
                 "-linkoffline=https\\://example.com/api/\\toffline/api\\nhttps\\://example.com/other/\\toffline/other\n");
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
         AtomicReference<List<String>> captured = new AtomicReference<>();
@@ -77,10 +77,10 @@ public class ProcessBuildStepTest {
 
     @Test
     public void a_forked_program_receives_the_variables_of_each_of_its_configurations() throws IOException {
-        Path folder = Files.createDirectories(root.resolve("argument/environment")).getParent();
-        Files.writeString(folder.resolve("environment/java.properties"),
+        Path folder = Files.createDirectories(root.resolve("argument"));
+        write(folder, ProcessBuildStep.ENVIRONMENT, "java",
                 "SAMPLE_LITERAL=java\nSAMPLE_SHARED=java\nSAMPLE_UNSET_IN_THE_BUILD\n");
-        Files.writeString(folder.resolve("environment/test.properties"), "SAMPLE_SHARED=test\n");
+        write(folder, ProcessBuildStep.ENVIRONMENT, "test", "SAMPLE_SHARED=test\n");
         Path source = root.resolve("Variables.java");
         Files.writeString(source, """
                 public class Variables {
@@ -251,8 +251,8 @@ public class ProcessBuildStepTest {
 
     @Test
     public void a_jdk_tool_refuses_an_environment_even_when_forked() throws IOException {
-        Path folder = Files.createDirectories(root.resolve("argument/environment")).getParent();
-        Files.writeString(folder.resolve("environment/javac.properties"), "SAMPLE=value\n");
+        Path folder = Files.createDirectories(root.resolve("argument"));
+        write(folder, ProcessBuildStep.ENVIRONMENT, "javac", "SAMPLE=value\n");
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
         ProcessBuildStep step = new ProcessBuildStep("javac", ProcessHandler.OfProcess.ofJavaHome("bin/javac")) {
             @Override
@@ -273,8 +273,8 @@ public class ProcessBuildStepTest {
 
     @Test
     public void a_program_run_through_the_tools_api_refuses_an_environment() throws IOException {
-        Path folder = Files.createDirectories(root.resolve("argument/environment")).getParent();
-        Files.writeString(folder.resolve("environment/probe.properties"), "SAMPLE=value\n");
+        Path folder = Files.createDirectories(root.resolve("argument"));
+        write(folder, ProcessBuildStep.ENVIRONMENT, "probe", "SAMPLE=value\n");
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
         ToolProvider tool = new ToolProvider() {
             @Override
@@ -301,8 +301,8 @@ public class ProcessBuildStepTest {
 
     @Test
     public void a_staged_program_reads_no_process_configuration() throws IOException {
-        Path folder = Files.createDirectories(root.resolve("argument/process")).getParent();
-        Files.writeString(folder.resolve("process/protoc.properties"), "-Xmx=512m\n");
+        Path folder = Files.createDirectories(root.resolve("argument"));
+        write(folder, ProcessBuildStep.PROCESS, "protoc", "-Xmx=512m\n");
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
         AtomicReference<SequencedMap<String, SequencedMap<String, String>>> captured = new AtomicReference<>();
         ProcessBuildStep step = new ProcessBuildStep("protoc", ProcessHandler.OfProcess.ofStaged()) {
@@ -656,5 +656,11 @@ public class ProcessBuildStepTest {
                                                         SequencedMap<String, SequencedMap<String, String>> properties) {
             return CompletableFuture.completedStage(processed);
         }
+    }
+
+    private static void write(Path folder, String kind, String tool, String lines) throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.load(new StringReader(lines));
+        ProcessBuildStep.store(folder, kind, tool, properties);
     }
 }

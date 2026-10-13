@@ -198,10 +198,10 @@ public class KotlinCompilerModule implements BuildExecutorModule {
         }
 
         @Override
-        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             return Javac.hasRelevantChange(arguments,
                     Set.of(".kt", ".java"),
-                    Set.of("kotlinc.properties", "javac.properties"),
+                    Set.of("kotlinc", "javac"),
                     includeResources);
         }
 
@@ -335,8 +335,8 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                     project = loaded.value("project");
                     artifact = loaded.value("artifact");
                 }
-                Path javacProperties = argument.folder().resolve(ProcessBuildStep.PROCESS + "javac.properties");
-                if (Files.exists(javacProperties)) {
+                Path javacProperties = ProcessBuildStep.locate(argument.folder(), ProcessBuildStep.PROCESS, "javac");
+                if (javacProperties != null) {
                     SequencedProperties loaded = SequencedProperties.ofFiles(javacProperties);
                     String value = loaded.value("--release");
                     if (value != null) {

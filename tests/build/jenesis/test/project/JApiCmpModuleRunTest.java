@@ -122,7 +122,7 @@ public class JApiCmpModuleRunTest {
         SequencedProperties process = new SequencedProperties();
         process.setProperty("--include-synthetic", "");
         process.setProperty("-J-Xmx256m", "");
-        process.store(Files.createDirectories(project.resolve(ProcessBuildStep.PROCESS)).resolve("japicmp.properties"));
+        ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "japicmp", process);
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);

@@ -99,8 +99,7 @@ public class Inventory implements BuildStep {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(MODULE),
                 Path.of(UNSTAGED),
-                Path.of(ProcessBuildStep.PROCESS + "javac.properties"),
-                Path.of(ProcessBuildStep.PROCESS + "java.properties"),
+                Path.of(ProcessBuildStep.PROCESS),
                 Path.of(METADATA),
                 Path.of(IDENTITY),
                 Path.of(ATTACHMENTS),
@@ -193,12 +192,12 @@ public class Inventory implements BuildStep {
                 modular |= properties.flag("modular");
             }
             staged &= !Files.exists(folder.resolve(UNSTAGED));
-            Path javacProperties = folder.resolve(ProcessBuildStep.PROCESS + "javac.properties");
-            if (release == null && Files.isRegularFile(javacProperties)) {
+            Path javacProperties = ProcessBuildStep.locate(folder, ProcessBuildStep.PROCESS, "javac");
+            if (release == null && javacProperties != null) {
                 release = SequencedProperties.ofFiles(javacProperties).value("--release");
             }
-            Path javaProperties = folder.resolve(ProcessBuildStep.PROCESS + "java.properties");
-            if (Files.isRegularFile(javaProperties)) {
+            Path javaProperties = ProcessBuildStep.locate(folder, ProcessBuildStep.PROCESS, "java");
+            if (javaProperties != null) {
                 processes.add(javaProperties);
             }
             Path metadataFile = folder.resolve(METADATA);

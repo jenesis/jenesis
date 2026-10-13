@@ -155,8 +155,8 @@ public class Docker implements BuildStep {
                 packages = candidate;
             }
             for (String configuration : List.of("jpackage-" + format, "jpackage")) {
-                Path file = argument.folder().resolve(ProcessBuildStep.PROCESS + configuration + ".properties");
-                if (name == null && Files.isRegularFile(file)) {
+                Path file = ProcessBuildStep.locate(argument.folder(), ProcessBuildStep.PROCESS, configuration);
+                if (name == null && file != null) {
                     name = SequencedProperties.ofFiles(file).value("--name");
                 }
             }

@@ -12,7 +12,7 @@ import build.jenesis.SequencedProperties;
 
 public abstract class ProcessBuildStep implements BuildStep {
 
-    public static final String PROCESS = "process/", ENVIRONMENT = "environment/";
+    public static final String PROCESS = "process/", ENVIRONMENT = "environment/", INDEX = "index.properties";
     private static final SAXParserFactory REPORTS = reports();
     private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
     private static final int TAIL = 200;
@@ -143,8 +143,8 @@ public abstract class ProcessBuildStep implements BuildStep {
                 continue;
             }
             for (String name : configurations()) {
-                Path file = argument.folder().resolve(ENVIRONMENT + name + ".properties");
-                if (Files.exists(file)) {
+                Path file = locate(argument.folder(), ENVIRONMENT, name);
+                if (file != null) {
                     SequencedProperties.ofFiles(file).forEachProperty(variables::put);
                 }
             }
@@ -192,14 +192,32 @@ public abstract class ProcessBuildStep implements BuildStep {
             }
             SequencedMap<String, String> folderMap = new LinkedHashMap<>();
             for (String name : configurations()) {
-                Path file = entry.getValue().folder().resolve(PROCESS + name + ".properties");
-                if (Files.exists(file)) {
+                Path file = locate(entry.getValue().folder(), PROCESS, name);
+                if (file != null) {
                     SequencedProperties.ofFiles(file).forEachProperty(folderMap::put);
                 }
             }
             properties.put(entry.getKey(), folderMap);
         }
         return properties;
+    }
+
+    public static Path locate(Path folder, String kind, String tool) throws IOException {
+        Path index = folder.resolve(kind).resolve(INDEX);
+        if (!Files.isRegularFile(index)) {
+            return null;
+        }
+        String file = SequencedProperties.ofFiles(index).getProperty(tool);
+        return file == null ? null : folder.resolve(kind).resolve(file);
+    }
+
+    public static void store(Path folder, String kind, String tool, SequencedProperties properties) throws IOException {
+        Path target = Files.createDirectories(folder.resolve(kind)), index = target.resolve(INDEX);
+        SequencedProperties tools = Files.isRegularFile(index) ? SequencedProperties.ofFiles(index) : new SequencedProperties();
+        String file = tools.getProperty(tool, tool + ".properties");
+        properties.store(target.resolve(file));
+        tools.setProperty(tool, file);
+        tools.store(index);
     }
 
     protected static ForkedOptions forked(SequencedMap<String, SequencedMap<String, String>> properties) {

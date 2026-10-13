@@ -17,6 +17,7 @@ import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.KotlinCompilerModule;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.ProcessBuildStep;
 import java.lang.classfile.Attributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -170,10 +171,9 @@ public class KotlinCompilerModuleTest {
                 package sample
                 class Sample { fun name(): String = greeting() + " 17" }
                 """);
-        Path processFolder = Files.createDirectories(project.resolve("process"));
         SequencedProperties javacProperties = new SequencedProperties();
         javacProperties.setProperty("--release", "11");
-        javacProperties.store(processFolder.resolve("javac.properties"));
+        ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "javac", javacProperties);
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
@@ -284,10 +284,9 @@ public class KotlinCompilerModuleTest {
                 package sample
                 class Sample
                 """);
-        Path processFolder = Files.createDirectories(project.resolve("process"));
         SequencedProperties javacProperties = new SequencedProperties();
         javacProperties.setProperty("--release", "11");
-        javacProperties.store(processFolder.resolve("javac.properties"));
+        ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "javac", javacProperties);
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
@@ -325,7 +324,7 @@ public class KotlinCompilerModuleTest {
                 """);
         SequencedProperties javacProperties = new SequencedProperties();
         javacProperties.setProperty("--release", "8");
-        javacProperties.store(Files.createDirectories(project.resolve("process")).resolve("javac.properties"));
+        ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "javac", javacProperties);
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
@@ -366,7 +365,7 @@ public class KotlinCompilerModuleTest {
         kotlincProperties.setProperty("-api-version", "2.0");
         kotlincProperties.setProperty("-language-version", "2.0");
         kotlincProperties.setProperty("-J-Xss4m", "");
-        kotlincProperties.store(Files.createDirectories(project.resolve("process")).resolve("kotlinc.properties"));
+        ProcessBuildStep.store(project, ProcessBuildStep.PROCESS, "kotlinc", kotlincProperties);
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
