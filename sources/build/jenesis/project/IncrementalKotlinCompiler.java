@@ -155,58 +155,60 @@ final class IncrementalKotlinCompiler implements ToolProvider {
         }
     }
 
-    private static Object toolchains(List<Path> jars) {
-        return TOOLCHAINS.computeIfAbsent(List.copyOf(jars), key -> {
-            URL[] urls = new URL[key.size()];
-            try {
-                Path copies = Path.of(System.getProperty("java.io.tmpdir"), "jenesis-kotlin");
-                for (int index = 0; index < urls.length; index++) {
-                    Path jar = key.get(index), copy = copies.resolve(digest(jar)).resolve(jar.getFileName().toString());
-                    if (!Files.exists(copy)) {
-                        Files.createDirectories(copy.getParent());
-                        Path temporary = Files.createTempFile(copy.getParent(), "jar", ".tmp");
-                        Files.copy(jar, temporary, StandardCopyOption.REPLACE_EXISTING);
-                        try {
-                            Files.move(temporary, copy, StandardCopyOption.ATOMIC_MOVE);
-                        } catch (FileAlreadyExistsException _) {
-                            Files.delete(temporary);
-                        }
-                    }
-                    urls[index] = copy.toUri().toURL();
+    private static Object toolchains(List<Path> jars) throws IOException {
+        List<Path> key = List.copyOf(jars);
+        Object cached = TOOLCHAINS.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        URL[] urls = new URL[key.size()];
+        Path copies = Path.of(System.getProperty("java.io.tmpdir"), "jenesis-kotlin");
+        for (int index = 0; index < urls.length; index++) {
+            Path jar = key.get(index), copy = copies.resolve(digest(jar)).resolve(jar.getFileName().toString());
+            if (!Files.exists(copy)) {
+                Files.createDirectories(copy.getParent());
+                Path temporary = Files.createTempFile(copy.getParent(), "jar", ".tmp");
+                Files.copy(jar, temporary, StandardCopyOption.REPLACE_EXISTING);
+                try {
+                    Files.move(temporary, copy, StandardCopyOption.ATOMIC_MOVE);
+                } catch (FileAlreadyExistsException _) {
+                    Files.delete(temporary);
                 }
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
             }
-            URLClassLoader loader = new URLClassLoader(urls, ClassLoader.getPlatformClassLoader());
-            Class<?> type;
-            try {
-                type = Class.forName(API + "KotlinToolchains", true, loader);
-            } catch (ClassNotFoundException _) {
-                throw new IllegalStateException("Incremental Kotlin compilation drives the Kotlin Build Tools API of"
-                        + " Kotlin 2.3 or newer, which " + key + " does not hold: pin"
-                        + " org.jetbrains.kotlin:kotlin-build-tools-impl to 2.3 or newer, or set"
-                        + " jenesis.kotlin.incremental=false");
-            }
-            try {
-                Object toolchains = type.getMethod("loadImplementation", ClassLoader.class).invoke(null, loader);
-                String compiler = (String) type.getMethod("getCompilerVersion").invoke(toolchains), implementation = null;
-                CodeSource source = toolchains.getClass().getProtectionDomain().getCodeSource();
-                if (source != null) {
-                    try (JarFile jar = new JarFile(Path.of(source.getLocation().toURI()).toFile())) {
-                        Manifest manifest = jar.getManifest();
-                        implementation = manifest == null ? null : manifest.getMainAttributes().getValue("Implementation-Version");
-                    }
+            urls[index] = copy.toUri().toURL();
+        }
+        URLClassLoader loader = new URLClassLoader(urls, ClassLoader.getPlatformClassLoader());
+        Class<?> type;
+        try {
+            type = Class.forName(API + "KotlinToolchains", true, loader);
+        } catch (ClassNotFoundException _) {
+            throw new IllegalStateException("Incremental Kotlin compilation drives the Kotlin Build Tools API of"
+                    + " Kotlin 2.3 or newer, which " + key + " does not hold: pin"
+                    + " org.jetbrains.kotlin:kotlin-build-tools-impl to 2.3 or newer, or set"
+                    + " jenesis.kotlin.incremental=false");
+        }
+        Object toolchains;
+        String compiler, implementation = null;
+        try {
+            toolchains = type.getMethod("loadImplementation", ClassLoader.class).invoke(null, loader);
+            compiler = (String) type.getMethod("getCompilerVersion").invoke(toolchains);
+            CodeSource source = toolchains.getClass().getProtectionDomain().getCodeSource();
+            if (source != null) {
+                try (JarFile jar = new JarFile(Path.of(source.getLocation().toURI()).toFile())) {
+                    Manifest manifest = jar.getManifest();
+                    implementation = manifest == null ? null : manifest.getMainAttributes().getValue("Implementation-Version");
                 }
-                if (implementation != null && !implementation.replaceFirst("-release-\\d+$", "").equals(compiler)) {
-                    throw new IllegalStateException("The Kotlin Build Tools API implementation " + implementation
-                            + " drives the Kotlin compiler " + compiler + ", but each needs the other's version: pin"
-                            + " org.jetbrains.kotlin:kotlin-build-tools-impl and kotlin-compiler-embeddable to one version");
-                }
-                return toolchains;
-            } catch (ReflectiveOperationException | IOException | URISyntaxException e) {
-                throw new IllegalStateException("Could not load the Kotlin Build Tools API from " + key, e);
             }
-        });
+        } catch (ReflectiveOperationException | URISyntaxException e) {
+            throw new IllegalStateException("Could not load the Kotlin Build Tools API from " + key, e);
+        }
+        if (implementation != null && !implementation.replaceFirst("-release-\\d+$", "").equals(compiler)) {
+            throw new IllegalStateException("The Kotlin Build Tools API implementation " + implementation
+                    + " drives the Kotlin compiler " + compiler + ", but each needs the other's version: pin"
+                    + " org.jetbrains.kotlin:kotlin-build-tools-impl and kotlin-compiler-embeddable to one version");
+        }
+        Object existing = TOOLCHAINS.putIfAbsent(key, toolchains);
+        return existing == null ? toolchains : existing;
     }
 
     private static Path absolute(String path) {
