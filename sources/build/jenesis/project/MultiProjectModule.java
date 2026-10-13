@@ -32,6 +32,16 @@ public record MultiProjectModule(BuildExecutorModule identifier,
     private static final String GROUP = "group";
     public static final String IDENTIFIER_PATH = PREVIOUS.repeat(3) + IDENTIFIER + "/";
 
+    public static boolean test(SequencedMap<String, Path> arguments) throws IOException {
+        for (Map.Entry<String, Path> entry : arguments.entrySet()) {
+            if (entry.getKey().endsWith("/" + MANIFESTS)) {
+                Path module = entry.getValue().resolve(BuildStep.MODULE);
+                return Files.isRegularFile(module) && SequencedProperties.ofFiles(module).getProperty("test") != null;
+            }
+        }
+        return false;
+    }
+
     public static Path location(Path root, SequencedMap<String, Path> arguments) throws IOException {
         for (Map.Entry<String, Path> entry : arguments.entrySet()) {
             if (entry.getKey().endsWith("/" + MANIFESTS)) {

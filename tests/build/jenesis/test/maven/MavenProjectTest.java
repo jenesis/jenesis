@@ -3298,7 +3298,8 @@ public class MavenProjectTest {
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
-                Path.of("app"));
+                Path.of("app"),
+                false);
         assertThat(main.configurations()).containsExactly(
                 Path.of("app/src/main/build.jenesis"),
                 Path.of("app/build.jenesis"));
@@ -3306,7 +3307,8 @@ public class MavenProjectTest {
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
-                Path.of("app"));
+                Path.of("app"),
+                true);
         assertThat(test.configurations()).containsExactly(
                 Path.of("app/src/test/build.jenesis"),
                 Path.of("app/build.jenesis"));
@@ -3314,7 +3316,8 @@ public class MavenProjectTest {
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
-                null);
+                null,
+                false);
         assertThat(unlocated.configurations()).isEmpty();
     }
 }
