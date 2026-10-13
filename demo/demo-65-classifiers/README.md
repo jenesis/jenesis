@@ -44,7 +44,7 @@ names the profile that does:
 Layout
 ------
 
-    demo/demo-72-classifiers
+    demo/demo-65-classifiers
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- jenesis.plugins.properties   library+binary/compiled=./library
     |-- library/             the plugin that builds the variant's library

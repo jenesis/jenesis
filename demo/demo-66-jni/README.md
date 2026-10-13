@@ -30,7 +30,7 @@ The jar holds the library below a folder named for the platform it was built on:
 Layout
 ------
 
-    demo/demo-65-jni
+    demo/demo-66-jni
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- jenesis.plugins.properties   jni+binary/compiled=./jni
     |-- jni/                 the plugin that builds the library
@@ -69,7 +69,7 @@ regenerates the header.
 Native access
 -------------
 
-Loading a library is a restricted method, as demo 52 shows for the foreign
+Loading a library is a restricted method, as `native-access` shows for the foreign
 function API. The application runs its own module, so it grants native access
 to itself:
 
@@ -82,6 +82,6 @@ One library per platform
 
 A library built here serves the machine that built it. A project that publishes
 a library for several platforms builds each on its own machine and publishes it
-as a variant of the jar, as demo 75 shows: the plugin writes the library into a
+as a variant of the jar, as `classifiers` shows: the plugin writes the library into a
 folder that the module's `classifiers.properties` names, instead of below
 `classes/`.

@@ -114,14 +114,14 @@ Quick index
 | 62 | [`external-module`](demo-62-external-module/README.md)            | Resolve the same build module as a published coordinate                      | `java build/Demo.java`            |
 | 63 | [`byte-buddy`](demo-63-byte-buddy/README.md)                      | Rewrite the compiled classes with Byte Buddy's plugins, from a project plugin | `java build/jenesis/Execute.java` |
 | 64 | [`project-plugins`](demo-64-project-plugins/README.md)            | Hook plugins into the build of the whole project, from a first check to release | `java build/jenesis/Make.java stage`|
-| 65 | [`jni`](demo-65-jni/README.md)                                    | Compile a C library a native method calls, from a plugin of the project      | `java build/jenesis/Execute.java` |
-| 66 | [`custom-maven`](demo-66-custom-maven/README.md)                  | Drive a multi-module Maven build without `Project`                           | `java build/Demo.java`            |
-| 67 | [`custom-modular`](demo-67-custom-modular/README.md)              | The same for `module-info.java` modules                                      | `java build/Demo.java`            |
-| 68 | [`custom-build`](demo-68-custom-build/README.md)                  | No template at all: wire the build by hand                                   | `java build/Demo.java`            |
-| 69 | [`code-signing`](demo-69-code-signing/README.md)                  | Sign the produced jar with `jarsigner`, keyed by the environment             | `java build/Demo.java`            |
-| 70 | [`export`](demo-70-export/README.md)                              | Install a build into the local repositories, for other projects to require   | `java build/jenesis/Make.java export`|
-| 71 | [`publishing`](demo-71-publishing/README.md)                      | Assemble a Maven Central ready bundle and resolve it back                    | `java build/Demo.java`            |
-| 72 | [`classifiers`](demo-72-classifiers/README.md)                    | Publish variants of a module's jar, and run a sibling on one of them         | `java -Djenesis.make.profiles=platform-a build/jenesis/Execute.java` |
+| 65 | [`classifiers`](demo-65-classifiers/README.md)                    | Publish variants of a module's jar, and run a sibling on one of them         | `java -Djenesis.make.profiles=platform-a build/jenesis/Execute.java` |
+| 66 | [`jni`](demo-66-jni/README.md)                                    | Compile a C library a native method calls, from a plugin of the project      | `java build/jenesis/Execute.java` |
+| 67 | [`custom-maven`](demo-67-custom-maven/README.md)                  | Drive a multi-module Maven build without `Project`                           | `java build/Demo.java`            |
+| 68 | [`custom-modular`](demo-68-custom-modular/README.md)              | The same for `module-info.java` modules                                      | `java build/Demo.java`            |
+| 69 | [`custom-build`](demo-69-custom-build/README.md)                  | No template at all: wire the build by hand                                   | `java build/Demo.java`            |
+| 70 | [`code-signing`](demo-70-code-signing/README.md)                  | Sign the produced jar with `jarsigner`, keyed by the environment             | `java build/Demo.java`            |
+| 71 | [`export`](demo-71-export/README.md)                              | Install a build into the local repositories, for other projects to require   | `java build/jenesis/Make.java export`|
+| 72 | [`publishing`](demo-72-publishing/README.md)                      | Assemble a Maven Central ready bundle and resolve it back                    | `java build/Demo.java`            |
 | 73 | [`module-convention`](demo-73-module-convention/README.md)        | Resolve your own modules from your own Maven repository                      | `java build/Demo.java`            |
 | 74 | [`discovery-module`](demo-74-discovery-module/README.md)          | Resolve a module by what its domain says it is published as                  | `java build/jenesis/Execute.java` |
 | 75 | [`discovery-maven`](demo-75-discovery-maven/README.md)            | The same for a Maven dependency, from a release or a Maven repository        | `java build/jenesis/Execute.java` |
@@ -1023,7 +1023,24 @@ under `plugin` runs only when it is named, as `plugin/lines`, without a build. T
 values from `jenesis.plugins.arguments.properties`, and `pin` records their own
 closures in `jenesis.plugins.pin.properties`.
 
-## 48. A C library beside the Java code - [`jni`](demo-65-jni/README.md)
+## 48. Variants of a module's jar - [`classifiers`](demo-65-classifiers/README.md)
+
+Some libraries publish more than one jar under their coordinate: the jar itself,
+and variants told apart by a classifier that add what one platform needs, as
+`maven-jar-plugin` `<classifier>` executions do. A module declares its variants
+in a `classifiers.properties`, one line per classifier naming the folders whose
+files the variant adds to the module's jar:
+
+    platform-a=../variants/platform-a
+    legacy=
+
+Kept in a profile's folder, the file decides which variants a machine builds.
+`stage` lays each out beside the jar, and a module of the same build selects one
+with the classifier qualifier of a pin that `platform-guard` introduced,
+`@jenesis.pin demo.natives :platform-a`; the variant then takes the jar's place on
+every path the consumer is built and run with.
+
+## 49. A C library beside the Java code - [`jni`](demo-66-jni/README.md)
 
 A native method needs a JNI header to compile its C side against and a library
 the module loads at run time. A plugin of the project at `binary/compiled` builds
@@ -1038,7 +1055,7 @@ The application grants itself native access with `@jenesis.native demo.adder`,
 since loading a library is a restricted method. A library for several platforms
 is built on each and published as a variant of the jar.
 
-## 49. Driving the build without `Project` - [`custom-maven`](demo-66-custom-maven/README.md), [`custom-modular`](demo-67-custom-modular/README.md)
+## 50. Driving the build without `Project` - [`custom-maven`](demo-67-custom-maven/README.md), [`custom-modular`](demo-68-custom-modular/README.md)
 
 These two drive a multi-module build from a hand-written `build/Demo.java`, with
 no layout and no goals, while reusing the whole standard toolchain:
@@ -1052,7 +1069,7 @@ no layout and no goals, while reusing the whole standard toolchain:
 `module-info.java` modules. The three-argument `make` discovers the modules and
 supplies the defaults a normal build would configure.
 
-## 50. Dropping the template entirely - [`custom-build`](demo-68-custom-build/README.md)
+## 51. Dropping the template entirely - [`custom-build`](demo-69-custom-build/README.md)
 
 The last of the customization demos removes the template altogether and wires the
 build by hand in one `main` method - no `pom.xml`, no `module-info.java`, just
@@ -1063,7 +1080,7 @@ model:
     java build/Demo.java
     java -cp target/jar/output/artifacts/classes.jar sample.Sample
 
-## 51. Signing the jar you publish - [`code-signing`](demo-69-code-signing/README.md)
+## 52. Signing the jar you publish - [`code-signing`](demo-70-code-signing/README.md)
 
 Where `openpgp` and `sigstore` ask who produced the dependencies coming in,
 `code-signing` answers the same question about what goes out, and answers it
@@ -1086,7 +1103,7 @@ The password is never a value: `storepass` takes `env <variable>` or
 `file <path>`, and anything else is refused. The signed jar replaces the unsigned
 one before the inventory, the staged repositories or a publication ever see it.
 
-## 52. Requiring a build from another local project - [`export`](demo-70-export/README.md)
+## 53. Requiring a build from another local project - [`export`](demo-71-export/README.md)
 
 Before anything is published, `export` installs what `stage` laid out into this
 machine's local repositories: the modular tree into `~/.jenesis`, the Maven tree
@@ -1103,7 +1120,7 @@ and pinning that version fixes the dependency. A consumer resolves again when wh
 it declares changes, not when a new export appears, so `jenesis.executor.rebuild`
 is how it takes one.
 
-## 53. Publishing to Maven Central - [`publishing`](demo-71-publishing/README.md)
+## 54. Publishing to Maven Central - [`publishing`](demo-72-publishing/README.md)
 
 Publishing is two jobs - produce a correct bundle and upload it - and Jenesis
 does the first. A `module-info.java` plus a `project.properties` supply the
@@ -1121,23 +1138,6 @@ is reached by `release` itself once `jenesis.deploy.uri` names it, as
 `maven-deploy-plugin` reaches one: every staged file with its checksums, the
 `maven-metadata.xml` merged with the repository's, a SNAPSHOT under a unique
 timestamped name. The demo releases into a small repository on this machine.
-
-## 54. Variants of a module's jar - [`classifiers`](demo-72-classifiers/README.md)
-
-Some libraries publish more than one jar under their coordinate: the jar itself,
-and variants told apart by a classifier that add what one platform needs, as
-`maven-jar-plugin` `<classifier>` executions do. A module declares its variants
-in a `classifiers.properties`, one line per classifier naming the folders whose
-files the variant adds to the module's jar:
-
-    platform-a=../variants/platform-a
-    legacy=
-
-Kept in a profile's folder, the file decides which variants a machine builds.
-`stage` lays each out beside the jar, and a module of the same build selects one
-with the classifier qualifier of a pin that `platform-guard` introduced,
-`@jenesis.pin demo.natives :platform-a`; the variant then takes the jar's place on
-every path the consumer is built and run with.
 
 ## 55. Your own modules from your own Maven repository - [`module-convention`](demo-73-module-convention/README.md)
 

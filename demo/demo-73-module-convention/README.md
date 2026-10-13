@@ -55,7 +55,7 @@ The convention
 The MODULAR_TO_MAVEN layout derives the Maven coordinate of every module it
 publishes from the module name alone: the **groupId is the first two dotted
 segments**, the **artifactId is the full module name** (see
-`../demo-71-publishing`). `module demo.convention.greeter` is therefore published
+`../demo-72-publishing`). `module demo.convention.greeter` is therefore published
 as `demo.convention:demo.convention.greeter`, and `MavenModuleRepository` derives
 exactly the same pair when resolving it - one method, `MavenModuleRepository.groupId(...)`,
 serves both directions, so the publisher and the consumer cannot drift apart.
