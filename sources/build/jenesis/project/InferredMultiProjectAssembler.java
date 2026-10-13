@@ -14,6 +14,7 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Bundle;
+import build.jenesis.step.Classifiers;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Docker;
 import build.jenesis.step.Inventory;
@@ -275,6 +276,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             }
         }
         SequencedMap<String, BuildExecutorModule> none = Collections.emptyNavigableMap();
+        Classifiers classifiers = Classifiers.configured(descriptor.configuration(), descriptor.location(), descriptor.root());
         Sbom sbom = environment.flag("sbom.cyclonedx", true)
                 ? Sbom.configured(BuildStep.locate(descriptor.configuration(), "sbom.properties"))
                 : null;
@@ -367,6 +369,11 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                     .pinning(descriptor.pinning())
                                     .custom(hooks.getOrDefault("artifact", none))),
                     Stream.concat(Stream.of("prepare", "binary"), inputs(descriptor, closure)));
+            if (classifiers != null) {
+                sub.addModule("classifiers",
+                        classifiers.timestamp(BuildStep.timestamp(environment)),
+                        Stream.concat(Stream.of("binary"), descriptor.manifests().stream()));
+            }
             sub.addStep("layers",
                     new Layers(),
                     Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));

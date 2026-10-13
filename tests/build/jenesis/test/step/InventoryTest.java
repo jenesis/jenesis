@@ -10,6 +10,7 @@ import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Classifiers;
 import build.jenesis.step.Inventory;
 import java.util.jar.Attributes;
 
@@ -117,6 +118,29 @@ public class InventoryTest {
                 new BuildStepArgument(null, Checksum.removed(Set.of(Path.of(Inventory.INVENTORY)))),
                 new BuildStepArgument(module, Map.of()))))
                 .containsExactly(Map.entry("module", new LinkedHashMap<>(Map.of("notice", module.resolve("notice.txt")))));
+    }
+
+    @Test
+    public void attaches_each_classifier_jar_under_its_classifier() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "native");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        Path produce = Files.createDirectory(root.resolve("produce"));
+        Files.writeString(Files.createDirectory(produce.resolve(BuildStep.ARTIFACTS)).resolve("native.jar"), "main");
+        Path classifiers = Files.createDirectory(produce.resolve(Classifiers.CLASSIFIERS));
+        Path variant = Files.writeString(classifiers.resolve("any-name.jar"), "variant");
+        SequencedProperties classified = new SequencedProperties();
+        classified.setProperty("linux-x86_64", Classifiers.CLASSIFIERS + "any-name.jar");
+        classified.store(produce.resolve(Classifiers.CLASSIFIED));
+
+        run(args("manifests", manifests, "produce", produce));
+
+        SequencedProperties inventory = read(next.resolve(Inventory.INVENTORY));
+        assertThat(inventory.getProperty("module-native.attachment.linux-x86_64"))
+                .as("a classifier jar is staged as an attachment of the module, beside its jar")
+                .isEqualTo(relativize(variant));
+        assertThat(inventory.getProperty("module-native.artifacts.1")).isNull();
     }
 
     @Test

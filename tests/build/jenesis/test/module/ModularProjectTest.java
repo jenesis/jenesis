@@ -482,15 +482,64 @@ public class ModularProjectTest {
     }
 
     @Test
-    public void requires_a_classified_alias_target_without_inventing_a_version_segment() throws IOException {
+    public void requires_the_classifier_a_pin_selects_of_an_aliased_artifact_without_inventing_a_version() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
-                 * @jenesis.alias natives.lib org.example/native-lib/jar/linux
+                 * @jenesis.alias natives.lib org.example/native-lib
+                 * @jenesis.pin org.example/native-lib :linux
                  */
                 module foo {
                   requires natives.lib;
                 }
                 """);
+        Path manifests = manifests(new ModularProject("module", project));
+        assertThat(SequencedProperties.ofFiles(manifests.resolve(BuildStep.REQUIRES)))
+                .as("the classifier is passed through whole, so it is never mistaken for a version")
+                .containsOnly(Map.entry("main/compile/maven/org.example/native-lib/jar/linux", ""),
+                        Map.entry("main/runtime/maven/org.example/native-lib/jar/linux", ""));
+        assertThat(SequencedProperties.ofFiles(manifests.resolve(BuildStep.ALIASES)))
+                .containsOnly(Map.entry("main/module/natives.lib", "org.example/native-lib/jar/linux"));
+    }
+
+    @Test
+    public void pins_the_classified_artifact_the_coordinate_of_an_alias_is_pinned_to() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias natives.lib org.example/native-lib
+                 * @jenesis.pin org.example/native-lib :linux:1.2 SHA-256/abc
+                 */
+                module foo {
+                  requires natives.lib;
+                }
+                """);
+        Path manifests = manifests(new ModularProject("module", project));
+        assertThat(SequencedProperties.ofFiles(manifests.resolve(BuildStep.REQUIRES)))
+                .containsOnly(Map.entry("main/compile/maven/org.example/native-lib/jar/linux/1.2", ""),
+                        Map.entry("main/runtime/maven/org.example/native-lib/jar/linux/1.2", ""));
+        assertThat(SequencedProperties.ofFiles(manifests.resolve(BuildStep.VERSIONS)))
+                .as("the version and checksum of a classifier pin describe the classified jar")
+                .containsEntry("main/maven/org.example/native-lib/jar/linux", "1.2 SHA-256/abc")
+                .doesNotContainKey("main/maven/org.example/native-lib");
+    }
+
+    @Test
+    public void refuses_an_alias_in_the_layout_that_resolves_modules_by_name_alone() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias natives.lib org.example/native-lib
+                 */
+                module foo {
+                  requires natives.lib;
+                }
+                """);
+        assertThatThrownBy(() -> manifests(new ModularProject("module", project).maven(false)))
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("@jenesis.alias natives.lib org.example/native-lib")
+                .hasMessageContaining("-Djenesis.project.layout=modular_to_maven");
+    }
+
+    private Path manifests(ModularProject module) throws IOException {
         BuildExecutor executor = BuildExecutor.of(build,
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
@@ -500,13 +549,8 @@ public class ModularProjectTest {
                 false,
                 false,
                 0);
-        executor.addModule("module", new ModularProject("module", project));
-        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
-        assertThat(SequencedProperties.ofFiles(
-                results.get("module/module-/manifests").resolve(BuildStep.REQUIRES)))
-                .as("the token is passed through whole, so its classifier is never mistaken for a version")
-                .containsOnly(Map.entry("main/compile/maven/org.example/native-lib/jar/linux", ""),
-                        Map.entry("main/runtime/maven/org.example/native-lib/jar/linux", ""));
+        executor.addModule("module", module);
+        return executor.execute(Runnable::run).toCompletableFuture().join().get("module/module-/manifests");
     }
 
     @Test

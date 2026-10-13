@@ -148,7 +148,7 @@ public class ModuleInfoParserTest {
                 /**
                  * @jenesis.alias toolkit.lib org.example/plain-lib
                  * @jenesis.alias   other.lib   org.example/other-lib \s
-                 * @jenesis.alias natives.lib org.example/plain-lib/jar/natives-linux
+                 * @jenesis.alias pom.lib org.example/plain-pom/pom
                  */
                 module foo {
                     requires toolkit.lib;
@@ -158,7 +158,23 @@ public class ModuleInfoParserTest {
         assertThat(info.aliases())
                 .containsEntry("toolkit.lib", "org.example/plain-lib")
                 .containsEntry("other.lib", "org.example/other-lib")
-                .containsEntry("natives.lib", "org.example/plain-lib/jar/natives-linux");
+                .containsEntry("pom.lib", "org.example/plain-pom/pom");
+    }
+
+    @Test
+    public void refuses_an_alias_that_names_a_classifier_naming_the_pin_that_selects_one() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias natives.lib org.example/native-lib/jar/linux
+                 */
+                module foo {
+                    requires natives.lib;
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("@jenesis.alias natives.lib org.example/native-lib")
+                .hasMessageContaining("@jenesis.pin org.example/native-lib :linux[:<version>]");
     }
 
     @Test
@@ -354,7 +370,7 @@ public class ModuleInfoParserTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Malformed @jenesis.alias declaration"
                         + " 'toolkit.lib org.example/plain-lib 1.0': expected <module-name>"
-                        + " <groupId>/<artifactId>[/<type>[/<classifier>]]");
+                        + " <groupId>/<artifactId>[/<type>]");
     }
 
     @Test
@@ -369,7 +385,7 @@ public class ModuleInfoParserTest {
         assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Malformed @jenesis.alias declaration 'toolkit.lib': expected"
-                        + " <module-name> <groupId>/<artifactId>[/<type>[/<classifier>]]");
+                        + " <module-name> <groupId>/<artifactId>[/<type>]");
     }
 
     @Test

@@ -277,7 +277,14 @@ public class ModularProject implements BuildExecutorModule {
     }
 
     public static BuildStep manifests(String group, String prefix, Platform platform) {
-        return new Manifests(group, prefix, "", true, platform, Runtime.version().feature(), 0, false);
+        return new Manifests(group,
+                prefix,
+                "",
+                true,
+                platform,
+                Runtime.version().feature(),
+                MavenModuleRepository.segments(),
+                true);
     }
 
     private record Coordinates(String prefix) implements BuildStep {
@@ -386,7 +393,34 @@ public class ModularProject implements BuildExecutorModule {
                     versions.put(variant.getKey(), selected);
                 }
             }
-            SequencedMap<String, String> targets = info.aliases();
+            if (!maven && !info.aliases().isEmpty()) {
+                Map.Entry<String, String> alias = info.aliases().firstEntry();
+                throw new IllegalArgumentException("@jenesis.alias " + alias.getKey() + " " + alias.getValue() + " in "
+                        + Path.of(path).resolve("module-info.java") + " names a Maven artifact, which the modular layout"
+                        + " does not resolve, as it reads modules by name from the module repository alone - build"
+                        + " with -Djenesis.project.layout=modular_to_maven, or require the module by a name the module"
+                        + " repository serves, whose variant @jenesis.pin <module> :<classifier> selects");
+            }
+            SequencedMap<String, String> targets = new LinkedHashMap<>(info.aliases());
+            for (Map.Entry<String, String> alias : targets.entrySet()) {
+                String declared = versions.get(group + "/maven/" + alias.getValue());
+                if (declared == null || !declared.startsWith(":")) {
+                    continue;
+                }
+                int space = declared.indexOf(' ');
+                String qualifier = space < 0 ? declared : declared.substring(0, space);
+                int divider = qualifier.indexOf(':', 1);
+                String classifier = divider < 0 ? qualifier.substring(1) : qualifier.substring(1, divider);
+                String[] segments = alias.getValue().split("/");
+                String target = segments[0] + "/" + segments[1] + "/" + (segments.length > 2 ? segments[2] : "jar")
+                        + "/" + classifier;
+                versions.remove(group + "/maven/" + alias.getValue());
+                if (divider > 0) {
+                    versions.put(group + "/maven/" + target,
+                            qualifier.substring(divider + 1) + (space < 0 ? "" : declared.substring(space)));
+                }
+                alias.setValue(target);
+            }
             SequencedProperties requires = new SequencedProperties();
             for (String dependency : info.requires()) {
                 String target = targets.get(dependency);

@@ -11,8 +11,10 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.MultiProjectDependencies;
+import build.jenesis.step.Assign;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class MultiProjectDependenciesTest {
 
@@ -136,5 +138,99 @@ public class MultiProjectDependenciesTest {
         assertThat(result.next()).isTrue();
         SequencedProperties properties = SequencedProperties.ofFiles(next.resolve(BuildStep.REQUIRES));
         assertThat(properties.getProperty("baz")).isEqualTo("SHA256/cafebabe");
+    }
+
+    @Test
+    public void fingerprints_the_variant_a_classifier_pin_of_a_sibling_selects() throws IOException {
+        requiring("main/compile/module/natives", "main/module/natives", ":linux");
+        SequencedProperties identity = new SequencedProperties();
+        identity.setProperty("module/natives", "main.jar");
+        identity.setProperty("module/natives-linux", "linux.jar");
+        identity.store(dependency.resolve(BuildStep.IDENTITY));
+        HashDigestFunction hash = new HashDigestFunction("MD5");
+
+        prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}, Path.of("linux.jar"), new byte[]{2}), hash));
+
+        assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.REQUIRES)).getProperty("main/compile/module/natives"))
+                .as("a consumer of a variant resolves again when the variant changes")
+                .isEqualTo(hash.encoded(new byte[]{2}));
+    }
+
+    @Test
+    public void refuses_a_classifier_a_sibling_declares_only_in_an_inactive_profile_naming_the_profile() throws IOException {
+        requiring("main/compile/module/natives", "main/module/natives", ":linux");
+        SequencedProperties identity = new SequencedProperties(), inactive = new SequencedProperties();
+        identity.setProperty("module/natives", "main.jar");
+        identity.store(dependency.resolve(BuildStep.IDENTITY));
+        inactive.setProperty("module/natives-linux", "platform-a");
+        inactive.store(dependency.resolve(Assign.INACTIVE));
+
+        assertThatThrownBy(() -> prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}), new HashDigestFunction("MD5"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("app asks for the classifier linux of module/natives")
+                .hasMessageContaining("-Djenesis.make.profiles=platform-a");
+    }
+
+    @Test
+    public void refuses_a_classifier_of_a_dependency_on_a_sibling_that_declares_none_naming_the_file() throws IOException {
+        requiring("main/compile/maven/org.example/natives/jar/linux/1.0", null, null);
+        SequencedProperties identity = new SequencedProperties();
+        identity.setProperty("maven/org.example/natives/1.0", "main.jar");
+        identity.store(dependency.resolve(BuildStep.IDENTITY));
+
+        assertThatThrownBy(() -> prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}), new HashDigestFunction("MD5"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not declare")
+                .hasMessageContaining("linux=<folder>[,<folder>...] in a classifiers.properties");
+    }
+
+    @Test
+    public void refuses_a_version_in_the_classifier_pin_of_a_sibling() throws IOException {
+        requiring("main/compile/module/natives", "main/module/natives", ":linux:1.0");
+        SequencedProperties identity = new SequencedProperties();
+        identity.setProperty("module/natives", "main.jar");
+        identity.store(dependency.resolve(BuildStep.IDENTITY));
+
+        assertThatThrownBy(() -> prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}), new HashDigestFunction("MD5"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("@jenesis.pin natives :<classifier>");
+    }
+
+    @Test
+    public void hands_on_the_variants_its_siblings_publish() throws IOException {
+        requiring("main/compile/maven/org.example/natives/jar/linux/1.0", null, null);
+        SequencedProperties identity = new SequencedProperties(), variants = new SequencedProperties();
+        identity.setProperty("maven/org.example/natives/1.0", "main.jar");
+        identity.setProperty("maven/org.example/natives/jar/linux/1.0", "linux.jar");
+        identity.store(dependency.resolve(BuildStep.IDENTITY));
+        variants.setProperty("maven/org.example/natives/jar/linux/1.0", "maven/org.example/natives/1.0");
+        variants.store(dependency.resolve(Assign.VARIANTS));
+
+        prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}, Path.of("linux.jar"), new byte[]{2}), new HashDigestFunction("MD5")));
+
+        assertThat(SequencedProperties.ofFiles(next.resolve(Assign.VARIANTS)))
+                .containsEntry("maven/org.example/natives/jar/linux/1.0", "maven/org.example/natives/1.0");
+    }
+
+    private void requiring(String required, String pin, String value) throws IOException {
+        SequencedProperties requires = new SequencedProperties(), module = new SequencedProperties();
+        requires.setProperty(required, "");
+        requires.store(this.module.resolve(BuildStep.REQUIRES));
+        module.setProperty("path", "app");
+        module.store(this.module.resolve(BuildStep.MODULE));
+        if (pin != null) {
+            SequencedProperties versions = new SequencedProperties();
+            versions.setProperty(pin, value);
+            versions.store(this.module.resolve(BuildStep.VERSIONS));
+        }
+    }
+
+    private void prepare(Map<Path, Checksum> artifacts) throws IOException {
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("foo", new BuildStepArgument(module, Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("bar", new BuildStepArgument(dependency, artifacts));
+        new MultiProjectDependencies("foo"::equals).apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture()
+                .join();
     }
 }
