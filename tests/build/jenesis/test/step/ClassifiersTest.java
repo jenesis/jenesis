@@ -8,6 +8,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Classifiers;
 import java.util.jar.Attributes;
@@ -45,7 +46,7 @@ public class ClassifiersTest {
         Files.writeString(root.resolve("variants/linux/META-INF/MANIFEST.MF"), "Manifest-Version: 1.0\nVariant: linux\n");
         Files.writeString(configuration.resolve(Classifiers.FILE), "linux=../variants/linux\n");
 
-        Path jar = classify(configured()).resolve(Classifiers.CLASSIFIERS + "linux.jar");
+        Path jar = variant(classify(configured()), "linux");
 
         try (JarFile file = new JarFile(jar.toFile())) {
             assertThat(file.stream().map(JarEntry::getName))
@@ -68,7 +69,7 @@ public class ClassifiersTest {
 
         assertThat(classifiers.folders()).containsOnlyKeys("legacy");
         assertThat(classifiers.folders().get("legacy")).isEmpty();
-        assertThat(classify(classifiers).resolve(Classifiers.CLASSIFIERS + "legacy.jar"))
+        assertThat(variant(classify(classifiers), "legacy"))
                 .as("a classifier that names no folder republishes the module's jar under a name of its own")
                 .hasSameBinaryContentAs(built.resolve("native.jar"));
     }
@@ -80,7 +81,7 @@ public class ClassifiersTest {
         Files.writeString(configuration.resolve(Classifiers.FILE), "linux=../variants/linux\n");
         OffsetDateTime timestamp = OffsetDateTime.parse("1980-02-01T00:00:00Z");
 
-        Path jar = classify(configured().timestamp(timestamp)).resolve(Classifiers.CLASSIFIERS + "linux.jar");
+        Path jar = variant(classify(configured().timestamp(timestamp)), "linux");
 
         try (JarFile file = new JarFile(jar.toFile())) {
             assertThat(file.stream().map(JarEntry::getTimeLocal).distinct())
@@ -122,7 +123,7 @@ public class ClassifiersTest {
         assertThat(classifiers.folders().get("linux"))
                 .as("a folder the project does not hold is left to the steps the variant reads")
                 .containsEntry("variants/linux", null);
-        try (JarFile file = new JarFile(classify(classifiers).resolve(Classifiers.CLASSIFIERS + "linux.jar").toFile())) {
+        try (JarFile file = new JarFile(variant(classify(classifiers), "linux").toFile())) {
             assertThat(file.stream().map(JarEntry::getName)).contains("sample/Native.class", "lib/native.so");
         }
     }
@@ -135,7 +136,7 @@ public class ClassifiersTest {
         Files.writeString(root.resolve("built/variants/linux/native.so"), "compiled");
         Files.writeString(configuration.resolve(Classifiers.FILE), "linux=variants/linux\n");
 
-        try (JarFile file = new JarFile(classify(configured()).resolve(Classifiers.CLASSIFIERS + "linux.jar").toFile())) {
+        try (JarFile file = new JarFile(variant(classify(configured()), "linux").toFile())) {
             assertThat(file.stream().map(JarEntry::getName)).contains("notice.txt", "native.so");
         }
 
@@ -234,5 +235,9 @@ public class ClassifiersTest {
         buildExecutor.addSource("built", new Bind(Map.of(Path.of(""), Path.of(""))), root.resolve("built"));
         buildExecutor.addModule("classifiers", classifiers, "built");
         return buildExecutor.execute().get("classifiers");
+    }
+
+    private static Path variant(Path output, String classifier) throws IOException {
+        return output.resolve(SequencedProperties.ofFiles(output.resolve(Classifiers.CLASSIFIED)).value(classifier));
     }
 }

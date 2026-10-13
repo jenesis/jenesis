@@ -129,7 +129,10 @@ public class InventoryTest {
         Path produce = Files.createDirectory(root.resolve("produce"));
         Files.writeString(Files.createDirectory(produce.resolve(BuildStep.ARTIFACTS)).resolve("native.jar"), "main");
         Path classifiers = Files.createDirectory(produce.resolve(Classifiers.CLASSIFIERS));
-        Path variant = Files.writeString(classifiers.resolve("linux-x86_64.jar"), "variant");
+        Path variant = Files.writeString(classifiers.resolve("any-name.jar"), "variant");
+        SequencedProperties classified = new SequencedProperties();
+        classified.setProperty("linux-x86_64", Classifiers.CLASSIFIERS + "any-name.jar");
+        classified.store(produce.resolve(Classifiers.CLASSIFIED));
 
         run(args("manifests", manifests, "produce", produce));
 

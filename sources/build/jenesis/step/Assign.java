@@ -52,6 +52,7 @@ public class Assign implements BuildStep {
                         Path.of(IDENTITY),
                         Path.of(JMod.JMODS),
                         Path.of(Classifiers.CLASSIFIERS),
+                        Path.of(Classifiers.CLASSIFIED),
                         Path.of(Classifiers.DORMANT)));
     }
 
@@ -85,14 +86,10 @@ public class Assign implements BuildStep {
                     }
                 }
             }
-            Path variants = argument.folder().resolve(Classifiers.CLASSIFIERS);
-            if (Files.isDirectory(variants)) {
-                try (DirectoryStream<Path> stream = Files.newDirectoryStream(variants, "*.jar")) {
-                    for (Path variant : stream) {
-                        String name = variant.getFileName().toString();
-                        classified.put(name.substring(0, name.length() - ".jar".length()), variant);
-                    }
-                }
+            Path variants = argument.folder().resolve(Classifiers.CLASSIFIED);
+            if (Files.isRegularFile(variants)) {
+                SequencedProperties.ofFiles(variants).forEachProperty((classifier, variant) ->
+                        classified.putIfAbsent(classifier, argument.folder().resolve(variant)));
             }
             Path profiles = argument.folder().resolve(Classifiers.DORMANT);
             if (Files.isRegularFile(profiles)) {
