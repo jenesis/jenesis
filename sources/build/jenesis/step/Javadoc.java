@@ -120,8 +120,8 @@ public class Javadoc extends ProcessBuildStep {
             if (argument.removed()) {
                 continue;
             }
-            Path javac = argument.folder().resolve(ProcessBuildStep.PROCESS + "javac.properties");
-            if (Files.isRegularFile(javac)) {
+            Path javac = ProcessBuildStep.locate(argument.folder(), ProcessBuildStep.PROCESS, "javac");
+            if (javac != null) {
                 SequencedProperties compiled = SequencedProperties.ofFiles(javac);
                 if (release == null) {
                     release = compiled.value("--release");

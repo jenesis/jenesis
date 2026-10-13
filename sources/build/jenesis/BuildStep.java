@@ -44,7 +44,7 @@ public interface BuildStep extends Serializable {
         };
     }
 
-    default boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+    default boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
         return arguments.values().stream().anyMatch(BuildStepArgument::hasChanged);
     }
 

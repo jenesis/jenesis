@@ -219,10 +219,10 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
         }
 
         @Override
-        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             return Javac.hasRelevantChange(arguments,
                     Set.of(".groovy", ".java"),
-                    Set.of("groovydoc.properties", "javac.properties"),
+                    Set.of("groovydoc", "javac"),
                     false);
         }
 
@@ -260,8 +260,8 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
                 for (Path jar : Dependencies.select(argument.folder(), group, "compile")) {
                     jars.add(jar.toString());
                 }
-                Path javacProperties = argument.folder().resolve(ProcessBuildStep.PROCESS + "javac.properties");
-                if (Files.exists(javacProperties)) {
+                Path javacProperties = ProcessBuildStep.locate(argument.folder(), ProcessBuildStep.PROCESS, "javac");
+                if (javacProperties != null) {
                     SequencedProperties loaded = SequencedProperties.ofFiles(javacProperties);
                     String value = loaded.value("--release");
                     if (value != null) {

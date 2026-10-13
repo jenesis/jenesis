@@ -197,10 +197,10 @@ public class GroovyCompilerModule implements BuildExecutorModule {
         }
 
         @Override
-        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             return Javac.hasRelevantChange(arguments,
                     Set.of(".groovy", ".java"),
-                    Set.of("groovyc.properties", "javac.properties"),
+                    Set.of("groovyc", "javac"),
                     includeResources);
         }
 

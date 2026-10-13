@@ -14,6 +14,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.step.JLink;
 import build.jenesis.step.Layers;
 import build.jenesis.step.ProcessHandler;
+import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -53,7 +54,7 @@ public class JLinkTest {
         assertThat(archived).isZero();
         SequencedProperties configuration = new SequencedProperties();
         configuration.setProperty("--add-modules", "sample");
-        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jlink.properties"));
+        ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jlink", configuration);
         BuildStepResult result = new JLink(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
@@ -85,7 +86,7 @@ public class JLinkTest {
                 "--manifest", manifest.toString(), "-C", classes.toString(), ".")).isZero();
         SequencedProperties configuration = new SequencedProperties();
         configuration.setProperty("--add-modules", "sample");
-        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jlink.properties"));
+        ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jlink", configuration);
         BuildStepResult result = new JLink(ProcessHandler.Factory.FORK).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
@@ -129,7 +130,7 @@ public class JLinkTest {
         membership.store(bundle.resolve(Layers.MEMBERSHIP));
         SequencedProperties configuration = new SequencedProperties();
         configuration.setProperty("--add-modules", "sample");
-        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jlink.properties"));
+        ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jlink", configuration);
         BuildStepResult result = new JLink(ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),

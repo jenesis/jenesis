@@ -15,6 +15,8 @@ import build.jenesis.step.Jar;
 import build.jenesis.step.Javac;
 import build.jenesis.step.Javadoc;
 import build.jenesis.step.ProcessHandler;
+import build.jenesis.step.ProcessBuildStep;
+import build.jenesis.SequencedProperties;
 import sample.Sample;
 
 import static java.util.Objects.requireNonNull;
@@ -455,8 +457,9 @@ public class JarTest {
     @ValueSource(strings = {"--manifest", "-m"})
     public void refuses_a_manifest_option_in_the_process_file(String option) throws IOException {
         Files.createDirectory(classes.resolve(Javac.CLASSES));
-        Files.writeString(Files.createDirectory(classes.resolve("process")).resolve("jar.properties"),
-                option + "=extra.mf\n");
+        SequencedProperties jar = new SequencedProperties();
+        jar.setProperty(option, "extra.mf");
+        ProcessBuildStep.store(classes, ProcessBuildStep.PROCESS, "jar", jar);
         assertThatThrownBy(() -> Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
