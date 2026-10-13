@@ -14,6 +14,7 @@ import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.InferredCompilerChainModule;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -94,12 +95,12 @@ public class ErrorProneRunTest {
 
         compile();
 
-        SequencedProperties options = SequencedProperties.ofFiles(root.resolve("chain")
-                .resolve(InferredCompilerChainModule.COMPILE)
-                .resolve(InferredCompilerChainModule.ERRORPRONE)
-                .resolve("output")
-                .resolve("process")
-                .resolve("javac.properties"));
+        SequencedProperties options = SequencedProperties.ofFiles(ProcessBuildStep.locate(root.resolve("chain")
+                        .resolve(InferredCompilerChainModule.COMPILE)
+                        .resolve(InferredCompilerChainModule.ERRORPRONE)
+                        .resolve("output"),
+                ProcessBuildStep.PROCESS,
+                "javac"));
         assertThat(options.stringPropertyNames())
                 .as("the plugin is named with its arguments as one option, and javac is granted the internals it reads")
                 .contains("-Xplugin:ErrorProne -XepAllErrorsAsWarnings",

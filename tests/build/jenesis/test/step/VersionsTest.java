@@ -30,7 +30,7 @@ public class VersionsTest {
     }
 
     @Test
-    public void shouldRun_fires_when_the_manifest_changed() {
+    public void shouldRun_fires_when_the_manifest_changed() throws IOException {
         BuildStepArgument argument = new BuildStepArgument(root, Map.of(
                 Path.of("manifest.mf"), Checksum.of(ChecksumStatus.ADDED)));
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();

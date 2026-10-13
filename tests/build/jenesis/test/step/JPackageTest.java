@@ -15,6 +15,7 @@ import build.jenesis.step.JLink;
 import build.jenesis.step.JPackage;
 import build.jenesis.step.Layers;
 import build.jenesis.step.ProcessHandler;
+import build.jenesis.step.ProcessBuildStep;
 import sample.Sample;
 
 import static java.util.Objects.requireNonNull;
@@ -54,7 +55,7 @@ public class JPackageTest {
         configuration.setProperty("--name", "Sample");
         configuration.setProperty("--main-jar", "app.jar");
         configuration.setProperty("--main-class", "sample.Sample");
-        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jpackage.properties"));
+        ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", configuration);
         BuildStepResult result = new JPackage(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
@@ -79,17 +80,16 @@ public class JPackageTest {
             }
             jar.closeEntry();
         }
-        Path process = Files.createDirectory(bundle.resolve("process"));
         SequencedProperties shared = new SequencedProperties();
         shared.setProperty("--name", "Sample");
         shared.setProperty("--main-jar", "app.jar");
-        shared.store(process.resolve("jpackage.properties"));
+        ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", shared);
         SequencedProperties image = new SequencedProperties();
         image.setProperty("--main-class", "sample.Sample");
-        image.store(process.resolve("jpackage-app-image.properties"));
+        ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage-app-image", image);
         SequencedProperties installer = new SequencedProperties();
         installer.setProperty("--linux-deb-maintainer", "dev@example.com");
-        installer.store(process.resolve("jpackage-deb.properties"));
+        ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage-deb", installer);
         BuildStepResult result = new JPackage(ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
@@ -117,7 +117,7 @@ public class JPackageTest {
     public void truncates_the_app_version_qualifier(String version, String expected) throws IOException {
         SequencedProperties configuration = new SequencedProperties();
         configuration.setProperty("--app-version", version);
-        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jpackage.properties"));
+        ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", configuration);
         SequencedMap<String, SequencedMap<String, String>> properties = new ExposedJPackage().properties(
                 new LinkedHashMap<>(Map.of("bundle", new BuildStepArgument(
                         bundle,
@@ -205,7 +205,7 @@ public class JPackageTest {
         configuration.setProperty("--name", "sample");
         configuration.setProperty("--main-jar", "app.jar");
         configuration.setProperty("--main-class", "sample.Sample");
-        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jpackage.properties"));
+        ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", configuration);
     }
 
     private static class ExposedJPackage extends JPackage {
@@ -226,7 +226,7 @@ public class JPackageTest {
     public void skips_when_no_jars_are_present(boolean process) throws IOException {
         SequencedProperties configuration = new SequencedProperties();
         configuration.setProperty("--main-jar", "app.jar");
-        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jpackage.properties"));
+        ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", configuration);
         BuildStepResult result = new JPackage(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
@@ -259,7 +259,7 @@ public class JPackageTest {
         SequencedProperties configuration = new SequencedProperties();
         configuration.setProperty("--name", "Sample");
         configuration.setProperty("--module", "sample/sample.Sample");
-        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jpackage.properties"));
+        ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", configuration);
         BuildStepResult result = new JPackage(ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
@@ -298,7 +298,7 @@ public class JPackageTest {
         SequencedProperties configuration = new SequencedProperties();
         configuration.setProperty("--name", "Sample");
         configuration.setProperty("--module", "sample/sample.Sample");
-        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jpackage.properties"));
+        ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", configuration);
         BuildStepResult result = new JPackage(ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
@@ -348,7 +348,7 @@ public class JPackageTest {
         SequencedProperties configuration = new SequencedProperties();
         configuration.setProperty("--name", "Sample");
         configuration.setProperty("--module", "sample/sample.Sample");
-        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jpackage.properties"));
+        ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", configuration);
         BuildStepResult result = new JPackage(ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
@@ -378,7 +378,7 @@ public class JPackageTest {
         index.store(bundle.resolve(BuildStep.DEPENDENCIES));
         SequencedProperties configuration = new SequencedProperties();
         configuration.setProperty("--main-jar", "app.jar");
-        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jpackage.properties"));
+        ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", configuration);
         assertThatThrownBy(() -> new JPackage(ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),

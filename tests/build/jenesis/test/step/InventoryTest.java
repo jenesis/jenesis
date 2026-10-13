@@ -12,6 +12,7 @@ import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Classifiers;
 import build.jenesis.step.Inventory;
+import build.jenesis.step.ProcessBuildStep;
 import java.util.jar.Attributes;
 
 
@@ -32,7 +33,7 @@ public class InventoryTest {
     }
 
     @Test
-    public void shouldRun_fires_when_a_docker_context_or_a_layer_declaration_changed() {
+    public void shouldRun_fires_when_a_docker_context_or_a_layer_declaration_changed() throws IOException {
         for (Path changed : List.of(Path.of("docker/Dockerfile"), Path.of(BuildStep.LAYERS))) {
             BuildStepArgument argument = new BuildStepArgument(root, Map.of(
                     changed, Checksum.of(ChecksumStatus.ADDED)));
@@ -45,7 +46,7 @@ public class InventoryTest {
     }
 
     @Test
-    public void shouldRun_fires_when_identity_properties_changed() {
+    public void shouldRun_fires_when_identity_properties_changed() throws IOException {
         BuildStepArgument argument = new BuildStepArgument(root, Map.of(
                 Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED)));
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
@@ -623,7 +624,7 @@ public class InventoryTest {
         module.store(manifests.resolve(BuildStep.MODULE));
         SequencedProperties javac = new SequencedProperties();
         javac.setProperty("--release", "21");
-        javac.store(Files.createDirectories(manifests.resolve("process")).resolve("javac.properties"));
+        ProcessBuildStep.store(manifests, ProcessBuildStep.PROCESS, "javac", javac);
 
         run(args("manifests", manifests));
 

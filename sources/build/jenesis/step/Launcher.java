@@ -94,8 +94,8 @@ public class Launcher implements BuildStep {
             if (argument.removed()) {
                 continue;
             }
-            Path process = argument.folder().resolve(ProcessBuildStep.PROCESS + "java.properties");
-            if (Files.isRegularFile(process)) {
+            Path process = ProcessBuildStep.locate(argument.folder(), ProcessBuildStep.PROCESS, "java");
+            if (process != null) {
                 SequencedProperties.ofFiles(process).forEachProperty((option, values) -> {
                     String key = switch (option) {
                         case "--add-reads" -> "addReads";
