@@ -22,6 +22,7 @@ import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.JavaToolchainModule;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Versions;
+import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -482,9 +483,9 @@ public class MavenProjectTest {
                 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
-        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve("process/javac.properties"))
+        assertThat(SequencedProperties.ofFiles(ProcessBuildStep.locate(results.get("maven/module-/manifests"), ProcessBuildStep.PROCESS, "javac"))
                 .getProperty("--release")).isEqualTo("8");
-        assertThat(SequencedProperties.ofFiles(results.get("maven/test-module-/manifests").resolve("process/javac.properties"))
+        assertThat(SequencedProperties.ofFiles(ProcessBuildStep.locate(results.get("maven/test-module-/manifests"), ProcessBuildStep.PROCESS, "javac"))
                 .getProperty("--release")).isEqualTo("17");
     }
 
@@ -536,11 +537,11 @@ public class MavenProjectTest {
                 mavenRepository,
                 mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
-        assertThat(SequencedProperties.ofFiles(results.get("maven/module-targeted/manifests").resolve("process/javac.properties"))
+        assertThat(SequencedProperties.ofFiles(ProcessBuildStep.locate(results.get("maven/module-targeted/manifests"), ProcessBuildStep.PROCESS, "javac"))
                 .getProperty("--release"))
                 .as("maven.compiler.target 1.8 compiles for release 8, as the compiler plugin does")
                 .isEqualTo("8");
-        assertThat(SequencedProperties.ofFiles(results.get("maven/module-unset/manifests").resolve("process/javac.properties"))
+        assertThat(SequencedProperties.ofFiles(ProcessBuildStep.locate(results.get("maven/module-unset/manifests"), ProcessBuildStep.PROCESS, "javac"))
                 .getProperty("--release")).isEqualTo(Integer.toString(Runtime.version().feature()));
         assertThat(printed).containsExactly("[RELEASE]   group:unset compiles for release " + Runtime.version().feature()
                 + ", the JDK the build runs on, as " + Path.of("unset", "pom.xml") + " sets neither maven.compiler.release nor its target or source"
@@ -3298,7 +3299,8 @@ public class MavenProjectTest {
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
-                Path.of("app"));
+                Path.of("app"),
+                false);
         assertThat(main.configurations()).containsExactly(
                 Path.of("app/src/main/build.jenesis"),
                 Path.of("app/build.jenesis"));
@@ -3306,7 +3308,8 @@ public class MavenProjectTest {
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
-                Path.of("app"));
+                Path.of("app"),
+                true);
         assertThat(test.configurations()).containsExactly(
                 Path.of("app/src/test/build.jenesis"),
                 Path.of("app/build.jenesis"));
@@ -3314,7 +3317,8 @@ public class MavenProjectTest {
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
-                null);
+                null,
+                false);
         assertThat(unlocated.configurations()).isEmpty();
     }
 }

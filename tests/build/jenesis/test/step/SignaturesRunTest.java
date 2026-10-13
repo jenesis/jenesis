@@ -14,6 +14,7 @@ import build.jenesis.RepositoryItem;
 import build.jenesis.SequencedProperties;
 import build.jenesis.Verification;
 import build.jenesis.maven.MavenRepository;
+import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.Signatures;
 
@@ -255,9 +256,9 @@ public class SignaturesRunTest {
 
     @Test
     public void reads_the_keyring_a_process_configuration_names() throws Exception {
-        Files.createDirectory(input.resolve("process"));
-        Files.writeString(input.resolve("process/gpgv.properties"),
-                "--keyring=" + vault.resolve(fingerprint + ".gpg") + "\n");
+        SequencedProperties gpgv = new SequencedProperties();
+        gpgv.setProperty("--keyring", vault.resolve(fingerprint + ".gpg").toString());
+        ProcessBuildStep.store(input, ProcessBuildStep.PROCESS, "gpgv", gpgv);
         assertThatCode(() -> new Signatures(serving(vaulted(Files.createDirectory(root.resolve("bare")))))
                 .verification(Verification.DECLARED)
                 .apply(Runnable::run,

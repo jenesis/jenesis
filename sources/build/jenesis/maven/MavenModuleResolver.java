@@ -111,10 +111,25 @@ public class MavenModuleResolver implements Resolver {
         Repository repository = repositories.getOrDefault(Resolver.base(prefix), discovery);
         List<MavenResolver.RootPom> rootPoms = new ArrayList<>();
         SequencedMap<MavenDependencyKey, MavenDependencyValue> mavenPins = new LinkedHashMap<>();
+        SequencedMap<String, Map.Entry<String, String>> classified = new LinkedHashMap<>();
         try {
             for (Map.Entry<String, SequencedSet<String>> entry : coordinates.entrySet()) {
                 String coordinate = entry.getKey();
-                MavenDependencyValue managed = toManagedValue(coordinate, versions.get(coordinate));
+                String pinned = versions.get(coordinate);
+                if (pinned != null && pinned.startsWith(":")) {
+                    int space = pinned.indexOf(' ');
+                    String qualifier = space < 0 ? pinned : pinned.substring(0, space);
+                    int divider = qualifier.indexOf(':', 1);
+                    String classifier = divider < 0 ? qualifier.substring(1) : qualifier.substring(1, divider);
+                    String version = divider < 0 ? null : qualifier.substring(divider + 1);
+                    if (classifier.isEmpty() || version != null && version.isEmpty()) {
+                        throw new IllegalArgumentException("Malformed classifier '" + qualifier + "' for " + coordinate
+                                + ": expected :<classifier> or :<classifier>:<version>");
+                    }
+                    classified.put(coordinate, Map.entry(classifier, space < 0 ? "" : pinned.substring(space + 1).trim()));
+                    pinned = version;
+                }
+                MavenDependencyValue managed = toManagedValue(coordinate, pinned);
                 String fetchCoord = managed == null
                         ? coordinate + ":pom"
                         : coordinate + "/" + managed.version() + ":pom";
@@ -183,11 +198,37 @@ public class MavenModuleResolver implements Resolver {
         MavenRepository mavenRepo = MavenRepository.of(repositories.getOrDefault(mavenPrefix, Repository.empty()));
         MavenResolver.Closure resolution = delegate.dependencies(
                 executor, mavenRepo, rootPoms, mavenPins, MavenDependencyScope.COMPILE, mavenPrefix);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> closure = resolution.dependencies();
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> closure = new LinkedHashMap<>();
+        Map<MavenDependencyKey, String> checksums = new HashMap<>();
+        resolution.dependencies().forEach((key, value) -> {
+            Map.Entry<String, String> variant = resolution.roots().entrySet().stream()
+                    .filter(root -> root.getValue().equals(key) && classified.containsKey(root.getKey()))
+                    .map(root -> classified.get(root.getKey()))
+                    .findFirst()
+                    .orElse(null);
+            if (variant == null || !key.jar()) {
+                closure.put(key, value);
+            } else {
+                MavenDependencyKey selected = new MavenDependencyKey(key.groupId(), key.artifactId(), "jar", variant.getKey());
+                closure.put(selected, value);
+                String pinned = versions.getOrDefault(selected.coordinate(null, null), "");
+                int space = pinned.indexOf(' ');
+                checksums.put(selected,
+                        !variant.getValue().isEmpty() || space < 0 || !pinned.substring(0, space).equals(value.version())
+                                ? variant.getValue()
+                                : pinned.substring(space + 1).trim());
+            }
+        });
+        SequencedMap<String, MavenDependencyKey> roots = new LinkedHashMap<>();
+        resolution.roots().forEach((module, key) -> roots.put(module,
+                classified.containsKey(module) && key.jar()
+                        ? new MavenDependencyKey(key.groupId(), key.artifactId(), "jar", classified.get(module).getKey())
+                        : key));
         SequencedMap<String, String> result = new LinkedHashMap<>();
         closure.forEach((key, value) -> {
             if (key.jar()) {
-                result.put(key.coordinate(mavenPrefix, value.version()), value.checksum() == null ? "" : value.checksum());
+                result.put(key.coordinate(mavenPrefix, value.version()),
+                        checksums.getOrDefault(key, value.checksum() == null ? "" : value.checksum()));
             }
         });
         SequencedMap<String, Resolver.Resolved> materialized = new LinkedHashMap<>(
@@ -207,7 +248,7 @@ public class MavenModuleResolver implements Resolver {
             }
         });
         CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new)).join();
-        resolution.roots().forEach((module, key) -> {
+        roots.forEach((module, key) -> {
             MavenDependencyValue value = closure.get(key);
             if (value == null) {
                 return;
@@ -250,8 +291,9 @@ public class MavenModuleResolver implements Resolver {
         int space = pinned.indexOf(' ');
         String version = space < 0 ? pinned : pinned.substring(0, space);
         if (version.startsWith(":")) {
-            throw new IllegalArgumentException("Module classifiers are not supported when resolving "
-                    + coordinate + " through Maven: " + version);
+            throw new IllegalArgumentException("Malformed pin " + version + " for " + coordinate
+                    + ": a Maven coordinate names its classifier in the coordinate, as"
+                    + " maven/<groupId>/<artifactId>/jar/<classifier>");
         }
         return new MavenDependencyValue(version,
                 null,

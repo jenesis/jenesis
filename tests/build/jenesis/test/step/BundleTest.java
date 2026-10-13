@@ -100,7 +100,7 @@ public class BundleTest {
         SequencedProperties java = new SequencedProperties();
         java.setProperty("--add-reads", "org.hibernate.validator=org.apache.tomcat.embed.el");
         java.setProperty("-Dsample=true", "");
-        java.store(Files.createDirectory(input.resolve(ProcessBuildStep.PROCESS)).resolve("java.properties"));
+        ProcessBuildStep.store(input, ProcessBuildStep.PROCESS, "java", java);
 
         Bundle.ofEnvironment(Environment.NONE).apply(
                 Runnable::run,

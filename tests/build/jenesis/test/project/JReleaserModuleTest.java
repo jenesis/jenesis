@@ -11,6 +11,7 @@ import build.jenesis.HashDigestFunction;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.JReleaserModule;
 import build.jenesis.project.ReleaseModule;
+import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -73,7 +74,7 @@ public class JReleaserModuleTest {
     public void emits_the_project_version_for_jreleaser() throws IOException {
         Files.writeString(root.resolve("jreleaser.yml"), "");
         Path emitted = release("release/jreleaser/environment").get("release/jreleaser/environment");
-        assertThat(SequencedProperties.ofFiles(emitted.resolve(JReleaserModule.VARIABLES))
+        assertThat(SequencedProperties.ofFiles(ProcessBuildStep.locate(emitted, ProcessBuildStep.ENVIRONMENT, "jreleaser"))
                 .getProperty("JRELEASER_PROJECT_VERSION"))
                 .as("the version the build stamped is the version JReleaser releases")
                 .isEqualTo("1.2.3");
@@ -83,7 +84,7 @@ public class JReleaserModuleTest {
     public void emits_no_version_when_the_project_declares_none() throws IOException {
         Files.writeString(root.resolve("jreleaser.yml"), "");
         Path emitted = release("release/jreleaser/environment", null).get("release/jreleaser/environment");
-        assertThat(SequencedProperties.ofFiles(emitted.resolve(JReleaserModule.VARIABLES)).stringPropertyNames())
+        assertThat(SequencedProperties.ofFiles(ProcessBuildStep.locate(emitted, ProcessBuildStep.ENVIRONMENT, "jreleaser")).stringPropertyNames())
                 .as("nothing is invented for a project that never declared a version")
                 .isEmpty();
     }

@@ -283,8 +283,7 @@ public class ModuleInfoParser {
                                 if (words.length != 2) {
                                     throw new IllegalArgumentException("Malformed @jenesis.alias declaration '"
                                             + content
-                                            + "': expected <module-name>"
-                                            + " <groupId>/<artifactId>[/<type>[/<classifier>]]");
+                                            + "': expected <module-name> <groupId>/<artifactId>[/<type>]");
                                 }
                                 String alias = words[0];
                                 if (ModuleGraph.isSystemModule(alias)) {
@@ -298,11 +297,19 @@ public class ModuleInfoParser {
                                             + "': expected a module name");
                                 }
                                 String[] segments = words[1].split("/", -1);
-                                if (segments.length < 2 || segments.length > 4
+                                if (segments.length == 4 && Arrays.stream(segments).noneMatch(String::isEmpty)) {
+                                    throw new IllegalArgumentException("Malformed @jenesis.alias target '"
+                                            + words[1]
+                                            + "': an alias names an artifact and no classifier, which a pin selects"
+                                            + " - write @jenesis.alias " + alias + " " + segments[0] + "/" + segments[1]
+                                            + (segments[2].equals("jar") ? "" : "/" + segments[2])
+                                            + " and @jenesis.pin " + segments[0] + "/" + segments[1] + " :" + segments[3]
+                                            + "[:<version>]");
+                                } else if (segments.length < 2 || segments.length > 3
                                         || Arrays.stream(segments).anyMatch(String::isEmpty)) {
                                     throw new IllegalArgumentException("Malformed @jenesis.alias target '"
                                             + words[1]
-                                            + "': expected <groupId>/<artifactId>[/<type>[/<classifier>]]");
+                                            + "': expected <groupId>/<artifactId>[/<type>]");
                                 }
                                 String value = words[1];
                                 String previous = aliases.putIfAbsent(alias, value);

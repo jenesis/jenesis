@@ -10,7 +10,9 @@ import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Classifiers;
 import build.jenesis.step.Inventory;
+import build.jenesis.step.ProcessBuildStep;
 import java.util.jar.Attributes;
 
 
@@ -31,7 +33,7 @@ public class InventoryTest {
     }
 
     @Test
-    public void shouldRun_fires_when_a_docker_context_or_a_layer_declaration_changed() {
+    public void shouldRun_fires_when_a_docker_context_or_a_layer_declaration_changed() throws IOException {
         for (Path changed : List.of(Path.of("docker/Dockerfile"), Path.of(BuildStep.LAYERS))) {
             BuildStepArgument argument = new BuildStepArgument(root, Map.of(
                     changed, Checksum.of(ChecksumStatus.ADDED)));
@@ -44,7 +46,7 @@ public class InventoryTest {
     }
 
     @Test
-    public void shouldRun_fires_when_identity_properties_changed() {
+    public void shouldRun_fires_when_identity_properties_changed() throws IOException {
         BuildStepArgument argument = new BuildStepArgument(root, Map.of(
                 Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED)));
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
@@ -117,6 +119,29 @@ public class InventoryTest {
                 new BuildStepArgument(null, Checksum.removed(Set.of(Path.of(Inventory.INVENTORY)))),
                 new BuildStepArgument(module, Map.of()))))
                 .containsExactly(Map.entry("module", new LinkedHashMap<>(Map.of("notice", module.resolve("notice.txt")))));
+    }
+
+    @Test
+    public void attaches_each_classifier_jar_under_its_classifier() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "native");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        Path produce = Files.createDirectory(root.resolve("produce"));
+        Files.writeString(Files.createDirectory(produce.resolve(BuildStep.ARTIFACTS)).resolve("native.jar"), "main");
+        Path classifiers = Files.createDirectory(produce.resolve(Classifiers.CLASSIFIERS));
+        Path variant = Files.writeString(classifiers.resolve("any-name.jar"), "variant");
+        SequencedProperties classified = new SequencedProperties();
+        classified.setProperty("linux-x86_64", Classifiers.CLASSIFIERS + "any-name.jar");
+        classified.store(produce.resolve(Classifiers.CLASSIFIED));
+
+        run(args("manifests", manifests, "produce", produce));
+
+        SequencedProperties inventory = read(next.resolve(Inventory.INVENTORY));
+        assertThat(inventory.getProperty("module-native.attachment.linux-x86_64"))
+                .as("a classifier jar is staged as an attachment of the module, beside its jar")
+                .isEqualTo(relativize(variant));
+        assertThat(inventory.getProperty("module-native.artifacts.1")).isNull();
     }
 
     @Test
@@ -599,7 +624,7 @@ public class InventoryTest {
         module.store(manifests.resolve(BuildStep.MODULE));
         SequencedProperties javac = new SequencedProperties();
         javac.setProperty("--release", "21");
-        javac.store(Files.createDirectories(manifests.resolve("process")).resolve("javac.properties"));
+        ProcessBuildStep.store(manifests, ProcessBuildStep.PROCESS, "javac", javac);
 
         run(args("manifests", manifests));
 

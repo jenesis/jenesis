@@ -170,6 +170,7 @@ public record Project(
                                                          (descriptor, mergedRepos, mergedResolvers) -> pomAware.apply(
                                         new ProjectModuleDescriptor(descriptor)
                                                 .location(descriptor.location())
+                                                .root(project.root())
                                                 .configuration(locations.apply(descriptor.configurations()))
                                                 .test(project.tests())
                                                 .source(project.sources())
@@ -265,6 +266,7 @@ public record Project(
                                                              (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
                                         new ProjectModuleDescriptor(descriptor)
                                                 .location(descriptor.location())
+                                                .root(project.root())
                                                 .configuration(configurations(
                                                                 modularConfigurationFolder(descriptor.location()),
                                                                 project.configuration(),
@@ -374,6 +376,7 @@ public record Project(
                                                              (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
                                         new ProjectModuleDescriptor(descriptor)
                                                 .location(descriptor.location())
+                                                .root(project.root())
                                                 .configuration(configurations(modularConfigurationFolder(descriptor.location()), project.configuration(), project.profiles()))
                                                 .test(project.tests())
                                                 .source(project.sources())
@@ -727,7 +730,7 @@ public record Project(
                       output is reused.
                     - Whenever you add or change a dependency, offer to run `pin`.
                     - Find the demo that matches the task and copy its shape rather than inventing
-                      configuration. A number a page cites, as (60), is the demo-60-* folder of
+                      configuration. A number a page cites, as (61), is the demo-61-* folder of
                       https://github.com/jenesis/jenesis/tree/main/demo; skill/demos lists them.
                     - Moving a Maven or Gradle build here? Follow skill/migrate step by step, and end
                       with the summary of the migration it asks for. A user hands an agent that task by
@@ -1175,7 +1178,7 @@ public record Project(
                       the version          version=<version> in project.properties at the root,
                                            which -Djenesis.project.version overrides
 
-                    demo-02 is one module, demo-04 several with a test module, demo-69 the
+                    demo-02 is one module, demo-04 several with a test module, demo-72 the
                     published coordinate; skill/tags lists every tag.
 
                     ## 4. Replace each plugin
@@ -1377,9 +1380,9 @@ public record Project(
                     root, JReleaser installed on the runner, the version as
                     -Djenesis.project.version and -Djenesis.jreleaser.dry=false. The job's
                     credentials become the JRELEASER_* variables JReleaser reads, which the release
-                    is handed (69). A job that deployed to a repository of its own rather than to
+                    is handed (72). A job that deployed to a repository of its own rather than to
                     Maven Central names it in MAVEN_RELEASE_URI and its key in MAVEN_RELEASE_TOKEN
-                    instead (69). Then let `ide` write the IntelliJ, VS Code or Eclipse
+                    instead (72). Then let `ide` write the IntelliJ, VS Code or Eclipse
                     project so no IDE depends on the old build: one IDE module per module, its
                     tests in its test sources. The IDE files it writes into a source folder never
                     reach a jar. A Maven layout keeps its pom.xml files, which are now its build
@@ -1437,13 +1440,16 @@ public record Project(
                           kotlin("jvm") adds on its own, is declared, as kotlinc compiles against the
                           module's dependencies alone; a Kotlin Multiplatform library is named by its
                           JVM variant, <artifactId>-jvm, where its root artifact holds no class and its
-                          POM does not depend on that variant, as Gradle module metadata is not read
-                      scala-maven-plugin / scala -> .scala sources, compiled by Scala 3 (48); Scala 2
+                          POM does not depend on that variant, as Gradle module metadata is not read;
+                          Gradle's incremental Kotlin compilation (kotlin.incremental, the default) is
+                          jenesis.kotlin.incremental=true, which needs Kotlin 2.3 or newer and
+                          pins org.jetbrains.kotlin:kotlin-build-tools-impl in the group kotlinc
+                      scala-maven-plugin / scala -> .scala sources, compiled by Scala 3 (49); Scala 2
                           is not supported; the incremental compilation of Zinc, which sbt, Gradle and
                           the plugin's recompileMode=incremental use, is
                           jenesis.scala.incremental=true
                       gmavenplus / groovy -> .groovy sources, compiled by Groovy 4 or newer after
-                          javac (50), so Groovy uses Java types and Java no Groovy type: gmavenplus
+                          javac (51), so Groovy uses Java types and Java no Groovy type: gmavenplus
                           stubs for a joint compilation have no counterpart, and Java code that uses
                           Groovy moves to a module that requires the Groovy one
                       jaxb2-maven-plugin / a JAXB plugin -> xjc.properties (17)
@@ -1453,7 +1459,7 @@ public record Project(
                       openapi-generator-maven-plugin / org.openapi.generator
                           -> openapi.properties (18)
                       antlr4-maven-plugin / antlr -> antlr.properties (19)
-                      com.google.devtools.ksp / ksp(...) dependencies -> ksp.properties, each ksp(...)
+                      com.google.devtools.ksp / ksp(...) dependencies -> ksp.properties (48), each ksp(...)
                           processor as @jenesis.plugin ksp <coordinate> or a pom.xml
                           <!--jenesis.plugin ksp maven/<groupId>/<artifactId>-->, and ksp { arg(...) }
                           as the lines of ksp.properties
@@ -1473,7 +1479,7 @@ public record Project(
                       moditect add-module-info, a descriptor for a Java 8 base
                           -> module-info.java in sources/META-INF/versions/9/ (12)
                       replacer, templating, a generated version class
-                          -> a plugin at binary/generated that writes the source (60)
+                          -> a plugin at binary/generated that writes the source (61)
                       maven-resources-plugin targetPath, a file outside the resource folders
                           -> -Djenesis.project.resources=<file>:<path in the jar>
                       animal-sniffer with a JDK signature -> maven.compiler.release, as javac
@@ -1550,8 +1556,8 @@ public record Project(
                           text, the header is // SPDX-FileCopyrightText: <copyright> and
                           // SPDX-License-Identifier: <id> of the one license the project declares
                       detekt, ktlint / the same -> detekt.yml, .editorconfig (46)
-                      scalastyle, scalafmt / the same -> scalastyle-config.xml, .scalafmt.conf (49)
-                      codenarc / codenarc -> codenarc.xml (51)
+                      scalastyle, scalafmt / the same -> scalastyle-config.xml, .scalafmt.conf (50)
+                      codenarc / codenarc -> codenarc.xml (52)
                       maven-surefire-plugin / test -> on by default; test.properties names the
                           framework where inference does not (38), and only changed tests re-run (40)
                       surefire systemPropertyVariables of ${project.artifactId} or ${project.version}
@@ -1584,7 +1590,7 @@ public record Project(
                           as XML or DSL, which configures awkwardly; here a plugin of the project at
                           binary/transform constructs the net.bytebuddy.build.Plugin instances in Java,
                           with values from plugin-<name>.properties, and runs them with Plugin.Engine
-                          over the module's compiled classes and its compile class path (62)
+                          over the module's compiled classes and its compile class path (63)
                       japicmp-maven-plugin / me.champeau.gradle.japicmp -> japicmp.properties (44)
                       revapi-maven-plugin / org.revapi.revapi-gradle-plugin -> revapi.properties (44):
                           oldArtifacts -> baseline=<groupId>/<artifactId>[/<version>], the last
@@ -1639,11 +1645,11 @@ public record Project(
                           (13); addDefaultImplementationEntries -> on by default: Implementation-Title
                           and -Vendor, and -Version where the POM, project.properties or
                           jenesis.project.version names one
-                      maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (8, 69),
+                      maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (8, 72),
                           whose jar holds the sources and, as Maven's and Gradle's do, the resources,
                           including those of -Djenesis.project.resources
                       maven-javadoc-plugin / withJavadocJar(), Dokka
-                          -> -Djenesis.project.documentation=true (8, 69), which documents
+                          -> -Djenesis.project.documentation=true (8, 72), which documents
                           the main modules, a test module only under jenesis.stage.tests, one with a
                           module-info.java as that module (module-summary.html, its pages below the
                           module's name), as maven-javadoc-plugin and Gradle do; javadoc runs with
@@ -1652,6 +1658,27 @@ public record Project(
                           excludePackageNames -> -exclude=<package>[:<package>...] there, which
                           leaves those packages and their subpackages undocumented; Dokka, which
                           documents Kotlin sources, fails the build as javadoc does when it fails
+                      maven-jar-plugin <classifier> executions, build-helper attach-artifact of a
+                          prepared file -> classifiers.properties, one <classifier>=<folder>[,...]
+                          line per variant: the module's jar plus each folder's files, staged
+                          beside the jar as <artifact>-<version>-<classifier>.jar and
+                          <module>-<classifier>.jar; <classifier>= republishes the jar as it is.
+                          A platform's variant goes into the classifiers.properties of a profile
+                          folder, and a consumer selects one with @jenesis.pin <module>
+                          :<classifier> or a pom.xml <classifier> (65)
+                      exec-maven-plugin or maven-antrun-plugin running make, cmake or cargo,
+                          nar-maven-plugin, Gradle's cpp-library or an Exec task calling cargo
+                          -> a plugin at binary/compiled that forks the native tool as an
+                          EnvironmentalProcessBuildStep and writes its library below a folder of
+                          its output, as library/linux-x86_64/, which classifiers.properties names
+                          as linux-x86_64=library/linux-x86_64 (65); os-maven-plugin's
+                          ${os.detected.classifier} -> one profile per platform, each building on
+                          its own machine; the compiler is the machine's, as with Maven and Gradle.
+                          javac -h, as maven-compiler-plugin's <headerOutputDirectory> or Gradle's
+                          options.headerOutputDirectory -> the same plugin first wires
+                          new Javac(ProcessHandler.Factory.of()).headers(true), which compiles the
+                          module's sources and hands on nothing but headers/, one header per class
+                          with a native method, for the C compiler's include path (66)
                       dokka-maven-plugin / org.jetbrains.dokka -> dokka.properties (45), whose
                           files are resolved against the module's folder and are inputs of the
                           build: moduleName -> module-name (documentation by default), includes ->
@@ -1679,20 +1706,20 @@ public record Project(
                       jib-maven-plugin / com.google.cloud.tools.jib
                           -> docker=<image>, a build context; the build never runs Docker (9, 10)
                       native-maven-plugin / org.graalvm.buildtools.native
-                          -> native=true, graal.properties (55)
-                      maven-jarsigner-plugin / jar signing -> jenesis.jarsigner.* (67)
-                      maven-install-plugin / publishToMavenLocal -> `export` (68)
+                          -> native=true, graal.properties (56)
+                      maven-jarsigner-plugin / jar signing -> jenesis.jarsigner.* (70)
+                      maven-install-plugin / publishToMavenLocal -> `export` (71)
                       maven-deploy-plugin, distributionManagement to a repository of your own /
                           maven-publish to one -> `release` with jenesis.deploy.uri and
                           jenesis.deploy.token, which puts the staged Maven tree there
                           with its checksums and maven-metadata.xml, unsigned, a SNAPSHOT under
-                          a unique timestamped name (69); altDeploymentRepository -> the same
+                          a unique timestamped name (72); altDeploymentRepository -> the same
                           setting on the command line
                       deploy to Maven Central, central-publishing, maven-gpg-plugin / maven-publish
                           to Central, signing
                           -> `release` with a jreleaser.yml, handed JRELEASER_PROJECT_VERSION from
                           jenesis.project.version, which a pom.xml build sets for a release whose
-                          configuration names no version (69). JReleaser
+                          configuration names no version (72). JReleaser
                           is not resolved like the other tools but run as the `jreleaser` program
                           on the PATH, or the one jenesis.jreleaser.executable names, so it is
                           installed apart from the build. It runs with --dry-run, publishing
@@ -1715,7 +1742,7 @@ public record Project(
                       <profiles> chosen with -P or a property / properties and conventions
                           -> jenesis-<profile>.properties; those activated by <jdk> or
                           <activeByDefault> are read from the POM (8)
-                      a Gradle build cache -> jenesis.cache.uri (56)
+                      a Gradle build cache -> jenesis.cache.uri (57)
 
                     ## No built-in
 
@@ -1895,12 +1922,13 @@ public record Project(
                     `<module>` abbreviates `<group>/module/<module>`, `<groupId>/<artifactId>`
                     abbreviates `<group>/maven/<groupId>/<artifactId>`, and `maven/<coordinate>`
                     abbreviates `<group>/maven/<coordinate>` - the form a type or a classifier needs,
-                    as in maven/<groupId>/<artifactId>/jar/<classifier>, because a longer token without
+                    as a pin of a classifier artifact a POM brings in writes
+                    maven/<groupId>/<artifactId>/jar/<classifier>, because a longer token without
                     the repository reads its groupId as a group, which is refused. A trailing `(<token>,...)`
                     guard applies a line only on a matching platform, with an unguarded line for the
                     same coordinate as fallback. Parentheses rather than brackets, because a
                     bracketed word is a link in a Markdown documentation comment and javadoc fails
-                    on one it cannot resolve. exclude and override are MODULAR_TO_MAVEN only.
+                    on one it cannot resolve. alias, exclude and override are MODULAR_TO_MAVEN only.
 
                       @jenesis.release <V>   Java release target (default: the running JDK's, which a
                                              [RELEASE] line names); <V>-preview also
@@ -1923,7 +1951,12 @@ public record Project(
                       @jenesis.pin <token> <ver> [<algo>/<hex>] [(<guard>)]
                           Pin a version and optionally a content checksum. A module name pins a
                           module that is required by that name; one a dependency's POM brings in is
-                          pinned by <groupId>/<artifactId>.
+                          pinned by <groupId>/<artifactId>. A version written :<classifier>[:<ver>]
+                          selects the variant of the module published under that classifier, in
+                          place of its jar on every path, in both modular layouts and for an aliased
+                          name as well; a module of this build is selected as :<classifier> alone,
+                          resolving to the variant its classifiers.properties declares, and fails
+                          naming the profile or the file to set where it declares none.
                       @jenesis.signature <algo>/<hex> | Sigstore/<host>/<path> <token>... | [<group>/]signature-<name>.properties
                           Declare the OpenPGP key that signs these coordinates' artifacts - the
                           fingerprint first, because one key normally signs many. A Maven token may
@@ -1991,9 +2024,11 @@ public record Project(
                           Both forms may cover one coordinate, and each is then verified against
                           whatever it publishes; a coordinate covered only by an identity forks no
                           gpg at all, since the whole check is JDK cryptography in process.
-                      @jenesis.alias <module> <groupId>/<artifactId>[/<type>[/<classifier>]]
+                      @jenesis.alias <module> <groupId>/<artifactId>[/<type>]
                           Require a Maven artifact under a stable module name, so a non-modular jar
-                          needs no derived automatic name. Carries no version: a pin or BOM entry
+                          needs no derived automatic name. It names no classifier: a pin of the
+                          artifact, @jenesis.pin <groupId>/<artifactId> :<classifier>[:<version>],
+                          selects one. Carries no version: a pin or BOM entry
                           states it and is the place for a checksum; failing that the version the
                           closure already resolves is kept, and only a coordinate nothing else pulls
                           in is negotiated as LATEST. It also names the artifact a `requires` takes,
@@ -2131,6 +2166,19 @@ public record Project(
                                                 its jar, POM, sources and documentation out of the
                                                 staged repositories, so neither export nor release
                                                 ships them
+                      classifiers.properties    <classifier>=<folder>[,<folder>...] per line, each a
+                                                variant of the module's jar holding its files and
+                                                the files of the folders, named from the module's
+                                                folder and kept inside the project, and from the
+                                                output of the module's plugins, as a plugin at
+                                                binary/compiled writes a native library, a META-INF/
+                                                MANIFEST.MF among them merged over the jar's; a file
+                                                the jar holds already is refused, <classifier>=
+                                                republishes the jar as it is, tests, sources and
+                                                javadoc are the build's own; staged beside the jar
+                                                and selected by @jenesis.pin <module> :<classifier>
+                                                or a pom.xml <classifier>; a platform's variants go
+                                                into a profile's folder
                       test.properties           framework=junit-platform|junit4|testng, naming what
                                                 this module's tests are written against; absent, it is
                                                 inferred from the resolved dependencies;
@@ -2422,7 +2470,7 @@ public record Project(
                     than the JVM, so two runs in one program never clash; everything after them is
                     what the command line would take. A setting that replaces the process a build
                     runs in - toolchain.version, project.docker, execute.docker - is refused by name
-                    there, and so is a -J option, as the JDK's own tools refuse one; demo-74-tools-api
+                    there, and so is a -J option, as the JDK's own tools refuse one; demo-77-tools-api
                     shows the whole contract.
 
                     Every command line here, the commands and the tools alike, reads @<file> as the
@@ -2521,9 +2569,9 @@ public record Project(
 
                     Write one only when skill/registry has no line for the job. A plugin adds steps
                     to the stock build and replaces none; skill/plugins wires it in. The smallest
-                    whole example is demo-60-internal-module, the same plugin published is
-                    demo-61-external-module, demo-62-byte-buddy rewrites compiled classes with
-                    Byte Buddy, and demo-63-project-plugins uses every project-wide hook point.
+                    whole example is demo-61-internal-module, the same plugin published is
+                    demo-62-external-module, demo-63-byte-buddy rewrites compiled classes with
+                    Byte Buddy, and demo-64-project-plugins uses every project-wide hook point.
 
                     ## The shape
 
@@ -2631,7 +2679,7 @@ public record Project(
                     module. Configure the tool in that code, too: where a Maven
                     or Gradle plugin discovers the tool's own extensions and takes their settings as XML,
                     as Byte Buddy's build plugin does, the provider constructs them in Java and reads
-                    only plain values from plugin-<name>.properties, as demo-62 does with Byte Buddy. A JDK tool is forked by extending ProcessBuildStep,
+                    only plain values from plugin-<name>.properties, as demo-63 does with Byte Buddy. A JDK tool is forked by extending ProcessBuildStep,
                     which also reads process-<tool>.properties; one that runs a program extends
                     EnvironmentalProcessBuildStep for environment-<tool>.properties. Write nothing
                     outside context.next(): a step that must, as an exporter does, overrides
@@ -2662,7 +2710,7 @@ public record Project(
                 case "demos" -> """
                     # Jenesis - Copy a demo
 
-                    74 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    77 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -2702,26 +2750,30 @@ public record Project(
                                          43 test-runs (the tests of a scanned jar, run again
                                          with other flags by another module),
                                          44 api-compatibility (japicmp, revapi)
-                      Other languages    45 kotlin, 46 kotlin-quality, 47 kotlin-plugin, 48 scala,
-                                         49 scala-quality, 50 groovy, 51 groovy-quality
-                      At run time        52 agents (@jenesis.attach),
-                                         53 native-access (@jenesis.native),
-                                         54 native-access-layer (passed on to a layer),
-                                         55 native-image (GraalVM)
-                      Operating it       56 build-cache, 57 docker-isolation
-                      Extending it       58 custom-assembler, 59 custom-jmod, 60 internal-module,
-                                         61 external-module,
-                                         62 byte-buddy (Byte Buddy's plugins over the compiled classes),
-                                         63 project-plugins (hooks from a first check to release),
-                                         64 custom-maven, 65 custom-modular,
-                                         66 custom-build (no Project at all)
-                      Shipping it        67 code-signing (jarsigner), 68 export (into the local repositories),
-                                         69 publishing (Maven Central),
-                                         70 module-convention (resolving what you published),
-                                         71, 72 discovery (a dependency resolved from its
+                      Other languages    45 kotlin, 46 kotlin-quality, 47 kotlin-plugin,
+                                         48 ksp (a Kotlin symbol processor), 49 scala,
+                                         50 scala-quality, 51 groovy, 52 groovy-quality
+                      At run time        53 agents (@jenesis.attach),
+                                         54 native-access (@jenesis.native),
+                                         55 native-access-layer (passed on to a layer),
+                                         56 native-image (GraalVM)
+                      Operating it       57 build-cache, 58 docker-isolation
+                      Extending it       59 custom-assembler, 60 custom-jmod, 61 internal-module,
+                                         62 external-module,
+                                         63 byte-buddy (Byte Buddy's plugins over the compiled classes),
+                                         64 project-plugins (hooks from a first check to release),
+                                         65 classifiers (variants a module of the build publishes,
+                                         selected by a sibling),
+                                         66 jni (a C library a plugin compiles against the headers),
+                                         67 custom-maven, 68 custom-modular,
+                                         69 custom-build (no Project at all)
+                      Shipping it        70 code-signing (jarsigner), 71 export (into the local repositories),
+                                         72 publishing (Maven Central),
+                                         73 module-convention (resolving what you published),
+                                         74, 75 discovery (a dependency resolved from its
                                          publisher's own domain, as a module or by coordinate),
-                                         73 jpx (run a released program without building),
-                                         74 tools-api (a build inside another program's JVM)
+                                         76 jpx (run a released program without building),
+                                         77 tools-api (a build inside another program's JVM)
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
@@ -4519,6 +4571,7 @@ public record Project(
                 source.scalafmt|report|ignore|report|strict: scalafmt checking, activated by a .scalafmt.conf; ignore skips it, report lists a source it would format differently, strict fails the build on one
                 source.codenarc|report|ignore|report|strict: CodeNarc, activated by a codenarc.xml; ignore skips it, report records its findings, strict fails the build on any of them
                 compile.errorprone|true|Error Prone over the javac plugin declared with @jenesis.plugin javac, activated by an errorprone.properties; javac forks to grant it the compiler internals it reads
+                kotlin.incremental|false|Compile Kotlin incrementally in the Kotlin daemon through the Kotlin Build Tools API of Kotlin 2.3 or newer, resolved as org.jetbrains.kotlin:kotlin-build-tools-impl, which recompiles only what a change reaches and keeps the compiler warm between builds; the -J and -D lines of process-kotlinc.properties configure the daemon's JVM
                 scala.incremental|false|Compile Scala incrementally with Zinc, resolved as org.scala-sbt:zinc_2.13 in a zinc group and driving the compiler through org.scala-lang:scala3-sbt-bridge at the compiler's version, in a JVM forked per compile, which recompiles only what a change reaches; the lines of process-scalac.properties configure that JVM
                 format.java|true|The Java formatter a javaformat.properties selects - google, palantir or eclipse - with its options
                 format.ktlint|true|ktlint formatting, activated by an .editorconfig
