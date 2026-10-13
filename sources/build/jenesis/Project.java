@@ -1445,7 +1445,9 @@ public record Project(
                           jenesis.kotlin.incremental=true, which needs Kotlin 2.3 or newer and
                           pins org.jetbrains.kotlin:kotlin-build-tools-impl in the group kotlinc
                       scala-maven-plugin / scala -> .scala sources, compiled by Scala 3 (49); Scala 2
-                          is not supported
+                          is not supported; the incremental compilation of Zinc, which sbt, Gradle and
+                          the plugin's recompileMode=incremental use, is
+                          jenesis.scala.incremental=true
                       gmavenplus / groovy -> .groovy sources, compiled by Groovy 4 or newer after
                           javac (51), so Groovy uses Java types and Java no Groovy type: gmavenplus
                           stubs for a joint compilation have no counterpart, and Java code that uses
@@ -4570,6 +4572,7 @@ public record Project(
                 source.codenarc|report|ignore|report|strict: CodeNarc, activated by a codenarc.xml; ignore skips it, report records its findings, strict fails the build on any of them
                 compile.errorprone|true|Error Prone over the javac plugin declared with @jenesis.plugin javac, activated by an errorprone.properties; javac forks to grant it the compiler internals it reads
                 kotlin.incremental|false|Compile Kotlin incrementally in the Kotlin daemon through the Kotlin Build Tools API of Kotlin 2.3 or newer, resolved as org.jetbrains.kotlin:kotlin-build-tools-impl, which recompiles only what a change reaches and keeps the compiler warm between builds; the -J and -D lines of process-kotlinc.properties configure the daemon's JVM
+                scala.incremental|false|Compile Scala incrementally with Zinc, resolved as org.scala-sbt:zinc_2.13 in a zinc group and driving the compiler through org.scala-lang:scala3-sbt-bridge at the compiler's version, in a JVM forked per compile, which recompiles only what a change reaches; the lines of process-scalac.properties configure that JVM
                 format.java|true|The Java formatter a javaformat.properties selects - google, palantir or eclipse - with its options
                 format.ktlint|true|ktlint formatting, activated by an .editorconfig
                 format.ktfmt|true|ktfmt formatting, activated by a ktfmt.properties, which names its style and what it does to the imports; refused beside ktlint formatting the same sources

@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class ScalaCompilerModuleTest {
 
-    private static final String SCALA_VERSION = "3.5.2";
+    private static final String SCALA_VERSION = "3.5.2", INCREMENTAL_VERSION = "3.10.0", ZINC_VERSION = "1.12.1";
 
     @TempDir
     private Path root, project;
@@ -223,6 +223,95 @@ public class ScalaCompilerModuleTest {
         assertThat(classes.resolve("sample/Sample.class"))
                 .as("Sample.scala resolved the Greeter type from the .java source companion and compiled")
                 .isNotEmptyFile();
+    }
+
+    @Test
+    public void recompiles_incrementally_only_what_a_change_reaches() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("scalac/maven/org.scala-lang/scala3-compiler_3", INCREMENTAL_VERSION);
+        properties.setProperty("scalac/maven/org.scala-lang/scala3-sbt-bridge", INCREMENTAL_VERSION);
+        properties.setProperty("zinc/maven/org.scala-sbt/zinc_2.13", ZINC_VERSION);
+        properties.store(project.resolve(BuildStep.VERSIONS));
+        Path sampleDir = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sampleDir.resolve("Greeter.java"), """
+                package sample;
+                public class Greeter {
+                    public String hello() { return "Hello"; }
+                }
+                """);
+        Files.writeString(sampleDir.resolve("Untouched.scala"), """
+                package sample
+                class Untouched:
+                  def name(): String = Greeter().hello()
+                """);
+        Files.writeString(sampleDir.resolve("Edited.scala"), """
+                package sample
+                class Edited:
+                  def value(): String = "first"
+                """);
+        Files.writeString(sampleDir.resolve("User.scala"), """
+                package sample
+                class User:
+                  def use(): String = "used " + Edited().value()
+                """);
+        Files.writeString(sampleDir.resolve("Removed.scala"), """
+                package sample
+                class Removed
+                """);
+        Files.writeString(sampleDir.resolve("data.txt"), "data");
+        incremental();
+        Path classes = root.resolve("scala").resolve(ScalaCompilerModule.CLASSES).resolve("output").resolve(BuildStep.CLASSES);
+        FileTime untouched = Files.getLastModifiedTime(classes.resolve("sample/Untouched.class")),
+                user = Files.getLastModifiedTime(classes.resolve("sample/User.class"));
+        assertThat(classes.resolve("sample/Removed.class")).isNotEmptyFile();
+        assertThat(classes.resolve("sample/Edited.tasty")).isNotEmptyFile();
+        assertThat(classes.resolve("sample/Greeter.class"))
+                .as("a Java source is compiled by javac after the Scala compiler, not published by Zinc")
+                .doesNotExist();
+
+        Files.writeString(sampleDir.resolve("Edited.scala"), """
+                package sample
+                class Edited:
+                  def value(): String = "second"
+                """);
+        Files.delete(sampleDir.resolve("Removed.scala"));
+        incremental();
+        assertThat(Files.getLastModifiedTime(classes.resolve("sample/Untouched.class")))
+                .as("a source the change does not reach keeps the class the previous run compiled")
+                .isEqualTo(untouched);
+        assertThat(Files.getLastModifiedTime(classes.resolve("sample/User.class")))
+                .as("a body changed behind an unchanged signature leaves the class that calls it as it was")
+                .isEqualTo(user);
+        assertThat(classes.resolve("sample/Removed.class"))
+                .as("the class of a removed source is removed with it")
+                .doesNotExist();
+        assertThat(classes.resolve("sample/data.txt")).hasContent("data");
+        assertThat(new String(Files.readAllBytes(classes.resolve("sample/Edited.class")), StandardCharsets.ISO_8859_1))
+                .as("the edited source is compiled again")
+                .contains("second");
+
+        Files.writeString(sampleDir.resolve("Edited.scala"), """
+                package sample
+                class Edited:
+                  def value(): Int = 2
+                """);
+        incremental();
+        assertThat(Files.getLastModifiedTime(classes.resolve("sample/User.class")))
+                .as("a changed signature recompiles the source that uses it")
+                .isNotEqualTo(user);
+        assertThat(Files.getLastModifiedTime(classes.resolve("sample/Untouched.class"))).isEqualTo(untouched);
+    }
+
+    private void incremental() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "scala",
+                new ScalaCompilerModule(
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).incremental(true),
+                "project");
+        executor.execute();
     }
 
     @Test
