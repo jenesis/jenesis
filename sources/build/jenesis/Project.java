@@ -1178,7 +1178,7 @@ public record Project(
                       the version          version=<version> in project.properties at the root,
                                            which -Djenesis.project.version overrides
 
-                    demo-02 is one module, demo-04 several with a test module, demo-71 the
+                    demo-02 is one module, demo-04 several with a test module, demo-72 the
                     published coordinate; skill/tags lists every tag.
 
                     ## 4. Replace each plugin
@@ -1380,9 +1380,9 @@ public record Project(
                     root, JReleaser installed on the runner, the version as
                     -Djenesis.project.version and -Djenesis.jreleaser.dry=false. The job's
                     credentials become the JRELEASER_* variables JReleaser reads, which the release
-                    is handed (71). A job that deployed to a repository of its own rather than to
+                    is handed (72). A job that deployed to a repository of its own rather than to
                     Maven Central names it in MAVEN_RELEASE_URI and its key in MAVEN_RELEASE_TOKEN
-                    instead (71). Then let `ide` write the IntelliJ, VS Code or Eclipse
+                    instead (72). Then let `ide` write the IntelliJ, VS Code or Eclipse
                     project so no IDE depends on the old build: one IDE module per module, its
                     tests in its test sources. The IDE files it writes into a source folder never
                     reach a jar. A Maven layout keeps its pom.xml files, which are now its build
@@ -1640,11 +1640,11 @@ public record Project(
                           (13); addDefaultImplementationEntries -> on by default: Implementation-Title
                           and -Vendor, and -Version where the POM, project.properties or
                           jenesis.project.version names one
-                      maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (8, 71),
+                      maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (8, 72),
                           whose jar holds the sources and, as Maven's and Gradle's do, the resources,
                           including those of -Djenesis.project.resources
                       maven-javadoc-plugin / withJavadocJar(), Dokka
-                          -> -Djenesis.project.documentation=true (8, 71), which documents
+                          -> -Djenesis.project.documentation=true (8, 72), which documents
                           the main modules, a test module only under jenesis.stage.tests, one with a
                           module-info.java as that module (module-summary.html, its pages below the
                           module's name), as maven-javadoc-plugin and Gradle do; javadoc runs with
@@ -1660,20 +1660,20 @@ public record Project(
                           <module>-<classifier>.jar; <classifier>= republishes the jar as it is.
                           A platform's variant goes into the classifiers.properties of a profile
                           folder, and a consumer selects one with @jenesis.pin <module>
-                          :<classifier> or a pom.xml <classifier> (72)
+                          :<classifier> or a pom.xml <classifier> (65)
                       exec-maven-plugin or maven-antrun-plugin running make, cmake or cargo,
                           nar-maven-plugin, Gradle's cpp-library or an Exec task calling cargo
                           -> a plugin at binary/compiled that forks the native tool as an
                           EnvironmentalProcessBuildStep and writes its library below a folder of
                           its output, as library/linux-x86_64/, which classifiers.properties names
-                          as linux-x86_64=library/linux-x86_64 (72); os-maven-plugin's
+                          as linux-x86_64=library/linux-x86_64 (65); os-maven-plugin's
                           ${os.detected.classifier} -> one profile per platform, each building on
                           its own machine; the compiler is the machine's, as with Maven and Gradle.
                           javac -h, as maven-compiler-plugin's <headerOutputDirectory> or Gradle's
                           options.headerOutputDirectory -> the same plugin first wires
                           new Javac(ProcessHandler.Factory.of()).headers(true), which compiles the
                           module's sources and hands on nothing but headers/, one header per class
-                          with a native method, for the C compiler's include path (65)
+                          with a native method, for the C compiler's include path (66)
                       dokka-maven-plugin / org.jetbrains.dokka -> dokka.properties (45), whose
                           files are resolved against the module's folder and are inputs of the
                           build: moduleName -> module-name (documentation by default), includes ->
@@ -1702,19 +1702,19 @@ public record Project(
                           -> docker=<image>, a build context; the build never runs Docker (9, 10)
                       native-maven-plugin / org.graalvm.buildtools.native
                           -> native=true, graal.properties (56)
-                      maven-jarsigner-plugin / jar signing -> jenesis.jarsigner.* (69)
-                      maven-install-plugin / publishToMavenLocal -> `export` (70)
+                      maven-jarsigner-plugin / jar signing -> jenesis.jarsigner.* (70)
+                      maven-install-plugin / publishToMavenLocal -> `export` (71)
                       maven-deploy-plugin, distributionManagement to a repository of your own /
                           maven-publish to one -> `release` with jenesis.deploy.uri and
                           jenesis.deploy.token, which puts the staged Maven tree there
                           with its checksums and maven-metadata.xml, unsigned, a SNAPSHOT under
-                          a unique timestamped name (71); altDeploymentRepository -> the same
+                          a unique timestamped name (72); altDeploymentRepository -> the same
                           setting on the command line
                       deploy to Maven Central, central-publishing, maven-gpg-plugin / maven-publish
                           to Central, signing
                           -> `release` with a jreleaser.yml, handed JRELEASER_PROJECT_VERSION from
                           jenesis.project.version, which a pom.xml build sets for a release whose
-                          configuration names no version (71). JReleaser
+                          configuration names no version (72). JReleaser
                           is not resolved like the other tools but run as the `jreleaser` program
                           on the PATH, or the one jenesis.jreleaser.executable names, so it is
                           installed apart from the build. It runs with --dry-run, publishing
@@ -2757,13 +2757,13 @@ public record Project(
                                          62 external-module,
                                          63 byte-buddy (Byte Buddy's plugins over the compiled classes),
                                          64 project-plugins (hooks from a first check to release),
-                                         65 jni (a C library a plugin compiles against the headers),
-                                         66 custom-maven, 67 custom-modular,
-                                         68 custom-build (no Project at all)
-                      Shipping it        69 code-signing (jarsigner), 70 export (into the local repositories),
-                                         71 publishing (Maven Central),
-                                         72 classifiers (variants a module of the build publishes,
+                                         65 classifiers (variants a module of the build publishes,
                                          selected by a sibling),
+                                         66 jni (a C library a plugin compiles against the headers),
+                                         67 custom-maven, 68 custom-modular,
+                                         69 custom-build (no Project at all)
+                      Shipping it        70 code-signing (jarsigner), 71 export (into the local repositories),
+                                         72 publishing (Maven Central),
                                          73 module-convention (resolving what you published),
                                          74, 75 discovery (a dependency resolved from its
                                          publisher's own domain, as a module or by coordinate),
