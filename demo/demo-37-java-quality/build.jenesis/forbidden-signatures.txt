@@ -1,0 +1,2 @@
+@defaultMessage Name a thread: an unnamed one is hard to tell apart in a thread dump
+java.lang.Thread#<init>(java.lang.Runnable)

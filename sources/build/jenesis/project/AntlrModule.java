@@ -37,7 +37,7 @@ public class AntlrModule implements BuildExecutorModule {
              "antlr",
              null,
              List.of(),
-             ProcessBuildStep.Terms.of("antlr"));
+             new ProcessBuildStep.Terms());
     }
 
     public static AntlrModule ofEnvironment(Environment environment,
@@ -144,14 +144,29 @@ public class AntlrModule implements BuildExecutorModule {
                 try {
                     Path sources = context.next().resolve(BuildStep.SOURCES);
                     if (Files.isDirectory(sources)) {
-                        List<Path> auxiliary = new ArrayList<>();
+                        List<Path> auxiliary = new ArrayList<>(), generated = new ArrayList<>();
                         try (Stream<Path> files = Files.walk(sources)) {
-                            files.filter(Files::isRegularFile)
-                                    .filter(file -> !file.getFileName().toString().endsWith(".java"))
-                                    .forEach(auxiliary::add);
+                            files.filter(Files::isRegularFile).forEach(file -> (file.getFileName().toString()
+                                    .endsWith(".java") ? generated : auxiliary).add(file));
                         }
                         for (Path file : auxiliary) {
                             Files.delete(file);
+                        }
+                        List<String> headers = arguments.values().stream()
+                                .filter(argument -> !argument.removed())
+                                .map(argument -> "// Generated from " + argument.folder().resolve(FOLDER)
+                                        + File.separator)
+                                .toList();
+                        for (Path file : generated) {
+                            String content = Files.readString(file), named = content;
+                            for (String header : headers) {
+                                if (named.startsWith(header)) {
+                                    named = "// Generated from " + named.substring(header.length());
+                                }
+                            }
+                            if (!named.equals(content)) {
+                                Files.writeString(file, named);
+                            }
                         }
                     }
                     return result;

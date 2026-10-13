@@ -440,6 +440,19 @@ public class SignaturesTest {
     }
 
     @Test
+    public void quotes_the_reproduction_of_a_verifier_that_gave_no_verdict_for_a_shell() throws IOException {
+        Path jar = Files.createFile(input.resolve("lib(1.0).jar"));
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("main/compile/maven/org.example/lib/1.0", jar.getFileName().toString());
+        properties.store(input.resolve(BuildStep.DEPENDENCIES));
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(signature("lib"))))
+                .hasStackTraceContaining("Unexpected exit code 1 and no signature verdict")
+                .as("a path holding parentheses stays one word when the line is pasted into a shell")
+                .hasStackTraceContaining(" '" + jar.toAbsolutePath() + "'");
+    }
+
+    @Test
     public void rejects_a_declared_coordinate_that_publishes_no_signature() throws IOException {
         resolved("maven/org.example/lib", "1.0", null);
         declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");

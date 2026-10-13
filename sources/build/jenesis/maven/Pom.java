@@ -5,7 +5,9 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Dependencies;
 
 public class Pom implements BuildStep {
 
@@ -13,48 +15,45 @@ public class Pom implements BuildStep {
 
     private final Set<String> prefixes;
     private final Map<String, String> shared;
-    private final boolean resolved;
     private final String group;
     private final boolean embedded;
     private final transient MavenPomEmitter emitter = new MavenPomEmitter();
 
     public Pom() {
-        this(Set.of("maven"), Map.of(), false, "main", false);
+        this(Set.of("maven"), Map.of(), "main", false);
     }
 
-    private Pom(Set<String> prefixes, Map<String, String> shared, boolean resolved, String group, boolean embedded) {
+    private Pom(Set<String> prefixes, Map<String, String> shared, String group, boolean embedded) {
         this.prefixes = Set.copyOf(prefixes);
         this.shared = Map.copyOf(shared);
-        this.resolved = resolved;
         this.group = group;
         this.embedded = embedded;
     }
 
     public Pom prefixes(Set<String> prefixes) {
-        return new Pom(prefixes, shared, resolved, group, embedded);
+        return new Pom(prefixes, shared, group, embedded);
     }
 
     public Pom shared(Map<String, String> shared) {
-        return new Pom(prefixes, shared, resolved, group, embedded);
-    }
-
-    public Pom resolved(boolean resolved) {
-        return new Pom(prefixes, shared, resolved, group, embedded);
+        return new Pom(prefixes, shared, group, embedded);
     }
 
     public Pom group(String group) {
-        return new Pom(prefixes, shared, resolved, group, embedded);
+        return new Pom(prefixes, shared, group, embedded);
     }
 
     public Pom embedded(boolean embedded) {
-        return new Pom(prefixes, shared, resolved, group, embedded);
+        return new Pom(prefixes, shared, group, embedded);
     }
 
     @Override
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
-                Path.of(resolved ? DEPENDENCIES : REQUIRES),
+                Path.of(REQUIRES),
                 Path.of(EXCLUSIONS),
+                Path.of(OPTIONALS),
+                Path.of(OVERRIDES),
+                Path.of(Dependencies.GRAPH),
                 Path.of(METADATA)));
     }
 
@@ -67,19 +66,41 @@ public class Pom implements BuildStep {
                 .filter(argument -> !argument.removed())
                 .map(BuildStepArgument::folder)
                 .toList();
-        SequencedProperties requires = SequencedProperties.ofFolders(folders, resolved ? DEPENDENCIES : REQUIRES);
+        SequencedProperties requires = SequencedProperties.ofFolders(folders, REQUIRES);
         SequencedProperties exclusions = SequencedProperties.ofFolders(folders, EXCLUSIONS);
+        SequencedProperties optionals = SequencedProperties.ofFolders(folders, OPTIONALS);
         SequencedProperties metadata = SequencedProperties.ofFolders(folders, METADATA);
+        SequencedProperties overrides = SequencedProperties.ofFolders(folders, OVERRIDES);
+        SequencedSet<MavenDependencyName> dropped = new LinkedHashSet<>();
+        SequencedProperties recorded = SequencedProperties.ofFolders(folders, Dependencies.GRAPH);
+        for (String key : recorded.stringPropertyNames()) {
+            if (key.startsWith("overridden/" + group + "/")) {
+                String coordinate = key.substring(key.indexOf('/', "overridden/".length() + group.length() + 1) + 1);
+                int prefix = coordinate.indexOf('/'), separator = coordinate.indexOf('/', prefix + 1);
+                if (prefixes.contains(coordinate.substring(0, prefix))) {
+                    dropped.add(new MavenDependencyName(coordinate.substring(prefix + 1, separator),
+                            coordinate.substring(separator + 1)));
+                }
+            }
+        }
+        SequencedMap<String, Resolver.Resolution> graph = Dependencies.graph(folders.stream()
+                .map(folder -> folder.resolve(Dependencies.GRAPH))
+                .toList(), List.of());
+        Set<String> coordinateOptionals = new HashSet<>();
+        for (String key : optionals.stringPropertyNames()) {
+            if (key.startsWith(group + "/")) {
+                coordinateOptionals.add(key.substring(key.indexOf('/', key.indexOf('/') + 1) + 1));
+            }
+        }
         SequencedMap<String, SequencedSet<String>> coordinateScopes = new LinkedHashMap<>();
         for (String key : requires.stringPropertyNames()) {
             int first = key.indexOf('/');
             int second = key.indexOf('/', first + 1);
-            String coordinate = key.substring(second + 1);
-            if (!key.startsWith(group + "/")) {
+            String coordinate = key.substring(second + 1), scope = key.substring(first + 1, second);
+            if (!key.startsWith(group + "/") || overrides.getProperty(group + "/" + coordinate) != null) {
                 continue;
             }
-            coordinateScopes.computeIfAbsent(coordinate, _ -> new LinkedHashSet<>())
-                    .add(key.substring(first + 1, second));
+            coordinateScopes.computeIfAbsent(coordinate, _ -> new LinkedHashSet<>()).add(scope);
         }
         SequencedMap<String, String> coordinateExclusions = new LinkedHashMap<>();
         for (String key : exclusions.stringPropertyNames()) {
@@ -100,43 +121,56 @@ public class Pom implements BuildStep {
         SequencedMap<MavenDependencyKey, MavenDependencyValue> deps = new LinkedHashMap<>();
         for (Map.Entry<String, SequencedSet<String>> scopedEntry : coordinateScopes.entrySet()) {
             String name = scopedEntry.getKey();
-            int separator = name.indexOf('/');
-            if (separator == -1 || !prefixes.contains(name.substring(0, separator))) {
-                continue;
-            }
             boolean inCompile = scopedEntry.getValue().contains("compile");
             boolean inRuntime = scopedEntry.getValue().contains("runtime");
-            if (!inCompile && !inRuntime) {
+            int separator = name.indexOf('/');
+            if (separator == -1 || !inCompile && !inRuntime) {
                 continue;
             }
-            MavenDependencyKey.Versioned parsed = MavenDependencyKey.parse(name.substring(separator + 1));
+            boolean maven = prefixes.contains(name.substring(0, separator));
+            String module = name.substring(separator + 1);
+            String coordinate = scopedEntry.getValue().stream()
+                    .map(scope -> graph.get(group + "/" + scope))
+                    .filter(Objects::nonNull)
+                    .flatMap(resolution -> resolution.vertices().entrySet().stream())
+                    .filter(vertex -> vertex.getValue().resolvedVersion() != null && (maven
+                            ? vertex.getKey().equals(name)
+                            : module.equals(vertex.getValue().module())
+                                    && prefixes.contains(vertex.getKey().substring(0, vertex.getKey().indexOf('/')))))
+                    .findFirst()
+                    .map(vertex -> vertex.getKey() + "/" + vertex.getValue().resolvedVersion())
+                    .orElse(maven ? name : null);
+            if (coordinate == null) {
+                throw new IllegalStateException("The POM of " + groupId + ":" + artifactId + " names each module its"
+                        + " module requires by the Maven artifact it resolved to, and " + module + " resolved to none:"
+                        + " name its artifact with @jenesis.alias " + module + " <groupId>/<artifactId>");
+            }
+            separator = coordinate.indexOf('/');
+            if (!prefixes.contains(coordinate.substring(0, separator))) {
+                continue;
+            }
+            MavenDependencyKey.Versioned parsed = MavenDependencyKey.parse(coordinate.substring(separator + 1));
             MavenDependencyScope scope = inCompile && inRuntime
                     ? MavenDependencyScope.COMPILE
                     : inCompile ? MavenDependencyScope.PROVIDED : MavenDependencyScope.RUNTIME;
-            List<MavenDependencyName> excludes;
-            if (resolved) {
-                excludes = List.of(MavenDependencyName.EXCLUDE_ALL);
-            } else {
-                excludes = null;
-                String exclusionList = coordinateExclusions.get(name);
-                if (exclusionList != null && !exclusionList.isEmpty()) {
-                    excludes = new ArrayList<>();
-                    for (String entry : exclusionList.split(",")) {
-                        int slash = entry.indexOf('/');
-                        if (slash > 0) {
-                            excludes.add(new MavenDependencyName(
-                                    entry.substring(0, slash),
-                                    entry.substring(slash + 1)));
-                        }
+            SequencedSet<MavenDependencyName> excluded = new LinkedHashSet<>();
+            String exclusionList = coordinateExclusions.get(name);
+            if (exclusionList != null && !exclusionList.isEmpty()) {
+                for (String entry : exclusionList.split(",")) {
+                    int slash = entry.indexOf('/');
+                    if (slash > 0) {
+                        excluded.add(new MavenDependencyName(entry.substring(0, slash), entry.substring(slash + 1)));
                     }
                 }
             }
+            excluded.addAll(dropped);
+            List<MavenDependencyName> excludes = excluded.isEmpty() ? null : List.copyOf(excluded);
             deps.putIfAbsent(parsed.key(), new MavenDependencyValue(
                     parsed.version(),
                     scope,
                     null,
                     excludes,
-                    null));
+                    coordinateOptionals.contains(name) ? Boolean.TRUE : null));
         }
         try (Writer writer = Files.newBufferedWriter(context.next().resolve(POM))) {
             emitter.emit(
@@ -144,7 +178,7 @@ public class Pom implements BuildStep {
                     artifactId,
                     version,
                     deps,
-                    parseMetadata(metadata)).accept(writer);
+                    MavenPomEmitter.Metadata.of(metadata)).accept(writer);
         }
         if (embedded) {
             Path folder = Files.createDirectories(context.next()
@@ -160,55 +194,4 @@ public class Pom implements BuildStep {
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
-
-    private static MavenPomEmitter.Metadata parseMetadata(SequencedProperties metadata) {
-        if (metadata.isEmpty()) {
-            return null;
-        }
-        SequencedSet<String> licenseIds = new LinkedHashSet<>(), developerIds = new LinkedHashSet<>();
-        for (String key : metadata.stringPropertyNames()) {
-            int dot = key.lastIndexOf('.');
-            if (key.startsWith("license.") && dot > "license.".length()) {
-                licenseIds.add(key.substring("license.".length(), dot));
-            } else if (key.startsWith("developer.") && dot > "developer.".length()) {
-                developerIds.add(key.substring("developer.".length(), dot));
-            }
-        }
-        List<MavenPomEmitter.Metadata.License> licenses = new ArrayList<>();
-        for (String id : licenseIds) {
-            licenses.add(new MavenPomEmitter.Metadata.License(
-                    metadata.getProperty("license." + id + ".name"),
-                    metadata.getProperty("license." + id + ".url")));
-        }
-        List<MavenPomEmitter.Metadata.Developer> developers = new ArrayList<>();
-        for (String id : developerIds) {
-            developers.add(new MavenPomEmitter.Metadata.Developer(
-                    id,
-                    metadata.getProperty("developer." + id + ".name"),
-                    metadata.getProperty("developer." + id + ".email")));
-        }
-        MavenPomEmitter.Metadata.Scm scm = null;
-        String scmConnection = metadata.getProperty("scm.connection");
-        String scmDeveloperConnection = metadata.getProperty("scm.developerConnection");
-        String scmUrl = metadata.getProperty("scm.url");
-        String scmTag = metadata.value("scm.tag");
-        if (scmConnection != null || scmDeveloperConnection != null || scmUrl != null || scmTag != null) {
-            scm = new MavenPomEmitter.Metadata.Scm(
-                    scmConnection,
-                    scmDeveloperConnection,
-                    scmUrl,
-                    scmTag);
-        }
-        return new MavenPomEmitter.Metadata(
-                metadata.getProperty("name"),
-                metadata.getProperty("description"),
-                metadata.getProperty("url"),
-                licenses,
-                developers,
-                scm,
-                metadata.value("organization.name") == null && metadata.value("organization.url") == null
-                        ? null
-                        : new MavenPomEmitter.Metadata.Organization(metadata.value("organization.name"), metadata.value("organization.url")));
-    }
-
 }

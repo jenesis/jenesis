@@ -109,6 +109,25 @@ public class ScalafmtModuleRunTest {
         assertThatThrownBy(executor::execute)
                 .hasRootCauseInstanceOf(IllegalStateException.class)
                 .rootCause()
+                .hasMessageContaining("scalafmt found 1 finding, reported in ");
+    }
+
+    @Test
+    public void fails_a_report_only_run_when_scalafmt_cannot_load_its_configuration() throws IOException {
+        Files.writeString(project.resolve(".scalafmt.conf"), """
+                version = "3.8.3"
+                runner.dialect = no_such_dialect
+                """);
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "scalafmt",
+                new ScalafmtModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
+                "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .as("report-only covers a misformatted file, not a scalafmt that never ran")
                 .hasMessageContaining("Unexpected exit code");
     }
 

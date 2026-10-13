@@ -13,6 +13,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenDefaultVersionNegotiator;
@@ -46,7 +47,21 @@ public class DependenciesModuleClaimTest {
                 .hasStackTraceContaining("maven/org.example/one-lib/1.0 and maven/org.example/two-lib/2.0"
                         + " both carry module lib.shared in group main"
                         + " - a module path resolves whichever of the two comes first,"
-                        + " so drop one with @jenesis.exclude");
+                        + " so drop one: an <exclusions> entry in pom.xml or @jenesis.exclude in module-info.java");
+    }
+
+    @Test
+    public void names_version_management_when_two_versions_of_one_artifact_carry_its_module() throws IOException {
+        modularLib("lib", "1.0", "lib.shared", "one");
+        modularLib("lib", "2.0", "lib.shared", "one");
+
+        assertThatThrownBy(() -> resolveScoped("main/compile/maven/org.example/lib/1.0", "main/runtime/maven/org.example/lib/2.0"))
+                .as("two scopes of one group that mediate to different versions cannot share a module path,"
+                        + " and a version is settled by managing it rather than by excluding a path to it")
+                .hasStackTraceContaining("maven/org.example/lib/1.0 and maven/org.example/lib/2.0"
+                        + " both carry module lib.shared in group main")
+                .hasStackTraceContaining("settle on one version: a <dependencyManagement> entry in pom.xml"
+                        + " or a @jenesis.pin main/maven/org.example/lib <version> line in module-info.java manages it");
     }
 
     @Test
@@ -58,6 +73,73 @@ public class DependenciesModuleClaimTest {
 
         assertThat(next.resolve(Dependencies.RESOLVED + "lib.one-1.0.jar")).exists();
         assertThat(next.resolve(Dependencies.RESOLVED + "lib.two-2.0.jar")).exists();
+    }
+
+    @Test
+    public void accepts_two_artifacts_that_carry_one_module_name_where_they_land_on_the_class_path() throws IOException {
+        modularLib("lib", "1.0", "lib.shared", "one");
+        modularLib("lib-tests", "1.0", "lib.shared", "two");
+
+        resolveScoped(dependencies -> dependencies.pathPlacement(PathPlacement.CLASS_PATH),
+                "main/compile/maven/org.example/lib/1.0",
+                "main/compile/maven/org.example/lib-tests/1.0");
+
+        assertThat(next.resolve(Dependencies.RESOLVED + "lib.shared-1.0.jar")).exists();
+        assertThat(next.resolve(Dependencies.RESOLVED + "org.example%2Flib-tests%2F1.0.jar"))
+                .as("a second jar of the module and its version takes the file name of its coordinate")
+                .exists();
+    }
+
+    @Test
+    public void accepts_two_artifacts_that_carry_one_module_name_on_the_processor_path() throws IOException {
+        modularLib("one-lib", "1.0", "lib.shared", "one");
+        modularLib("two-lib", "2.0", "lib.shared", "two");
+
+        resolveScoped(UnaryOperator.identity(),
+                "javac/plugin/maven/org.example/one-lib/1.0",
+                "javac/plugin/maven/org.example/two-lib/2.0");
+
+        assertThat(next.resolve(Dependencies.RESOLVED + "lib.shared-1.0.jar")).exists();
+        assertThat(next.resolve(Dependencies.RESOLVED + "lib.shared-2.0.jar")).exists();
+    }
+
+    @Test
+    public void refuses_an_artifact_without_a_module_name_where_every_jar_is_a_module() throws IOException {
+        modularLib("one-lib", "1.0", "lib.one", "one");
+        Files.writeString(mavenRepoFolder.resolve("org/example/one-lib/1.0/one-lib-1.0.pom"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>one-lib</artifactId>
+                    <version>1.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>plain</artifactId>
+                            <version>2.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Path plain = Files.createDirectories(mavenRepoFolder.resolve("org/example/plain/2.0"));
+        Files.writeString(plain.resolve("plain-2.0.pom"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>plain</artifactId>
+                    <version>2.0</version>
+                </project>
+                """);
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(plain.resolve("plain-2.0.jar")))) {
+            output.putNextEntry(new JarEntry("plain/Value.class"));
+            output.closeEntry();
+        }
+
+        assertThatThrownBy(() -> resolveScoped(dependencies -> dependencies.pathPlacement(PathPlacement.MODULE_PATH),
+                "plugin-sample/runtime/maven/org.example/one-lib/1.0"))
+                .hasStackTraceContaining("maven/org.example/plain/2.0 declares no module name, neither by a"
+                        + " module-info.class nor by an Automatic-Module-Name, but every jar of group plugin-sample"
+                        + " loads as a module of its own layer - name it with a @jenesis.alias <module>"
+                        + " org.example/plain line in the module-info.java that requires it, or drop it with"
+                        + " @jenesis.exclude");
     }
 
     private void modularLib(String artifactId, String version, String module, String name) throws IOException {
@@ -111,9 +193,17 @@ public class DependenciesModuleClaimTest {
     }
 
     private Path resolve(String... coordinates) throws IOException {
+        return resolveScoped(Stream.of(coordinates).map(coordinate -> "main/compile/maven/" + coordinate).toArray(String[]::new));
+    }
+
+    private Path resolveScoped(String... keys) throws IOException {
+        return resolveScoped(UnaryOperator.identity(), keys);
+    }
+
+    private Path resolveScoped(UnaryOperator<Dependencies> configurator, String... keys) throws IOException {
         SequencedProperties requires = new SequencedProperties();
-        for (String coordinate : coordinates) {
-            requires.setProperty("main/compile/maven/" + coordinate, "");
+        for (String key : keys) {
+            requires.setProperty(key, "");
         }
         requires.store(dependencies.resolve(BuildStep.REQUIRES));
         BuildExecutor executor = BuildExecutor.of(build,
@@ -126,9 +216,9 @@ public class DependenciesModuleClaimTest {
                 false,
                 0);
         executor.addSource("dependencies", dependencies);
-        executor.addModule("resolved", new Dependencies(
+        executor.addModule("resolved", configurator.apply(new Dependencies(
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
-                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))), "dependencies");
+                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven())))), "dependencies");
         next = executor.execute().get("resolved");
         return next;
     }

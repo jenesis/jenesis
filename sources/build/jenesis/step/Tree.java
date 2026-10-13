@@ -16,10 +16,11 @@ public class Tree implements BuildStep {
 
     private final transient Consumer<String> out;
     private final transient Palette palette;
-    private final transient boolean compact, merged, internal, tests;
+    private final transient boolean compact, merged, internal, tests, tools;
+    private final transient String group;
 
     public Tree() {
-        this(null, Palette.NONE, false, true, false, true);
+        this(null, Palette.NONE, false, true, false, true, false, "main");
     }
 
     public static Tree ofEnvironment(Environment environment) {
@@ -28,7 +29,9 @@ public class Tree implements BuildStep {
                 false,
                 environment.flag("tree.merge", true),
                 environment.flag("tree.internal", false),
-                environment.flag("tree.tests", true));
+                environment.flag("tree.tests", true),
+                environment.flag("tree.tools", false),
+                "main");
         String format = environment.getProperty("tree.format");
         return format == null ? tree : tree.compact(switch (format) {
             case "full" -> false;
@@ -43,33 +46,45 @@ public class Tree implements BuildStep {
                  boolean compact,
                  boolean merged,
                  boolean internal,
-                 boolean tests) {
+                 boolean tests,
+                 boolean tools,
+                 String group) {
         this.out = out;
         this.palette = palette;
         this.compact = compact;
         this.merged = merged;
         this.internal = internal;
         this.tests = tests;
+        this.tools = tools;
+        this.group = group;
     }
 
     public Tree printing(Consumer<String> out, Palette palette) {
-        return new Tree(out, palette, compact, merged, internal, tests);
+        return new Tree(out, palette, compact, merged, internal, tests, tools, group);
     }
 
     public Tree compact(boolean compact) {
-        return new Tree(out, palette, compact, merged, internal, tests);
+        return new Tree(out, palette, compact, merged, internal, tests, tools, group);
     }
 
     public Tree merged(boolean merged) {
-        return new Tree(out, palette, compact, merged, internal, tests);
+        return new Tree(out, palette, compact, merged, internal, tests, tools, group);
     }
 
     public Tree internal(boolean internal) {
-        return new Tree(out, palette, compact, merged, internal, tests);
+        return new Tree(out, palette, compact, merged, internal, tests, tools, group);
     }
 
     public Tree tests(boolean tests) {
-        return new Tree(out, palette, compact, merged, internal, tests);
+        return new Tree(out, palette, compact, merged, internal, tests, tools, group);
+    }
+
+    public Tree tools(boolean tools) {
+        return new Tree(out, palette, compact, merged, internal, tests, tools, group);
+    }
+
+    public Tree group(String group) {
+        return new Tree(out, palette, compact, merged, internal, tests, tools, group);
     }
 
     @Override
@@ -89,8 +104,11 @@ public class Tree implements BuildStep {
         SequencedMap<Path, String> prefixes = new LinkedHashMap<>();
         SequencedMap<String, String> locations = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
             Path inventoryFile = argument.folder().resolve(Inventory.INVENTORY);
-            if (argument.removed() || !Files.isRegularFile(inventoryFile)) {
+            if (!Files.isRegularFile(inventoryFile)) {
                 continue;
             }
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
@@ -144,29 +162,32 @@ public class Tree implements BuildStep {
             Dependencies.graph(
                     graphs,
                     Inventory.paths(inventory, entry.getKey(), prefix + "licenses")).forEach((groupScope, resolution) -> {
-                String group = groupScope.substring(0, groupScope.indexOf('/')),
+                String named = groupScope.substring(0, groupScope.indexOf('/')),
                         scope = groupScope.substring(groupScope.indexOf('/') + 1);
-                if (key != null && group.startsWith("layer:")) {
-                    String name = scope.equals("runtime") ? group : groupScope;
+                if (key != null && named.startsWith("layer:")) {
+                    String name = scope.equals("runtime") ? named : groupScope;
                     layered.put(name, resolution);
-                    layers.put(name, declarations.getOrDefault(group.substring("layer:".length()), key));
+                    layers.put(name, declarations.getOrDefault(named.substring("layer:".length()), key));
+                } else if (key == null || tools || named.equals(group)) {
+                    groups.computeIfAbsent(named, _ -> new TreeMap<>()).put(scope, resolution);
                 } else {
-                    groups.computeIfAbsent(group, _ -> new TreeMap<>()).put(scope, resolution);
+                    return;
                 }
                 aggregated.putAll(resolution.vertices());
             });
             if (!layered.isEmpty()) {
-                groups.computeIfAbsent("main", _ -> new TreeMap<>());
+                groups.computeIfAbsent(group, _ -> new TreeMap<>());
             }
-            groups.forEach((group, scopes) -> {
+            groups.forEach((named, scopes) -> {
                 if (key == null) {
-                    report.render(group, scopes);
-                } else if (group.equals("main")) {
+                    report.render(named, scopes);
+                } else if (named.equals(group)) {
                     SequencedMap<String, Resolver.Resolution> merged = new LinkedHashMap<>(scopes);
                     merged.putAll(layered);
                     report.render(merged, key, root, layers);
                 } else {
-                    report.render(scopes, key, root);
+                    report.render("Group " + named + ", resolved to build "
+                            + (version == null ? key : key + " " + version) + ":", scopes);
                 }
             });
         }

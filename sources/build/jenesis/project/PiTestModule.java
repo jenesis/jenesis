@@ -26,7 +26,11 @@ public class PiTestModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final String tool;
     private final String group;
-    private final SequencedProperties config;
+    private final List<String> targetClasses;
+    private final List<String> targetTests;
+    private final List<OutputFormat> outputFormats;
+    private final List<String> mutators;
+    private final boolean failWhenNoMutations;
     private final ProcessBuildStep.Terms terms;
 
     public PiTestModule(Map<String, Repository> repositories,
@@ -35,8 +39,12 @@ public class PiTestModule implements BuildExecutorModule {
              null,
              "pitest",
              "main",
-             new SequencedProperties(),
-             ProcessBuildStep.Terms.of("pitest"));
+             List.of("*"),
+             List.of("*"),
+             List.of(OutputFormat.XML),
+             List.of(),
+             false,
+             new ProcessBuildStep.Terms());
     }
 
     public static PiTestModule ofEnvironment(Environment environment,
@@ -46,7 +54,11 @@ public class PiTestModule implements BuildExecutorModule {
                 null,
                 "pitest",
                 "main",
-                new SequencedProperties(),
+                List.of("*"),
+                List.of("*"),
+                List.of(OutputFormat.XML),
+                List.of(),
+                false,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "pitest"));
     }
 
@@ -54,34 +66,162 @@ public class PiTestModule implements BuildExecutorModule {
                          Pinning pinning,
                          String tool,
                          String group,
-                         SequencedProperties config,
+                         List<String> targetClasses,
+                         List<String> targetTests,
+                         List<OutputFormat> outputFormats,
+                         List<String> mutators,
+                         boolean failWhenNoMutations,
                          ProcessBuildStep.Terms terms) {
         this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.group = group;
-        this.config = config;
+        this.targetClasses = targetClasses;
+        this.targetTests = targetTests;
+        this.outputFormats = outputFormats;
+        this.mutators = mutators;
+        this.failWhenNoMutations = failWhenNoMutations;
         this.terms = terms;
     }
 
     public PiTestModule pinning(Pinning pinning) {
-        return new PiTestModule(dependencies, pinning, tool, group, config, terms);
+        return new PiTestModule(dependencies,
+                pinning,
+                tool,
+                group,
+                targetClasses,
+                targetTests,
+                outputFormats,
+                mutators,
+                failWhenNoMutations,
+                terms);
     }
 
     public PiTestModule tool(String tool) {
-        return new PiTestModule(dependencies, pinning, tool, group, config, terms);
+        return new PiTestModule(dependencies,
+                pinning,
+                tool,
+                group,
+                targetClasses,
+                targetTests,
+                outputFormats,
+                mutators,
+                failWhenNoMutations,
+                terms);
     }
 
     public PiTestModule group(String group) {
-        return new PiTestModule(dependencies, pinning, tool, group, config, terms);
+        return new PiTestModule(dependencies,
+                pinning,
+                tool,
+                group,
+                targetClasses,
+                targetTests,
+                outputFormats,
+                mutators,
+                failWhenNoMutations,
+                terms);
     }
 
-    public PiTestModule config(SequencedProperties config) {
-        return new PiTestModule(dependencies, pinning, tool, group, config, terms);
+    public PiTestModule targetClasses(List<String> targetClasses) {
+        return new PiTestModule(dependencies,
+                pinning,
+                tool,
+                group,
+                globs("classes to mutate", targetClasses),
+                targetTests,
+                outputFormats,
+                mutators,
+                failWhenNoMutations,
+                terms);
+    }
+
+    public PiTestModule targetTests(List<String> targetTests) {
+        return new PiTestModule(dependencies,
+                pinning,
+                tool,
+                group,
+                targetClasses,
+                globs("tests to run against the mutants", targetTests),
+                outputFormats,
+                mutators,
+                failWhenNoMutations,
+                terms);
+    }
+
+    public PiTestModule outputFormats(List<OutputFormat> outputFormats) {
+        if (outputFormats.isEmpty()) {
+            throw new IllegalArgumentException("PIT writes its report in at least one format, expected some of "
+                    + List.of(OutputFormat.values()));
+        }
+        return new PiTestModule(dependencies,
+                pinning,
+                tool,
+                group,
+                targetClasses,
+                targetTests,
+                List.copyOf(new LinkedHashSet<>(outputFormats)),
+                mutators,
+                failWhenNoMutations,
+                terms);
+    }
+
+    public PiTestModule mutators(List<String> mutators) {
+        for (String mutator : mutators) {
+            if (mutator.isBlank() || mutator.contains(",")) {
+                throw new IllegalArgumentException("A mutator of PIT is one name, such as DEFAULTS, STRONGER or"
+                        + " CONDITIONALS_BOUNDARY, with neither a comma nor only blanks: '" + mutator + "'");
+            }
+        }
+        return new PiTestModule(dependencies,
+                pinning,
+                tool,
+                group,
+                targetClasses,
+                targetTests,
+                outputFormats,
+                List.copyOf(mutators),
+                failWhenNoMutations,
+                terms);
+    }
+
+    public PiTestModule failWhenNoMutations(boolean failWhenNoMutations) {
+        return new PiTestModule(dependencies,
+                pinning,
+                tool,
+                group,
+                targetClasses,
+                targetTests,
+                outputFormats,
+                mutators,
+                failWhenNoMutations,
+                terms);
+    }
+
+    private static List<String> globs(String selected, List<String> globs) {
+        if (globs.isEmpty()) {
+            throw new IllegalArgumentException("PIT selects the " + selected + " by at least one glob, such as *");
+        }
+        for (String glob : globs) {
+            if (glob.isBlank() || glob.contains(",")) {
+                throw new IllegalArgumentException("A glob of the " + selected + " is one class name pattern, such as"
+                        + " com.example.*, with neither a comma nor only blanks: '" + glob + "'");
+            }
+        }
+        return List.copyOf(globs);
     }
 
     public PiTestModule printing(BiConsumer<Boolean, String> printing) {
-        return new PiTestModule(dependencies, pinning, tool, group, config, terms.printing(printing));
+        return new PiTestModule(dependencies,
+                pinning,
+                tool,
+                group,
+                targetClasses,
+                targetTests,
+                outputFormats,
+                mutators,
+                failWhenNoMutations,
+                terms.printing(printing));
     }
 
     @Override
@@ -96,7 +236,14 @@ public class PiTestModule implements BuildExecutorModule {
         SequencedSet<String> mutateInputs = new LinkedHashSet<>();
         mutateInputs.add(DEPENDENCIES);
         mutateInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(MUTATE, new Mutate(terms, tool, group, config), mutateInputs);
+        buildExecutor.addStep(MUTATE, new Mutate(terms,
+                tool,
+                group,
+                targetClasses,
+                targetTests,
+                outputFormats,
+                mutators,
+                failWhenNoMutations), mutateInputs);
     }
 
     private record Requires(String tool) implements BuildStep {
@@ -149,16 +296,28 @@ public class PiTestModule implements BuildExecutorModule {
 
         private final String tool;
         private final String group;
-        private final SequencedProperties config;
+        private final List<String> targetClasses;
+        private final List<String> targetTests;
+        private final List<OutputFormat> outputFormats;
+        private final List<String> mutators;
+        private final boolean failWhenNoMutations;
 
         private Mutate(ProcessBuildStep.Terms terms,
                        String tool,
                        String group,
-                       SequencedProperties config) {
+                       List<String> targetClasses,
+                       List<String> targetTests,
+                       List<OutputFormat> outputFormats,
+                       List<String> mutators,
+                       boolean failWhenNoMutations) {
             super("pitest", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.group = group;
-            this.config = config;
+            this.targetClasses = targetClasses;
+            this.targetTests = targetTests;
+            this.outputFormats = outputFormats;
+            this.mutators = mutators;
+            this.failWhenNoMutations = failWhenNoMutations;
         }
 
         @Override
@@ -217,7 +376,7 @@ public class PiTestModule implements BuildExecutorModule {
             if (candidates.isEmpty() || sources.isEmpty()) {
                 return CompletableFuture.completedStage(null);
             }
-            if (!matches(candidates, config.value("targetTests", "*"))) {
+            if (!matches(candidates, targetTests)) {
                 return CompletableFuture.completedStage(null);
             }
             Path report = Files.createDirectories(context.next().resolve(BuildStep.REPORTS + "pitest"));
@@ -230,16 +389,15 @@ public class PiTestModule implements BuildExecutorModule {
                     "--reportDir", report.toString(),
                     "--classPath", String.join(",", classPath),
                     "--sourceDirs", String.join(",", sources),
-                    "--targetClasses", config.value("targetClasses", "*"),
-                    "--targetTests", config.value("targetTests", "*"),
-                    "--outputFormats", config.value("outputFormats", "XML"),
+                    "--targetClasses", String.join(",", targetClasses),
+                    "--targetTests", String.join(",", targetTests),
+                    "--outputFormats", outputFormats.stream().map(OutputFormat::name).collect(Collectors.joining(",")),
                     "--mutableCodePaths", code.toString(),
                     "--timestampedReports", "false",
-                    "--failWhenNoMutations", config.value("failWhenNoMutations", "false")));
-            String mutators = config.value("mutators");
-            if (mutators != null) {
+                    "--failWhenNoMutations", Boolean.toString(failWhenNoMutations)));
+            if (!mutators.isEmpty()) {
                 commands.add("--mutators");
-                commands.add(mutators);
+                commands.add(String.join(",", mutators));
             }
             return CompletableFuture.completedStage(commands);
         }
@@ -277,13 +435,9 @@ public class PiTestModule implements BuildExecutorModule {
             });
         }
 
-        private static boolean matches(SequencedSet<String> names, String globs) {
-            for (String glob : globs.split(",")) {
-                String trimmed = glob.trim();
-                if (trimmed.isEmpty()) {
-                    continue;
-                }
-                Pattern pattern = Pattern.compile(trimmed.replace(".", "\\.").replace("*", ".*"));
+        private static boolean matches(SequencedSet<String> names, List<String> globs) {
+            for (String glob : globs) {
+                Pattern pattern = Pattern.compile(glob.replace(".", "\\.").replace("*", ".*"));
                 for (String name : names) {
                     if (pattern.matcher(name).matches()) {
                         return true;
@@ -292,5 +446,10 @@ public class PiTestModule implements BuildExecutorModule {
             }
             return false;
         }
+    }
+
+    public enum OutputFormat {
+
+        XML, HTML, CSV
     }
 }

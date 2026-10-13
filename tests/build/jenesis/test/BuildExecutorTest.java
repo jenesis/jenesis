@@ -505,6 +505,27 @@ public class BuildExecutorTest implements Serializable {
     }
 
     @Test
+    public void reports_a_failure_two_steps_depend_on_once_when_aggregating() throws IOException {
+        BuildExecutor executor = BuildExecutor.of(root2,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                true,
+                0);
+        executor.addStep("step1", (_, _, _) -> {
+            throw new RuntimeException("one");
+        });
+        executor.addStep("step2", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)), "step1");
+        executor.addStep("step3", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)), "step1");
+        Throwable thrown = catchThrowable(() -> executor.execute(Runnable::run).toCompletableFuture().join());
+        assertThat(thrown).isInstanceOf(BuildExecutorException.class).hasMessage("Failed to execute step1");
+        assertThat(thrown.getSuppressed()).as("the one failure is reported once rather than suppressed by itself").isEmpty();
+    }
+
+    @Test
     public void aggregate_configuration_defaults_from_property_and_is_overridable() {
         assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings)).aggregate()).isFalse();
         assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings)).aggregate(true).aggregate()).isTrue();

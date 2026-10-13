@@ -18,7 +18,7 @@ public class JarSigner extends ProcessBuildStep {
     private final List<String> arguments;
 
     public JarSigner() {
-        this(null, null, null, null, null, null, List.of(), Terms.of("jarsigner"));
+        this(null, null, null, null, null, null, List.of(), new Terms());
     }
 
     public static JarSigner ofEnvironment(Environment environment) {

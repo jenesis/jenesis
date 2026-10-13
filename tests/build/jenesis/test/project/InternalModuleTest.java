@@ -5,12 +5,15 @@ import module org.junit.jupiter.api;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
+import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
+import build.jenesis.Resolver;
+import build.jenesis.SequencedProperties;
 import build.jenesis.module.ModularJarResolver;
 import build.jenesis.project.InternalModule;
 
@@ -667,6 +670,120 @@ public class InternalModuleTest {
         assertThat(steps.get("internal/marker").resolve("out.txt")).content().isEqualTo("pinned");
         assertThat(asked).isNotEmpty().allSatisfy(coordinate ->
                 assertThat(coordinate).isEqualTo("build.jenesis/9.9.9"));
+    }
+
+    @Test
+    public void takes_no_alias_of_the_build_it_is_handed() throws IOException {
+        Path source = writeModuleSource(work.resolve("plugin"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                Map.of("test/plugin/Plugin.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutor;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStepResult;
+                        import java.nio.file.Files;
+                        import java.nio.file.Path;
+                        import java.util.SequencedMap;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Plugin implements BuildExecutorModule {
+                            public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
+                                executor.addStep("marker", (_, context, _) -> {
+                                    Files.writeString(context.next().resolve("out.txt"), "isolated");
+                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                });
+                            }
+                        }
+                        """));
+        Path outer = Files.createDirectories(work.resolve("outer"));
+        SequencedProperties aliases = new SequencedProperties();
+        aliases.setProperty("main/module/build.jenesis", "sample/elsewhere");
+        aliases.store(outer.resolve(BuildStep.ALIASES));
+        List<String> asked = Collections.synchronizedList(new ArrayList<>());
+        buildExecutor.addSource("outer", outer);
+        buildExecutor.addModule("internal", new InternalModule(
+                "module",
+                null,
+                source)
+                .repositories(Map.of("module", recording(asked, Map.of("build.jenesis", jenesisJar))))
+                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))), "outer");
+
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps.get("internal/marker").resolve("out.txt")).content().isEqualTo("isolated");
+        assertThat(asked)
+                .as("an alias of the build the plugin runs in renames nothing the plugin requires")
+                .isNotEmpty()
+                .allSatisfy(coordinate -> assertThat(coordinate).startsWith("build.jenesis"));
+    }
+
+    @Test
+    public void resolves_a_required_module_through_its_alias() throws IOException {
+        Path toolSources = writeModuleSource(work.resolve("tool"), "module sample.tool { exports sample.tool; }", Map.of("sample/tool/Tool.java", """
+                package sample.tool;
+                public class Tool {
+                    public static String greeting() {
+                        return "aliased";
+                    }
+                }
+                """));
+        Path toolClasses = Files.createDirectories(work.resolve("tool-classes"));
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
+                "-d", toolClasses.toString(),
+                toolSources.resolve("module-info.java").toString(),
+                toolSources.resolve("sample/tool/Tool.java").toString())).isZero();
+        Path tool = work.resolve("tool.jar");
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(tool))) {
+            for (String entry : List.of("module-info.class", "sample/tool/Tool.class")) {
+                jar.putNextEntry(new JarEntry(entry));
+                Files.copy(toolClasses.resolve(entry), jar);
+                jar.closeEntry();
+            }
+        }
+        Path source = writeModuleSource(work.resolve("plugin"), """
+                        /**
+                         * @jenesis.alias sample.tool sample/tool
+                         * @jenesis.pin sample/tool 1.0
+                         */
+                        module test.plugin {
+                            requires build.jenesis;
+                            requires sample.tool;
+                            provides build.jenesis.BuildExecutorModule with test.plugin.Plugin;
+                        }
+                        """,
+                Map.of("test/plugin/Plugin.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutor;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStepResult;
+                        import java.nio.file.Files;
+                        import java.nio.file.Path;
+                        import java.util.SequencedMap;
+                        import java.util.concurrent.CompletableFuture;
+                        import sample.tool.Tool;
+                        public class Plugin implements BuildExecutorModule {
+                            public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
+                                executor.addStep("marker", (_, context, _) -> {
+                                    Files.writeString(context.next().resolve("out.txt"), Tool.greeting());
+                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                });
+                            }
+                        }
+                        """));
+        List<String> asked = new ArrayList<>();
+        buildExecutor.addModule("internal", new InternalModule(
+                "module",
+                null,
+                source)
+                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar)),
+                        "maven", recording(asked, Map.of("sample", tool))))
+                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true),
+                        "maven", Resolver.identity())));
+
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps.get("internal/marker").resolve("out.txt"))
+                .as("a module the module index does not serve is reached through the alias, as in a project")
+                .content()
+                .isEqualTo("aliased");
+        assertThat(asked).containsExactly("sample/tool/1.0");
     }
 
     private static Path writeModuleSource(Path target, String moduleInfo, Map<String, String> sources) throws IOException {

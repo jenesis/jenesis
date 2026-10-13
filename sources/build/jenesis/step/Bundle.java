@@ -7,37 +7,50 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.ModuleGraph;
+import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 
 public class Bundle implements BuildStep {
 
     public static final String BUNDLE = "bundle/";
+    private static final Set<String> ARCHIVES = Set.of(".jar", ".zip", ".jmod", ".war", ".ear", ".gz", ".tgz", ".xz", ".bz2");
 
     private final String group;
     private final OffsetDateTime timestamp;
+    private final transient Consumer<String> out;
+    private final transient Palette palette;
 
     public Bundle() {
         this("main",
-             BuildStep.timestamp());
+             BuildStep.timestamp(),
+             null,
+             Palette.NONE);
     }
 
     public static Bundle ofEnvironment(Environment environment) {
         return new Bundle()
-                .timestamp(BuildStep.timestamp(environment));
+                .timestamp(BuildStep.timestamp(environment))
+                .printing(environment.out(), Palette.ofEnvironment(environment));
     }
 
-    private Bundle(String group, OffsetDateTime timestamp) {
+    private Bundle(String group, OffsetDateTime timestamp, Consumer<String> out, Palette palette) {
         this.group = group;
         this.timestamp = timestamp;
+        this.out = out;
+        this.palette = palette;
     }
 
     public Bundle group(String group) {
-        return new Bundle(group, timestamp);
+        return new Bundle(group, timestamp, out, palette);
     }
 
     public Bundle timestamp(OffsetDateTime timestamp) {
-        return new Bundle(group, timestamp);
+        return new Bundle(group, timestamp, out, palette);
+    }
+
+    public Bundle printing(Consumer<String> out, Palette palette) {
+        return new Bundle(group, timestamp, out, palette);
     }
 
     @Override
@@ -45,7 +58,7 @@ public class Bundle implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        String mainClass = null, mainModule = null;
+        String mainClass = null, mainModule = null, artifact = null;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -61,8 +74,19 @@ public class Bundle implements BuildStep {
             if (mainModule == null) {
                 mainModule = launcher.getProperty("mainModule");
             }
+            if (artifact == null) {
+                artifact = launcher.getProperty("name");
+            }
         }
         if (mainClass == null) {
+            if (out != null) {
+                out.accept(("%s%-11s%s %s builds no bundle, as it names no main class: name one with @jenesis.main"
+                        + " <class> in its module-info.java, or with a <mainClass> property in its pom.xml")
+                        .formatted(palette.warning(),
+                                "[SKIPPED]",
+                                palette.reset(),
+                                artifact == null ? "The module" : artifact));
+            }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         SequencedMap<String, Path> jars = new TreeMap<>();
@@ -123,6 +147,7 @@ public class Bundle implements BuildStep {
         layers.forEach((layer, membership) -> membership.nativeAccess(jars, granted)
                 .forEach((jar, module) -> graph.enableNativeAccess(layer, jar, module)));
         agents.keySet().retainAll(jars.sequencedKeySet());
+        List<String> javaOptions = javaOptions(arguments);
         SequencedMap<String, Path> descriptors = new LinkedHashMap<>();
         for (Map.Entry<String, String> platform : List.of(
                 Map.entry("unix", ":"),
@@ -130,7 +155,8 @@ public class Bundle implements BuildStep {
         )) {
             descriptors.put("application." + platform.getKey() + ".args", ProcessBuildStep.argumentFile(
                     context.supplement().resolve("application." + platform.getKey() + ".args"),
-                    command(mainClass,
+                    command(javaOptions,
+                            mainClass,
                             mainModule,
                             graph.arguments(),
                             classpath.sequencedKeySet(),
@@ -163,7 +189,26 @@ public class Bundle implements BuildStep {
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
-    private static List<String> command(String mainClass,
+    static List<String> javaOptions(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+        List<String> javaOptions = new ArrayList<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            Path process = argument.folder().resolve(ProcessBuildStep.PROCESS + "java.properties");
+            if (!argument.removed() && Files.isRegularFile(process)) {
+                SequencedProperties.ofFiles(process).forEachProperty((option, values) -> {
+                    for (String value : values.split("\n")) {
+                        javaOptions.add(option);
+                        if (!value.isEmpty()) {
+                            javaOptions.addAll(List.of(value.split("\t")));
+                        }
+                    }
+                });
+            }
+        }
+        return javaOptions;
+    }
+
+    private static List<String> command(List<String> javaOptions,
+                                        String mainClass,
                                         String mainModule,
                                         List<String> relaxations,
                                         SequencedSet<String> classpath,
@@ -171,7 +216,7 @@ public class Bundle implements BuildStep {
                                         SequencedMap<String, Layers.Membership> layers,
                                         SequencedMap<String, String> agents,
                                         String separator) {
-        List<String> command = new ArrayList<>();
+        List<String> command = new ArrayList<>(javaOptions);
         agents.forEach((jar, options) -> command.add("-javaagent:jars/" + jar
                 + (options.isEmpty() ? "" : "=" + options)));
         layers.forEach((name, membership) -> {
@@ -209,6 +254,16 @@ public class Bundle implements BuildStep {
             entry.setTime(Files.getLastModifiedTime(file).toMillis());
         } else {
             entry.setTimeLocal(timestamp.toLocalDateTime());
+        }
+        int dot = name.lastIndexOf('.');
+        if (dot >= 0 && ARCHIVES.contains(name.substring(dot).toLowerCase(Locale.ROOT))) {
+            try (CheckedInputStream in = new CheckedInputStream(Files.newInputStream(file), new CRC32())) {
+                long size = in.transferTo(OutputStream.nullOutputStream());
+                entry.setMethod(ZipEntry.STORED);
+                entry.setSize(size);
+                entry.setCompressedSize(size);
+                entry.setCrc(in.getChecksum().getValue());
+            }
         }
         out.putNextEntry(entry);
         Files.copy(file, out);

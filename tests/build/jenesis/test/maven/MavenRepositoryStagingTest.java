@@ -46,6 +46,60 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
+    public void stages_the_pom_of_a_bom_without_any_jar() throws IOException {
+        Path inventoryDir = Files.createDirectory(source.resolve("bom"));
+        Files.writeString(inventoryDir.resolve("pom.xml"), buildPom("com.example", "foo-bom", "1.2.3", List.of()));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-bom.path", "bom");
+        inventory.setProperty("module-bom.pom", "pom.xml");
+        inventory.setProperty("module-bom.packaging", "pom");
+        inventory.store(inventoryDir.resolve(Inventory.INVENTORY));
+
+        BuildStepResult result = run(true, inventoryDir);
+
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve("com/example/foo-bom/1.2.3/foo-bom-1.2.3.pom")).exists();
+        try (Stream<Path> files = Files.list(next.resolve("com/example/foo-bom/1.2.3"))) {
+            assertThat(files).as("a BOM is its POM alone").hasSize(1);
+        }
+    }
+
+    @Test
+    public void leaves_out_a_module_whose_packaging_stages_none() throws IOException {
+        Path published = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(published, "classes.jar", "classes-bytes");
+        Path skipped = mainInventory("bar", "com.example", "bar", "1.2.3", "classes.jar");
+        writeArtifact(skipped, "classes.jar", "classes-bytes");
+        SequencedProperties inventory = SequencedProperties.ofFiles(skipped.resolve(Inventory.INVENTORY));
+        inventory.setProperty("module-bar.stage", "false");
+        inventory.store(skipped.resolve(Inventory.INVENTORY));
+
+        run(true, published, skipped);
+
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).exists();
+        assertThat(next.resolve("com/example/bar"))
+                .as("a module built and tested only, as stage=false in packaging.properties declares, is never published")
+                .doesNotExist();
+    }
+
+    @Test
+    public void leaves_out_the_tests_of_a_module_whose_packaging_stages_none() throws IOException {
+        Path main = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(main, "classes.jar", "classes-bytes");
+        SequencedProperties inventory = SequencedProperties.ofFiles(main.resolve(Inventory.INVENTORY));
+        inventory.setProperty("module-foo.stage", "false");
+        inventory.store(main.resolve(Inventory.INVENTORY));
+        Path test = testInventory("foo-test", "com.example", "foo.test", "1.2.3", "foo", List.of(), "classes.jar");
+        writeArtifact(test, "classes.jar", "test-bytes");
+
+        run(true, main, test);
+
+        assertThat(next.resolve("com/example/foo"))
+                .as("the tests of a module that is not staged have no artifact to be staged beside")
+                .doesNotExist();
+    }
+
+    @Test
     public void resolves_inventory_paths_that_navigate_to_sibling_step_outputs() throws IOException {
         Path module = source.resolve("mod");
         Path inventoryDir = Files.createDirectories(module.resolve("inventory/output"));
@@ -57,6 +111,7 @@ public class MavenRepositoryStagingTest {
         Files.writeString(sbomDir.resolve("sbom.json"), "{}");
 
         SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-foo.path", "foo");
         inventory.setProperty("module-foo.pom", "../../produce/describe/pom/output/pom.xml");
         inventory.setProperty("module-foo.artifacts.0",
                 "../../produce/assemble/binary/artifacts/jar/output/artifacts/classes.jar");
@@ -80,6 +135,22 @@ public class MavenRepositoryStagingTest {
         attached.setProperty("module-foo.attachment.licenses", "attachment/licenses/LICENSES.zip");
         attached.store(additions.resolve(Inventory.INVENTORY));
         Files.writeString(Files.createDirectories(additions.resolve("attachment/licenses")).resolve("LICENSES.zip"), "zip");
+
+        run(true, inv, additions);
+
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).hasContent("c");
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-licenses.zip")).hasContent("zip");
+    }
+
+    @Test
+    public void stages_a_module_whose_path_holds_dots_with_what_another_inventory_attaches() throws IOException {
+        Path inv = mainInventory("org.example.foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(inv, "classes.jar", "c");
+        Path additions = Files.createDirectory(source.resolve("additions"));
+        SequencedProperties attached = new SequencedProperties();
+        attached.setProperty("module-org.example.foo.attachment.licenses", "LICENSES.zip");
+        attached.store(additions.resolve(Inventory.INVENTORY));
+        Files.writeString(additions.resolve("LICENSES.zip"), "zip");
 
         run(true, inv, additions);
 
@@ -526,6 +597,7 @@ public class MavenRepositoryStagingTest {
         Files.writeString(folder.resolve("pom.xml"), buildPom(groupId, artifactId, version, deps));
         SequencedProperties inventory = new SequencedProperties();
         String prefix = "module-" + name;
+        inventory.setProperty(prefix + ".path", name);
         inventory.setProperty(prefix + ".pom", "pom.xml");
         for (String artifactFile : artifactFiles) {
             switch (artifactFile) {

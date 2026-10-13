@@ -328,11 +328,7 @@ public record ProjectPlugins(Path pins,
                     for (Path folder : inherited.values()) {
                         Path file = folder.resolve(Inventory.INVENTORY);
                         if (Files.isRegularFile(file)) {
-                            for (String key : SequencedProperties.ofFiles(file).stringPropertyNames()) {
-                                if (key.indexOf('.') > 0 && key.endsWith(".path")) {
-                                    prefixes.add(key.substring(0, key.indexOf('.')));
-                                }
-                            }
+                            prefixes.addAll(Inventory.prefixes(SequencedProperties.ofFiles(file)));
                         }
                     }
                     buildExecutor.addModule(TRANSFORM, (transform, given) -> {
@@ -440,23 +436,6 @@ public record ProjectPlugins(Path pins,
         return inputs;
     }
 
-    private static SequencedMap<String, String> listing(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
-        SequencedMap<String, String> listing = new TreeMap<>();
-        for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
-            Path folder = argument.getValue().folder();
-            if (argument.getValue().removed() || !Files.isDirectory(folder)) {
-                continue;
-            }
-            try (Stream<Path> files = Files.walk(folder)) {
-                for (Path file : files.filter(Files::isRegularFile).toList()) {
-                    listing.put(argument.getKey() + "/" + folder.relativize(file).toString().replace(File.separatorChar, '/'),
-                            Files.size(file) + " " + Files.getLastModifiedTime(file).toMillis());
-                }
-            }
-        }
-        return listing;
-    }
-
     private record Additions(String prefix, SequencedSet<String> prefixes) implements BuildStep {
 
         @Override
@@ -475,12 +454,12 @@ public record ProjectPlugins(Path pins,
                 }
                 SequencedProperties inventory = SequencedProperties.ofFiles(file);
                 for (String key : inventory.stringPropertyNames()) {
-                    int dot = key.indexOf('.');
-                    String owner = dot > 0 ? key.substring(0, dot) : key, entry = dot > 0 ? key.substring(dot + 1) : "";
-                    if (!prefixes.contains(owner)) {
+                    String owner = prefixes.contains(key) ? key : Inventory.ownerOf(key, prefixes);
+                    if (owner == null) {
                         throw new IllegalArgumentException("A transform adds " + key + " in " + file
                                 + ", which names no module of this build - prefix it with one of " + prefixes);
                     }
+                    String entry = key.substring(Math.min(owner.length() + 1, key.length()));
                     if (entry.isEmpty() || entry.contains("/") || Arrays.asList(entry.split("\\.", -1)).contains("")) {
                         throw new IllegalArgumentException("A transform adds " + key + " in " + file + " - name what it"
                                 + " adds as <module>.<key>, a key of dot-separated names, for a file below its own"
@@ -571,7 +550,7 @@ public record ProjectPlugins(Path pins,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
             SequencedProperties sealed = new SequencedProperties();
-            listing(arguments).forEach(sealed::setProperty);
+            BuildStep.listing(arguments).forEach(sealed::setProperty);
             sealed.store(context.next().resolve("sealed.properties"));
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
@@ -590,7 +569,7 @@ public record ProjectPlugins(Path pins,
             SequencedProperties sealed = SequencedProperties.ofFiles(seal.folder().resolve("sealed.properties"));
             SequencedMap<String, String> expected = new TreeMap<>();
             sealed.forEachProperty(expected::put);
-            SequencedMap<String, String> actual = listing(inspected);
+            SequencedMap<String, String> actual = BuildStep.listing(inspected);
             if (!expected.equals(actual)) {
                 SequencedSet<String> changed = new TreeSet<>(expected.keySet());
                 changed.addAll(actual.keySet());

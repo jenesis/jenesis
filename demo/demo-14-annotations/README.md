@@ -1,0 +1,74 @@
+Annotation processor demo
+=========================
+
+Run a Java annotation processor (JSR-269) over a modular project. The processor
+is declared explicitly in `module-info.java`, resolved onto its own processor
+path, and handed to `javac` with `--processor-module-path` - never discovered
+implicitly from the class or module path.
+
+This module uses [Immutables](https://immutables.github.io/): `Animal` is an
+abstract `@Value.Immutable` type, and the processor generates a concrete
+`ImmutableAnimal` builder that `Zoo` then uses.
+
+Build it
+--------
+
+From this directory:
+
+    java build/jenesis/Make.java
+
+Jenesis auto-detects the MODULAR_TO_MAVEN layout (a `module-info.java`, no
+`pom.xml`), resolves the processor, runs it, and emits a modular jar alongside a
+generated POM.
+
+How the processor is wired
+--------------------------
+
+A single Javadoc tag on the module declaration turns the processor on:
+
+    @jenesis.plugin org.immutables.value
+
+The processor is named the same way `requires` names a dependency - by module
+name. The tag is generic: `@jenesis.plugin <repository>/<coordinate>` (or a bare
+module name) resolves to the `plugin` scope, a Java annotation processor;
+`@jenesis.plugin <compiler> <repository>/<coordinate>` resolves to the `plugin`
+scope of that compiler's own group for a language compiler plugin (`@jenesis.plugin
+kotlinc maven/...` for a Kotlin compiler plugin). Here the bare module name resolves to
+the `plugin` scope; Jenesis resolves it alongside
+the module's other dependencies, and the Java compiler picks the `plugin`-scope
+jars and passes them to `javac` as `--processor-module-path`.
+The version is pinned the usual way - the `pin` step writes back a
+`@jenesis.pin org.immutables.value 2.12.2` line automatically. A bare token with
+no slash is a Java module name, short for `<group>/module/<name>`; here it pins
+the processor by module name. Because the same module is also a compile
+dependency in the `main` group, the module additionally carries a
+`@jenesis.pin org.immutables/value 2.12.2 SHA-256/...` line, a one-slash Maven
+`<groupId>/<artifactId>` token short for `<group>/maven/<groupId>/<artifactId>`;
+the two are pinned independently.
+
+No implicit discovery
+---------------------
+
+Notice that `org.immutables.value` is also a regular module dependency
+(`requires static org.immutables.value`), so the exact same jar sits on the
+compile `--module-path`. It still does not run as a processor on its own:
+`javac` only runs processors found on the processor path, never the class or
+module path. The explicit `@jenesis.plugin` declaration is what places the
+jar on the processor path.
+
+You can see this directly. Delete the `@jenesis.plugin` line from
+`module-info.java` and rebuild: the jar is still on the module path through
+`requires`, but the processor no longer runs, `ImmutableAnimal` is never
+generated, and the build fails to compile `Zoo`. Processors are taken only from
+what you declare - never picked up from a dependency that happens to bundle one.
+
+In the editor
+-------------
+
+`ide` lists what the processor wrote as a generated source folder of the
+module, so the editor resolves `ImmutableAnimal` like any other class:
+
+    java build/jenesis/Make.java ide
+
+The folder lies in the build's output, so a build brings it up to date after
+`Animal` changes.

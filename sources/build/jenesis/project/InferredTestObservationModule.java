@@ -15,8 +15,11 @@ import build.jenesis.step.Bind;
 public class InferredTestObservationModule implements BuildExecutorModule {
 
     public static final String TEST = "test", MUTATE = "mutate";
-    private static final String FRAMEWORK = "framework";
-    private static final Set<String> TEST_KEYS = Set.of(FRAMEWORK);
+    private static final String FRAMEWORK = "framework", ENGINES = "engines", SCAN = "scan";
+    private static final String MINIMUM = "minimum.", MAXIMUM_MISSED = "maximum.missed.";
+    private static final String TARGET_CLASSES = "targetClasses", TARGET_TESTS = "targetTests", OUTPUT_FORMATS = "outputFormats", MUTATORS = "mutators", FAIL_WHEN_NO_MUTATIONS = "failWhenNoMutations";
+    private static final Set<String> TEST_KEYS = Set.of(FRAMEWORK, ENGINES, SCAN);
+    private static final List<String> PITEST_KEYS = List.of(TARGET_CLASSES, TARGET_TESTS, OUTPUT_FORMATS, MUTATORS, FAIL_WHEN_NO_MUTATIONS);
 
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
@@ -31,6 +34,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
     private final UnaryOperator<Jfr> jfr;
     private final Function<PiTestModule, BuildExecutorModule> pitest;
     private final SequencedMap<String, BuildExecutorModule> custom;
+    private final SequencedSet<String> untested;
 
     public InferredTestObservationModule(SequencedSet<Path> configuration,
                                          Map<String, Repository> repositories,
@@ -47,7 +51,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 value -> value,
                 value -> value,
                 value -> value,
-                Collections.emptyNavigableMap());
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableSet());
     }
 
     public static InferredTestObservationModule ofEnvironment(Environment environment,
@@ -66,7 +71,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 value -> value,
                 value -> value,
                 value -> value,
-                Collections.emptyNavigableMap());
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableSet());
         Boolean jacoco = environment.flagOrNull("observe.jacoco");
         if (jacoco != null) {
             module = module.jacoco(jacoco ? value -> value : null);
@@ -86,9 +92,102 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         return module;
     }
 
-    private static TestFramework declaredFramework(Path file) throws IOException {
+    private static JaCoCoModule limited(JaCoCoModule module, Path file) throws IOException {
+        SequencedMap<JaCoCoModule.Counter, Double> minimum = new LinkedHashMap<>();
+        SequencedMap<JaCoCoModule.Counter, Long> maximumMissed = new LinkedHashMap<>();
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        for (String key : properties.stringPropertyNames()) {
+            boolean ratio = key.startsWith(MINIMUM);
+            String name = ratio ? key.substring(MINIMUM.length())
+                    : key.startsWith(MAXIMUM_MISSED) ? key.substring(MAXIMUM_MISSED.length())
+                    : null;
+            JaCoCoModule.Counter counter = name == null ? null : Arrays.stream(JaCoCoModule.Counter.values())
+                    .filter(candidate -> candidate.name().toLowerCase(Locale.ROOT).equals(name))
+                    .findFirst()
+                    .orElse(null);
+            if (counter == null) {
+                throw new IllegalArgumentException("Unknown key " + key + " in " + file + ", expected " + MINIMUM
+                        + "<counter> or " + MAXIMUM_MISSED + "<counter> for a counter of "
+                        + Arrays.stream(JaCoCoModule.Counter.values())
+                                .map(candidate -> candidate.name().toLowerCase(Locale.ROOT))
+                                .toList());
+            }
+            String value = properties.value(key, "");
+            try {
+                if (ratio) {
+                    minimum.put(counter, Double.parseDouble(value));
+                } else {
+                    maximumMissed.put(counter, Long.parseLong(value));
+                }
+            } catch (NumberFormatException _) {
+                throw new IllegalArgumentException("The value " + value + " of " + key + " in " + file + " is "
+                        + (ratio
+                                ? "no covered ratio, expected a number from 0 to 1, such as 0.8"
+                                : "no count of missed items, expected a whole number of at least 0"));
+            }
+        }
+        return module.minimum(minimum).maximumMissed(maximumMissed);
+    }
+
+    private static PiTestModule mutating(PiTestModule module, SequencedProperties properties, Path file) {
+        for (String key : properties.stringPropertyNames()) {
+            if (!PITEST_KEYS.contains(key)) {
+                throw new IllegalArgumentException("Unknown key " + key + " in " + file + ", expected one of "
+                        + PITEST_KEYS);
+            }
+        }
+        List<String> targetClasses = properties.entries(TARGET_CLASSES), targetTests = properties.entries(TARGET_TESTS);
+        List<String> outputFormats = properties.entries(OUTPUT_FORMATS), mutators = properties.entries(MUTATORS);
+        PiTestModule mutating = targetClasses == null ? module : module.targetClasses(targetClasses);
+        mutating = targetTests == null ? mutating : mutating.targetTests(targetTests);
+        mutating = mutators == null ? mutating : mutating.mutators(mutators);
+        if (outputFormats != null) {
+            List<PiTestModule.OutputFormat> formats = new ArrayList<>();
+            for (String format : outputFormats) {
+                formats.add(Arrays.stream(PiTestModule.OutputFormat.values())
+                        .filter(candidate -> candidate.name().equalsIgnoreCase(format))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Unknown format " + format + " of "
+                                + OUTPUT_FORMATS + " in " + file + ", expected some of "
+                                + List.of(PiTestModule.OutputFormat.values()))));
+            }
+            mutating = mutating.outputFormats(formats);
+        }
+        String failWhenNoMutations = properties.getProperty(FAIL_WHEN_NO_MUTATIONS);
+        if (failWhenNoMutations != null) {
+            try {
+                mutating = mutating.failWhenNoMutations(properties.flag(FAIL_WHEN_NO_MUTATIONS));
+            } catch (IllegalArgumentException _) {
+                throw new IllegalArgumentException("The value " + failWhenNoMutations + " of " + FAIL_WHEN_NO_MUTATIONS
+                        + " in " + file + " is no flag, expected true, false, or the key named with no value at all");
+            }
+        }
+        return mutating;
+    }
+
+    private static Jfr recorded(Path file) throws IOException {
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        SequencedMap<String, String> options = new TreeMap<>();
+        for (String key : properties.stringPropertyNames()) {
+            String value = properties.value(key);
+            if (key.equals("filename")) {
+                throw new IllegalArgumentException(file + " names a filename, which the build sets to the recording"
+                        + " in the test step's reports/jfr/ - remove the filename line");
+            } else if (value == null) {
+                throw new IllegalArgumentException(file + " gives " + key + " no value, but an option of the recording"
+                        + " is <key>=<value>");
+            } else if (value.contains(",")) {
+                throw new IllegalArgumentException(file + " gives " + key + " the value " + value + ", but the value of"
+                        + " an option of the recording holds no comma");
+            }
+            options.put(key, value);
+        }
+        return new Jfr(options);
+    }
+
+    private static TestModule declared(TestModule module, Path file) throws IOException {
         if (file == null) {
-            return null;
+            return module;
         }
         SequencedProperties properties = SequencedProperties.ofFiles(file);
         for (String key : properties.stringPropertyNames()) {
@@ -96,8 +195,11 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 throw new IllegalArgumentException("Unknown test property: " + key);
             }
         }
-        String framework = properties.value(FRAMEWORK);
-        return framework == null ? null : TestFramework.named(framework);
+        String framework = properties.value(FRAMEWORK), engines = properties.value(ENGINES);
+        List<String> scan = properties.entries(SCAN);
+        TestModule declared = framework == null ? module : module.framework(TestFramework.named(framework));
+        declared = scan == null ? declared : declared.scan(scan);
+        return engines == null ? declared : declared.engines(engines);
     }
 
     private InferredTestObservationModule(SequencedSet<Path> configuration,
@@ -112,7 +214,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                                           Function<NativeImageAgentModule, BuildExecutorModule> nativeImage,
                                           UnaryOperator<Jfr> jfr,
                                           Function<PiTestModule, BuildExecutorModule> pitest,
-                                          SequencedMap<String, BuildExecutorModule> custom) {
+                                          SequencedMap<String, BuildExecutorModule> custom,
+                                          SequencedSet<String> untested) {
         this.configuration = configuration;
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
@@ -126,6 +229,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         this.jfr = jfr;
         this.pitest = pitest;
         this.custom = custom;
+        this.untested = untested;
     }
 
     public InferredTestObservationModule pinning(Pinning pinning) {
@@ -141,7 +245,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule pathPlacement(PathPlacement pathPlacement) {
@@ -157,7 +262,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule moduleName(String moduleName) {
@@ -173,7 +279,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule test(Function<TestModule, BuildExecutorModule> test) {
@@ -189,7 +296,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule jacoco(Function<JaCoCoModule, BuildExecutorModule> jacoco) {
@@ -205,7 +313,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule nativeImage(Function<NativeImageAgentModule, BuildExecutorModule> nativeImage) {
@@ -221,7 +330,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule jfr(UnaryOperator<Jfr> jfr) {
@@ -237,7 +347,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule pitest(Function<PiTestModule, BuildExecutorModule> pitest) {
@@ -253,7 +364,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule custom(SequencedMap<String, BuildExecutorModule> custom) {
@@ -269,7 +381,25 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 nativeImage,
                 jfr,
                 pitest,
-                custom);
+                custom,
+                untested);
+    }
+
+    public InferredTestObservationModule untested(SequencedSet<String> untested) {
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                jfr,
+                pitest,
+                custom,
+                untested);
     }
 
     public InferredTestObservationModule custom(String name, BuildExecutorModule module) {
@@ -288,10 +418,16 @@ public class InferredTestObservationModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        Path described = BuildStep.locate(new LinkedHashSet<>(inherited.values()), BuildStep.MODULE);
+        SequencedProperties description = described == null ? null : SequencedProperties.ofFiles(described);
+        if (description != null && (description.getProperty("test") == null || description.flag("abstract"))) {
+            return;
+        }
         SequencedMap<String, BuildExecutorModule> reports = new LinkedHashMap<>();
         List<ObservabilityEngine> engines = new ArrayList<>();
-        if (jacoco != null && BuildStep.locate(configuration, "jacoco.properties") != null) {
-            BuildExecutorModule report = jacoco.apply(jacocoModule.pinning(pinning));
+        Path coverage = BuildStep.locate(configuration, "jacoco.properties");
+        if (jacoco != null && coverage != null) {
+            BuildExecutorModule report = jacoco.apply(limited(jacocoModule.pinning(pinning), coverage));
             if (report != null) {
                 JaCoCo engine = new JaCoCo();
                 engines.add(engine);
@@ -308,7 +444,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         }
         Path recording = BuildStep.locate(configuration, "jfr.properties");
         if (jfr != null && recording != null) {
-            Jfr engine = jfr.apply(Jfr.ofFile(recording));
+            Jfr engine = jfr.apply(recorded(recording));
             if (engine != null) {
                 engines.add(engine);
             }
@@ -317,23 +453,25 @@ public class InferredTestObservationModule implements BuildExecutorModule {
             TestModule module = testModule.observe(engines)
                     .pinning(pinning)
                     .pathPlacement(pathPlacement)
-                    .moduleName(moduleName);
-            TestFramework declared = declaredFramework(BuildStep.locate(configuration, "test.properties"));
-            BuildExecutorModule executed = test.apply(declared == null ? module : module.framework(declared));
+                    .moduleName(moduleName == null && description != null ? description.getProperty("module") : moduleName);
+            BuildExecutorModule executed = test.apply(declared(module, BuildStep.locate(configuration, "test.properties")));
             if (executed != null) {
-                buildExecutor.addModule(TEST, executed, inherited.sequencedKeySet());
+                buildExecutor.addModule(TEST, executed, inherited.sequencedKeySet().stream().filter(identity ->
+                        untested.stream().noneMatch(input -> identity.equals(PREVIOUS + input)
+                                || identity.startsWith(PREVIOUS + input + "/"))));
                 SequencedSet<String> reportInputs = new LinkedHashSet<>();
                 reportInputs.add(TEST);
                 reportInputs.addAll(inherited.sequencedKeySet());
                 reports.forEach((name, report) -> buildExecutor.addModule(name, report, reportInputs));
             }
         }
+        Path mutation = BuildStep.locate(configuration, "pitest.properties");
         Bind.configuredByProperties(buildExecutor,
                 inherited.sequencedKeySet(),
                 MUTATE,
                 pitest,
-                BuildStep.locate(configuration, "pitest.properties"),
-                properties -> pitestModule.pinning(pinning).config(properties));
+                mutation,
+                properties -> mutating(pitestModule.pinning(pinning), properties, mutation));
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
                     nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());

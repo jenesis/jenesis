@@ -94,6 +94,40 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_pin_reads_a_repository_first_token_in_the_group_of_the_module() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin maven/org.glassfish/jakarta.json/jar/module 2.0.1
+                 */
+                module foo {
+                    requires bar;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.versions())
+                .as("a classified coordinate is spelt as a key of a pin-<name>.properties file spells it")
+                .containsOnlyKeys("main/maven/org.glassfish/jakarta.json/jar/module")
+                .containsEntry("main/maven/org.glassfish/jakarta.json/jar/module", "2.0.1");
+    }
+
+    @Test
+    public void jenesis_pin_refuses_a_classified_coordinate_that_reads_as_a_group() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin org.glassfish/jakarta.json/jar/module 2.0.1
+                 */
+                module foo {
+                    requires bar;
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("a group named like a groupId would be stored where no resolution ever looks")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.pin token 'org.glassfish/jakarta.json/jar/module'")
+                .hasMessageContaining("written maven/org.glassfish/jakarta.json/jar/module");
+    }
+
+    @Test
     public void jenesis_pin_tolerates_surrounding_whitespace() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
@@ -367,6 +401,44 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_plugin_refuses_a_version_written_after_the_coordinate() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.plugin maven/org.jboss.logging/jboss-logging-processor 3.6.1.Final
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("a version beside the coordinate would otherwise become part of a file name to fetch")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.plugin declaration"
+                        + " 'maven/org.jboss.logging/jboss-logging-processor 3.6.1.Final'")
+                .hasMessageContaining("maven/<groupId>/<artifactId>/<version>");
+    }
+
+    @Test
+    public void a_java_prefixed_module_the_jdk_does_not_hold_is_a_dependency_and_can_be_aliased() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias java.money javax.money/money-api
+                 */
+                module foo {
+                    requires java.sql;
+                    requires static java.money;
+                    requires jdk.unsupported;
+                    requires jdk.example.library;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.requires())
+                .as("only a module of the running JDK is a platform module, whatever its name starts with")
+                .containsExactly("java.money", "jdk.example.library");
+        assertThat(info.runtimeRequires()).containsExactly("jdk.example.library");
+        assertThat(info.aliases()).containsEntry("java.money", "javax.money/money-api");
+    }
+
+    @Test
     public void jenesis_alias_rejects_conflicting_duplicates() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
@@ -630,6 +702,22 @@ public class ModuleInfoParserTest {
         assertThat(new ModuleInfoParser().identify(folder.resolve("module-info.java")).plugins()).containsExactly(
                 Map.entry("module/some.processor", "kotlinc"),
                 Map.entry("maven/com.example/plugin", "scalac"));
+    }
+
+    @Test
+    public void jenesis_plugin_refuses_one_coordinate_in_two_groups() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.plugin some.processor
+                 * @jenesis.plugin ksp some.processor
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.plugin declaration 'ksp some.processor'")
+                .hasMessageContaining("named in the group plugin already");
     }
 
     @Test

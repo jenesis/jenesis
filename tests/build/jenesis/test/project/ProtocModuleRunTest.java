@@ -75,6 +75,50 @@ public class ProtocModuleRunTest {
     }
 
     @Test
+    public void imports_a_well_known_type_that_a_compile_dependency_carries() throws IOException {
+        Files.writeString(
+                Files.createDirectories(project.resolve(ProtocModule.FOLDER)).resolve("event.proto"),
+                """
+                syntax = "proto3";
+                package test;
+                import "google/protobuf/timestamp.proto";
+                option java_package = "test.event";
+                option java_outer_classname = "EventProto";
+                message Event {
+                  google.protobuf.Timestamp at = 1;
+                }
+                """);
+        Path resolved = Files.createDirectories(project.resolve("resolved"));
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(resolved.resolve("protobuf-java.jar")))) {
+            jar.putNextEntry(new JarEntry("google/protobuf/timestamp.proto"));
+            jar.write("""
+                    syntax = "proto3";
+                    package google.protobuf;
+                    option java_package = "com.google.protobuf";
+                    message Timestamp {
+                      int64 seconds = 1;
+                      int32 nanos = 2;
+                    }
+                    """.getBytes(StandardCharsets.UTF_8));
+            jar.closeEntry();
+        }
+        SequencedProperties dependencies = new SequencedProperties();
+        dependencies.setProperty("main/compile/maven/com.google.protobuf/protobuf-java/4.32.1", "resolved/protobuf-java.jar");
+        dependencies.store(project.resolve(BuildStep.DEPENDENCIES));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("protoc", newModule(), "project");
+        executor.execute();
+
+        assertThat(root.resolve("protoc").resolve("generate").resolve("output")
+                .resolve("sources").resolve("test").resolve("event").resolve("EventProto.java"))
+                .as("protobuf-java carries the well-known types that protoc from Maven Central does not, so it is on the include path")
+                .content()
+                .contains("com.google.protobuf.Timestamp");
+    }
+
+    @Test
     public void generates_nothing_when_no_definition_is_among_the_inputs() throws IOException {
         Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
 

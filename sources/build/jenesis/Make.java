@@ -8,6 +8,7 @@ public final class Make {
     private static final List<String> CREDENTIALS = List.of("jenesis.maven.token",
             "jenesis.module.token",
             "jenesis.release.token",
+            "jenesis.deploy.token",
             "jenesis.cache.key");
     private static final List<String> PLAINTEXT = List.of("jenesis.repository.insecure", "jenesis.cache.insecure");
     private static final List<String> PROGRAMS = List.of("jenesis.daemon.options",
@@ -16,16 +17,28 @@ public final class Make {
     private static final List<String> SHARED = List.of("jenesis.cache.uri",
             "jenesis.maven.local",
             "jenesis.module.local",
+            "jenesis.discovery.ttl",
             "jenesis.sigstore.uri",
             "jenesis.sigstore.issuers");
     private static final List<String> CONFINED = List.of("jenesis.project.target",
+            "jenesis.project.reproduce",
             "jenesis.project.artifacts",
             "jenesis.project.cache",
             "jenesis.openpgp.local",
             "jenesis.make.classes",
             "jenesis.pin.file",
             "jenesis.aot.file");
-    private static final Set<String> PRINTING = Set.of("help", "skill", "configuration", "properties", "--stop");
+    private static final Set<String> PRINTING = Set.of("help", "skill", "prompt", "configuration", "properties", "--stop");
+    static final List<String> CONTAINED = List.of("jenesis.project.docker",
+            "jenesis.project.image",
+            "jenesis.project.readable",
+            "jenesis.project.writable",
+            "jenesis.project.env"),
+            EXECUTED = List.of("jenesis.execute.docker",
+                    "jenesis.execute.image",
+                    "jenesis.execute.readable",
+                    "jenesis.execute.writable",
+                    "jenesis.execute.env");
 
     private final String mainClass;
     private final Map<String, String> ambient;
@@ -709,6 +722,12 @@ public final class Make {
     }
 
     private static void requireApplicable(Path root, Path file, Properties properties, boolean trusted) {
+        for (String name : new TreeSet<>(properties.stringPropertyNames())) {
+            if (!name.startsWith("jenesis.")) {
+                throw new IllegalArgumentException(name + " in " + file + " is no setting: every key of this file"
+                        + " is written in full, as `configuration` prints it, so write jenesis." + name);
+            }
+        }
         if (properties.getProperty(PROVIDED) != null) {
             throw new IllegalStateException(PROVIDED + " cannot be set in " + file
                     + ": it records which settings the files a project provides supplied, and Make derives it");
@@ -743,7 +762,7 @@ public final class Make {
         }
         if (!trusted) {
             for (String name : properties.stringPropertyNames()) {
-                if (name.startsWith("jenesis.project.docker") || name.startsWith("jenesis.execute.docker")) {
+                if (CONTAINED.contains(name) || EXECUTED.contains(name)) {
                     throw new IllegalStateException(name + " cannot be set in " + file
                             + ": whether and how the build is isolated is yours to decide, so only the command line"
                             + " or your own ~/.jenesis/jenesis.properties may configure Docker, never a file the"

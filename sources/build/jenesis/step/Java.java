@@ -19,7 +19,7 @@ public abstract class Java extends EnvironmentalProcessBuildStep {
                    PathPlacement pathPlacement,
                    boolean jarsOnly,
                    String group) {
-        this(factory, pathPlacement, jarsOnly, group, Terms.of("java"));
+        this(factory, pathPlacement, jarsOnly, group, new Terms());
     }
 
     protected Java(Function<List<String>, ? extends ProcessHandler> factory,

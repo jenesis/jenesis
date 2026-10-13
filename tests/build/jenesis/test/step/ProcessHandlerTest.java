@@ -2,6 +2,7 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import module org.junit.jupiter.params;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -139,6 +140,116 @@ public class ProcessHandlerTest {
         assertThat(Files.readString(error)).contains("err-one");
         assertThat(outLines).containsExactly("out-one", "out-two");
         assertThat(errLines).containsExactly("err-one");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void a_tool_writes_its_output_in_utf_8_whatever_the_native_encoding(boolean teed) throws Exception {
+        ToolProvider tool = new ToolProvider() {
+            @Override
+            public String name() {
+                return "quoting";
+            }
+
+            @Override
+            public int run(PrintWriter out, PrintWriter err, String... arguments) {
+                err.println("@Foo(\"\u201Cx\u201D\")");
+                for (int index = 0; index < 200; index++) {
+                    err.println("line " + index);
+                }
+                return 1;
+            }
+        };
+        Path output = root.resolve("output"), error = root.resolve("error");
+        List<String> errLines = new CopyOnWriteArrayList<>();
+        ProcessHandler handler = ProcessHandler.OfTool.of(tool).apply(List.of());
+        assertThat(handler.execute(output,
+                error,
+                teed ? new ProcessHandler.Tee(Runnable::run, _ -> { }, errLines::add) : null)).isEqualTo(1);
+        assertThat(Files.readAllLines(error, StandardCharsets.UTF_8))
+                .as("every character the tool prints is kept, as UTF-8 holds them all")
+                .hasSize(201)
+                .startsWith("@Foo(\"\u201Cx\u201D\")")
+                .endsWith("line 199");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void a_forked_jvm_is_told_to_print_in_utf_8_and_captured_exactly(boolean teed) throws Exception {
+        assertThat(accented(List.of(), teed))
+                .as("whatever the platform's encoding, a JVM the build forks prints every character")
+                .containsExactly("caf\u00e9");
+    }
+
+    @Test
+    public void a_forked_jvm_printing_in_an_encoding_of_its_own_is_read_in_that_one() throws Exception {
+        assertThat(accented(List.of("-Dstdout.encoding=ISO-8859-1"), false))
+                .as("an encoding a process file names is the one the output is read in")
+                .containsExactly("caf\u00e9");
+    }
+
+    private List<String> accented(List<String> options, boolean teed) throws Exception {
+        Path source = root.resolve("Accented.java");
+        Files.writeString(source, """
+                public class Accented {
+                    public static void main(String[] args) {
+                        System.out.println("caf\\u00e9");
+                    }
+                }
+                """);
+        Path output = root.resolve("output"), error = root.resolve("error");
+        List<String> arguments = new ArrayList<>(options);
+        arguments.add(source.toString());
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            ProcessHandler handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(arguments);
+            assertThat(handler.execute(output,
+                    error,
+                    teed ? new ProcessHandler.Tee(executor, _ -> { }, _ -> { }) : null)).isZero();
+        } finally {
+            executor.shutdown();
+        }
+        return Files.readAllLines(output, StandardCharsets.UTF_8);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void a_forked_program_writing_what_the_native_encoding_cannot_decode_is_still_captured(boolean teed)
+            throws Exception {
+        Path source = root.resolve("Raw.java");
+        Files.writeString(source, """
+                public class Raw {
+                    public static void main(String[] args) throws Exception {
+                        System.out.write(new byte[] {(byte) 0xFF, (byte) 0xFE, ' ', 'o', 'k', '\\n'});
+                        System.out.write("after\\n".getBytes());
+                        System.out.flush();
+                    }
+                }
+                """);
+        Path output = root.resolve("output"), error = root.resolve("error");
+        List<String> outLines = new CopyOnWriteArrayList<>();
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            ProcessHandler handler = ProcessHandler.OfProcess.of(List.of(Path.of(System.getProperty("java.home"),
+                    "bin",
+                    File.separatorChar == '\\' ? "java.exe" : "java").toString())).apply(List.of(source.toString()));
+            assertThat(handler.execute(output,
+                    error,
+                    teed ? new ProcessHandler.Tee(executor, outLines::add, _ -> { }) : null))
+                    .as("a program not known to be a JVM is read in the platform's encoding, and what that cannot"
+                            + " decode never fails the build")
+                    .isZero();
+        } finally {
+            executor.shutdown();
+        }
+        assertThat(Files.readAllLines(output, StandardCharsets.UTF_8))
+                .as("a byte the platform's encoding cannot decode is replaced, and the file stays UTF-8")
+                .hasSize(2)
+                .endsWith("after");
+        if (teed) {
+            assertThat(outLines).hasSize(2).last().isEqualTo("after");
+            assertThat(outLines.getFirst()).endsWith(" ok");
+        }
     }
 
     @Test

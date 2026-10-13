@@ -10,5 +10,7 @@
     <modules>
         <module>greeter</module>
         <module>app</module>
+        <module>bom</module>
+        <module>hello</module>
     </modules>
 </project>

@@ -88,7 +88,7 @@ public class SbomTest {
                 .join();
         assertThat(result.next()).isTrue();
 
-        Path embedded = next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("demo.cdx.json");
+        Path embedded = next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("build.jenesis").resolve("demo.cdx.json");
         assertThat(embedded).isNotEmptyFile();
         String sbom = Files.readString(embedded);
         assertThat(sbom)
@@ -110,7 +110,7 @@ public class SbomTest {
 
         SequencedProperties manifest = SequencedProperties.ofFiles(next.resolve("manifest.mf"));
         assertThat(manifest.getProperty("Sbom-Format")).isEqualTo("CycloneDX");
-        assertThat(manifest.getProperty("Sbom-Location")).isEqualTo("META-INF/sbom/demo.cdx.json");
+        assertThat(manifest.getProperty("Sbom-Location")).isEqualTo("META-INF/sbom/build.jenesis/demo.cdx.json");
 
         assertThat(next.resolve("reports").resolve("sbom").resolve("demo-1.0.0.cdx.json")).isNotEmptyFile();
     }
@@ -334,6 +334,41 @@ public class SbomTest {
                         + "      \"scope\": \"excluded\"");
     }
 
+    @Test
+    public void takes_the_checksum_the_resolution_recorded_rather_than_hashing_the_jar_again() throws Exception {
+        Files.writeString(Files.createDirectories(argument.resolve("resolved")).resolve("lib-1.0.jar"), "lib");
+        String recorded = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest("recorded".getBytes(StandardCharsets.UTF_8)));
+        SequencedProperties dependencies = new SequencedProperties();
+        dependencies.setProperty("main/runtime/maven/org.example/lib/1.0", "resolved/lib-1.0.jar SHA-256/" + recorded);
+        dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+
+        assertThat(sbom(Map.of()))
+                .as("the resolution verified the jar against the checksum it recorded")
+                .contains("\"content\": \"" + recorded + "\"");
+    }
+
+    @Test
+    public void describes_a_jar_with_a_recorded_checksum_byte_for_byte_as_one_it_hashes() throws Exception {
+        byte[] jar = "lib".getBytes(StandardCharsets.UTF_8);
+        Files.write(Files.createDirectories(argument.resolve("resolved")).resolve("lib-1.0.jar"), jar);
+        String sha256 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(jar)),
+                sha1 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-1").digest(jar));
+        List<String> documents = new ArrayList<>();
+        for (String checksum : List.of("", " SHA-256/" + sha256.toUpperCase(Locale.ROOT), " SHA-1/" + sha1)) {
+            SequencedProperties dependencies = new SequencedProperties();
+            dependencies.setProperty("main/runtime/maven/org.example/lib/1.0", "resolved/lib-1.0.jar" + checksum);
+            dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+            next = Files.createDirectory(root.resolve("next-" + documents.size()));
+            documents.add(sbom(Map.of()));
+        }
+
+        assertThat(documents.getFirst()).contains("\"content\": \"" + sha256 + "\"");
+        assertThat(documents)
+                .as("a recorded SHA-256 is taken as it stands, and a checksum of another algorithm is hashed again")
+                .containsOnly(documents.getFirst());
+    }
+
     private String sbom(Map<String, String> scm) throws Exception {
         return sbom(new Sbom(), scm);
     }
@@ -353,7 +388,7 @@ public class SbomTest {
                 .toCompletableFuture()
                 .join();
         assertThat(result.next()).isTrue();
-        return Files.readString(next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("demo.cdx.json"));
+        return Files.readString(next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("build.jenesis").resolve("demo.cdx.json"));
     }
 
     @Test
@@ -372,7 +407,7 @@ public class SbomTest {
                 .join();
         assertThat(result.next()).isTrue();
 
-        Path embedded = next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("demo.cdx.json");
+        Path embedded = next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("build.jenesis").resolve("demo.cdx.json");
         assertThat(embedded).isNotEmptyFile();
         assertThat(Files.readString(embedded))
                 .as("a module that declares no version reports none")
@@ -383,5 +418,26 @@ public class SbomTest {
         assertThat(next.resolve("reports").resolve("sbom").resolve("demo.cdx.json"))
                 .as("the standalone report is named without a version suffix")
                 .isNotEmptyFile();
+    }
+
+    @Test
+    public void embeds_under_the_module_name_where_a_project_names_no_group() throws Exception {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("artifact", "build.jenesis.demo");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+
+        BuildStepResult result = new Sbom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+
+        assertThat(next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("build.jenesis.demo.cdx.json"))
+                .isNotEmptyFile();
+        assertThat(SequencedProperties.ofFiles(next.resolve("manifest.mf")).getProperty("Sbom-Location"))
+                .isEqualTo("META-INF/sbom/build.jenesis.demo.cdx.json");
     }
 }

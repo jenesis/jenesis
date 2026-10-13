@@ -26,6 +26,11 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final String group;
     private final boolean verify;
+    private final boolean aosp;
+    private final boolean reflow;
+    private final boolean javadoc;
+    private final boolean sortImports;
+    private final boolean removeUnusedImports;
     private final ProcessBuildStep.Terms terms;
 
     public GoogleJavaFormatModule(Map<String, Repository> repositories,
@@ -34,7 +39,12 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
              null,
              "google-java-format",
              false,
-             ProcessBuildStep.Terms.of("google-java-format"));
+             false,
+             true,
+             true,
+             true,
+             true,
+             new ProcessBuildStep.Terms());
     }
 
     public static GoogleJavaFormatModule ofEnvironment(Environment environment,
@@ -44,6 +54,11 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
                 null,
                 "google-java-format",
                 false,
+                false,
+                true,
+                true,
+                true,
+                true,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "google-java-format"));
     }
 
@@ -51,28 +66,139 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
                                    Pinning pinning,
                                    String group,
                                    boolean verify,
+                                   boolean aosp,
+                                   boolean reflow,
+                                   boolean javadoc,
+                                   boolean sortImports,
+                                   boolean removeUnusedImports,
                                    ProcessBuildStep.Terms terms) {
         this.dependencies = dependencies;
         this.pinning = pinning;
         this.group = group;
         this.verify = verify;
+        this.aosp = aosp;
+        this.reflow = reflow;
+        this.javadoc = javadoc;
+        this.sortImports = sortImports;
+        this.removeUnusedImports = removeUnusedImports;
         this.terms = terms;
     }
 
     public GoogleJavaFormatModule pinning(Pinning pinning) {
-        return new GoogleJavaFormatModule(dependencies, pinning, group, verify, terms);
+        return new GoogleJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                aosp,
+                reflow,
+                javadoc,
+                sortImports,
+                removeUnusedImports,
+                terms);
     }
 
     public GoogleJavaFormatModule group(String group) {
-        return new GoogleJavaFormatModule(dependencies, pinning, group, verify, terms);
+        return new GoogleJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                aosp,
+                reflow,
+                javadoc,
+                sortImports,
+                removeUnusedImports,
+                terms);
     }
 
     public GoogleJavaFormatModule verify(boolean verify) {
-        return new GoogleJavaFormatModule(dependencies, pinning, group, verify, terms);
+        return new GoogleJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                aosp,
+                reflow,
+                javadoc,
+                sortImports,
+                removeUnusedImports,
+                terms);
+    }
+
+    public GoogleJavaFormatModule aosp(boolean aosp) {
+        return new GoogleJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                aosp,
+                reflow,
+                javadoc,
+                sortImports,
+                removeUnusedImports,
+                terms);
+    }
+
+    public GoogleJavaFormatModule reflow(boolean reflow) {
+        return new GoogleJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                aosp,
+                reflow,
+                javadoc,
+                sortImports,
+                removeUnusedImports,
+                terms);
+    }
+
+    public GoogleJavaFormatModule javadoc(boolean javadoc) {
+        return new GoogleJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                aosp,
+                reflow,
+                javadoc,
+                sortImports,
+                removeUnusedImports,
+                terms);
+    }
+
+    public GoogleJavaFormatModule sortImports(boolean sortImports) {
+        return new GoogleJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                aosp,
+                reflow,
+                javadoc,
+                sortImports,
+                removeUnusedImports,
+                terms);
+    }
+
+    public GoogleJavaFormatModule removeUnusedImports(boolean removeUnusedImports) {
+        return new GoogleJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                aosp,
+                reflow,
+                javadoc,
+                sortImports,
+                removeUnusedImports,
+                terms);
     }
 
     public GoogleJavaFormatModule printing(BiConsumer<Boolean, String> printing) {
-        return new GoogleJavaFormatModule(dependencies, pinning, group, verify, terms.printing(printing));
+        return new GoogleJavaFormatModule(dependencies,
+                pinning,
+                group,
+                verify,
+                aosp,
+                reflow,
+                javadoc,
+                sortImports,
+                removeUnusedImports,
+                terms.printing(printing));
     }
 
     @Override
@@ -87,7 +213,9 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
         SequencedSet<String> formatInputs = new LinkedHashSet<>();
         formatInputs.add(DEPENDENCIES);
         formatInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(FORMAT, new Format(terms, group, verify), formatInputs);
+        buildExecutor.addStep(FORMAT,
+                new Format(terms, group, verify, aosp, reflow, javadoc, sortImports, removeUnusedImports),
+                formatInputs);
     }
 
     private record Requires(String group) implements BuildStep {
@@ -111,8 +239,22 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
 
     private static class Format extends FormatBuildStep {
 
-        private Format(ProcessBuildStep.Terms terms, String group, boolean verify) {
+        private final boolean aosp, reflow, javadoc, sortImports, removeUnusedImports;
+
+        private Format(ProcessBuildStep.Terms terms,
+                       String group,
+                       boolean verify,
+                       boolean aosp,
+                       boolean reflow,
+                       boolean javadoc,
+                       boolean sortImports,
+                       boolean removeUnusedImports) {
             super("google-java-format", group, verify, terms);
+            this.aosp = aosp;
+            this.reflow = reflow;
+            this.javadoc = javadoc;
+            this.sortImports = sortImports;
+            this.removeUnusedImports = removeUnusedImports;
         }
 
         @Override
@@ -122,7 +264,11 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
         }
 
         @Override
-        protected List<String> command(List<String> jars, Path config, List<String> files, boolean verify) {
+        protected List<String> command(BuildStepContext context,
+                                       List<String> jars,
+                                       Path config,
+                                       List<String> files,
+                                       boolean verify) {
             List<String> commands = new ArrayList<>(List.of(
                     "--add-exports", "jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
                     "--add-exports", "jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
@@ -132,6 +278,21 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
                     "--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
                     "-cp", String.join(File.pathSeparator, jars),
                     "com.google.googlejavaformat.java.Main"));
+            if (aosp) {
+                commands.add("--aosp");
+            }
+            if (!reflow) {
+                commands.add("--skip-reflowing-long-strings");
+            }
+            if (!javadoc) {
+                commands.add("--skip-javadoc-formatting");
+            }
+            if (!sortImports) {
+                commands.add("--skip-sorting-imports");
+            }
+            if (!removeUnusedImports) {
+                commands.add("--skip-removing-unused-imports");
+            }
             if (verify) {
                 commands.add("--dry-run");
                 commands.add("--set-exit-if-changed");

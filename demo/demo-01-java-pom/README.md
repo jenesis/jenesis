@@ -67,7 +67,10 @@ Layout
 
 `Sample.java` uses `org.apache.commons.lang3.StringUtils`, which is what makes
 the build resolve the real dependency. Nothing else is configured: the build
-compiles with plain `javac`.
+compiles with plain `javac`, for the JDK it runs on, since the `pom.xml` sets no
+`maven.compiler.release`. A `[RELEASE]` line says so on every build; setting the
+property, or `maven.compiler.target` as older builds do, compiles for that
+release instead.
 
 Printing the dependency graph
 -----------------------------

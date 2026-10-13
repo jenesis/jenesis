@@ -34,7 +34,7 @@ public class KtlintFormatModule implements BuildExecutorModule {
              null,
              "ktlint-format",
              false,
-             ProcessBuildStep.Terms.of("ktlint-format"));
+             new ProcessBuildStep.Terms());
     }
 
     public static KtlintFormatModule ofEnvironment(Environment environment,
@@ -131,7 +131,11 @@ public class KtlintFormatModule implements BuildExecutorModule {
         }
 
         @Override
-        protected List<String> command(List<String> jars, Path config, List<String> files, boolean verify) {
+        protected List<String> command(BuildStepContext context,
+                                       List<String> jars,
+                                       Path config,
+                                       List<String> files,
+                                       boolean verify) {
             List<String> commands = new ArrayList<>(List.of(
                     "-cp", String.join(File.pathSeparator, jars),
                     "com.pinterest.ktlint.Main"));

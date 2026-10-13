@@ -17,7 +17,6 @@ public class MavenDefaultVersionNegotiator implements MavenVersionNegotiator {
 
     static DocumentBuilderFactory toDocumentBuilderFactory() {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        factory.setNamespaceAware(true);
         try {
             factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -191,7 +190,14 @@ public class MavenDefaultVersionNegotiator implements MavenVersionNegotiator {
                           String classifier,
                           String version) throws IOException {
         return switch (version) {
-            case "RELEASE" -> toMetadata(executor, repository, groupId, artifactId).release();
+            case "RELEASE" -> {
+                Metadata metadata = toMetadata(executor, repository, groupId, artifactId);
+                String release = metadata.release();
+                yield isStable(release) ? release : metadata.versions().stream()
+                        .filter(MavenDefaultVersionNegotiator::isStable)
+                        .max(MavenDefaultVersionNegotiator::compareVersions)
+                        .orElse(release);
+            }
             case "LATEST" -> toMetadata(executor, repository, groupId, artifactId).latest();
             case "STABLE" -> toStable(toMetadata(executor, repository, groupId, artifactId), groupId, artifactId);
             case String range when isRange(range) -> {
@@ -293,26 +299,26 @@ public class MavenDefaultVersionNegotiator implements MavenVersionNegotiator {
             metadata = switch (document.getDocumentElement().getAttribute("modelVersion")) {
                 case "", "1.1.0" -> {
                     Node versioning = toChildren(document.getDocumentElement())
-                            .filter(node -> Objects.equals(node.getLocalName(), "versioning"))
+                            .filter(node -> Objects.equals(node.getNodeName(), "versioning"))
                             .findFirst()
                             .orElseThrow(missing("versioning"));
                     yield new Metadata(
                             toChildren(versioning)
-                                    .filter(node -> Objects.equals(node.getLocalName(), "latest"))
+                                    .filter(node -> Objects.equals(node.getNodeName(), "latest"))
                                     .findFirst()
                                     .map(Node::getTextContent)
                                     .orElse(null),
                             toChildren(versioning)
-                                    .filter(node -> Objects.equals(node.getLocalName(), "release"))
+                                    .filter(node -> Objects.equals(node.getNodeName(), "release"))
                                     .findFirst()
                                     .map(Node::getTextContent)
                                     .orElse(null),
                             toChildren(versioning)
-                                    .filter(node -> Objects.equals(node.getLocalName(), "versions"))
+                                    .filter(node -> Objects.equals(node.getNodeName(), "versions"))
                                     .findFirst()
                                     .stream()
                                     .flatMap(MavenPomResolver::toChildren)
-                                    .filter(node -> Objects.equals(node.getLocalName(), "version"))
+                                    .filter(node -> Objects.equals(node.getNodeName(), "version"))
                                     .map(Node::getTextContent)
                                     .toList());
                 }

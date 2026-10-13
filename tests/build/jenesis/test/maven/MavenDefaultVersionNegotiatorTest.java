@@ -115,6 +115,53 @@ public class MavenDefaultVersionNegotiatorTest {
     }
 
     @Test
+    public void release_skips_a_pre_release_that_metadata_calls_release() throws IOException {
+        for (MavenVersionNegotiator negotiator : List.of(maven(), closest())) {
+            assertThat(negotiator.resolve(Runnable::run,
+                    metadata("<metadata><versioning>"
+                            + "<latest>21.0-rc-1</latest><release>21.0-rc-1</release>"
+                            + "<versions><version>4.35.0-RC1</version><version>4.35.1</version>"
+                            + "<version>21.0-rc-1</version></versions>"
+                            + "</versioning></metadata>"),
+                    "com.google.protobuf",
+                    "protoc",
+                    "exe",
+                    "linux-x86_64",
+                    "RELEASE"))
+                    .as("an unpinned tool takes the newest version without a pre-release qualifier")
+                    .isEqualTo("4.35.1");
+        }
+    }
+
+    @Test
+    public void release_keeps_the_release_of_metadata_without_a_pre_release_qualifier() throws IOException {
+        assertThat(closest().resolve(Runnable::run,
+                metadata("<metadata><versioning>"
+                        + "<latest>2.0</latest><release>1.9.1</release>"
+                        + "<versions><version>1.9.1</version><version>2.0</version></versions>"
+                        + "</versioning></metadata>"),
+                "group",
+                "artifact",
+                null,
+                null,
+                "RELEASE")).isEqualTo("1.9.1");
+    }
+
+    @Test
+    public void release_takes_a_pre_release_when_nothing_else_is_published() throws IOException {
+        assertThat(closest().resolve(Runnable::run,
+                metadata("<metadata><versioning>"
+                        + "<latest>1.0-M2</latest><release>1.0-M2</release>"
+                        + "<versions><version>1.0-M1</version><version>1.0-M2</version></versions>"
+                        + "</versioning></metadata>"),
+                "group",
+                "artifact",
+                null,
+                null,
+                "RELEASE")).isEqualTo("1.0-M2");
+    }
+
+    @Test
     public void release_without_release_fails() {
         assertThatThrownBy(() -> closest().resolve(Runnable::run,
                 metadata("<metadata><versioning><latest>1.0-SNAPSHOT</latest></versioning></metadata>"),

@@ -14,6 +14,7 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -21,7 +22,9 @@ public class ScalafmtModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
+    private static final String SETTING = "source.scalafmt";
     private static final String MAVEN_GROUP = "org.scalameta", MAVEN_ARTIFACT = "scalafmt-cli_2.13";
+    private static final int TEST_ERROR = 1;
 
     private final Dependencies dependencies;
     private final Pinning pinning;
@@ -37,7 +40,7 @@ public class ScalafmtModule implements BuildExecutorModule {
              "scalafmt",
              ".scalafmt.conf",
              false,
-             ProcessBuildStep.Terms.of("scalafmt"));
+             new ProcessBuildStep.Terms());
     }
 
     public static ScalafmtModule ofEnvironment(Environment environment,
@@ -47,7 +50,7 @@ public class ScalafmtModule implements BuildExecutorModule {
                 null,
                 "scalafmt",
                 ".scalafmt.conf",
-                false,
+                Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "scalafmt"));
     }
 
@@ -143,8 +146,20 @@ public class ScalafmtModule implements BuildExecutorModule {
         public boolean acceptableExitCode(int code,
                                           Executor executor,
                                           BuildStepContext context,
-                                          SequencedMap<String, BuildStepArgument> arguments) {
-            return !strict || code == 0;
+                                          SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Path diff = context.supplement().resolve("error");
+            int findings = code == 0 ? 0 : -1;
+            if (code == TEST_ERROR && Files.isRegularFile(diff)) {
+                List<String> lines = Files.readAllLines(diff, StandardCharsets.UTF_8);
+                findings = 0;
+                for (int index = 1; index < lines.size(); index++) {
+                    if (lines.get(index - 1).startsWith("--- a") && lines.get(index).startsWith("+++ b")) {
+                        findings++;
+                    }
+                }
+            }
+            return new Findings("scalafmt", diff, findings)
+                    .acceptable(code, context, true, strict, SETTING, terms.reporting());
         }
 
         @Override
