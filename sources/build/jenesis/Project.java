@@ -1440,7 +1440,10 @@ public record Project(
                           kotlin("jvm") adds on its own, is declared, as kotlinc compiles against the
                           module's dependencies alone; a Kotlin Multiplatform library is named by its
                           JVM variant, <artifactId>-jvm, where its root artifact holds no class and its
-                          POM does not depend on that variant, as Gradle module metadata is not read
+                          POM does not depend on that variant, as Gradle module metadata is not read;
+                          Gradle's incremental Kotlin compilation (kotlin.incremental, the default) is
+                          jenesis.kotlin.incremental=true, which needs Kotlin 2.3 or newer and
+                          pins org.jetbrains.kotlin:kotlin-build-tools-impl in the group kotlinc
                       scala-maven-plugin / scala -> .scala sources, compiled by Scala 3 (49); Scala 2
                           is not supported
                       gmavenplus / groovy -> .groovy sources, compiled by Groovy 4 or newer after
@@ -4566,6 +4569,7 @@ public record Project(
                 source.scalafmt|report|ignore|report|strict: scalafmt checking, activated by a .scalafmt.conf; ignore skips it, report lists a source it would format differently, strict fails the build on one
                 source.codenarc|report|ignore|report|strict: CodeNarc, activated by a codenarc.xml; ignore skips it, report records its findings, strict fails the build on any of them
                 compile.errorprone|true|Error Prone over the javac plugin declared with @jenesis.plugin javac, activated by an errorprone.properties; javac forks to grant it the compiler internals it reads
+                kotlin.incremental|false|Compile Kotlin incrementally in the Kotlin daemon through the Kotlin Build Tools API of Kotlin 2.3 or newer, resolved as org.jetbrains.kotlin:kotlin-build-tools-impl, which recompiles only what a change reaches and keeps the compiler warm between builds; the -J and -D lines of process-kotlinc.properties configure the daemon's JVM
                 format.java|true|The Java formatter a javaformat.properties selects - google, palantir or eclipse - with its options
                 format.ktlint|true|ktlint formatting, activated by an .editorconfig
                 format.ktfmt|true|ktfmt formatting, activated by a ktfmt.properties, which names its style and what it does to the imports; refused beside ktlint formatting the same sources
