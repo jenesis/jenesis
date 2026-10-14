@@ -47,6 +47,31 @@ public class ProjectMainTest {
     }
 
     @Test
+    public void runs_a_static_main_inherited_from_a_superclass() {
+        assertThat(run(InheritingStatic.class, "argument")).isEqualTo(0);
+        assertThat(INVOKED.get(InheritedStatic.class)).containsExactly("argument");
+    }
+
+    @Test
+    public void runs_the_main_without_parameters_where_the_one_taking_arguments_is_private() {
+        assertThat(run(PrivateWithArguments.class, "ignored")).isEqualTo(0);
+        assertThat(INVOKED.get(PrivateWithArguments.class)).isEmpty();
+    }
+
+    @Test
+    public void refuses_a_main_that_returns_a_value_as_java_does() {
+        assertThat(run(Returning.class)).isEqualTo(1);
+        assertThat(INVOKED).doesNotContainKey(Returning.class);
+        assertThat(errors).anyMatch(line -> line.contains("declares or inherits no main method"));
+    }
+
+    @Test
+    public void reports_what_the_main_method_throws_as_it_was_thrown() {
+        assertThat(run(Throwing.class)).isEqualTo(1);
+        assertThat(errors.getFirst()).isEqualTo(IllegalStateException.class.getName() + ": thrown by main");
+    }
+
+    @Test
     public void refuses_a_class_whose_only_main_is_private() {
         assertThat(run(PrivateOnly.class)).isEqualTo(1);
         assertThat(INVOKED).doesNotContainKey(PrivateOnly.class);
@@ -89,7 +114,6 @@ public class ProjectMainTest {
         }
     }
 
-    @SuppressWarnings("unused")
     static class BothForms {
 
         void main() {
@@ -101,7 +125,6 @@ public class ProjectMainTest {
         }
     }
 
-    @SuppressWarnings("UnnecessaryModifier")
     static class Inherited {
 
         protected void main(String[] args) {
@@ -109,8 +132,43 @@ public class ProjectMainTest {
         }
     }
 
-    @SuppressWarnings("EmptyClass")
     static class Inheriting extends Inherited {
+    }
+
+    static class InheritedStatic {
+
+        static void main(String[] args) {
+            INVOKED.put(InheritedStatic.class, List.of(args));
+        }
+    }
+
+    static class InheritingStatic extends InheritedStatic {
+    }
+
+    static class PrivateWithArguments {
+
+        private static void main(String[] args) {
+            INVOKED.put(PrivateWithArguments.class, List.of(args));
+        }
+
+        void main() {
+            INVOKED.put(getClass(), List.of());
+        }
+    }
+
+    static class Returning {
+
+        static int main(String[] args) {
+            INVOKED.put(Returning.class, List.of(args));
+            return 0;
+        }
+    }
+
+    static class Throwing {
+
+        static void main() {
+            throw new IllegalStateException("thrown by main");
+        }
     }
 
     interface Launchable {
@@ -123,7 +181,6 @@ public class ProjectMainTest {
     static class Defaulting implements Launchable {
     }
 
-    @SuppressWarnings({"ConfusingMainMethod", "unused"})
     static class PrivateOnly {
 
         private static void main(String[] args) {
@@ -138,7 +195,6 @@ public class ProjectMainTest {
         }
     }
 
-    @SuppressWarnings({"ClassWithOnlyPrivateConstructors", "ConfusingMainMethod", "unused"})
     static class PrivateConstructor {
 
         private PrivateConstructor() {
