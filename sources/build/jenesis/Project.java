@@ -2,11 +2,41 @@ package build.jenesis;
 
 import module java.base;
 import build.jenesis.docker.DockerizedJava;
-import build.jenesis.maven.*;
-import build.jenesis.module.*;
-import build.jenesis.project.*;
-import build.jenesis.step.*;
-
+import build.jenesis.maven.MavenDefaultRepository;
+import build.jenesis.maven.MavenModuleResolver;
+import build.jenesis.maven.MavenPomResolver;
+import build.jenesis.maven.MavenProject;
+import build.jenesis.maven.MavenRepositoryExport;
+import build.jenesis.maven.MavenRepositoryStaging;
+import build.jenesis.maven.MavenResolver;
+import build.jenesis.maven.PinPom;
+import build.jenesis.maven.Pom;
+import build.jenesis.module.JenesisModuleRepository;
+import build.jenesis.module.JenesisModuleRepositoryExport;
+import build.jenesis.module.JenesisRepository;
+import build.jenesis.module.ModularJarResolver;
+import build.jenesis.module.ModularProject;
+import build.jenesis.module.ModularStaging;
+import build.jenesis.module.PinModuleInfo;
+import build.jenesis.project.AssemblyDescriptor;
+import build.jenesis.project.ExternalModule;
+import build.jenesis.project.Ide;
+import build.jenesis.project.InferredMultiProjectAssembler;
+import build.jenesis.project.InternalModule;
+import build.jenesis.project.MultiProjectAssembler;
+import build.jenesis.project.MultiProjectModule;
+import build.jenesis.project.ProjectModuleDescriptor;
+import build.jenesis.project.ProjectPlugins;
+import build.jenesis.project.ProjectWatch;
+import build.jenesis.project.ReleaseModule;
+import build.jenesis.step.Bind;
+import build.jenesis.step.Bom;
+import build.jenesis.step.Dependencies;
+import build.jenesis.step.ImageStaging;
+import build.jenesis.step.Inventory;
+import build.jenesis.step.ProjectFiles;
+import build.jenesis.step.ReportStaging;
+import build.jenesis.step.Tree;
 import javax.lang.model.SourceVersion;
 
 public record Project(
@@ -4746,27 +4776,12 @@ public record Project(
             if (mainClass.equals(Execution.class.getName())) {
                 return Execution.run(environment, root, profiles, selectors);
             }
-            Class<?> type = Class.forName(mainClass, true, Project.class.getClassLoader());
-            Method main = mainMethod(type);
-            main.setAccessible(true);
-            Object instance = null;
-            if (!Modifier.isStatic(main.getModifiers())) {
-                if (Modifier.isAbstract(type.getModifiers())) {
-                    throw new IllegalArgumentException("The main class " + mainClass + " is abstract or an interface"
-                            + " and declares an instance main method, which needs an instance: make the class"
-                            + " concrete, or make the main method static");
-                }
-                Constructor<?> constructor = Arrays.stream(type.getDeclaredConstructors())
-                        .filter(candidate -> candidate.getParameterCount() == 0
-                                && !Modifier.isPrivate(candidate.getModifiers()))
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalArgumentException("The main class " + mainClass
-                                + " declares an instance main method but no non-private constructor without"
-                                + " parameters: declare one, or make the main method static"));
-                constructor.setAccessible(true);
-                instance = constructor.newInstance();
+            MethodHandle main = mainMethod(Class.forName(mainClass, true, Project.class.getClassLoader()));
+            if (main.type().parameterCount() == 0) {
+                main.invoke();
+            } else {
+                main.invoke(selectors);
             }
-            main.invoke(instance, main.getParameterCount() == 0 ? new Object[0] : new Object[]{selectors});
             return 0;
         } catch (Throwable t) {
             report(t, environment);
@@ -4774,33 +4789,42 @@ public record Project(
         }
     }
 
-    private static Method mainMethod(Class<?> type) {
-        SequencedSet<Class<?>> hierarchy = Stream.<Class<?>>iterate(type, Objects::nonNull, Class::getSuperclass)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-        List<Class<?>> pending = new ArrayList<>(hierarchy);
-        for (int index = 0; index < pending.size(); index++) {
-            for (Class<?> parent : pending.get(index).getInterfaces()) {
-                if (hierarchy.add(parent)) {
-                    pending.add(parent);
-                }
-            }
-        }
-        for (Class<?>[] parameters : List.of(new Class<?>[]{String[].class}, new Class<?>[0])) {
-            for (Class<?> declaring : hierarchy) {
-                Method candidate;
+    private static MethodHandle mainMethod(Class<?> type) throws Throwable {
+        Project.class.getModule().addReads(type.getModule());
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(type, MethodHandles.lookup());
+        for (MethodType signature : List.of(MethodType.methodType(void.class, String[].class),
+                MethodType.methodType(void.class))) {
+            MethodHandle main;
+            try {
+                main = lookup.findStatic(type, "main", signature);
+            } catch (NoSuchMethodException | IllegalAccessException _) {
                 try {
-                    candidate = declaring.getDeclaredMethod("main", parameters);
-                } catch (NoSuchMethodException _) {
+                    main = lookup.findVirtual(type, "main", signature);
+                } catch (NoSuchMethodException | IllegalAccessException _) {
                     continue;
                 }
-                int modifiers = candidate.getModifiers();
-                if (candidate.getReturnType() == void.class
-                        && !Modifier.isPrivate(modifiers)
-                        && !Modifier.isAbstract(modifiers)
-                        && (declaring == type || !declaring.isInterface() || !Modifier.isStatic(modifiers))) {
-                    return candidate;
-                }
             }
+            int modifiers = lookup.revealDirect(main).getModifiers();
+            if (Modifier.isPrivate(modifiers)) {
+                continue;
+            } else if (Modifier.isStatic(modifiers)) {
+                return main;
+            } else if (Modifier.isAbstract(type.getModifiers())) {
+                throw new IllegalArgumentException("The main class " + type.getName() + " is abstract or an interface"
+                        + " but its main method is not static: make the class concrete, or the method static");
+            }
+            MethodHandle constructor;
+            try {
+                constructor = lookup.findConstructor(type, MethodType.methodType(void.class));
+            } catch (NoSuchMethodException _) {
+                constructor = null;
+            }
+            if (constructor == null || Modifier.isPrivate(lookup.revealDirect(constructor).getModifiers())) {
+                throw new IllegalArgumentException("The main class " + type.getName() + " has an instance main method"
+                        + " but no non-private constructor without parameters: declare one, declare the class static"
+                        + " if it is an inner class, or make the main method static");
+            }
+            return main.bindTo(constructor.invoke());
         }
         throw new IllegalArgumentException("The main class " + type.getName() + " declares or inherits no main"
                 + " method: declare a non-private void main(String[] args) or void main(), static or not");
