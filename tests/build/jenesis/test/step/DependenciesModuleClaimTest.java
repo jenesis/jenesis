@@ -134,9 +134,9 @@ public class DependenciesModuleClaimTest {
         }
 
         assertThatThrownBy(() -> resolveScoped(dependencies -> dependencies.pathPlacement(PathPlacement.MODULE_PATH),
-                "plugin-sample/runtime/maven/org.example/one-lib/1.0"))
+                "sample/runtime/maven/org.example/one-lib/1.0"))
                 .hasStackTraceContaining("maven/org.example/plain/2.0 declares no module name, neither by a"
-                        + " module-info.class nor by an Automatic-Module-Name, but every jar of group plugin-sample"
+                        + " module-info.class nor by an Automatic-Module-Name, but every jar of group sample"
                         + " loads as a module of its own layer - name it with a @jenesis.alias <module>"
                         + " org.example/plain line in the module-info.java that requires it, or drop it with"
                         + " @jenesis.exclude");

@@ -56,6 +56,23 @@ public class Bind implements BuildStep {
         return new Bind(Map.of(Path.of(""), Path.of(METADATA)));
     }
 
+    public static Path contained(Path root, Path path, String origin) {
+        Path project = root.toAbsolutePath().normalize(), located = path.toAbsolutePath().normalize();
+        boolean inside = located.startsWith(project);
+        if (inside && Files.exists(located)) {
+            try {
+                inside = located.toRealPath().startsWith(project.toRealPath());
+            } catch (IOException e) {
+                throw new UncheckedIOException("Cannot resolve " + located, e);
+            }
+        }
+        if (!inside) {
+            throw new IllegalArgumentException(origin + " names " + located + ", which lies outside the project "
+                    + project + " - name a folder the project holds");
+        }
+        return located;
+    }
+
     public static BuildExecutorModule asInputs(SequencedMap<String, SequencedMap<Path, Path>> inputs) {
         return (buildExecutor, _) -> {
             for (Map.Entry<String, SequencedMap<Path, Path>> input : inputs.entrySet()) {
@@ -86,17 +103,23 @@ public class Bind implements BuildStep {
                                                                      Function<M, BuildExecutorModule> configurator,
                                                                      Path configurationFile,
                                                                      Supplier<M> module) {
-        return configured(buildExecutor, inputs, name, configurator, configurationFile, Collections.emptyNavigableSet(), module);
+        return configured(buildExecutor,
+                inputs,
+                name,
+                configurator,
+                configurationFile == null
+                        ? Collections.emptyNavigableMap()
+                        : new TreeMap<>(Map.of(configurationFile.getFileName(), configurationFile)),
+                module);
     }
 
     public static <M extends BuildExecutorModule> boolean configured(BuildExecutor buildExecutor,
                                                                      SequencedSet<String> inputs,
                                                                      String name,
                                                                      Function<M, BuildExecutorModule> configurator,
-                                                                     Path configurationFile,
-                                                                     SequencedSet<Path> siblings,
+                                                                     SequencedMap<Path, Path> files,
                                                                      Supplier<M> module) {
-        if (configurator == null || configurationFile == null) {
+        if (configurator == null || files.isEmpty()) {
             return false;
         }
         BuildExecutorModule configured = configurator.apply(module.get());
@@ -104,15 +127,14 @@ public class Bind implements BuildStep {
             return false;
         }
         buildExecutor.addModule(name, (nested, inherited) -> {
-            if (siblings.isEmpty()) {
-                nested.addSource("configuration",
-                        new Bind(Map.of(Path.of(""), configurationFile.getFileName())),
-                        configurationFile);
+            if (files.size() == 1) {
+                Map.Entry<Path, Path> file = files.firstEntry();
+                nested.addSource("configuration", new Bind(Map.of(Path.of(""), file.getKey())), file.getValue());
             } else {
                 SequencedSet<String> sources = new LinkedHashSet<>();
-                for (Path file : Stream.concat(Stream.of(configurationFile.getFileName()), siblings.stream()).toList()) {
+                for (Map.Entry<Path, Path> file : files.entrySet()) {
                     String source = "configuration-" + sources.size();
-                    nested.addSource(source, new Bind(Map.of(Path.of(""), file)), configurationFile.resolveSibling(file));
+                    nested.addSource(source, new Bind(Map.of(Path.of(""), file.getKey())), file.getValue());
                     sources.add(source);
                 }
                 nested.addStep("configuration", new Bind(Map.of(Path.of(""), Path.of(""))), sources);
@@ -177,7 +199,8 @@ public class Bind implements BuildStep {
                                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
                                         throws IOException {
                                     if (!ide && source.equals(dir.getParent())
-                                            && IDE_FILES.contains(dir.getFileName().toString())) {
+                                            && IDE_FILES.contains(dir.getFileName().toString())
+                                            || !dir.equals(source) && Files.exists(dir.resolve(BuildExecutor.SKIP_MARKER))) {
                                         return FileVisitResult.SKIP_SUBTREE;
                                     }
                                     if (!filtered) {
@@ -191,6 +214,7 @@ public class Bind implements BuildStep {
                                         throws IOException {
                                     String name = file.getFileName().toString();
                                     if (filtered && extensions.stream().noneMatch(name::endsWith)
+                                            || name.equals(BuildExecutor.SKIP_MARKER)
                                             || !ide && source.equals(file.getParent())
                                             && (IDE_FILES.contains(name) || name.endsWith(".iml"))) {
                                         return FileVisitResult.CONTINUE;

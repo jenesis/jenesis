@@ -405,7 +405,7 @@ public class JavadocTest {
         Path own = plainJar(library.resolve("plain.jar")), tool = modularJar(library.resolve("tool.jar"), "plugin.tool");
         SequencedProperties index = new SequencedProperties();
         index.setProperty("main/compile/maven/plain", "../library/plain.jar");
-        index.setProperty("plugin-manifest/compile/module/plugin.tool", "../library/tool.jar");
+        index.setProperty("manifest/compile/module/plugin.tool", "../library/tool.jar");
         index.setProperty("checkstyle/runtime/maven/checkstyle", "../library/tool.jar");
         index.store(sources.resolve(BuildStep.DEPENDENCIES));
         Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"), """

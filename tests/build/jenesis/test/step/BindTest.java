@@ -56,6 +56,34 @@ public class BindTest {
     }
 
     @Test
+    public void leaves_out_a_folder_that_a_build_marked_as_its_own() throws IOException {
+        Path module = Files.createDirectory(root.resolve("module"));
+        Files.writeString(module.resolve("module-info.java"), "module sample {}");
+        Files.createFile(module.resolve(BuildExecutor.SKIP_MARKER));
+        Path artifacts = Files.createDirectories(module.resolve(".jenesis/artifacts"));
+        Files.createFile(artifacts.resolve(BuildExecutor.SKIP_MARKER));
+        Files.writeString(artifacts.resolve("cached.jar"), "cached");
+        BuildExecutor buildExecutor = BuildExecutor.of(root.resolve("target"),
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        buildExecutor.addSource("sources", Bind.asSources(), module);
+
+        Path sources = buildExecutor.execute().get("sources").resolve("sources");
+
+        assertThat(sources.resolve("module-info.java")).exists();
+        assertThat(sources.resolve(".jenesis/artifacts/cached.jar"))
+                .as("what a build caches inside a module's folder is no source of the module")
+                .doesNotExist();
+        assertThat(sources.resolve(BuildExecutor.SKIP_MARKER)).doesNotExist();
+    }
+
+    @Test
     public void binds_a_file_added_to_a_bound_folder_since_the_last_build() throws IOException {
         Path schemas = Files.createDirectory(root.resolve("schemas"));
         Files.writeString(schemas.resolve("order.xsd"), "<order/>");

@@ -10,12 +10,15 @@ import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Observation;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.module.ModularJarResolver;
+import build.jenesis.project.TestFramework;
 import build.jenesis.project.InternalModule;
+import build.jenesis.project.Language;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -77,7 +80,7 @@ public class InternalModuleTest {
     @Test
     public void can_compile_and_run_modular_plugin() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
                 Map.of("test/plugin/Plugin.java", """
                         package test.plugin;
                         import build.jenesis.BuildExecutor;
@@ -87,7 +90,15 @@ public class InternalModuleTest {
                         import java.nio.file.Path;
                         import java.util.SequencedMap;
                         import java.util.concurrent.CompletableFuture;
-                        public class Plugin implements BuildExecutorModule {
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "hello");
@@ -97,16 +108,416 @@ public class InternalModuleTest {
                         }
                         """));
 
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps).containsKey("internal/marker");
         assertThat(steps.get("internal/marker").resolve("out.txt")).content().isEqualTo("hello");
+    }
+
+    @Test
+    public void keeps_the_layer_of_a_plugin_warm_for_the_next_build_of_the_same_jars() throws Exception {
+        assertThat(created("test.warm", List.of("first", "first"))).containsExactly("1", "2");
+    }
+
+    @Test
+    public void replaces_the_warm_layer_of_a_plugin_whose_jars_changed() throws Exception {
+        assertThat(created("test.edited", List.of("first", "second", "second")))
+                .as("a plugin edited between two builds is loaded afresh, and its new layer is then kept")
+                .containsExactly("1", "1", "2");
+    }
+
+    private List<String> created(String name, List<String> variants) throws Exception {
+        List<String> created = new ArrayList<>();
+        for (String variant : variants) {
+            Path source = writeModuleSource(work.resolve(name),
+                    "module " + name + " { requires build.jenesis; provides build.jenesis.BuildModuleFactory with "
+                            + name + ".Plugin; }",
+                    Map.of(name.replace('.', '/') + "/Plugin.java", """
+                            package %s;
+                            import build.jenesis.BuildExecutor;
+                            import build.jenesis.BuildExecutorModule;
+                            import build.jenesis.BuildStepResult;
+                            import java.nio.file.Files;
+                            import java.nio.file.Path;
+                            import java.util.SequencedMap;
+                            import java.util.concurrent.CompletableFuture;
+                            public class Plugin implements build.jenesis.BuildModuleFactory {
+                                private static final String VARIANT = "%s";
+                                private static int created;
+                                public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                                  java.util.SequencedMap<String, String> properties,
+                                                                  build.jenesis.Permits permits,
+                                                                  String group,
+                                                                  java.util.Map<String, build.jenesis.Repository> repositories,
+                                                                  java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                    String count = String.valueOf(++created);
+                                    return (BuildExecutor executor, SequencedMap<String, Path> inherited) -> executor.addStep("marker", (_, context, _) -> {
+                                        Files.writeString(context.next().resolve("created.txt"), count);
+                                        return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    });
+                                }
+                            }
+                            """.formatted(name, variant)));
+            Path folder = Files.createTempDirectory(work, "build");
+            BuildExecutor executor = BuildExecutor.of(folder,
+                    Duration.ZERO,
+                    new HashDigestFunction("MD5"),
+                    BuildStepHashFunction.ofSerializationDigest("MD5"),
+                    BuildExecutorCallback.nop(),
+                    BuildExecutorCache.nop(),
+                    false,
+                    false,
+                    0);
+            executor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE, "module", "main", source,
+                    Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                    Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+            created.add(Files.readString(executor.execute().get("internal/marker").resolve("created.txt")));
+        }
+        return created;
+    }
+
+    @Test
+    public void creates_the_observation_of_a_plugin_that_observes_the_tests() throws IOException {
+        Path source = writeModuleSource(work.resolve("plugin"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.ObservabilityFactory with test.plugin.Factory; }",
+                Map.of("test/plugin/Factory.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildStepResult;
+                        import build.jenesis.ObservabilityEngine;
+                        import build.jenesis.Observation;
+                        import java.nio.file.Files;
+                        import java.nio.file.Path;
+                        import java.util.LinkedHashMap;
+                        import java.util.List;
+                        import java.util.SequencedMap;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Factory implements build.jenesis.ObservabilityFactory {
+                            public Observation create(build.jenesis.Environment environment,
+                                                      SequencedMap<String, String> properties,
+                                                      build.jenesis.Permits permits,
+                                                      String group,
+                                                      java.util.Map<String, build.jenesis.Repository> repositories,
+                                                      java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return new Observation(new Engine(group, properties.get("option")),
+                                        (executor, _) -> executor.addStep("report", (_, context, _) -> {
+                                            Files.writeString(context.next().resolve("report.txt"), group);
+                                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                                        }));
+                            }
+                            public record Engine(String name, String option) implements ObservabilityEngine {
+                                public SequencedMap<String, String> coordinates() {
+                                    return new LinkedHashMap<>();
+                                }
+                                public List<String> commands(SequencedMap<String, Path> resolved, Path output) {
+                                    return List.of(option + "=" + output.getFileName());
+                                }
+                            }
+                        }
+                        """));
+        InternalModule internal = InternalModule.ofEnvironment(Environment.NONE, "module", "probe", source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
+                .properties(new LinkedHashMap<>(Map.of("option", "-Dprobe")));
+
+        buildExecutor.addModule("prepared", internal.preparation());
+        buildExecutor.addModule("observed", (executor, inherited) -> {
+            SequencedMap<String, Path> prepared = new LinkedHashMap<>();
+            inherited.forEach((identity, folder) -> prepared.put(
+                    identity.replace("prepared/", ""), folder));
+            Observation observation = internal.observation(prepared);
+            String engine = observation.engine().name() + " "
+                    + observation.engine().commands(new LinkedHashMap<>(), Path.of("output"));
+            executor.addStep("engine", (_, context, _) -> {
+                Files.writeString(context.next().resolve("engine.txt"), engine);
+                return CompletableFuture.completedStage(new BuildStepResult(true));
+            });
+            executor.addModule("report", observation.report());
+        }, "prepared");
+
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps.get("observed/engine").resolve("engine.txt"))
+                .as("the engine the plugin attaches to the tests is named after its group and takes its values")
+                .content()
+                .isEqualTo("probe [-Dprobe=output]");
+        assertThat(steps.get("observed/report/report").resolve("report.txt")).content().isEqualTo("probe");
+    }
+
+    @Test
+    public void creates_the_language_of_a_plugin_that_compiles_one() throws IOException {
+        Path source = writeModuleSource(work.resolve("plugin"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.project.LanguageFactory with test.plugin.Factory; }",
+                Map.of("test/plugin/Factory.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutor;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStepResult;
+                        import build.jenesis.project.Language;
+                        import java.nio.file.Files;
+                        import java.nio.file.Path;
+                        import java.util.LinkedHashSet;
+                        import java.util.List;
+                        import java.util.SequencedMap;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Factory implements build.jenesis.project.LanguageFactory {
+                            public Language create(build.jenesis.Environment environment,
+                                                   SequencedMap<String, String> properties,
+                                                   build.jenesis.Permits permits,
+                                                   String group,
+                                                   java.util.Map<String, build.jenesis.Repository> repositories,
+                                                   java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                String target = properties.get("target");
+                                BuildExecutorModule compiler = (BuildExecutor executor, SequencedMap<String, Path> inherited) ->
+                                        executor.addStep("compile", (_, context, _) -> {
+                                            Files.writeString(context.next().resolve("compiled.txt"), target);
+                                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                                        });
+                                return new Language(new LinkedHashSet<>(List.of(".greet")), Language.Order.AFTER_JAVAC, compiler, null);
+                            }
+                        }
+                        """));
+        InternalModule internal = InternalModule.ofEnvironment(Environment.NONE, "module", "main", source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
+                .properties(new LinkedHashMap<>(Map.of("target", "jvm")));
+
+        buildExecutor.addModule("prepared", internal.preparation());
+        buildExecutor.addModule("language", (executor, inherited) -> {
+            SequencedMap<String, Path> prepared = new LinkedHashMap<>();
+            inherited.forEach((identity, folder) -> prepared.put(identity.replace("prepared/", ""), folder));
+            Language language = internal.language(prepared);
+            assertThat(language.extensions()).containsExactly(".greet");
+            assertThat(language.order()).isEqualTo(Language.Order.AFTER_JAVAC);
+            assertThat(language.documentation()).isNull();
+            executor.addModule("compiler", language.compiler());
+        }, "prepared");
+
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps.entrySet().stream()
+                .filter(entry -> entry.getKey().startsWith("language/compiler/"))
+                .map(entry -> entry.getValue().resolve("compiled.txt"))
+                .filter(Files::isRegularFile)
+                .findFirst())
+                .as("the compiler the plugin's language names runs through the bridge with the values it was handed")
+                .hasValueSatisfying(file -> assertThat(file).hasContent("jvm"));
+    }
+
+    @Test
+    public void creates_the_test_framework_of_a_plugin_that_runs_the_tests() throws IOException {
+        Path source = writeModuleSource(work.resolve("plugin"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.project.TestFrameworkFactory with test.plugin.Factory; }",
+                Map.of("test/plugin/Factory.java", """
+                        package test.plugin;
+                        import build.jenesis.project.TestFramework;
+                        import java.lang.module.ModuleDescriptor;
+                        import java.nio.file.Path;
+                        import java.util.List;
+                        import java.util.Set;
+                        import java.util.SequencedMap;
+                        import java.util.SequencedSet;
+                        public class Factory implements build.jenesis.project.TestFrameworkFactory {
+                            public TestFramework create(build.jenesis.Environment environment,
+                                                        SequencedMap<String, String> properties,
+                                                        build.jenesis.Permits permits,
+                                                        String group,
+                                                        java.util.Map<String, build.jenesis.Repository> repositories,
+                                                        java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return new Runner(properties.get("runner"));
+                            }
+                            public record Runner(String runnerClass) implements TestFramework {
+                                public String runnerModule() {
+                                    return null;
+                                }
+                                public boolean isMarkedBy(ModuleDescriptor module) {
+                                    return module.name().equals("example.tests");
+                                }
+                                public Set<String> reflectingModules() {
+                                    return Set.of();
+                                }
+                                public List<String> arguments(Path supplement,
+                                                              Path output,
+                                                              SequencedSet<String> classes,
+                                                              SequencedMap<String, SequencedSet<String>> methods,
+                                                              boolean parallel,
+                                                              boolean reporting) {
+                                    return List.copyOf(classes);
+                                }
+                            }
+                        }
+                        """));
+        InternalModule internal = InternalModule.ofEnvironment(Environment.NONE, "module", "main", source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
+                .properties(new LinkedHashMap<>(Map.of("runner", "example.Runner")));
+
+        buildExecutor.addModule("prepared", internal.preparation());
+        buildExecutor.addModule("framework", (executor, inherited) -> {
+            SequencedMap<String, Path> prepared = new LinkedHashMap<>();
+            inherited.forEach((identity, folder) -> prepared.put(identity.replace("prepared/", ""), folder));
+            TestFramework framework = internal.framework(prepared);
+            String described = framework.runnerClass() + " "
+                    + framework.isMarkedBy(ModuleDescriptor.newModule("example.tests").build()) + " "
+                    + framework.isMarkedBy(ModuleDescriptor.newModule("example.other").build()) + " "
+                    + framework.arguments(Path.of("supplement"),
+                            Path.of("output"),
+                            new LinkedHashSet<>(List.of("example.SampleTest")),
+                            new LinkedHashMap<>(),
+                            false,
+                            false);
+            executor.addStep("described", (_, context, _) -> {
+                Files.writeString(context.next().resolve("framework.txt"), described);
+                return CompletableFuture.completedStage(new BuildStepResult(true));
+            });
+        }, "prepared");
+
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps.get("framework/described").resolve("framework.txt"))
+                .as("the framework the plugin creates answers through the bridge with the values it was handed")
+                .content()
+                .isEqualTo("example.Runner true false [example.SampleTest]");
+    }
+
+    @Test
+    public void hands_the_plugin_the_repositories_to_resolve_its_tool_with_apart_from_those_it_is_loaded_from()
+            throws IOException {
+        Path source = writeModuleSource(work.resolve("plugin"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Factory; }",
+                Map.of("test/plugin/Factory.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStepResult;
+                        import java.nio.file.Files;
+                        import java.util.TreeSet;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Factory implements build.jenesis.BuildModuleFactory {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                String handed = new TreeSet<>(repositories.keySet()) + " " + new TreeSet<>(resolvers.keySet());
+                                return (executor, _) -> executor.addStep("marker", (_, context, _) -> {
+                                    Files.writeString(context.next().resolve("out.txt"), handed);
+                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                });
+                            }
+                        }
+                        """));
+
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
+                "module",
+                "greeting",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
+                .repositories(Map.of("project", versionInsensitive(Map.of())))
+                .resolvers(Map.of("project", Resolver.identity())));
+
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps.get("internal/marker").resolve("out.txt"))
+                .as("the plugin resolves its tool with the repositories of the build that loads it")
+                .content()
+                .isEqualTo("[project] [project]");
+    }
+
+    @Test
+    public void hands_the_plugin_the_group_to_resolve_its_tool_in() throws IOException {
+        Path source = writeModuleSource(work.resolve("plugin"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Factory; }",
+                Map.of("test/plugin/Factory.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStepResult;
+                        import java.nio.file.Files;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Factory implements build.jenesis.BuildModuleFactory {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return (executor, _) -> executor.addStep("marker", (_, context, _) -> {
+                                    Files.writeString(context.next().resolve("out.txt"), group);
+                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                });
+                            }
+                        }
+                        """));
+
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
+                "module",
+                "greeting",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps.get("internal/marker").resolve("out.txt"))
+                .as("the plugin is handed the group its own closure is resolved in, under which it names its tool's")
+                .content()
+                .isEqualTo("greeting");
+    }
+
+    @Test
+    public void fails_a_plugin_step_that_resolves_in_a_group_not_named_after_the_plugin() throws IOException {
+        buildExecutor.addModule("internal", resolvingIn("greeting:tool/runtime/module/tool", "other/runtime/module/tool"));
+
+        assertThatThrownBy(() -> buildExecutor.execute())
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("The plugin greeting resolved other/runtime/module/tool in the group other")
+                .hasMessageContaining("greeting:tool");
+    }
+
+    @Test
+    public void accepts_a_plugin_step_that_resolves_in_groups_named_after_the_plugin() throws IOException {
+        buildExecutor.addModule("internal", resolvingIn("greeting:tool/runtime/module/tool",
+                "greeting:processor/runtime/module/processor"));
+
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps.get("internal/resolved").resolve(BuildStep.DEPENDENCIES))
+                .as("a plugin resolves what it runs in a group of its own name and any purpose")
+                .exists();
+    }
+
+    private InternalModule resolvingIn(String... keys) throws IOException {
+        StringBuilder index = new StringBuilder();
+        for (String key : keys) {
+            index.append(key.replace(":", "\\\\:")).append("=tool.jar\\n");
+        }
+        Path source = writeModuleSource(work.resolve("plugin"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Factory; }",
+                Map.of("test/plugin/Factory.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStep;
+                        import build.jenesis.BuildStepResult;
+                        import java.nio.file.Files;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Factory implements build.jenesis.BuildModuleFactory {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return (executor, _) -> executor.addStep("resolved", (_, context, _) -> {
+                                    Files.writeString(context.next().resolve(BuildStep.DEPENDENCIES), "%s");
+                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                });
+                            }
+                        }
+                        """.formatted(index)));
+        return InternalModule.ofEnvironment(Environment.NONE, "module", "greeting", source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)));
     }
 
     @Test
@@ -120,7 +531,15 @@ public class InternalModuleTest {
                 import java.nio.file.Path;
                 import java.util.SequencedMap;
                 import java.util.concurrent.CompletableFuture;
-                public class Plugin implements BuildExecutorModule {
+                public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                    public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                      java.util.SequencedMap<String, String> properties,
+                                                      build.jenesis.Permits permits,
+                                                      String group,
+                                                      java.util.Map<String, build.jenesis.Repository> repositories,
+                                                      java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                        return this;
+                    }
                     public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                         executor.addStep("marker", (_, context, _) -> {
                             Files.writeString(context.next().resolve("out.txt"), "%s");
@@ -129,13 +548,13 @@ public class InternalModuleTest {
                     }
                 }
                 """;
-        String moduleInfo = "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }";
+        String moduleInfo = "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }";
         Path source = writeModuleSource(work.resolve("plugin"),
                 moduleInfo,
                 Map.of("test/plugin/Plugin.java", plugin.formatted("before")));
-        buildExecutor.addModule("internal", new InternalModule("module", null, source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE, "module", "main", source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
         assertThat(buildExecutor.execute().get("internal/marker").resolve("out.txt")).content().isEqualTo("before");
 
         writeModuleSource(work.resolve("plugin"), moduleInfo, Map.of("test/plugin/Plugin.java", plugin.formatted("after")));
@@ -154,9 +573,9 @@ public class InternalModuleTest {
                 false,
                 false,
                 0);
-        buildExecutor.addModule("internal", new InternalModule("module", null, source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE, "module", "main", source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
         assertThat(buildExecutor.execute().get("internal/marker").resolve("out.txt")).content()
                 .as("a copy of the first build's target holds the old output, and the step's serialised form is unchanged,"
                         + " so only the code of the plugin can tell it apart")
@@ -166,7 +585,7 @@ public class InternalModuleTest {
     @Test
     public void hands_its_properties_to_the_constructor_of_a_plugin_that_takes_them() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
                 Map.of("test/plugin/Plugin.java", """
                         package test.plugin;
                         import build.jenesis.BuildExecutor;
@@ -177,7 +596,15 @@ public class InternalModuleTest {
                         import java.util.Collections;
                         import java.util.SequencedMap;
                         import java.util.concurrent.CompletableFuture;
-                        public class Plugin implements BuildExecutorModule {
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return new Plugin(properties);
+                            }
                             private final String greeting;
                             public Plugin() {
                                 this(Collections.emptyNavigableMap());
@@ -197,12 +624,12 @@ public class InternalModuleTest {
         SequencedMap<String, String> properties = new LinkedHashMap<>();
         properties.put("greeting", "configured");
 
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
                 .properties(properties));
 
         assertThat(buildExecutor.execute().get("internal/marker").resolve("out.txt")).content().isEqualTo("configured");
@@ -211,7 +638,7 @@ public class InternalModuleTest {
     @Test
     public void creates_a_plugin_without_a_properties_constructor_as_without_properties() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
                 Map.of("test/plugin/Plugin.java", """
                         package test.plugin;
                         import build.jenesis.BuildExecutor;
@@ -221,7 +648,15 @@ public class InternalModuleTest {
                         import java.nio.file.Path;
                         import java.util.SequencedMap;
                         import java.util.concurrent.CompletableFuture;
-                        public class Plugin implements BuildExecutorModule {
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "hello");
@@ -231,51 +666,21 @@ public class InternalModuleTest {
                         }
                         """));
 
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
                 .properties(new LinkedHashMap<>()));
 
         assertThat(buildExecutor.execute().get("internal/marker").resolve("out.txt")).content().isEqualTo("hello");
     }
 
     @Test
-    public void refuses_properties_for_a_plugin_that_takes_none() throws IOException {
-        Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
-                Map.of("test/plugin/Plugin.java", """
-                        package test.plugin;
-                        import build.jenesis.BuildExecutor;
-                        import build.jenesis.BuildExecutorModule;
-                        import java.nio.file.Path;
-                        import java.util.SequencedMap;
-                        public class Plugin implements BuildExecutorModule {
-                            public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) { }
-                        }
-                        """));
-        SequencedMap<String, String> properties = new LinkedHashMap<>();
-        properties.put("greeting", "configured");
-
-        buildExecutor.addModule("internal", new InternalModule(
-                "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
-                .properties(properties));
-
-        assertThatThrownBy(buildExecutor::execute)
-                .rootCause()
-                .hasMessageContaining("test.plugin.Plugin takes no properties, but [greeting] are given");
-    }
-
-    @Test
     public void plugin_step_can_read_predecessor_argument_folder() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
                 Map.of("test/plugin/Plugin.java", """
                         package test.plugin;
                         import build.jenesis.BuildExecutor;
@@ -285,7 +690,15 @@ public class InternalModuleTest {
                         import java.nio.file.Path;
                         import java.util.SequencedMap;
                         import java.util.concurrent.CompletableFuture;
-                        public class Plugin implements BuildExecutorModule {
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("first", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("payload.txt"), "produced");
@@ -301,12 +714,12 @@ public class InternalModuleTest {
                         }
                         """));
 
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps.get("internal/second").resolve("out.txt")).content().isEqualTo("seen:produced");
@@ -315,7 +728,7 @@ public class InternalModuleTest {
     @Test
     public void plugin_can_add_nested_module() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
                 Map.of("test/plugin/Plugin.java", """
                         package test.plugin;
                         import build.jenesis.BuildExecutor;
@@ -325,7 +738,15 @@ public class InternalModuleTest {
                         import java.nio.file.Path;
                         import java.util.SequencedMap;
                         import java.util.concurrent.CompletableFuture;
-                        public class Plugin implements BuildExecutorModule {
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addModule("inner", (sub, _) -> {
                                     sub.addStep("marker", (_, context, _) -> {
@@ -337,15 +758,70 @@ public class InternalModuleTest {
                         }
                         """));
 
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps.get("internal/inner/marker").resolve("out.txt")).content().isEqualTo("nested");
+    }
+
+    @Test
+    public void hides_what_the_modules_of_a_plugin_resolve_to_nothing() throws IOException {
+        Path source = writeModuleSource(work.resolve("plugin"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
+                Map.of("test/plugin/Plugin.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutor;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStepResult;
+                        import java.nio.file.Path;
+                        import java.util.Optional;
+                        import java.util.SequencedMap;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
+                            public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
+                                executor.addStep("hidden", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+                                executor.addStep("shown", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+                                executor.addModule("inner", new BuildExecutorModule() {
+                                    public void accept(BuildExecutor sub, SequencedMap<String, Path> ignored) {
+                                        sub.addStep("hidden", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+                                        sub.addStep("shown", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+                                    }
+                                    public Optional<String> resolve(String path) {
+                                        return path.equals("hidden") ? Optional.empty() : Optional.of(path);
+                                    }
+                                });
+                            }
+                            public Optional<String> resolve(String path) {
+                                return path.equals("hidden") ? Optional.empty() : Optional.of(path);
+                            }
+                        }
+                        """));
+
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
+                "module",
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps).containsKeys("internal/shown", "internal/inner/shown");
+        assertThat(steps)
+                .as("a plugin's modules decide what they expose, as they would in the build itself")
+                .doesNotContainKeys("internal/hidden", "internal/inner/hidden");
     }
 
     @Test
@@ -353,12 +829,12 @@ public class InternalModuleTest {
         Path source = Files.createDirectory(work.resolve("non-modular"));
         Files.writeString(source.resolve("Foo.java"), "public class Foo {}");
 
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
 
         assertThatThrownBy(() -> buildExecutor.execute())
                 .rootCause()
@@ -369,7 +845,7 @@ public class InternalModuleTest {
     @Test
     public void resolves_named_provider_when_load_build_module_set() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
                 Map.of("test/plugin/Plugin.java", """
                         package test.plugin;
                         import build.jenesis.BuildExecutor;
@@ -381,7 +857,15 @@ public class InternalModuleTest {
                         import java.util.SequencedMap;
                         import java.util.concurrent.CompletableFuture;
                         @BuildModuleName("foo")
-                        public class Plugin implements BuildExecutorModule {
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "named");
@@ -391,12 +875,12 @@ public class InternalModuleTest {
                         }
                         """));
 
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
                 .buildModuleName("foo"));
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
@@ -406,7 +890,7 @@ public class InternalModuleTest {
     @Test
     public void fails_when_no_provider_with_requested_name() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
                 Map.of("test/plugin/Plugin.java", """
                         package test.plugin;
                         import build.jenesis.BuildExecutor;
@@ -415,17 +899,25 @@ public class InternalModuleTest {
                         import java.nio.file.Path;
                         import java.util.SequencedMap;
                         @BuildModuleName("foo")
-                        public class Plugin implements BuildExecutorModule {
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {}
                         }
                         """));
 
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
                 .buildModuleName("bar"));
 
         assertThatThrownBy(() -> buildExecutor.execute())
@@ -437,7 +929,7 @@ public class InternalModuleTest {
     @Test
     public void fails_when_only_annotated_provider_exists_without_load_build_module() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
                 Map.of("test/plugin/Plugin.java", """
                         package test.plugin;
                         import build.jenesis.BuildExecutor;
@@ -446,17 +938,25 @@ public class InternalModuleTest {
                         import java.nio.file.Path;
                         import java.util.SequencedMap;
                         @BuildModuleName("foo")
-                        public class Plugin implements BuildExecutorModule {
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {}
                         }
                         """));
 
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
 
         assertThatThrownBy(() -> buildExecutor.execute())
                 .rootCause()
@@ -467,7 +967,7 @@ public class InternalModuleTest {
     @Test
     public void fails_when_multiple_unnamed_providers() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.PluginA, test.plugin.PluginB; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.PluginA, test.plugin.PluginB; }",
                 Map.of(
                         "test/plugin/PluginA.java", """
                                 package test.plugin;
@@ -475,7 +975,15 @@ public class InternalModuleTest {
                                 import build.jenesis.BuildExecutorModule;
                                 import java.nio.file.Path;
                                 import java.util.SequencedMap;
-                                public class PluginA implements BuildExecutorModule {
+                                public class PluginA implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                                    public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                                      java.util.SequencedMap<String, String> properties,
+                                                                      build.jenesis.Permits permits,
+                                                                      String group,
+                                                                      java.util.Map<String, build.jenesis.Repository> repositories,
+                                                                      java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                        return this;
+                                    }
                                     public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {}
                                 }
                                 """,
@@ -485,17 +993,25 @@ public class InternalModuleTest {
                                 import build.jenesis.BuildExecutorModule;
                                 import java.nio.file.Path;
                                 import java.util.SequencedMap;
-                                public class PluginB implements BuildExecutorModule {
+                                public class PluginB implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                                    public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                                      java.util.SequencedMap<String, String> properties,
+                                                                      build.jenesis.Permits permits,
+                                                                      String group,
+                                                                      java.util.Map<String, build.jenesis.Repository> repositories,
+                                                                      java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                        return this;
+                                    }
                                     public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {}
                                 }
                                 """));
 
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
 
         assertThatThrownBy(() -> buildExecutor.execute())
                 .rootCause()
@@ -506,7 +1022,7 @@ public class InternalModuleTest {
     @Test
     public void honors_pinned_version_and_checksum() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
                 Map.of("test/plugin/Plugin.java", """
                         package test.plugin;
                         import build.jenesis.BuildExecutor;
@@ -516,7 +1032,15 @@ public class InternalModuleTest {
                         import java.nio.file.Path;
                         import java.util.SequencedMap;
                         import java.util.concurrent.CompletableFuture;
-                        public class Plugin implements BuildExecutorModule {
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "hello");
@@ -531,12 +1055,12 @@ public class InternalModuleTest {
                     "main/module/build.jenesis=1.0.0 SHA-256/" + sha256(jenesisJar) + "\n");
             return CompletableFuture.completedStage(new BuildStepResult(true));
         });
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))), "manifests");
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))), "manifests");
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps.get("internal/marker").resolve("out.txt")).content().isEqualTo("hello");
@@ -545,7 +1069,7 @@ public class InternalModuleTest {
     @Test
     public void fails_when_pinned_checksum_mismatches() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
                 Map.of("test/plugin/Plugin.java", """
                         package test.plugin;
                         import build.jenesis.BuildExecutor;
@@ -555,7 +1079,15 @@ public class InternalModuleTest {
                         import java.nio.file.Path;
                         import java.util.SequencedMap;
                         import java.util.concurrent.CompletableFuture;
-                        public class Plugin implements BuildExecutorModule {
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "hello");
@@ -570,12 +1102,12 @@ public class InternalModuleTest {
                     "main/module/build.jenesis=1.0.0 SHA-256/" + "00".repeat(32) + "\n");
             return CompletableFuture.completedStage(new BuildStepResult(true));
         });
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))), "manifests");
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))), "manifests");
 
         assertThatThrownBy(() -> buildExecutor.execute())
                 .rootCause()
@@ -586,7 +1118,7 @@ public class InternalModuleTest {
     @Test
     public void fails_when_group_pinned_checksum_mismatches_constrains_runtime_scope() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
                 Map.of("test/plugin/Plugin.java", """
                         package test.plugin;
                         import build.jenesis.BuildExecutor;
@@ -596,7 +1128,15 @@ public class InternalModuleTest {
                         import java.nio.file.Path;
                         import java.util.SequencedMap;
                         import java.util.concurrent.CompletableFuture;
-                        public class Plugin implements BuildExecutorModule {
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "hello");
@@ -611,12 +1151,12 @@ public class InternalModuleTest {
                     "main/module/build.jenesis=1.0.0 SHA-256/" + "00".repeat(32) + "\n");
             return CompletableFuture.completedStage(new BuildStepResult(true));
         });
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))), "manifests");
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))), "manifests");
 
         assertThatThrownBy(() -> buildExecutor.execute())
                 .rootCause()
@@ -637,7 +1177,7 @@ public class InternalModuleTest {
         Path source = writeModuleSource(work.resolve("plugin"),
                 """
                         /** @jenesis.pin build.jenesis 9.9.9 */
-                        module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }
+                        module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }
                         """,
                 Map.of("test/plugin/Plugin.java", """
                         package test.plugin;
@@ -648,7 +1188,15 @@ public class InternalModuleTest {
                         import java.nio.file.Path;
                         import java.util.SequencedMap;
                         import java.util.concurrent.CompletableFuture;
-                        public class Plugin implements BuildExecutorModule {
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "pinned");
@@ -659,12 +1207,12 @@ public class InternalModuleTest {
                         """));
 
         List<String> asked = Collections.synchronizedList(new ArrayList<>());
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", recording(asked, Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+                "main",
+                source,
+                Map.of("module", recording(asked, Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps.get("internal/marker").resolve("out.txt")).content().isEqualTo("pinned");
@@ -675,7 +1223,7 @@ public class InternalModuleTest {
     @Test
     public void takes_no_alias_of_the_build_it_is_handed() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
                 Map.of("test/plugin/Plugin.java", """
                         package test.plugin;
                         import build.jenesis.BuildExecutor;
@@ -685,7 +1233,15 @@ public class InternalModuleTest {
                         import java.nio.file.Path;
                         import java.util.SequencedMap;
                         import java.util.concurrent.CompletableFuture;
-                        public class Plugin implements BuildExecutorModule {
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "isolated");
@@ -700,12 +1256,12 @@ public class InternalModuleTest {
         aliases.store(outer.resolve(BuildStep.ALIASES));
         List<String> asked = Collections.synchronizedList(new ArrayList<>());
         buildExecutor.addSource("outer", outer);
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", recording(asked, Map.of("build.jenesis", jenesisJar))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))), "outer");
+                "main",
+                source,
+                Map.of("module", recording(asked, Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))), "outer");
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps.get("internal/marker").resolve("out.txt")).content().isEqualTo("isolated");
@@ -746,7 +1302,7 @@ public class InternalModuleTest {
                         module test.plugin {
                             requires build.jenesis;
                             requires sample.tool;
-                            provides build.jenesis.BuildExecutorModule with test.plugin.Plugin;
+                            provides build.jenesis.BuildModuleFactory with test.plugin.Plugin;
                         }
                         """,
                 Map.of("test/plugin/Plugin.java", """
@@ -759,7 +1315,15 @@ public class InternalModuleTest {
                         import java.util.SequencedMap;
                         import java.util.concurrent.CompletableFuture;
                         import sample.tool.Tool;
-                        public class Plugin implements BuildExecutorModule {
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), Tool.greeting());
@@ -769,13 +1333,13 @@ public class InternalModuleTest {
                         }
                         """));
         List<String> asked = new ArrayList<>();
-        buildExecutor.addModule("internal", new InternalModule(
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
-                null,
-                source)
-                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar)),
-                        "maven", recording(asked, Map.of("sample", tool))))
-                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true),
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar)),
+                        "maven", recording(asked, Map.of("sample", tool))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true),
                         "maven", Resolver.identity())));
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
