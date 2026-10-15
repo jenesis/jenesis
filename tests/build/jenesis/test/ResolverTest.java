@@ -22,13 +22,16 @@ public class ResolverTest {
     }
 
     @Test
-    public void validate_rejects_a_mismatched_checksum() throws IOException {
+    public void validate_rejects_a_mismatched_checksum_naming_the_file_and_both_digests() throws IOException {
         Path file = Files.writeString(folder.resolve("artifact.jar"), "payload");
         assertThatThrownBy(() -> Resolver.validate(file,
                 "SHA-256/0000000000000000000000000000000000000000000000000000000000000000",
                 "group/artifact"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Mismatched digest for group/artifact");
+                .hasMessageContaining("Mismatched digest for group/artifact")
+                .hasMessageContaining(file.toString())
+                .hasMessageContaining("SHA-256/239f59ed55e737c77147cf55ad0c1b030b6d7ee748a7426952f9b852d5a935e5")
+                .hasMessageContaining("where the pin names SHA-256/0000000000000000000000000000000000000000000000000000000000000000");
     }
 
     @Test

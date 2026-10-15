@@ -629,6 +629,23 @@ public class DependenciesResolutionTest {
     }
 
     @Test
+    public void strict_pinning_rejects_an_unpinned_dependency_of_a_local_folder() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("main/compile/foo/bar", "");
+        properties.store(dependencies.resolve(BuildStep.REQUIRES));
+        Repository local = (_, coordinate, _) -> Optional.of(RepositoryItem.ofLocalFile(
+                Files.write(artifacts.resolve(coordinate.replace('/', '-') + ".jar"), new byte[]{1})));
+        Dependencies resolve = new Dependencies(Map.of("foo", local), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+            SequencedMap<String, String> resolved = new LinkedHashMap<>();
+            descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+        })).pinning(Pinning.STRICT);
+        assertThatThrownBy(() -> execute(resolve))
+                .as("an export into a local folder is pinned as a remote artifact is, unlike what this build builds")
+                .hasStackTraceContaining("No checksum pinned for foo/bar");
+    }
+
+    @Test
     public void strict_pinning_rejects_unpinned_external_dependency() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/bar", "");

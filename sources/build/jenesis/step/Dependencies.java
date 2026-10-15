@@ -63,7 +63,7 @@ public class Dependencies implements BuildExecutorModule {
         return new Dependencies(repositories,
                 resolvers,
                 Signatures.ofEnvironment(environment, repositories),
-                null,
+                Pinning.ofEnvironment(environment),
                 null,
                 PathPlacement.INFERRED,
                 BuildStep.timestamp(environment),
