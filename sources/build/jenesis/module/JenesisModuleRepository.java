@@ -433,7 +433,7 @@ public class JenesisModuleRepository implements JenesisRepository {
         if ("file".equals(uri.getScheme())) {
             Path file = Path.of(uri);
             return Files.isRegularFile(file)
-                    ? Optional.of(RepositoryItem.ofFile(file, true))
+                    ? Optional.of(RepositoryItem.ofLocalFile(file))
                     : Optional.empty();
         }
         Map<String, String> headers = toHeaders(uri);

@@ -9,6 +9,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Palette;
+import build.jenesis.Permits;
 import build.jenesis.Pinning;
 import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
@@ -19,7 +20,7 @@ import javax.tools.ToolProvider;
 
 public class PinModuleInfo implements BuildStep {
 
-    private final transient Semaphore permits;
+    private final transient Permits permits;
     private final String prefix;
     private final String path;
     private final List<Path> moduleInfoFiles;
@@ -68,7 +69,7 @@ public class PinModuleInfo implements BuildStep {
                           boolean checksum,
                           boolean flatten,
                           Retain retain,
-                          Semaphore permits,
+                          Permits permits,
                           Consumer<String> printing,
                           Palette palette) {
         this.permits = permits;
@@ -84,7 +85,7 @@ public class PinModuleInfo implements BuildStep {
         this.palette = palette;
     }
 
-    public PinModuleInfo permits(Semaphore permits) {
+    public PinModuleInfo permits(Permits permits) {
         return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
     }
 
@@ -150,7 +151,7 @@ public class PinModuleInfo implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        Semaphore permits = this.permits;
+        Permits permits = this.permits;
         if (permits == null) {
             return pin(arguments);
         }
@@ -208,7 +209,7 @@ public class PinModuleInfo implements BuildStep {
         };
         for (Path file : moduleInfoFiles) {
             SequencedSet<String> carried = new TreeSet<>();
-            updateModuleInfo(file, entries, covered, retained, references, flatten, platform, carried);
+            updateModuleInfo(file, entries, covered, internal, retained, references, flatten, platform, carried);
             if (printing != null && !carried.isEmpty()) {
                 printing.accept("%s%-11s%s %s".formatted(
                         palette.warning(),
@@ -307,6 +308,7 @@ public class PinModuleInfo implements BuildStep {
     private static void updateModuleInfo(Path file,
                                          SequencedMap<String, String> entries,
                                          Set<String> covered,
+                                         Set<String> internal,
                                          Predicate<String> retained,
                                          SequencedMap<String, String> references,
                                          boolean flatten,
@@ -334,6 +336,7 @@ public class PinModuleInfo implements BuildStep {
                             comment.tags(),
                             entries,
                             covered,
+                            internal,
                             retained,
                             references,
                             flatten,
@@ -411,6 +414,7 @@ public class PinModuleInfo implements BuildStep {
                                          List<Tag> located,
                                          SequencedMap<String, String> entries,
                                          Set<String> covered,
+                                         Set<String> internal,
                                          Predicate<String> retained,
                                          SequencedMap<String, String> references,
                                          boolean flatten,
@@ -512,7 +516,9 @@ public class PinModuleInfo implements BuildStep {
                     insertAt = kept.size();
                 }
                 String coordinate = expand(tag.token());
-                if (!regenerated.contains(coordinate) && retained.test(coordinate)) {
+                if (internal.contains(coordinate.substring(coordinate.indexOf('/') + 1))) {
+                    merged.putIfAbsent(tag.token(), tag.rest());
+                } else if (!regenerated.contains(coordinate) && retained.test(coordinate)) {
                     merged.putIfAbsent(tag.token(), tag.rest());
                     carried.add(tag.token() + " " + tag.rest());
                 }

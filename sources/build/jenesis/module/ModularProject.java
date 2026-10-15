@@ -202,12 +202,12 @@ public class ModularProject implements BuildExecutorModule {
                             new ModularModuleDescriptor(name, dependencies.sequencedKeySet(), spdxInherited, location),
                             repositories,
                             resolvers);
-                    AssemblyDescriptor assembly = new AssemblyDescriptor((buildExecutor, inherited) -> {
+                    return packaging.nest(packaging.build(), PRODUCE, _ -> (buildExecutor, inherited) -> {
                     Map<String, Repository> mergedRepositories = Repository.prepend(repositories,
                             Repository.ofProperties(BuildStep.IDENTITY,
                                     inherited.entrySet().stream()
                                             .filter(entry ->
-                                                    entry.getKey().startsWith(PREVIOUS + SIBLING_MODULE_PREFIX)
+                                                    entry.getKey().startsWith(PREVIOUS + packaging.build() + "-")
                                                             && entry.getKey().endsWith("/" + ASSIGN))
                                             .map(Map.Entry::getValue)
                                             .toList(),
@@ -256,7 +256,7 @@ public class ModularProject implements BuildExecutorModule {
                     buildExecutor.addModule(PRODUCE,
                             assembler.apply(new ModularModuleDescriptor(name, dependencies.sequencedKeySet(), spdxInherited, location),
                                     mergedRepositories,
-                                    resolvers).build(),
+                                    resolvers).toBuildModule(),
                             produceDeps);
                     buildExecutor.addStep(ASSIGN,
                             new Assign(),
@@ -269,10 +269,6 @@ public class ModularProject implements BuildExecutorModule {
                             PRODUCE,
                             DEPENDENCIES + "/" + ARTIFACTS);
                     });
-                    for (Map.Entry<String, BuildExecutorModule> phase : packaging.tail().entrySet()) {
-                        assembly = assembly.then(phase.getKey(), phase.getValue());
-                    }
-                    return assembly;
                 });
     }
 
@@ -400,6 +396,12 @@ public class ModularProject implements BuildExecutorModule {
                         + " does not resolve, as it reads modules by name from the module repository alone - build"
                         + " with -Djenesis.project.layout=modular_to_maven, or require the module by a name the module"
                         + " repository serves, whose variant @jenesis.pin <module> :<classifier> selects");
+            }
+            for (Map.Entry<String, String> alias : info.aliases().entrySet()) {
+                String named = versions.remove(group + "/" + prefix + "/" + alias.getKey());
+                if (named != null) {
+                    versions.putIfAbsent(group + "/maven/" + alias.getValue(), named);
+                }
             }
             SequencedMap<String, String> targets = new LinkedHashMap<>(info.aliases());
             for (Map.Entry<String, String> alias : targets.entrySet()) {

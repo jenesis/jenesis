@@ -97,6 +97,26 @@ public class MavenRepositoryExportTest {
     }
 
     @Test
+    public void adds_exported_files_to_the_remote_repositories_marker_of_a_download() throws IOException {
+        stageArtifact("com.example", "foo", "1.2.3", "jar bytes");
+        Path version = Files.createDirectories(target.resolve("com/example/foo/1.2.3"));
+        Files.writeString(version.resolve("foo-1.2.3.jar.sha1"), "0000000000000000000000000000000000000000");
+        Files.writeString(version.resolve("foo-1.2.3-sources.jar"), "downloaded sources");
+        Files.writeString(version.resolve("_remote.repositories"), """
+                #NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+                foo-1.2.3.jar>central=
+                foo-1.2.3-sources.jar>central=
+                """);
+
+        run();
+
+        assertThat(Files.readString(version.resolve("_remote.repositories")))
+                .as("an export records what it installed beside where the rest came from, as Maven's install does")
+                .contains("foo-1.2.3.jar>=", "foo-1.2.3.pom>=", "foo-1.2.3.jar>central=", "foo-1.2.3-sources.jar>central=")
+                .doesNotContain("foo-1.2.3-sources.jar>=", ".sha1>");
+    }
+
+    @Test
     public void aggregates_versions_in_artifact_metadata() throws IOException {
         stageArtifact("com.example", "multi", "1.0", "v10");
         stageArtifact("com.example", "multi", "1.1", "v11");

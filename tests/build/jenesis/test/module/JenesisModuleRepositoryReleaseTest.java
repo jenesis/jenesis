@@ -190,13 +190,13 @@ public class JenesisModuleRepositoryReleaseTest {
         URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/repository/releases");
 
         assertThatThrownBy(() -> run(JenesisModuleRepositoryRelease.ofEnvironment(
-                new Environment(Map.of("release.uri", uri.toString())), uri).printing(null, Palette.ANSI)))
+                new Environment(Map.of("release.publish", "true", "release.uri", uri.toString())), uri).printing(null, Palette.ANSI)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.repository.insecure");
         assertThat(requests).isEmpty();
 
         run(JenesisModuleRepositoryRelease.ofEnvironment(
-                new Environment(Map.of("release.uri", uri.toString(), "repository.insecure", "true")), uri).printing(null, Palette.ANSI));
+                new Environment(Map.of("release.publish", "true", "release.uri", uri.toString(), "repository.insecure", "true")), uri).printing(null, Palette.ANSI));
 
         assertThat(received).containsEntry("/repository/releases/module/demo.greeter/1.0.0/demo.greeter.jar", "classes");
     }
@@ -212,7 +212,8 @@ public class JenesisModuleRepositoryReleaseTest {
     public void sends_no_token_to_a_repository_the_project_named_itself() throws IOException {
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
         URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/repository/releases");
-        Environment environment = new Environment(Map.of("release.uri", uri.toString(),
+        Environment environment = new Environment(Map.of("release.publish", "true",
+                "release.uri", uri.toString(),
                 "release.token", "Bearer secret",
                 "repository.insecure", "true",
                 "make.provided", "release.uri"));
@@ -226,7 +227,8 @@ public class JenesisModuleRepositoryReleaseTest {
     public void sends_the_token_to_a_repository_the_command_line_named() throws IOException {
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
         URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/repository/releases");
-        Environment environment = new Environment(Map.of("release.uri", uri.toString(),
+        Environment environment = new Environment(Map.of("release.publish", "true",
+                "release.uri", uri.toString(),
                 "release.token", "Bearer secret",
                 "repository.insecure", "true"));
 
@@ -248,8 +250,33 @@ public class JenesisModuleRepositoryReleaseTest {
                 .endsWith("module/demo.greeter/1.0.0/demo.greeter.jar");
     }
 
+    @Test
+    public void a_dry_run_names_what_it_would_put_and_sends_nothing() throws IOException {
+        stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
+        List<String> printed = new ArrayList<>();
+
+        run(release().publish(false).connection(new Repository.Connection().insecure(true).offline(true)).printing(printed::add, Palette.ANSI));
+
+        assertThat(requests).as("a dry run talks to no repository, so it runs offline as well").isEmpty();
+        assertThat(printed).hasSize(1);
+        assertThat(printed.getFirst())
+                .contains("[DRY RUN]")
+                .endsWith("module/demo.greeter/1.0.0/demo.greeter.jar");
+    }
+
+    @Test
+    public void a_dry_run_refuses_what_a_release_would_refuse() throws IOException {
+        Files.createDirectories(staged.resolve("demo.greeter").resolve("1.0.0"));
+
+        assertThatThrownBy(() -> run(release().publish(false)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no demo.greeter.jar is staged");
+        assertThat(requests).isEmpty();
+    }
+
     private JenesisModuleRepositoryRelease release() {
         return new JenesisModuleRepositoryRelease(URI.create("http://localhost:" + server.getAddress().getPort() + "/repository/releases"))
+                .publish(true)
                 .connection(new Repository.Connection().insecure(true).retries(0))
                 .printing(null, Palette.ANSI);
     }

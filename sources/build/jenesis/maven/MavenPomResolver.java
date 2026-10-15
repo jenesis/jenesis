@@ -166,6 +166,15 @@ public class MavenPomResolver implements MavenResolver {
                             .collect(Collectors.toList());
             MavenDependencyKey.Versioned parsed = MavenDependencyKey.tryParse(coordinate);
             MavenDependencyValue managed = managedDependencies.get(parsed.key());
+            if (managed == null && (parsed.key().classifier() != null || !parsed.key().type().equals("jar"))) {
+                MavenDependencyValue artifact = managedDependencies.get(new MavenDependencyKey(parsed.key().groupId(),
+                        parsed.key().artifactId(),
+                        "jar",
+                        null));
+                if (artifact != null && artifact.version() != null) {
+                    managed = new MavenDependencyValue(artifact.version(), MavenDependencyScope.COMPILE, null, null, null);
+                }
+            }
             String declared = parsed.version();
             if (declared != null && !isFloating(declared)) {
                 String checksum = null;
