@@ -2,6 +2,8 @@ package build.jenesis.project;
 
 import module java.base;
 import build.jenesis.BuildStep;
+import build.jenesis.TestFramework;
+import build.jenesis.TestTags;
 
 public record TestNG() implements TestFramework {
 

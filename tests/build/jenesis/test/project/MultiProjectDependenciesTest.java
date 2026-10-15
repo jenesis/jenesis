@@ -20,13 +20,14 @@ public class MultiProjectDependenciesTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, module, dependency;
+    private Path previous, next, supplement, persistent, module, dependency;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         module = Files.createDirectory(root.resolve("module"));
         dependency = Files.createDirectory(root.resolve("dependency"));
     }
@@ -44,7 +45,7 @@ public class MultiProjectDependenciesTest {
         String checksum = hash.encoded(artifact);
         BuildStepResult result = new MultiProjectDependencies("foo"::equals).apply(
                         Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of(
                                 "foo", new BuildStepArgument(
                                         module,
@@ -82,7 +83,7 @@ public class MultiProjectDependenciesTest {
                 Map.of(Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new MultiProjectDependencies(_ -> true).apply(
                         Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         arguments)
                 .toCompletableFuture().join();
         assertThat(result.next()).isTrue();
@@ -113,7 +114,7 @@ public class MultiProjectDependenciesTest {
                 Map.of(Path.of(BuildStep.ALIASES), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new MultiProjectDependencies(_ -> true).apply(
                         Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         arguments)
                 .toCompletableFuture().join();
         assertThat(result.next()).isTrue();
@@ -129,7 +130,7 @@ public class MultiProjectDependenciesTest {
         dependencies.store(module.resolve(BuildStep.REQUIRES));
         BuildStepResult result = new MultiProjectDependencies("foo"::equals).apply(
                         Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of(
                                 "foo", new BuildStepArgument(
                                         module,
@@ -229,7 +230,7 @@ public class MultiProjectDependenciesTest {
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
         arguments.put("foo", new BuildStepArgument(module, Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED))));
         arguments.put("bar", new BuildStepArgument(dependency, artifacts));
-        new MultiProjectDependencies("foo"::equals).apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+        new MultiProjectDependencies("foo"::equals).apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture()
                 .join();
     }

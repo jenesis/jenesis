@@ -20,13 +20,14 @@ public class BindTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, original;
+    private Path previous, next, supplement, persistent, original;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         original = Files.createDirectory(root.resolve("original"));
     }
 
@@ -120,7 +121,7 @@ public class BindTest {
         Files.writeString(Files.createDirectories(original.resolve("sample")).resolve("layout.iml"), "kept");
         BuildStepResult result = Bind.asSources().apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("original", new BuildStepArgument(
                         original,
                         Map.of(Path.of("module-info.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -141,7 +142,7 @@ public class BindTest {
                         Path.of("file"), Path.of("other/copied"),
                         Path.of("folder"), Path.of("other"))).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("original", new BuildStepArgument(
                         original,
                         Map.of(Path.of("file"), Checksum.of(ChecksumStatus.ADDED),
@@ -158,7 +159,7 @@ public class BindTest {
         Files.createSymbolicLink(original.resolve("folder"), shared);
         BuildStepResult result = new Bind(Map.of(Path.of("folder"), Path.of("linked"))).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("original", new BuildStepArgument(
                         original,
                         Map.of(Path.of("folder/pin-lib.properties"), Checksum.of(ChecksumStatus.ADDED))))))
@@ -177,7 +178,7 @@ public class BindTest {
         Files.createSymbolicLink(folder.resolve("LICENSE"), Path.of("../../LICENSE"));
         BuildStepResult result = Bind.asResources().apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("original", new BuildStepArgument(
                         original,
                         Map.of(Path.of("META-INF/LICENSE"), Checksum.of(ChecksumStatus.ADDED))))))

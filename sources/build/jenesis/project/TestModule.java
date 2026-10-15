@@ -14,6 +14,8 @@ import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.TestFramework;
+import build.jenesis.TestTags;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Java;
 import build.jenesis.step.ProcessBuildStep;
@@ -768,7 +770,7 @@ public class TestModule implements BuildExecutorModule {
         }
         TestFramework resolved = framework;
         if (resolved == null) {
-            resolved = TestFramework.detect(frameworks, () -> inherited.values().stream().iterator()).orElse(null);
+            resolved = TestFrameworks.detect(frameworks, () -> inherited.values().stream().iterator()).orElse(null);
             if (resolved == null) {
                 if (requireFramework && !skip) {
                     throw new IllegalStateException(
@@ -839,8 +841,8 @@ public class TestModule implements BuildExecutorModule {
                     .filter(argument -> !argument.removed())
                     .map(BuildStepArgument::folder)
                     .toList();
-            List<ModuleDescriptor> artifacts = TestFramework.modules(folders);
-            TestFramework resolved = framework != null ? framework : TestFramework.detect(frameworks, artifacts).orElse(null);
+            List<ModuleDescriptor> artifacts = TestFrameworks.modules(folders);
+            TestFramework resolved = framework != null ? framework : TestFrameworks.detect(frameworks, artifacts).orElse(null);
             SequencedProperties properties = new SequencedProperties();
             SequencedProperties versions = new SequencedProperties();
             SequencedMap<String, String> pinned = new LinkedHashMap<>();
@@ -1123,9 +1125,9 @@ public class TestModule implements BuildExecutorModule {
                     .toList();
             TestFramework resolved = (framework != null
                     ? framework
-                    : TestFramework.detect(frameworks, folders)
+                    : TestFrameworks.detect(frameworks, folders)
                             .orElseThrow(() -> new IllegalArgumentException("No test framework found")))
-                    .runningOn(TestFramework.jars(folders));
+                    .runningOn(TestFrameworks.jars(folders));
             String path = null, compiledFrom = null;
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {

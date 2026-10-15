@@ -18,13 +18,14 @@ public class VersionsTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, classesInput, requiresInput;
+    private Path previous, next, supplement, persistent, classesInput, requiresInput;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         classesInput = Files.createDirectory(root.resolve("classes-input"));
         requiresInput = Files.createDirectory(root.resolve("requires-input"));
     }
@@ -178,7 +179,7 @@ public class VersionsTest {
         second.setProperty("module/qux/2.0", "dependencies/qux.jar");
         second.store(otherRequires.resolve(BuildStep.DEPENDENCIES));
         BuildStepResult result = new Versions().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of(
                                 "classes", argumentFor(classesInput),
                                 "requires-1", argumentFor(requiresInput),
@@ -240,7 +241,7 @@ public class VersionsTest {
         byte[] sentinel = new byte[] { 0x01, 0x02, 0x03, 0x04 };
         Files.write(priorClasses.resolve("module-info.class"), sentinel);
         BuildStepResult result = new Versions().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of(
                                 "classes", new BuildStepArgument(
                                         classesInput,
@@ -264,7 +265,7 @@ public class VersionsTest {
         Path priorClasses = Files.createDirectories(previous.resolve(BuildStep.CLASSES));
         Files.write(priorClasses.resolve("module-info.class"), new byte[] { 0x01, 0x02 });
         BuildStepResult result = new Versions().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of(
                                 "classes", new BuildStepArgument(
                                         classesInput,
@@ -382,7 +383,7 @@ public class VersionsTest {
 
     private void runStep() throws IOException {
         BuildStepResult result = new Versions().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of(
                                 "classes", argumentFor(classesInput),
                                 "requires", argumentFor(requiresInput))))

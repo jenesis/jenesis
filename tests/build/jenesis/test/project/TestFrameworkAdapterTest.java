@@ -10,9 +10,10 @@ import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.TestFramework;
 import build.jenesis.project.JUnit4;
 import build.jenesis.project.JUnitPlatform;
-import build.jenesis.project.TestFramework;
+import build.jenesis.project.TestFrameworks;
 import build.jenesis.project.TestModule;
 import build.jenesis.project.TestNG;
 
@@ -133,7 +134,7 @@ public class TestFrameworkAdapterTest {
 
     @Test
     public void selects_junit_platform_ahead_of_junit4_and_testng() {
-        assertThat(TestFramework.detect(List.of(
+        assertThat(TestFrameworks.detect(List.of(
                 ModuleDescriptor.newAutomaticModule("junit").build(),
                 ModuleDescriptor.newAutomaticModule("org.testng").build(),
                 ModuleDescriptor.newAutomaticModule("org.junit.platform.engine").build())))
@@ -142,7 +143,7 @@ public class TestFrameworkAdapterTest {
 
     @Test
     public void selects_junit4_ahead_of_testng() {
-        assertThat(TestFramework.detect(List.of(
+        assertThat(TestFrameworks.detect(List.of(
                 ModuleDescriptor.newAutomaticModule("org.testng").build(),
                 ModuleDescriptor.newAutomaticModule("junit").build())))
                 .get().isInstanceOf(JUnit4.class);
@@ -150,7 +151,7 @@ public class TestFrameworkAdapterTest {
 
     @Test
     public void a_declared_framework_rejects_an_unknown_name() {
-        assertThatThrownBy(() -> TestFramework.named("does-not-exist"))
+        assertThatThrownBy(() -> TestFrameworks.named("does-not-exist"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown test framework")
                 .hasMessageContaining("expected junit-platform, junit4, or testng");
@@ -158,9 +159,9 @@ public class TestFrameworkAdapterTest {
 
     @Test
     public void a_declared_framework_is_named_case_insensitively() {
-        assertThat(TestFramework.named("JUnit-Platform")).isInstanceOf(JUnitPlatform.class);
-        assertThat(TestFramework.named("JUnit4")).isInstanceOf(JUnit4.class);
-        assertThat(TestFramework.named("TestNG")).isInstanceOf(TestNG.class);
+        assertThat(TestFrameworks.named("JUnit-Platform")).isInstanceOf(JUnitPlatform.class);
+        assertThat(TestFrameworks.named("JUnit4")).isInstanceOf(JUnit4.class);
+        assertThat(TestFrameworks.named("TestNG")).isInstanceOf(TestNG.class);
     }
 
     @Test

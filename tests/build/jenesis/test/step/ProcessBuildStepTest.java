@@ -11,6 +11,7 @@ import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
 import build.jenesis.Environment;
+import build.jenesis.Permits;
 import build.jenesis.SequencedProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +28,7 @@ public class ProcessBuildStepTest {
         write(folder, ProcessBuildStep.PROCESS, "java", "-Xmx=512m\n-Dshared=java\n");
         write(folder, ProcessBuildStep.PROCESS, "test", "-Dshared=test\n-Dextra=test\n");
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Path persistent = Files.createDirectory(root.resolve("persistent"));
         AtomicReference<SequencedMap<String, SequencedMap<String, String>>> captured = new AtomicReference<>();
         ProcessBuildStep step = new ProcessBuildStep("java", ProcessHandler.OfProcess.ofJavaHome("bin/java")) {
             @Override
@@ -44,7 +46,7 @@ public class ProcessBuildStepTest {
             }
         };
         step.apply(Runnable::run,
-                new BuildStepContext(null, next, supplement),
+                new BuildStepContext(null, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(folder, Map.of())))).toCompletableFuture().join();
         assertThat(captured.get().get("argument")).containsExactly(
                 Map.entry("-Xmx", "512m"),
@@ -58,6 +60,7 @@ public class ProcessBuildStepTest {
         write(folder, ProcessBuildStep.PROCESS, "javadoc",
                 "-linkoffline=https\\://example.com/api/\\toffline/api\\nhttps\\://example.com/other/\\toffline/other\n");
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Path persistent = Files.createDirectory(root.resolve("persistent"));
         AtomicReference<List<String>> captured = new AtomicReference<>();
         Function<List<String>, ProcessHandler.OfProcess> base = ProcessHandler.OfProcess.ofJavaHome("bin/java");
         new Program("javadoc", arguments -> {
@@ -65,7 +68,7 @@ public class ProcessBuildStepTest {
             return base.apply(List.of("-version"));
         }, List.of("javadoc"), List.of())
                 .apply(Runnable::run,
-                        new BuildStepContext(null, next, supplement),
+                        new BuildStepContext(null, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(folder, Map.of()))))
                 .toCompletableFuture()
                 .join();
@@ -92,12 +95,13 @@ public class ProcessBuildStepTest {
                 }
                 """);
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Path persistent = Files.createDirectory(root.resolve("persistent"));
         new Program("java",
                 ProcessHandler.OfProcess.ofJavaHome("bin/java"),
                 List.of("java", "test"),
                 List.of(source.toString(), "SAMPLE_LITERAL", "SAMPLE_SHARED", "SAMPLE_UNSET_IN_THE_BUILD"))
                 .apply(Runnable::run,
-                        new BuildStepContext(null, next, supplement),
+                        new BuildStepContext(null, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(folder, Map.of()))))
                 .toCompletableFuture()
                 .join();
@@ -118,11 +122,12 @@ public class ProcessBuildStepTest {
                 }
                 """);
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Path persistent = Files.createDirectory(root.resolve("persistent"));
         assertThatThrownBy(() -> new Program("java",
                 ProcessHandler.OfProcess.ofJavaHome("bin/java"),
                 List.of(),
                 List.of(source.toString(), "-Xplugin:Sample -XepExcludedPaths:.*/(generated)/.*", "it's"))
-                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), new LinkedHashMap<>())
                 .toCompletableFuture()
                 .join())
                 .rootCause()
@@ -141,11 +146,12 @@ public class ProcessBuildStepTest {
                 }
                 """);
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Path persistent = Files.createDirectory(root.resolve("persistent"));
         assertThatThrownBy(() -> new Program("java",
                 ProcessHandler.OfProcess.ofJavaHome("bin/java"),
                 List.of(),
                 List.of(source.toString()))
-                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), new LinkedHashMap<>())
                 .toCompletableFuture()
                 .join())
                 .rootCause()
@@ -169,11 +175,12 @@ public class ProcessBuildStepTest {
                 }
                 """);
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Path persistent = Files.createDirectory(root.resolve("persistent"));
         assertThatThrownBy(() -> new Program("java",
                 ProcessHandler.OfProcess.ofJavaHome("bin/java"),
                 List.of(),
                 List.of(source.toString()))
-                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), new LinkedHashMap<>())
                 .toCompletableFuture()
                 .join())
                 .rootCause()
@@ -195,12 +202,13 @@ public class ProcessBuildStepTest {
     public void a_failure_prints_as_many_lines_as_the_setting_names() throws IOException {
         Path source = verbose(5);
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Path persistent = Files.createDirectory(root.resolve("persistent"));
         assertThatThrownBy(() -> new Program("java",
                 ProcessHandler.OfProcess.ofJavaHome("bin/java"),
                 List.of(),
                 List.of(source.toString()),
                 ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.tail", "2")), "java"))
-                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), new LinkedHashMap<>())
                 .toCompletableFuture()
                 .join())
                 .rootCause()
@@ -213,12 +221,13 @@ public class ProcessBuildStepTest {
     public void a_failure_prints_every_line_when_the_setting_is_0() throws IOException {
         Path source = verbose(300);
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Path persistent = Files.createDirectory(root.resolve("persistent"));
         assertThatThrownBy(() -> new Program("java",
                 ProcessHandler.OfProcess.ofJavaHome("bin/java"),
                 List.of(),
                 List.of(source.toString()),
                 ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.tail", "0")), "java"))
-                .apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), new LinkedHashMap<>())
                 .toCompletableFuture()
                 .join())
                 .rootCause()
@@ -254,6 +263,7 @@ public class ProcessBuildStepTest {
         Path folder = Files.createDirectories(root.resolve("argument"));
         write(folder, ProcessBuildStep.ENVIRONMENT, "javac", "SAMPLE=value\n");
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Path persistent = Files.createDirectory(root.resolve("persistent"));
         ProcessBuildStep step = new ProcessBuildStep("javac", ProcessHandler.OfProcess.ofJavaHome("bin/javac")) {
             @Override
             protected CompletionStage<List<String>> process(Executor executor,
@@ -264,7 +274,7 @@ public class ProcessBuildStepTest {
             }
         };
         assertThatThrownBy(() -> step.apply(Runnable::run,
-                new BuildStepContext(null, next, supplement),
+                new BuildStepContext(null, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(folder, Map.of())))).toCompletableFuture().join())
                 .rootCause()
                 .isInstanceOf(IllegalStateException.class)
@@ -276,6 +286,7 @@ public class ProcessBuildStepTest {
         Path folder = Files.createDirectories(root.resolve("argument"));
         write(folder, ProcessBuildStep.ENVIRONMENT, "probe", "SAMPLE=value\n");
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Path persistent = Files.createDirectory(root.resolve("persistent"));
         ToolProvider tool = new ToolProvider() {
             @Override
             public String name() {
@@ -289,7 +300,7 @@ public class ProcessBuildStepTest {
         };
         assertThatThrownBy(() -> new Program("probe", ProcessHandler.OfTool.of(tool), List.of("probe"), List.of())
                 .apply(Runnable::run,
-                        new BuildStepContext(null, next, supplement),
+                        new BuildStepContext(null, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(folder, Map.of()))))
                 .toCompletableFuture()
                 .join())
@@ -304,6 +315,7 @@ public class ProcessBuildStepTest {
         Path folder = Files.createDirectories(root.resolve("argument"));
         write(folder, ProcessBuildStep.PROCESS, "protoc", "-Xmx=512m\n");
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Path persistent = Files.createDirectory(root.resolve("persistent"));
         AtomicReference<SequencedMap<String, SequencedMap<String, String>>> captured = new AtomicReference<>();
         ProcessBuildStep step = new ProcessBuildStep("protoc", ProcessHandler.OfProcess.ofStaged()) {
             @Override
@@ -316,7 +328,7 @@ public class ProcessBuildStepTest {
             }
         };
         step.apply(Runnable::run,
-                new BuildStepContext(null, next, supplement),
+                new BuildStepContext(null, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(folder, Map.of())))).toCompletableFuture().join();
         assertThat(captured.get().get("argument"))
                 .as("a step that stages its own program must not have options prepended before it")
@@ -356,9 +368,36 @@ public class ProcessBuildStepTest {
     }
 
     @Test
+    public void keeps_no_jvm_warm_unless_the_setting_asks_for_one() {
+        assertThat(new ProcessBuildStep.Terms().daemon())
+                .as("a build that runs without the daemon leaves no JVM running")
+                .isFalse();
+        assertThat(ProcessBuildStep.Terms.ofEnvironment(Environment.NONE, "gated").daemon()).isFalse();
+        assertThat(ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.mode", "daemon")), "gated").daemon())
+                .isTrue();
+    }
+
+    @Test
+    public void starts_a_tool_from_a_cache_in_the_folder_of_caches_when_the_mode_asks_for_one() {
+        ProcessBuildStep.Terms terms = ProcessBuildStep.Terms.ofEnvironment(
+                new Environment(Map.of("process.mode", "aot", "aot.folder", "/caches")), "gated");
+        assertThat(terms.aot()).isEqualTo(Path.of("/caches").toAbsolutePath());
+        assertThat(terms.daemon()).as("a tool runs either from a cache or kept warm, never both").isFalse();
+    }
+
+    @Test
+    public void rejects_a_process_mode_it_does_not_know() {
+        assertThatThrownBy(() -> ProcessBuildStep.Terms.ofEnvironment(
+                new Environment(Map.of("process.mode", "warm")), "gated"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.process.mode")
+                .hasMessageContaining("fork, aot or daemon");
+    }
+
+    @Test
     public void limits_the_processes_running_at_once() throws Exception {
         AtomicInteger running = new AtomicInteger(), peak = new AtomicInteger();
-        Semaphore permits = new Semaphore(1);
+        Permits permits = Permits.of(1);
         run(() -> new Gated(counting(running, peak), permits));
         assertThat(peak).hasValue(1);
     }
@@ -473,7 +512,8 @@ public class ProcessBuildStepTest {
         return linter.apply(Runnable::run,
                 new BuildStepContext(null,
                         Files.createDirectory(step.resolve("output")),
-                        Files.createDirectory(step.resolve("supplement"))),
+                        Files.createDirectory(step.resolve("supplement")),
+                        Files.createDirectory(step.resolve("persistent"))),
                 new LinkedHashMap<>()).toCompletableFuture().join();
     }
 
@@ -485,7 +525,8 @@ public class ProcessBuildStepTest {
                 results.add(steps.get().apply(executor,
                         new BuildStepContext(null,
                                 Files.createDirectory(folder.resolve("next")),
-                                Files.createDirectory(folder.resolve("supplement"))),
+                                Files.createDirectory(folder.resolve("supplement")),
+                                Files.createDirectory(folder.resolve("persistent"))),
                         new LinkedHashMap<>()));
             }
             for (CompletionStage<BuildStepResult> result : results) {
@@ -575,7 +616,7 @@ public class ProcessBuildStepTest {
             super("gated", ProcessHandler.OfTool.of(provider), Terms.ofEnvironment(environment, "gated"));
         }
 
-        private Gated(ToolProvider provider, Semaphore permits) {
+        private Gated(ToolProvider provider, Permits permits) {
             super("gated", ProcessHandler.OfTool.of(provider), new Terms().permits(permits));
         }
 

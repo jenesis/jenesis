@@ -84,6 +84,13 @@ public class Javac extends ProcessBuildStep {
         ProcessBuildStep.store(folder, ProcessBuildStep.PROCESS, "javac", properties);
     }
 
+    @Override
+    protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
+        return commands.stream().anyMatch(option -> option.startsWith("-J"))
+                ? ProcessHandler.OfProcess.ofJavaHome("bin/javac").apply(commands).daemon(terms.daemon())
+                : super.handler(context, commands);
+    }
+
     public Javac factory(ProcessHandler.Factory factory) {
         return new Javac(factory.apply("javac", "bin/javac"), includeResources, pathPlacement, group, headers, terms);
     }
@@ -125,6 +132,9 @@ public class Javac extends ProcessBuildStep {
         Path modularIndex = Path.of(Dependencies.MODULAR);
         Path modularDir = Path.of(Dependencies.MODULAR_PATH);
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                return true;
+            }
             Set<Path> processFiles = new HashSet<>();
             processFiles.add(Path.of(ProcessBuildStep.PROCESS, ProcessBuildStep.INDEX));
             for (String tool : tools) {
@@ -661,7 +671,7 @@ public class Javac extends ProcessBuildStep {
         commands.add("@" + argumentFile(context.supplement().resolve("javac-" + release + ".args"), options));
         Path output = context.supplement().resolve("output-" + release);
         Path error = context.supplement().resolve("error-" + release);
-        ProcessHandler handler = factory.apply(commands);
+        ProcessHandler handler = handler(context, commands);
         Files.writeString(context.supplement().resolve("command-" + release), shell(handler.commands()));
         ProcessHandler.Tee tee = tee(executor, handler);
         CompletableFuture<Void> future = new CompletableFuture<>();

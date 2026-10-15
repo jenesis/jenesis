@@ -23,13 +23,14 @@ public class InventoryTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement;
+    private Path previous, next, supplement, persistent;
 
     @BeforeEach
     public void setUp() throws IOException {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
     }
 
     @Test
@@ -887,7 +888,7 @@ public class InventoryTest {
             arguments.put(entry.getKey(), new BuildStepArgument(entry.getValue(), Map.of()));
         }
         return inventory.apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         arguments)
                 .toCompletableFuture()
                 .join();

@@ -20,13 +20,14 @@ public class JModTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, bundle;
+    private Path previous, next, supplement, persistent, bundle;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         bundle = Files.createDirectory(root.resolve("bundle"));
     }
 
@@ -47,7 +48,7 @@ public class JModTest {
         assertThat(code).isZero();
         BuildStepResult result = JMod.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("classes/module-info.class"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -68,7 +69,7 @@ public class JModTest {
         assertThat(code).isZero();
         BuildStepResult result = JMod.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("classes/module-info.class"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -101,7 +102,7 @@ public class JModTest {
 
         BuildStepResult result = JMod.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 arguments).toCompletableFuture().join();
 
         assertThat(result.next()).isTrue();
@@ -126,7 +127,7 @@ public class JModTest {
         jmod = JMod.ofEnvironment(new Environment(Map.of("archive.timestamp", "")), ProcessHandler.Factory.TOOL);
         BuildStepResult result = jmod.apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("classes/module-info.class"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -152,7 +153,7 @@ public class JModTest {
 
         BuildStepResult result = JMod.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("classes/module-info.class"), Checksum.of(ChecksumStatus.ADDED),
@@ -176,7 +177,7 @@ public class JModTest {
         Files.createDirectory(bundle.resolve(BuildStep.CLASSES));
         BuildStepResult result = JMod.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("classes/Sample.class"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -202,7 +203,7 @@ public class JModTest {
 
         JMod.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 arguments).toCompletableFuture().join();
 
         try (ZipFile jmod = new ZipFile(next.resolve(JMod.JMODS + "sample.jmod").toFile())) {

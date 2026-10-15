@@ -31,7 +31,7 @@ public class OsvDownloadTest {
         dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
         OsvDownload step = OsvDownload.ofEnvironment(Environment.NONE).endpoint(URI.create("http://osv.invalid"));
         assertThatThrownBy(() -> step.apply(Runnable::run,
-                new BuildStepContext(root.resolve("previous"), next, root.resolve("supplement")),
+                new BuildStepContext(root.resolve("previous"), next, root.resolve("supplement"), root.resolve("persistent")),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                         argument,
                         Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED)))))))
@@ -68,7 +68,7 @@ public class OsvDownloadTest {
             dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
             URI endpoint = URI.create("http://localhost:" + server.getAddress().getPort());
             BuildStepResult result = OsvDownload.ofEnvironment(new Environment(Map.of("repository.insecure", "true"))).endpoint(endpoint).apply(Runnable::run,
-                    new BuildStepContext(root.resolve("retry-previous"), next, root.resolve("retry-supplement")),
+                    new BuildStepContext(root.resolve("retry-previous"), next, root.resolve("retry-supplement"), root.resolve("retry-persistent")),
                     new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                             argument,
                             Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
