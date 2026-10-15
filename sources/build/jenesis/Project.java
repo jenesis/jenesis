@@ -4776,14 +4776,58 @@ public record Project(
             if (mainClass.equals(Execution.class.getName())) {
                 return Execution.run(environment, root, profiles, selectors);
             }
-            Class.forName(mainClass, true, Project.class.getClassLoader())
-                    .getMethod("main", String[].class)
-                    .invoke(null, (Object) selectors);
+            MethodHandle main = mainMethod(Class.forName(mainClass, true, Project.class.getClassLoader()));
+            if (main.type().parameterCount() == 0) {
+                main.invoke();
+            } else {
+                main.invoke(selectors);
+            }
             return 0;
         } catch (Throwable t) {
             report(t, environment);
             return 1;
         }
+    }
+
+    private static MethodHandle mainMethod(Class<?> type) throws Throwable {
+        Project.class.getModule().addReads(type.getModule());
+        MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(type, MethodHandles.lookup());
+        for (MethodType signature : List.of(MethodType.methodType(void.class, String[].class),
+                MethodType.methodType(void.class))) {
+            MethodHandle main;
+            try {
+                main = lookup.findStatic(type, "main", signature);
+            } catch (NoSuchMethodException | IllegalAccessException _) {
+                try {
+                    main = lookup.findVirtual(type, "main", signature);
+                } catch (NoSuchMethodException | IllegalAccessException _) {
+                    continue;
+                }
+            }
+            int modifiers = lookup.revealDirect(main).getModifiers();
+            if (Modifier.isPrivate(modifiers)) {
+                continue;
+            } else if (Modifier.isStatic(modifiers)) {
+                return main;
+            } else if (Modifier.isAbstract(type.getModifiers())) {
+                throw new IllegalArgumentException("The main class " + type.getName() + " is abstract or an interface"
+                        + " but its main method is not static: make the class concrete, or the method static");
+            }
+            MethodHandle constructor;
+            try {
+                constructor = lookup.findConstructor(type, MethodType.methodType(void.class));
+            } catch (NoSuchMethodException _) {
+                constructor = null;
+            }
+            if (constructor == null || Modifier.isPrivate(lookup.revealDirect(constructor).getModifiers())) {
+                throw new IllegalArgumentException("The main class " + type.getName() + " has an instance main method"
+                        + " but no non-private constructor without parameters: declare one, declare the class static"
+                        + " if it is an inner class, or make the main method static");
+            }
+            return main.bindTo(constructor.invoke());
+        }
+        throw new IllegalArgumentException("The main class " + type.getName() + " declares or inherits no main"
+                + " method: declare a non-private void main(String[] args) or void main(), static or not");
     }
 
     private static void report(Throwable t, Environment environment) {
