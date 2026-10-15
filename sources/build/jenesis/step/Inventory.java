@@ -49,6 +49,7 @@ public class Inventory implements BuildStep {
     private final String group;
     private final String module;
     private final NativeAccess nativeAccess;
+    private final boolean supplement;
     private final transient Consumer<String> warnings;
 
     public enum NativeAccess {
@@ -56,7 +57,7 @@ public class Inventory implements BuildStep {
     }
 
     public Inventory() {
-        this("main", null, NativeAccess.IGNORE, null);
+        this("main", null, NativeAccess.IGNORE, false, null);
     }
 
     public static Inventory ofEnvironment(Environment environment) {
@@ -71,27 +72,32 @@ public class Inventory implements BuildStep {
         }
     }
 
-    private Inventory(String group, String module, NativeAccess nativeAccess, Consumer<String> warnings) {
+    private Inventory(String group, String module, NativeAccess nativeAccess, boolean supplement, Consumer<String> warnings) {
         this.group = group;
         this.module = module;
         this.nativeAccess = nativeAccess;
+        this.supplement = supplement;
         this.warnings = warnings;
     }
 
     public Inventory group(String group) {
-        return new Inventory(group, module, nativeAccess, warnings);
+        return new Inventory(group, module, nativeAccess, supplement, warnings);
     }
 
     public Inventory module(String module) {
-        return new Inventory(group, module, nativeAccess, warnings);
+        return new Inventory(group, module, nativeAccess, supplement, warnings);
     }
 
     public Inventory nativeAccess(NativeAccess nativeAccess) {
-        return new Inventory(group, module, nativeAccess, warnings);
+        return new Inventory(group, module, nativeAccess, supplement, warnings);
+    }
+
+    public Inventory supplement(boolean supplement) {
+        return new Inventory(group, module, nativeAccess, supplement, warnings);
     }
 
     public Inventory warnings(Consumer<String> warnings) {
-        return new Inventory(group, module, nativeAccess, warnings);
+        return new Inventory(group, module, nativeAccess, supplement, warnings);
     }
 
     @Override
@@ -307,6 +313,17 @@ public class Inventory implements BuildStep {
         }
         String prefix = this.module == null ? prefixOf(path) : this.module + ".";
         SequencedProperties inventory = new SequencedProperties();
+        if (supplement) {
+            writePaths(inventory, context, prefix + "sources", sources.stream()
+                    .filter(file -> archived(file.getParent(), file))
+                    .toList());
+            writePaths(inventory, context, prefix + "documentation", documentation);
+            writeClosure(inventory, context, prefix + "tool.", closureJars, closureScopes, closureChecksums);
+            if (!inventory.isEmpty()) {
+                inventory.store(context.next().resolve(INVENTORY));
+            }
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
         SequencedSet<Path> runtime = new LinkedHashSet<>(artifacts);
         for (Map.Entry<String, Path> entry : closureJars.entrySet()) {
             String group = entry.getKey().substring(0, entry.getKey().indexOf('/'));
@@ -319,22 +336,7 @@ public class Inventory implements BuildStep {
         for (String coordinate : identity) {
             inventory.setProperty(prefix + "identity." + identityIndex++, coordinate);
         }
-        int dependencyIndex = 0;
-        for (Map.Entry<String, Path> entry : closureJars.entrySet()) {
-            int slash = entry.getKey().indexOf('/');
-            String group = entry.getKey().substring(0, slash);
-            String coordinate = entry.getKey().substring(slash + 1);
-            String checksum = closureChecksums.get(entry.getKey());
-            inventory.setProperty(prefix + "dependency." + dependencyIndex,
-                    coordinate + " " + relativize(context, entry.getValue())
-                            + (checksum == null || checksum.isEmpty() ? "" : " " + checksum));
-            String scope = closureScopes.get(entry.getKey());
-            if (scope != null) {
-                inventory.setProperty(prefix + "dependency." + dependencyIndex + ".scope", scope);
-            }
-            inventory.setProperty(prefix + "dependency." + dependencyIndex + ".group", group);
-            dependencyIndex++;
-        }
+        writeClosure(inventory, context, prefix + "dependency.", closureJars, closureScopes, closureChecksums);
         int agentIndex = 0;
         for (Map.Entry<String, String> attachment : attachments.entrySet()) {
             String key = attachment.getKey();
@@ -475,8 +477,15 @@ public class Inventory implements BuildStep {
             inventory.setProperty(prefix + "report." + entry.getKey(), relativize(context, entry.getValue()));
         }
         writePaths(inventory, context, prefix + "graph", graphs);
-        if (!graphs.isEmpty()) {
-            inventory.setProperty(prefix + "report.dependencies", relativize(context, graphs.getFirst()));
+        for (Path graph : graphs) {
+            if (SequencedProperties.ofFiles(graph).entrySet().stream()
+                    .filter(edge -> edge.getKey().toString().startsWith("edge/"))
+                    .map(edge -> edge.getValue().toString())
+                    .map(edge -> edge.substring(0, edge.indexOf('\t')))
+                    .allMatch(named -> named.equals(group) || named.startsWith("layer:"))) {
+                inventory.setProperty(prefix + "report.dependencies", relativize(context, graph));
+                break;
+            }
         }
         writePaths(inventory, context, prefix + "licenses", dependencyLicenses);
         if (image != null) {
@@ -570,6 +579,28 @@ public class Inventory implements BuildStep {
         return null;
     }
 
+    private static void writeClosure(SequencedProperties inventory,
+                                     BuildStepContext context,
+                                     String key,
+                                     SequencedMap<String, Path> closureJars,
+                                     SequencedMap<String, String> closureScopes,
+                                     SequencedMap<String, String> closureChecksums) {
+        int index = 0;
+        for (Map.Entry<String, Path> entry : closureJars.entrySet()) {
+            int slash = entry.getKey().indexOf('/');
+            String checksum = closureChecksums.get(entry.getKey());
+            inventory.setProperty(key + index,
+                    entry.getKey().substring(slash + 1) + " " + relativize(context, entry.getValue())
+                            + (checksum == null || checksum.isEmpty() ? "" : " " + checksum));
+            String scope = closureScopes.get(entry.getKey());
+            if (scope != null) {
+                inventory.setProperty(key + index + ".scope", scope);
+            }
+            inventory.setProperty(key + index + ".group", entry.getKey().substring(0, slash));
+            index++;
+        }
+    }
+
     private static void writePaths(SequencedProperties inventory,
                                    BuildStepContext context,
                                    String key,
@@ -579,6 +610,36 @@ public class Inventory implements BuildStep {
             inventory.setProperty(key + "." + index, relativize(context, file));
             index++;
         }
+    }
+
+    public static SequencedMap<String, List<Path>> supplements(Iterable<BuildStepArgument> arguments) throws IOException {
+        SequencedMap<String, List<Path>> supplements = new LinkedHashMap<>();
+        for (BuildStepArgument argument : arguments) {
+            Path inventoryFile = argument.removed() ? null : argument.folder().resolve(INVENTORY);
+            if (inventoryFile == null || !Files.isRegularFile(inventoryFile)) {
+                continue;
+            }
+            SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
+            if (!prefixes(inventory).isEmpty()) {
+                continue;
+            }
+            for (String key : inventory.stringPropertyNames()) {
+                int index = key.lastIndexOf('.');
+                String listed = index < 0 ? key : key.substring(0, index);
+                if ((listed.endsWith(".sources") || listed.endsWith(".documentation")) && !supplements.containsKey(listed)) {
+                    supplements.put(listed, paths(inventory, argument.folder(), listed));
+                }
+            }
+        }
+        return supplements;
+    }
+
+    public static List<Path> supplemented(SequencedProperties inventory,
+                                          Path folder,
+                                          String key,
+                                          SequencedMap<String, List<Path>> supplements) {
+        List<Path> paths = paths(inventory, folder, key);
+        return paths.isEmpty() ? supplements.getOrDefault(key, List.of()) : paths;
     }
 
     public static String prefixOf(String path) {
@@ -616,7 +677,6 @@ public class Inventory implements BuildStep {
     }
 
     public static SequencedMap<String, Dependency> closure(Iterable<BuildStepArgument> arguments, String path) throws IOException {
-        String key = prefixOf(path) + "dependency.";
         SequencedMap<String, Dependency> closure = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments) {
             if (argument.removed()) {
@@ -627,21 +687,23 @@ public class Inventory implements BuildStep {
                 continue;
             }
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
-            for (int index = 0; ; index++) {
-                String value = inventory.getProperty(key + index);
-                if (value == null) {
-                    break;
+            for (String key : List.of(prefixOf(path) + "dependency.", prefixOf(path) + "tool.")) {
+                for (int index = 0; ; index++) {
+                    String value = inventory.getProperty(key + index);
+                    if (value == null) {
+                        break;
+                    }
+                    String[] parts = value.split(" ", 3);
+                    String group = inventory.getProperty(key + index + ".group");
+                    if (group == null) {
+                        group = "main";
+                    }
+                    closure.putIfAbsent(group + "/" + parts[0], new Dependency(
+                            argument.folder().resolve(parts[1]).normalize(),
+                            parts.length > 2 ? parts[2] : "",
+                            inventory.getProperty(key + index + ".scope"),
+                            group));
                 }
-                String[] parts = value.split(" ", 3);
-                String group = inventory.getProperty(key + index + ".group");
-                if (group == null) {
-                    group = "main";
-                }
-                closure.putIfAbsent(group + "/" + parts[0], new Dependency(
-                        argument.folder().resolve(parts[1]).normalize(),
-                        parts.length > 2 ? parts[2] : "",
-                        inventory.getProperty(key + index + ".scope"),
-                        group));
             }
         }
         return closure;

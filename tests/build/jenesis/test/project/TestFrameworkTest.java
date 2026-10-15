@@ -63,6 +63,19 @@ public class TestFrameworkTest {
     }
 
     @Test
+    public void consults_the_frameworks_a_project_declares_first_in_their_order() throws IOException {
+        writeJar(root.resolve("artifacts"), "api.jar", "org.junit.jupiter.api");
+        Declared first = new Declared("first", "org.junit.jupiter.api"), second = new Declared("second", "org.junit.jupiter.api");
+        assertThat(TestFramework.detect(List.of(first, second), List.of(root)))
+                .as("a declared framework that the tests' modules mark precedes the next one and the built-in frameworks")
+                .contains(first);
+        assertThat(TestFramework.detect(List.of(new Declared("other", "com.example.other")), List.of(root)))
+                .as("a declared framework that no module marks leaves the choice to the built-in frameworks")
+                .get()
+                .isInstanceOf(JUnitPlatform.class);
+    }
+
+    @Test
     public void detects_no_framework_for_unrelated_module() throws IOException {
         writeJar(root.resolve("artifacts"), "plain.jar", "com.example.something");
         assertThat(TestFramework.detect(List.of(root))).isEmpty();
@@ -236,9 +249,6 @@ public class TestFrameworkTest {
                 false,
                 false))
                 .containsExactly("execute", "--disable-banner", "--disable-ansi-colors",
-                        "--reports-dir=" + root.resolve("reports"),
-                        "--config=junit.platform.reporting.open.xml.enabled=true",
-                        "--config=junit.platform.reporting.output.dir=" + root.resolve("reports"),
                         "--select-class=sample.BetaTest",
                         "--select-method=sample.AlphaTest#first",
                         "--select-method=sample.AlphaTest#second");
@@ -253,9 +263,7 @@ public class TestFrameworkTest {
                 false,
                 false))
                 .as("the execute command exists from JUnit Platform 1.10 on, and an older launcher rejects it")
-                .containsExactly("--disable-banner", "--disable-ansi-colors", "--reports-dir=" + root.resolve("reports"),
-                        "--config=junit.platform.reporting.open.xml.enabled=true",
-                        "--config=junit.platform.reporting.output.dir=" + root.resolve("reports"),
+                .containsExactly("--disable-banner", "--disable-ansi-colors",
                         "--select-class=sample.BetaTest");
     }
 
@@ -270,9 +278,6 @@ public class TestFrameworkTest {
                     false))
                     .as("version %s", version)
                     .containsExactly("execute", "--disable-banner", "--disable-ansi-colors",
-                            "--reports-dir=" + root.resolve("reports"),
-                            "--config=junit.platform.reporting.open.xml.enabled=true",
-                            "--config=junit.platform.reporting.output.dir=" + root.resolve("reports"),
                             "--select-class=sample.BetaTest");
         }
     }
@@ -369,7 +374,7 @@ public class TestFrameworkTest {
     }
 
     @Test
-    public void junit_platform_writes_both_report_formats_into_the_reports_folder_or_else_the_supplement() {
+    public void junit_platform_writes_both_report_formats_into_the_reports_folder_only_when_they_are_kept() {
         assertThat(new JUnitPlatform().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
@@ -385,10 +390,9 @@ public class TestFrameworkTest {
                 Collections.emptyNavigableMap(),
                 false,
                 false))
-                .as("the same reports are written whether or not they are kept, so a failure can always be read from them")
-                .contains("--reports-dir=" + root.resolve("reports"),
-                        "--config=junit.platform.reporting.open.xml.enabled=true",
-                        "--config=junit.platform.reporting.output.dir=" + root.resolve("reports"));
+                .as("a report costs a test run time and nothing in the build reads one")
+                .noneMatch(argument -> argument.startsWith("--reports-dir=")
+                        || argument.startsWith("--config=junit.platform.reporting."));
     }
 
     @Test
@@ -473,6 +477,39 @@ public class TestFrameworkTest {
                 true,
                 false))
                 .containsExactly("sample.AlphaTest");
+    }
+
+    private record Declared(String name, String marker) implements TestFramework {
+
+        @Override
+        public String runnerModule() {
+            return null;
+        }
+
+        @Override
+        public String runnerClass() {
+            return "example.Runner";
+        }
+
+        @Override
+        public boolean isMarkedBy(ModuleDescriptor module) {
+            return module.name().equals(marker);
+        }
+
+        @Override
+        public Set<String> reflectingModules() {
+            return Set.of();
+        }
+
+        @Override
+        public List<String> arguments(Path supplement,
+                                      Path output,
+                                      SequencedSet<String> classes,
+                                      SequencedMap<String, SequencedSet<String>> methods,
+                                      boolean parallel,
+                                      boolean reporting) {
+            return List.copyOf(classes);
+        }
     }
 
     private static ModuleDescriptor automatic(String name, String version) {

@@ -66,13 +66,21 @@ public interface TestFramework extends Serializable {
     }
 
     static Optional<TestFramework> detect(List<ModuleDescriptor> modules) {
-        return Stream.<TestFramework>of(new JUnitPlatform(), new JUnit4(), new TestNG())
+        return detect(List.of(), modules);
+    }
+
+    static Optional<TestFramework> detect(List<TestFramework> frameworks, List<ModuleDescriptor> modules) {
+        return Stream.concat(frameworks.stream(), Stream.<TestFramework>of(new JUnitPlatform(), new JUnit4(), new TestNG()))
                 .filter(framework -> modules.stream().anyMatch(framework::isMarkedBy))
                 .findFirst();
     }
 
     static Optional<TestFramework> detect(Iterable<Path> folders) throws IOException {
-        return detect(modules(folders));
+        return detect(List.of(), modules(folders));
+    }
+
+    static Optional<TestFramework> detect(List<TestFramework> frameworks, Iterable<Path> folders) throws IOException {
+        return detect(frameworks, modules(folders));
     }
 
     static List<ModuleDescriptor> modules(Iterable<Path> folders) throws IOException {

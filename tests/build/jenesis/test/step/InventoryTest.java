@@ -122,6 +122,44 @@ public class InventoryTest {
     }
 
     @Test
+    public void a_supplement_lists_the_documentation_of_a_module_without_declaring_the_module() throws IOException {
+        Path manifests = manifests();
+        Path documented = Files.createDirectory(root.resolve("documented"));
+        Path jar = Files.writeString(Files.createDirectory(documented.resolve(BuildStep.DOCUMENTATION)).resolve("javadoc.jar"),
+                "javadoc");
+
+        run(new Inventory().supplement(true), args("manifests", manifests, "documented", documented));
+
+        assertThat(read(next.resolve(Inventory.INVENTORY)).stringPropertyNames())
+                .as("a supplement names no path, so that no reader takes it for the module itself")
+                .containsExactly("module-foo.documentation.0");
+        assertThat(Inventory.supplements(List.of(new BuildStepArgument(next, Map.of()))))
+                .containsExactly(Map.entry("module-foo.documentation", List.of(jar)));
+    }
+
+    @Test
+    public void a_supplement_records_what_its_phase_resolved_for_pin_without_adding_it_to_the_module() throws IOException {
+        Path manifests = manifests();
+        Path check = Files.createDirectory(root.resolve("check"));
+        Path plugin = Files.writeString(Files.createDirectory(check.resolve("resolved")).resolve("plugin.jar"), "plugin");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("pmd/runtime/module/build.jenesis.plugin.pmd/1.0", "resolved/plugin.jar");
+        index.store(check.resolve(BuildStep.DEPENDENCIES));
+
+        run(new Inventory().supplement(true), args("manifests", manifests, "check", check));
+
+        SequencedProperties inventory = read(next.resolve(Inventory.INVENTORY));
+        assertThat(inventory.stringPropertyNames())
+                .as("the module's own dependencies stay what its build resolved")
+                .noneMatch(key -> key.contains(".dependency."));
+        assertThat(Inventory.closure(List.of(new BuildStepArgument(next, Map.of())), "foo"))
+                .containsOnlyKeys("pmd/module/build.jenesis.plugin.pmd/1.0")
+                .extractingByKey("pmd/module/build.jenesis.plugin.pmd/1.0")
+                .extracting(Inventory.Dependency::jar, Inventory.Dependency::group)
+                .containsExactly(plugin, "pmd");
+    }
+
+    @Test
     public void attaches_each_classifier_jar_under_its_classifier() throws IOException {
         Path manifests = Files.createDirectory(root.resolve("manifests"));
         SequencedProperties module = new SequencedProperties();
@@ -560,6 +598,26 @@ public class InventoryTest {
         assertThat(inventory.getProperty("module-foo.artifacts.0")).isEqualTo(relativize(classes));
         assertThat(inventory.getProperty("module-foo.runtime.0")).isEqualTo(relativize(classes));
         assertThat(inventory.getProperty("module-foo.runtime.1")).isNull();
+    }
+
+    @Test
+    public void reports_the_dependencies_of_the_module_rather_than_those_of_a_tool() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        Path tool = Files.createDirectory(root.resolve("tool")), own = Files.createDirectory(root.resolve("own"));
+        Files.writeString(tool.resolve("graph.properties"),
+                "edge/0=checkstyle\\truntime\\tmaven\\ttrue\\tcompile\\t1\\t\\tmaven/tool/tool/1\n");
+        Files.writeString(own.resolve("graph.properties"), "");
+
+        run(args("manifests", manifests, "tool", tool, "own", own));
+
+        SequencedProperties inventory = read(next.resolve(Inventory.INVENTORY));
+        assertThat(inventory.getProperty("module-foo.report.dependencies"))
+                .as("a module without dependencies reports its empty graph, not the closure of a tool it runs")
+                .isEqualTo(relativize(own.resolve("graph.properties")));
+        assertThat(inventory.getProperty("module-foo.graph.0")).isEqualTo(relativize(tool.resolve("graph.properties")));
     }
 
     @Test
