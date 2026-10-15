@@ -7,6 +7,7 @@ class BuildExecutorDefault implements BuildExecutor {
     private static final Pattern
             VALIDATE_ORIGINAL = Pattern.compile("[a-zA-Z0-9._%-][a-zA-Z0-9._%+-]*"),
             VALIDATE_RESOLVED = Pattern.compile("[a-zA-Z0-9./_%+-]+");
+    private static final String PERSISTENT = "persistent";
 
     private static final ConcurrentMap<Path, FileChannel> LOCKS = new ConcurrentHashMap<>();
 
@@ -171,6 +172,12 @@ class BuildExecutorDefault implements BuildExecutor {
                     if (fromCache) {
                         callback.loaded(location + identity, System.nanoTime() - fetchStarted);
                     }
+                    Path nextPersistent = next.resolve(PERSISTENT);
+                    if (!fromCache && consistent && Files.isDirectory(previous.persistent())) {
+                        Files.move(previous.persistent(), nextPersistent);
+                    } else {
+                        Files.createDirectory(nextPersistent);
+                    }
                     CompletionStage<BuildStepResult> stepStage;
                     if (fromCache) {
                         stepStage = CompletableFuture.completedStage(cached.get());
@@ -178,7 +185,8 @@ class BuildExecutorDefault implements BuildExecutor {
                         BuildStepContext context = new BuildStepContext(
                                 consistent ? previous.output() : null,
                                 nextOutput,
-                                nextSupplement);
+                                nextSupplement,
+                                nextPersistent);
                         if (permits == null) {
                             try {
                                 stepStage = step.apply(executor, context, arguments);
@@ -206,24 +214,36 @@ class BuildExecutorDefault implements BuildExecutor {
                                 Files.move(next, exists
                                         ? Files.walkFileTree(previous.path(), new RecursiveFolderDeletion(null))
                                         : previous.path());
+                                try (Stream<Path> kept = Files.list(previous.persistent())) {
+                                    if (kept.findAny().isEmpty()) {
+                                        Files.delete(previous.persistent());
+                                    }
+                                }
                                 Files.createDirectory(previous.checksum());
                                 SequencedProperties local = new SequencedProperties();
                                 local.setProperty("run", run);
                                 local.setProperty("cached", Boolean.toString(fromCache));
                                 local.store(previous.path().resolve(BuildExecutor.LOCAL));
                             } else if (consistent) {
+                                if (!Files.exists(previous.persistent())) {
+                                    try (Stream<Path> kept = Files.list(nextPersistent)) {
+                                        if (kept.findAny().isPresent()) {
+                                            Files.move(nextPersistent, previous.persistent());
+                                        }
+                                    }
+                                }
                                 Files.delete(Files.walkFileTree(next, new RecursiveFolderDeletion(next)));
-                                Files.deleteIfExists(previous.stepFile());
+                                Files.deleteIfExists(previous.step());
                                 Files.walkFileTree(previous.checksum(), new RecursiveFolderDeletion(previous.checksum()));
                             } else {
                                 throw new IllegalStateException("Cannot reuse initial run for " + location + identity);
                             }
                             previous.record(summaries);
                             Map<Path, byte[]> checksums = HashFunction.read(previous.output(), hash, executor);
-                            HashFunction.write(previous.outputChecksums(), checksums);
+                            HashFunction.write(previous.checksums(), checksums);
                             SequencedProperties stepProperties = new SequencedProperties();
                             stepProperties.setProperty("serialization", HexFormat.of().formatHex(currentStepHash));
-                            stepProperties.storeAtomically(previous.stepFile());
+                            stepProperties.storeAtomically(previous.step());
                             if (cache.stores() && !fromCache && result.next()) {
                                 String stored = location + identity;
                                 try {
@@ -756,7 +776,7 @@ class BuildExecutorDefault implements BuildExecutor {
     private record StepSummary(Path folder, Map<Path, byte[]> checksums) {
     }
 
-    private record StepFolder(Path path, Path checksum, Path output, Path stepFile, Path outputChecksums) {
+    private record StepFolder(Path path, Path checksum, Path output, Path persistent, Path step, Path checksums) {
 
         private static final String ARGUMENT = "argument.", PROPERTIES = ".properties", ARGUMENTS = "arguments.properties";
 
@@ -765,6 +785,7 @@ class BuildExecutorDefault implements BuildExecutor {
             return new StepFolder(path,
                     checksum,
                     path.resolve("output"),
+                    path.resolve(PERSISTENT),
                     checksum.resolve("step" + PROPERTIES),
                     checksum.resolve("output" + PROPERTIES));
         }
@@ -818,15 +839,15 @@ class BuildExecutorDefault implements BuildExecutor {
     }
 
     private StepRecord completed(StepFolder folder, byte[] step, Executor executor) {
-        if (!Files.isRegularFile(folder.stepFile())) {
+        if (!Files.isRegularFile(folder.step())) {
             return StepRecord.INCOMPLETE;
         }
         try {
-            String serialization = SequencedProperties.ofFiles(folder.stepFile()).getProperty("serialization");
+            String serialization = SequencedProperties.ofFiles(folder.step()).getProperty("serialization");
             if (serialization == null || !Arrays.equals(step, HexFormat.of().parseHex(serialization))) {
                 return StepRecord.INCOMPLETE;
             }
-            Map<Path, byte[]> checksums = HashFunction.read(folder.outputChecksums());
+            Map<Path, byte[]> checksums = HashFunction.read(folder.checksums());
             return new StepRecord(checksums, HashFunction.areConsistent(folder.output(), checksums, hash, executor));
         } catch (IOException | IllegalArgumentException _) {
             return StepRecord.INCOMPLETE;

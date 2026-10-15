@@ -21,13 +21,14 @@ public class DockerTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, input;
+    private Path previous, next, supplement, persistent, input;
 
     @BeforeEach
     public void setUp() throws IOException {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         input = Files.createDirectory(root.resolve("input"));
     }
 
@@ -44,7 +45,7 @@ public class DockerTest {
 
         BuildStepResult result = new Docker("example:latest").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -81,7 +82,7 @@ public class DockerTest {
 
         BuildStepResult result = new Docker("example:latest").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -122,7 +123,7 @@ public class DockerTest {
 
         BuildStepResult result = new Docker("example:latest").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(input, Map.of())))).toCompletableFuture().join();
 
         assertThat(result.next()).isTrue();
@@ -165,7 +166,7 @@ public class DockerTest {
 
         BuildStepResult result = new Docker("example:latest").labels(labels).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -211,7 +212,7 @@ public class DockerTest {
                 new Environment(Map.of("archive.timestamp", "2026-01-01T00:00:00+01:00")),
                 "example:latest").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -237,7 +238,7 @@ public class DockerTest {
                 new Environment(Map.of("archive.timestamp", "2026-01-01T00:00:00Z")),
                 "example:latest").labels(labels).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -261,7 +262,7 @@ public class DockerTest {
 
         BuildStepResult result = new Docker("example:latest").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -285,7 +286,7 @@ public class DockerTest {
 
         BuildStepResult result = new Docker("example:latest").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -308,7 +309,7 @@ public class DockerTest {
 
         BuildStepResult result = new Docker("debian:stable-slim").jpackage("app-image").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("packages/sample/bin/sample"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -338,7 +339,7 @@ public class DockerTest {
 
         BuildStepResult result = new Docker("debian:stable-slim").jpackage("deb").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("packages/sample_1.0_amd64.deb"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -369,7 +370,7 @@ public class DockerTest {
 
         new Docker("fedora:latest").jpackage("rpm").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("packages/sample-1.0-1.x86_64.rpm"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -394,7 +395,7 @@ public class DockerTest {
 
         assertThatThrownBy(() -> new Docker("debian:stable-slim").jpackage("app-image").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("packages/sample.app/Contents"), Checksum.of(ChecksumStatus.ADDED)))))))
@@ -409,7 +410,7 @@ public class DockerTest {
 
         BuildStepResult result = new Docker("debian:stable-slim").jpackage("app-image").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();

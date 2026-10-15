@@ -30,7 +30,7 @@ public class SignaturesTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, input;
+    private Path previous, next, supplement, persistent, input;
 
     @AfterEach
     public void clear() {
@@ -42,6 +42,7 @@ public class SignaturesTest {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         input = Files.createDirectory(root.resolve("input"));
     }
 
@@ -112,7 +113,7 @@ public class SignaturesTest {
 
     private void run(Signatures signatures) throws IOException {
         signatures.apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                                 input,
                                 Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))

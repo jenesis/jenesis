@@ -15,13 +15,14 @@ public class ImageStagingTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, source;
+    private Path previous, next, supplement, persistent, source;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         source = Files.createDirectory(root.resolve("source"));
     }
 
@@ -65,7 +66,7 @@ public class ImageStagingTest {
         inventory.store(folder.resolve(Inventory.INVENTORY));
 
         BuildStepResult result = new ImageStaging("image").apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("module", new BuildStepArgument(folder, Map.of()))))
                 .toCompletableFuture()
                 .join();
@@ -85,7 +86,7 @@ public class ImageStagingTest {
         inventory.store(folder.resolve(Inventory.INVENTORY));
 
         BuildStepResult result = new ImageStaging("native").apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("module", new BuildStepArgument(folder, Map.of()))))
                 .toCompletableFuture()
                 .join();
@@ -100,7 +101,7 @@ public class ImageStagingTest {
         Path bar = runtimeImage("bar", "bar-java");
 
         new ImageStaging("image").apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of(
                                 "foo", new BuildStepArgument(foo, Map.of()),
                                 "bar", new BuildStepArgument(bar, Map.of()))))
@@ -126,7 +127,7 @@ public class ImageStagingTest {
         inventory.store(folder.resolve(Inventory.INVENTORY));
 
         new ImageStaging("image").noFolder(true).apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("module", new BuildStepArgument(folder, Map.of()))))
                 .toCompletableFuture()
                 .join();
@@ -145,7 +146,7 @@ public class ImageStagingTest {
         inventory.store(folder.resolve(Inventory.INVENTORY));
 
         new ImageStaging("image").apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("module", new BuildStepArgument(folder, Map.of()))))
                 .toCompletableFuture()
                 .join();
@@ -175,7 +176,7 @@ public class ImageStagingTest {
         Path app = packagePhase("module-app");
 
         new ImageStaging("docker").apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of(
                                 "greeter", new BuildStepArgument(greeter, Map.of()),
                                 "app", new BuildStepArgument(app, Map.of()))))
@@ -194,7 +195,7 @@ public class ImageStagingTest {
         Files.writeString(Files.createDirectories(docker.resolve("docker")).resolve("Dockerfile"), module);
         Path inventory = Files.createDirectories(root.resolve("inventory").resolve("output"));
         new Inventory().module(module).apply(Runnable::run,
-                        new BuildStepContext(previous, inventory, supplement),
+                        new BuildStepContext(previous, inventory, supplement, persistent),
                         new LinkedHashMap<>(Map.of("docker", new BuildStepArgument(docker, Map.of()))))
                 .toCompletableFuture()
                 .join();
@@ -227,7 +228,7 @@ public class ImageStagingTest {
             arguments.put(folder.getFileName().toString(), new BuildStepArgument(folder, Map.of()));
         }
         return new ImageStaging("package").apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         arguments)
                 .toCompletableFuture()
                 .join();

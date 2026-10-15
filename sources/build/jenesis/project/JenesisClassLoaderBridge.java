@@ -12,6 +12,8 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.Environment;
+import build.jenesis.Language;
+import build.jenesis.LanguageFactory;
 import build.jenesis.ObservabilityEngine;
 import build.jenesis.ObservabilityFactory;
 import build.jenesis.Observation;
@@ -19,6 +21,8 @@ import build.jenesis.Permits;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.TestFramework;
+import build.jenesis.TestFrameworkFactory;
 import java.lang.annotation.Annotation;
 import java.lang.module.Configuration;
 import java.lang.reflect.Proxy;
@@ -136,7 +140,7 @@ class JenesisClassLoaderBridge {
                 "shouldCacheRemotely",
                 MethodType.methodType(boolean.class));
         foreignContextCtor = lookup.findConstructor(foreignBuildStepContext,
-                MethodType.methodType(void.class, Path.class, Path.class, Path.class));
+                MethodType.methodType(void.class, Path.class, Path.class, Path.class, Path.class));
         foreignArgumentCtor = lookup.findConstructor(foreignBuildStepArgument,
                 MethodType.methodType(void.class, Path.class, Map.class));
         foreignResultNext = lookup.findVirtual(foreignBuildStepResult,
@@ -544,7 +548,7 @@ class JenesisClassLoaderBridge {
 
     private Object toForeignContext(BuildStepContext context) {
         try {
-            return foreignContextCtor.invoke(context.previous(), context.next(), context.supplement());
+            return foreignContextCtor.invoke(context.previous(), context.next(), context.supplement(), context.persistent());
         } catch (RuntimeException | Error e) {
             throw e;
         } catch (Throwable t) {

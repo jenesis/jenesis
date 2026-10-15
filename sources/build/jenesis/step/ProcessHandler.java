@@ -188,10 +188,13 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         private static final Set<String> PLATFORM = Set.of("PATH", "HOME", "LANG", "TMPDIR",
                 "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP", "USERPROFILE",
                 "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432", "PROGRAMDATA", "APPDATA", "LOCALAPPDATA");
+        private static final Map<String, Path> DRIVERS = new ConcurrentHashMap<>();
 
         private final List<String> commands;
         private final SortedMap<String, String> environment;
         private final Charset output, error;
+        private final boolean main, daemon, shared;
+        private final Path aot;
 
         private OfProcess(List<String> commands) {
             this(commands, encoding(), encoding());
@@ -204,17 +207,25 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     environment.put(name, value);
                 }
             });
-            this(commands, environment, output, error);
+            this(commands, environment, output, error, false, false, false, null);
         }
 
         private OfProcess(List<String> commands,
                           SortedMap<String, String> environment,
                           Charset output,
-                          Charset error) {
+                          Charset error,
+                          boolean main,
+                          boolean daemon,
+                          boolean shared,
+                          Path aot) {
             this.commands = commands;
             this.environment = Collections.unmodifiableSortedMap(environment);
             this.output = output;
             this.error = error;
+            this.main = main;
+            this.daemon = daemon;
+            this.shared = shared;
+            this.aot = aot;
         }
 
         public static Function<List<String>, OfProcess> ofJavaHome(String command) {
@@ -238,6 +249,62 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                 } else {
                     throw new IllegalStateException("Could not find command " + program.getPath() + " in " + home);
                 }
+            }
+        }
+
+        public static Function<List<String>, OfProcess> ofJavaMain() {
+            Function<List<String>, OfProcess> java = ofJavaHome("bin/java");
+            return arguments -> {
+                OfProcess process = java.apply(arguments);
+                return new OfProcess(process.commands,
+                        new TreeMap<>(process.environment),
+                        process.output,
+                        process.error,
+                        true,
+                        true,
+                        false,
+                        null);
+            };
+        }
+
+        public static Path driver(Class<?> type) throws IOException {
+            SequencedMap<String, byte[]> classes = new TreeMap<>();
+            for (Class<?> member : type.getNestMembers()) {
+                String name = member.getName().replace('.', '/') + ".class";
+                try (InputStream input = member.getResourceAsStream("/" + name)) {
+                    if (input == null) {
+                        throw new IllegalStateException("Cannot read the class file of " + member.getName()
+                                + " to hand it to a JVM - load the driver from a jar or a folder");
+                    }
+                    classes.put(name, input.readAllBytes());
+                }
+            }
+            MessageDigest digest;
+            try {
+                digest = MessageDigest.getInstance("SHA-256");
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException(e);
+            }
+            classes.forEach((name, bytes) -> {
+                digest.update(name.getBytes(StandardCharsets.UTF_8));
+                digest.update(bytes);
+            });
+            try {
+                return DRIVERS.computeIfAbsent(HexFormat.of().formatHex(digest.digest()), _ -> {
+                    try {
+                        Path folder = Files.createTempDirectory("jenesis-driver");
+                        for (Map.Entry<String, byte[]> entry : classes.entrySet()) {
+                            Path file = folder.resolve(entry.getKey());
+                            Files.createDirectories(file.getParent());
+                            Files.write(file, entry.getValue());
+                        }
+                        return folder;
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                });
+            } catch (UncheckedIOException e) {
+                throw e.getCause();
             }
         }
 
@@ -342,7 +409,31 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess environment(SortedMap<String, String> environment) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error);
+            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, shared, aot);
+        }
+
+        public boolean daemon() {
+            return daemon;
+        }
+
+        public OfProcess daemon(boolean daemon) {
+            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, shared, aot);
+        }
+
+        public boolean shared() {
+            return shared;
+        }
+
+        public OfProcess shared(boolean shared) {
+            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, shared, aot);
+        }
+
+        public Path aot() {
+            return aot;
+        }
+
+        public OfProcess aot(Path aot) {
+            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, shared, aot);
         }
 
         @Override
@@ -352,7 +443,14 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
         @Override
         public int execute(Path output, Path error, Tee tee) throws IOException {
-            ProcessBuilder builder = new ProcessBuilder(commands);
+            JavaWorker.Call call = main || daemon ? JavaWorker.call(commands) : null;
+            if (call != null && daemon) {
+                return JavaWorker.execute(call, shared, environment, output, error, tee);
+            }
+            JavaWorker.Once once = call == null || !main || call.main().endsWith(".java")
+                    ? null
+                    : JavaWorker.once(call, aot);
+            ProcessBuilder builder = new ProcessBuilder(once == null ? commands : once.commands());
             builder.environment().clear();
             builder.environment().putAll(environment);
             builder.environment().putIfAbsent("COLUMNS", "80");
@@ -377,6 +475,9 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     printed.join();
                 }
                 errored.join();
+                if (once != null) {
+                    once.complete();
+                }
                 return code;
             } catch (InterruptedException e) {
                 process.destroyForcibly();

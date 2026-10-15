@@ -18,13 +18,14 @@ public class MavenRepositoryStagingTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, source;
+    private Path previous, next, supplement, persistent, source;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         source = Files.createDirectory(root.resolve("source"));
     }
 
@@ -643,7 +644,7 @@ public class MavenRepositoryStagingTest {
             arguments.put(folder.getFileName().toString(), new BuildStepArgument(folder, checksums));
         }
         return new MavenRepositoryStaging(includeTests).apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         arguments)
                 .toCompletableFuture()
                 .join();

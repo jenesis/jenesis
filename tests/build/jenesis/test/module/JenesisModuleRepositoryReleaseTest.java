@@ -263,7 +263,8 @@ public class JenesisModuleRepositoryReleaseTest {
         return release.apply(Runnable::run,
                         new BuildStepContext(root.resolve("previous"),
                                 Files.createDirectories(root.resolve("next")),
-                                Files.createDirectories(root.resolve("supplement"))),
+                                Files.createDirectories(root.resolve("supplement")),
+                                Files.createDirectories(root.resolve("persistent"))),
                         new LinkedHashMap<>(Map.of("staged", new BuildStepArgument(
                                 staged,
                                 Map.of(Path.of("."), Checksum.of(ChecksumStatus.ADDED))))))

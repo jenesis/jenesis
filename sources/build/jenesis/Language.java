@@ -1,7 +1,6 @@
-package build.jenesis.project;
+package build.jenesis;
 
 import module java.base;
-import build.jenesis.BuildExecutorModule;
 
 public record Language(SequencedSet<String> extensions,
                        Order order,

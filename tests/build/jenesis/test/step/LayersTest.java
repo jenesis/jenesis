@@ -18,13 +18,14 @@ public class LayersTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, input, resolved, artifacts;
+    private Path previous, next, supplement, persistent, input, resolved, artifacts;
 
     @BeforeEach
     public void setUp() throws IOException {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         input = Files.createDirectory(root.resolve("input"));
         resolved = Files.createDirectory(input.resolve("resolved"));
         artifacts = Files.createDirectory(input.resolve(BuildStep.ARTIFACTS));
@@ -221,7 +222,7 @@ public class LayersTest {
         }
         return new Layers().apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 arguments)
                 .toCompletableFuture()
                 .join();

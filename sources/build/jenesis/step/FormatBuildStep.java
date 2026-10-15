@@ -23,7 +23,7 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
                               String tool,
                               boolean verify,
                               Terms terms) {
-        super(command, ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
+        super(command, ProcessHandler.OfProcess.ofJavaMain(), terms);
         this.tool = tool;
         this.verify = verify;
     }

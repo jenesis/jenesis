@@ -9,6 +9,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Language;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SequencedProperties;
@@ -16,7 +17,6 @@ import build.jenesis.module.ModularJarResolver;
 import build.jenesis.project.InferredCompilerChainModule;
 import build.jenesis.project.InferredDocumentationChainModule;
 import build.jenesis.project.InternalModule;
-import build.jenesis.project.Language;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -52,7 +52,7 @@ public class LanguageTest {
                 module sample.greet {
                     requires build.jenesis;
                     requires java.compiler;
-                    provides build.jenesis.project.LanguageFactory with sample.greet.Factory;
+                    provides build.jenesis.LanguageFactory with sample.greet.Factory;
                 }
                 """);
         Path sources = Files.createDirectories(plugin.resolve("sample/greet"));
@@ -63,8 +63,8 @@ public class LanguageTest {
                 import build.jenesis.Permits;
                 import build.jenesis.Repository;
                 import build.jenesis.Resolver;
-                import build.jenesis.project.Language;
-                import build.jenesis.project.LanguageFactory;
+                import build.jenesis.Language;
+                import build.jenesis.LanguageFactory;
                 import java.util.LinkedHashSet;
                 import java.util.List;
                 import java.util.Map;
