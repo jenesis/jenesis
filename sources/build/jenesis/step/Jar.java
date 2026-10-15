@@ -70,6 +70,16 @@ public class Jar extends ProcessBuildStep {
                 }
             }
         }
+        if (sort == Sort.CLASSES) {
+            String mainClass = properties.values().stream()
+                    .map(configured -> configured.getOrDefault("--main-class", configured.get("-e")))
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+            if (mainClass != null) {
+                requireMain(mainClass, arguments);
+            }
+        }
         List<String> commands = new ArrayList<>(List.of(
                 "--create",
                 "--file",
@@ -168,6 +178,103 @@ public class Jar extends ProcessBuildStep {
             }
         }
         return CompletableFuture.completedStage(commands);
+    }
+
+    private static void requireMain(String mainClass, SequencedMap<String, BuildStepArgument> arguments)
+            throws IOException {
+        List<Path> folders = new ArrayList<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            if (!argument.removed() && Files.isDirectory(argument.folder().resolve(CLASSES))) {
+                folders.add(argument.folder().resolve(CLASSES));
+            }
+        }
+        List<Path> jars = new ArrayList<>(Dependencies.paths(arguments, "main", "compile"));
+        jars.addAll(Dependencies.paths(arguments, "main", "runtime"));
+        ClassModel type = find(folders, jars, mainClass.replace('.', '/'));
+        if (type == null) {
+            throw new IllegalArgumentException("The main class " + mainClass + " is neither among the classes"
+                    + " of the module nor in its dependencies: name a class that declares or inherits a main"
+                    + " method, by its binary name, with @jenesis.main in module-info.java or with a"
+                    + " <mainClass> property in pom.xml");
+        }
+        List<ClassModel> hierarchy = new ArrayList<>(List.of(type));
+        Set<String> seen = new HashSet<>(Set.of(type.thisClass().asInternalName()));
+        for (int index = 0; index < hierarchy.size(); index++) {
+            ClassModel current = hierarchy.get(index);
+            List<ClassEntry> supertypes = new ArrayList<>();
+            current.superclass().ifPresent(supertypes::add);
+            supertypes.addAll(current.interfaces());
+            for (ClassEntry supertype : supertypes) {
+                if (seen.add(supertype.asInternalName())) {
+                    ClassModel parent = find(folders, jars, supertype.asInternalName());
+                    if (parent == null) {
+                        return;
+                    }
+                    hierarchy.add(parent);
+                }
+            }
+        }
+        hierarchy.sort(Comparator.comparing(declaring -> (declaring.flags().flagsMask() & ClassFile.ACC_INTERFACE) != 0
+                && declaring != type));
+        for (String descriptor : List.of("([Ljava/lang/String;)V", "()V")) {
+            MethodModel main = null;
+            for (ClassModel declaring : hierarchy) {
+                for (MethodModel method : declaring.methods()) {
+                    if (main == null
+                            && method.methodName().equalsString("main")
+                            && method.methodType().equalsString(descriptor)
+                            && (declaring == type
+                            || (declaring.flags().flagsMask() & ClassFile.ACC_INTERFACE) == 0
+                            || (method.flags().flagsMask() & ClassFile.ACC_STATIC) == 0)) {
+                        main = method;
+                    }
+                }
+            }
+            if (main == null || (main.flags().flagsMask() & ClassFile.ACC_PRIVATE) != 0) {
+                continue;
+            } else if ((main.flags().flagsMask() & ClassFile.ACC_STATIC) != 0) {
+                return;
+            } else if ((type.flags().flagsMask() & (ClassFile.ACC_ABSTRACT | ClassFile.ACC_INTERFACE)) != 0) {
+                throw new IllegalArgumentException("The main class " + mainClass + " is abstract or an interface"
+                        + " but its main method is not static: make the class concrete, or the method static");
+            } else if (type.methods().stream().noneMatch(method -> method.methodName().equalsString("<init>")
+                    && method.methodType().equalsString("()V")
+                    && (method.flags().flagsMask() & ClassFile.ACC_PRIVATE) == 0)) {
+                throw new IllegalArgumentException("The main class " + mainClass + " has an instance main method"
+                        + " but no non-private constructor without parameters: declare one, declare the class"
+                        + " static if it is an inner class, or make the main method static");
+            }
+            return;
+        }
+        throw new IllegalArgumentException("The main class " + mainClass + " declares or inherits no main"
+                + " method that java runs: declare a non-private void main(String[] args) or void main(),"
+                + " static or not");
+    }
+
+    private static ClassModel find(List<Path> folders, List<Path> jars, String name) throws IOException {
+        String file = name + ".class";
+        for (Path folder : folders) {
+            Path candidate = folder.resolve(file);
+            if (Files.isRegularFile(candidate)) {
+                return ClassFile.of().parse(candidate);
+            }
+        }
+        try (InputStream in = ClassLoader.getPlatformClassLoader().getResourceAsStream(file)) {
+            if (in != null) {
+                return ClassFile.of().parse(in.readAllBytes());
+            }
+        }
+        for (Path jar : jars) {
+            try (JarFile archive = new JarFile(jar.toFile())) {
+                JarEntry entry = archive.getJarEntry(file);
+                if (entry != null) {
+                    try (InputStream in = archive.getInputStream(entry)) {
+                        return ClassFile.of().parse(in.readAllBytes());
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private static void mergeAttributes(Attributes target, Attributes source, Path file) {
