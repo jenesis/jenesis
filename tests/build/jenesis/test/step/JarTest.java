@@ -2,6 +2,7 @@ package build.jenesis.test.step;
 
 import module java.base;
 import java.util.jar.Attributes;
+import javax.tools.ToolProvider;
 import module org.junit.jupiter.api;
 import module org.junit.jupiter.params;
 import build.jenesis.BuildStep;
@@ -469,6 +470,81 @@ public class JarTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("process-jar.properties sets " + option)
                 .hasMessageContaining("META-INF/MANIFEST.MF among the module's resources");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "package app; public class Main { public static void main(String[] args) { } }",
+            "package app; class Main { void main() { } }",
+            "package app; class Main extends Base { } class Base { protected void main(String[] args) { } }",
+            "package app; class Main extends Base { } class Base { static void main() { } }",
+            "package app; class Main implements Launchable { } interface Launchable { default void main() { } }",
+            "package app; class Main { private static void main(String[] args) { } void main() { } }"
+    })
+    public void accepts_a_main_class_with_a_main_method_that_java_runs(String source) throws IOException {
+        mainClass(source);
+        Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
+                .toCompletableFuture().join();
+        assertThat(mainAttributes().getValue(Attributes.Name.MAIN_CLASS)).isEqualTo("app.Main");
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "package app; class Main { void helper() { } }"
+                    + " | declares or inherits no main method",
+            "package app; class Main { private static void main(String[] args) { } }"
+                    + " | declares or inherits no main method",
+            "package app; class Main { static int main(String[] args) { return 0; } }"
+                    + " | declares or inherits no main method",
+            "package app; class Main implements Launchable { } interface Launchable { static void main(String[] args) { } }"
+                    + " | declares or inherits no main method",
+            "package app; abstract class Main { void main() { } }"
+                    + " | is abstract or an interface",
+            "package app; class Main { private Main() { } void main() { } }"
+                    + " | no non-private constructor without parameters",
+            "package app; class Other { public static void main(String[] args) { } }"
+                    + " | is neither among the classes of the module nor in its dependencies"
+    })
+    public void refuses_a_main_class_without_a_main_method_that_java_runs(String source, String message)
+            throws IOException {
+        mainClass(source);
+        assertThatThrownBy(() -> Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
+                .toCompletableFuture().join())
+                .as("java would refuse to run the jar's main class, so the build refuses to package it")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("app.Main")
+                .hasMessageContaining(message);
+    }
+
+    @Test
+    public void leaves_a_main_class_whose_supertype_it_cannot_read_to_java() throws IOException {
+        mainClass("package app; class Main extends Base { } class Base { }");
+        Files.delete(classes.resolve(Javac.CLASSES).resolve("app/Base.class"));
+        Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
+                .toCompletableFuture().join();
+        assertThat(mainAttributes().getValue(Attributes.Name.MAIN_CLASS))
+                .as("a main method may be inherited from a class the step does not see")
+                .isEqualTo("app.Main");
+    }
+
+    private void mainClass(String source) throws IOException {
+        Path sources = Files.createDirectories(root.resolve("main-sources/app"));
+        Path file = Files.writeString(sources.resolve("Main.java"), source);
+        Path folder = Files.createDirectory(classes.resolve(Javac.CLASSES));
+        assertThat(ToolProvider.getSystemJavaCompiler().run(null, null, null,
+                "-d", folder.toString(), file.toString())).isZero();
+        SequencedProperties jar = new SequencedProperties();
+        jar.setProperty("--main-class", "app.Main");
+        ProcessBuildStep.store(classes, ProcessBuildStep.PROCESS, "jar", jar);
     }
 
     private Attributes mainAttributes() throws IOException {

@@ -455,6 +455,8 @@ public class InferredMultiProjectAssemblerTest {
     @Test
     public void labels_the_docker_image_with_the_metadata_of_the_module_and_the_configured_labels() throws IOException {
         Fixture fixture = setUp("main=sample.Sample\n", false, false, false);
+        Files.writeString(Files.createDirectories(fixture.sources().resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { public static void main(String[] args) { } }");
         Files.writeString(fixture.configuration().resolve("packaging.properties"),
                 "docker=example:latest\ndocker.label.com.example.team=core\n");
         Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "project=sample\nartifact=app\nversion=1\n");
@@ -683,10 +685,11 @@ public class InferredMultiProjectAssemblerTest {
 
     @Test
     public void a_process_command_file_for_javadoc_reaches_the_javadoc_of_the_documentation_jar() throws IOException {
-        Fixture fixture = setUp("main=foo.Main\n", false, false, true);
+        Fixture fixture = setUp("main=Foo\n", false, false, true);
         Files.writeString(fixture.configuration().resolve("process-javadoc.properties"), "-windowtitle=Configured\n");
         Files.createDirectory(fixture.sources.resolve(BuildStep.SOURCES));
-        Files.writeString(fixture.sources.resolve(BuildStep.SOURCES).resolve("Foo.java"), "public class Foo {}");
+        Files.writeString(fixture.sources.resolve(BuildStep.SOURCES).resolve("Foo.java"),
+                "public class Foo { public static void main(String[] args) { } }");
         Path javadocOutput = fixture.execute("sub/documentation/archive").get("sub/documentation/archive");
         assertThat(fixture.build().resolve("sub/documentation/generate/document/javadoc/supplement/command"))
                 .content()
@@ -1129,6 +1132,8 @@ public class InferredMultiProjectAssemblerTest {
     @Test
     public void stages_what_a_packager_writes_into_packages() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
+        Files.writeString(Files.createDirectories(fixture.sources().resolve(BuildStep.SOURCES + "com/example")).resolve("Entry.java"),
+                "package com.example; public class Entry { public static void main(String[] args) { } }");
         Files.writeString(fixture.configuration().resolve("plugin-appimage.properties"), "");
         SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
         plugins.put("appimage+package", (_, _) -> new PackageStep("app.AppImage").asModule("appimage"));
@@ -1142,6 +1147,8 @@ public class InferredMultiProjectAssemblerTest {
     @Test
     public void refuses_two_packagers_that_write_the_same_package() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
+        Files.writeString(Files.createDirectories(fixture.sources().resolve(BuildStep.SOURCES + "com/example")).resolve("Entry.java"),
+                "package com.example; public class Entry { public static void main(String[] args) { } }");
         Files.writeString(fixture.configuration().resolve("plugin-first.properties"), "");
         Files.writeString(fixture.configuration().resolve("plugin-second.properties"), "");
         SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
