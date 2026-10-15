@@ -130,4 +130,25 @@ public class EnvironmentTest {
                 .as("a setting whose key is a pattern is found by listing the settings rather than by a derived list")
                 .containsOnlyKeys("platform.fips", "test.sample.value");
     }
+
+    @Test
+    public void reads_a_value_naming_a_variable_as_the_setting_it_names() {
+        Environment environment = new Environment(Map.of("variable.level", "strict"));
+        assertThat(environment.variable("The file sets level", "@level")).isEqualTo("strict");
+        assertThat(environment.variable("The file sets level", "@other/lenient"))
+                .as("a variable that is not set takes the default it names")
+                .isEqualTo("lenient");
+        assertThat(environment.variable("The file sets level", "@@level"))
+                .as("@@ is a literal @")
+                .isEqualTo("@level");
+        assertThat(environment.variable("The file sets level", "plain")).isEqualTo("plain");
+    }
+
+    @Test
+    public void refuses_a_value_naming_a_variable_that_is_not_set() {
+        assertThatThrownBy(() -> Environment.NONE.variable("The file sets level", "@level"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("The file sets level to @level, but jenesis.variable.level is not set - set it, or give a"
+                        + " default as @level/<default>");
+    }
 }
