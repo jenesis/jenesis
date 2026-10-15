@@ -115,7 +115,7 @@ public final class DaemonClient {
             start(fingerprint);
         }
         throw new IllegalStateException("The build daemon under " + folder + " refused two consecutive requests"
-                + " - see daemon.log there, or set -Djenesis.make.daemon=false to build without it");
+                + " - see daemon.log there, or set -Djenesis.make.mode=compiled to build without it");
     }
 
     private static String fingerprint(Collection<Path> files, String seed, SequencedMap<String, String> environment)
@@ -233,7 +233,7 @@ public final class DaemonClient {
         List<String> command = new ArrayList<>();
         command.add(ProcessHandle.current().info().command().orElseThrow(() -> new IllegalStateException(
                 "Cannot resolve the running Java executable to start a build daemon"
-                        + " - set -Djenesis.make.daemon=false to build without one")));
+                        + " - set -Djenesis.make.mode=compiled to build without one")));
         if (!options.isBlank()) {
             command.addAll(List.of(options.trim().split("\\s+")));
         }

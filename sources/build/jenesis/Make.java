@@ -12,8 +12,7 @@ public final class Make {
             "jenesis.cache.key");
     private static final List<String> PLAINTEXT = List.of("jenesis.repository.insecure", "jenesis.cache.insecure");
     private static final List<String> PROGRAMS = List.of("jenesis.daemon.options",
-            "jenesis.openpgp.command",
-            "jenesis.jreleaser.executable");
+            "jenesis.openpgp.command");
     private static final List<String> SHARED = List.of("jenesis.cache.uri",
             "jenesis.maven.local",
             "jenesis.module.local",
@@ -27,7 +26,7 @@ public final class Make {
             "jenesis.openpgp.local",
             "jenesis.make.classes",
             "jenesis.pin.file",
-            "jenesis.aot.file");
+            "jenesis.aot.folder");
     private static final Set<String> PRINTING = Set.of("help", "skill", "prompt", "configuration", "properties", "--stop");
     static final List<String> CONTAINED = List.of("jenesis.project.docker",
             "jenesis.project.image",
@@ -44,10 +43,8 @@ public final class Make {
     private final Map<String, String> ambient;
     private final Path root;
     private final Path classes;
-    private final boolean daemon;
-    private final boolean compile;
-    private final boolean aot;
-    private final Path aotFile;
+    private final Mode mode;
+    private final Path aotFolder;
     private final Duration aotLifetime;
     private final Settings settings;
 
@@ -77,12 +74,10 @@ public final class Make {
         classes = classesLocation == null || classesLocation.isBlank()
                 ? root.resolve(".jenesis").resolve("classes")
                 : root.resolve(classesLocation).normalize();
-        daemon = flag(settings.keys(), "make.daemon", false);
-        compile = flag(settings.keys(), "make.compile", true);
-        aot = flag(settings.keys(), "make.aot", false);
-        String cache = settings.keys().get("aot.file");
-        aotFile = cache == null || cache.isBlank()
-                ? root.resolve(".jenesis").resolve("engine.aot")
+        mode = Mode.of(settings.keys().get("make.mode"));
+        String cache = settings.keys().get("aot.folder");
+        aotFolder = cache == null || cache.isBlank()
+                ? root.resolve(".jenesis").resolve("aot")
                 : root.resolve(cache.trim()).normalize();
         String lifetime = settings.keys().get("aot.lifetime");
         if (lifetime == null || lifetime.isBlank()) {
@@ -96,25 +91,25 @@ public final class Make {
                         + "' (expected an ISO-8601 duration, as PT12H or P7D, or no value to keep the cache)", e);
             }
         }
-        requireCompatible(aot, daemon, compile);
     }
 
-    private static void requireCompatible(boolean aot, boolean daemon, boolean compile) {
-        if (aot && daemon) {
-            throw new IllegalArgumentException("jenesis.make.aot and jenesis.make.daemon are both on: a daemon keeps"
-                    + " the engine loaded in a JVM of its own, which is what a cache of that loading replaces"
-                    + " (turn one of them off)");
-        }
-        if (aot && !compile) {
-            throw new IllegalArgumentException("jenesis.make.aot is on and jenesis.make.compile is off: a cache"
-                    + " serves the engine a JVM loads from the compiled classes, and without them there is nothing"
-                    + " for it to serve (turn one of them off)");
-        }
-    }
+    public enum Mode {
 
-    private static boolean flag(Map<String, String> keys, String key, boolean defaultValue) {
-        Boolean value = parsed("jenesis." + key, keys.get(key));
-        return value == null ? defaultValue : value;
+        SOURCE, COMPILED, AOT, DAEMON;
+
+        static Mode of(String value) {
+            if (value == null || value.isBlank()) {
+                return COMPILED;
+            }
+            for (Mode mode : values()) {
+                if (mode.name().equalsIgnoreCase(value.trim())) {
+                    return mode;
+                }
+            }
+            throw new IllegalArgumentException("Malformed value for jenesis.make.mode: '"
+                    + value
+                    + "' (expected source, compiled, aot or daemon)");
+        }
     }
 
     static Boolean parsed(String name, String value) {
@@ -136,21 +131,16 @@ public final class Make {
                  Map<String, String> ambient,
                  Path root,
                  Path classes,
-                 boolean daemon,
-                 boolean compile,
-                 boolean aot,
-                 Path aotFile,
+                 Mode mode,
+                 Path aotFolder,
                  Duration aotLifetime,
                  Settings settings) {
-        requireCompatible(aot, daemon, compile);
         this.mainClass = mainClass;
         this.ambient = ambient;
         this.root = root;
         this.classes = classes;
-        this.daemon = daemon;
-        this.compile = compile;
-        this.aot = aot;
-        this.aotFile = aotFile;
+        this.mode = mode;
+        this.aotFolder = aotFolder;
         this.aotLifetime = aotLifetime;
         this.settings = settings;
     }
@@ -161,10 +151,8 @@ public final class Make {
                     ambient,
                     root,
                     classes,
-                    daemon,
-                    compile,
-                    aot,
-                    aotFile,
+                    mode,
+                    aotFolder,
                     aotLifetime,
                     settings(root, ambient));
         } catch (IOException e) {
@@ -173,27 +161,23 @@ public final class Make {
     }
 
     public Make classes(Path classes) {
-        return new Make(mainClass, ambient, root, classes, daemon, compile, aot, aotFile, aotLifetime, settings);
+        return new Make(mainClass, ambient, root, classes, mode, aotFolder, aotLifetime, settings);
     }
 
-    public Make daemon(boolean daemon) {
-        return new Make(mainClass, ambient, root, classes, daemon, compile, aot, aotFile, aotLifetime, settings);
+    public Mode mode() {
+        return mode;
     }
 
-    public Make compile(boolean compile) {
-        return new Make(mainClass, ambient, root, classes, daemon, compile, aot, aotFile, aotLifetime, settings);
+    public Make mode(Mode mode) {
+        return new Make(mainClass, ambient, root, classes, mode, aotFolder, aotLifetime, settings);
     }
 
-    public Make aot(boolean aot) {
-        return new Make(mainClass, ambient, root, classes, daemon, compile, aot, aotFile, aotLifetime, settings);
-    }
-
-    public Make aotFile(Path aotFile) {
-        return new Make(mainClass, ambient, root, classes, daemon, compile, aot, aotFile, aotLifetime, settings);
+    public Make aotFolder(Path aotFolder) {
+        return new Make(mainClass, ambient, root, classes, mode, aotFolder, aotLifetime, settings);
     }
 
     public Make aotLifetime(Duration aotLifetime) {
-        return new Make(mainClass, ambient, root, classes, daemon, compile, aot, aotFile, aotLifetime, settings);
+        return new Make(mainClass, ambient, root, classes, mode, aotFolder, aotLifetime, settings);
     }
 
     public record Result(int code, SequencedMap<String, Path> outputs) {
@@ -382,13 +366,19 @@ public final class Make {
         } catch (URISyntaxException _) {
             location = null;
         }
-        boolean stop = selectors.length == 1 && selectors[0].equals("--stop");
+        boolean stop = selectors.length == 1 && selectors[0].equals("--stop"),
+                building = mainClass.equals("build.jenesis.Project") && (selectors.length == 0 || !Stream.of(selectors)
+                        .allMatch(selector -> PRINTING.contains(selector.split("/", 2)[0])));
         if (location == null || !location.getFileName().toString().endsWith(".java")) {
-            if (!daemon) {
-                if (aot && collected == null && location != null && mainClass.equals("build.jenesis.Project")
-                        && (selectors.length == 0 || !Stream.of(selectors).allMatch(
-                                selector -> PRINTING.contains(selector.split("/", 2)[0])))) {
+            if (mode != Mode.DAEMON) {
+                if (mode == Mode.AOT && collected == null && location != null && building) {
                     return cached(location, selectors);
+                }
+                if (location != null
+                        && building
+                        && !(Files.isDirectory(aotFolder) && location.toRealPath().startsWith(aotFolder.toRealPath()))
+                        && tools()) {
+                    sweep(location);
                 }
                 return invoke(Make.class.getClassLoader(), collected, selectors);
             }
@@ -403,7 +393,7 @@ public final class Make {
                     collected,
                     selectors);
         }
-        if (!daemon && !compile && !stop) {
+        if (mode == Mode.SOURCE && !stop) {
             return invoke(Make.class.getClassLoader(), collected, selectors);
         }
         Path build = location.getParent();
@@ -413,78 +403,52 @@ public final class Make {
         try (URLClassLoader loader = new URLClassLoader(
                 new URL[] { folder.toUri().toURL() },
                 ClassLoader.getPlatformClassLoader())) {
-            if (daemon || stop) {
+            if (mode == Mode.DAEMON || stop) {
                 return dispatched(loader, List.of("-cp", folder.toString()), seed, collected, selectors);
+            }
+            if (building && tools()) {
+                sweep(folder);
             }
             return invoke(loader, collected, selectors);
         }
     }
 
     private int cached(Path engine, String... selectors) throws IOException, InterruptedException {
-        Files.createDirectories(aotFile.getParent());
+        sweep(engine);
         String modules = System.getProperty("jdk.module.path");
         String module = modules == null ? null : Make.class.getModule().getName();
-        Path jar = module != null || Files.isRegularFile(engine) ? engine : aotFile.resolveSibling("engine.jar");
-        StringBuilder identity = new StringBuilder(engine.toString());
-        if (Files.isRegularFile(engine)) {
-            BasicFileAttributes attributes = Files.readAttributes(engine, BasicFileAttributes.class);
-            identity.append(':').append(attributes.size()).append(':').append(attributes.lastModifiedTime().toMillis());
-        } else {
-            try (Stream<Path> files = Files.walk(engine)) {
-                for (Path file : files.filter(Files::isRegularFile).sorted().toList()) {
-                    BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class);
-                    identity.append('|').append(engine.relativize(file))
-                            .append(':').append(attributes.size())
-                            .append(':').append(attributes.lastModifiedTime().toMillis());
-                }
-            }
-        }
-        identity.append('|').append(Runtime.version()).append('|').append(module == null ? jar : modules);
+        Path jar = module != null || Files.isRegularFile(engine) ? engine : aotFolder.resolve("engine.jar");
         MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
-        String name = aotFile.getFileName().toString();
-        int dot = name.lastIndexOf('.');
-        String stem = (dot < 0 ? name : name.substring(0, dot)) + "-", extension = dot < 0 ? "" : name.substring(dot);
-        Path cache = aotFile.resolveSibling(stem
-                + HexFormat.of().formatHex(digest.digest(identity.toString().getBytes(StandardCharsets.UTF_8)))
-                        .substring(0, 12)
-                + extension);
-        boolean reusable = Files.isRegularFile(cache)
-                && Files.exists(jar)
-                && (aotLifetime.isZero()
-                || !Files.getLastModifiedTime(cache).toInstant().isBefore(Instant.now().minus(aotLifetime)));
-        if (!reusable) {
-            try (DirectoryStream<Path> stale = Files.newDirectoryStream(cache.getParent(),
-                    stem + "?".repeat(12) + extension)) {
-                for (Path file : stale) {
-                    String hash = file.getFileName().toString().substring(stem.length(), stem.length() + 12);
-                    if (hash.chars().allMatch(character -> Character.digit(character, 16) >= 0)) {
-                        Files.deleteIfExists(file);
-                    }
+        Path cache = aotFolder.resolve("engine-" + HexFormat.of()
+                .formatHex(digest.digest((module == null ? jar.toString() : modules).getBytes(StandardCharsets.UTF_8)))
+                .substring(0, 12) + ".aot");
+        boolean reusable = Files.isRegularFile(cache) && Files.exists(jar);
+        if (!reusable && !jar.equals(engine)) {
+            Path temporary = Files.createTempFile(jar.getParent(), "engine", ".jar");
+            try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(temporary));
+                 Stream<Path> files = Files.walk(engine)) {
+                for (Path file : files.filter(Files::isRegularFile).sorted().toList()) {
+                    out.putNextEntry(new JarEntry(engine.relativize(file).toString()
+                            .replace(File.separatorChar, '/')));
+                    Files.copy(file, out);
+                    out.closeEntry();
                 }
             }
-            if (!jar.equals(engine)) {
-                Path temporary = Files.createTempFile(jar.getParent(), "engine", ".jar");
-                try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(temporary));
-                     Stream<Path> files = Files.walk(engine)) {
-                    for (Path file : files.filter(Files::isRegularFile).sorted().toList()) {
-                        out.putNextEntry(new JarEntry(engine.relativize(file).toString()
-                                .replace(File.separatorChar, '/')));
-                        Files.copy(file, out);
-                        out.closeEntry();
-                    }
-                }
-                Files.move(temporary, jar, StandardCopyOption.REPLACE_EXISTING);
-            }
+            Files.move(temporary, jar, StandardCopyOption.REPLACE_EXISTING);
         }
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", File.separatorChar == '\\' ? "java.exe" : "java")
                 .toString());
         command.add((reusable ? "-XX:AOTCache=" : "-XX:AOTCacheOutput=") + cache);
+        if (!reusable) {
+            command.add("-XX:+UnlockDiagnosticVMOptions");
+            command.add("-XX:-DisplayVMOutput");
+        }
         command.add("-Xlog:aot=off");
         new TreeMap<>(ambient).forEach((key, value) -> {
             if (!key.startsWith("toolchain.")) {
@@ -493,7 +457,11 @@ public final class Make {
         });
         command.add("-Djenesis.make.root=" + root);
         command.add("-Djenesis.make.classes=" + classes);
-        command.add("-Djenesis.make.aot=false");
+        command.add("-Djenesis.make.mode=compiled");
+        if (tools()) {
+            command.add("-Djenesis.process.mode=aot");
+            command.add("-Djenesis.aot.folder=" + aotFolder);
+        }
         if (module == null) {
             command.addAll(List.of("-cp", jar.toString(), Make.class.getName()));
         } else {
@@ -590,17 +558,79 @@ public final class Make {
         if (collected == null || !mainClass.equals("build.jenesis.Project")) {
             return (int) project
                     .getMethod("run", Map.class, String.class, Path.class, SequencedSet.class, String[].class)
-                    .invoke(null, settings.keys(), mainClass, root, settings.profiles(), selectors);
+                    .invoke(null, settled(), mainClass, root, settings.profiles(), selectors);
         }
         Object produced = project
                 .getMethod("perform", Map.class, Path.class, SequencedSet.class, String[].class)
-                .invoke(null, settings.keys(), root, settings.profiles(), selectors);
+                .invoke(null, settled(), root, settings.profiles(), selectors);
         if (produced == null) {
             return 1;
         }
         ((Map<?, ?>) produced).forEach((identity, output) -> collected.put(identity.toString(),
                 root.relativize(Path.of(output.toString()).toAbsolutePath().normalize()).toString()));
         return 0;
+    }
+
+    private boolean tools() {
+        String process = settings.keys().get("process.mode");
+        return process == null || process.isBlank() ? mode == Mode.AOT : process.trim().equalsIgnoreCase("aot");
+    }
+
+    private Map<String, String> settled() {
+        if (!tools()) {
+            return settings.keys();
+        }
+        Map<String, String> keys = new HashMap<>(settings.keys());
+        keys.put("process.mode", "aot");
+        keys.put("aot.folder", aotFolder.toString());
+        return Collections.unmodifiableMap(keys);
+    }
+
+    private void sweep(Path engine) throws IOException {
+        StringBuilder identity = new StringBuilder(Runtime.version().toString());
+        try (Stream<Path> files = Files.walk(engine)) {
+            for (Path file : files.filter(Files::isRegularFile).sorted().toList()) {
+                BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class);
+                identity.append('|').append(engine.relativize(file))
+                        .append(':').append(attributes.size())
+                        .append(':').append(attributes.lastModifiedTime().toMillis());
+            }
+        }
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        String fingerprint = HexFormat.of().formatHex(digest.digest(identity.toString().getBytes(StandardCharsets.UTF_8)));
+        Path stamp = aotFolder.resolve("aot.properties");
+        Properties recorded = Files.isRegularFile(stamp) ? read(stamp) : new Properties();
+        Instant created;
+        try {
+            created = Instant.parse(recorded.getProperty("created", ""));
+        } catch (DateTimeParseException _) {
+            created = null;
+        }
+        if (fingerprint.equals(recorded.getProperty("engine"))
+                && created != null
+                && (aotLifetime.isZero() || !created.isBefore(Instant.now().minus(aotLifetime)))) {
+            return;
+        }
+        if (Files.isDirectory(aotFolder)) {
+            try (Stream<Path> files = Files.walk(aotFolder)) {
+                for (Path file : files.filter(file -> !file.equals(aotFolder)).sorted(Comparator.reverseOrder()).toList()) {
+                    Files.deleteIfExists(file);
+                }
+            }
+        }
+        Properties written = new Properties();
+        written.setProperty("engine", fingerprint);
+        written.setProperty("created", Instant.now().toString());
+        Path temporary = Files.createTempFile(Files.createDirectories(aotFolder), "aot", ".properties");
+        try (Writer writer = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8)) {
+            written.store(writer, null);
+        }
+        Files.move(temporary, stamp, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }
 
     public static Settings settings(Path path) throws IOException {
@@ -754,6 +784,11 @@ public final class Make {
             throw new IllegalStateException("jenesis.make.root cannot be set in " + file
                     + ": the project root locates this file, so it is resolved before the file is read"
                     + " (pass -Djenesis.make.root on the command line instead)");
+        }
+        if (properties.getProperty("jenesis.release.publish") != null) {
+            throw new IllegalStateException("jenesis.release.publish cannot be set in " + file
+                    + ": publishing is what one run is asked to do, and every pin runs the release, so only the"
+                    + " command line may name it (pass -Djenesis.release.publish=true to the release that publishes)");
         }
         if (properties.getProperty("jenesis.make.global") != null) {
             throw new IllegalStateException("jenesis.make.global cannot be set in " + file

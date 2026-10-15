@@ -111,12 +111,17 @@ public class BuildExecutorCallbackTest {
         assertThat(events.get(1)).containsEntry("step", "foo")
                 .containsEntry("status", "executed")
                 .containsEntry("folder", target.toAbsolutePath().normalize().resolve("foo").toString())
-                .containsKey("seconds");
+                .containsKey("seconds")
+                .as("a step's start, in seconds since the build began, places it on the build's timeline")
+                .hasEntrySatisfying("start", start -> assertThat((Double) start).isNotNegative());
         assertThat(events.get(2)).containsEntry("step", "bar").containsEntry("status", "skipped");
         assertThat(events.get(3)).containsEntry("step", "baz")
                 .containsEntry("status", "loaded")
                 .containsEntry("seconds", 1.5);
-        assertThat(events.get(5)).containsEntry("module", "qux").containsEntry("status", "resolved");
+        assertThat(events.get(5)).containsEntry("module", "qux")
+                .containsEntry("status", "resolved")
+                .hasEntrySatisfying("start", start -> assertThat((Double) start)
+                        .isGreaterThanOrEqualTo((Double) events.get(1).get("start")));
         assertThat(events.get(6))
                 .as("a failure names the exception that caused it rather than the executor's wrapper")
                 .containsEntry("step", "qux/quux")
