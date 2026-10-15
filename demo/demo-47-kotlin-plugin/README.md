@@ -3,7 +3,7 @@ Kotlin compiler plugin demo
 
 Run a Kotlin compiler plugin over a modular Kotlin project, declared the same way
 as a Java annotation processor - with `@jenesis.plugin`, but naming the Kotlin
-compiler so the plugin resolves in that compiler's own `kotlinc` group.
+plugin so the compiler plugin resolves in that plugin's own `kotlin` group.
 
 This module uses [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization):
 `Point` is a `@Serializable` data class, and the serialization compiler plugin
@@ -16,21 +16,22 @@ From this directory:
 
     java build/jenesis/Make.java
 
-Jenesis auto-detects the MODULAR_TO_MAVEN layout, resolves the Kotlin compiler,
-resolves the plugin, and compiles the module - emitting the generated
-`Point$$serializer` class alongside `Point`.
+Jenesis auto-detects the MODULAR_TO_MAVEN layout, resolves the Kotlin compiler
+of the Kotlin plugin that `jenesis.plugins.properties` names, as in
+`../demo-45-kotlin`, resolves the compiler plugin, and compiles the module -
+emitting the generated `Point$$serializer` class alongside `Point`.
 
 How the plugin is wired
 -----------------------
 
-The plugin is declared with the Kotlin compiler named first, then the plugin's
-`<repository>/<coordinate>`:
+The compiler plugin is declared with the Kotlin plugin's name first, then the
+compiler plugin's `<repository>/<coordinate>`:
 
-    @jenesis.plugin kotlinc maven/org.jetbrains.kotlin/kotlin-serialization-compiler-plugin
+    @jenesis.plugin kotlin:tool maven/org.jetbrains.kotlin/kotlin-serialization-compiler-plugin
 
-Naming a compiler resolves the plugin in that compiler's group (`kotlinc`) under a
-`plugin` scope, version coordinated to the compiler (the `pin` step writes back a
-`kotlinc/maven/org.jetbrains.kotlin/kotlin-serialization-compiler-plugin ...`
+Naming the Kotlin plugin resolves the compiler plugin in its group (`kotlin`)
+under a `plugin` scope, version coordinated to the compiler (the `pin` step writes
+back a `kotlin:tool/maven/org.jetbrains.kotlin/kotlin-serialization-compiler-plugin ...`
 line), and
 the Kotlin compiler picks the resolved jar and hands it over as
 `-Xplugin=<jar>`. The compiler self-loads it

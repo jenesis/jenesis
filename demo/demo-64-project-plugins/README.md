@@ -9,7 +9,7 @@ Hook plugins into the build of the whole project rather than into one module's:
 - a `package` plugin adds a package of its own beside the ones Jenesis builds;
 - a `stage/transform` plugin adds to what was staged, and a `stage/inspect`
   plugin checks it, before anything is exported or released;
-- an `export` or a `release` plugin delivers what was staged;
+- a `release` plugin delivers what was staged;
 - a plugin under `plugin` runs only when it is asked for, and needs no build.
 
 `preprocess` and `postprocess` run as part of `build`, so everything after it -
@@ -69,7 +69,7 @@ Layout
     |-- notice/                                the transform
     |-- audit/                                 the inspection
     |-- zip/                                   the packager
-    |-- publish/                               the exporter
+    |-- publish/                               the releaser
     |-- checksums/                             the transform of the staged trees
     |-- complete/                              the inspection of the staged trees
     |-- lines/                                 a plugin run on demand
@@ -87,12 +87,12 @@ demo names its generator:
     notice+postprocess/transform=./notice
     audit+postprocess/inspect=./audit
     zip+package=./zip
-    publish+export=./publish
+    publish+release=./publish
     checksums+stage/transform=./checksums
     complete+stage/inspect=./complete
     lines+plugin=./lines
 
-Eight hook points run a plugin once for the whole project rather than once per module:
+Seven hook points run a plugin once for the whole project rather than once per module:
 
 | Hook point | Runs as | Runs | Is handed |
 | --- | --- | --- | --- |
@@ -101,12 +101,14 @@ Eight hook points run a plugin once for the whole project rather than once per m
 | `postprocess/inspect` | `build/postprocess/inspect/<name>` | after the transforms | the same, plus what they added |
 | `stage/transform` | `stage/transform/<name>` | after the stock staging | everything staged |
 | `stage/inspect` | `stage/inspect/<name>` | after the transforms of stage | the staged trees with what they added |
-| `export` | `export/custom/<name>` | with `export`, beside its stock steps | everything staged |
-| `release` | `release/custom/<name>` | with `release`, beside its stock steps | everything staged |
+| `release` | `release/custom/<name>` | with `release`, beside its stock steps, where its `plugin-<name>.properties` is found | everything staged, the project's root and its resolved metadata |
 | `plugin` | `plugin/<name>` | only when `plugin/<name>` is named | only what it binds |
 
 No `plugin-<name>.properties` switches such a plugin on in a module: the line itself
-does. Transforms run in the order the file names them, each seeing what the ones
+does. A releaser is the exception: it runs only where a configuration folder holds its
+`plugin-<name>.properties`, and it takes its values from that file rather than from the
+arguments below. `export` has no hook point: it installs what was staged into this
+machine's local repositories, and the plugins of `stage` already shape what that is. Transforms run in the order the file names them, each seeing what the ones
 before it added, and the inspections run after all of them. `package` is a hook point
 of each module instead, like `binary/generated`, and is described below.
 
@@ -121,11 +123,10 @@ per value as `<plugin>.<key>`. This demo's holds
     licence.@legal=legal
     notice.holder=Example Corp.
     notice.@legal=legal
-    publish.directory=target/published
     lines.@sources=sources
     lines.file=target/LINES
 
-and `holder=Example Corp.` reaches the `notice` plugin's `SequencedMap` constructor. A profile
+and `holder=Example Corp.` reaches the `notice` plugin's factory among its values. A profile
 brings values of its own in `jenesis.plugins.arguments-<profile>.properties`, which
 win over the file without a profile:
 
@@ -173,8 +174,10 @@ place their files at one target fail the build. A value whose key starts with `@
 written with two: `@@name=value` hands the plugin `@name=value`.
 
 A path is resolved against the project root here, and against the module's own
-folder in a module's `plugin-<name>.properties`. Either way it has to stay within
-the project, symbolic links included:
+folder in a module's `plugin-<name>.properties`, and `@<key>` names it through
+`-Djenesis.variable.<key>`. A file may lie outside the project, so that several
+projects share one configuration, but a folder has to stay within it, symbolic
+links included:
 
     # jenesis.plugins.arguments-outside.properties
     notice.@legal=../..
@@ -245,18 +248,30 @@ writes already fails the build rather than replacing it.
 Delivering what was staged
 --------------------------
 
-An exporter runs with `export`, and a releaser with `release`, beside the steps
-Jenesis runs there itself. Both are handed everything that was staged. The `publish`
-plugin copies the modular tree into the folder its arguments name:
+A releaser runs with `release`, beside the steps Jenesis runs there itself, and is
+handed everything that was staged. The `publish` plugin copies the modular tree into
+the folder its `build.jenesis/plugin-publish.properties` names:
 
-    java build/jenesis/Make.java export/custom
+    directory=target/published
+
+A release is a dry run unless the command line asks for more, and a releaser reads
+that setting too, so `publish` only names what it would copy:
+
+    java build/jenesis/Make.java release
+
+    Would publish target/published/demo.app/demo.app.jar
+    ...
+
+`-Djenesis.release.publish=true` makes it copy, and only the command line may pass it:
+
+    java -Djenesis.release.publish=true build/jenesis/Make.java release/custom
 
     target/published/demo.app/demo.app.jar
 
-Naming `export/custom` runs the exporters alone, without writing into the local
-repositories. A step that writes outside the build, as an exporter does, runs every
-time it is selected rather than only when what it reads has changed - `publish`
-says so by overriding `shouldRun`.
+Naming `release/custom` runs the releasers alone, without the steps Jenesis runs in
+`release` itself. A step that writes outside the build, as a releaser does, runs every
+time it is selected rather than only when what it reads has changed - `publish` says
+so by overriding `shouldRun`.
 
 Adding to what was staged
 -------------------------
@@ -298,18 +313,18 @@ The plugins of the whole project belong to no module, so their pins live beside 
 file that names them, in `jenesis.plugins.pin.properties`, one line for each module
 in each plugin's closure:
 
-    plugin-audit/module/build.jenesis=0.14.0 SHA-256/...
-    plugin-checksums/module/build.jenesis=0.14.1 SHA-256/...
-    plugin-complete/module/build.jenesis=0.14.1 SHA-256/...
-    plugin-licence/module/build.jenesis=0.14.1 SHA-256/...
-    plugin-lines/module/build.jenesis=0.14.1 SHA-256/...
-    plugin-notice/module/build.jenesis=0.14.0 SHA-256/...
-    plugin-publish/module/build.jenesis=0.14.1 SHA-256/...
+    audit/module/build.jenesis=0.14.0 SHA-256/...
+    checksums/module/build.jenesis=0.14.1 SHA-256/...
+    complete/module/build.jenesis=0.14.1 SHA-256/...
+    licence/module/build.jenesis=0.14.1 SHA-256/...
+    lines/module/build.jenesis=0.14.1 SHA-256/...
+    notice/module/build.jenesis=0.14.0 SHA-256/...
+    publish/module/build.jenesis=0.14.1 SHA-256/...
 
 A plugin of a module, the `zip` packager among them, is pinned in the module's own
 declaration, as the `internal-module` demo's generator is:
 
-    @jenesis.pin plugin-zip/module/build.jenesis 0.14.1 SHA-256/...
+    @jenesis.pin zip/module/build.jenesis 0.14.1 SHA-256/...
 
 `java build/jenesis/Make.java pin` writes the file, pinning every plugin the file
 names, including one a setting switches off, so a plugin that only a profile

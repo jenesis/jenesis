@@ -3,8 +3,9 @@ Scala demo
 
 Build a project that mixes Java and Scala 3 in one module of the Java module
 system, and export a package that holds only Scala. You point Jenesis at the
-project, it compiles the `.java` and `.scala` sources together, and emits a
-modular jar alongside a generated POM - there is no build script to write.
+project and name the Scala plugin, it compiles the `.java` and `.scala` sources
+together, and emits a modular jar alongside a generated POM - there is no build
+script to write.
 
 Build it
 --------
@@ -19,6 +20,11 @@ modular jar alongside a generated POM. The `requires scala.library` directive
 resolves to `org.scala-lang:scala-library`, the jar that carries the Scala
 standard library.
 
+Scala is a plugin of the hook point `language`, named in
+`jenesis.plugins.properties` as Kotlin is in `../demo-45-kotlin`:
+
+    scala+language=build.jenesis.plugin.scala
+
 Layout
 ------
 
@@ -27,6 +33,7 @@ sources out under one package:
 
     demo/demo-49-scala
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
+    |-- jenesis.plugins.properties names the Scala plugin
     `-- sources
         |-- module-info.java       requires scala.library; exports sample; exports sample.pure
         `-- sample
@@ -38,7 +45,7 @@ sources out under one package:
 How Jenesis builds it
 ---------------------
 
-Jenesis detects the `.scala` sources and drives the Scala compiler as part of
+The Scala plugin finds the `.scala` sources and drives the Scala compiler as part of
 the standard build, with `javac` participating for `module-info.java` and the
 companion `.java` file. The module exports both a mixed package and a package
 that holds only Scala.
@@ -46,7 +53,7 @@ that holds only Scala.
 Compile order and exporting a Scala package
 -------------------------------------------
 
-The inferred chain compiles Scala first, then `javac`. `scalac` reads the `.java`
+The plugin compiles Scala first, then `javac`. `scalac` reads the `.java`
 sources for symbol resolution, so `Sample.scala` can call `Greeter`, but it emits
 only Scala classes; `javac` then compiles `Greeter.java` and `module-info.java`.
 When `javac` validates the `exports` directives, it sees the already-compiled
@@ -56,7 +63,7 @@ yet exported.
 
 One Scala-specific detail: `scalac` is not handed `module-info.java`. Its Java
 source parser cannot read a module declaration (it fails with "';' expected but
-'.' found" on the dotted module name), so Jenesis withholds `module-info.java`
+'.' found" on the dotted module name), so the plugin withholds `module-info.java`
 from `scalac` and lets `javac` own it; `scalac` still receives the other `.java`
 sources for resolution.
 
@@ -84,9 +91,9 @@ also compiles the `.java` sources to follow what they declare, but the module's
 Java classes still come from `javac`, as without the setting. Each compile runs
 in a JVM of its own, as `scalac` does without the setting.
 
-Zinc resolves as `org.scala-sbt:zinc_2.13` in a `zinc` group of its own, and drives
-the compiler through `org.scala-lang:scala3-sbt-bridge`, which the module pins in
-the `scalac` group at the compiler's version.
+Zinc resolves as `org.scala-sbt:zinc_2.13` in a `scala:zinc` group of its own, and
+drives the compiler through `org.scala-lang:scala3-sbt-bridge`, which the module
+pins in the `scala:tool` group at the compiler's version.
 
 Pinning
 -------
@@ -95,9 +102,10 @@ The module's closure is pinned with `@jenesis.pin` tags on the module
 declaration: the module's own dependency in the default `main` group
 (the bare `scala.library` Java module name, plus its `org.scala-lang/scala-library`
 Maven coordinate) and
-the Scala compiler toolchain in its own `scalac` group (each
-`scalac/maven/...` coordinate with a version and SHA-256 checksum), and Zinc in its
-`zinc` group. The latest
+the Scala compiler toolchain in the tool group of the plugin, `scala:tool` (each
+`scala:tool/maven/...` coordinate with a version and SHA-256 checksum), Zinc in its
+`scala:zinc` group, and Scaladoc, which documents the module under
+`-Djenesis.project.documentation=true`, in its `scala:scaladoc` group. The latest
 Scala `<release>` on Maven Central is often a release candidate, so pinning is
 what keeps an otherwise floating build from drifting onto a fresh `-RC`. Run
 `java build/jenesis/Make.java pin` to record or refresh the tags; re-running

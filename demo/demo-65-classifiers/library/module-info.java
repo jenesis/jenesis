@@ -1,4 +1,4 @@
 module demo.library {
     requires build.jenesis;
-    provides build.jenesis.BuildExecutorModule with demo.library.LibraryModule;
+    provides build.jenesis.BuildModuleFactory with demo.library.LibraryFactory;
 }

@@ -5,6 +5,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.Make;
 import build.jenesis.Project;
+import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.step.JMod;
 
@@ -15,7 +16,7 @@ public class Demo {
         InferredMultiProjectAssembler assembler = InferredMultiProjectAssembler.ofEnvironment(environment);
         Project.ofEnvironment(environment, Path.of(".")).assembler((descriptor, repositories, resolvers) -> assembler
                 .apply(descriptor.content("config"), repositories, resolvers)
-                .mapBuild(stock -> (sub, inherited) -> {
+                .nest(AssemblyDescriptor.BUILD, "", stock -> (sub, inherited) -> {
                     sub.addStep("config", (executor, context, arguments) -> {
                         Path config = Files.createDirectory(context.next().resolve(JMod.CONFIG));
                         Files.writeString(config.resolve("app.properties"),
