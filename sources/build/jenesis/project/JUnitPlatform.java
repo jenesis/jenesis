@@ -3,6 +3,8 @@ package build.jenesis.project;
 import module java.base;
 import build.jenesis.BuildStep;
 import build.jenesis.PathPlacement;
+import build.jenesis.TestFramework;
+import build.jenesis.TestTags;
 
 public record JUnitPlatform(String console) implements TestFramework {
 

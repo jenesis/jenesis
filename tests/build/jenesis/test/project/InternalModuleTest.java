@@ -10,15 +10,15 @@ import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Language;
 import build.jenesis.Observation;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.TestFramework;
 import build.jenesis.module.ModularJarResolver;
-import build.jenesis.project.TestFramework;
 import build.jenesis.project.InternalModule;
-import build.jenesis.project.Language;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -174,7 +174,10 @@ public class InternalModuleTest {
                     false,
                     false,
                     0);
-            executor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE, "module", "main", source,
+            executor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
+                    "module",
+                    "main",
+                    source,
                     Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
                     Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
             created.add(Files.readString(executor.execute().get("internal/marker").resolve("created.txt")));
@@ -220,7 +223,10 @@ public class InternalModuleTest {
                             }
                         }
                         """));
-        InternalModule internal = InternalModule.ofEnvironment(Environment.NONE, "module", "probe", source,
+        InternalModule internal = InternalModule.ofEnvironment(Environment.NONE,
+                "module",
+                "probe",
+                source,
                 Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
                 Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
                 .properties(new LinkedHashMap<>(Map.of("option", "-Dprobe")));
@@ -251,20 +257,20 @@ public class InternalModuleTest {
     @Test
     public void creates_the_language_of_a_plugin_that_compiles_one() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.project.LanguageFactory with test.plugin.Factory; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.LanguageFactory with test.plugin.Factory; }",
                 Map.of("test/plugin/Factory.java", """
                         package test.plugin;
                         import build.jenesis.BuildExecutor;
                         import build.jenesis.BuildExecutorModule;
                         import build.jenesis.BuildStepResult;
-                        import build.jenesis.project.Language;
+                        import build.jenesis.Language;
                         import java.nio.file.Files;
                         import java.nio.file.Path;
                         import java.util.LinkedHashSet;
                         import java.util.List;
                         import java.util.SequencedMap;
                         import java.util.concurrent.CompletableFuture;
-                        public class Factory implements build.jenesis.project.LanguageFactory {
+                        public class Factory implements build.jenesis.LanguageFactory {
                             public Language create(build.jenesis.Environment environment,
                                                    SequencedMap<String, String> properties,
                                                    build.jenesis.Permits permits,
@@ -281,7 +287,10 @@ public class InternalModuleTest {
                             }
                         }
                         """));
-        InternalModule internal = InternalModule.ofEnvironment(Environment.NONE, "module", "main", source,
+        InternalModule internal = InternalModule.ofEnvironment(Environment.NONE,
+                "module",
+                "main",
+                source,
                 Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
                 Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
                 .properties(new LinkedHashMap<>(Map.of("target", "jvm")));
@@ -310,17 +319,17 @@ public class InternalModuleTest {
     @Test
     public void creates_the_test_framework_of_a_plugin_that_runs_the_tests() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.plugin { requires build.jenesis; provides build.jenesis.project.TestFrameworkFactory with test.plugin.Factory; }",
+                "module test.plugin { requires build.jenesis; provides build.jenesis.TestFrameworkFactory with test.plugin.Factory; }",
                 Map.of("test/plugin/Factory.java", """
                         package test.plugin;
-                        import build.jenesis.project.TestFramework;
+                        import build.jenesis.TestFramework;
                         import java.lang.module.ModuleDescriptor;
                         import java.nio.file.Path;
                         import java.util.List;
                         import java.util.Set;
                         import java.util.SequencedMap;
                         import java.util.SequencedSet;
-                        public class Factory implements build.jenesis.project.TestFrameworkFactory {
+                        public class Factory implements build.jenesis.TestFrameworkFactory {
                             public TestFramework create(build.jenesis.Environment environment,
                                                         SequencedMap<String, String> properties,
                                                         build.jenesis.Permits permits,
@@ -350,7 +359,10 @@ public class InternalModuleTest {
                             }
                         }
                         """));
-        InternalModule internal = InternalModule.ofEnvironment(Environment.NONE, "module", "main", source,
+        InternalModule internal = InternalModule.ofEnvironment(Environment.NONE,
+                "module",
+                "main",
+                source,
                 Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
                 Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
                 .properties(new LinkedHashMap<>(Map.of("runner", "example.Runner")));
@@ -515,7 +527,10 @@ public class InternalModuleTest {
                             }
                         }
                         """.formatted(index)));
-        return InternalModule.ofEnvironment(Environment.NONE, "module", "greeting", source,
+        return InternalModule.ofEnvironment(Environment.NONE,
+                "module",
+                "greeting",
+                source,
                 Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
                 Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)));
     }
@@ -552,7 +567,10 @@ public class InternalModuleTest {
         Path source = writeModuleSource(work.resolve("plugin"),
                 moduleInfo,
                 Map.of("test/plugin/Plugin.java", plugin.formatted("before")));
-        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE, "module", "main", source,
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
+                "module",
+                "main",
+                source,
                 Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
                 Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
         assertThat(buildExecutor.execute().get("internal/marker").resolve("out.txt")).content().isEqualTo("before");
@@ -573,7 +591,10 @@ public class InternalModuleTest {
                 false,
                 false,
                 0);
-        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE, "module", "main", source,
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
+                "module",
+                "main",
+                source,
                 Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
                 Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
         assertThat(buildExecutor.execute().get("internal/marker").resolve("out.txt")).content()

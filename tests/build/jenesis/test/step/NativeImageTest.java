@@ -20,13 +20,14 @@ public class NativeImageTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, bundle, shim;
+    private Path previous, next, supplement, persistent, bundle, shim;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         bundle = Files.createDirectory(root.resolve("bundle"));
         Files.writeString(Files.createDirectory(bundle.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"), "jar");
         shim = root.resolve("native-image-shim");
@@ -104,7 +105,7 @@ public class NativeImageTest {
         BuildStepResult result = new NativeImage(PathPlacement.CLASS_PATH, ProcessHandler.OfProcess.of(List.of(shim.toString())))
                 .group("extra")
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                                 bundle,
                                 Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -166,7 +167,7 @@ public class NativeImageTest {
 
         new NativeImage(PathPlacement.CLASS_PATH, ProcessHandler.OfProcess.of(List.of(linked.toString()))).apply(
                         Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                                 bundle,
                                 Map.of(Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED))))))
@@ -199,7 +200,7 @@ public class NativeImageTest {
 
         assertThatThrownBy(() -> new NativeImage(PathPlacement.CLASS_PATH, ProcessHandler.OfProcess.of(List.of(program.toString()))).apply(
                         Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                                 bundle,
                                 Map.of(Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED))))))
@@ -237,7 +238,7 @@ public class NativeImageTest {
     private BuildStepResult run(PathPlacement modulePath) throws IOException {
         return new NativeImage(modulePath, ProcessHandler.OfProcess.of(List.of(shim.toString()))).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),

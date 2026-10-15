@@ -23,13 +23,14 @@ public class PinModuleInfoTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, input;
+    private Path previous, next, supplement, persistent, input;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         input = Files.createDirectory(root.resolve("input"));
     }
 
@@ -97,7 +98,7 @@ public class PinModuleInfoTest {
         configurator.apply(PinModuleInfo.ofEnvironment(new Environment(settings), "module", "", List.of(moduleInfo), new HashDigestFunction("SHA-256"))
                         .platform(platform))
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                                 input,
                                 Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))

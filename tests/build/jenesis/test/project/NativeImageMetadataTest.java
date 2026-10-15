@@ -15,13 +15,14 @@ public class NativeImageMetadataTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, source;
+    private Path previous, next, supplement, persistent, source;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         source = Files.createDirectory(root.resolve("source"));
     }
 
@@ -95,7 +96,7 @@ public class NativeImageMetadataTest {
             map.put(argument.getKey(), argument.getValue());
         }
         BuildStepResult result = new NativeImageMetadata().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         map)
                 .toCompletableFuture()
                 .join();

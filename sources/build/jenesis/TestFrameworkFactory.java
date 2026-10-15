@@ -1,10 +1,6 @@
-package build.jenesis.project;
+package build.jenesis;
 
 import module java.base;
-import build.jenesis.Environment;
-import build.jenesis.Permits;
-import build.jenesis.Repository;
-import build.jenesis.Resolver;
 
 @FunctionalInterface
 public interface TestFrameworkFactory {

@@ -8,13 +8,14 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.Palette;
+import build.jenesis.Permits;
 import build.jenesis.SequencedProperties;
 
 public abstract class ProcessBuildStep implements BuildStep {
 
     public static final String PROCESS = "process/", ENVIRONMENT = "environment/", INDEX = "index.properties";
     private static final SAXParserFactory REPORTS = reports();
-    private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<Integer, Permits> PERMITS = new ConcurrentHashMap<>();
     private static final int TAIL = 200;
     private static final int KILLED = 128 + 9;
     private static final Pattern UNQUOTED = Pattern.compile("[A-Za-z0-9_@%+=:,./-]+");
@@ -46,17 +47,21 @@ public abstract class ProcessBuildStep implements BuildStep {
     }
 
     public record Terms(BiConsumer<Boolean, String> printing,
-                        Semaphore permits,
+                        Permits permits,
                         Consumer<String> announcing,
                         Consumer<String> reporting,
-                        int tail) {
+                        int tail,
+                        boolean daemon,
+                        Path aot) {
 
         public Terms() {
             this(null,
-                    PERMITS.computeIfAbsent(Runtime.getRuntime().availableProcessors(), Semaphore::new),
+                    PERMITS.computeIfAbsent(Runtime.getRuntime().availableProcessors(), Permits::of),
                     null,
                     null,
-                    TAIL);
+                    TAIL,
+                    false,
+                    null);
         }
 
         public static Terms ofEnvironment(Environment environment, String command) {
@@ -66,10 +71,6 @@ public abstract class ProcessBuildStep implements BuildStep {
         public static Terms ofEnvironment(Environment environment,
                                    String command,
                                    boolean printing) {
-            int concurrency = environment.number("process.concurrency", Runtime.getRuntime().availableProcessors());
-            if (concurrency < 0) {
-                throw new IllegalArgumentException("Process concurrency must not be negative: " + concurrency);
-            }
             int tail = environment.number("process.tail", TAIL);
             if (tail < 0) {
                 throw new IllegalArgumentException("jenesis.process.tail is " + tail
@@ -77,13 +78,18 @@ public abstract class ProcessBuildStep implements BuildStep {
             }
             boolean streamed = environment.flag("print." + command,
                     environment.flag("print.process", printing));
+            String mode = environment.value("process.mode", "fork").toLowerCase(Locale.ROOT);
+            if (!List.of("fork", "aot", "daemon").contains(mode)) {
+                throw new IllegalArgumentException("Malformed value for jenesis.process.mode: '" + mode
+                        + "' (expected fork, aot or daemon)");
+            }
             Consumer<String> out = environment.out();
             Palette palette = Palette.ofEnvironment(environment);
             return new Terms(streamed
                     ? (error, line) -> out.accept((error ? palette.error() : palette.output())
                             + command + " >>>> " + line + palette.reset())
                     : null,
-                    concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Semaphore::new),
+                    ProcessBuildStep.permits(environment),
                     environment.flag("print.command")
                             ? executed -> out.accept("%s%-11s%s %s".formatted(
                                     palette.info(), "[EXECUTED]", palette.reset(), executed))
@@ -92,27 +98,39 @@ public abstract class ProcessBuildStep implements BuildStep {
                             ? found -> out.accept("%s%-11s%s %s".formatted(
                                     palette.warning(), "[FINDINGS]", palette.reset(), found))
                             : null,
-                    tail);
+                    tail,
+                    mode.equals("daemon"),
+                    mode.equals("aot")
+                            ? Path.of(environment.value("aot.folder", ".jenesis/aot")).toAbsolutePath()
+                            : null);
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {
-            return new Terms(printing, permits, announcing, reporting, tail);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, aot);
         }
 
-        public Terms permits(Semaphore permits) {
-            return new Terms(printing, permits, announcing, reporting, tail);
+        public Terms permits(Permits permits) {
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, aot);
         }
 
         public Terms announcing(Consumer<String> announcing) {
-            return new Terms(printing, permits, announcing, reporting, tail);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, aot);
         }
 
         public Terms reporting(Consumer<String> reporting) {
-            return new Terms(printing, permits, announcing, reporting, tail);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, aot);
         }
 
         public Terms tail(int tail) {
-            return new Terms(printing, permits, announcing, reporting, tail);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, aot);
+        }
+
+        public Terms daemon(boolean daemon) {
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, aot);
+        }
+
+        public Terms aot(Path aot) {
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, aot);
         }
     }
 
@@ -121,7 +139,10 @@ public abstract class ProcessBuildStep implements BuildStep {
     }
 
     protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
-        return factory.apply(commands);
+        ProcessHandler handler = factory.apply(commands);
+        return handler instanceof ProcessHandler.OfProcess process
+                ? process.daemon(process.daemon() && terms.daemon()).aot(terms.aot())
+                : handler;
     }
 
     protected ProcessHandler environment(ProcessHandler handler, SequencedMap<String, BuildStepArgument> arguments)
@@ -154,7 +175,7 @@ public abstract class ProcessBuildStep implements BuildStep {
 
     protected int execute(ProcessHandler handler, Path output, Path error, ProcessHandler.Tee tee)
             throws IOException, InterruptedException {
-        Semaphore permits = terms.permits();
+        Permits permits = terms.permits();
         if (permits == null) {
             return handler.execute(output, error, tee);
         }
@@ -200,6 +221,14 @@ public abstract class ProcessBuildStep implements BuildStep {
             properties.put(entry.getKey(), folderMap);
         }
         return properties;
+    }
+
+    public static Permits permits(Environment environment) {
+        int concurrency = environment.number("process.concurrency", Runtime.getRuntime().availableProcessors());
+        if (concurrency < 0) {
+            throw new IllegalArgumentException("Process concurrency must not be negative: " + concurrency);
+        }
+        return concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Permits::of);
     }
 
     public static Path locate(Path folder, String kind, String tool) throws IOException {
@@ -275,7 +304,7 @@ public abstract class ProcessBuildStep implements BuildStep {
         }
     }
 
-    protected Optional<String> diagnosis(BuildStepContext context) throws IOException {
+    protected Optional<String> diagnosis(BuildStepContext context) {
         return Optional.empty();
     }
 

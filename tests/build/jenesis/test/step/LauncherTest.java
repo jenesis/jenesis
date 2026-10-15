@@ -22,13 +22,14 @@ public class LauncherTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, input;
+    private Path previous, next, supplement, persistent, input;
 
     @BeforeEach
     public void setUp() throws IOException {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         input = Files.createDirectory(root.resolve("input"));
     }
 
@@ -48,7 +49,7 @@ public class LauncherTest {
                 "launcher",
                 PathPlacement.INFERRED).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("resolved/launcher.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -78,7 +79,7 @@ public class LauncherTest {
 
         assertThatThrownBy(() -> Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.INFERRED).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(input, Map.of())))))
                 .as("a launcher reading its descriptor elsewhere would yield a jar that fails only at java -jar")
                 .isInstanceOf(IllegalStateException.class)
@@ -104,7 +105,7 @@ public class LauncherTest {
 
         BuildStepResult result = Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.INFERRED).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("resolved/launcher.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -160,7 +161,7 @@ public class LauncherTest {
         application.store(input.resolve("launcher.properties"));
         Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.INFERRED).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(input, Map.of())))).toCompletableFuture().join();
         assertThat(entries(next.resolve(Launcher.LAUNCHER).resolve("app.jar")))
                 .as("a class path scan asks for a package as a directory, so a stored jar keeps the directories it holds")
@@ -192,7 +193,7 @@ public class LauncherTest {
 
         Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.INFERRED).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 arguments).toCompletableFuture().join();
 
         Path jar = next.resolve(Launcher.LAUNCHER).resolve("app.jar");
@@ -222,7 +223,7 @@ public class LauncherTest {
 
         BuildStepResult result = Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.INFERRED).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("resolved/launcher.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -262,7 +263,7 @@ public class LauncherTest {
 
         BuildStepResult result = Launcher.ofEnvironment(Environment.NONE.out(printed::add), "launcher", PathPlacement.INFERRED).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("resolved/launcher.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -300,7 +301,7 @@ public class LauncherTest {
 
         BuildStepResult result = Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.CLASS_PATH).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("resolved/launcher.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -330,7 +331,7 @@ public class LauncherTest {
 
         BuildStepResult result = Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.INFERRED).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("resolved/launcher.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -368,7 +369,7 @@ public class LauncherTest {
 
         BuildStepResult result = launcher.apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("resolved/launcher.jar"), Checksum.of(ChecksumStatus.ADDED),

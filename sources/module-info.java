@@ -21,8 +21,8 @@ module build.jenesis {
 
     uses build.jenesis.BuildModuleFactory;
     uses build.jenesis.ObservabilityFactory;
-    uses build.jenesis.project.TestFrameworkFactory;
-    uses build.jenesis.project.LanguageFactory;
+    uses build.jenesis.TestFrameworkFactory;
+    uses build.jenesis.LanguageFactory;
 
     provides java.util.spi.ToolProvider with build.jenesis.MakeTool,
             build.jenesis.ExecuteTool,

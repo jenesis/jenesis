@@ -23,13 +23,14 @@ public class JavadocTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, sources;
+    private Path previous, next, supplement, persistent, sources;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         sources = Files.createDirectory(root.resolve("sources"));
     }
 
@@ -48,7 +49,7 @@ public class JavadocTest {
                 """);
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -75,7 +76,7 @@ public class JavadocTest {
         Javac.writeRelease(sources, Runtime.version().feature() + "-preview", Runtime.version().feature());
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -106,7 +107,7 @@ public class JavadocTest {
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE,
                 process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 arguments).toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         assertThat(next.resolve(Javadoc.JAVADOC + "java/lang/invoke/VarHandle.html"))
@@ -125,7 +126,7 @@ public class JavadocTest {
         Javac.writeRelease(sources, "8", Runtime.version().feature());
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -145,7 +146,7 @@ public class JavadocTest {
         ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javadoc", javadoc);
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -167,7 +168,7 @@ public class JavadocTest {
         assertThatThrownBy(() -> Javadoc.ofEnvironment(Environment.NONE,
                         process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
@@ -193,7 +194,7 @@ public class JavadocTest {
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE,
                         process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -231,7 +232,7 @@ public class JavadocTest {
 
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("module-info.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -254,7 +255,7 @@ public class JavadocTest {
         assertThatThrownBy(() -> Javadoc.ofEnvironment(Environment.NONE,
                         process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
@@ -270,7 +271,7 @@ public class JavadocTest {
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE,
                 process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sample/SampleTest.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -292,7 +293,7 @@ public class JavadocTest {
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE,
                 process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sample/SampleTest.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -312,7 +313,7 @@ public class JavadocTest {
                 ProcessHandler.Factory.TOOL);
         javadoc.apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -343,7 +344,7 @@ public class JavadocTest {
 
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("module-info.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -385,7 +386,7 @@ public class JavadocTest {
 
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("module-info.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -416,7 +417,7 @@ public class JavadocTest {
 
         BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),

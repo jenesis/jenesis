@@ -20,13 +20,14 @@ public class PomTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, argument;
+    private Path previous, next, supplement, persistent, argument;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         argument = Files.createDirectory(root.resolve("argument"));
     }
 
@@ -49,7 +50,7 @@ public class PomTest {
         metadata.store(argument.resolve(BuildStep.METADATA));
 
         BuildStepResult result = new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(argument, Map.of(
                                 Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED),
                                 Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
@@ -89,7 +90,7 @@ public class PomTest {
         metadata.store(argument.resolve(BuildStep.METADATA));
 
         new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(argument, Map.of(
                                 Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED),
                                 Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
@@ -133,7 +134,7 @@ public class PomTest {
         metadata.setProperty("version", "1.0.0");
         metadata.store(argument.resolve(BuildStep.METADATA));
         new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(argument, Map.of(
                                 Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
                                 Path.of(BuildStep.EXCLUSIONS), Checksum.of(ChecksumStatus.ADDED),
@@ -170,7 +171,7 @@ public class PomTest {
         metadata.setProperty("version", "1.0.0");
         metadata.store(argument.resolve(BuildStep.METADATA));
         assertThatThrownBy(() -> new Pom().apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(argument, Map.of(
                         Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
                         Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED)))))))
@@ -205,7 +206,7 @@ public class PomTest {
         metadata.setProperty("version", "1.0.0");
         metadata.store(argument.resolve(BuildStep.METADATA));
         new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(argument, Map.of(
                                 Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
                                 Path.of(BuildStep.OVERRIDES), Checksum.of(ChecksumStatus.ADDED),
@@ -232,7 +233,7 @@ public class PomTest {
         metadata.store(argument.resolve(BuildStep.METADATA));
 
         new Pom().embedded(true).apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
@@ -256,7 +257,7 @@ public class PomTest {
         metadata.store(argument.resolve(BuildStep.METADATA));
 
         new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
@@ -287,7 +288,7 @@ public class PomTest {
         metadata.setProperty("version", "1.0.0");
         metadata.store(argument.resolve(BuildStep.METADATA));
         BuildStepResult result = new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(
@@ -342,7 +343,7 @@ public class PomTest {
         metadata.setProperty("version", "1.0.0");
         metadata.store(argument.resolve(BuildStep.METADATA));
         BuildStepResult result = new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(
@@ -392,7 +393,7 @@ public class PomTest {
         metadata.setProperty("version", "1.0.0");
         metadata.store(argument.resolve(BuildStep.METADATA));
         BuildStepResult result = new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(
@@ -425,7 +426,7 @@ public class PomTest {
         metadata.setProperty("version", "1.0.0");
         metadata.store(argument.resolve(BuildStep.METADATA));
         BuildStepResult result = new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED),
@@ -462,7 +463,7 @@ public class PomTest {
         metadata.setProperty("version", "1.0.0");
         metadata.store(argument.resolve(BuildStep.METADATA));
         new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED),
@@ -494,7 +495,7 @@ public class PomTest {
         metadata.setProperty("version", "2.7.1");
         metadata.store(argument.resolve(BuildStep.METADATA));
         BuildStepResult result = new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(
@@ -516,7 +517,7 @@ public class PomTest {
         metadata.store(argument.resolve(BuildStep.METADATA));
 
         new Pom().apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                         argument,
                         Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
@@ -551,7 +552,7 @@ public class PomTest {
         metadata.setProperty("scm.url", "https://example.com/jenesis");
         metadata.store(argument.resolve(BuildStep.METADATA));
         BuildStepResult result = new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(
@@ -590,7 +591,7 @@ public class PomTest {
         metadata.setProperty("ciManagement.url", "https://example.com/actions");
         metadata.store(argument.resolve(BuildStep.METADATA));
         new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
@@ -619,7 +620,7 @@ public class PomTest {
         metadata.setProperty("license.apache_2_0.distribution", "repo");
         metadata.store(argument.resolve(BuildStep.METADATA));
         new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
@@ -645,7 +646,7 @@ public class PomTest {
         metadata.setProperty("developer.carol.name", "Carol Example");
         metadata.store(argument.resolve(BuildStep.METADATA));
         new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
@@ -674,7 +675,7 @@ public class PomTest {
         metadata.setProperty("scm.tag", tag);
         metadata.store(argument.resolve(BuildStep.METADATA));
         BuildStepResult result = new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(
@@ -714,7 +715,7 @@ public class PomTest {
         arguments.put("user", new BuildStepArgument(userMetadata, Map.of(
                 Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         arguments)
                 .toCompletableFuture()
                 .join();
@@ -750,7 +751,7 @@ public class PomTest {
         arguments.put("user", new BuildStepArgument(userMetadata, Map.of(
                 Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))));
         new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         arguments)
                 .toCompletableFuture()
                 .join();
@@ -782,7 +783,7 @@ public class PomTest {
         metadata.setProperty("version", "1.0.0");
         metadata.store(argument.resolve(BuildStep.METADATA));
         BuildStepResult result = new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED),
@@ -818,7 +819,7 @@ public class PomTest {
         metadata.setProperty("version", "1.0.0");
         metadata.store(argument.resolve(BuildStep.METADATA));
         new Pom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),

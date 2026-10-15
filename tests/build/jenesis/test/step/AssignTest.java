@@ -19,13 +19,14 @@ public class AssignTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, argument;
+    private Path previous, next, supplement, persistent, argument;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         argument = Files.createDirectory(root.resolve("argument"));
     }
 
@@ -39,7 +40,7 @@ public class AssignTest {
         properties.store(argument.resolve(BuildStep.IDENTITY));
         Files.writeString(Files.createDirectory(argument.resolve(BuildStep.ARTIFACTS)).resolve("artifact"), "baz");
         BuildStepResult result = new Assign().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(
@@ -65,7 +66,7 @@ public class AssignTest {
         Files.writeString(artifacts.resolve("artifact.jar"), "jar");
         Files.createDirectory(artifacts.resolve(".index-tmp"));
         assertThatThrownBy(() -> new Assign().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED)))))))
@@ -84,7 +85,7 @@ public class AssignTest {
         Path jmod = Files.writeString(
                 Files.createDirectory(argument.resolve("jmods")).resolve("foo.jmod"), "jmod");
         BuildStepResult result = new Assign().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(
@@ -117,7 +118,7 @@ public class AssignTest {
                     "foo", argument.resolve(BuildStep.ARTIFACTS).resolve("artifact"),
                     "qux", argument.resolve(BuildStep.ARTIFACTS).resolve("artifact"));
         }).apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(
@@ -152,7 +153,7 @@ public class AssignTest {
         dormant.setProperty("windows", "platform-w");
         dormant.store(argument.resolve(Classifiers.DORMANT));
         new Assign().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED))))))

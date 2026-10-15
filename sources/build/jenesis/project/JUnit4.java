@@ -1,6 +1,8 @@
 package build.jenesis.project;
 
 import module java.base;
+import build.jenesis.TestFramework;
+import build.jenesis.TestTags;
 import java.lang.classfile.Attributes;
 
 public record JUnit4() implements TestFramework {

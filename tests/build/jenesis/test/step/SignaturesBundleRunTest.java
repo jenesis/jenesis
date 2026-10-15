@@ -25,12 +25,13 @@ public class SignaturesBundleRunTest {
 
     @TempDir
     private Path root;
-    private Path next, supplement, input;
+    private Path next, supplement, persistent, input;
 
     @BeforeEach
     public void setUp() throws Exception {
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         input = Files.createDirectory(root.resolve("input"));
         Path artifact = downloaded(".jar", "protobuf-specs-0.5.2.jar");
         downloaded(".jar.sigstore.json", "bundle.sigstore.json");
@@ -140,7 +141,7 @@ public class SignaturesBundleRunTest {
 
     private void run(Signatures signatures) throws IOException {
         signatures.apply(Runnable::run,
-                        new BuildStepContext(root.resolve("previous"), next, supplement),
+                        new BuildStepContext(root.resolve("previous"), next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                                 input,
                                 Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))

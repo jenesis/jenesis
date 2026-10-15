@@ -17,15 +17,15 @@ import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.TestFramework;
+import build.jenesis.TestTags;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.JUnit4;
 import build.jenesis.project.JUnitPlatform;
 import build.jenesis.project.Jfr;
-import build.jenesis.project.TestFramework;
 import build.jenesis.project.TestModule;
 import build.jenesis.project.TestNG;
-import build.jenesis.project.TestTags;
 import build.jenesis.step.Javac;
 import java.lang.classfile.ClassFile;
 import java.lang.classfile.attribute.ModuleAttribute;
@@ -188,13 +188,15 @@ public class TestModuleTest {
 
     @Test
     public void a_failed_run_prints_the_runner_output_and_names_its_reports_only_where_they_are_kept() throws IOException {
-        compileSource(classes.resolve(Javac.CLASSES + "sample"), "BrokenTest", """
+        compileSource(classes.resolve(Javac.CLASSES + "sample"),
+                "BrokenTest", """
                 package sample;
                 public class BrokenTest {
                     @org.junit.jupiter.api.Test
                     public void fails() { throw new AssertionError("broken"); }
                 }
-                """, bootModuleJars());
+                """,
+                bootModuleJars());
         for (boolean reporting : List.of(false, true)) {
             BuildExecutor executor = newExecutor();
             executor.addSource("dependencies", dependencies);
@@ -205,7 +207,8 @@ public class TestModuleTest {
                             Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                             Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                             .isTest(candidate -> candidate.endsWith("BrokenTest")).jarsOnly(false).reporting(reporting),
-                    "dependencies", "classes");
+                    "dependencies",
+                    "classes");
             Throwable failure = catchThrowable(executor::execute);
             assertThat(failure)
                     .as("the runner names the failed test in the output the failure prints, reports or not")
@@ -1488,7 +1491,8 @@ public class TestModuleTest {
                         .observe(new Agent())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
-                "dependencies", "classes");
+                "dependencies",
+                "classes");
         executor.execute("test/" + "resolved");
 
         assertThat(readRequires(root.resolve("test").resolve("resolved")).stringPropertyNames())
@@ -1513,7 +1517,8 @@ public class TestModuleTest {
                         .observe(new Agent())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
-                "dependencies", "classes");
+                "dependencies",
+                "classes");
         executor.execute("test/" + "resolved");
 
         assertThat(readRequires(root.resolve("test").resolve("resolved")).stringPropertyNames())

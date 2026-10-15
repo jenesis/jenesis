@@ -22,7 +22,7 @@ public class DownloadModuleUrisTest {
                 .locations((Supplier<List<URI>> & Serializable) () -> List.of(location));
 
         step.apply(Runnable::run,
-                        new BuildStepContext(root.resolve("previous"), next, root.resolve("supplement")),
+                        new BuildStepContext(root.resolve("previous"), next, root.resolve("supplement"), root.resolve("persistent")),
                         new LinkedHashMap<>())
                 .toCompletableFuture().join();
 

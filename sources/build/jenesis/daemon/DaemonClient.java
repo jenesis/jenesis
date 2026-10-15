@@ -3,6 +3,7 @@ package build.jenesis.daemon;
 import module java.base;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Make;
 import build.jenesis.SequencedProperties;
 
 public final class DaemonClient {
@@ -23,11 +24,17 @@ public final class DaemonClient {
     private final String mainClass;
     private final SequencedMap<String, String> supplied;
     private final String options;
+    private final long idle;
     private final SequencedMap<String, String> outputs;
 
     public DaemonClient(Path root, List<String> path, String mainClass, SequencedMap<String, String> supplied) {
-        this(root, path, mainClass, supplied, effective(supplied)
-                .getOrDefault("jenesis.make.daemon.options", "-Xmx2g"), null);
+        this(root,
+                path,
+                mainClass,
+                supplied,
+                new Environment(Make.keys(effective(supplied))).value("daemon.options", "-Xmx2g"),
+                new Environment(Make.keys(effective(supplied))).number("daemon.idle", 10_800L),
+                null);
     }
 
     private DaemonClient(Path root,
@@ -35,22 +42,28 @@ public final class DaemonClient {
                          String mainClass,
                          SequencedMap<String, String> supplied,
                          String options,
+                         long idle,
                          SequencedMap<String, String> outputs) {
         this.root = root.toAbsolutePath().normalize();
         this.path = path;
         this.mainClass = mainClass;
         this.supplied = supplied;
         this.options = options;
+        this.idle = idle;
         this.outputs = outputs;
         folder = this.root.resolve(".jenesis");
     }
 
     public DaemonClient options(String options) {
-        return new DaemonClient(root, path, mainClass, supplied, options, outputs);
+        return new DaemonClient(root, path, mainClass, supplied, options, idle, outputs);
+    }
+
+    public DaemonClient idle(long idle) {
+        return new DaemonClient(root, path, mainClass, supplied, options, idle, outputs);
     }
 
     public DaemonClient outputs(SequencedMap<String, String> outputs) {
-        return new DaemonClient(root, path, mainClass, supplied, options, outputs);
+        return new DaemonClient(root, path, mainClass, supplied, options, idle, outputs);
     }
 
     private static SequencedMap<String, String> effective(SequencedMap<String, String> supplied) {
@@ -140,7 +153,7 @@ public final class DaemonClient {
         if (outputs != null) {
             outputs.clear();
         }
-        Path port = folder.resolve("daemon.port"), secret = folder.resolve("daemon.token");
+        Path port = folder.resolve(Worker.PORT), secret = folder.resolve(Worker.TOKEN);
         if (!Files.isRegularFile(port) || !Files.isRegularFile(secret)) {
             return null;
         }
@@ -153,73 +166,65 @@ public final class DaemonClient {
             socket.close();
             return null;
         }
+        Path produced = outputs == null || stop ? null : Files.createTempFile(folder, "daemon", ".outputs");
         try (socket;
              DataOutputStream out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
              DataInputStream in = new DataInputStream(new BufferedInputStream(socket.getInputStream()))) {
             out.writeUTF(Files.readString(secret).trim());
             out.writeUTF(fingerprint);
-            out.writeUTF(mainClass);
             out.writeBoolean(stop);
-            SequencedMap<String, String> properties = effective(supplied);
-            out.writeInt(properties.size());
-            for (Map.Entry<String, String> property : properties.entrySet()) {
-                out.writeUTF(property.getKey());
-                out.writeUTF(property.getValue());
-            }
-            out.writeInt(selectors.length);
-            for (String selector : selectors) {
-                out.writeUTF(selector);
+            if (!stop) {
+                List<String> request = new ArrayList<>(List.of(DaemonBuild.class.getName(),
+                        root.toString(),
+                        mainClass,
+                        produced == null ? "" : produced.toString()));
+                effective(supplied).forEach((key, value) -> request.add("-D" + key + "=" + value));
+                request.add("--");
+                request.addAll(List.of(selectors));
+                Worker.request(out, 0, request);
             }
             out.flush();
-            return receive(in);
-        }
-    }
-
-    private Integer receive(DataInputStream in) throws IOException {
-        boolean started = false;
-        while (true) {
-            int kind;
+            byte status;
             try {
-                kind = in.readByte();
-            } catch (EOFException e) {
-                if (started) {
-                    throw new IllegalStateException("The build daemon died while the build was running"
-                            + " - its output above is incomplete and the build did not finish", e);
-                }
+                status = in.readByte();
+            } catch (EOFException _) {
                 return null;
             }
-            switch (kind) {
-                case 0 -> {
-                    return in.readInt();
-                }
-                case 1, 2 -> {
-                    byte[] bytes = new byte[in.readInt()];
-                    in.readFully(bytes);
-                    started = true;
-                    (kind == 1 ? System.out : System.err).write(bytes);
-                    (kind == 1 ? System.out : System.err).flush();
-                }
-                case 3 -> throw new IllegalStateException("The build daemon rejected this client's token"
+            switch (status) {
+                case Worker.REJECTED -> throw new IllegalStateException("The build daemon rejected this client's token"
                         + " - delete .jenesis/daemon.token and .jenesis/daemon.port, then build again");
-                case 4 -> {
+                case Worker.STALE -> {
                     return null;
                 }
-                case 5 -> throw new IllegalStateException(in.readUTF());
-                case 6 -> {
-                    for (int index = in.readInt(); index > 0; index--) {
-                        String identity = in.readUTF(), output = in.readUTF();
-                        if (outputs != null) {
-                            outputs.put(identity, output);
-                        }
-                    }
+                case Worker.BUSY -> throw new IllegalStateException("Another build process is already building "
+                        + root.resolve(effective(supplied).getOrDefault("jenesis.project.target", "target"))
+                                .toAbsolutePath()
+                                .normalize()
+                        + ": concurrent builds over one target folder interfere with each other's staged steps");
+                case Worker.ACCEPTED -> {
                 }
-                default -> throw new IllegalStateException("The build daemon sent an unknown frame: " + kind);
+                default -> throw new IllegalStateException("The build daemon answered with an unknown status: " + status);
+            }
+            int code;
+            try {
+                code = Worker.receive(in, new Forward(System.out), new Forward(System.err));
+            } catch (EOFException e) {
+                throw new IllegalStateException("The build daemon died while the build was running"
+                        + " - its output above is incomplete and the build did not finish", e);
+            }
+            if (produced != null && code == 0 && Files.size(produced) > 0) {
+                SequencedProperties.ofFiles(produced).forEachProperty(outputs::put);
+            }
+            return code;
+        } finally {
+            if (produced != null) {
+                Files.deleteIfExists(produced);
             }
         }
     }
 
     private void start(String fingerprint) throws IOException, InterruptedException {
-        Path port = folder.resolve("daemon.port");
+        Path port = folder.resolve(Worker.PORT);
         Files.createDirectories(folder);
         if (Files.isRegularFile(port)) {
             request(fingerprint, true);
@@ -232,20 +237,13 @@ public final class DaemonClient {
         if (!options.isBlank()) {
             command.addAll(List.of(options.trim().split("\\s+")));
         }
-        for (String name : System.getProperties().stringPropertyNames()) {
-            if (name.startsWith("jenesis.daemon.")) {
-                command.add("-D" + name + "=" + System.getProperty(name));
-            }
-        }
         command.addAll(path);
         if (path.getFirst().equals("-p")) {
-            command.addAll(List.of("-m",
-                    DaemonServer.class.getModule().getName() + "/" + DaemonServer.class.getName()));
+            command.addAll(List.of("-m", Worker.class.getModule().getName() + "/" + Worker.class.getName()));
         } else {
-            command.add(DaemonServer.class.getName());
+            command.add(Worker.class.getName());
         }
-        command.add(root.toString());
-        command.add(fingerprint);
+        command.addAll(List.of("listen", folder.toString(), fingerprint, Long.toString(idle)));
         new ProcessBuilder(command)
                 .directory(root.toFile())
                 .redirectErrorStream(true)
@@ -257,6 +255,26 @@ public final class DaemonClient {
         if (!Files.isRegularFile(port)) {
             throw new IllegalStateException("A build daemon was started but never announced a port in " + port
                     + " - see " + folder.resolve("daemon.log"));
+        }
+    }
+
+    private static final class Forward extends OutputStream {
+
+        private final PrintStream stream;
+
+        private Forward(PrintStream stream) {
+            this.stream = stream;
+        }
+
+        @Override
+        public void write(int value) {
+            stream.write(value);
+        }
+
+        @Override
+        public void write(byte[] bytes, int offset, int length) {
+            stream.write(bytes, offset, length);
+            stream.flush();
         }
     }
 }

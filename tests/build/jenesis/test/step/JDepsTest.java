@@ -20,12 +20,13 @@ public class JDepsTest {
 
     @TempDir
     private Path root;
-    private Path next, supplement, staged, analyzed, modules;
+    private Path next, supplement, persistent, staged, analyzed, modules;
 
     @BeforeEach
     public void setUp() throws Exception {
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         staged = Files.createDirectory(root.resolve("staged"));
         analyzed = Files.createDirectory(staged.resolve(JDeps.ANALYZED));
         modules = Files.createDirectory(staged.resolve(JDeps.MODULES));
@@ -98,7 +99,7 @@ public class JDepsTest {
         Files.createDirectory(next);
         return new JDeps(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(null, next, supplement),
+                new BuildStepContext(null, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("staged", new BuildStepArgument(
                         staged,
                         Map.of(Path.of(JDeps.ANALYZED), Checksum.of(ChecksumStatus.ADDED))))))

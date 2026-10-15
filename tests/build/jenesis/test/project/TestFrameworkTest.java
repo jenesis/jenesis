@@ -4,11 +4,12 @@ import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.BuildStep;
 import build.jenesis.SequencedProperties;
+import build.jenesis.TestFramework;
+import build.jenesis.TestTags;
 import build.jenesis.project.JUnit4;
 import build.jenesis.project.JUnitPlatform;
-import build.jenesis.project.TestFramework;
+import build.jenesis.project.TestFrameworks;
 import build.jenesis.project.TestNG;
-import build.jenesis.project.TestTags;
 import java.util.jar.Attributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,20 +23,20 @@ public class TestFrameworkTest {
     @Test
     public void detects_junit_platform_from_engine_module() throws IOException {
         writeJar(root.resolve("artifacts"), "engine.jar", "org.junit.platform.engine");
-        assertThat(TestFramework.detect(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
+        assertThat(TestFrameworks.detect(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
     }
 
     @Test
     public void detects_junit_platform_from_jupiter_api_without_an_engine() throws IOException {
         writeJar(root.resolve("artifacts"), "api.jar", "org.junit.jupiter.api");
-        assertThat(TestFramework.detect(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
+        assertThat(TestFrameworks.detect(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
     }
 
     @Test
     public void prefers_junit_platform_over_an_incidental_junit4_jar() throws IOException {
         writeJar(root.resolve("artifacts"), "api.jar", "org.junit.jupiter.api");
         writeJar(root.resolve("artifacts"), "junit.jar", "junit");
-        assertThat(TestFramework.detect(List.of(root)))
+        assertThat(TestFrameworks.detect(List.of(root)))
                 .as("a transitive junit:junit must not outrank the Jupiter API of the tests themselves")
                 .get()
                 .isInstanceOf(JUnitPlatform.class);
@@ -44,13 +45,13 @@ public class TestFrameworkTest {
     @Test
     public void detects_junit4_from_module() throws IOException {
         writeJar(root.resolve("artifacts"), "junit.jar", "junit");
-        assertThat(TestFramework.detect(List.of(root))).get().isInstanceOf(JUnit4.class);
+        assertThat(TestFrameworks.detect(List.of(root))).get().isInstanceOf(JUnit4.class);
     }
 
     @Test
     public void detects_testng_from_module() throws IOException {
         writeJar(root.resolve("artifacts"), "testng.jar", "org.testng");
-        assertThat(TestFramework.detect(List.of(root))).get().isInstanceOf(TestNG.class);
+        assertThat(TestFrameworks.detect(List.of(root))).get().isInstanceOf(TestNG.class);
     }
 
     @Test
@@ -59,17 +60,17 @@ public class TestFrameworkTest {
         SequencedProperties index = new SequencedProperties();
         index.setProperty("runtime/maven/engine", "resolved/engine.jar");
         index.store(root.resolve(BuildStep.DEPENDENCIES));
-        assertThat(TestFramework.detect(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
+        assertThat(TestFrameworks.detect(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
     }
 
     @Test
     public void consults_the_frameworks_a_project_declares_first_in_their_order() throws IOException {
         writeJar(root.resolve("artifacts"), "api.jar", "org.junit.jupiter.api");
         Declared first = new Declared("first", "org.junit.jupiter.api"), second = new Declared("second", "org.junit.jupiter.api");
-        assertThat(TestFramework.detect(List.of(first, second), List.of(root)))
+        assertThat(TestFrameworks.detect(List.of(first, second), List.of(root)))
                 .as("a declared framework that the tests' modules mark precedes the next one and the built-in frameworks")
                 .contains(first);
-        assertThat(TestFramework.detect(List.of(new Declared("other", "com.example.other")), List.of(root)))
+        assertThat(TestFrameworks.detect(List.of(new Declared("other", "com.example.other")), List.of(root)))
                 .as("a declared framework that no module marks leaves the choice to the built-in frameworks")
                 .get()
                 .isInstanceOf(JUnitPlatform.class);
@@ -78,30 +79,30 @@ public class TestFrameworkTest {
     @Test
     public void detects_no_framework_for_unrelated_module() throws IOException {
         writeJar(root.resolve("artifacts"), "plain.jar", "com.example.something");
-        assertThat(TestFramework.detect(List.of(root))).isEmpty();
+        assertThat(TestFrameworks.detect(List.of(root))).isEmpty();
     }
 
     @Test
     public void detects_no_framework_from_file_name_alone() throws IOException {
         writeJar(root.resolve("artifacts"), "org.junit.platform.engine.jar", null);
-        assertThat(TestFramework.detect(List.of(root))).isEmpty();
+        assertThat(TestFrameworks.detect(List.of(root))).isEmpty();
     }
 
     @Test
     public void detects_no_framework_without_jars() throws IOException {
-        assertThat(TestFramework.detect(List.of(root))).isEmpty();
+        assertThat(TestFrameworks.detect(List.of(root))).isEmpty();
     }
 
     @Test
     public void resolves_nothing_where_the_console_jar_is_on_the_path() throws IOException {
         writeJar(root.resolve("artifacts"), "console.jar", "org.junit.platform.console");
-        assertThat(new JUnitPlatform().missingCoordinates(TestFramework.modules(List.of(root)))).isEmpty();
+        assertThat(new JUnitPlatform().missingCoordinates(TestFrameworks.modules(List.of(root)))).isEmpty();
     }
 
     @Test
     public void resolves_the_console_where_only_the_engine_jar_is_on_the_path() throws IOException {
         writeJar(root.resolve("artifacts"), "engine.jar", "org.junit.platform.engine");
-        assertThat(new JUnitPlatform().missingCoordinates(TestFramework.modules(List.of(root))))
+        assertThat(new JUnitPlatform().missingCoordinates(TestFrameworks.modules(List.of(root))))
                 .containsOnlyKeys("module/org.junit.platform.console",
                         "maven/org.junit.platform/junit-platform-console");
     }
@@ -263,7 +264,8 @@ public class TestFrameworkTest {
                 false,
                 false))
                 .as("the execute command exists from JUnit Platform 1.10 on, and an older launcher rejects it")
-                .containsExactly("--disable-banner", "--disable-ansi-colors",
+                .containsExactly("--disable-banner",
+                        "--disable-ansi-colors",
                         "--select-class=sample.BetaTest");
     }
 

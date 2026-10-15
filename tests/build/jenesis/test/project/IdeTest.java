@@ -19,12 +19,13 @@ public class IdeTest {
 
     @TempDir
     private Path root;
-    private Path next, supplement;
+    private Path next, supplement, persistent;
 
     @BeforeEach
     public void setUp() throws IOException {
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
     }
 
     @Test
@@ -733,7 +734,7 @@ public class IdeTest {
             default -> throw new IllegalArgumentException(tool);
         };
         BuildStepResult result = step.apply(Runnable::run,
-                        new BuildStepContext(root.resolve("previous"), next, supplement),
+                        new BuildStepContext(root.resolve("previous"), next, supplement, persistent),
                         arguments)
                 .toCompletableFuture()
                 .join();

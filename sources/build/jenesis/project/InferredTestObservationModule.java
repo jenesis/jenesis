@@ -12,6 +12,7 @@ import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.TestFramework;
 
 public class InferredTestObservationModule implements BuildExecutorModule {
 
@@ -136,7 +137,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         List<String> scan = properties.entries(SCAN);
         TestModule declared = framework == null ? module
                 : frameworks.containsKey(framework) ? frameworks.get(framework) == null ? module : module.framework(frameworks.get(framework))
-                : module.framework(TestFramework.named(framework));
+                : module.framework(TestFrameworks.named(framework));
         declared = scan == null ? declared : declared.scan(scan);
         return engines == null ? declared : declared.engines(engines);
     }
