@@ -16,13 +16,13 @@ public record NativeImageMetadata() implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        String selectionPrefix = BuildExecutorModule.PREVIOUS + MultiProjectModule.SELECTION + "/";
+        String testedPrefix = BuildExecutorModule.PREVIOUS + MultiProjectModule.TESTED + "/";
         String artifact = null;
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
             if (entry.getValue().removed()) {
                 continue;
             }
-            if (entry.getKey().startsWith(selectionPrefix)) {
+            if (entry.getKey().startsWith(testedPrefix)) {
                 continue;
             }
             Path inventoryFile = entry.getValue().folder().resolve(Inventory.INVENTORY);
@@ -49,7 +49,7 @@ public record NativeImageMetadata() implements BuildStep {
             if (entry.getValue().removed()) {
                 continue;
             }
-            if (!entry.getKey().startsWith(selectionPrefix)) {
+            if (!entry.getKey().startsWith(testedPrefix)) {
                 continue;
             }
             Path inventoryFile = entry.getValue().folder().resolve(Inventory.INVENTORY);

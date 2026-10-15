@@ -5,11 +5,9 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
-import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
-import build.jenesis.step.Bind;
 
 public class InferredSourceGenerationModule implements BuildExecutorModule {
 
@@ -20,319 +18,301 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
             OPENAPI = "openapi",
             ANTLR = "antlr",
             KSP = "ksp";
-    public static final String PREPARE = "prepare", TOOL = "tool";
-    private static final String FOLDERS = "META-INF/build.jenesis";
-    private static final Set<String> XJC_KEYS = Set.of("folders", "package", "catalog", "arguments");
-    private static final Set<String> PROTOC_KEYS = Set.of("folders", "classifier", "plugins", "arguments");
-    private static final Set<String> AVRO_KEYS = Set.of("folders", "arguments");
-    private static final Set<String> WSIMPORT_KEYS = Set.of("folders", "package", "location", "catalog", "arguments");
-    private static final Set<String> OPENAPI_KEYS = Set.of("folders", "specification", "generator", "package", "sources", "arguments");
-    private static final Set<String> ANTLR_KEYS = Set.of("folders", "package", "arguments");
 
     private final SequencedSet<Path> configuration;
-    private final Pinning pinning;
-    private final XjcModule xjcModule;
-    private final ProtocModule protocModule;
-    private final AvroModule avroModule;
-    private final WsImportModule wsimportModule;
-    private final OpenApiModule openapiModule;
-    private final AntlrModule antlrModule;
-    private final KspModule kspModule;
-    private final Function<XjcModule, BuildExecutorModule> xjc;
-    private final Function<ProtocModule, BuildExecutorModule> protoc;
-    private final Function<AvroModule, BuildExecutorModule> avro;
-    private final Function<WsImportModule, BuildExecutorModule> wsimport;
-    private final Function<OpenApiModule, BuildExecutorModule> openapi;
-    private final Function<AntlrModule, BuildExecutorModule> antlr;
-    private final Function<KspModule, BuildExecutorModule> ksp;
+    private final Path location;
+    private final Path root;
+    private final ExternalModule xjcModule;
+    private final boolean xjc;
+    private final ExternalModule protocModule;
+    private final boolean protoc;
+    private final ExternalModule avroModule;
+    private final boolean avro;
+    private final ExternalModule wsimportModule;
+    private final boolean wsimport;
+    private final ExternalModule openapiModule;
+    private final boolean openapi;
+    private final ExternalModule antlrModule;
+    private final boolean antlr;
+    private final ExternalModule kspModule;
+    private final boolean ksp;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredSourceGenerationModule(SequencedSet<Path> configuration,
+                                          Path location,
+                                          Path root,
                                           Map<String, Repository> repositories,
                                           Map<String, Resolver> resolvers) {
         this(configuration,
-                null,
-                new XjcModule(repositories, resolvers),
-                new ProtocModule(repositories, resolvers),
-                new AvroModule(repositories, resolvers),
-                new WsImportModule(repositories, resolvers),
-                new OpenApiModule(repositories, resolvers),
-                new AntlrModule(repositories, resolvers),
-                new KspModule(repositories, resolvers),
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
+                location,
+                root,
+                ExternalModule.official(Environment.NONE, "xjc", null, repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, "protoc", null, repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, "avro", null, repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, "wsimport", null, repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, "openapi", null, repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, "antlr", null, repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, "ksp", null, repositories, resolvers),
+                true,
                 Collections.emptyNavigableMap());
     }
 
     public static InferredSourceGenerationModule ofEnvironment(Environment environment,
-                                                        SequencedSet<Path> configuration,
-                                                        Map<String, Repository> repositories,
-                                                        Map<String, Resolver> resolvers) {
+                                                               SequencedSet<Path> configuration,
+                                                               Path location,
+                                                               Path root,
+                                                               Map<String, Repository> repositories,
+                                                               Map<String, Resolver> resolvers) {
         InferredSourceGenerationModule module = new InferredSourceGenerationModule(configuration,
-                null,
-                XjcModule.ofEnvironment(environment, repositories, resolvers),
-                ProtocModule.ofEnvironment(environment, repositories, resolvers),
-                AvroModule.ofEnvironment(environment, repositories, resolvers),
-                WsImportModule.ofEnvironment(environment, repositories, resolvers),
-                OpenApiModule.ofEnvironment(environment, repositories, resolvers),
-                AntlrModule.ofEnvironment(environment, repositories, resolvers),
-                KspModule.ofEnvironment(environment, repositories, resolvers),
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
+                location,
+                root,
+                ExternalModule.official(environment, "xjc", null, repositories, resolvers),
+                true,
+                ExternalModule.official(environment, "protoc", null, repositories, resolvers),
+                true,
+                ExternalModule.official(environment, "avro", null, repositories, resolvers),
+                true,
+                ExternalModule.official(environment, "wsimport", null, repositories, resolvers),
+                true,
+                ExternalModule.official(environment, "openapi", null, repositories, resolvers),
+                true,
+                ExternalModule.official(environment, "antlr", null, repositories, resolvers),
+                true,
+                ExternalModule.official(environment, "ksp", null, repositories, resolvers),
+                true,
                 Collections.emptyNavigableMap());
-        Boolean xjc = environment.flagOrNull("generate.xjc");
-        if (xjc != null) {
-            module = module.xjc(xjc ? value -> value : null);
+        if (!environment.flag("generate.xjc", true)) {
+            module = module.xjc(false);
         }
-        Boolean protoc = environment.flagOrNull("generate.protoc");
-        if (protoc != null) {
-            module = module.protoc(protoc ? value -> value : null);
+        if (!environment.flag("generate.protoc", true)) {
+            module = module.protoc(false);
         }
-        Boolean avro = environment.flagOrNull("generate.avro");
-        if (avro != null) {
-            module = module.avro(avro ? value -> value : null);
+        if (!environment.flag("generate.avro", true)) {
+            module = module.avro(false);
         }
-        Boolean wsimport = environment.flagOrNull("generate.wsimport");
-        if (wsimport != null) {
-            module = module.wsimport(wsimport ? value -> value : null);
+        if (!environment.flag("generate.wsimport", true)) {
+            module = module.wsimport(false);
         }
-        Boolean openapi = environment.flagOrNull("generate.openapi");
-        if (openapi != null) {
-            module = module.openapi(openapi ? value -> value : null);
+        if (!environment.flag("generate.openapi", true)) {
+            module = module.openapi(false);
         }
-        Boolean antlr = environment.flagOrNull("generate.antlr");
-        if (antlr != null) {
-            module = module.antlr(antlr ? value -> value : null);
+        if (!environment.flag("generate.antlr", true)) {
+            module = module.antlr(false);
         }
-        Boolean ksp = environment.flagOrNull("generate.ksp");
-        if (ksp != null) {
-            module = module.ksp(ksp ? value -> value : null);
+        if (!environment.flag("generate.ksp", true)) {
+            module = module.ksp(false);
         }
         return module;
     }
 
     private InferredSourceGenerationModule(SequencedSet<Path> configuration,
-                                           Pinning pinning,
-                                           XjcModule xjcModule,
-                                           ProtocModule protocModule,
-                                           AvroModule avroModule,
-                                           WsImportModule wsimportModule,
-                                           OpenApiModule openapiModule,
-                                           AntlrModule antlrModule,
-                                           KspModule kspModule,
-                                           Function<XjcModule, BuildExecutorModule> xjc,
-                                           Function<ProtocModule, BuildExecutorModule> protoc,
-                                           Function<AvroModule, BuildExecutorModule> avro,
-                                           Function<WsImportModule, BuildExecutorModule> wsimport,
-                                           Function<OpenApiModule, BuildExecutorModule> openapi,
-                                           Function<AntlrModule, BuildExecutorModule> antlr,
-                                           Function<KspModule, BuildExecutorModule> ksp,
+                                           Path location,
+                                           Path root,
+                                           ExternalModule xjcModule,
+                                           boolean xjc,
+                                           ExternalModule protocModule,
+                                           boolean protoc,
+                                           ExternalModule avroModule,
+                                           boolean avro,
+                                           ExternalModule wsimportModule,
+                                           boolean wsimport,
+                                           ExternalModule openapiModule,
+                                           boolean openapi,
+                                           ExternalModule antlrModule,
+                                           boolean antlr,
+                                           ExternalModule kspModule,
+                                           boolean ksp,
                                            SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
-        this.pinning = pinning;
+        this.location = location;
+        this.root = root;
         this.xjcModule = xjcModule;
-        this.protocModule = protocModule;
-        this.avroModule = avroModule;
-        this.wsimportModule = wsimportModule;
-        this.openapiModule = openapiModule;
-        this.antlrModule = antlrModule;
-        this.kspModule = kspModule;
         this.xjc = xjc;
+        this.protocModule = protocModule;
         this.protoc = protoc;
+        this.avroModule = avroModule;
         this.avro = avro;
+        this.wsimportModule = wsimportModule;
         this.wsimport = wsimport;
+        this.openapiModule = openapiModule;
         this.openapi = openapi;
+        this.antlrModule = antlrModule;
         this.antlr = antlr;
+        this.kspModule = kspModule;
         this.ksp = ksp;
         this.custom = custom;
     }
 
-    public InferredSourceGenerationModule pinning(Pinning pinning) {
+    public InferredSourceGenerationModule xjc(boolean xjc) {
         return new InferredSourceGenerationModule(configuration,
-                pinning,
+                location,
+                root,
                 xjcModule,
-                protocModule,
-                avroModule,
-                wsimportModule,
-                openapiModule,
-                antlrModule,
-                kspModule,
                 xjc,
+                protocModule,
                 protoc,
+                avroModule,
                 avro,
+                wsimportModule,
                 wsimport,
+                openapiModule,
                 openapi,
+                antlrModule,
                 antlr,
+                kspModule,
                 ksp,
                 custom);
     }
 
-    public InferredSourceGenerationModule xjc(Function<XjcModule, BuildExecutorModule> xjc) {
+    public InferredSourceGenerationModule protoc(boolean protoc) {
         return new InferredSourceGenerationModule(configuration,
-                pinning,
+                location,
+                root,
                 xjcModule,
-                protocModule,
-                avroModule,
-                wsimportModule,
-                openapiModule,
-                antlrModule,
-                kspModule,
                 xjc,
+                protocModule,
                 protoc,
+                avroModule,
                 avro,
+                wsimportModule,
                 wsimport,
+                openapiModule,
                 openapi,
+                antlrModule,
                 antlr,
+                kspModule,
                 ksp,
                 custom);
     }
 
-    public InferredSourceGenerationModule protoc(Function<ProtocModule, BuildExecutorModule> protoc) {
+    public InferredSourceGenerationModule avro(boolean avro) {
         return new InferredSourceGenerationModule(configuration,
-                pinning,
+                location,
+                root,
                 xjcModule,
-                protocModule,
-                avroModule,
-                wsimportModule,
-                openapiModule,
-                antlrModule,
-                kspModule,
                 xjc,
+                protocModule,
                 protoc,
+                avroModule,
                 avro,
+                wsimportModule,
                 wsimport,
+                openapiModule,
                 openapi,
+                antlrModule,
                 antlr,
+                kspModule,
                 ksp,
                 custom);
     }
 
-    public InferredSourceGenerationModule avro(Function<AvroModule, BuildExecutorModule> avro) {
+    public InferredSourceGenerationModule wsimport(boolean wsimport) {
         return new InferredSourceGenerationModule(configuration,
-                pinning,
+                location,
+                root,
                 xjcModule,
-                protocModule,
-                avroModule,
-                wsimportModule,
-                openapiModule,
-                antlrModule,
-                kspModule,
                 xjc,
+                protocModule,
                 protoc,
+                avroModule,
                 avro,
+                wsimportModule,
                 wsimport,
+                openapiModule,
                 openapi,
+                antlrModule,
                 antlr,
+                kspModule,
                 ksp,
                 custom);
     }
 
-    public InferredSourceGenerationModule wsimport(Function<WsImportModule, BuildExecutorModule> wsimport) {
+    public InferredSourceGenerationModule openapi(boolean openapi) {
         return new InferredSourceGenerationModule(configuration,
-                pinning,
+                location,
+                root,
                 xjcModule,
-                protocModule,
-                avroModule,
-                wsimportModule,
-                openapiModule,
-                antlrModule,
-                kspModule,
                 xjc,
+                protocModule,
                 protoc,
+                avroModule,
                 avro,
+                wsimportModule,
                 wsimport,
+                openapiModule,
                 openapi,
+                antlrModule,
                 antlr,
+                kspModule,
                 ksp,
                 custom);
     }
 
-    public InferredSourceGenerationModule openapi(Function<OpenApiModule, BuildExecutorModule> openapi) {
+    public InferredSourceGenerationModule antlr(boolean antlr) {
         return new InferredSourceGenerationModule(configuration,
-                pinning,
+                location,
+                root,
                 xjcModule,
-                protocModule,
-                avroModule,
-                wsimportModule,
-                openapiModule,
-                antlrModule,
-                kspModule,
                 xjc,
+                protocModule,
                 protoc,
+                avroModule,
                 avro,
+                wsimportModule,
                 wsimport,
+                openapiModule,
                 openapi,
+                antlrModule,
                 antlr,
+                kspModule,
                 ksp,
                 custom);
     }
 
-    public InferredSourceGenerationModule antlr(Function<AntlrModule, BuildExecutorModule> antlr) {
+    public InferredSourceGenerationModule ksp(boolean ksp) {
         return new InferredSourceGenerationModule(configuration,
-                pinning,
+                location,
+                root,
                 xjcModule,
-                protocModule,
-                avroModule,
-                wsimportModule,
-                openapiModule,
-                antlrModule,
-                kspModule,
                 xjc,
-                protoc,
-                avro,
-                wsimport,
-                openapi,
-                antlr,
-                ksp,
-                custom);
-    }
-
-    public InferredSourceGenerationModule ksp(Function<KspModule, BuildExecutorModule> ksp) {
-        return new InferredSourceGenerationModule(configuration,
-                pinning,
-                xjcModule,
                 protocModule,
-                avroModule,
-                wsimportModule,
-                openapiModule,
-                antlrModule,
-                kspModule,
-                xjc,
                 protoc,
+                avroModule,
                 avro,
+                wsimportModule,
                 wsimport,
+                openapiModule,
                 openapi,
+                antlrModule,
                 antlr,
+                kspModule,
                 ksp,
                 custom);
     }
 
     public InferredSourceGenerationModule custom(SequencedMap<String, BuildExecutorModule> custom) {
         return new InferredSourceGenerationModule(configuration,
-                pinning,
+                location,
+                root,
                 xjcModule,
-                protocModule,
-                avroModule,
-                wsimportModule,
-                openapiModule,
-                antlrModule,
-                kspModule,
                 xjc,
+                protocModule,
                 protoc,
+                avroModule,
                 avro,
+                wsimportModule,
                 wsimport,
+                openapiModule,
                 openapi,
+                antlrModule,
                 antlr,
+                kspModule,
                 ksp,
                 custom);
     }
@@ -353,191 +333,51 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        SequencedProperties properties = read(XJC, XJC_KEYS, xjc);
-        if (properties != null) {
-            generate(buildExecutor,
-                    inherited.sequencedKeySet(),
-                    XJC,
-                    prepare(properties,
-                            XjcModule.FOLDER,
-                            Set.of(XjcModule.SCHEMA, XjcModule.BINDING),
-                            named(properties, "catalog", XjcModule.CATALOG)),
-                     xjc.apply(xjcModule
-                            .pinning(pinning)
-                            .packageName(properties.value("package"))
-                            .arguments(properties.words("arguments"))));
+        Path xjcFile = BuildStep.locate(configuration, "xjc.properties");
+        if (xjcFile != null && xjc) {
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(xjcFile).forEachProperty(values::put);
+            buildExecutor.addModule(XJC, xjcModule.configured(location, root, values), inherited.sequencedKeySet());
         }
-        properties = read(PROTOC, PROTOC_KEYS, protoc);
-        if (properties != null) {
-            ProtocModule module = protocModule
-                    .pinning(pinning)
-                    .plugins(plugins(properties))
-                    .arguments(properties.words("arguments"));
-            String classifier = properties.value("classifier");
-            generate(buildExecutor,
-                    inherited.sequencedKeySet(),
-                    PROTOC,
-                    prepare(properties,
-                            ProtocModule.FOLDER,
-                            Set.of(ProtocModule.DEFINITION),
-                            Collections.emptyNavigableMap()),
-                    protoc.apply(classifier == null ? module : module.classifier(classifier)));
+        Path protocFile = BuildStep.locate(configuration, "protoc.properties");
+        if (protocFile != null && protoc) {
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(protocFile).forEachProperty(values::put);
+            buildExecutor.addModule(PROTOC, protocModule.configured(location, root, values), inherited.sequencedKeySet());
         }
-        properties = read(AVRO, AVRO_KEYS, avro);
-        if (properties != null) {
-            generate(buildExecutor,
-                    inherited.sequencedKeySet(),
-                    AVRO,
-                    prepare(properties,
-                            AvroModule.FOLDER,
-                            Set.of(AvroModule.SCHEMA, AvroModule.PROTOCOL),
-                            Collections.emptyNavigableMap()),
-                     avro.apply(avroModule
-                            .pinning(pinning)
-                            .arguments(properties.words("arguments"))));
+        Path avroFile = BuildStep.locate(configuration, "avro.properties");
+        if (avroFile != null && avro) {
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(avroFile).forEachProperty(values::put);
+            buildExecutor.addModule(AVRO, avroModule.configured(location, root, values), inherited.sequencedKeySet());
         }
-        properties = read(WSIMPORT, WSIMPORT_KEYS, wsimport);
-        if (properties != null) {
-            generate(buildExecutor,
-                    inherited.sequencedKeySet(),
-                    WSIMPORT,
-                    prepare(properties,
-                            WsImportModule.FOLDER,
-                            Set.of(WsImportModule.DESCRIPTION, WsImportModule.BINDING),
-                            named(properties, "catalog", WsImportModule.CATALOG)),
-                     wsimport.apply(wsimportModule
-                            .pinning(pinning)
-                            .packageName(properties.value("package"))
-                            .location(properties.value("location"))
-                            .arguments(properties.words("arguments"))));
+        Path wsimportFile = BuildStep.locate(configuration, "wsimport.properties");
+        if (wsimportFile != null && wsimport) {
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(wsimportFile).forEachProperty(values::put);
+            buildExecutor.addModule(WSIMPORT, wsimportModule.configured(location, root, values), inherited.sequencedKeySet());
         }
-        properties = read(OPENAPI, OPENAPI_KEYS, openapi);
-        if (properties != null) {
-            OpenApiModule module = openapiModule
-                    .pinning(pinning)
-                    .packageName(properties.value("package"))
-                    .arguments(properties.words("arguments"));
-            String generator = properties.value("generator");
-            if (generator != null) {
-                module = module.generator(generator);
-            }
-            String sources = properties.value("sources");
-            generate(buildExecutor,
-                    inherited.sequencedKeySet(),
-                    OPENAPI,
-                    prepare(properties,
-                            OpenApiModule.FOLDER,
-                            OpenApiModule.DOCUMENTS,
-                            named(properties, "specification", OpenApiModule.SPECIFICATION)),
-                    openapi.apply(sources == null ? module : module.sourceFolder(sources)));
+        Path openapiFile = BuildStep.locate(configuration, "openapi.properties");
+        if (openapiFile != null && openapi) {
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(openapiFile).forEachProperty(values::put);
+            buildExecutor.addModule(OPENAPI, openapiModule.configured(location, root, values), inherited.sequencedKeySet());
         }
-        properties = read(ANTLR, ANTLR_KEYS, antlr);
-        if (properties != null) {
-            generate(buildExecutor,
-                    inherited.sequencedKeySet(),
-                    ANTLR,
-                    prepare(properties,
-                            AntlrModule.FOLDER,
-                            Set.of(AntlrModule.GRAMMAR),
-                            Collections.emptyNavigableMap()),
-                     antlr.apply(antlrModule
-                            .pinning(pinning)
-                            .packageName(properties.value("package"))
-                            .arguments(properties.words("arguments"))));
+        Path antlrFile = BuildStep.locate(configuration, "antlr.properties");
+        if (antlrFile != null && antlr) {
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(antlrFile).forEachProperty(values::put);
+            buildExecutor.addModule(ANTLR, antlrModule.configured(location, root, values), inherited.sequencedKeySet());
         }
-        Path symbols = KspModule.configurationFile(configuration);
-        if (ksp != null && symbols != null) {
-            SequencedMap<String, String> options = new LinkedHashMap<>();
-            SequencedProperties.ofFiles(symbols).forEachProperty(options::put);
-            BuildExecutorModule module = ksp.apply(kspModule.pinning(pinning).options(options));
-            if (module != null) {
-                buildExecutor.addModule(KSP, module, inherited.sequencedKeySet());
-            }
+        Path kspFile = BuildStep.locate(configuration, "ksp.properties");
+        if (kspFile != null && ksp) {
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(kspFile).forEachProperty(values::put);
+            buildExecutor.addModule(KSP, kspModule.configured(location, root, values), inherited.sequencedKeySet());
         }
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
                     nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());
         }
-    }
-
-    private SequencedProperties read(String tool, Set<String> keys, Function<?, BuildExecutorModule> configurator)
-            throws IOException {
-        Path file = BuildStep.locate(configuration, tool + ".properties");
-        if (configurator == null || file == null) {
-            return null;
-        }
-        SequencedProperties properties = SequencedProperties.ofFiles(file);
-        for (String key : properties.stringPropertyNames()) {
-            if (!keys.contains(key)) {
-                throw new IllegalArgumentException("Unknown " + tool + " property: " + key
-                        + " (expected one of " + new TreeSet<>(keys) + ")");
-            }
-        }
-        return properties;
-    }
-
-    private static void generate(BuildExecutor buildExecutor,
-                                 SequencedSet<String> inputs,
-                                 String name,
-                                 Bind prepare,
-                                 BuildExecutorModule tool) {
-        if (tool == null) {
-            return;
-        }
-        buildExecutor.addModule(name, (nested, inherited) -> {
-            nested.addStep(PREPARE, prepare, inherited.sequencedKeySet());
-            SequencedSet<String> toolInputs = new LinkedHashSet<>();
-            toolInputs.add(PREPARE);
-            toolInputs.addAll(inherited.sequencedKeySet());
-            nested.addModule(TOOL, tool, toolInputs);
-        }, inputs);
-    }
-
-    private static Bind prepare(SequencedProperties properties,
-                                String folder,
-                                Set<String> extensions,
-                                SequencedMap<String, String> named) {
-        List<String> folders = properties.entries("folders");
-        if (folders != null && folders.isEmpty()) {
-            throw new IllegalArgumentException("No folder listed for folders in the generator configuration");
-        }
-        SequencedMap<Path, Path> paths = new LinkedHashMap<>();
-        for (String source : folders == null ? List.of(FOLDERS) : folders) {
-            for (String root : List.of(BuildStep.SOURCES, BuildStep.RESOURCES)) {
-                paths.put(Path.of(root + source), Path.of(folder));
-                named.forEach((file, customary) -> {
-                    int dot = file.lastIndexOf('.');
-                    paths.put(Path.of(root + source + "/" + file),
-                            Path.of(folder + customary + (dot < 0 ? "" : file.substring(dot))));
-                });
-            }
-        }
-        return new Bind(paths).extensions(extensions);
-    }
-
-    private static SequencedMap<String, String> named(SequencedProperties properties, String key, String customary) {
-        SequencedMap<String, String> named = new LinkedHashMap<>();
-        String value = properties.value(key);
-        if (value != null) {
-            named.put(value, customary);
-        }
-        return named;
-    }
-
-    private static SequencedMap<String, String> plugins(SequencedProperties properties) {
-        SequencedMap<String, String> plugins = new LinkedHashMap<>();
-        List<String> entries = properties.entries("plugins");
-        if (entries == null) {
-            return plugins;
-        }
-        for (String entry : entries) {
-            int assign = entry.indexOf('=');
-            if (assign < 1 || assign == entry.length() - 1) {
-                throw new IllegalArgumentException("Malformed protoc plugin: " + entry
-                        + " (expected <name>=<groupId>/<artifactId>)");
-            }
-            plugins.put(entry.substring(0, assign).trim(), entry.substring(assign + 1).trim());
-        }
-        return plugins;
     }
 }

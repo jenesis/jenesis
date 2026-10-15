@@ -6,7 +6,6 @@ import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Group;
-import build.jenesis.step.Inventory;
 
 public record MultiProjectModule(BuildExecutorModule identifier,
                                  Function<String, Optional<String>> resolver,
@@ -16,8 +15,7 @@ public record MultiProjectModule(BuildExecutorModule identifier,
     public static final String IDENTIFIER = "identifier",
             COMPOSE = "compose",
             MODULE = "module",
-            PACKAGE = "package",
-            SELECTION = "selection";
+            TESTED = "tested";
     public static final String SOURCES = "sources",
             MANIFESTS = "manifests",
             COORDINATES = "coordinates",
@@ -103,6 +101,8 @@ public record MultiProjectModule(BuildExecutorModule identifier,
                 }
                 MultiProject project = factory.apply(projects);
                 SequencedMap<String, AssemblyDescriptor> assemblies = new LinkedHashMap<>();
+                SequencedMap<String, SequencedSet<String>> closures = new LinkedHashMap<>(), testers = new LinkedHashMap<>();
+                SequencedMap<String, SequencedMap<String, Path>> arguments = new LinkedHashMap<>();
                 SequencedMap<String, SequencedSet<String>> pending = new LinkedHashMap<>(projects);
                 while (!pending.isEmpty()) {
                     boolean progressed = false;
@@ -110,8 +110,8 @@ public record MultiProjectModule(BuildExecutorModule identifier,
                     while (it.hasNext()) {
                         Map.Entry<String, SequencedSet<String>> entry = it.next();
                         if (Collections.disjoint(entry.getValue(), pending.keySet())) {
-                            SequencedMap<String, Path> arguments = new LinkedHashMap<>();
-                            identifiers.get(entry.getKey()).forEach(identifier -> arguments.put(
+                            SequencedMap<String, Path> identifying = new LinkedHashMap<>();
+                            identifiers.get(entry.getKey()).forEach(identifier -> identifying.put(
                                     PREVIOUS + identifier,
                                     paths.get(PREVIOUS + identifier)));
                             SequencedMap<String, SequencedSet<String>> dependencies = new LinkedHashMap<>();
@@ -124,14 +124,13 @@ public record MultiProjectModule(BuildExecutorModule identifier,
                                     queue.addAll(values);
                                 }
                             }
-                            AssemblyDescriptor assembly = project.module(entry.getKey(), dependencies, arguments);
-                            build.addModule(entry.getKey(), assembly.build(), Stream.of(
-                                            arguments.sequencedKeySet().stream(),
-                                            dependencies.sequencedKeySet().stream(),
-                                            inherited.sequencedKeySet().stream()
-                                                    .map(identifier -> PREVIOUS.repeat(2) + identifier))
-                                    .flatMap(Function.identity()));
-                            assemblies.put(entry.getKey(), assembly);
+                            assemblies.put(entry.getKey(), project.module(entry.getKey(), dependencies, identifying));
+                            arguments.put(entry.getKey(), identifying);
+                            closures.put(entry.getKey(), dependencies.sequencedKeySet());
+                            if (test(identifying)) {
+                                entry.getValue().forEach(tested -> testers.computeIfAbsent(tested, _ -> new LinkedHashSet<>())
+                                        .add(entry.getKey()));
+                            }
                             it.remove();
                             progressed = true;
                         }
@@ -140,38 +139,44 @@ public record MultiProjectModule(BuildExecutorModule identifier,
                         throw new IllegalStateException("Cyclic module dependencies: " + pending.keySet());
                     }
                 }
-                if (assemblies.values().stream().anyMatch(assembly -> !assembly.tail().isEmpty())) {
-                    build.addModule(PACKAGE, (packaged, packageInherited) -> {
-                        for (Map.Entry<String, AssemblyDescriptor> entry : assemblies.entrySet()) {
-                            SequencedMap<String, BuildExecutorModule> tail = entry.getValue().tail();
-                            if (tail.isEmpty()) {
-                                continue;
-                            }
-                            String ownPrefix = PREVIOUS + entry.getKey() + "/",
-                                    identifierPrefix = IDENTIFIER_PATH + entry.getKey() + "/";
-                            SequencedMap<String, String> inputs = new LinkedHashMap<>();
-                            for (String key : packageInherited.sequencedKeySet()) {
-                                if (key.startsWith(ownPrefix)) {
-                                    inputs.put(key, key.substring(ownPrefix.length()));
-                                } else if (key.startsWith(identifierPrefix)) {
-                                    inputs.put(key, key.substring(identifierPrefix.length()));
-                                } else if (Files.isRegularFile(packageInherited.get(key).resolve(Inventory.INVENTORY))) {
-                                    inputs.put(key, SELECTION + "/" + key.substring(PREVIOUS.length()));
-                                }
-                            }
-                            packaged.addModule(entry.getKey(), (phases, phaseInherited) -> {
-                                SequencedMap<String, String> phaseInputs = new LinkedHashMap<>();
-                                for (String key : phaseInherited.sequencedKeySet()) {
-                                    phaseInputs.put(key, key.substring(PREVIOUS.length()));
-                                }
-                                for (Map.Entry<String, BuildExecutorModule> phase : tail.entrySet()) {
-                                    phases.addModule(phase.getKey(), phase.getValue(), phaseInputs);
-                                }
-                            }, inputs);
+                SequencedMap<String, AssemblyDescriptor.Registration> registrations = new LinkedHashMap<>();
+                SequencedSet<String> passed = inherited.sequencedKeySet().stream()
+                        .map(key -> PREVIOUS.repeat(2) + key)
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+                for (Map.Entry<String, AssemblyDescriptor> assembly : assemblies.entrySet()) {
+                    String module = assembly.getKey();
+                    SequencedMap<String, String> built = new LinkedHashMap<>(), followed = new LinkedHashMap<>();
+                    for (String identifier : arguments.get(module).sequencedKeySet()) {
+                        String identity = identifier.substring(PREVIOUS.repeat(2).length() + IDENTIFIER.length() + 1);
+                        built.put(identifier, identifier);
+                        followed.put(identifier, identity.startsWith(module + "/") ? identity.substring(module.length() + 1) : identity);
+                    }
+                    registrations.putAll(assembly.getValue().toBuildModules(module,
+                            built,
+                            followed,
+                            closures.get(module),
+                            testers.getOrDefault(module, Collections.emptyNavigableSet()),
+                            assemblies,
+                            passed));
+                }
+                Set<String> registered = new HashSet<>();
+                while (!registrations.isEmpty()) {
+                    boolean progressed = false;
+                    Iterator<Map.Entry<String, AssemblyDescriptor.Registration>> it = registrations.entrySet().iterator();
+                    while (it.hasNext()) {
+                        Map.Entry<String, AssemblyDescriptor.Registration> entry = it.next();
+                        if (entry.getValue().requirements().sequencedKeySet().stream()
+                                .filter(key -> !key.startsWith(PREVIOUS))
+                                .allMatch(registered::contains)) {
+                            build.addModule(entry.getKey(), entry.getValue().module(), entry.getValue().requirements());
+                            registered.add(entry.getKey());
+                            it.remove();
+                            progressed = true;
                         }
-                    }, Stream.concat(assemblies.sequencedKeySet().stream(), assemblies.sequencedKeySet().stream()
-                            .flatMap(module -> identifiers.get(module).stream())
-                            .map(identifier -> PREVIOUS + identifier)));
+                    }
+                    if (!progressed) {
+                        throw new IllegalStateException("Cyclic phase dependencies: " + registrations.keySet());
+                    }
                 }
             }, Stream.concat(Stream.of(GROUP), identified.sequencedKeySet().stream()));
         }, Stream.concat(Stream.of(IDENTIFIER), inherited.sequencedKeySet().stream()));

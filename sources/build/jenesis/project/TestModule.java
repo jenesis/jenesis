@@ -1,7 +1,6 @@
 package build.jenesis.project;
 
 import module java.base;
-import module java.xml;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
@@ -9,6 +8,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.ObservabilityEngine;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
@@ -19,15 +19,14 @@ import build.jenesis.step.Java;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 import javax.lang.model.SourceVersion;
-import org.xml.sax.Attributes;
 
 public class TestModule implements BuildExecutorModule {
 
     public static final String REQUIRED = "required", ARTIFACTS = "artifacts", EXECUTED = "executed";
     private static final String RESOLVED = "resolved", DEPENDENCIES = "dependencies";
-    private static final int NAMED_FAILURES = 20;
 
     private final TestFramework framework;
+    private final List<TestFramework> frameworks;
     private final Predicate<String> isTest;
     private final Function<List<String>, ProcessHandler.OfProcess> factory;
     private final Map<String, Resolver> resolvers;
@@ -53,6 +52,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
         this(null,
+                List.of(),
                 defaultIsTest(),
                 null,
                 resolvers,
@@ -81,6 +81,7 @@ public class TestModule implements BuildExecutorModule {
                                     Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) {
         return new TestModule(null,
+                List.of(),
                 defaultIsTest(),
                 null,
                 resolvers,
@@ -128,6 +129,7 @@ public class TestModule implements BuildExecutorModule {
     }
 
     private TestModule(TestFramework framework,
+                       List<TestFramework> frameworks,
                        Predicate<String> isTest,
                        Function<List<String>, ProcessHandler.OfProcess> factory,
                        Map<String, Resolver> resolvers,
@@ -152,6 +154,7 @@ public class TestModule implements BuildExecutorModule {
                        boolean skip) {
         this.skip = skip;
         this.framework = framework;
+        this.frameworks = frameworks;
         this.isTest = isTest;
         this.factory = factory;
         this.resolvers = resolvers;
@@ -177,6 +180,34 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule framework(TestFramework framework) {
         return new TestModule(framework,
+                frameworks,
+                isTest,
+                factory,
+                resolvers,
+                dependencies,
+                jarsOnly,
+                requireFramework,
+                pinning,
+                pathPlacement,
+                moduleName,
+                filter,
+                exclude,
+                tag,
+                engines,
+                scan,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                incrementalDigest,
+                terms,
+                skip);
+    }
+
+    public TestModule frameworks(List<TestFramework> frameworks) {
+        return new TestModule(framework,
+                List.copyOf(frameworks),
                 isTest,
                 factory,
                 resolvers,
@@ -203,6 +234,7 @@ public class TestModule implements BuildExecutorModule {
 
     public <P extends Predicate<String> & Serializable> TestModule isTest(P isTest) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -229,6 +261,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule factory(Function<List<String>, ProcessHandler.OfProcess> factory) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -255,6 +288,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule filter(String filter) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -281,6 +315,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule exclude(String exclude) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -307,6 +342,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule jarsOnly(boolean jarsOnly) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -333,6 +369,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule requireFramework(boolean requireFramework) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -359,6 +396,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule pinning(Pinning pinning) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -385,6 +423,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule pathPlacement(PathPlacement pathPlacement) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -411,6 +450,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule moduleName(String moduleName) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -437,6 +477,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule tag(String tag) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -463,6 +504,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule engines(String engines) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -499,6 +541,7 @@ public class TestModule implements BuildExecutorModule {
             }
         }
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -525,6 +568,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule force(boolean force) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -551,6 +595,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule group(String group) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -577,6 +622,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule parallel(boolean parallel) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -603,6 +649,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule reporting(boolean reporting) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -633,6 +680,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule observe(List<ObservabilityEngine> observers) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -659,6 +707,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule printing(BiConsumer<Boolean, String> printing) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -685,6 +734,7 @@ public class TestModule implements BuildExecutorModule {
 
     public TestModule skip(boolean skip) {
         return new TestModule(framework,
+                frameworks,
                 isTest,
                 factory,
                 resolvers,
@@ -718,7 +768,7 @@ public class TestModule implements BuildExecutorModule {
         }
         TestFramework resolved = framework;
         if (resolved == null) {
-            resolved = TestFramework.detect(() -> inherited.values().stream().iterator()).orElse(null);
+            resolved = TestFramework.detect(frameworks, () -> inherited.values().stream().iterator()).orElse(null);
             if (resolved == null) {
                 if (requireFramework && !skip) {
                     throw new IllegalStateException(
@@ -729,7 +779,9 @@ public class TestModule implements BuildExecutorModule {
             }
         }
         SequencedSet<String> upstream = inherited.sequencedKeySet();
-        buildExecutor.addStep(RESOLVED, new Requires(group, resolved, Set.copyOf(resolvers.keySet()), observers), upstream);
+        buildExecutor.addStep(RESOLVED,
+                new Requires(group, resolved, frameworks, Set.copyOf(resolvers.keySet()), observers),
+                upstream);
         SequencedSet<String> resolveInputs = new LinkedHashSet<>(upstream);
         resolveInputs.add(RESOLVED);
         buildExecutor.addModule(DEPENDENCIES,
@@ -742,6 +794,7 @@ public class TestModule implements BuildExecutorModule {
                 new Run(terms,
                         factory,
                         resolved,
+                        frameworks,
                         isTest,
                         jarsOnly,
                         pathPlacement,
@@ -771,7 +824,11 @@ public class TestModule implements BuildExecutorModule {
         return Optional.empty();
     }
 
-    private record Requires(String group, TestFramework framework, Set<String> prefixes, List<ObservabilityEngine> observers) implements BuildStep {
+    private record Requires(String group,
+                            TestFramework framework,
+                            List<TestFramework> frameworks,
+                            Set<String> prefixes,
+                            List<ObservabilityEngine> observers) implements BuildStep {
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -783,7 +840,7 @@ public class TestModule implements BuildExecutorModule {
                     .map(BuildStepArgument::folder)
                     .toList();
             List<ModuleDescriptor> artifacts = TestFramework.modules(folders);
-            TestFramework resolved = framework != null ? framework : TestFramework.detect(artifacts).orElse(null);
+            TestFramework resolved = framework != null ? framework : TestFramework.detect(frameworks, artifacts).orElse(null);
             SequencedProperties properties = new SequencedProperties();
             SequencedProperties versions = new SequencedProperties();
             SequencedMap<String, String> pinned = new LinkedHashMap<>();
@@ -822,8 +879,9 @@ public class TestModule implements BuildExecutorModule {
                 }
             }
             for (ObservabilityEngine observer : observers) {
+                String agent = observer.name() + ":agent";
                 for (Map.Entry<String, String> entry : observer.coordinates().entrySet()) {
-                    properties.setProperty(observer.name()
+                    properties.setProperty(agent
                             + "/runtime/"
                             + entry.getKey()
                             + "/"
@@ -845,7 +903,7 @@ public class TestModule implements BuildExecutorModule {
             if (!version.equals("RELEASE") || repository < 1 || groupId < 0) {
                 return version;
             }
-            String own = engine + "/" + coordinate, release = engine + "/" + coordinate.substring(0, groupId + 1);
+            String own = engine + ":agent/" + coordinate, release = "/" + coordinate.substring(0, groupId + 1);
             String train = null;
             for (Map.Entry<String, String> entry : pinned.entrySet()) {
                 String pin = entry.getValue().trim().split("\\s+", 2)[0];
@@ -855,7 +913,11 @@ public class TestModule implements BuildExecutorModule {
                 if (entry.getKey().equals(own)) {
                     return pin;
                 }
-                if (train == null && entry.getKey().startsWith(release)) {
+                int slash = entry.getKey().indexOf('/');
+                String group = slash < 0 ? "" : entry.getKey().substring(0, slash);
+                if (train == null
+                        && (group.equals(engine) || group.startsWith(engine + ":"))
+                        && entry.getKey().startsWith(release, slash)) {
                     train = pin;
                 }
             }
@@ -930,6 +992,7 @@ public class TestModule implements BuildExecutorModule {
     private static class Run extends Java {
 
         private final TestFramework framework;
+        private final List<TestFramework> frameworks;
         private final Predicate<String> isTest;
         private final String moduleName;
         private final transient String filter;
@@ -947,6 +1010,7 @@ public class TestModule implements BuildExecutorModule {
         private Run(ProcessBuildStep.Terms terms,
                     Function<List<String>, ProcessHandler.OfProcess> factory,
                     TestFramework framework,
+                    List<TestFramework> frameworks,
                     Predicate<String> isTest,
                     boolean jarsOnly,
                     PathPlacement pathPlacement,
@@ -968,6 +1032,7 @@ public class TestModule implements BuildExecutorModule {
                   group,
                   terms);
             this.framework = framework;
+            this.frameworks = frameworks;
             this.isTest = isTest;
             this.moduleName = moduleName;
             this.filter = filter;
@@ -989,70 +1054,11 @@ public class TestModule implements BuildExecutorModule {
         }
 
         @Override
-        protected Optional<String> diagnosis(BuildStepContext context) throws IOException {
-            SequencedSet<String> failed = new LinkedHashSet<>();
-            SequencedSet<Path> reported = new LinkedHashSet<>();
-            for (Path folder : List.of(context.next().resolve(BuildStep.REPORTS + "tests"), context.supplement())) {
-                if (!Files.isDirectory(folder)) {
-                    continue;
-                }
-                List<Path> reports;
-                try (Stream<Path> files = Files.walk(folder)) {
-                    reports = files.filter(file -> file.getFileName().toString().endsWith(".xml"))
-                            .filter(Files::isRegularFile)
-                            .sorted()
-                            .toList();
-                }
-                for (Path report : reports) {
-                    if (failures(report, failed)) {
-                        reported.add(report.getParent());
-                    }
-                }
-            }
-            if (failed.isEmpty()) {
-                return Optional.empty();
-            }
-            List<String> named = failed.stream().limit(NAMED_FAILURES).map(test -> "  " + test).toList();
-            return Optional.of(failed.size()
-                    + (failed.size() == 1 ? " test failed" : " tests failed")
-                    + ", as reported in "
-                    + reported.stream().map(Path::toString).collect(Collectors.joining(", "))
-                    + ":\n"
-                    + String.join("\n", named)
-                    + (failed.size() > named.size() ? "\n  ... and " + (failed.size() - named.size()) + " more" : ""));
-        }
-
-        private static boolean failures(Path report, SequencedSet<String> failed) throws IOException {
-            int before = failed.size();
-            parsed(report, new DefaultHandler() {
-
-                private String testcase;
-
-                @Override
-                public void startElement(String uri, String localName, String qualifiedName, Attributes attributes) {
-                    switch (qualifiedName) {
-                        case "testcase" -> {
-                            String type = attributes.getValue("classname"), name = attributes.getValue("name");
-                            testcase = type == null || type.isEmpty() ? name : name == null ? type : type + "#" + name;
-                        }
-                        case "failure", "error" -> {
-                            if (testcase != null) {
-                                failed.add(testcase);
-                            }
-                        }
-                        default -> {
-                        }
-                    }
-                }
-
-                @Override
-                public void endElement(String uri, String localName, String qualifiedName) {
-                    if (qualifiedName.equals("testcase")) {
-                        testcase = null;
-                    }
-                }
-            });
-            return failed.size() > before;
+        protected Optional<String> diagnosis(BuildStepContext context) {
+            Path reports = context.next().resolve(BuildStep.REPORTS + "tests");
+            return reporting && Files.isDirectory(reports)
+                    ? Optional.of("The reports of the test run are in " + reports)
+                    : Optional.empty();
         }
 
         @Override
@@ -1117,7 +1123,7 @@ public class TestModule implements BuildExecutorModule {
                     .toList();
             TestFramework resolved = (framework != null
                     ? framework
-                    : TestFramework.detect(folders)
+                    : TestFramework.detect(frameworks, folders)
                             .orElseThrow(() -> new IllegalArgumentException("No test framework found")))
                     .runningOn(TestFramework.jars(folders));
             String path = null, compiledFrom = null;
@@ -1396,10 +1402,9 @@ public class TestModule implements BuildExecutorModule {
                 return CompletableFuture.completedFuture(null);
             } else if (matchedClasses.isEmpty() && matchedMethods.isEmpty() && tags.all()) {
                 String unmatched = "among the " + compiled.get() + " classes compiled"
-                        + (compiledFrom == null ? "" : " from " + compiledFrom + ", the folder compiled for"
-                                + " these tests beside src/test/kotlin and src/test/groovy of a pom.xml, so tests kept"
-                                + " in another one need it named as the test sources, by testSourceDirectory in a"
-                                + " pom.xml")
+                        + (compiledFrom == null ? "" : " from " + compiledFrom + ", so tests kept in another"
+                                + " folder need it named as the test sources, as testSourceDirectory or"
+                                + " jenesis.maven.sources names one of a pom.xml")
                         + (scanned.isEmpty() ? "" : ", nor among the " + contained + " classes of the scanned "
                                 + scanned.stream().map(jar -> jar.getFileName().toString()).collect(Collectors.joining(", ")));
                 if (!specs.isEmpty()) {
@@ -1611,7 +1616,7 @@ public class TestModule implements BuildExecutorModule {
                 }
                 SequencedProperties properties = SequencedProperties.ofFiles(file);
                 for (String coordinate : observer.coordinates().sequencedKeySet()) {
-                    String prefix = observer.name() + "/runtime/" + coordinate + "/";
+                    String prefix = observer.name() + ":agent/runtime/" + coordinate + "/";
                     for (String key : properties.stringPropertyNames()) {
                         if (key.startsWith(prefix)) {
                             String value = properties.getProperty(key);
