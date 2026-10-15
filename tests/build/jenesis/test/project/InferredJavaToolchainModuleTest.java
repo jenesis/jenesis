@@ -129,7 +129,7 @@ public class InferredJavaToolchainModuleTest {
     }
 
     private InferredJavaToolchainModule toolchain() {
-        return new InferredJavaToolchainModule(new LinkedHashSet<>(List.of(input)), Map.of(), Map.of());
+        return new InferredJavaToolchainModule(new LinkedHashSet<>(List.of(input)), input, input, Map.of(), Map.of());
     }
 
     private static String keytool() {

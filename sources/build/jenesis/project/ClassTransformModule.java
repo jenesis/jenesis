@@ -32,7 +32,7 @@ public record ClassTransformModule(SequencedMap<String, BuildExecutorModule> tra
                 nested.addModule(PLUGIN, plugin, handed.sequencedKeySet());
                 nested.addStep(CLASSES, new Overlay(), handed.firstEntry().getKey(), PLUGIN);
             }, Stream.concat(Stream.of(previous), inputs.stream()));
-            previous = entry.getKey();
+            previous = entry.getKey() + "/" + CLASSES;
         }
     }
 

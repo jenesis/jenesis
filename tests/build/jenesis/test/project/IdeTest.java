@@ -270,7 +270,7 @@ public class IdeTest {
             properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
         });
         library(main, "lib.jar");
-        Path test = inventory("test-module-greeter", properties -> {
+        Path test = inventory("testmodule-greeter", properties -> {
             properties.setProperty("module-greeter.path", "greeter");
             properties.setProperty("module-greeter.test", "greeter");
             properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/any-name.jar");
@@ -381,7 +381,7 @@ public class IdeTest {
             properties.setProperty("module-greeter.path", "greeter");
             properties.setProperty("module-greeter.generated.0", "generated/sources");
         });
-        Path test = inventory("test-module-greeter", properties -> {
+        Path test = inventory("testmodule-greeter", properties -> {
             properties.setProperty("module-greeter.path", "greeter");
             properties.setProperty("module-greeter.test", "greeter");
             properties.setProperty("module-greeter.generated.0", "generated/sources");
@@ -414,7 +414,7 @@ public class IdeTest {
             properties.setProperty("module-greeter.path", "greeter");
             properties.setProperty("module-greeter.generated.0", "generated/sources");
         });
-        Path test = inventory("test-module-greeter", properties -> {
+        Path test = inventory("testmodule-greeter", properties -> {
             properties.setProperty("module-greeter.path", "greeter");
             properties.setProperty("module-greeter.test", "greeter");
             properties.setProperty("module-greeter.generated.0", "generated/sources");

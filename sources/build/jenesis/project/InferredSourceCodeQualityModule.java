@@ -5,11 +5,9 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
-import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
-import build.jenesis.step.Bind;
 
 public class InferredSourceCodeQualityModule implements BuildExecutorModule {
 
@@ -20,44 +18,43 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
             SCALASTYLE = "scalastyle",
             SCALAFMT = "scalafmt",
             CODENARC = "codenarc";
+    private static final Pattern CONFIG_LOC = Pattern.compile("\\$\\{config_loc}/([^\"'<>${}\\s]+)");
 
     private final SequencedSet<Path> configuration;
-    private final Pinning pinning;
-    private final CheckstyleModule checkstyleModule;
-    private final PmdModule pmdModule;
-    private final DetektModule detektModule;
-    private final KtlintModule ktlintModule;
-    private final ScalastyleModule scalastyleModule;
-    private final ScalafmtModule scalafmtModule;
-    private final CodeNarcModule codenarcModule;
-    private final Function<CheckstyleModule, BuildExecutorModule> checkstyle;
-    private final Function<PmdModule, BuildExecutorModule> pmd;
-    private final Function<DetektModule, BuildExecutorModule> detekt;
-    private final Function<KtlintModule, BuildExecutorModule> ktlint;
-    private final Function<ScalastyleModule, BuildExecutorModule> scalastyle;
-    private final Function<ScalafmtModule, BuildExecutorModule> scalafmt;
-    private final Function<CodeNarcModule, BuildExecutorModule> codenarc;
+    private final ExternalModule checkstyleModule;
+    private final boolean checkstyle;
+    private final ExternalModule pmdModule;
+    private final boolean pmd;
+    private final ExternalModule detektModule;
+    private final boolean detekt;
+    private final ExternalModule ktlintModule;
+    private final boolean ktlint;
+    private final ExternalModule scalastyleModule;
+    private final boolean scalastyle;
+    private final ExternalModule scalafmtModule;
+    private final boolean scalafmt;
+    private final ExternalModule codenarcModule;
+    private final boolean codenarc;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredSourceCodeQualityModule(SequencedSet<Path> configuration,
                                            Map<String, Repository> repositories,
                                            Map<String, Resolver> resolvers) {
         this(configuration,
-                null,
-                new CheckstyleModule(repositories, resolvers),
-                new PmdModule(repositories, resolvers),
-                new DetektModule(repositories, resolvers),
-                new KtlintModule(repositories, resolvers),
-                new ScalastyleModule(repositories, resolvers),
-                new ScalafmtModule(repositories, resolvers),
-                new CodeNarcModule(repositories, resolvers),
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
+                ExternalModule.official(Environment.NONE, "checkstyle", null, repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, "pmd", null, repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, "detekt", null, repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, "ktlint", "check", repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, "scalastyle", null, repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, "scalafmt", "check", repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, "codenarc", null, repositories, resolvers),
+                true,
                 Collections.emptyNavigableMap());
     }
 
@@ -66,258 +63,227 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
                                                                 Map<String, Repository> repositories,
                                                                 Map<String, Resolver> resolvers) {
         InferredSourceCodeQualityModule module = new InferredSourceCodeQualityModule(configuration,
-                null,
-                CheckstyleModule.ofEnvironment(environment, repositories, resolvers),
-                PmdModule.ofEnvironment(environment, repositories, resolvers),
-                DetektModule.ofEnvironment(environment, repositories, resolvers),
-                KtlintModule.ofEnvironment(environment, repositories, resolvers),
-                ScalastyleModule.ofEnvironment(environment, repositories, resolvers),
-                ScalafmtModule.ofEnvironment(environment, repositories, resolvers),
-                CodeNarcModule.ofEnvironment(environment, repositories, resolvers),
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
-                value -> value,
+                ExternalModule.official(environment, "checkstyle", null, repositories, resolvers),
+                true,
+                ExternalModule.official(environment, "pmd", null, repositories, resolvers),
+                true,
+                ExternalModule.official(environment, "detekt", null, repositories, resolvers),
+                true,
+                ExternalModule.official(environment, "ktlint", "check", repositories, resolvers),
+                true,
+                ExternalModule.official(environment, "scalastyle", null, repositories, resolvers),
+                true,
+                ExternalModule.official(environment, "scalafmt", "check", repositories, resolvers),
+                true,
+                ExternalModule.official(environment, "codenarc", null, repositories, resolvers),
+                true,
                 Collections.emptyNavigableMap());
         if (Enforcement.ofEnvironment(environment, "source.checkstyle") == Enforcement.IGNORE) {
-            module = module.checkstyle(null);
+            module = module.checkstyle(false);
         }
         if (Enforcement.ofEnvironment(environment, "source.pmd") == Enforcement.IGNORE) {
-            module = module.pmd(null);
+            module = module.pmd(false);
         }
         if (Enforcement.ofEnvironment(environment, "source.detekt") == Enforcement.IGNORE) {
-            module = module.detekt(null);
+            module = module.detekt(false);
         }
         if (Enforcement.ofEnvironment(environment, "source.ktlint") == Enforcement.IGNORE) {
-            module = module.ktlint(null);
+            module = module.ktlint(false);
         }
         if (Enforcement.ofEnvironment(environment, "source.scalastyle") == Enforcement.IGNORE) {
-            module = module.scalastyle(null);
+            module = module.scalastyle(false);
         }
         if (Enforcement.ofEnvironment(environment, "source.scalafmt") == Enforcement.IGNORE) {
-            module = module.scalafmt(null);
+            module = module.scalafmt(false);
         }
         if (Enforcement.ofEnvironment(environment, "source.codenarc") == Enforcement.IGNORE) {
-            module = module.codenarc(null);
+            module = module.codenarc(false);
         }
         return module;
     }
 
     private InferredSourceCodeQualityModule(SequencedSet<Path> configuration,
-                                            Pinning pinning,
-                                            CheckstyleModule checkstyleModule,
-                                            PmdModule pmdModule,
-                                            DetektModule detektModule,
-                                            KtlintModule ktlintModule,
-                                            ScalastyleModule scalastyleModule,
-                                            ScalafmtModule scalafmtModule,
-                                            CodeNarcModule codenarcModule,
-                                            Function<CheckstyleModule, BuildExecutorModule> checkstyle,
-                                            Function<PmdModule, BuildExecutorModule> pmd,
-                                            Function<DetektModule, BuildExecutorModule> detekt,
-                                            Function<KtlintModule, BuildExecutorModule> ktlint,
-                                            Function<ScalastyleModule, BuildExecutorModule> scalastyle,
-                                            Function<ScalafmtModule, BuildExecutorModule> scalafmt,
-                                            Function<CodeNarcModule, BuildExecutorModule> codenarc,
+                                            ExternalModule checkstyleModule,
+                                            boolean checkstyle,
+                                            ExternalModule pmdModule,
+                                            boolean pmd,
+                                            ExternalModule detektModule,
+                                            boolean detekt,
+                                            ExternalModule ktlintModule,
+                                            boolean ktlint,
+                                            ExternalModule scalastyleModule,
+                                            boolean scalastyle,
+                                            ExternalModule scalafmtModule,
+                                            boolean scalafmt,
+                                            ExternalModule codenarcModule,
+                                            boolean codenarc,
                                             SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
-        this.pinning = pinning;
         this.checkstyleModule = checkstyleModule;
-        this.pmdModule = pmdModule;
-        this.detektModule = detektModule;
-        this.ktlintModule = ktlintModule;
-        this.scalastyleModule = scalastyleModule;
-        this.scalafmtModule = scalafmtModule;
-        this.codenarcModule = codenarcModule;
         this.checkstyle = checkstyle;
+        this.pmdModule = pmdModule;
         this.pmd = pmd;
+        this.detektModule = detektModule;
         this.detekt = detekt;
+        this.ktlintModule = ktlintModule;
         this.ktlint = ktlint;
+        this.scalastyleModule = scalastyleModule;
         this.scalastyle = scalastyle;
+        this.scalafmtModule = scalafmtModule;
         this.scalafmt = scalafmt;
+        this.codenarcModule = codenarcModule;
         this.codenarc = codenarc;
         this.custom = custom;
     }
 
-    public InferredSourceCodeQualityModule pinning(Pinning pinning) {
+    public InferredSourceCodeQualityModule checkstyle(boolean checkstyle) {
         return new InferredSourceCodeQualityModule(configuration,
-                pinning,
                 checkstyleModule,
-                pmdModule,
-                detektModule,
-                ktlintModule,
-                scalastyleModule,
-                scalafmtModule,
-                codenarcModule,
                 checkstyle,
+                pmdModule,
                 pmd,
+                detektModule,
                 detekt,
+                ktlintModule,
                 ktlint,
+                scalastyleModule,
                 scalastyle,
+                scalafmtModule,
                 scalafmt,
+                codenarcModule,
                 codenarc,
                 custom);
     }
 
-    public InferredSourceCodeQualityModule checkstyle(Function<CheckstyleModule, BuildExecutorModule> checkstyle) {
+    public InferredSourceCodeQualityModule pmd(boolean pmd) {
         return new InferredSourceCodeQualityModule(configuration,
-                pinning,
                 checkstyleModule,
-                pmdModule,
-                detektModule,
-                ktlintModule,
-                scalastyleModule,
-                scalafmtModule,
-                codenarcModule,
                 checkstyle,
+                pmdModule,
                 pmd,
+                detektModule,
                 detekt,
+                ktlintModule,
                 ktlint,
+                scalastyleModule,
                 scalastyle,
+                scalafmtModule,
                 scalafmt,
+                codenarcModule,
                 codenarc,
                 custom);
     }
 
-    public InferredSourceCodeQualityModule pmd(Function<PmdModule, BuildExecutorModule> pmd) {
+    public InferredSourceCodeQualityModule detekt(boolean detekt) {
         return new InferredSourceCodeQualityModule(configuration,
-                pinning,
                 checkstyleModule,
-                pmdModule,
-                detektModule,
-                ktlintModule,
-                scalastyleModule,
-                scalafmtModule,
-                codenarcModule,
                 checkstyle,
+                pmdModule,
                 pmd,
+                detektModule,
                 detekt,
+                ktlintModule,
                 ktlint,
+                scalastyleModule,
                 scalastyle,
+                scalafmtModule,
                 scalafmt,
+                codenarcModule,
                 codenarc,
                 custom);
     }
 
-    public InferredSourceCodeQualityModule detekt(Function<DetektModule, BuildExecutorModule> detekt) {
+    public InferredSourceCodeQualityModule ktlint(boolean ktlint) {
         return new InferredSourceCodeQualityModule(configuration,
-                pinning,
                 checkstyleModule,
-                pmdModule,
-                detektModule,
-                ktlintModule,
-                scalastyleModule,
-                scalafmtModule,
-                codenarcModule,
                 checkstyle,
+                pmdModule,
                 pmd,
+                detektModule,
                 detekt,
+                ktlintModule,
                 ktlint,
+                scalastyleModule,
                 scalastyle,
+                scalafmtModule,
                 scalafmt,
+                codenarcModule,
                 codenarc,
                 custom);
     }
 
-    public InferredSourceCodeQualityModule ktlint(Function<KtlintModule, BuildExecutorModule> ktlint) {
+    public InferredSourceCodeQualityModule scalastyle(boolean scalastyle) {
         return new InferredSourceCodeQualityModule(configuration,
-                pinning,
                 checkstyleModule,
-                pmdModule,
-                detektModule,
-                ktlintModule,
-                scalastyleModule,
-                scalafmtModule,
-                codenarcModule,
                 checkstyle,
+                pmdModule,
                 pmd,
+                detektModule,
                 detekt,
+                ktlintModule,
                 ktlint,
+                scalastyleModule,
                 scalastyle,
+                scalafmtModule,
                 scalafmt,
+                codenarcModule,
                 codenarc,
                 custom);
     }
 
-    public InferredSourceCodeQualityModule scalastyle(Function<ScalastyleModule, BuildExecutorModule> scalastyle) {
+    public InferredSourceCodeQualityModule scalafmt(boolean scalafmt) {
         return new InferredSourceCodeQualityModule(configuration,
-                pinning,
                 checkstyleModule,
-                pmdModule,
-                detektModule,
-                ktlintModule,
-                scalastyleModule,
-                scalafmtModule,
-                codenarcModule,
                 checkstyle,
+                pmdModule,
                 pmd,
+                detektModule,
                 detekt,
+                ktlintModule,
                 ktlint,
+                scalastyleModule,
                 scalastyle,
+                scalafmtModule,
                 scalafmt,
+                codenarcModule,
                 codenarc,
                 custom);
     }
 
-    public InferredSourceCodeQualityModule scalafmt(Function<ScalafmtModule, BuildExecutorModule> scalafmt) {
+    public InferredSourceCodeQualityModule codenarc(boolean codenarc) {
         return new InferredSourceCodeQualityModule(configuration,
-                pinning,
                 checkstyleModule,
-                pmdModule,
-                detektModule,
-                ktlintModule,
-                scalastyleModule,
-                scalafmtModule,
-                codenarcModule,
                 checkstyle,
-                pmd,
-                detekt,
-                ktlint,
-                scalastyle,
-                scalafmt,
-                codenarc,
-                custom);
-    }
-
-    public InferredSourceCodeQualityModule codenarc(Function<CodeNarcModule, BuildExecutorModule> codenarc) {
-        return new InferredSourceCodeQualityModule(configuration,
-                pinning,
-                checkstyleModule,
                 pmdModule,
-                detektModule,
-                ktlintModule,
-                scalastyleModule,
-                scalafmtModule,
-                codenarcModule,
-                checkstyle,
                 pmd,
+                detektModule,
                 detekt,
+                ktlintModule,
                 ktlint,
+                scalastyleModule,
                 scalastyle,
+                scalafmtModule,
                 scalafmt,
+                codenarcModule,
                 codenarc,
                 custom);
     }
 
     public InferredSourceCodeQualityModule custom(SequencedMap<String, BuildExecutorModule> custom) {
         return new InferredSourceCodeQualityModule(configuration,
-                pinning,
                 checkstyleModule,
-                pmdModule,
-                detektModule,
-                ktlintModule,
-                scalastyleModule,
-                scalafmtModule,
-                codenarcModule,
                 checkstyle,
+                pmdModule,
                 pmd,
+                detektModule,
                 detekt,
+                ktlintModule,
                 ktlint,
+                scalastyleModule,
                 scalastyle,
+                scalafmtModule,
                 scalafmt,
+                codenarcModule,
                 codenarc,
                 custom);
     }
@@ -338,50 +304,66 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        Path checkstyleFile = CheckstyleModule.configurationFile(configuration);
-        Bind.configured(buildExecutor,
-                inherited.sequencedKeySet(),
-                CHECKSTYLE,
-                checkstyle,
-                checkstyleFile,
-                checkstyle == null ? Collections.emptyNavigableSet() : CheckstyleModule.siblings(checkstyleFile),
-                () -> checkstyleModule.pinning(pinning));
-        Bind.configured(buildExecutor,
-                inherited.sequencedKeySet(),
-                PMD,
-                pmd,
-                PmdModule.configurationFile(configuration),
-                () -> pmdModule.pinning(pinning));
-        Bind.configured(buildExecutor,
-                inherited.sequencedKeySet(),
-                DETEKT,
-                detekt,
-                DetektModule.configurationFile(configuration),
-                () -> detektModule.pinning(pinning));
-        Bind.configured(buildExecutor,
-                inherited.sequencedKeySet(),
-                KTLINT,
-                ktlint,
-                KtlintModule.configurationFile(configuration),
-                () -> ktlintModule.pinning(pinning));
-        Bind.configured(buildExecutor,
-                inherited.sequencedKeySet(),
-                SCALASTYLE,
-                scalastyle,
-                ScalastyleModule.configurationFile(configuration),
-                () -> scalastyleModule.pinning(pinning));
-        Bind.configured(buildExecutor,
-                inherited.sequencedKeySet(),
-                SCALAFMT,
-                scalafmt,
-                ScalafmtModule.configurationFile(configuration),
-                () -> scalafmtModule.pinning(pinning));
-        Bind.configured(buildExecutor,
-                inherited.sequencedKeySet(),
-                CODENARC,
-                codenarc,
-                CodeNarcModule.configurationFile(configuration),
-                () -> codenarcModule.pinning(pinning));
+        Path checkstyleFile = BuildStep.locate(configuration, "checkstyle.xml");
+        if (checkstyleFile != null && checkstyle) {
+            ExternalModule module = checkstyleModule.bound(ExternalModule.RULES, checkstyleFile.getFileName(), checkstyleFile);
+            Matcher matcher = CONFIG_LOC.matcher(Files.readString(checkstyleFile));
+            while (matcher.find()) {
+                Path sibling = Path.of(matcher.group(1)).normalize();
+                if (sibling.isAbsolute() || sibling.startsWith("..")) {
+                    throw new IllegalArgumentException(checkstyleFile + " references ${config_loc}/" + matcher.group(1)
+                            + ", which is not beside or below it - place the file in the folder of "
+                            + checkstyleFile.getFileName());
+                }
+                if (!sibling.equals(checkstyleFile.getFileName())
+                        && Files.isRegularFile(checkstyleFile.resolveSibling(sibling))) {
+                    module = module.bound(ExternalModule.RULES, sibling, checkstyleFile.resolveSibling(sibling));
+                }
+            }
+            Path expansions = checkstyleFile.resolveSibling("checkstyle.properties");
+            if (Files.isRegularFile(expansions)) {
+                SequencedMap<String, String> values = new LinkedHashMap<>();
+                SequencedProperties.ofFiles(expansions).forEachProperty(values::put);
+                module = module.properties(values);
+            }
+            buildExecutor.addModule(CHECKSTYLE, module, inherited.sequencedKeySet());
+        }
+        Path pmdFile = BuildStep.locate(configuration, "pmd.xml");
+        if (pmdFile != null && pmd) {
+            buildExecutor.addModule(PMD,
+                    pmdModule.bound(ExternalModule.RULES, pmdFile.getFileName(), pmdFile),
+                    inherited.sequencedKeySet());
+        }
+        Path detektFile = BuildStep.locate(configuration, "detekt.yml");
+        if (detektFile != null && detekt) {
+            buildExecutor.addModule(DETEKT,
+                    detektModule.bound(ExternalModule.RULES, detektFile.getFileName(), detektFile),
+                    inherited.sequencedKeySet());
+        }
+        Path ktlintFile = BuildStep.locate(configuration, ".editorconfig");
+        if (ktlintFile != null && ktlint) {
+            buildExecutor.addModule(KTLINT,
+                    ktlintModule.bound(ExternalModule.RULES, ktlintFile.getFileName(), ktlintFile),
+                    inherited.sequencedKeySet());
+        }
+        Path scalastyleFile = BuildStep.locate(configuration, "scalastyle-config.xml");
+        if (scalastyleFile != null && scalastyle) {
+            buildExecutor.addModule(SCALASTYLE,
+                    scalastyleModule.bound(ExternalModule.RULES, scalastyleFile.getFileName(), scalastyleFile),
+                    inherited.sequencedKeySet());
+        }
+        Path scalafmtFile = BuildStep.locate(configuration, ".scalafmt.conf");
+        if (scalafmtFile != null && scalafmt) {
+            buildExecutor.addModule(SCALAFMT,
+                    scalafmtModule.bound(ExternalModule.RULES, scalafmtFile.getFileName(), scalafmtFile),
+                    inherited.sequencedKeySet());
+        }
+        Path codenarcFile = BuildStep.locate(configuration, "codenarc.xml");
+        if (codenarcFile != null && codenarc) {
+            buildExecutor.addModule(CODENARC,
+                    codenarcModule.bound(ExternalModule.RULES, codenarcFile.getFileName(), codenarcFile),
+                    inherited.sequencedKeySet());
+        }
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
                     nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());

@@ -34,13 +34,15 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
     private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredJavaToolchainModule(SequencedSet<Path> configuration,
+                                       Path location,
+                                       Path root,
                                        Map<String, Repository> repositories,
                                        Map<String, Resolver> resolvers) {
         this(configuration,
                 null,
                 PathPlacement.INFERRED,
-                new InferredSourceGenerationModule(configuration, repositories, resolvers),
-                new InferredCompilerChainModule(configuration, repositories, resolvers),
+                new InferredSourceGenerationModule(configuration, location, root, repositories, resolvers),
+                new InferredCompilerChainModule(repositories, resolvers),
                 new InferredByteCodeQualityModule(configuration, repositories, resolvers),
                 new JarSigner(),
                 new ClassPathCompatibility(),
@@ -56,13 +58,15 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
 
     public static InferredJavaToolchainModule ofEnvironment(Environment environment,
                                                             SequencedSet<Path> configuration,
+                                                            Path location,
+                                                            Path root,
                                                             Map<String, Repository> repositories,
                                                             Map<String, Resolver> resolvers) {
         InferredJavaToolchainModule module = new InferredJavaToolchainModule(configuration,
                 null,
                 PathPlacement.INFERRED,
-                InferredSourceGenerationModule.ofEnvironment(environment, configuration, repositories, resolvers),
-                InferredCompilerChainModule.ofEnvironment(environment, configuration, repositories, resolvers),
+                InferredSourceGenerationModule.ofEnvironment(environment, configuration, location, root, repositories, resolvers),
+                InferredCompilerChainModule.ofEnvironment(environment, repositories, resolvers),
                 InferredByteCodeQualityModule.ofEnvironment(environment, configuration, repositories, resolvers),
                 JarSigner.ofEnvironment(environment),
                 new ClassPathCompatibility(),
@@ -388,7 +392,6 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
 
     private JavaToolchainModule toolchain(BuildStep signing) {
         BuildExecutorModule compiled = compiler == null ? null : compiler.apply(compilerModule
-                .pinning(pinning)
                 .pathPlacement(pathPlacement));
         if (compiled == null) {
             throw new IllegalStateException("A Java toolchain requires a compiler but none is configured");
@@ -398,10 +401,10 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 ? null
                 : classpath.apply(classpathStep);
         return new JavaToolchainModule(
-                generator == null ? null : generator.apply(generatorModule.pinning(pinning)),
+                generator == null ? null : generator.apply(generatorModule),
                 compiled,
                 transformer,
-                validator == null ? null : validator.apply(validatorModule.pinning(pinning)),
+                validator == null ? null : validator.apply(validatorModule),
                 signing == null || archiver == null ? archiver : new SignedArchive(archiver, signing),
                 compatibility == null ? null : compatibility.asModule("services"));
     }

@@ -2,6 +2,7 @@ package build.jenesis.project;
 
 import module java.base;
 import build.jenesis.BuildStep;
+import build.jenesis.ObservabilityEngine;
 
 public record Jfr(SequencedMap<String, String> options) implements ObservabilityEngine {
 

@@ -1,6 +1,7 @@
 package build.jenesis.project;
 
 import module java.base;
+import build.jenesis.ObservabilityEngine;
 
 public record NativeImageAgent() implements ObservabilityEngine {
 
