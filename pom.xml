@@ -58,7 +58,7 @@
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <mainClass>build.jenesis.Project</mainClass>
+        <mainClass>build.jenesis.Make</mainClass>
     </properties>
 
     <dependencyManagement>
