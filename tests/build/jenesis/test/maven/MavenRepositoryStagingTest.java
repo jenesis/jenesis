@@ -47,6 +47,30 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
+    public void stages_the_sources_and_javadoc_jars_a_supplementary_inventory_names_for_a_module() throws IOException {
+        Path inv = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(inv, "classes.jar", "classes-bytes");
+        Path documented = Files.createDirectory(source.resolve("documented"));
+        writeArtifact(documented, "javadoc.jar", "javadoc-bytes");
+        SequencedProperties documentation = new SequencedProperties();
+        documentation.setProperty("module-foo.documentation.0", "documentation/javadoc.jar");
+        documentation.store(documented.resolve(Inventory.INVENTORY));
+        Path sourced = Files.createDirectory(source.resolve("sourced"));
+        writeArtifact(sourced, "sources.jar", "sources-bytes");
+        SequencedProperties sources = new SequencedProperties();
+        sources.setProperty("module-foo.sources.0", "sources/sources.jar");
+        sources.store(sourced.resolve(Inventory.INVENTORY));
+
+        run(true, inv, documented, sourced);
+
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).hasContent("classes-bytes");
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-javadoc.jar"))
+                .as("the javadoc jar a later phase wrote is staged beside the jar of its module")
+                .hasContent("javadoc-bytes");
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-sources.jar")).hasContent("sources-bytes");
+    }
+
+    @Test
     public void stages_the_pom_of_a_bom_without_any_jar() throws IOException {
         Path inventoryDir = Files.createDirectory(source.resolve("bom"));
         Files.writeString(inventoryDir.resolve("pom.xml"), buildPom("com.example", "foo-bom", "1.2.3", List.of()));
