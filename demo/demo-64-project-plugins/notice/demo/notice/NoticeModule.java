@@ -7,10 +7,6 @@ public class NoticeModule implements BuildExecutorModule {
 
     private final String holder;
 
-    public NoticeModule() {
-        this(Collections.emptyNavigableMap());
-    }
-
     public NoticeModule(SequencedMap<String, String> properties) {
         holder = properties.getOrDefault("holder", "its authors");
     }

@@ -1,4 +1,4 @@
 module demo.audit {
     requires build.jenesis;
-    provides build.jenesis.BuildExecutorModule with demo.audit.AuditModule;
+    provides build.jenesis.BuildModuleFactory with demo.audit.AuditFactory;
 }

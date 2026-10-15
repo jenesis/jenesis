@@ -9,10 +9,6 @@ public class JniModule implements BuildExecutorModule {
 
     private final String library;
 
-    public JniModule() {
-        this(Collections.emptyNavigableMap());
-    }
-
     public JniModule(SequencedMap<String, String> properties) {
         library = properties.getOrDefault("library", "native");
     }

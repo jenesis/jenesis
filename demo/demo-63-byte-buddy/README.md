@@ -38,8 +38,9 @@ Layout
     |   |-- .jenesis.skip              keeps the project's module discovery out of plugin/
     |   |-- module-info.java           module demo.plugin { requires build.jenesis;
     |   |                                      requires net.bytebuddy;
-    |   |                                      provides build.jenesis.BuildExecutorModule
-    |   |                                      with demo.plugin.EnhanceModule; }
+    |   |                                      provides build.jenesis.BuildModuleFactory
+    |   |                                      with demo.plugin.EnhanceFactory; }
+    |   |-- demo/plugin/EnhanceFactory.java
     |   `-- demo/plugin/EnhanceModule.java
     `-- sources/
         |-- module-info.java           module demo.bytebuddy { requires static net.bytebuddy; ... }
@@ -73,14 +74,9 @@ The plugin runs in a module where `plugin-enhance.properties` is found, here in
     type=sample.Greeting
     greeting=Hello from a method that Byte Buddy rewrote in a build plugin!
 
-The file's values reach the provider's constructor as a `SequencedMap`, in the
-file's order, and the provider keeps what it needs. `javac` requires a service
-provider to keep a public constructor without arguments as well, which the build
-uses when the file is empty:
-
-    public EnhanceModule() {
-        this(Collections.emptyNavigableMap());
-    }
+The file's values reach the plugin's `BuildModuleFactory` as a `SequencedMap`, in
+the file's order, and the factory hands them to the module it creates, which keeps
+what it needs:
 
     public EnhanceModule(SequencedMap<String, String> properties) {
         type = properties.getOrDefault("type", "sample.Greeting");
@@ -140,11 +136,11 @@ runs, with the values of its own properties file, and runs nothing it did not na
 
 The plugin's dependencies - `build.jenesis` and `net.bytebuddy` - resolve by module
 name into the plugin's own module layer, and `pin` records them in
-`sources/module-info.java` under the group named after the plugin, beside the
+`sources/module-info.java` under the group of the plugin's name, beside the
 `net.bytebuddy` the module itself compiles against:
 
-    @jenesis.pin plugin-enhance/module/build.jenesis ...
-    @jenesis.pin plugin-enhance/module/net.bytebuddy ...
+    @jenesis.pin enhance/module/build.jenesis ...
+    @jenesis.pin enhance/module/net.bytebuddy ...
 
 Byte Buddy never reaches the running application: the module requires it only to
 compile against its annotation, and what the plugin rewrote refers to nothing but

@@ -17,10 +17,6 @@ public class EnhanceModule implements BuildExecutorModule {
 
     private final String type, greeting;
 
-    public EnhanceModule() {
-        this(Collections.emptyNavigableMap());
-    }
-
     public EnhanceModule(SequencedMap<String, String> properties) {
         type = properties.getOrDefault("type", "sample.Greeting");
         greeting = properties.getOrDefault("greeting", "Hello from a rewritten method!");
