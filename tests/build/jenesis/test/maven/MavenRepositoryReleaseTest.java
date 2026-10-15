@@ -232,7 +232,8 @@ public class MavenRepositoryReleaseTest {
     @Test
     public void sends_the_token_to_a_repository_the_command_line_named() throws IOException {
         stage("1.0.0", "greeter-1.0.0.jar", "classes");
-        Environment environment = new Environment(Map.of("deploy.uri", uri(),
+        Environment environment = new Environment(Map.of("release.publish", "true",
+                "deploy.uri", uri(),
                 "deploy.token", "Bearer secret",
                 "repository.insecure", "true"));
 
@@ -244,7 +245,8 @@ public class MavenRepositoryReleaseTest {
     @Test
     public void sends_no_token_to_a_repository_the_project_named_itself() throws IOException {
         stage("1.0.0", "greeter-1.0.0.jar", "classes");
-        Environment environment = new Environment(Map.of("deploy.uri", uri(),
+        Environment environment = new Environment(Map.of("release.publish", "true",
+                "deploy.uri", uri(),
                 "deploy.token", "Bearer secret",
                 "repository.insecure", "true",
                 "make.provided", "deploy.uri"));
@@ -364,12 +366,37 @@ public class MavenRepositoryReleaseTest {
         assertThat(printed.getLast()).endsWith("demo/greeter/greeter/1.0.0/greeter-1.0.0.pom");
     }
 
+    @Test
+    public void a_dry_run_names_each_file_it_would_put_and_sends_nothing() throws IOException {
+        stage("1.0.0", "greeter-1.0.0.jar", "classes");
+        stage("1.0.0", "greeter-1.0.0.pom", "<project/>");
+        List<String> printed = new ArrayList<>();
+
+        run(release().publish(false).connection(new Repository.Connection().insecure(true).offline(true)).printing(printed::add, Palette.ANSI));
+
+        assertThat(requests).as("a dry run talks to no repository, so it runs offline as well").isEmpty();
+        assertThat(printed).hasSize(2).allMatch(line -> line.contains("[DRY RUN]"));
+        assertThat(printed.getFirst()).endsWith("/repository/releases/demo/greeter/greeter/1.0.0/greeter-1.0.0.jar");
+        assertThat(printed.getLast()).endsWith("/repository/releases/demo/greeter/greeter/1.0.0/greeter-1.0.0.pom");
+    }
+
+    @Test
+    public void a_dry_run_refuses_what_a_release_would_refuse() throws IOException {
+        stage("1.0.0", "other-1.0.0.jar", "classes");
+
+        assertThatThrownBy(() -> run(release().publish(false)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("is named greeter-1.0.0[-<classifier>].<extension>");
+        assertThat(requests).isEmpty();
+    }
+
     private String uri() {
         return "http://localhost:" + server.getAddress().getPort() + "/repository/releases/";
     }
 
     private MavenRepositoryRelease release() {
         return new MavenRepositoryRelease(URI.create("http://localhost:" + server.getAddress().getPort() + "/repository/releases"))
+                .publish(true)
                 .connection(new Repository.Connection().insecure(true).retries(0))
                 .printing(null, Palette.ANSI);
     }

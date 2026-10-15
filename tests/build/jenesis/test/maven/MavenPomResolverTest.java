@@ -2710,6 +2710,47 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void a_version_pinned_for_an_artifact_resolves_its_classified_executable_at_that_version() throws IOException {
+        Files.writeString(Files.createDirectories(repository.resolve("sample/protoc")).resolve("maven-metadata.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <metadata modelVersion="1.1.0">
+                  <versioning>
+                    <latest>4.36.2</latest>
+                    <release>4.36.2</release>
+                    <versions>
+                      <version>4.35.1</version>
+                      <version>4.36.2</version>
+                    </versions>
+                  </versioning>
+                </metadata>
+                """);
+        for (String version : List.of("4.35.1", "4.36.2")) {
+            addToRepository("sample",
+                    "protoc",
+                    version, """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                    </project>
+                    """);
+            Files.writeString(repository.resolve("sample/protoc/" + version + "/protoc-" + version + "-linux-x86_64.exe"),
+                    version);
+        }
+        Resolver.Resolution resolution = mavenPomResolver.dependencies(
+                Runnable::run,
+                "maven",
+                Map.<String, Repository>of("maven", mavenRepository),
+                new LinkedHashMap<>(Map.of("sample/protoc/exe/linux-x86_64/RELEASE", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(Map.of("sample/protoc", "4.35.1")),
+                DependencyScope.COMPILE);
+        assertThat(resolution.vertices().values())
+                .as("a platform's executable is the artifact the pin names, so the pin decides its version")
+                .singleElement()
+                .extracting(Resolver.Vertex::resolvedVersion)
+                .isEqualTo("4.35.1");
+    }
+
+    @Test
     public void refuses_a_transitive_dependency_naming_a_property_its_pom_does_not_define_whatever_the_jvm_holds() throws IOException {
         addToRepository("group", "artifact", "1", rootPom("", "middle"));
         addToRepository("middle", "artifact", "1", """

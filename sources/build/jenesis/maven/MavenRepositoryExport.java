@@ -12,6 +12,7 @@ import build.jenesis.SequencedProperties;
 
 public class MavenRepositoryExport implements BuildStep {
 
+    private static final String INSTALLED = "_remote.repositories";
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter
             .ofPattern("yyyyMMddHHmmss")
@@ -92,24 +93,38 @@ public class MavenRepositoryExport implements BuildStep {
                 throw new IOException("Resolved path escapes the repository root: " + targetVersionDir);
             }
             Files.createDirectories(targetVersionDir);
+            SequencedSet<String> exported = new TreeSet<>();
             try (DirectoryStream<Path> files = Files.newDirectoryStream(stagedVersionDir)) {
                 for (Path source : files) {
                     if (!Files.isRegularFile(source)) {
                         continue;
                     }
                     String name = source.getFileName().toString();
-                    if (name.endsWith(".xml") || name.equals("_remote.repositories")) {
+                    if (name.endsWith(".xml") || name.equals(INSTALLED)) {
                         continue;
                     }
                     Path destination = targetVersionDir.resolve(name);
                     Files.deleteIfExists(destination);
                     BuildStep.linkOrCopy(destination, source);
+                    exported.add(name);
                 }
             }
             if (coordinates.version().endsWith("-SNAPSHOT")) {
                 writeSnapshotMetadata(targetVersionDir, coordinates, timestamp);
             }
-            writeRemoteRepositoriesMarker(targetVersionDir);
+            Path marker = targetVersionDir.resolve(INSTALLED);
+            SequencedSet<String> entries = new TreeSet<>();
+            if (Files.isRegularFile(marker)) {
+                entries.addAll(SequencedProperties.ofFiles(marker).stringPropertyNames());
+            }
+            exported.forEach(name -> entries.add(name + ">"));
+            StringBuilder body = new StringBuilder()
+                    .append("#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.\n")
+                    .append("#")
+                    .append(DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now()))
+                    .append('\n');
+            entries.forEach(installed -> body.append(installed).append("=\n"));
+            Files.writeString(marker, body.toString());
             versionsByArtifactDir.computeIfAbsent(targetArtifactDir, _ -> new LinkedHashSet<>())
                     .add(coordinates.version());
             sampleByArtifactDir.putIfAbsent(targetArtifactDir, coordinates);
@@ -237,31 +252,6 @@ public class MavenRepositoryExport implements BuildStep {
         }
         metadata.appendChild(document.createElement("version")).setTextContent(coordinates.version());
         writeXml(document, versionDir.resolve("maven-metadata-local.xml"));
-    }
-
-    private static void writeRemoteRepositoriesMarker(Path versionDir) throws IOException {
-        StringBuilder body = new StringBuilder()
-                .append("#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.\n")
-                .append("#")
-                .append(DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now()))
-                .append('\n');
-        try (DirectoryStream<Path> files = Files.newDirectoryStream(versionDir)) {
-            SequencedSet<String> names = new TreeSet<>();
-            for (Path file : files) {
-                if (!Files.isRegularFile(file)) {
-                    continue;
-                }
-                String name = file.getFileName().toString();
-                if (name.endsWith(".xml") || name.equals("_remote.repositories")) {
-                    continue;
-                }
-                names.add(name);
-            }
-            for (String name : names) {
-                body.append(name).append(">=\n");
-            }
-        }
-        Files.writeString(versionDir.resolve("_remote.repositories"), body.toString());
     }
 
     private static Document newDocument() {
