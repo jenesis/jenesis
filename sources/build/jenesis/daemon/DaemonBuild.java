@@ -31,7 +31,7 @@ public final class DaemonBuild {
         }
         String[] selectors = Arrays.copyOfRange(arguments, Math.min(index + 1, arguments.length), arguments.length);
         requested.put("jenesis.make.root", root.toString());
-        requested.put("jenesis.make.daemon", "false");
+        requested.put("jenesis.make.mode", "compiled");
         requested.putIfAbsent("jenesis.process.mode", "daemon");
         requested.putIfAbsent("jenesis.project.target", root.resolve("target").toString());
         requested.putIfAbsent("jenesis.project.artifacts", root.resolve(".jenesis").resolve("artifacts").toString());

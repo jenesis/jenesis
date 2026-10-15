@@ -117,6 +117,20 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
         return value == null ? List.of() : List.of(value.split("\\s+"));
     }
 
+    public String variable(String origin, String value) {
+        if (!value.startsWith("@") || value.startsWith("@@")) {
+            return value.startsWith("@") ? value.substring(1) : value;
+        }
+        int slash = value.indexOf('/');
+        String name = value.substring(1, slash == -1 ? value.length() : slash);
+        String resolved = value("variable." + name, slash == -1 ? null : value.substring(slash + 1));
+        if (resolved == null) {
+            throw new IllegalArgumentException(origin + " to " + value + ", but jenesis.variable." + name
+                    + " is not set - set it, or give a default as @" + name + "/<default>");
+        }
+        return resolved;
+    }
+
     private static String trimmed(String value) {
         if (value == null) {
             return null;

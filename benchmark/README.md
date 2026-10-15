@@ -27,7 +27,7 @@ Running
 | Subcommand  | What it isolates                                                                          |
 |-------------|-------------------------------------------------------------------------------------------|
 | `launch`    | Launch overhead alone: `help` with no project work, once per launch strategy               |
-| `make`      | The engine itself: `jenesis.make.compile`, `jenesis.make.classes`, `jenesis.make.daemon`, `jenesis.make.aot` |
+| `make`      | The engine itself: `jenesis.make.mode` and `jenesis.make.classes` |
 | `compile`   | Maven vs Jenesis, compile and package, tests compiled but not run                          |
 | `full`      | Maven vs Jenesis with the whole test suite executed                                        |
 | `maven`     | Maven 3 vs Maven 4 on the same `pom.xml`                                                   |
@@ -87,7 +87,7 @@ These controls are what make the comparison fair; they are the conclusions of a 
 The engine is the project here
 ------------------------------
 
-Jenesis compiles its own engine once and caches it: `jenesis.make.compile` (default `true`) batch-compiles
+Jenesis compiles its own engine once and caches it: `jenesis.make.mode=compiled`, the default, batch-compiles
 `build/jenesis/*.java` into `jenesis.make.classes` (default `.jenesis/classes`) and stamps it with a digest of
 those sources. A later run that matches the stamp skips the compile; a run that does not pays a full engine
 compile of roughly 400 class files before any project work begins.
@@ -99,14 +99,14 @@ loop twice: once on a **test** source, where no tool code changes and the four l
 comparable, and once on a **main** source, which is the honest self-build figure and is labelled as recompiling
 the engine. A project that only vendors the engine and edits its own sources sees the first of those two.
 
-`jenesis.make.daemon` (default `false`) keeps a JVM alive between builds, so the engine's classes stay loaded
+`jenesis.make.mode=daemon` keeps a JVM alive between builds, so the engine's classes stay loaded
 and JIT-compiled. Its fingerprint covers the engine and the non-`jenesis.*` JVM flags, so each distinct flag
 set gets a daemon of its own; the script stops the ones it starts. Source mode cannot benefit much from it:
 the JDK source launcher compiles `Make.java` and what it pulls in on every single invocation, before any
 daemon is reached, and that floor is the `source` row of the `launch` table.
 
-`jenesis.make.aot` (default `false`) runs the build in a JVM that loads the precompiled engine from an
-ahead-of-time cache under `.jenesis`, trained by the first build that finds none. The `make` table measures a
+`jenesis.make.mode=aot` runs the build in a JVM that loads the precompiled engine from an
+ahead-of-time cache under `.jenesis/aot`, trained by the first build that finds none. The `make` table measures a
 build that reuses the cache and, separately, the build that trains it. It has no effect on `help`, which is
 answered before the engine starts, nor in source mode. The `aot` table measures the same JVM feature by hand,
 with a jar and a recording run of its own.

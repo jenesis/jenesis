@@ -9,6 +9,8 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildExecutorFileCache;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
+import build.jenesis.BuildStepArgument;
+import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
@@ -18,6 +20,7 @@ import build.jenesis.Project;
 import build.jenesis.SequencedProperties;
 import build.jenesis.module.JenesisModuleRepositoryExport;
 import build.jenesis.project.AssemblyDescriptor;
+import build.jenesis.project.AssemblyRequirement;
 import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.ProjectModuleDescriptor;
@@ -60,7 +63,7 @@ public class ProjectTest {
                 "project.sources", "",
                 "project.digest", "SHA-512")), root);
         assertThat(project.version()).isEqualTo("1.2.3");
-        assertThat(project.target()).isEqualTo(Path.of("out"));
+        assertThat(project.target()).isEqualTo(root.resolve("out"));
         assertThat(project.sources()).isTrue();
         assertThat(System.getProperty("jenesis.project.version"))
                 .as("a caller configures a build by handing it a provider, never by setting a property"
@@ -74,7 +77,7 @@ public class ProjectTest {
         assertThat(project.version())
                 .as("the environment configures the entry point's project, not every project a caller builds")
                 .isNull();
-        assertThat(project.target()).isEqualTo(Path.of("target"));
+        assertThat(project.target()).isEqualTo(root.resolve("target"));
         assertThat(Project.ofEnvironment(new Environment(Map.of("project.version", "9.9.9", "project.target", "elsewhere")), root).version()).isEqualTo("9.9.9");
     }
 
@@ -124,6 +127,69 @@ public class ProjectTest {
         named.put("project.metadata", "");
         assertThat(metadataValues(Project.ofEnvironment(new Environment(named), Path.of("."))))
                 .doesNotContainKey("copyright");
+    }
+
+    @Test
+    public void pin_keeps_what_pins_the_tool_of_a_project_plugin_and_drops_what_pins_no_plugin() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        Path pins = Files.writeString(root.resolve("jenesis.plugins.pin.properties"), """
+                jreleaser\\:tool/maven/org.jreleaser/jreleaser-tool-provider=1.26.0 SHA-256/abc
+                gone/maven/org.example/gone=1.0 SHA-256/def
+                """);
+        Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .plugins(new ProjectPlugins().pins(pins).resolutions(new LinkedHashMap<>(Map.of(
+                        "jreleaser", new Resolved("jreleaser/runtime/module/build.jenesis/0.16.0").asModule("jreleaser")))))
+                .build(Project.PIN);
+
+        SequencedProperties written = SequencedProperties.ofFiles(pins);
+        assertThat(written.getProperty("jreleaser/module/build.jenesis"))
+                .as("pin writes the closure of the plugin it resolved")
+                .isEqualTo("0.16.0 SHA-256/xyz");
+        assertThat(written.getProperty("jreleaser:tool/maven/org.jreleaser/jreleaser-tool-provider"))
+                .as("a release plugin resolves its tool only when it releases, so pin keeps what pins it")
+                .isEqualTo("1.26.0 SHA-256/abc");
+        assertThat(written.stringPropertyNames())
+                .as("a line of a group no plugin of the project resolves in goes")
+                .doesNotContain("gone/maven/org.example/gone");
+    }
+
+    @Test
+    public void pin_runs_the_release_dry_and_pins_the_tool_a_release_plugin_resolved() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("plugin-jreleaser.properties"), "");
+        Path pins = Files.writeString(root.resolve("jenesis.plugins.pin.properties"), """
+                jreleaser\\:tool/maven/org.jreleaser/jreleaser-tool-provider=1.26.0 SHA-256/abc
+                jreleaser\\:tool/maven/org.jreleaser/jreleaser-gone=1.26.0 SHA-256/def
+                """);
+        Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .plugins(new ProjectPlugins().pins(pins)
+                        .resolutions(new LinkedHashMap<>(Map.of(
+                                "jreleaser", new Resolved("jreleaser/runtime/module/build.jenesis/0.16.0").asModule("jreleaser"))))
+                        .release("jreleaser", new Resolved("jreleaser:tool/runtime/maven/org.jreleaser/jreleaser-tool-provider/1.27.0")))
+                .build(Project.PIN);
+
+        SequencedProperties written = SequencedProperties.ofFiles(pins);
+        assertThat(written.getProperty("jreleaser:tool/maven/org.jreleaser/jreleaser-tool-provider"))
+                .as("pin runs after the release, so it pins the tool the release plugin resolved")
+                .isEqualTo("1.27.0 SHA-256/xyz");
+        assertThat(written.stringPropertyNames())
+                .as("a tool the release resolved is pinned as it resolved, so a line it no longer needs goes")
+                .doesNotContain("jreleaser:tool/maven/org.jreleaser/jreleaser-gone");
+    }
+
+    private record Resolved(String dependency) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            SequencedProperties dependencies = new SequencedProperties();
+            dependencies.setProperty(dependency, "missing.jar SHA-256/xyz");
+            dependencies.store(context.next().resolve(BuildStep.DEPENDENCIES));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
     }
 
     private SequencedProperties metadataValues(Project project) throws IOException {
@@ -340,18 +406,6 @@ public class ProjectTest {
                     .as("a preprocessor runs as part of build and stops it")
                     .rootCause()
                     .hasMessage("the gate refuses");
-            SequencedMap<String, Path> outputs = project.plugins(new ProjectPlugins().export("publish", (_, context, arguments) -> {
-                Files.writeString(context.next().resolve("handed.txt"), String.join("\n", arguments.keySet()));
-                return CompletableFuture.completedStage(new BuildStepResult(true));
-            })).build(Project.EXPORT + "/" + ProjectPlugins.CUSTOM);
-            Path published = outputs.entrySet().stream()
-                    .filter(entry -> entry.getKey().startsWith(Project.EXPORT + "/" + ProjectPlugins.CUSTOM + "/publish"))
-                    .map(Map.Entry::getValue)
-                    .findFirst()
-                    .orElseThrow();
-            assertThat(Files.readString(published.resolve("handed.txt")))
-                    .as("an exporter is handed what was staged")
-                    .contains(Project.STAGE + "/");
             assertThat(project.plugins(new ProjectPlugins().release("announce", (_, _, _) ->
                     CompletableFuture.completedStage(new BuildStepResult(true)))).build(Project.RELEASE).keySet())
                     .as("a releaser runs within release")
@@ -370,7 +424,7 @@ public class ProjectTest {
             assertThat(benched.build().keySet())
                     .as("a goal runs only when it is named")
                     .noneMatch(key -> key.startsWith(Project.PLUGIN + "/"));
-            SequencedMap<String, Path> summed = project.plugins(new ProjectPlugins().stageTransform("checksums", (_, context, _) -> {
+            SequencedMap<String, Path> summed = project.plugins(new ProjectPlugins().supplement("checksums", (_, context, _) -> {
                 Files.writeString(Files.createDirectories(context.next().resolve("project")).resolve("SHA256SUMS"), "sums");
                 return CompletableFuture.completedStage(new BuildStepResult(true));
             })).build(Project.STAGE);
@@ -736,7 +790,7 @@ public class ProjectTest {
 
     @Test
     public void assembler_can_be_overridden() {
-        MultiProjectAssembler<ProjectModuleDescriptor> custom = (_, _, _) -> new AssemblyDescriptor((_, _) -> {});
+        MultiProjectAssembler<ProjectModuleDescriptor> custom = (_, _, _) -> AssemblyDescriptor.of((_, _) -> {}, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
         assertThat(Project.ofEnvironment(new Environment(settings), Path.of(".")).assembler(custom).assembler()).isSameAs(custom);
     }
 
@@ -761,8 +815,8 @@ public class ProjectTest {
                         0),
                 project,
                 new InferredMultiProjectAssembler());
-        assertThat(resolver.apply("sources")).isEqualTo("build/maven/compose/module/module-sources");
-        assertThat(resolver.apply("")).isEqualTo("build/maven/compose/module/module-");
+        assertThat(resolver.apply("sources")).isEqualTo("build/maven/compose/module/build-module-sources");
+        assertThat(resolver.apply("")).isEqualTo("build/maven/compose/module/build-module-");
     }
 
     @Test
@@ -781,9 +835,9 @@ public class ProjectTest {
                         0),
                 project,
                 new InferredMultiProjectAssembler());
-        assertThat(resolver.apply("sources")).isEqualTo("build/modules/compose/module/module-sources");
-        assertThat(resolver.apply("")).isEqualTo("build/modules/compose/module/module-");
-        assertThat(resolver.apply("api+client/compile")).isEqualTo("build/modules/compose/module/module-api+client/compile");
+        assertThat(resolver.apply("sources")).isEqualTo("build/modules/compose/module/build-module-sources");
+        assertThat(resolver.apply("")).isEqualTo("build/modules/compose/module/build-module-");
+        assertThat(resolver.apply("api+client/compile")).isEqualTo("build/modules/compose/module/build-module-api+client/compile");
     }
 
     @Test
@@ -803,9 +857,9 @@ public class ProjectTest {
                 project,
                 new InferredMultiProjectAssembler());
         assertThat(resolver.apply("sources/compile/dependencies/artifacts"))
-                .isEqualTo("build/maven/compose/module/module-sources/compile/dependencies/artifacts");
+                .isEqualTo("build/maven/compose/module/build-module-sources/compile/dependencies/artifacts");
         assertThat(resolver.apply("/compile"))
-                .isEqualTo("build/maven/compose/module/module-/compile");
+                .isEqualTo("build/maven/compose/module/build-module-/compile");
     }
 
     @Test
@@ -825,9 +879,9 @@ public class ProjectTest {
                 project,
                 new InferredMultiProjectAssembler());
         assertThat(resolver.apply("sources/compile/dependencies/artifacts"))
-                .isEqualTo("build/modules/compose/module/module-sources/compile/dependencies/artifacts");
+                .isEqualTo("build/modules/compose/module/build-module-sources/compile/dependencies/artifacts");
         assertThat(resolver.apply("/compile"))
-                .isEqualTo("build/modules/compose/module/module-/compile");
+                .isEqualTo("build/modules/compose/module/build-module-/compile");
     }
 
     @Test
@@ -847,9 +901,9 @@ public class ProjectTest {
                 project,
                 new InferredMultiProjectAssembler());
         assertThat(resolver.apply("sources/compile/dependencies/artifacts"))
-                .isEqualTo("build/modules/compose/module/module-sources/compile/dependencies/artifacts");
+                .isEqualTo("build/modules/compose/module/build-module-sources/compile/dependencies/artifacts");
         assertThat(resolver.apply("/compile"))
-                .isEqualTo("build/modules/compose/module/module-/compile");
+                .isEqualTo("build/modules/compose/module/build-module-/compile");
     }
 
     @Test
@@ -866,6 +920,7 @@ public class ProjectTest {
         server.start();
         try {
             settings.put("release.uri", "http://localhost:" + server.getAddress().getPort() + "/repository/");
+            settings.put("release.publish", "true");
             settings.put("repository.insecure", "true");
             for (Project.Layout layout : List.of(Project.Layout.MODULAR, Project.Layout.MODULAR_TO_MAVEN)) {
                 put.clear();
@@ -928,6 +983,7 @@ public class ProjectTest {
         server.start();
         try {
             settings.put("deploy.uri", "http://localhost:" + server.getAddress().getPort() + "/repository/");
+            settings.put("release.publish", "true");
             settings.put("repository.insecure", "true");
             List<String> printed = new ArrayList<>();
             Project.ofEnvironment(new Environment(settings).out(printed::add), root)
@@ -995,8 +1051,8 @@ public class ProjectTest {
                         0),
                 project,
                 new InferredMultiProjectAssembler());
-        assertThat(resolver.apply("sources")).isEqualTo("build/modules/compose/module/module-sources");
-        assertThat(resolver.apply("")).isEqualTo("build/modules/compose/module/module-");
+        assertThat(resolver.apply("sources")).isEqualTo("build/modules/compose/module/build-module-sources");
+        assertThat(resolver.apply("")).isEqualTo("build/modules/compose/module/build-module-");
     }
 
     @Test
@@ -1095,7 +1151,6 @@ public class ProjectTest {
                 headers+preprocess=./headers
                 licenses+postprocess/transform=./licenses
                 audit+postprocess/inspect=demo.audit@audit
-                publish+export=demo.publish
                 announce+release=./announce
                 bench+plugin=./bench
                 sums+stage/transform=./sums
@@ -1107,14 +1162,21 @@ public class ProjectTest {
         assertThat(project.plugins().preprocessors()).containsOnlyKeys("headers");
         assertThat(project.plugins().transforms()).containsOnlyKeys("licenses");
         assertThat(project.plugins().inspections()).containsOnlyKeys("audit");
-        assertThat(project.plugins().exporters()).containsOnlyKeys("publish");
         assertThat(project.plugins().releasers()).containsOnlyKeys("announce");
         assertThat(project.plugins().goals()).containsOnlyKeys("bench");
-        assertThat(project.plugins().stageTransforms()).containsOnlyKeys("sums");
-        assertThat(project.plugins().stageInspections()).containsOnlyKeys("signed");
+        assertThat(project.plugins().supplements()).containsOnlyKeys("sums");
+        assertThat(project.plugins().audits()).containsOnlyKeys("signed");
         assertThat(project.plugins().resolutions())
-                .containsOnlyKeys("headers", "licenses", "audit", "publish", "announce", "bench", "sums", "signed");
+                .containsOnlyKeys("headers", "licenses", "audit", "announce", "bench", "sums", "signed");
         assertThat(project.plugins().pins()).isEqualTo(root.resolve("jenesis.plugins.pin.properties"));
+    }
+
+    @Test
+    public void refuses_a_plugin_of_export_which_installs_what_was_staged_and_has_no_hook_point() throws IOException {
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "publish+export=demo.publish\n");
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot add the plugin publish+export");
     }
 
     @Test
@@ -1188,7 +1250,7 @@ public class ProjectTest {
 
     @Test
     public void reads_a_key_escaped_with_two_at_signs_as_a_value() throws IOException {
-        assertThat(plugin("@@header", "@generated"))
+        assertThat(plugin("@@header", "generated"))
                 .as("@@header is the value @header, not an input that must exist")
                 .isNotNull();
     }
@@ -1198,6 +1260,25 @@ public class ProjectTest {
         assertThatThrownBy(() -> plugin("@schemas", root.relativize(elsewhere).toString()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The input @schemas of the plugin gen")
+                .hasMessageContaining("lies outside the project");
+    }
+
+    @Test
+    public void binds_a_file_outside_the_project_that_several_projects_share() throws IOException {
+        Path shared = Files.writeString(elsewhere.resolve("checkstyle.xml"), "<module name=\"Checker\"/>");
+        assertThat(plugin("@rules", root.relativize(shared).toString()))
+                .as("a configuration file is shared between projects, a folder is not")
+                .isNotNull();
+    }
+
+    @Test
+    public void binds_an_input_that_a_variable_names() throws IOException {
+        Path shared = Files.writeString(elsewhere.resolve("checkstyle.xml"), "<module name=\"Checker\"/>");
+        settings.put("variable.rules", shared.toString());
+        assertThat(plugin("@rules", "@rules")).isNotNull();
+        settings.put("variable.rules", elsewhere.toString());
+        assertThatThrownBy(() -> plugin("@rules", "@rules"))
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("lies outside the project");
     }
 
@@ -1280,6 +1361,19 @@ public class ProjectTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The plugin gen+check")
                 .hasMessageContaining("neither a module name nor a folder of the project");
+    }
+
+    @Test
+    public void refuses_a_plugin_value_naming_a_variable_that_is_not_set() {
+        assertThatThrownBy(() -> plugin("level", "@level"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The plugin gen sets level to @level, but jenesis.variable.level is not set");
+    }
+
+    @Test
+    public void reads_a_plugin_value_naming_a_variable_from_the_setting() throws IOException {
+        settings.put("variable.level", "strict");
+        assertThat(plugin("level", "@level")).isNotNull();
     }
 
     private BuildExecutorModule plugin(String... declarations) throws IOException {
@@ -1440,6 +1534,23 @@ public class ProjectTest {
         assertThatThrownBy(() -> Make.settings(root, settings))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.make.global cannot be set in");
+    }
+
+    @Test
+    public void the_layered_settings_rejects_publishing_in_the_project_file_and_in_the_user_global_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.release.publish=true\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .as("a project that could publish would publish with every pin")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.release.publish cannot be set in");
+        Files.delete(root.resolve("jenesis.properties"));
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.release.publish=true\n");
+        settings.put("make.global", root.resolve("home").toString());
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .as("publishing is asked of one run, never settled for every run of a machine")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.release.publish cannot be set in");
     }
 
     @Test
@@ -1788,6 +1899,27 @@ public class ProjectTest {
     }
 
     @Test
+    public void a_build_awaits_the_phases_project_await_names_in_the_modules_it_depends_on() throws IOException {
+        writeMavenProjectWithSibling();
+        SequencedMap<String, String> awaiting = new LinkedHashMap<>(settings);
+        awaiting.put("project.await", "verify");
+        Project project = Project.ofEnvironment(new Environment(awaiting), root)
+                .target(root.resolve("target"))
+                .layout(Project.Layout.MAVEN)
+                .assembler(new InferredMultiProjectAssembler().check(_ -> (executor, _) -> executor.addStep("refuse",
+                        (_, _, _) -> {
+                            throw new IllegalStateException("refused");
+                        })));
+        assertThatThrownBy(() -> project.build(Project.BUILD))
+                .rootCause()
+                .hasMessage("refused");
+        assertThat(root.resolve("target/build/maven/compose/module/build-module-user"))
+                .as("the module user waits for the checks of base, which refused")
+                .doesNotExist();
+        assertThat(root.resolve("target/build/maven/compose/module/build-module-base")).exists();
+    }
+
+    @Test
     public void the_pom_of_a_modular_module_names_what_it_requires_by_the_artifact_it_resolved_to() throws IOException {
         writeLibrary();
         Files.writeString(Files.createDirectories(root.resolve("base/base")).resolve("Type.java"),
@@ -1899,7 +2031,7 @@ public class ProjectTest {
                 .layout(layout)
                 .build(Project.BUILD);
         return Files.readString(outputs.entrySet().stream()
-                .filter(entry -> entry.getKey().endsWith("/module-user/produce/describe/pom"))
+                .filter(entry -> entry.getKey().endsWith("/build-module-user/describe/pom"))
                 .map(Map.Entry::getValue)
                 .findFirst()
                 .orElseThrow()
