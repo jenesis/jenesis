@@ -166,6 +166,19 @@ to be allowed to use one:
          -Djenesis.repository.insecure=true \
          build/jenesis/Make.java release
 
+    [DRY RUN]   http://localhost:8642/build/jenesis/build.jenesis.demo.publishing/1.0.0/build.jenesis.demo.publishing-1.0.0-cyclonedx.json
+    ...
+
+A release is a dry run unless the command line asks for more: it checks the staged
+tree and names each file it would put, and the repository receives nothing. Pass
+`-Djenesis.release.publish=true` to put them:
+
+    java -Djenesis.project.version=1.0.0 \
+         -Djenesis.deploy.uri=http://localhost:8642/ \
+         -Djenesis.repository.insecure=true \
+         -Djenesis.release.publish=true \
+         build/jenesis/Make.java release
+
     [RELEASED]  http://localhost:8642/build/jenesis/build.jenesis.demo.publishing/1.0.0/build.jenesis.demo.publishing-1.0.0-cyclonedx.json
     [RELEASED]  http://localhost:8642/build/jenesis/build.jenesis.demo.publishing/1.0.0/build.jenesis.demo.publishing-1.0.0.jar
     [RELEASED]  http://localhost:8642/build/jenesis/build.jenesis.demo.publishing/1.0.0/build.jenesis.demo.publishing-1.0.0.pom
@@ -199,6 +212,7 @@ build that requires `0-SNAPSHOT` resolves the newest:
 
     java -Djenesis.deploy.uri=http://localhost:8642/ \
          -Djenesis.repository.insecure=true \
+         -Djenesis.release.publish=true \
          build/jenesis/Make.java release
 
     target/repository/build/jenesis/build.jenesis.demo.publishing/0-SNAPSHOT/build.jenesis.demo.publishing-0-20261010.120053-1.jar
@@ -224,8 +238,8 @@ service - which is the next section's job:
     java -Djenesis.deploy.uri=https://repo1.maven.org/maven2/ build/jenesis/Make.java release
 
     Cannot release to https://repo1.maven.org/maven2/: Maven Central takes a release signed and
-    through its own publishing service, which JReleaser handles - describe that release in a
-    jreleaser.yml at the project root, ...
+    through its own publishing service, which JReleaser handles - place a jreleaser.yml at the
+    project's root, ...
 
 Publishing to Maven Central
 ---------------------------
@@ -253,38 +267,33 @@ module name as well. A project that publishes to Maven therefore reaches module
 consumers with the same upload.
 
 That division is about credentials and signing keys, not about who types the
-command, so the build does offer to run the release tool for you. A `jreleaser.yml`
-at the project root adds a `release/jreleaser` step to the `release` goal:
+command, so the build does offer to run the release tool for you. Where the project's
+root holds a `jreleaser.yml` (or a `.yaml`, `.toml` or `.json`), `release` runs JReleaser
+through the JReleaser plugin of [jenesis-plugins](https://github.com/jenesis/jenesis-plugins),
+which the build resolves by itself; nothing names it. An optional `jreleaser.properties`
+in the configuration folder holds its values, and `-Djenesis.release.jreleaser=false`
+leaves it out:
 
-    java build/jenesis/Make.java release
+    java -Djenesis.project.version=1.0.0 -Djenesis.release.publish=true build/jenesis/Make.java release
 
-It is a rehearsal by default - JReleaser runs with `--dry-run`, performing every
-local phase and skipping every remote one - and publishing takes the explicit
-`-Djenesis.jreleaser.dry=false`. Of the shell's environment, JReleaser is
-handed the platform's own variables and every `JRELEASER_*` one, which is where
-it reads its credentials. The tool itself is expected on the `PATH`
-rather than resolved as a pinned dependency, because unlike a compiler or a linter
-a release tool shapes nothing about the artifact: it transmits a staged tree that
-is already finished, so its version changes how the upload happens and never what
-was uploaded. It is environmental setup, like the JDK or `git`.
-
-The goal also contributes one thing to a release run by somebody else. Its
-`release/jreleaser/environment` step writes `environment/jreleaser.properties` carrying
-`JRELEASER_PROJECT_VERSION`, the version `jenesis.project.version` stamped, and the `release`
-goal hands that variable to the JReleaser process it starts - so the version is
-stated once, by the build, instead of being passed separately to the build and to
-the release tool and drifting. That step runs no process and has no side effect,
-which makes it safe for a CI job that then hands off to a dedicated release action
-and reads the version from the file.
-Note it only applies to a configuration that leaves `project.version` unset: a
-version written in the `jreleaser.yml` wins outright and the file is ignored.
-The build infers no version of its own: a `pom.xml` build whose configuration names
-none releases with `-Djenesis.project.version` naming the version it publishes.
+JReleaser is resolved and pinned like any other tool and runs in the build's own JVM,
+in the project's root, with the version the build resolved - the one
+`-Djenesis.project.version` sets above - so the version is stated once, by the build.
+Every value of the project's metadata and the folder of every staged tree are
+template properties of the `jreleaser.yml` as well, named in camel case after a
+`jenesis` prefix: `{{ jenesisStageMaven }}` is the staged Maven tree, wherever
+`jenesis.project.target` puts it. Without `-Djenesis.release.publish=true`, which only
+the command line may set, it is a rehearsal - JReleaser runs with `--dry-run`, performing
+every local phase and skipping every remote one.
+JReleaser reads its credentials from its `JRELEASER_*` variables, as on the command
+line, or from `JRELEASER_*` lines of its `jreleaser.properties`, such as
+`JRELEASER_GITHUB_TOKEN=@github.token`, which reads the setting
+`jenesis.variable.github.token` of your own `~/.jenesis/jenesis.properties`.
 
 For a release driven by CI, prefer a dedicated release step where your platform
-offers one - JReleaser's own GitHub Action pins the tool version and wires the
-secret store better than a build tool reaching for `PATH`. This repository does
-exactly that, and keeps the goal for rehearsing a release locally first.
+offers one - JReleaser's own GitHub Action wires the secret store better than a
+build tool can. This repository does exactly that, and keeps the plugin for
+rehearsing a release locally first.
 
 This separation is deliberate, not just convenient. Most people building the
 project never release it at all - releasing is usually a job for CI or another

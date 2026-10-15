@@ -95,13 +95,13 @@ Quick index
 | 43 | [`test-runs`](demo-43-test-runs/README.md)                        | Run the tests a dependency's jar holds, once per module that scans it        | `java build/jenesis/Make.java`    |
 | 44 | [`api-compatibility`](demo-44-api-compatibility/README.md)        | Compare the jar against the last release with japicmp and revapi             | `java build/Demo.java`            |
 | 45 | [`kotlin`](demo-45-kotlin/README.md)                              | Java and Kotlin in one module                                                | `java build/jenesis/Make.java`    |
-| 46 | [`kotlin-quality`](demo-46-kotlin-quality/README.md)              | detekt, ktlint and ktfmt, inferred from their config files                   | `java build/jenesis/Make.java`    |
+| 46 | [`kotlin-quality`](demo-46-kotlin-quality/README.md)              | detekt, ktlint and ktfmt as plugins, each binding its config file           | `java build/jenesis/Make.java`    |
 | 47 | [`kotlin-plugin`](demo-47-kotlin-plugin/README.md)                | Run a Kotlin compiler plugin declared with `@jenesis.plugin`                 | `java build/jenesis/Make.java`    |
 | 48 | [`ksp`](demo-48-ksp/README.md)                                    | Run a Kotlin symbol processor over the module's sources                      | `java build/jenesis/Execute.java` |
 | 49 | [`scala`](demo-49-scala/README.md)                                | Java and Scala 3 in one module                                               | `java build/jenesis/Make.java`    |
-| 50 | [`scala-quality`](demo-50-scala-quality/README.md)                | Scalastyle and scalafmt, inferred from their config files                    | `java build/jenesis/Make.java`    |
+| 50 | [`scala-quality`](demo-50-scala-quality/README.md)                | Scalastyle and scalafmt as plugins, each binding its config file            | `java build/jenesis/Make.java`    |
 | 51 | [`groovy`](demo-51-groovy/README.md)                              | Java and Groovy in one module                                                | `java build/jenesis/Make.java`    |
-| 52 | [`groovy-quality`](demo-52-groovy-quality/README.md)              | CodeNarc, inferred from its config file                                      | `java build/jenesis/Make.java`    |
+| 52 | [`groovy-quality`](demo-52-groovy-quality/README.md)              | CodeNarc as a plugin, binding its config file                                | `java build/jenesis/Make.java`    |
 | 53 | [`agents`](demo-53-agents/README.md)                              | Attach a library as a Java agent with `@jenesis.attach`                      | `java build/Demo.java`            |
 | 54 | [`native-access`](demo-54-native-access/README.md)                | Grant native access with `@jenesis.native`, and discover what to redeclare  | `java build/jenesis/Execute.java` |
 | 55 | [`native-access-layer`](demo-55-native-access-layer/README.md)    | Grant a library native access, which it passes on to the modules of its layer | `java build/Demo.java`            |
@@ -210,7 +210,7 @@ runs once, and 0.8 for a repeat.
 
 A reused JVM shaves the compile time on top of that, and is off by default:
 
-    java -Djenesis.make.daemon=true build/jenesis/Make.java
+    java -Djenesis.make.mode=daemon build/jenesis/Make.java
     java build/jenesis/Make.java --stop
 
 The daemon is worth reaching for on a project with several modules to compile,
@@ -222,7 +222,7 @@ The installed `jenesis` command can start from an ahead-of-time cache of the
 engine instead, trained by the first build and read by every later one, with no
 process kept between builds:
 
-    jenesis.make.aot=true
+    jenesis.make.mode=aot
 
 ## 6. The JDK a build runs on - [`toolchain`](demo-07-toolchain/README.md)
 
@@ -336,15 +336,15 @@ with the compiler named first:
 
     @jenesis.plugin javac maven/com.google.errorprone/error_prone_core
 
-An `errorprone.properties` is the switch that turns it on, and its `arguments`
-are passed on to the plugin, so every Error Prone flag applies:
+What turns it on are `javac`'s own options, in a `process-javac.properties` like
+any other compiler option: `-Xplugin:ErrorProne` with the plugin's flags, the
+compile policy and stop rule Error Prone requires, and the exports of the
+compiler internals it reads. Those are `-J` options of the JVM that runs `javac`,
+so `javac` runs in a JVM of its own. The README explains each line.
 
-    arguments=-Xep:ReferenceEquality:ERROR
-
-The demo promotes `ReferenceEquality` to an error and the build fails on a `==`
-comparison of two strings; the second half of `build/Demo.java` switches the
-plugin off again and the same sources compile. `-Djenesis.compile.errorprone=false`
-is the opt-out.
+The demo promotes `ReferenceEquality` to an error and the build with the profile
+holding those options fails on a `==` comparison of two strings; the build
+without it compiles the same sources.
 
 ## 12. Preview features - [`java-preview`](demo-16-java-preview/README.md)
 
@@ -363,30 +363,29 @@ from three inputs: an `order.xsd` through the JAXB binding compiler, a
 `avro-tools`. `service-contracts` does the same for the client side of a service:
 a WSDL through `wsimport` and an OpenAPI document through the OpenAPI Generator.
 
-Each generator is turned on by its own configuration file - `xjc.properties`,
-`protoc.properties`, `avro.properties`, `wsimport.properties`,
-`openapi.properties` - and an empty file is enough to activate one. The file also
-carries whatever that tool needs to be told: `openapi.properties` names its
-input, because a `.yaml` does not announce itself the way a `.xsd` or a `.proto`
-does.
+Each generator is a plugin at the hook point `binary/generated`, named in
+`jenesis.plugins.properties`, and runs in a module where its `plugin-<name>.properties`
+is found. The file binds the tool's input and carries whatever else that tool needs
+to be told: `plugin-xjc.properties` names a package, `plugin-protoc.properties` a
+protoc plugin.
 
 The input goes under `META-INF/build.jenesis/` in the module's sources, where it
 is an input to the build and nothing more - none of these jars carries the schema
-it was built from. An input that *should* ship goes in a folder the configuration
-file names instead (`folders=schema`), which is how `service-contracts` keeps its
-WSDL in the jar, where a JAX-WS client reads it at run time.
+it was built from. An input that *should* ship goes in a folder the binding names
+instead, which is how `service-contracts` keeps its WSDL in the jar, where a
+JAX-WS client reads it at run time.
 
 Generated sources are compiled into the module as if you had written them, and
 the linters and formatters read your own sources only. Each tool resolves in a
-dependency group named after it and is pinned separately from the module's own
+dependency group named after its plugin, as `wsimport:tool`, and is pinned separately from the module's own
 dependencies, so upgrading a generator never moves the library the generated code
 calls into.
 
 ## 14. Generating a parser - [`antlr`](demo-19-antlr/README.md)
 
 `antlr` is the same three moves for a grammar: a `.g4` under the module's
-`META-INF/build.jenesis/` folder, an `antlr.properties` that activates the
-generator, and generated sources compiled into the module. What the file adds is
+`META-INF/build.jenesis/` folder, the ANTLR plugin with a `plugin-antlr.properties`
+that binds it, and generated sources compiled into the module. What the file adds is
 where the parser lands:
 
     package=demo.antlr.calc
@@ -425,7 +424,7 @@ between repositories the reference itself carries no hash, so `pin` records a
 checksum for each artifact resolved through it. A local properties file carries
 the version and the `SHA-256` for each entry itself, so nothing has to be pinned
 beside it. BOM keys use the pin token grammar without the group; the group and an
-optional platform guard sit on the declaration (`kotlinc/pin-lang3.properties`).
+optional platform guard sit on the declaration (`kotlin/pin-lang3.properties`).
 
 A local `@jenesis.pin` overrides any BOM entry, the last declared BOM wins a
 conflict, and either model satisfies `-Djenesis.dependency.pin=strict`.
@@ -654,17 +653,15 @@ release commit - and the fingerprint moves with it:
 
 ## 29. Code quality for Java - [`java-quality`](demo-37-java-quality/README.md)
 
-`java-quality` turns a set of tools on without a build script: each runs because
-its configuration file is there. A `checkstyle.xml` and a `pmd.xml` lint the
-sources, a `spotbugs-exclude.xml` brings in SpotBugs over the compiled classes,
-a `forbiddenapis.properties` checks them for calls the project forbids,
-a `jdeps.properties` and a `jdeprscan.properties` for JDK internals and APIs
-scheduled for removal,
-a `javaformat.properties` selects `google-java-format` with its options, and a
-`licenseheader.properties` holds the header every source must start with. Each tool
-resolves in a group of its own, so its dependencies never mix with yours; its
-`eclipse` profile formats with the Eclipse formatter and an exported profile
-instead.
+`java-quality` turns a set of tools on without a build script. The Checkstyle
+and PMD plugins lint the sources and the google-java-format plugin verifies their
+layout, and the SpotBugs and forbiddenapis plugins check the compiled classes,
+each named in `jenesis.plugins.properties` and configured by its
+`plugin-<name>.properties`; a `jdeps.properties` and a `jdeprscan.properties`
+check the classes for JDK internals and APIs scheduled for removal, and a `licenseheader.properties` holds the header
+every source must start with. Each tool resolves in a group of its own, so its
+dependencies never mix with yours; its `eclipse` profile formats with the Eclipse
+plugin and an exported profile instead.
 
 The linters report; the formatter fails the build when a source is not already
 formatted, and one switch flips it to rewriting in place:
@@ -696,7 +693,7 @@ The demo ships that file under a profile, so both paths stay runnable:
 ## 31. Coverage, selection, mutation and benchmarks - [`code-coverage`](demo-39-code-coverage/README.md), [`test-selection`](demo-40-test-selection/README.md), [`pitest`](demo-41-pitest/README.md), [`jmh`](demo-42-jmh/README.md)
 
 `code-coverage` records which lines the tests exercise and renders an HTML and
-XML report, enabled by a `jacoco.properties` file. A `graal.properties` file
+XML report, from the JaCoCo plugin and its `plugin-jacoco.properties`. A `graal.properties` file
 enables a second recording in the same place: the GraalVM tracing agent, which
 captures the reflection, resources and proxies the tests use, so an ahead-of-time
 compiler can be told about them. Neither needs anything in the sources.
@@ -707,7 +704,7 @@ having in a watch loop and not in continuous integration:
     java -Djenesis.test.incremental -Djenesis.project.watch=true build/jenesis/Make.java
 
 `pitest` measures what the tests actually check rather than what they touch: with
-a `pitest.properties` in the module, PIT seeds faults into the code, re-runs the
+the PIT plugin and its `plugin-pitest.properties`, PIT seeds faults into the code, re-runs the
 tests against each one, and reports which survived. A surviving mutant is
 behaviour no test pins down.
 
@@ -734,7 +731,8 @@ A `pom.xml` build names the scanned dependency in the same `scan` key, as
 
 ## 33. Guarding a published API - [`api-compatibility`](demo-44-api-compatibility/README.md)
 
-An empty `japicmp.properties` makes the build compare the bytecode of the jar it
+The japicmp plugin, named at the hook point `artifact` with an empty
+`plugin-japicmp.properties`, makes the build compare the bytecode of the jar it
 produced against the bytecode of the last release of the same coordinate - which
 is what a caller actually linked against. With no `baseline` key the coordinate
 is this module's own at `RELEASE`, so every build measures the change you are
@@ -755,38 +753,42 @@ asks for `severity=non-breaking`, so the added overload is reported as well.
 
 ## 34. Kotlin - [`kotlin`](demo-45-kotlin/README.md), [`kotlin-quality`](demo-46-kotlin-quality/README.md), [`kotlin-plugin`](demo-47-kotlin-plugin/README.md)
 
-Other JVM languages need no configuration beyond their sources. `kotlin` is a
-module that mixes Java and Kotlin, and exports a package holding only Kotlin,
-with a Kotlin class of its own for Java 25 below `META-INF/versions/25/`. The
-Kotlin compiler is resolved and pinned in a `kotlinc` group of its own, so it
-never mixes with the project's own dependencies. With
-`-Djenesis.project.documentation=true` Dokka documents the Kotlin sources, and a
-`dokka.properties` sets what the Dokka Gradle and Maven plugins configure - the
-module name, Markdown includes, source links, external links and the footer.
+Other JVM languages need one line of `jenesis.plugins.properties` beyond their
+sources, naming the plugin of the hook point `language` that compiles them:
 
-`kotlin-quality` infers detekt (`detekt.yml`) and ktlint (`.editorconfig`) from
-their configuration files, with ktlint doubling as the formatter and sharing the
-`-Djenesis.format.rewrite=true` switch. Its `ktfmt` profile formats with ktfmt
-instead, which a `ktfmt.properties` turns on with its style.
+    kotlin+language=build.jenesis.plugin.kotlin
 
-`kotlin-plugin` adds a compiler plugin, declared with the compiler named first:
+`kotlin` is a module that mixes Java and Kotlin, and exports a package holding
+only Kotlin, with a Kotlin class of its own for Java 25 below
+`META-INF/versions/25/`. The Kotlin compiler is resolved and pinned in a `kotlin`
+group of its own, so it never mixes with the project's own dependencies. With
+`-Djenesis.project.documentation=true` Dokka documents the Kotlin sources, and the
+`dokka.` values of a `plugin-kotlin.properties` set what the Dokka Gradle and Maven
+plugins configure - the module name, source links, external links and the footer.
 
-    @jenesis.plugin kotlinc maven/org.jetbrains.kotlin/kotlin-serialization-compiler-plugin
+`kotlin-quality` lints with the detekt and ktlint plugins, binding `detekt.yml`
+and `.editorconfig`, with ktlint doubling as the formatter and sharing the
+`-Djenesis.format.rewrite=true` switch. Its `ktfmt` profile formats with the
+ktfmt plugin instead, whose `plugin-ktfmt.properties` names its style.
+
+`kotlin-plugin` adds a compiler plugin, declared with the Kotlin plugin named first:
+
+    @jenesis.plugin kotlin:tool maven/org.jetbrains.kotlin/kotlin-serialization-compiler-plugin
 
 The kotlinx.serialization plugin then generates `Point.serializer()` for an
 `@Serializable` data class; delete the line and the build fails.
 
 ## 35. Kotlin symbol processing - [`ksp`](demo-48-ksp/README.md)
 
-A `ksp.properties` switches KSP on, and its processors are named like a compiler
-plugin, in the group `ksp`:
+The KSP plugin runs where its `plugin-ksp.properties` is found, and its processors
+are named like a compiler plugin, in the group `ksp:processor`:
 
-    <!--jenesis.plugin ksp maven/com.squareup.moshi/moshi-kotlin-codegen-->
+    <!--jenesis.plugin ksp:processor maven/com.squareup.moshi/moshi-kotlin-codegen-->
 
 Moshi's code generator then writes `PointJsonAdapter` for the class annotated
 `@JsonClass(generateAdapter = true)`, which compiles with the module's sources,
-and the ProGuard rules it writes join the jar. Each line of `ksp.properties` is
-an option for the processors.
+and the ProGuard rules it writes join the jar. Each line of `plugin-ksp.properties`
+is an option for the processors.
 
 Cross-cutting concepts
 ----------------------
@@ -824,24 +826,26 @@ and `-Djenesis.dependency.pin=strict` refuses a dependency that has none. Every
 demo here is committed pinned.
 
 **Groups.** A group is the outermost isolation axis of a dependency. Your own
-dependencies live in the `main` group; a resolved tool lives in a group named
-after it (`kotlinc`, `scalac`, `groovyc`, `antlr`, `jacoco`, `japicmp`), so a
-tool's closure never mixes with the program's. `pin` writes each group
+dependencies live in the `main` group; the tool a plugin resolves lives in a group
+named after the plugin (`kotlin:tool`, `scala:tool`, `groovy:tool`, `antlr:tool`,
+`jacoco:tool`, `japicmp:tool`), and the plugin's own jars in the group of its name,
+so a tool's closure never mixes with the program's. `pin` writes each group
 separately.
 
 ## 36. Scala - [`scala`](demo-49-scala/README.md), [`scala-quality`](demo-50-scala-quality/README.md)
 
-Scala works the same way: a module that mixes Java and Scala exports a pure-Scala
-package, and the compiler is pinned in a `scalac` group. `scala-quality` infers
-Scalastyle (`scalastyle-config.xml`) and scalafmt (`.scalafmt.conf`), with
-scalafmt doubling as the formatter.
+Scala works the same way, named as `scala+language=build.jenesis.plugin.scala`: a
+module that mixes Java and Scala exports a pure-Scala package, and the compiler is
+pinned in a `scala` group. `scala-quality` lints
+with the Scalastyle and scalafmt plugins, binding `scalastyle-config.xml` and
+`.scalafmt.conf`, with scalafmt doubling as the formatter.
 
 ## 37. Groovy - [`groovy`](demo-51-groovy/README.md), [`groovy-quality`](demo-52-groovy-quality/README.md)
 
-Groovy follows the same pattern with one restriction: an exported package needs
-at least one Java type in it, which the demo's own README explains. The compiler
-is pinned in a `groovyc` group. `groovy-quality` lints with CodeNarc
-(`codenarc.xml`); there is no inferred Groovy formatter.
+Groovy follows the same pattern, named as `groovy+language=build.jenesis.plugin.groovy`,
+with one restriction: an exported package needs at least one Java type in it, which
+the demo's own README explains. The compiler is pinned in a `groovy` group. `groovy-quality` lints with the CodeNarc
+plugin, binding `codenarc.xml`; there is no Groovy formatter.
 
 ## 38. Attaching Java agents - [`agents`](demo-53-agents/README.md)
 
@@ -953,7 +957,7 @@ step before compile, jar and test run unchanged:
     Project.ofEnvironment(environment, Path.of("."))
             .assembler((descriptor, repositories, resolvers) -> stock
                     .apply(descriptor.sources("preprocess"), repositories, resolvers)
-                    .mapBuild(...))
+                    .nest(AssemblyDescriptor.BUILD, "", ...))
 
 Any step that produces a `sources/` tree fits the same shape: template expansion,
 code generation, license headers.
@@ -1132,8 +1136,8 @@ staged tree to prove the bundle is complete, all offline.
 
 The signed upload to Central is left to a release tool pointed at the staged
 tree - which is how Jenesis itself releases - so the demo needs no credentials, no
-key and no network. A `jreleaser.yml` at the project root adds that step to the
-`release` goal, a rehearsal unless told otherwise. A Maven repository of your own
+key and no network. The JReleaser plugin adds that step to the `release` goal where
+a profile holds its `plugin-jreleaser.properties`, a rehearsal unless told otherwise. A Maven repository of your own
 is reached by `release` itself once `jenesis.deploy.uri` names it, as
 `maven-deploy-plugin` reaches one: every staged file with its checksums, the
 `maven-metadata.xml` merged with the repository's, a SNAPSHOT under a unique

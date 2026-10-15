@@ -36,6 +36,7 @@ Layout
     |-- jni/                 the plugin that builds the library
     |   |-- .jenesis.skip
     |   |-- module-info.java
+    |   |-- demo/jni/JniFactory.java
     |   `-- demo/jni/JniModule.java
     |-- c/adder.c            the C implementation of the native method
     `-- sources/             the application, module demo.adder

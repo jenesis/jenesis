@@ -7,10 +7,6 @@ public class LibraryModule implements BuildExecutorModule {
 
     private final String platform;
 
-    public LibraryModule() {
-        this(Collections.emptyNavigableMap());
-    }
-
     public LibraryModule(SequencedMap<String, String> properties) {
         platform = properties.getOrDefault("platform", "default");
     }

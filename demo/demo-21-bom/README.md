@@ -100,10 +100,10 @@ The `@jenesis.bom` tag mirrors `@jenesis.pin`:
     @jenesis.bom acme.platform                          floating latest from the module repository
     @jenesis.bom acme.platform 2.1.0 SHA-256/ab12...    fetched at a version, content-verified
     @jenesis.bom org.slf4j/slf4j-bom 2.0.16             a Maven BOM's dependencyManagement (this demo)
-    @jenesis.bom kotlinc/module/acme.platform 2.1.0     entries merge into the kotlinc group
+    @jenesis.bom kotlin/module/acme.platform 2.1.0      entries merge into the kotlin group
     @jenesis.bom acme.platform 1.9.0 (legacy)           platform-guarded, like a guarded pin
     @jenesis.bom pin-lang3.properties                a local file (this demo)
-    @jenesis.bom kotlinc/pin-lang3.properties        the same file, entries in the kotlinc group
+    @jenesis.bom kotlin/pin-lang3.properties         the same file, entries in the kotlin group
 
 A repository BOM is a properties file published at the module repository's
 standard versioned path, `<module>/<version>/<module>.properties`; without a

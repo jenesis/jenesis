@@ -78,7 +78,7 @@ between.
 
 For review, the capture is readable in the test module's build output:
 
-    target/build/modules/compose/module/<test-module>/produce/assemble/observed/native-image/report/output/nativeimage/reachability-metadata.json
+    target/build/modules/compose/module/build-<test-module>/produce/assemble/observed/native-image/report/output/nativeimage/reachability-metadata.json
 
 which for this demo holds exactly the `sample.Greeter` constructor and `greet`
 method. The committed-metadata route still exists for published artifacts: drop a

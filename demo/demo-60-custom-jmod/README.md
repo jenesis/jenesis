@@ -90,7 +90,7 @@ Jenesis reads from the configuration location:
 
     Project.ofEnvironment(environment, Path.of(".")).assembler((descriptor, repositories, resolvers) -> assembler
             .apply(descriptor.content("config"), repositories, resolvers)
-            .mapBuild(stock -> (sub, inherited) -> {
+            .nest(AssemblyDescriptor.BUILD, "", stock -> (sub, inherited) -> {
                 sub.addStep("config", (executor, context, arguments) -> {
                     ... // write jmodconfig/app.properties into context.next()
                 });

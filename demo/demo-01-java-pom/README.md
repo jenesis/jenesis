@@ -33,16 +33,17 @@ build; the second progress line, `[EVENTS]`, names the file, and the third,
 A script or a coding agent reads the file instead of parsing the console:
 
     {"status":"started","target":"/.../demo-01-java-pom/target","directory":"/.../demo-01-java-pom","run":"20261005T152001.123456Z"}
-    {"status":"resolved","module":"build","seconds":0.063}
-    {"status":"executed","step":"build/maven/compose/module/module-/produce/assemble/binary/compiled/compile/javac","seconds":0.207,"folder":"/.../target/build/maven/compose/module/module-/produce/assemble/binary/compiled/compile/javac"}
-    {"status":"executed","step":"build/maven/compose/module/module-/produce/assemble/binary/artifacts/jar","seconds":0.020,"folder":"/.../target/build/maven/compose/module/module-/produce/assemble/binary/artifacts/jar"}
+    {"status":"resolved","module":"build","start":0.012,"seconds":0.063}
+    {"status":"executed","step":"build/maven/compose/module/build-module-/produce/assemble/binary/compiled/compile/javac","start":2.481,"seconds":0.207,"folder":"/.../target/build/maven/compose/module/build-module-/produce/assemble/binary/compiled/compile/javac"}
+    {"status":"executed","step":"build/maven/compose/module/build-module-/produce/assemble/binary/artifacts/jar","start":2.701,"seconds":0.020,"folder":"/.../target/build/maven/compose/module/build-module-/produce/assemble/binary/artifacts/jar"}
     {"status":"completed","seconds":6.152,"executed":19,"skipped":0,"failed":0}
 
 The first line names the `target` folder and the `directory` the build ran in,
 which a relative path in a failure's command line resolves against. A step is
 `executed`, `skipped` because nothing it reads changed, or `failed` with the
 `error` and `message` that stopped it, and `folder` is where its `output/`
-lives. A failed step's `folder` ends in `~` and holds what it wrote before it
+lives; `start` and `seconds` say when it began, counted from the start of the
+build, and how long it took. A failed step's `folder` ends in `~` and holds what it wrote before it
 failed - its `output/`, and a forked tool's command, output and reports under
 `supplement/` - beside a `.jenesis.failed` marker, until the step runs again.
 The last line says whether the build `completed` or `failed`; a file without

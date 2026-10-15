@@ -53,7 +53,7 @@ replaces its assembler with one that wraps the stock one:
         Project project = Project.ofEnvironment(environment, Path.of("."))
                 .assembler((descriptor, repositories, resolvers) -> checked
                         .apply(descriptor.sources("preprocess"), repositories, resolvers)
-                        .mapBuild(stock -> (sub, inherited) -> {
+                        .nest(AssemblyDescriptor.BUILD, "", stock -> (sub, inherited) -> {
                             sub.addStep("preprocess", (executor, context, arguments) -> {
                                 ... // rewrite ${greeting} into context.next()
                             }, descriptor.sources().stream());

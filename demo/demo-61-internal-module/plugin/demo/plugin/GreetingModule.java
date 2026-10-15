@@ -9,10 +9,6 @@ public class GreetingModule implements BuildExecutorModule {
 
     private final String greeting;
 
-    public GreetingModule() {
-        this(Collections.emptyNavigableMap());
-    }
-
     public GreetingModule(SequencedMap<String, String> properties) {
         greeting = properties.getOrDefault("greeting", "Hello from a generated source!");
     }

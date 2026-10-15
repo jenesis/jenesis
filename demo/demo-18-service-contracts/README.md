@@ -12,21 +12,28 @@ Run it
 
 | Module | Config file                                         | Input                                  | Ships? | Generator | Generated |
 | ------ | --------------------------------------------------- | -------------------------------------- | --- | --------- | --------- |
-| `soap` | `soap/META-INF/build.jenesis/wsimport.properties` | `soap/wsdl/greeter.wsdl`                 | yes | `wsimport` | `demo.greeter` |
-| `rest` | `rest/META-INF/build.jenesis/openapi.properties`  | `rest/META-INF/build.jenesis/greeting.yaml` | no | OpenAPI Generator | `demo.greeting` |
+| `soap` | `soap/META-INF/build.jenesis/plugin-wsimport.properties` | `soap/wsdl/greeter.wsdl`                 | yes | `wsimport` | `demo.greeter` |
+| `rest` | `rest/META-INF/build.jenesis/plugin-openapi.properties`  | `rest/META-INF/build.jenesis/greeting.yaml` | no | OpenAPI Generator | `demo.greeting` |
+
+`jenesis.plugins.properties` names both generators as plugins at the hook point
+`binary/generated`, and each runs in the module where its `plugin-<name>.properties`
+is found:
+
+    openapi+binary/generated=build.jenesis.plugin.openapi
+    wsimport+binary/generated=build.jenesis.plugin.wsimport
 
 Each module is a folder with a `module-info.java` at its root, which declares the
 module, what it requires and what it exports, as in the `java-modular-multi` demo.
 
-The two modules differ on purpose. A generator reads `META-INF/build.jenesis/` under
-the module's sources by default, and the compiler never copies that folder into the
-artifact - which is what `rest` wants, since nothing reads the specification at run
-time. `soap` needs the opposite: a JAX-WS client reads its WSDL when the service class
-is constructed, so the description has to be in the jar. It sits in `soap/wsdl/`,
-beside the module's sources, where every file that is no source ships, and naming
-the folder in the config file has the generator read it there:
+The two modules differ on purpose. Each binds its contract into the folder its
+generator reads, relative to the module. `rest` keeps its specification in
+`META-INF/build.jenesis/`, which the compiler never copies into the artifact, since
+nothing reads it at run time. `soap` needs the opposite: a JAX-WS client reads its
+WSDL when the service class is constructed, so the description has to be in the jar.
+It sits in `soap/wsdl/`, beside the module's sources, where every file that is no
+source ships, and the binding names that folder:
 
-    folders=wsdl
+    @descriptions/wsimport=wsdl
 
 `soap` gets a JAX-WS port interface and a `GreeterService` locator; `rest` gets a
 JDK-`HttpClient` API client and a `Greeting` model. Each module has one
@@ -53,13 +60,11 @@ wsimport
 --------
 
     package=demo.greeter
-    folders=wsdl
     location=/wsdl/greeter.wsdl
+    @descriptions/wsimport=wsdl
 
-Every `.wsdl` in the named folders is compiled; `folders` moves them out of the
-build's own folder, here to keep the description where it ships. A named folder is
-looked up beside the module's sources. In a `pom.xml` build it has to be a resource
-directory to ship: as with Maven, only the sources a compiler reads - `.java`,
+Every `.wsdl` in the bound folder is compiled, here where the description ships. In
+a `pom.xml` build that folder has to be a resource directory to ship: as with Maven, only the sources a compiler reads - `.java`,
 `.kt`, `.scala`, `.groovy` - are taken from a source directory there, and every
 other file stays out of the jar. The
 build passes `-Xnocompile`, because generating the sources is the whole job -
@@ -82,21 +87,20 @@ It is required, and states a live endpoint just as readily as a class-path path:
 wsimport writes one location for the whole run, and only the project knows where
 its description is served. A generator that reads its description out of the build's
 own folder has nothing to ship at all, and the build says so rather than writing a
-client that fails when its service class is first touched. A `.xjb` in a named folder
-is passed as a binding, a `catalog=<file>` names a catalog, and `arguments` are the
-remaining keys.
+client that fails when its service class is first touched. A `.xjb` in the bound
+folder is passed as a binding, a file named `catalog` as the catalog, and `arguments`
+holds the remaining options.
 
 OpenAPI
 -------
 
     package=demo.greeting
     arguments=--library native --additional-properties useJakartaEe=true
+    @specification/openapi/openapi.yaml=META-INF/build.jenesis/greeting.yaml
 
-No key names the input here. A `.xsd`, a `.proto` and an `.avsc` announce themselves
-by extension, and so does a lone OpenAPI document: the generator takes one document
-per run, so one `.yaml` or `.json` in the folders is the specification. A module that
-offers several says which with `specification=<file>`, and the build fails saying so
-rather than guessing.
+The generator takes one document per run, so the binding places it under the name
+the plugin looks for, `openapi.yaml`, whatever the file is called in the project;
+renaming it there changes the binding and nothing the generator is handed.
 
 The generator writes a whole project - a `pom.xml`, a `build.gradle`, a README,
 docs, tests - of which only the source folder belongs in your module. The build
@@ -119,8 +123,8 @@ and pinned:
     requires org.openapitools.jackson.nullable;
     requires jakarta.annotation;
 
-The tools themselves stay out of it: `wsimport` resolves in the `wsimport` group
-(`com.sun.xml.ws:jaxws-tools`) and the OpenAPI generator in the `openapi` group
+The tools themselves stay out of it: `wsimport` resolves in the `wsimport:tool` group
+(`com.sun.xml.ws:jaxws-tools`) and the OpenAPI generator in the `openapi:tool` group
 (`org.openapitools:openapi-generator-cli`), each pinned separately from what the
 generated code needs at run time.
 
@@ -129,14 +133,15 @@ Layout
 
     demo-18-service-contracts
     |-- build/jenesis            symlink to ../../../sources/build/jenesis
+    |-- jenesis.plugins.properties  names the wsimport and OpenAPI plugins
     |-- soap
     |   |-- module-info.java     requires jakarta.xml.ws
-    |   |-- META-INF/build.jenesis/wsimport.properties
+    |   |-- META-INF/build.jenesis/plugin-wsimport.properties
     |   |-- wsdl/greeter.wsdl                          named, so the client can read it
     |   `-- demo/contract/soap/Greeters.java
     `-- rest
         |-- module-info.java     requires the generated client's Jackson modules
         |-- META-INF/build.jenesis
-        |   |-- openapi.properties
+        |   |-- plugin-openapi.properties
         |   `-- greeting.yaml                          the input, which does not ship
         `-- demo/contract/rest/Greetings.java

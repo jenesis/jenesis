@@ -77,11 +77,11 @@ were handed that output after it:
 
     The build did not reproduce: 4 of 21 steps wrote a different output into target-reproduced than into target, which is kept to compare - fingerprint SHA-256:...
     Caused by these steps, whose output differs although they were handed the same input in both builds, in the files named:
-      build/modules/compose/module/module-sources/produce/assemble/stamp: sources/demo/reproducible/built.txt
+      build/modules/compose/module/build-module-sources/produce/assemble/stamp: sources/demo/reproducible/built.txt
     As a consequence, these steps were handed a different input:
-      build/modules/compose/module/module-sources/produce/assemble/binary/artifacts/jar
-      build/modules/compose/module/module-sources/produce/assemble/binary/classes
-      build/modules/compose/module/module-sources/produce/assemble/binary/compiled/compile/javac
+      build/modules/compose/module/build-module-sources/produce/assemble/binary/artifacts/jar
+      build/modules/compose/module/build-module-sources/produce/assemble/binary/classes
+      build/modules/compose/module/build-module-sources/produce/assemble/binary/compiled/compile/javac
 
 Some outputs differ by nature, such as a test run recording coverage or a report
 that records when it was written; they are listed the same way.

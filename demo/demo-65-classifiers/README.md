@@ -50,6 +50,7 @@ Layout
     |-- library/             the plugin that builds the variant's library
     |   |-- .jenesis.skip
     |   |-- module-info.java
+    |   |-- demo/library/LibraryFactory.java
     |   `-- demo/library/LibraryModule.java  writes library/<platform>/library.txt
     |-- native/              the library, module demo.natives
     |   |-- module-info.java

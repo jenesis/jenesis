@@ -1,4 +1,4 @@
 module demo.jni {
     requires build.jenesis;
-    provides build.jenesis.BuildExecutorModule with demo.jni.JniModule;
+    provides build.jenesis.BuildModuleFactory with demo.jni.JniFactory;
 }

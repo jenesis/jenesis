@@ -203,9 +203,9 @@ Passing `-Djenesis.test.parallel` runs the matched tests in parallel, letting
 the test framework execute them concurrently where its configuration allows.
 
 Three more switches round out the test wiring. `-Djenesis.test.reporting=true`
-keeps the machine-readable reports every test run writes in the module's
-`reports/tests` rather than under the step's `supplement/reports`: the legacy JUnit
-XML that CI report plugins read, and the JUnit open-test-reporting XML. `-Djenesis.test.skip=true` skips the test step entirely
+writes machine-readable reports into the module's `reports/tests`: the legacy JUnit
+XML that CI report plugins read, and the JUnit open-test-reporting XML. Without it,
+a run writes no report. `-Djenesis.test.skip=true` skips the test step entirely
 - handy when staging an artifact whose tests have already run.
 And on a `stage` build, `-Djenesis.stage.tests=true` also stages the module's
 `tests`-classifier variant beside the main jar, so the test artifact is published
@@ -224,15 +224,21 @@ this line.
 When a test fails
 -----------------
 
-A failing test fails the build, and the error names each failed test, at most
-twenty of them, read from the reports the runner writes whatever reached the
-console. The `failed` line of the test step in
-`target/.jenesis.events.jsonl` names a `folder` ending in `~`, which keeps the
-run as it ended: the command under `supplement/command`, the runner's output
-under `supplement/output` and `supplement/error`, and its reports under
-`supplement/reports` - or under `reports/tests` with
-`-Djenesis.test.reporting=true` - beside a `.jenesis.failed` marker. It stays
-until the step runs again.
+A failing test fails the build, and the error prints the end of the runner's
+output, where it names each failed test with its stack trace. With
+`-Djenesis.test.reporting=true`, the error also names the folder holding the
+run's reports:
+
+```text
+The reports of the test run are in target/build/.../test/executed~/output/reports/tests
+```
+
+The `failed` line
+of the test step in `target/.jenesis.events.jsonl` names a `folder` ending in `~`,
+which keeps the run as it ended: the command under `supplement/command`, the
+runner's whole output under `supplement/output` and `supplement/error`, and its
+reports under `reports/tests` with `-Djenesis.test.reporting=true` - beside a
+`.jenesis.failed` marker. It stays until the step runs again.
 
 Pinned dependencies
 -------------------
