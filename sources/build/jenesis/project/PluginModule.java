@@ -256,7 +256,7 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
 
             @Override
             public Optional<String> resolve(String path) {
-                return plugin.resolve(path);
+                return plugin.resolve(path).map(resolved -> resolved.isEmpty() ? path : resolved);
             }
         }, Stream.of(prepared().stream(), inherited.sequencedKeySet().stream(), inputs.isEmpty() ? Stream.<String>empty() : Stream.of(INPUTS))
                 .flatMap(Function.identity()));

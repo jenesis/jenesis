@@ -121,6 +121,48 @@ public class InternalModuleTest {
     }
 
     @Test
+    public void hands_on_the_output_of_a_plugin_that_is_a_single_step() throws IOException {
+        Path source = writeModuleSource(work.resolve("plugin"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
+                Map.of("test/plugin/Plugin.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStep;
+                        import build.jenesis.BuildStepResult;
+                        import java.nio.file.Files;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Plugin implements build.jenesis.BuildModuleFactory {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                BuildStep step = (_, context, _) -> {
+                                    Files.writeString(context.next().resolve("out.txt"), "hello");
+                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                };
+                                return step.asModule("marker");
+                            }
+                        }
+                        """));
+
+        buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
+                "module",
+                "main",
+                source,
+                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+        buildExecutor.addStep("after", (_, context, arguments) -> {
+            Files.copy(arguments.firstEntry().getValue().folder().resolve("out.txt"), context.next().resolve("out.txt"));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }, "internal/marker");
+
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps.get("after").resolve("out.txt")).content().isEqualTo("hello");
+    }
+
+    @Test
     public void keeps_the_layer_of_a_plugin_warm_for_the_next_build_of_the_same_jars() throws Exception {
         assertThat(created("test.warm", List.of("first", "first"))).containsExactly("1", "2");
     }
