@@ -435,3 +435,14 @@ alone.
 instead: every package, with its package-private classes and members. A module
 reads again only the class files that changed since its last build, and keeps
 the hash of every other one.
+
+A module compiles against the ABI of the modules it requires: when only the
+body of `Greeter.prefix()` changed, `greeter` is compiled again, while `app` and
+`greeter-testing` are not, as the build prints:
+
+    [SKIPPED]   build/modules/compose/module/build-module-app/produce/assemble/binary/compiled/compile/javac
+
+A change to what `greeter` exports - a method added to `Greeter` - compiles them
+again. A test module is compiled again whenever the module it tests changed, so
+`greeter-test` always is. Without `jenesis.abi.mode`, every module requiring a
+changed module is compiled again.

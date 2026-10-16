@@ -11,6 +11,7 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.MultiProjectDependencies;
+import build.jenesis.step.Abi;
 import build.jenesis.step.Assign;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -211,6 +212,46 @@ public class MultiProjectDependenciesTest {
 
         assertThat(SequencedProperties.ofFiles(next.resolve(Assign.VARIANTS)))
                 .containsEntry("maven/org.example/natives/jar/linux/1.0", "maven/org.example/natives/1.0");
+    }
+
+    @Test
+    public void hands_on_the_abi_of_a_sibling_module_it_requires() throws IOException {
+        requiring("main/compile/module/baz", null, null);
+        Map<Path, Checksum> artifacts = sibling();
+        prepare(artifacts);
+        assertThat(next.resolve(Abi.FOLDER + "module%2Fbaz.properties")).hasContent("baz/Baz.class=0");
+        assertThat(next.resolve(Abi.FOLDER + "maven%2Fbaz%2Fbaz%2F1.properties")).hasContent("baz/Baz.class=0");
+    }
+
+    @Test
+    public void withholds_the_abi_of_the_module_its_tests_are_compiled_against() throws IOException {
+        requiring("main/compile/module/baz", null, null);
+        SequencedProperties module = SequencedProperties.ofFiles(this.module.resolve(BuildStep.MODULE));
+        module.setProperty("test", "baz");
+        module.store(this.module.resolve(BuildStep.MODULE));
+        prepare(sibling());
+        assertThat(next.resolve(Abi.FOLDER)).doesNotExist();
+    }
+
+    @Test
+    public void hands_on_no_abi_of_a_sibling_module_it_does_not_require() throws IOException {
+        requiring("main/compile/module/other", null, null);
+        prepare(sibling());
+        assertThat(next.resolve(Abi.FOLDER)).doesNotExist();
+    }
+
+    private Map<Path, Checksum> sibling() throws IOException {
+        SequencedProperties identity = new SequencedProperties(), abis = new SequencedProperties();
+        identity.setProperty("module/baz", "baz.jar");
+        identity.setProperty("maven/baz/baz/1", "baz.jar");
+        identity.store(dependency.resolve(BuildStep.IDENTITY));
+        abis.setProperty("module/baz", Abi.ABI);
+        abis.setProperty("maven/baz/baz/1", Abi.ABI);
+        abis.store(dependency.resolve(Abi.ABIS));
+        Files.writeString(dependency.resolve(Abi.ABI), "baz/Baz.class=0");
+        byte[] jar = {1, 2, 3};
+        Files.write(dependency.resolve("baz.jar"), jar);
+        return Checksum.added(Map.of(Path.of("baz.jar"), jar), new HashDigestFunction("MD5"));
     }
 
     private void requiring(String required, String pin, String value) throws IOException {

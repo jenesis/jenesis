@@ -50,6 +50,7 @@ public class Assign implements BuildStep {
         return arguments.values().stream().anyMatch(argument ->
                 argument.hasChanged(Path.of(ARTIFACTS),
                         Path.of(IDENTITY),
+                        Path.of(Abi.ABI),
                         Path.of(JMod.JMODS),
                         Path.of(Classifiers.CLASSIFIERS),
                         Path.of(Classifiers.CLASSIFIED),
@@ -66,9 +67,13 @@ public class Assign implements BuildStep {
         SequencedSet<Path> jmods = new TreeSet<>();
         SequencedMap<String, Path> classified = new TreeMap<>();
         SequencedMap<String, String> dormant = new TreeMap<>();
+        Path abi = null;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
+            }
+            if (abi == null && Files.isRegularFile(argument.folder().resolve(Abi.ABI))) {
+                abi = argument.folder().resolve(Abi.ABI);
             }
             Path artifacts = argument.folder().resolve(ARTIFACTS);
             if (Files.exists(artifacts)) {
@@ -152,6 +157,14 @@ public class Assign implements BuildStep {
             });
         }
         assignments.store(context.next().resolve(IDENTITY));
+        if (abi != null && !assigned.isEmpty()) {
+            SequencedProperties abis = new SequencedProperties();
+            String relative = context.next().relativize(abi).toString().replace(File.separatorChar, '/');
+            for (String coordinate : new TreeSet<>(assigned.keySet())) {
+                abis.setProperty(coordinate, relative);
+            }
+            abis.store(context.next().resolve(Abi.ABIS));
+        }
         if (!variants.isEmpty()) {
             variants.store(context.next().resolve(VARIANTS));
         }

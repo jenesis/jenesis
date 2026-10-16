@@ -1,11 +1,13 @@
 package build.jenesis.project;
 
 import module java.base;
+import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Abi;
 import build.jenesis.step.Assign;
 import build.jenesis.step.Classifiers;
 
@@ -28,6 +30,8 @@ public class MultiProjectDependencies implements BuildStep {
                 Path.of(EXCLUSIONS),
                 Path.of(OVERRIDES),
                 Path.of(IDENTITY),
+                Path.of(Abi.ABI),
+                Path.of(Abi.ABIS),
                 Path.of(Assign.VARIANTS),
                 Path.of(Assign.INACTIVE),
                 Path.of(ARTIFACTS)));
@@ -38,9 +42,9 @@ public class MultiProjectDependencies implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        SequencedMap<String, Path> coordinates = new LinkedHashMap<>();
+        SequencedMap<String, Path> coordinates = new LinkedHashMap<>(), abis = new TreeMap<>();
         SequencedMap<String, String> dependencies = new LinkedHashMap<>(), variants = new TreeMap<>(), inactive = new TreeMap<>();
-        String path = null;
+        String path = null, tested = null;
         SequencedMap<String, SequencedMap<String, String>> inherited = new LinkedHashMap<>();
         for (String name : List.of(VERSIONS, ALIASES, BOMS, SIGNATURES, EXCLUSIONS, OVERRIDES)) {
             inherited.put(name, new LinkedHashMap<>());
@@ -52,7 +56,9 @@ public class MultiProjectDependencies implements BuildStep {
             if (isModule.test(entry.getKey())) {
                 Path moduleFile = entry.getValue().folder().resolve(MODULE);
                 if (path == null && Files.isRegularFile(moduleFile)) {
-                    path = SequencedProperties.ofFiles(moduleFile).value("path");
+                    SequencedProperties module = SequencedProperties.ofFiles(moduleFile);
+                    path = module.value("path");
+                    tested = module.value("test");
                 }
                 Path requiresPath = entry.getValue().folder().resolve(REQUIRES);
                 if (Files.exists(requiresPath)) {
@@ -93,9 +99,16 @@ public class MultiProjectDependencies implements BuildStep {
                         }
                     }
                 }
+                Path assigned = entry.getValue().folder().resolve(Abi.ABIS);
+                if (Files.exists(assigned)) {
+                    Path folder = entry.getValue().folder();
+                    SequencedProperties.ofFiles(assigned).forEachProperty((coordinate, value) ->
+                            abis.put(coordinate, folder.resolve(value).normalize()));
+                }
             }
         }
         SequencedProperties properties = new SequencedProperties();
+        Set<Path> required = new HashSet<>();
         SequencedMap<String, String> versions = inherited.get(VERSIONS);
         for (Map.Entry<String, String> entry : dependencies.entrySet()) {
             String key = entry.getKey();
@@ -134,6 +147,29 @@ public class MultiProjectDependencies implements BuildStep {
                     candidate != null
                             ? fingerprint(arguments.values(), candidate)
                             : entry.getValue());
+            if (candidate != null) {
+                required.add(candidate);
+            }
+        }
+        Set<Path> tests = new HashSet<>();
+        if (tested != null) {
+            for (Map.Entry<String, Path> coordinate : coordinates.entrySet()) {
+                String[] segments = coordinate.getKey().split("/");
+                if (coordinate.getKey().equals("module/" + tested)
+                        || segments.length == 4 && segments[0].equals("maven") && segments[2].equals(tested)) {
+                    tests.add(coordinate.getValue());
+                }
+            }
+        }
+        for (Map.Entry<String, Path> abi : abis.entrySet()) {
+            Path jar = coordinates.get(abi.getKey());
+            if (jar != null && required.contains(jar) && !tests.contains(jar)) {
+                Path target = context.next()
+                        .resolve(Abi.FOLDER)
+                        .resolve(BuildExecutorModule.encode(abi.getKey()) + ".properties");
+                Files.createDirectories(target.getParent());
+                Files.copy(abi.getValue(), target);
+            }
         }
         if (!variants.isEmpty()) {
             SequencedProperties listed = new SequencedProperties();

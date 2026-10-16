@@ -13,7 +13,7 @@ import java.lang.classfile.Attributes;
 
 public record Abi(Mode mode) implements BuildStep {
 
-    public static final String ABI = "abi.properties";
+    public static final String ABI = "abi.properties", ABIS = "abis.properties", FOLDER = "abi/";
     private static final String STATE = "abi-state.properties",
             FORMAT = "1",
             MODULE_INFO = "module-info",
@@ -68,6 +68,10 @@ public record Abi(Mode mode) implements BuildStep {
 
     public Abi mode(Mode mode) {
         return new Abi(mode);
+    }
+
+    public static String companion(String jar) {
+        return (jar.endsWith(".jar") ? jar.substring(0, jar.length() - ".jar".length()) : jar) + "." + ABI;
     }
 
     @Override
