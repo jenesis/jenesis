@@ -36,8 +36,8 @@
  * @jenesis.pin org.junit.platform/junit-platform-launcher 1.11.3 SHA-256/b4727459201b0011beb0742bd807421a1fc8426b116193031ed87825bc2d4f04
  * @jenesis.pin org.junit.platform/junit-platform-reporting 1.11.3 SHA-256/b8e19dbebcae7d1ff30b9d767047fbf3694027c33dfa423b371693b7f6679ed1
  * @jenesis.pin org.opentest4j/opentest4j 1.3.0 SHA-256/48e2df636cab6563ced64dcdff8abb2355627cb236ef0bf37598682ddf742f1b
- * @jenesis.pin kotlin/module/build.jenesis 0.16.0 SHA-256/bf8d90a8e3251fcb2519e11793ab87a68f37419f12a6b3275f9dd1d263149c98
- * @jenesis.pin kotlin/module/build.jenesis.plugin.kotlin 0.16.0 SHA-256/b8864fdc7d262ee7a177261a15adb287b6232c0280f983caf8875492c1427391
+ * @jenesis.pin kotlin/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
+ * @jenesis.pin kotlin/module/build.jenesis.plugin.kotlin 0.16.0 SHA-256/7d7382020af0a2e0a44de509bd90d80f08715546c869cfed840af48ca5e9f9a3
  */
 module sample.kotlin.test {
     requires sample.kotlin;
