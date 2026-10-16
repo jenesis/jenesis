@@ -138,8 +138,10 @@ public class DependenciesReuseTest {
         assertThat(ran).contains("resolved/resolve").doesNotContain("resolved/pinned");
         String entry = SequencedProperties.ofFiles(output.resolve(BuildStep.DEPENDENCIES))
                 .getProperty("main/compile/foo/produced");
-        assertThat(entry).endsWith(" " + checksum(produced));
-        assertThat(output.resolve(entry.substring(0, entry.indexOf(' '))))
+        assertThat(entry)
+                .as("an artifact the build produces is recorded without its checksum, so the index stays when it changes")
+                .doesNotContain(" ");
+        assertThat(output.resolve(entry))
                 .as("what runs against the resolution sees the artifact as the build produced it last")
                 .hasSameBinaryContentAs(produced);
     }
@@ -166,7 +168,7 @@ public class DependenciesReuseTest {
                 .isEqualTo(2);
         String entry = SequencedProperties.ofFiles(output.resolve(BuildStep.DEPENDENCIES))
                 .getProperty("main/compile/foo/produced");
-        assertThat(output.resolve(entry.substring(0, entry.indexOf(' ')))).hasSameBinaryContentAs(produced);
+        assertThat(output.resolve(entry)).hasSameBinaryContentAs(produced);
     }
 
     @Test
@@ -225,7 +227,7 @@ public class DependenciesReuseTest {
                 .isGreaterThan(1);
         String entry = SequencedProperties.ofFiles(output.resolve(BuildStep.DEPENDENCIES))
                 .getProperty("main/compile/foo/produced");
-        assertThat(output.resolve(entry.substring(0, entry.indexOf(' ')))).hasSameBinaryContentAs(produced);
+        assertThat(output.resolve(entry)).hasSameBinaryContentAs(produced);
     }
 
     @Test

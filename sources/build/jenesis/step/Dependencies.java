@@ -503,7 +503,6 @@ public class Dependencies implements BuildExecutorModule {
                         String value = index.getProperty(key);
                         int space = value.indexOf(' ');
                         String relative = space < 0 ? value : value.substring(0, space);
-                        String checksum = space < 0 ? "" : value.substring(space + 1);
                         Path target = context.next().resolve(relative).normalize();
                         refreshedInternals.put(parts[2] + "/" + parts[3], target);
                         if (refreshed.add(target)) {
@@ -512,17 +511,7 @@ public class Dependencies implements BuildExecutorModule {
                                     new IllegalStateException("Repository did not materialize a file for "
                                             + location)));
                         }
-                        String declared = requires
-                                .getOrDefault(parts[0], Collections.emptyNavigableMap())
-                                .getOrDefault(parts[1], Collections.emptyNavigableMap())
-                                .getOrDefault(parts[2], Collections.emptyNavigableMap())
-                                .getOrDefault(parts[3], "");
-                        if (!declared.isEmpty()) {
-                            checksum = declared;
-                        } else if (!checksum.isEmpty()) {
-                            Resolver.validate(target, checksum, parts[2] + "/" + parts[3]);
-                        }
-                        index.setProperty(key, checksum.isEmpty() ? relative : relative + " " + checksum);
+                        index.setProperty(key, relative);
                     }
                     index.store(context.next().resolve(DEPENDENCIES));
                     try (Stream<Path> files = Files.list(libs)) {
@@ -1043,7 +1032,9 @@ public class Dependencies implements BuildExecutorModule {
                         .relativize(placed.get(key.substring(second + 1)))
                         .toString()
                         .replace(File.separatorChar, '/');
-                index.setProperty(key, value.isEmpty() ? relative : relative + " " + value);
+                index.setProperty(key, value.isEmpty() || internals.getOrDefault(key.substring(second + 1), false)
+                        ? relative
+                        : relative + " " + value);
             }
             if (!aliased.isEmpty()) {
                 SequencedProperties properties = new SequencedProperties();
