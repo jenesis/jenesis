@@ -15,13 +15,14 @@ public class JenesisModuleRepositoryExportTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, source, target;
+    private Path previous, next, supplement, persistent, source, target;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         source = Files.createDirectory(root.resolve("source"));
         target = root.resolve("target");
     }
@@ -144,7 +145,7 @@ public class JenesisModuleRepositoryExportTest {
 
     private BuildStepResult run() throws IOException {
         return new JenesisModuleRepositoryExport(target).apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("source", new BuildStepArgument(
                                 source,
                                 Map.of(Path.of("."), Checksum.of(ChecksumStatus.ADDED))))))

@@ -11,6 +11,7 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.MultiProjectDependencies;
+import build.jenesis.step.Abi;
 import build.jenesis.step.Assign;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -20,13 +21,14 @@ public class MultiProjectDependenciesTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, module, dependency;
+    private Path previous, next, supplement, persistent, module, dependency;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         module = Files.createDirectory(root.resolve("module"));
         dependency = Files.createDirectory(root.resolve("dependency"));
     }
@@ -44,7 +46,7 @@ public class MultiProjectDependenciesTest {
         String checksum = hash.encoded(artifact);
         BuildStepResult result = new MultiProjectDependencies("foo"::equals).apply(
                         Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of(
                                 "foo", new BuildStepArgument(
                                         module,
@@ -82,7 +84,7 @@ public class MultiProjectDependenciesTest {
                 Map.of(Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new MultiProjectDependencies(_ -> true).apply(
                         Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         arguments)
                 .toCompletableFuture().join();
         assertThat(result.next()).isTrue();
@@ -113,7 +115,7 @@ public class MultiProjectDependenciesTest {
                 Map.of(Path.of(BuildStep.ALIASES), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new MultiProjectDependencies(_ -> true).apply(
                         Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         arguments)
                 .toCompletableFuture().join();
         assertThat(result.next()).isTrue();
@@ -129,7 +131,7 @@ public class MultiProjectDependenciesTest {
         dependencies.store(module.resolve(BuildStep.REQUIRES));
         BuildStepResult result = new MultiProjectDependencies("foo"::equals).apply(
                         Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of(
                                 "foo", new BuildStepArgument(
                                         module,
@@ -212,6 +214,46 @@ public class MultiProjectDependenciesTest {
                 .containsEntry("maven/org.example/natives/jar/linux/1.0", "maven/org.example/natives/1.0");
     }
 
+    @Test
+    public void hands_on_the_abi_of_a_sibling_module_it_requires() throws IOException {
+        requiring("main/compile/module/baz", null, null);
+        Map<Path, Checksum> artifacts = sibling();
+        prepare(artifacts);
+        assertThat(next.resolve(Abi.FOLDER + "module%2Fbaz.properties")).hasContent("baz/Baz.class=0");
+        assertThat(next.resolve(Abi.FOLDER + "maven%2Fbaz%2Fbaz%2F1.properties")).hasContent("baz/Baz.class=0");
+    }
+
+    @Test
+    public void withholds_the_abi_of_the_module_its_tests_are_compiled_against() throws IOException {
+        requiring("main/compile/module/baz", null, null);
+        SequencedProperties module = SequencedProperties.ofFiles(this.module.resolve(BuildStep.MODULE));
+        module.setProperty("test", "baz");
+        module.store(this.module.resolve(BuildStep.MODULE));
+        prepare(sibling());
+        assertThat(next.resolve(Abi.FOLDER)).doesNotExist();
+    }
+
+    @Test
+    public void hands_on_no_abi_of_a_sibling_module_it_does_not_require() throws IOException {
+        requiring("main/compile/module/other", null, null);
+        prepare(sibling());
+        assertThat(next.resolve(Abi.FOLDER)).doesNotExist();
+    }
+
+    private Map<Path, Checksum> sibling() throws IOException {
+        SequencedProperties identity = new SequencedProperties(), abis = new SequencedProperties();
+        identity.setProperty("module/baz", "baz.jar");
+        identity.setProperty("maven/baz/baz/1", "baz.jar");
+        identity.store(dependency.resolve(BuildStep.IDENTITY));
+        abis.setProperty("module/baz", Abi.ABI);
+        abis.setProperty("maven/baz/baz/1", Abi.ABI);
+        abis.store(dependency.resolve(Abi.ABIS));
+        Files.writeString(dependency.resolve(Abi.ABI), "baz/Baz.class=0");
+        byte[] jar = {1, 2, 3};
+        Files.write(dependency.resolve("baz.jar"), jar);
+        return Checksum.added(Map.of(Path.of("baz.jar"), jar), new HashDigestFunction("MD5"));
+    }
+
     private void requiring(String required, String pin, String value) throws IOException {
         SequencedProperties requires = new SequencedProperties(), module = new SequencedProperties();
         requires.setProperty(required, "");
@@ -229,7 +271,7 @@ public class MultiProjectDependenciesTest {
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
         arguments.put("foo", new BuildStepArgument(module, Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED))));
         arguments.put("bar", new BuildStepArgument(dependency, artifacts));
-        new MultiProjectDependencies("foo"::equals).apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+        new MultiProjectDependencies("foo"::equals).apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture()
                 .join();
     }

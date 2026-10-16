@@ -31,6 +31,44 @@ public class ClassTransformModuleTest {
                 .isNull();
     }
 
+    @Test
+    public void hands_the_next_transform_every_class_the_one_before_it_ends_with() throws IOException {
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addStep("compiled", new Written("Compiled"));
+        SequencedMap<String, build.jenesis.BuildExecutorModule> transforms = new LinkedHashMap<>();
+        transforms.put("first", new Written("First").asModule("first"));
+        transforms.put("second", new Written("Second").asModule("second"));
+        executor.addModule("transform", new ClassTransformModule(transforms), "compiled");
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+
+        Path classes = results.get("transform").resolve(BuildStep.CLASSES).resolve("sample");
+        assertThat(classes.resolve("Compiled.class"))
+                .as("a class no transform rewrites passes through every one of them")
+                .exists();
+        assertThat(classes.resolve("First.class")).exists();
+        assertThat(classes.resolve("Second.class")).exists();
+    }
+
+    private record Written(String name) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.CLASSES + "sample"))
+                    .resolve(name + ".class"), name);
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
     private Manifest transformed(String file) throws IOException {
         BuildExecutor executor = BuildExecutor.of(build,
                 Duration.ZERO,

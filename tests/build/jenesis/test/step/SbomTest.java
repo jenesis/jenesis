@@ -19,13 +19,14 @@ public class SbomTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, argument;
+    private Path previous, next, supplement, persistent, argument;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         argument = Files.createDirectory(root.resolve("argument"));
     }
 
@@ -78,7 +79,7 @@ public class SbomTest {
         metadata.store(argument.resolve(BuildStep.METADATA));
 
         BuildStepResult result = new Sbom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(
@@ -132,7 +133,7 @@ public class SbomTest {
         metadata.store(argument.resolve(BuildStep.METADATA));
 
         new Sbom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
@@ -381,7 +382,7 @@ public class SbomTest {
         scm.forEach(metadata::setProperty);
         metadata.store(argument.resolve(BuildStep.METADATA));
         BuildStepResult result = step.apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
@@ -399,7 +400,7 @@ public class SbomTest {
         metadata.store(argument.resolve(BuildStep.METADATA));
 
         BuildStepResult result = new Sbom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
@@ -427,7 +428,7 @@ public class SbomTest {
         metadata.store(argument.resolve(BuildStep.METADATA));
 
         BuildStepResult result = new Sbom().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
                                 Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))

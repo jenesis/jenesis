@@ -7,7 +7,15 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
+import build.jenesis.Project;
+import build.jenesis.Repository;
+import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.maven.MavenDefaultRepository;
+import build.jenesis.maven.MavenPomResolver;
+import build.jenesis.module.JenesisRepository;
+import build.jenesis.module.ModularJarResolver;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.ProjectFiles;
@@ -17,9 +25,8 @@ public record ProjectPlugins(Path pins,
                              SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> preprocessors,
                              SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> transforms,
                              SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> inspections,
-                             SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> stageTransforms,
-                             SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> stageInspections,
-                             SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> exporters,
+                             SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> supplements,
+                             SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> audits,
                              SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> releasers,
                              SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> goals,
                              SequencedMap<String, BuildExecutorModule> resolutions) {
@@ -35,7 +42,10 @@ public record ProjectPlugins(Path pins,
             PROJECT = "project",
             SEALED = "sealed",
             UNCHANGED = "unchanged",
-            RESOLVED = "resolved";
+            RESOLVED = "resolved",
+            JRELEASER = "jreleaser",
+            ROOT = "root.properties",
+            ROOT_KEY = "root";
 
     public ProjectPlugins() {
         this(null,
@@ -47,52 +57,184 @@ public record ProjectPlugins(Path pins,
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
-                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap());
     }
 
+    public static Map<String, Repository> repositories(Map<String, Repository> repositories, Environment environment) {
+        Map<String, Repository> merged = new LinkedHashMap<>();
+        merged.put("module", JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE));
+        merged.put("maven", MavenDefaultRepository.ofEnvironment(environment));
+        merged.putAll(repositories);
+        return Collections.unmodifiableMap(merged);
+    }
+
+    public static Map<String, Resolver> resolvers(Map<String, Resolver> resolvers, Environment environment) {
+        Map<String, Resolver> merged = new LinkedHashMap<>();
+        merged.put("module", ModularJarResolver.ofEnvironment(environment, true));
+        merged.put("maven", MavenPomResolver.ofEnvironment(environment));
+        merged.putAll(resolvers);
+        return Collections.unmodifiableMap(merged);
+    }
+
+    public static Path jreleaser(Path root) {
+        return Stream.of("jreleaser.yml", "jreleaser.yaml", "jreleaser.toml", "jreleaser.json")
+                .map(root::resolve)
+                .filter(Files::isRegularFile)
+                .findFirst()
+                .orElse(null);
+    }
+
+    public ProjectPlugins tools(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
+        UnaryOperator<SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>>> tooled = plugins -> {
+            SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> handed = new LinkedHashMap<>();
+            plugins.forEach((name, plugin) -> handed.put(name, values -> {
+                BuildExecutorModule module = plugin.apply(values);
+                return module instanceof PluginModule<?> tool
+                        ? tool.repositories(repositories).resolvers(resolvers)
+                        : module;
+            }));
+            return handed;
+        };
+        return new ProjectPlugins(pins,
+                arguments,
+                tooled.apply(preprocessors),
+                tooled.apply(transforms),
+                tooled.apply(inspections),
+                tooled.apply(supplements),
+                tooled.apply(audits),
+                tooled.apply(releasers),
+                tooled.apply(goals),
+                resolutions);
+    }
+
     public ProjectPlugins pins(Path pins) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins,
+                arguments,
+                preprocessors,
+                transforms,
+                inspections,
+                supplements,
+                audits,
+                releasers,
+                goals,
+                resolutions);
     }
 
     public ProjectPlugins arguments(Path arguments) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins,
+                arguments,
+                preprocessors,
+                transforms,
+                inspections,
+                supplements,
+                audits,
+                releasers,
+                goals,
+                resolutions);
     }
 
     public ProjectPlugins preprocessors(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> preprocessors) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins,
+                arguments,
+                preprocessors,
+                transforms,
+                inspections,
+                supplements,
+                audits,
+                releasers,
+                goals,
+                resolutions);
     }
 
     public ProjectPlugins transforms(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> transforms) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins,
+                arguments,
+                preprocessors,
+                transforms,
+                inspections,
+                supplements,
+                audits,
+                releasers,
+                goals,
+                resolutions);
     }
 
     public ProjectPlugins inspections(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> inspections) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins,
+                arguments,
+                preprocessors,
+                transforms,
+                inspections,
+                supplements,
+                audits,
+                releasers,
+                goals,
+                resolutions);
     }
 
-    public ProjectPlugins stageTransforms(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> stageTransforms) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
+    public ProjectPlugins supplements(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> supplements) {
+        return new ProjectPlugins(pins,
+                arguments,
+                preprocessors,
+                transforms,
+                inspections,
+                supplements,
+                audits,
+                releasers,
+                goals,
+                resolutions);
     }
 
-    public ProjectPlugins stageInspections(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> stageInspections) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
-    }
-
-    public ProjectPlugins exporters(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> exporters) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
+    public ProjectPlugins audits(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> audits) {
+        return new ProjectPlugins(pins,
+                arguments,
+                preprocessors,
+                transforms,
+                inspections,
+                supplements,
+                audits,
+                releasers,
+                goals,
+                resolutions);
     }
 
     public ProjectPlugins releasers(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> releasers) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins,
+                arguments,
+                preprocessors,
+                transforms,
+                inspections,
+                supplements,
+                audits,
+                releasers,
+                goals,
+                resolutions);
     }
 
     public ProjectPlugins goals(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> goals) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins,
+                arguments,
+                preprocessors,
+                transforms,
+                inspections,
+                supplements,
+                audits,
+                releasers,
+                goals,
+                resolutions);
     }
 
     public ProjectPlugins resolutions(SequencedMap<String, BuildExecutorModule> resolutions) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins,
+                arguments,
+                preprocessors,
+                transforms,
+                inspections,
+                supplements,
+                audits,
+                releasers,
+                goals,
+                resolutions);
     }
 
     public ProjectPlugins preprocess(String name, BuildExecutorModule module) {
@@ -137,46 +279,32 @@ public record ProjectPlugins(Path pins,
         return inspect(name, step.asModule(name));
     }
 
-    public ProjectPlugins stageTransform(String name, BuildExecutorModule module) {
-        if (stageTransforms.containsKey(name)) {
-            throw new IllegalArgumentException("A stage transform named " + name + " is added already - give this one"
+    public ProjectPlugins supplement(String name, BuildExecutorModule module) {
+        if (supplements.containsKey(name)) {
+            throw new IllegalArgumentException("A supplement named " + name + " is added already - give this one"
                     + " another name");
         }
-        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> added = new LinkedHashMap<>(stageTransforms);
+        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> added = new LinkedHashMap<>(supplements);
         added.put(name, _ -> module);
-        return stageTransforms(added);
+        return supplements(added);
     }
 
-    public ProjectPlugins stageTransform(String name, BuildStep step) {
-        return stageTransform(name, step.asModule(name));
+    public ProjectPlugins supplement(String name, BuildStep step) {
+        return supplement(name, step.asModule(name));
     }
 
-    public ProjectPlugins stageInspect(String name, BuildExecutorModule module) {
-        if (stageInspections.containsKey(name)) {
-            throw new IllegalArgumentException("A stage inspection named " + name + " is added already - give this"
-                    + " one another name");
-        }
-        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> added = new LinkedHashMap<>(stageInspections);
-        added.put(name, _ -> module);
-        return stageInspections(added);
-    }
-
-    public ProjectPlugins stageInspect(String name, BuildStep step) {
-        return stageInspect(name, step.asModule(name));
-    }
-
-    public ProjectPlugins export(String name, BuildExecutorModule module) {
-        if (exporters.containsKey(name)) {
-            throw new IllegalArgumentException("An exporter named " + name + " is added already - give this one"
+    public ProjectPlugins audit(String name, BuildExecutorModule module) {
+        if (audits.containsKey(name)) {
+            throw new IllegalArgumentException("An audit named " + name + " is added already - give this one"
                     + " another name");
         }
-        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> added = new LinkedHashMap<>(exporters);
+        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> added = new LinkedHashMap<>(audits);
         added.put(name, _ -> module);
-        return exporters(added);
+        return audits(added);
     }
 
-    public ProjectPlugins export(String name, BuildStep step) {
-        return export(name, step.asModule(name));
+    public ProjectPlugins audit(String name, BuildStep step) {
+        return audit(name, step.asModule(name));
     }
 
     public ProjectPlugins release(String name, BuildExecutorModule module) {
@@ -224,14 +352,26 @@ public record ProjectPlugins(Path pins,
 
             @Override
             public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-                hook(buildExecutor, inherited, preprocessors, profiles);
+                if (preprocessors.isEmpty()) {
+                    return;
+                }
+                SequencedMap<String, SequencedMap<String, String>> values = arguments(profiles);
+                SequencedSet<String> inputs = pinned(buildExecutor);
+                inputs.addAll(inherited.sequencedKeySet());
+                buildExecutor.addModule(CUSTOM, (custom, given) -> {
+                    for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : preprocessors.entrySet()) {
+                        custom.addModule(entry.getKey(),
+                                entry.getValue().apply(values.getOrDefault(entry.getKey(), Collections.emptyNavigableMap())),
+                                given.sequencedKeySet());
+                    }
+                }, inputs);
             }
         };
     }
 
     public BuildExecutorModule stage(SequencedSet<Path> profiles, SequencedMap<String, BuildStep> trees) {
         return (buildExecutor, inherited) -> {
-            if (stageTransforms.isEmpty() && stageInspections.isEmpty()) {
+            if (supplements.isEmpty() && audits.isEmpty()) {
                 for (Map.Entry<String, BuildStep> tree : trees.entrySet()) {
                     buildExecutor.addStep(tree.getKey(), tree.getValue(), inherited.sequencedKeySet());
                 }
@@ -246,10 +386,10 @@ public record ProjectPlugins(Path pins,
             }, inherited.sequencedKeySet());
             SequencedSet<String> handed = new LinkedHashSet<>(inputs);
             handed.add(STAGED);
-            if (!stageTransforms.isEmpty()) {
+            if (!supplements.isEmpty()) {
                 buildExecutor.addModule(TRANSFORM, (transform, given) -> {
                     SequencedSet<String> previous = new LinkedHashSet<>(given.sequencedKeySet());
-                    for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : stageTransforms.entrySet()) {
+                    for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : supplements.entrySet()) {
                         transform.addModule(entry.getKey(),
                                 entry.getValue().apply(values.getOrDefault(entry.getKey(), Collections.emptyNavigableMap())),
                                 previous);
@@ -260,16 +400,16 @@ public record ProjectPlugins(Path pins,
             for (String tree : trees.keySet()) {
                 buildExecutor.addStep(tree,
                         new Merged(tree, STAGED + "/" + tree),
-                        stageTransforms.isEmpty() ? Stream.of(STAGED + "/" + tree) : Stream.of(STAGED + "/" + tree, TRANSFORM));
+                        supplements.isEmpty() ? Stream.of(STAGED + "/" + tree) : Stream.of(STAGED + "/" + tree, TRANSFORM));
             }
-            if (!stageInspections.isEmpty()) {
+            if (!audits.isEmpty()) {
                 SequencedSet<String> inspected = new LinkedHashSet<>(trees.sequencedKeySet());
                 buildExecutor.addStep(SEALED, new Sealed(), inspected);
                 SequencedSet<String> available = new LinkedHashSet<>(inputs);
                 available.addAll(inspected);
                 available.add(SEALED);
                 buildExecutor.addModule(INSPECT, (inspect, given) -> {
-                    for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : stageInspections.entrySet()) {
+                    for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : audits.entrySet()) {
                         inspect.addModule(entry.getKey(),
                                 entry.getValue().apply(values.getOrDefault(entry.getKey(), Collections.emptyNavigableMap())),
                                 given.sequencedKeySet());
@@ -283,12 +423,39 @@ public record ProjectPlugins(Path pins,
         };
     }
 
-    public BuildExecutorModule export(SequencedSet<Path> profiles) {
-        return (buildExecutor, inherited) -> hook(buildExecutor, inherited, exporters, profiles);
-    }
-
-    public BuildExecutorModule release(SequencedSet<Path> profiles) {
-        return (buildExecutor, inherited) -> hook(buildExecutor, inherited, releasers, profiles);
+    public BuildExecutorModule release(SequencedSet<Path> configurations, Path root) {
+        return (buildExecutor, inherited) -> {
+            SequencedMap<String, BuildExecutorModule> plugins = new LinkedHashMap<>();
+            for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> releaser : releasers.entrySet()) {
+                if (!resolutions.containsKey(releaser.getKey())) {
+                    plugins.put(releaser.getKey(), releaser.getValue().apply(Collections.emptyNavigableMap()));
+                    continue;
+                }
+                boolean official = releaser.getKey().equals(JRELEASER) && jreleaser(root) != null;
+                Path file = BuildStep.locate(configurations, (official ? "" : "plugin-") + releaser.getKey() + ".properties");
+                if (file != null || official) {
+                    SequencedMap<String, String> values = new LinkedHashMap<>();
+                    if (file != null) {
+                        SequencedProperties.ofFiles(file).forEachProperty(values::put);
+                    }
+                    plugins.put(releaser.getKey(), releaser.getValue().apply(values));
+                }
+            }
+            if (plugins.isEmpty()) {
+                return;
+            }
+            buildExecutor.addStep(PROJECT, new Resolved(root.toAbsolutePath().normalize().toString()), inherited.sequencedKeySet());
+            SequencedSet<String> inputs = pinned(buildExecutor);
+            inputs.add(PROJECT);
+            inherited.sequencedKeySet().stream()
+                    .filter(key -> !key.startsWith(BuildExecutorModule.PREVIOUS + Project.METADATA + "/"))
+                    .forEach(inputs::add);
+            buildExecutor.addModule(CUSTOM, (custom, given) -> {
+                for (Map.Entry<String, BuildExecutorModule> plugin : plugins.entrySet()) {
+                    custom.addModule(plugin.getKey(), plugin.getValue(), given.sequencedKeySet());
+                }
+            }, inputs);
+        };
     }
 
     public BuildExecutorModule goal(SequencedSet<Path> profiles) {
@@ -372,25 +539,6 @@ public record ProjectPlugins(Path pins,
         };
     }
 
-    private void hook(BuildExecutor buildExecutor,
-                      SequencedMap<String, Path> inherited,
-                      SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins,
-                      SequencedSet<Path> profiles) throws IOException {
-        if (plugins.isEmpty()) {
-            return;
-        }
-        SequencedMap<String, SequencedMap<String, String>> values = arguments(profiles);
-        SequencedSet<String> inputs = pinned(buildExecutor);
-        inputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addModule(CUSTOM, (custom, given) -> {
-            for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : plugins.entrySet()) {
-                custom.addModule(entry.getKey(),
-                        entry.getValue().apply(values.getOrDefault(entry.getKey(), Collections.emptyNavigableMap())),
-                        given.sequencedKeySet());
-            }
-        }, inputs);
-    }
-
     private SequencedMap<String, SequencedMap<String, String>> arguments(SequencedSet<Path> profiles) throws IOException {
         SequencedMap<String, SequencedMap<String, String>> values = new TreeMap<>();
         if (arguments == null) {
@@ -411,15 +559,21 @@ public record ProjectPlugins(Path pins,
             for (String key : declared.stringPropertyNames()) {
                 int dot = key.indexOf('.');
                 String plugin = dot == -1 ? key : key.substring(0, dot);
-                if (dot <= 0 || dot == key.length() - 1 || Stream.of(resolutions, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals)
+                if (dot <= 0 || dot == key.length() - 1 || Stream.of(resolutions, preprocessors, transforms, inspections, supplements, audits, releasers, goals)
                         .noneMatch(plugins -> plugins.containsKey(plugin))) {
                     throw new IllegalArgumentException("The argument " + key + " in " + file + " names no plugin of "
                             + "the whole project - write <plugin>.<key>=<value> for one of "
                             + Stream.of(resolutions.keySet(), preprocessors.keySet(), transforms.keySet(),
-                                            inspections.keySet(), stageTransforms.keySet(), stageInspections.keySet(),
-                                            exporters.keySet(), releasers.keySet(), goals.keySet())
+                                            inspections.keySet(), supplements.keySet(), audits.keySet(),
+                                            releasers.keySet(), goals.keySet())
                                     .flatMap(Set::stream)
                                     .collect(Collectors.toCollection(TreeSet::new)));
+                }
+                if (releasers.containsKey(plugin) && resolutions.containsKey(plugin)) {
+                    throw new IllegalArgumentException("The argument " + key + " in " + file + " configures the plugin "
+                            + plugin + " of release, which takes its values from the plugin-" + plugin + ".properties"
+                            + " of a configuration folder, and runs only where one is found - write "
+                            + key.substring(dot + 1) + "=<value> there");
                 }
                 values.computeIfAbsent(plugin, _ -> new TreeMap<>()).putIfAbsent(key.substring(dot + 1), declared.getProperty(key));
             }
@@ -434,6 +588,38 @@ public record ProjectPlugins(Path pins,
             inputs.add(PINS);
         }
         return inputs;
+    }
+
+    private record Resolved(String root) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            SequencedProperties located = new SequencedProperties(), metadata = new SequencedProperties();
+            located.setProperty(ROOT_KEY, root);
+            String stage = BuildExecutorModule.PREVIOUS + Project.STAGE + "/",
+                    resolved = BuildExecutorModule.PREVIOUS + Project.METADATA + "/";
+            for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
+                if (argument.getValue().removed()) {
+                    continue;
+                }
+                String key = argument.getKey();
+                if (key.startsWith(resolved)) {
+                    Path file = argument.getValue().folder().resolve(METADATA);
+                    if (Files.isRegularFile(file)) {
+                        SequencedProperties.ofFiles(file).forEachProperty(metadata::setProperty);
+                    }
+                } else if (key.startsWith(stage) && key.indexOf('/', stage.length()) == -1) {
+                    located.setProperty("stage." + key.substring(stage.length()),
+                            argument.getValue().folder().toAbsolutePath().normalize().toString());
+                }
+            }
+            located.store(context.next().resolve(ROOT));
+            metadata.store(context.next().resolve(METADATA));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
     }
 
     private record Additions(String prefix, SequencedSet<String> prefixes) implements BuildStep {

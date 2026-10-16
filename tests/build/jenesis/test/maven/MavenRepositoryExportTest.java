@@ -17,13 +17,14 @@ public class MavenRepositoryExportTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, source, target;
+    private Path previous, next, supplement, persistent, source, target;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         source = Files.createDirectory(root.resolve("source"));
         target = Files.createDirectory(root.resolve("target"));
     }
@@ -93,6 +94,26 @@ public class MavenRepositoryExportTest {
         assertThat(content).contains("foo-1.2.3-sources.jar>=");
         assertThat(content).contains("foo-1.2.3.pom>=");
         assertThat(content).doesNotContain(".xml>=");
+    }
+
+    @Test
+    public void adds_exported_files_to_the_remote_repositories_marker_of_a_download() throws IOException {
+        stageArtifact("com.example", "foo", "1.2.3", "jar bytes");
+        Path version = Files.createDirectories(target.resolve("com/example/foo/1.2.3"));
+        Files.writeString(version.resolve("foo-1.2.3.jar.sha1"), "0000000000000000000000000000000000000000");
+        Files.writeString(version.resolve("foo-1.2.3-sources.jar"), "downloaded sources");
+        Files.writeString(version.resolve("_remote.repositories"), """
+                #NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+                foo-1.2.3.jar>central=
+                foo-1.2.3-sources.jar>central=
+                """);
+
+        run();
+
+        assertThat(Files.readString(version.resolve("_remote.repositories")))
+                .as("an export records what it installed beside where the rest came from, as Maven's install does")
+                .contains("foo-1.2.3.jar>=", "foo-1.2.3.pom>=", "foo-1.2.3.jar>central=", "foo-1.2.3-sources.jar>central=")
+                .doesNotContain("foo-1.2.3-sources.jar>=", ".sha1>");
     }
 
     @Test
@@ -221,7 +242,7 @@ public class MavenRepositoryExportTest {
 
     private BuildStepResult run() throws IOException {
         return new MavenRepositoryExport(target).apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("source", new BuildStepArgument(
                                 source,
                                 Map.of(Path.of("."), Checksum.of(ChecksumStatus.ADDED))))))

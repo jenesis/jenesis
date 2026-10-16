@@ -36,6 +36,21 @@ public class MakeToolTest {
     }
 
     @Test
+    public void builds_into_the_target_folder_of_the_root_it_is_given() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module foo {}");
+        StringWriter out = new StringWriter(), err = new StringWriter();
+        int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out),
+                new PrintWriter(err),
+                "-Djenesis.make.root=" + root,
+                "-Djenesis.print.progress=false");
+        assertThat(code).as(out + "\n" + err).isEqualTo(0);
+        assertThat(root.resolve("target"))
+                .as("a project built in another program's JVM writes below its own root rather than below"
+                        + " the folder that program runs in")
+                .isDirectory();
+    }
+
+    @Test
     public void takes_a_command_line_out_of_the_argument_file_it_names() throws IOException {
         Files.writeString(root.resolve("module-info.java"), "module foo {}");
         Path arguments = root.resolve("arguments.txt");
@@ -138,11 +153,11 @@ public class MakeToolTest {
         int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out),
                 new PrintWriter(err),
                 "-Djenesis.make.root=" + root,
-                "-Djenesis.make.aot=true",
+                "-Djenesis.make.mode=aot",
                 "configuration");
         assertThat(code).isEqualTo(1);
         assertThat(out.toString() + err)
                 .as("a cache is handed to a JVM on its command line, which a tool running in another JVM cannot do")
-                .contains("jenesis.make.aot cannot be honored by the jenesis-make tool");
+                .contains("jenesis.make.mode=aot cannot be honored by the jenesis-make tool");
     }
 }

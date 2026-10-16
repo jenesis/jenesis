@@ -1,5 +1,5 @@
-pitest - mutation testing, discovered from a config file
-========================================================
+pitest - mutation testing as a plugin
+=====================================
 
 Coverage tells you which lines a test *executed*; mutation testing tells you
 which behaviours a test actually *checks*. This demo runs [PIT](https://pitest.org)
@@ -8,18 +8,19 @@ a return value is replaced with a constant - re-runs the tests against each
 mutant, and reports which mutants the tests killed and which survived. A
 surviving mutant is a change to the program that no test noticed.
 
-Like the lint tools, PIT is **discovered from a config file**: when a tested
-module also has a `pitest.properties`, a `mutate` step is wired into the test
-block alongside the normal test run, so the suite runs as usual *and* PIT then
-assesses how good it is. There is no flag and no plugin to register; the plain
-build runs it:
+PIT is a plugin at the hook point `observed`, which runs over the tests' run:
+
+    pitest+observed=build.jenesis.plugin.pitest
+
+In a tested module that also finds its `plugin-pitest.properties`, the suite runs as
+usual *and* PIT then assesses how good it is. The plain build runs it:
 
     java build/jenesis/Make.java
 
 The build resolves PIT and its JUnit 5 plugin into their own `pitest` dependency
 group (separate from the project's dependencies), runs the analysis against the
 compiled classes and the test classpath, and writes an HTML and XML report under
-the `mutate` step's `reports/pitest/`. The version of PIT's JUnit 5 plugin is
+the plugin's `mutate` step, `reports/pitest/`. The version of PIT's JUnit 5 plugin is
 taken from the project's own resolved `junit-platform`, so it always lines up
 with the test framework the project uses rather than floating independently.
 
@@ -37,8 +38,7 @@ the assertion (for example assert nothing) and a mutant survives.
 The configuration
 -----------------
 
-`pitest.properties` carries the options PIT needs, so the file is real
-configuration rather than an empty marker:
+`plugin-pitest.properties` carries the options PIT needs:
 
     targetClasses=calc.Calculator   # which classes to mutate
     targetTests=calctest.*          # which tests to run against the mutants

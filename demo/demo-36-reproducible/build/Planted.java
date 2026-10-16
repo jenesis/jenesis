@@ -7,6 +7,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.Make;
 import build.jenesis.Project;
+import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.InferredMultiProjectAssembler;
 
 public class Planted {
@@ -16,7 +17,7 @@ public class Planted {
         InferredMultiProjectAssembler stock = InferredMultiProjectAssembler.ofEnvironment(environment);
         Project project = Project.ofEnvironment(environment, Path.of(".")).assembler((descriptor, repositories, resolvers) -> stock
                 .apply(descriptor.sources("stamp"), repositories, resolvers)
-                .mapBuild(build -> (sub, inherited) -> {
+                .nest(AssemblyDescriptor.BUILD, "", build -> (sub, inherited) -> {
                     sub.addStep("stamp", (_, context, arguments) -> {
                         Path target = context.next().resolve(BuildStep.SOURCES);
                         for (BuildStepArgument argument : arguments.values()) {

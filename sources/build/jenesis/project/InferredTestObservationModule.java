@@ -5,36 +5,43 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
+import build.jenesis.ObservabilityEngine;
+import build.jenesis.Observation;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
-import build.jenesis.step.Bind;
+import build.jenesis.TestFramework;
 
 public class InferredTestObservationModule implements BuildExecutorModule {
 
-    public static final String TEST = "test", MUTATE = "mutate";
+    public static final String TEST = "test",
+            OBSERVERS = "observers",
+            OBSERVATIONS = "observations",
+            FRAMEWORKS = "frameworks",
+            JACOCO = "jacoco",
+            PITEST = "pitest",
+            MUTATE = "mutate";
     private static final String FRAMEWORK = "framework", ENGINES = "engines", SCAN = "scan";
-    private static final String MINIMUM = "minimum.", MAXIMUM_MISSED = "maximum.missed.";
-    private static final String TARGET_CLASSES = "targetClasses", TARGET_TESTS = "targetTests", OUTPUT_FORMATS = "outputFormats", MUTATORS = "mutators", FAIL_WHEN_NO_MUTATIONS = "failWhenNoMutations";
     private static final Set<String> TEST_KEYS = Set.of(FRAMEWORK, ENGINES, SCAN);
-    private static final List<String> PITEST_KEYS = List.of(TARGET_CLASSES, TARGET_TESTS, OUTPUT_FORMATS, MUTATORS, FAIL_WHEN_NO_MUTATIONS);
 
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
     private final PathPlacement pathPlacement;
     private final String moduleName;
     private final TestModule testModule;
-    private final JaCoCoModule jacocoModule;
-    private final PiTestModule pitestModule;
     private final Function<TestModule, BuildExecutorModule> test;
-    private final Function<JaCoCoModule, BuildExecutorModule> jacoco;
     private final Function<NativeImageAgentModule, BuildExecutorModule> nativeImage;
     private final UnaryOperator<Jfr> jfr;
-    private final Function<PiTestModule, BuildExecutorModule> pitest;
     private final SequencedMap<String, BuildExecutorModule> custom;
+    private final SequencedMap<String, PluginModule<?>> observers;
+    private final SequencedMap<String, PluginModule<?>> frameworks;
     private final SequencedSet<String> untested;
+    private final ExternalModule jacocoModule;
+    private final boolean jacoco;
+    private final ExternalModule pitestModule;
+    private final boolean pitest;
 
     public InferredTestObservationModule(SequencedSet<Path> configuration,
                                          Map<String, Repository> repositories,
@@ -44,15 +51,17 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 PathPlacement.CLASS_PATH,
                 null,
                 new TestModule(repositories, resolvers),
-                new JaCoCoModule(repositories, resolvers),
-                new PiTestModule(repositories, resolvers),
-                value -> value,
-                value -> value,
                 value -> value,
                 value -> value,
                 value -> value,
                 Collections.emptyNavigableMap(),
-                Collections.emptyNavigableSet());
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableSet(),
+                ExternalModule.official(Environment.NONE, JACOCO, null, repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, PITEST, null, repositories, resolvers),
+                true);
     }
 
     public static InferredTestObservationModule ofEnvironment(Environment environment,
@@ -64,19 +73,17 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 PathPlacement.CLASS_PATH,
                 null,
                 TestModule.ofEnvironment(environment, repositories, resolvers),
-                JaCoCoModule.ofEnvironment(environment, repositories, resolvers),
-                PiTestModule.ofEnvironment(environment, repositories, resolvers),
-                value -> value,
-                value -> value,
                 value -> value,
                 value -> value,
                 value -> value,
                 Collections.emptyNavigableMap(),
-                Collections.emptyNavigableSet());
-        Boolean jacoco = environment.flagOrNull("observe.jacoco");
-        if (jacoco != null) {
-            module = module.jacoco(jacoco ? value -> value : null);
-        }
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableSet(),
+                ExternalModule.official(environment, JACOCO, null, repositories, resolvers),
+                true,
+                ExternalModule.official(environment, PITEST, null, repositories, resolvers),
+                true);
         Boolean nativeImage = environment.flagOrNull("observe.native");
         if (nativeImage != null) {
             module = module.nativeImage(nativeImage ? value -> value : null);
@@ -85,84 +92,13 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         if (jfr != null) {
             module = module.jfr(jfr ? value -> value : null);
         }
-        Boolean pitest = environment.flagOrNull("mutate.pitest");
-        if (pitest != null) {
-            module = module.pitest(pitest ? value -> value : null);
+        if (!environment.flag("observe.jacoco", true)) {
+            module = module.jacoco(false);
+        }
+        if (!environment.flag("mutate.pitest", true)) {
+            module = module.pitest(false);
         }
         return module;
-    }
-
-    private static JaCoCoModule limited(JaCoCoModule module, Path file) throws IOException {
-        SequencedMap<JaCoCoModule.Counter, Double> minimum = new LinkedHashMap<>();
-        SequencedMap<JaCoCoModule.Counter, Long> maximumMissed = new LinkedHashMap<>();
-        SequencedProperties properties = SequencedProperties.ofFiles(file);
-        for (String key : properties.stringPropertyNames()) {
-            boolean ratio = key.startsWith(MINIMUM);
-            String name = ratio ? key.substring(MINIMUM.length())
-                    : key.startsWith(MAXIMUM_MISSED) ? key.substring(MAXIMUM_MISSED.length())
-                    : null;
-            JaCoCoModule.Counter counter = name == null ? null : Arrays.stream(JaCoCoModule.Counter.values())
-                    .filter(candidate -> candidate.name().toLowerCase(Locale.ROOT).equals(name))
-                    .findFirst()
-                    .orElse(null);
-            if (counter == null) {
-                throw new IllegalArgumentException("Unknown key " + key + " in " + file + ", expected " + MINIMUM
-                        + "<counter> or " + MAXIMUM_MISSED + "<counter> for a counter of "
-                        + Arrays.stream(JaCoCoModule.Counter.values())
-                                .map(candidate -> candidate.name().toLowerCase(Locale.ROOT))
-                                .toList());
-            }
-            String value = properties.value(key, "");
-            try {
-                if (ratio) {
-                    minimum.put(counter, Double.parseDouble(value));
-                } else {
-                    maximumMissed.put(counter, Long.parseLong(value));
-                }
-            } catch (NumberFormatException _) {
-                throw new IllegalArgumentException("The value " + value + " of " + key + " in " + file + " is "
-                        + (ratio
-                                ? "no covered ratio, expected a number from 0 to 1, such as 0.8"
-                                : "no count of missed items, expected a whole number of at least 0"));
-            }
-        }
-        return module.minimum(minimum).maximumMissed(maximumMissed);
-    }
-
-    private static PiTestModule mutating(PiTestModule module, SequencedProperties properties, Path file) {
-        for (String key : properties.stringPropertyNames()) {
-            if (!PITEST_KEYS.contains(key)) {
-                throw new IllegalArgumentException("Unknown key " + key + " in " + file + ", expected one of "
-                        + PITEST_KEYS);
-            }
-        }
-        List<String> targetClasses = properties.entries(TARGET_CLASSES), targetTests = properties.entries(TARGET_TESTS);
-        List<String> outputFormats = properties.entries(OUTPUT_FORMATS), mutators = properties.entries(MUTATORS);
-        PiTestModule mutating = targetClasses == null ? module : module.targetClasses(targetClasses);
-        mutating = targetTests == null ? mutating : mutating.targetTests(targetTests);
-        mutating = mutators == null ? mutating : mutating.mutators(mutators);
-        if (outputFormats != null) {
-            List<PiTestModule.OutputFormat> formats = new ArrayList<>();
-            for (String format : outputFormats) {
-                formats.add(Arrays.stream(PiTestModule.OutputFormat.values())
-                        .filter(candidate -> candidate.name().equalsIgnoreCase(format))
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalArgumentException("Unknown format " + format + " of "
-                                + OUTPUT_FORMATS + " in " + file + ", expected some of "
-                                + List.of(PiTestModule.OutputFormat.values()))));
-            }
-            mutating = mutating.outputFormats(formats);
-        }
-        String failWhenNoMutations = properties.getProperty(FAIL_WHEN_NO_MUTATIONS);
-        if (failWhenNoMutations != null) {
-            try {
-                mutating = mutating.failWhenNoMutations(properties.flag(FAIL_WHEN_NO_MUTATIONS));
-            } catch (IllegalArgumentException _) {
-                throw new IllegalArgumentException("The value " + failWhenNoMutations + " of " + FAIL_WHEN_NO_MUTATIONS
-                        + " in " + file + " is no flag, expected true, false, or the key named with no value at all");
-            }
-        }
-        return mutating;
     }
 
     private static Jfr recorded(Path file) throws IOException {
@@ -185,7 +121,9 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         return new Jfr(options);
     }
 
-    private static TestModule declared(TestModule module, Path file) throws IOException {
+    private static TestModule declared(TestModule module,
+                                       Path file,
+                                       SequencedMap<String, TestFramework> frameworks) throws IOException {
         if (file == null) {
             return module;
         }
@@ -197,9 +135,22 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         }
         String framework = properties.value(FRAMEWORK), engines = properties.value(ENGINES);
         List<String> scan = properties.entries(SCAN);
-        TestModule declared = framework == null ? module : module.framework(TestFramework.named(framework));
+        TestModule declared = framework == null ? module
+                : frameworks.containsKey(framework) ? frameworks.get(framework) == null ? module : module.framework(frameworks.get(framework))
+                : module.framework(TestFrameworks.named(framework));
         declared = scan == null ? declared : declared.scan(scan);
         return engines == null ? declared : declared.engines(engines);
+    }
+
+    private static Observation observation(Map<String, Observation> observations,
+                                           Map.Entry<String, PluginModule<?>> observer,
+                                           SequencedMap<String, Path> inherited) throws IOException {
+        Observation observation = observations.get(observer.getKey());
+        if (observation == null) {
+            observation = observer.getValue().observation(PluginModule.prepared(OBSERVERS, observer.getKey(), inherited));
+            observations.put(observer.getKey(), observation);
+        }
+        return observation;
     }
 
     private InferredTestObservationModule(SequencedSet<Path> configuration,
@@ -207,29 +158,33 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                                           PathPlacement pathPlacement,
                                           String moduleName,
                                           TestModule testModule,
-                                          JaCoCoModule jacocoModule,
-                                          PiTestModule pitestModule,
                                           Function<TestModule, BuildExecutorModule> test,
-                                          Function<JaCoCoModule, BuildExecutorModule> jacoco,
                                           Function<NativeImageAgentModule, BuildExecutorModule> nativeImage,
                                           UnaryOperator<Jfr> jfr,
-                                          Function<PiTestModule, BuildExecutorModule> pitest,
                                           SequencedMap<String, BuildExecutorModule> custom,
-                                          SequencedSet<String> untested) {
+                                          SequencedMap<String, PluginModule<?>> observers,
+                                          SequencedMap<String, PluginModule<?>> frameworks,
+                                          SequencedSet<String> untested,
+                                          ExternalModule jacocoModule,
+                                          boolean jacoco,
+                                          ExternalModule pitestModule,
+                                          boolean pitest) {
         this.configuration = configuration;
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
         this.moduleName = moduleName;
         this.testModule = testModule;
-        this.jacocoModule = jacocoModule;
-        this.pitestModule = pitestModule;
         this.test = test;
-        this.jacoco = jacoco;
         this.nativeImage = nativeImage;
         this.jfr = jfr;
-        this.pitest = pitest;
         this.custom = custom;
+        this.observers = observers;
+        this.frameworks = frameworks;
         this.untested = untested;
+        this.jacocoModule = jacocoModule;
+        this.jacoco = jacoco;
+        this.pitestModule = pitestModule;
+        this.pitest = pitest;
     }
 
     public InferredTestObservationModule pinning(Pinning pinning) {
@@ -238,15 +193,17 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 testModule,
-                jacocoModule,
-                pitestModule,
                 test,
-                jacoco,
                 nativeImage,
                 jfr,
-                pitest,
                 custom,
-                untested);
+                observers,
+                frameworks,
+                untested,
+                jacocoModule,
+                jacoco,
+                pitestModule,
+                pitest);
     }
 
     public InferredTestObservationModule pathPlacement(PathPlacement pathPlacement) {
@@ -255,15 +212,17 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 testModule,
-                jacocoModule,
-                pitestModule,
                 test,
-                jacoco,
                 nativeImage,
                 jfr,
-                pitest,
                 custom,
-                untested);
+                observers,
+                frameworks,
+                untested,
+                jacocoModule,
+                jacoco,
+                pitestModule,
+                pitest);
     }
 
     public InferredTestObservationModule moduleName(String moduleName) {
@@ -272,15 +231,17 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 testModule,
-                jacocoModule,
-                pitestModule,
                 test,
-                jacoco,
                 nativeImage,
                 jfr,
-                pitest,
                 custom,
-                untested);
+                observers,
+                frameworks,
+                untested,
+                jacocoModule,
+                jacoco,
+                pitestModule,
+                pitest);
     }
 
     public InferredTestObservationModule test(Function<TestModule, BuildExecutorModule> test) {
@@ -289,32 +250,17 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 testModule,
-                jacocoModule,
-                pitestModule,
                 test,
-                jacoco,
                 nativeImage,
                 jfr,
-                pitest,
                 custom,
-                untested);
-    }
-
-    public InferredTestObservationModule jacoco(Function<JaCoCoModule, BuildExecutorModule> jacoco) {
-        return new InferredTestObservationModule(configuration,
-                pinning,
-                pathPlacement,
-                moduleName,
-                testModule,
+                observers,
+                frameworks,
+                untested,
                 jacocoModule,
-                pitestModule,
-                test,
                 jacoco,
-                nativeImage,
-                jfr,
-                pitest,
-                custom,
-                untested);
+                pitestModule,
+                pitest);
     }
 
     public InferredTestObservationModule nativeImage(Function<NativeImageAgentModule, BuildExecutorModule> nativeImage) {
@@ -323,15 +269,17 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 testModule,
-                jacocoModule,
-                pitestModule,
                 test,
-                jacoco,
                 nativeImage,
                 jfr,
-                pitest,
                 custom,
-                untested);
+                observers,
+                frameworks,
+                untested,
+                jacocoModule,
+                jacoco,
+                pitestModule,
+                pitest);
     }
 
     public InferredTestObservationModule jfr(UnaryOperator<Jfr> jfr) {
@@ -340,32 +288,17 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 testModule,
-                jacocoModule,
-                pitestModule,
                 test,
-                jacoco,
                 nativeImage,
                 jfr,
-                pitest,
                 custom,
-                untested);
-    }
-
-    public InferredTestObservationModule pitest(Function<PiTestModule, BuildExecutorModule> pitest) {
-        return new InferredTestObservationModule(configuration,
-                pinning,
-                pathPlacement,
-                moduleName,
-                testModule,
+                observers,
+                frameworks,
+                untested,
                 jacocoModule,
-                pitestModule,
-                test,
                 jacoco,
-                nativeImage,
-                jfr,
-                pitest,
-                custom,
-                untested);
+                pitestModule,
+                pitest);
     }
 
     public InferredTestObservationModule custom(SequencedMap<String, BuildExecutorModule> custom) {
@@ -374,15 +307,55 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 testModule,
-                jacocoModule,
-                pitestModule,
                 test,
-                jacoco,
                 nativeImage,
                 jfr,
-                pitest,
                 custom,
-                untested);
+                observers,
+                frameworks,
+                untested,
+                jacocoModule,
+                jacoco,
+                pitestModule,
+                pitest);
+    }
+
+    public InferredTestObservationModule observers(SequencedMap<String, ? extends BuildExecutorModule> observers) {
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                test,
+                nativeImage,
+                jfr,
+                custom,
+                PluginModule.plugins("observe", "ObservabilityFactory", observers),
+                frameworks,
+                untested,
+                jacocoModule,
+                jacoco,
+                pitestModule,
+                pitest);
+    }
+
+    public InferredTestObservationModule frameworks(SequencedMap<String, ? extends BuildExecutorModule> frameworks) {
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                test,
+                nativeImage,
+                jfr,
+                custom,
+                observers,
+                PluginModule.plugins("test", "TestFrameworkFactory", frameworks),
+                untested,
+                jacocoModule,
+                jacoco,
+                pitestModule,
+                pitest);
     }
 
     public InferredTestObservationModule untested(SequencedSet<String> untested) {
@@ -391,15 +364,55 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 pathPlacement,
                 moduleName,
                 testModule,
-                jacocoModule,
-                pitestModule,
                 test,
-                jacoco,
                 nativeImage,
                 jfr,
-                pitest,
                 custom,
-                untested);
+                observers,
+                frameworks,
+                untested,
+                jacocoModule,
+                jacoco,
+                pitestModule,
+                pitest);
+    }
+
+    public InferredTestObservationModule jacoco(boolean jacoco) {
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                test,
+                nativeImage,
+                jfr,
+                custom,
+                observers,
+                frameworks,
+                untested,
+                jacocoModule,
+                jacoco,
+                pitestModule,
+                pitest);
+    }
+
+    public InferredTestObservationModule pitest(boolean pitest) {
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                test,
+                nativeImage,
+                jfr,
+                custom,
+                observers,
+                frameworks,
+                untested,
+                jacocoModule,
+                jacoco,
+                pitestModule,
+                pitest);
     }
 
     public InferredTestObservationModule custom(String name, BuildExecutorModule module) {
@@ -417,6 +430,11 @@ public class InferredTestObservationModule implements BuildExecutorModule {
     }
 
     @Override
+    public Optional<String> resolve(String path) {
+        return PluginModule.exposed(Set.of(OBSERVERS, FRAMEWORKS), path);
+    }
+
+    @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
         Path described = BuildStep.locate(new LinkedHashSet<>(inherited.values()), BuildStep.MODULE);
         SequencedProperties description = described == null ? null : SequencedProperties.ofFiles(described);
@@ -425,15 +443,20 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         }
         SequencedMap<String, BuildExecutorModule> reports = new LinkedHashMap<>();
         List<ObservabilityEngine> engines = new ArrayList<>();
+        SequencedMap<String, PluginModule<?>> observers = new LinkedHashMap<>();
         Path coverage = BuildStep.locate(configuration, "jacoco.properties");
-        if (jacoco != null && coverage != null) {
-            BuildExecutorModule report = jacoco.apply(limited(jacocoModule.pinning(pinning), coverage));
-            if (report != null) {
-                JaCoCo engine = new JaCoCo();
-                engines.add(engine);
-                reports.put(engine.name(), report);
+        if (jacoco && coverage != null) {
+            if (this.observers.containsKey(JACOCO)) {
+                throw new IllegalArgumentException("The observer " + JACOCO + " takes the name of the plugin the"
+                        + " build runs by itself where jacoco.properties is found - remove its line from"
+                        + " jenesis.plugins.properties");
             }
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(coverage).forEachProperty(values::put);
+            ExternalModule module = jacocoModule.properties(values);
+            observers.put(JACOCO, module);
         }
+        observers.putAll(this.observers);
         if (nativeImage != null && BuildStep.locate(configuration, "graal.properties") != null) {
             BuildExecutorModule report = nativeImage.apply(new NativeImageAgentModule());
             if (report != null) {
@@ -450,28 +473,77 @@ public class InferredTestObservationModule implements BuildExecutorModule {
             }
         }
         if (test != null) {
+            Path declaration = BuildStep.locate(configuration, "test.properties");
             TestModule module = testModule.observe(engines)
                     .pinning(pinning)
                     .pathPlacement(pathPlacement)
                     .moduleName(moduleName == null && description != null ? description.getProperty("module") : moduleName);
-            BuildExecutorModule executed = test.apply(declared(module, BuildStep.locate(configuration, "test.properties")));
+            SequencedMap<String, TestFramework> unloaded = new LinkedHashMap<>();
+            frameworks.keySet().forEach(name -> unloaded.put(name, null));
+            BuildExecutorModule executed = test.apply(declared(module, declaration, unloaded));
             if (executed != null) {
-                buildExecutor.addModule(TEST, executed, inherited.sequencedKeySet().stream().filter(identity ->
-                        untested.stream().noneMatch(input -> identity.equals(PREVIOUS + input)
-                                || identity.startsWith(PREVIOUS + input + "/"))));
+                SequencedSet<String> testInputs = inherited.sequencedKeySet().stream()
+                        .filter(identity -> untested.stream().noneMatch(input -> identity.equals(PREVIOUS + input)
+                                || identity.startsWith(PREVIOUS + input + "/")))
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
                 SequencedSet<String> reportInputs = new LinkedHashSet<>();
                 reportInputs.add(TEST);
                 reportInputs.addAll(inherited.sequencedKeySet());
+                if (observers.isEmpty() && frameworks.isEmpty()) {
+                    buildExecutor.addModule(TEST, executed, testInputs);
+                } else {
+                    Map<String, Observation> observations = new ConcurrentHashMap<>();
+                    for (Map.Entry<String, ? extends SequencedMap<String, ? extends PluginModule<?>>> plugins : List.of(
+                            Map.entry(OBSERVERS, observers),
+                            Map.entry(FRAMEWORKS, frameworks))) {
+                        if (!plugins.getValue().isEmpty()) {
+                            buildExecutor.addModule(plugins.getKey(), (nested, nestedInherited) -> plugins.getValue()
+                                    .forEach((name, plugin) -> nested.addModule(name,
+                                            plugin.preparation(),
+                                            nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());
+                            testInputs.add(plugins.getKey());
+                        }
+                    }
+                    buildExecutor.addModule(TEST, (tested, testInherited) -> {
+                        List<ObservabilityEngine> observed = new ArrayList<>(engines);
+                        for (Map.Entry<String, PluginModule<?>> observer : observers.entrySet()) {
+                            observed.add(observation(observations, observer, testInherited).engine());
+                        }
+                        SequencedMap<String, TestFramework> loaded = new LinkedHashMap<>();
+                        for (Map.Entry<String, PluginModule<?>> framework : frameworks.entrySet()) {
+                            loaded.put(framework.getKey(),
+                                    framework.getValue().framework(PluginModule.prepared(FRAMEWORKS, framework.getKey(), testInherited)));
+                        }
+                        BuildExecutorModule observing = test.apply(declared(module.observe(observed)
+                                .frameworks(List.copyOf(loaded.values())), declaration, loaded));
+                        if (observing != null) {
+                            observing.accept(tested, PluginModule.unprepared(Set.of(OBSERVERS, FRAMEWORKS), testInherited));
+                        }
+                    }, testInputs);
+                    if (!observers.isEmpty()) {
+                        SequencedSet<String> observationInputs = new LinkedHashSet<>(reportInputs);
+                        observationInputs.add(OBSERVERS);
+                        buildExecutor.addModule(OBSERVATIONS, (nested, nestedInherited) -> {
+                            for (Map.Entry<String, PluginModule<?>> observer : observers.entrySet()) {
+                                nested.addModule(observer.getKey(), (reported, reportInherited) -> {
+                                    BuildExecutorModule report = observation(observations, observer, reportInherited).report();
+                                    if (report != null) {
+                                        report.accept(reported, PluginModule.unprepared(Set.of(OBSERVERS, FRAMEWORKS), reportInherited));
+                                    }
+                                }, nestedInherited.sequencedKeySet());
+                            }
+                        }, observationInputs);
+                    }
+                }
                 reports.forEach((name, report) -> buildExecutor.addModule(name, report, reportInputs));
             }
         }
         Path mutation = BuildStep.locate(configuration, "pitest.properties");
-        Bind.configuredByProperties(buildExecutor,
-                inherited.sequencedKeySet(),
-                MUTATE,
-                pitest,
-                mutation,
-                properties -> mutating(pitestModule.pinning(pinning), properties, mutation));
+        if (mutation != null && pitest) {
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(mutation).forEachProperty(values::put);
+            buildExecutor.addModule(MUTATE, pitestModule.properties(values), inherited.sequencedKeySet());
+        }
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
                     nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());

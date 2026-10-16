@@ -23,13 +23,14 @@ public class PinModuleInfoTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, input;
+    private Path previous, next, supplement, persistent, input;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         input = Files.createDirectory(root.resolve("input"));
     }
 
@@ -97,7 +98,7 @@ public class PinModuleInfoTest {
         configurator.apply(PinModuleInfo.ofEnvironment(new Environment(settings), "module", "", List.of(moduleInfo), new HashDigestFunction("SHA-256"))
                         .platform(platform))
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                                 input,
                                 Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
@@ -731,6 +732,30 @@ public class PinModuleInfoTest {
         writeIdentity(Map.of("module/internal/1.0", ""));
         String result = run(file);
         assertThat(result).doesNotContain("@jenesis.pin internal");
+        assertInsideJavadoc(result, "@jenesis.pin external 2.0");
+    }
+
+    @Test
+    public void keeps_a_pin_that_selects_a_classifier_of_a_module_the_build_builds() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.pin internal :platform-a
+                 */
+                module foo {
+                  requires internal;
+                  requires external;
+                }
+                """);
+        writeResolved(new LinkedHashMap<>(Map.of(
+                "module/internal-platform-a", "1.0",
+                "module/external", "2.0")));
+        writeIdentity(Map.of("module/internal/1.0", "", "module/internal-platform-a/1.0", ""));
+        String result = run(file);
+        assertThat(result)
+                .as("pin resolves no module the build builds, so what selects one is the author's and stays as written")
+                .contains("@jenesis.pin internal :platform-a")
+                .doesNotContain("@jenesis.pin internal :platform-a:");
         assertInsideJavadoc(result, "@jenesis.pin external 2.0");
     }
 

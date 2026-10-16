@@ -26,23 +26,29 @@ How the grammar is wired
 
 Three things turn ANTLR on, and none of them is a build script.
 
-The grammar lives where every generator reads its input, under the module's
-`META-INF/build.jenesis` folder:
+`jenesis.plugins.properties` names the ANTLR plugin at the hook point
+`binary/generated`, whose sources the module compiles with its own:
+
+    antlr+binary/generated=build.jenesis.plugin.antlr
+
+The grammar lives in the module's `META-INF/build.jenesis` folder, which keeps it
+out of the jar:
 
     sources/META-INF/build.jenesis/Calc.g4
 
-An `antlr.properties` in the configuration folder activates the generator and
-names the package the parser lands in:
+A `plugin-antlr.properties` in the configuration folder binds that folder as the
+plugin's grammars and names the package the parser lands in:
 
     package=demo.antlr.calc
     arguments=-visitor -no-listener
+    @grammars/antlr=META-INF/build.jenesis
 
 `package` is passed to ANTLR as `-package` and also decides where the generated
 files are written, so `demo/antlr/calc/CalcParser.java` compiles like any other
 source of the module. `arguments` is handed to the tool verbatim - here asking
-for a visitor and no listener. Both keys are optional; an empty file generates
-into the default package with ANTLR's own defaults. The third key, `folders`,
-names other folders to read the grammars from.
+for a visitor and no listener. Both keys are optional. The binding places the
+folder, relative to the module, as `antlr/` of the input `grammars`, the folder
+the plugin reads every `.g4` from.
 
 The module declares only the ANTLR *runtime* the generated code calls into:
 
@@ -55,7 +61,7 @@ The module declares only the ANTLR *runtime* the generated code calls into:
 The ANTLR *tool* is not a dependency of the module. It resolves in its own
 `antlr` group, pinned separately by the `pin` goal:
 
-    @jenesis.pin antlr/maven/org.antlr/antlr4 4.13.2 SHA-256/e6f0b10...
+    @jenesis.pin antlr:tool/maven/org.antlr/antlr4 4.13.2 SHA-256/e6f0b10...
     @jenesis.pin org.antlr.antlr4.runtime 4.13.2 SHA-256/dd3e8a1...
 
 so upgrading the parser generator never moves the runtime your program links
@@ -76,8 +82,8 @@ reach the jar:
     demo/antlr/calc/CalcBaseVisitor.class
     demo/antlr/Calculator.class
 
-Turn it off with `-Djenesis.generate.antlr=false`, the same way every other
-generator is opted out.
+Turn it off with `-Djenesis.plugin.antlr=false`, the same way every other
+plugin is left out.
 
 In the editor
 -------------

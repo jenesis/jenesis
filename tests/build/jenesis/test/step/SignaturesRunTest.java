@@ -27,7 +27,7 @@ public class SignaturesRunTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, input, home, vault, jar, detached;
+    private Path previous, next, supplement, persistent, input, home, vault, jar, detached;
     private String fingerprint;
 
     static boolean gpgAvailable() {
@@ -55,6 +55,7 @@ public class SignaturesRunTest {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         input = Files.createDirectory(root.resolve("input"));
         home = Files.createDirectory(root.resolve("gnupg"));
         vault = Files.createDirectory(root.resolve("keys"));
@@ -159,7 +160,7 @@ public class SignaturesRunTest {
                 .verification(Verification.DECLARED)
                 .expiry(expiry)
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                                 input,
                                 Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
@@ -225,7 +226,7 @@ public class SignaturesRunTest {
                 .verification(Verification.DECLARED)
                 .factory(ProcessHandler.OfProcess.of(emitting))
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                                 input,
                                 Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
@@ -244,7 +245,7 @@ public class SignaturesRunTest {
                 .verification(Verification.DECLARED)
                 .command(wrapper.toAbsolutePath().toString())
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                                 input,
                                 Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
@@ -262,7 +263,7 @@ public class SignaturesRunTest {
         assertThatCode(() -> new Signatures(serving(vaulted(Files.createDirectory(root.resolve("bare")))))
                 .verification(Verification.DECLARED)
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                                 input,
                                 Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
@@ -283,7 +284,7 @@ public class SignaturesRunTest {
         assertThatCode(() -> new Signatures(serving(vaulted(armoured)))
                 .verification(Verification.DECLARED)
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                                 input,
                                 Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))

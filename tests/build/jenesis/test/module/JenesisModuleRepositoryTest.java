@@ -387,6 +387,21 @@ public class JenesisModuleRepositoryTest {
     }
 
     @Test
+    public void serves_a_module_of_a_folder_as_local_rather_than_built_by_this_build() throws IOException {
+        Path versionDir = Files.createDirectories(root.resolve("build.jenesis/1.0.0"));
+        Files.writeString(versionDir.resolve("build.jenesis.jar"), "v1-classes");
+
+        RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
+                .fetch(Runnable::run, "build.jenesis/1.0.0")
+                .orElseThrow();
+
+        assertThat(item.local())
+                .as("a module exported into a folder is pinned and checked as one cached from a remote is")
+                .isTrue();
+        assertThat(item.internal()).isFalse();
+    }
+
+    @Test
     public void fetches_versioned_module_from_version_subdirectory() throws IOException {
         Path versionDir = Files.createDirectories(root.resolve("build.jenesis/1.0.0"));
         Files.writeString(versionDir.resolve("build.jenesis.jar"), "v1-classes");

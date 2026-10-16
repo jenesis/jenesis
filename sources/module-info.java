@@ -19,7 +19,10 @@ module build.jenesis {
     exports build.jenesis.project;
     exports build.jenesis.step;
 
-    uses build.jenesis.BuildExecutorModule;
+    uses build.jenesis.BuildModuleFactory;
+    uses build.jenesis.ObservabilityFactory;
+    uses build.jenesis.TestFrameworkFactory;
+    uses build.jenesis.LanguageFactory;
 
     provides java.util.spi.ToolProvider with build.jenesis.MakeTool,
             build.jenesis.ExecuteTool,

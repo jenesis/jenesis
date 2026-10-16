@@ -12,20 +12,20 @@ import build.jenesis.BuildStepHashFunction;
 import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.ObservabilityEngine;
 import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.TestFramework;
+import build.jenesis.TestTags;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.JUnit4;
 import build.jenesis.project.JUnitPlatform;
-import build.jenesis.project.JaCoCo;
 import build.jenesis.project.Jfr;
-import build.jenesis.project.TestFramework;
 import build.jenesis.project.TestModule;
 import build.jenesis.project.TestNG;
-import build.jenesis.project.TestTags;
 import build.jenesis.step.Javac;
 import java.lang.classfile.ClassFile;
 import java.lang.classfile.attribute.ModuleAttribute;
@@ -35,6 +35,7 @@ import javax.tools.ToolProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 public class TestModuleTest {
 
@@ -186,36 +187,50 @@ public class TestModuleTest {
     }
 
     @Test
-    public void a_failed_run_names_its_failed_tests_even_when_the_tests_swallow_the_output() throws IOException {
-        compileSource(classes.resolve(Javac.CLASSES + "sample"), "SilentTest", """
+    public void a_failed_run_prints_the_runner_output_and_names_its_reports_only_where_they_are_kept() throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"),
+                "BrokenTest", """
                 package sample;
-                public class SilentTest {
-                    @org.junit.jupiter.api.BeforeAll
-                    public static void silence() throws java.io.IOException {
-                        new java.io.FileOutputStream(java.io.FileDescriptor.out).close();
-                    }
+                public class BrokenTest {
                     @org.junit.jupiter.api.Test
                     public void fails() { throw new AssertionError("broken"); }
-                    @org.junit.jupiter.api.Test
-                    public void passes() { }
                 }
-                """, bootModuleJars());
-        BuildExecutor executor = newExecutor();
-        executor.addSource("dependencies", dependencies);
-        executor.addSource("classes", classes);
-        executor.addModule(
-                "test",
-                TestModule.ofEnvironment(new Environment(settings),
-                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
-                        .isTest(candidate -> candidate.endsWith("SilentTest")).jarsOnly(false),
-                "dependencies", "classes");
-        assertThatThrownBy(executor::execute)
-                .rootCause()
-                .as("the reports the runner writes name what failed whatever reached the console")
-                .hasMessageContaining("1 test failed")
-                .hasMessageContaining(":\n  sample.SilentTest#fails()\nTo reproduce")
-                .hasMessageNotContaining("passes()");
+                """,
+                bootModuleJars());
+        for (boolean reporting : List.of(false, true)) {
+            BuildExecutor executor = newExecutor();
+            executor.addSource("dependencies", dependencies);
+            executor.addSource("classes", classes);
+            executor.addModule(
+                    "test",
+                    TestModule.ofEnvironment(new Environment(settings),
+                            Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                            Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                            .isTest(candidate -> candidate.endsWith("BrokenTest")).jarsOnly(false).reporting(reporting),
+                    "dependencies",
+                    "classes");
+            Throwable failure = catchThrowable(executor::execute);
+            assertThat(failure)
+                    .as("the runner names the failed test in the output the failure prints, reports or not")
+                    .hasStackTraceContaining("fails()")
+                    .hasStackTraceContaining("broken");
+            Throwable cause = failure;
+            while (cause.getCause() != null) {
+                cause = cause.getCause();
+            }
+            if (reporting) {
+                String named = cause.getMessage().lines()
+                        .filter(line -> line.startsWith("The reports of the test run are in "))
+                        .findFirst()
+                        .orElseThrow()
+                        .substring("The reports of the test run are in ".length());
+                assertThat(Path.of(named).resolve("TEST-junit-jupiter.xml"))
+                        .as("the folder named is where the failed run's reports are kept")
+                        .isRegularFile();
+            } else {
+                assertThat(cause).hasMessageNotContaining("The reports of the test run are in");
+            }
+        }
     }
 
     @Test
@@ -1031,7 +1046,7 @@ public class TestModuleTest {
         assertThat(printed)
                 .as("a test folder the module does not name is not compiled, which the report makes visible")
                 .anyMatch(line -> line.contains("tests ran no test, as no class among the 1 classes compiled from"
-                        + " impl/src/test/java") && line.contains("src/test/groovy"));
+                        + " impl/src/test/java") && line.contains("jenesis.maven.sources"));
     }
 
     @Test
@@ -1473,23 +1488,24 @@ public class TestModuleTest {
                 "test",
                 TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
-                        .observe(new JaCoCo())
+                        .observe(new Agent())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
-                "dependencies", "classes");
+                "dependencies",
+                "classes");
         executor.execute("test/" + "resolved");
 
         assertThat(readRequires(root.resolve("test").resolve("resolved")).stringPropertyNames())
                 .containsExactlyInAnyOrder(
                         "main/runtime/maven/org.junit.platform/junit-platform-console",
-                        "jacoco/runtime/maven/org.jacoco/org.jacoco.agent/jar/runtime/RELEASE");
+                        "jacoco:agent/runtime/maven/org.jacoco/org.jacoco.agent/jar/runtime/RELEASE");
     }
 
     @Test
     public void an_observability_agent_follows_the_release_its_engine_pins() throws IOException {
         SequencedProperties versions = new SequencedProperties();
-        versions.setProperty("jacoco/maven/org.ow2.asm/asm", "9.7");
-        versions.setProperty("jacoco/maven/org.jacoco/org.jacoco.cli", "0.8.12 SHA-256/0000");
+        versions.setProperty("jacoco:tool/maven/org.ow2.asm/asm", "9.7");
+        versions.setProperty("jacoco:tool/maven/org.jacoco/org.jacoco.cli", "0.8.12 SHA-256/0000");
         versions.store(emptyDependencies.resolve(BuildStep.VERSIONS));
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", emptyDependencies);
@@ -1498,15 +1514,16 @@ public class TestModuleTest {
                 "test",
                 TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
-                        .observe(new JaCoCo())
+                        .observe(new Agent())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
-                "dependencies", "classes");
+                "dependencies",
+                "classes");
         executor.execute("test/" + "resolved");
 
         assertThat(readRequires(root.resolve("test").resolve("resolved")).stringPropertyNames())
-                .as("the agent writes what the report reads, so it takes the release of the tool its group pins")
-                .contains("jacoco/runtime/maven/org.jacoco/org.jacoco.agent/jar/runtime/0.8.12");
+                .as("the agent writes what the report reads, so it takes the release of the tool its plugin pins")
+                .contains("jacoco:agent/runtime/maven/org.jacoco/org.jacoco.agent/jar/runtime/0.8.12");
     }
 
     @Test
@@ -2097,5 +2114,25 @@ public class TestModuleTest {
             }
         }
         return new ArrayList<>(jars);
+    }
+
+    private record Agent() implements ObservabilityEngine {
+
+        @Override
+        public String name() {
+            return "jacoco";
+        }
+
+        @Override
+        public SequencedMap<String, String> coordinates() {
+            SequencedMap<String, String> coordinates = new LinkedHashMap<>();
+            coordinates.put("maven/org.jacoco/org.jacoco.agent/jar/runtime", "RELEASE");
+            return coordinates;
+        }
+
+        @Override
+        public List<String> commands(SequencedMap<String, Path> resolved, Path output) {
+            return List.of();
+        }
     }
 }

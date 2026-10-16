@@ -1,13 +1,15 @@
 Java code-quality demo
 ======================
 
-Wire the inferred code-quality tools into a single modular Java project. There
-is no build script and no plugin to configure: a tool turns itself on when its
-configuration file is present in the `build.jenesis/` configuration directory. This demo ships eight of them,
-so Checkstyle and PMD lint the sources, SpotBugs analyses the compiled classes,
-forbiddenapis looks for calls the project forbids in them, the JDK's jdeps and
+Wire code-quality tools into a single modular Java project. There is no build
+script: a tool of the build turns itself on when its configuration file is present
+in the `build.jenesis/` configuration directory, and a plugin runs where
+`jenesis.plugins.properties` names it and its `plugin-<name>.properties` is
+found there. This demo ships eight tools, so the Checkstyle and PMD plugins lint
+the sources, the SpotBugs plugin analyses the compiled classes, the
+forbiddenapis plugin looks for calls the project forbids in them, the JDK's jdeps and
 jdeprscan for JDK internals and APIs scheduled for removal,
-`google-java-format` verifies the source layout, and every source is checked
+the google-java-format plugin verifies the source layout, and every source is checked
 for the project's license header. Each tool resolves in its own group,
 independently of the module's own dependencies (here, none).
 
@@ -36,18 +38,23 @@ The configuration files sit in the *configuration directory*, which defaults to
 
     demo/demo-37-java-quality
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
-    |-- checkstyle.xml             activates Checkstyle (lints sources)
-    |-- checkstyle.properties      the ${...} properties checkstyle.xml names
-    |-- pmd.xml                    activates PMD (lints sources)
-    |-- spotbugs-exclude.xml       activates SpotBugs (analyses classes)
-    |-- forbiddenapis.properties   activates forbiddenapis (checks classes for forbidden calls)
+    |-- jenesis.plugins.properties names the Checkstyle, PMD and formatter plugins
+    |-- jenesis-eclipse.properties the eclipse profile's settings: no google-java-format
+    |-- build.jenesis/
+    |   |-- plugin-checkstyle.properties  binds checkstyle.xml, and its ${...} properties
+    |   |-- checkstyle.xml         the Checkstyle configuration
+    |   |-- plugin-pmd.properties  binds pmd.xml
+    |   |-- pmd.xml                the PMD rule set
+    |-- plugin-spotbugs.properties binds spotbugs-exclude.xml
+    |-- spotbugs-exclude.xml       the SpotBugs filter
+    |-- plugin-forbiddenapis.properties  forbiddenapis's signatures, binding the file below
     |-- forbidden-signatures.txt   the project's own forbidden calls
     |-- jdeps.properties           activates jdeps (JDK internal APIs the classes use)
     |-- jdeprscan.properties       activates jdeprscan (APIs deprecated for removal)
-    |-- javaformat.properties      selects the Java formatter (google) and its options
+    |-- plugin-googlejavaformat.properties  google-java-format's options
     |-- licenseheader.properties   the license header every source starts with
     |-- eclipse/
-    |   |-- javaformat.properties  selects the Eclipse formatter, under a profile
+    |   |-- plugin-eclipse.properties  runs the Eclipse formatter, under a profile
     |   `-- eclipse-formatter.xml  the formatter profile Eclipse exports
     |-- spdx/
     |   `-- licenseheader.properties  no text: the header is derived, under a profile
@@ -60,54 +67,50 @@ The configuration files sit in the *configuration directory*, which defaults to
 How Jenesis infers the tools
 ----------------------------
 
-Each tool is inferred from the presence of its configuration file, never from a
-build script:
+Each tool of the build is inferred from the presence of its configuration file,
+never from a build script:
 
-    checkstyle.xml          -> Checkstyle
-    pmd.xml                 -> PMD
-    spotbugs-exclude.xml    -> SpotBugs
-    forbiddenapis.properties -> forbiddenapis
     jdeps.properties        -> jdeps
     jdeprscan.properties    -> jdeprscan
-    scalastyle-config.xml   -> Scalastyle, and so on for the other languages
 
-Jenesis binds the matched file from the configuration directory into the build
-graph so the tool finds it. That binding is what lets a root-level filter reach
-SpotBugs, which runs *after* `javac` and so only ever sees compiled classes, not
-the configuration directory. The Java formatter is selected by a `javaformat.properties` file
-naming the formatter, with its options beside it:
+Checkstyle and PMD are plugins. `jenesis.plugins.properties` names each at the
+hook point `check`, which runs it beside the module's own checks:
 
-    formatter=google
-    reflow=false
+    checkstyle+check=build.jenesis.plugin.checkstyle
+    pmd+check=build.jenesis.plugin.pmd
 
-`formatter=palantir` selects the Palantir formatter instead, and
-`formatter=eclipse` the Eclipse formatter; without the file, no Java formatter
-runs. The options are the formatter's own, handed to it as it expects them:
+SpotBugs and forbiddenapis read the compiled classes, at the hook point
+`binary/validate`:
 
-    style=google|aosp     google-java-format's style, AOSP indenting by four
-    reflow=false          leaves a string past the line limit as it is, as
-                          Spotless's googleJavaFormat() does unless told otherwise
-    javadoc=false         leaves Javadoc as it is (google-java-format only)
-    imports=sort,remove   what is done to the imports: sort, remove the unused
-                          ones, both (the default), or none
-    profile=<file>        the formatter profile Eclipse exports (eclipse only),
-                          beside or below javaformat.properties
+    spotbugs+binary/validate=build.jenesis.plugin.spotbugs
+    forbiddenapis+binary/validate=build.jenesis.plugin.forbiddenapis
 
-A key the selected formatter does not take fails the build, naming the keys it
-does take, and a changed option verifies every source again.
+The Java formatters are plugins as well, at the hook point `format`:
+
+    googlejavaformat+format=build.jenesis.plugin.googlejavaformat
+    eclipse+format=build.jenesis.plugin.eclipse
+
+A plugin runs in a module where its `plugin-<name>.properties` is found, and that
+file binds what the tool reads. `@rules=<path>` hands the file at the path,
+relative to the module's folder, to the plugin's input `rules`:
+
+    @rules=../build.jenesis/pmd.xml
+
+That binding is what lets a filter of the configuration directory reach SpotBugs,
+which runs *after* `javac` and so only ever sees compiled classes.
 
 A discovered tool can be switched off without deleting its configuration file
 through its property, so file discovery alone decides until the property says
-otherwise. A linter's property is `report` by default, and `ignore` skips it; a
-formatter's is `true` by default, and `false` skips it:
+otherwise. A linter's property is `report` by default, and `ignore` skips it; the
+license header check's is `true` by default, and `false` skips it:
 
-    jenesis.source.<tool>        Checkstyle, PMD, Detekt, Ktlint, Scalastyle, Scalafmt, CodeNarc
+    jenesis.source.<tool>        the plugins Checkstyle, PMD, detekt, ktlint, Scalastyle, scalafmt, CodeNarc
     jenesis.validator.<tool>     SpotBugs, forbiddenapis, jdeps, jdeprscan
-    jenesis.format.<tool>        the Java / Ktlint / Ktfmt / Scalafmt formatters
     jenesis.format.license       the license header check
 
 For example `-Djenesis.source.checkstyle=ignore` keeps `checkstyle.xml` in place
-but skips Checkstyle, while PMD and SpotBugs still run.
+but skips Checkstyle, while PMD and SpotBugs still run, as
+`-Djenesis.plugin.checkstyle=false` leaves out any plugin.
 
 Per-module configuration
 ------------------------
@@ -132,26 +135,27 @@ module purely from its own location.
 Where the tools run and what they produce
 -----------------------------------------
 
-Checkstyle and PMD run on the sources, in parallel with compilation. SpotBugs,
-forbiddenapis, jdeps and jdeprscan are *validators* in the Java toolchain: they run
-once the classes exist. Each tool
+Every linter runs in the module's `verify` phase, which starts once the module is
+built, while the modules that depend on it build and test without waiting for it:
+Checkstyle and PMD read the sources, and SpotBugs, forbiddenapis, jdeps and
+jdeprscan are *validators* that read the compiled classes. Each tool
 writes an XML report into a `reports/<tool>/` subfolder of its step's output, for
 example:
 
-    target/build/.../assemble/check/checkstyle/check/output/reports/checkstyle/checkstyle-report.xml
-    target/build/.../assemble/check/pmd/check/output/reports/pmd/pmd-report.xml
-    target/build/.../assemble/binary/validate/spotbugs/check/output/reports/spotbugs/spotbugs-report.xml
-    target/build/.../assemble/binary/validate/forbiddenapis/tool/check/output/reports/forbiddenapis/forbiddenapis.txt
+    target/build/.../verify-module-sources/check/custom/checkstyle/delegate/check/output/reports/checkstyle/checkstyle-report.xml
+    target/build/.../verify-module-sources/check/custom/pmd/delegate/check/output/reports/pmd/pmd-report.xml
+    target/build/.../verify-module-sources/validate/custom/spotbugs/delegate/check/output/reports/spotbugs/spotbugs-report.xml
+    target/build/.../verify-module-sources/validate/custom/forbiddenapis/delegate/check/output/reports/forbiddenapis/forbiddenapis.txt
 
 A `stage` build collects every report from every module into one place, each kind
-in its own subfolder: `target/stage/reports/<kind>/<module>/`, for example
-`target/stage/reports/checkstyle/sources/checkstyle-report.xml`.
+in its own subfolder: `target/stage/reports/output/<kind>/<module>/`, for example
+`target/stage/reports/output/checkstyle/sources/checkstyle-report.xml`.
 
 By default the linters are report-only: they record findings but do not fail the
 build. A linter that found something says so in one line of the build's output,
 with the number of findings and where its report is:
 
-    [FINDINGS] checkstyle found 2 findings, reported in target/build/.../checkstyle/check/output/reports/checkstyle/checkstyle-report.xml
+    [FINDINGS] checkstyle found 2 findings, reported in target/build/.../checkstyle/delegate/check/output/reports/checkstyle/checkstyle-report.xml
 
 `-Djenesis.print.findings=false` leaves that line out. To turn findings into a
 build failure, set the tool's property to `strict`, on the command line or in
@@ -162,59 +166,94 @@ Checkstyle, PMD, detekt, ktlint, Scalastyle and scalafmt fail as their own exit
 code decides, so a Checkstyle finding at severity `warning` is reported but does
 not fail the build; SpotBugs, CodeNarc, forbiddenapis, jdeps and jdeprscan fail on any finding their
 report holds.
-When wiring a tool yourself, `.strict(true)` on its module does the same.
 Report-only covers findings, not a tool that never ran: a linter that fails on
 its own configuration, and so writes no complete report, fails its step either
 way.
 
 Checkstyle reads `${config_loc}` as the folder of `checkstyle.xml`, as the Maven
 and Gradle plugins define it. A file the configuration names as
-`${config_loc}/<path>`, such as a suppressions file beside it, is handed to
-Checkstyle with it and re-runs the check when it changes; any other file of the
-configuration directory is not. Every other `${<property>}` the configuration
-names is a line of a `checkstyle.properties` beside it, which takes the place of
-the Maven plugin's `propertyExpansion` and Gradle's `configProperties`; without
-one Checkstyle fails to load the configuration. Here `checkstyle.xml` sets its
-severity to `${checkstyle.severity}`, which the file names as `warning`.
-`config_loc` is the one property the file cannot set.
+`${config_loc}/<path>`, such as a suppressions file beside it, is bound into the
+same input, as `@rules/suppressions.xml=<path>`, and re-runs the check when it
+changes. Every other `${<property>}` the configuration names is a line of
+`plugin-checkstyle.properties`, which takes the place of the Maven plugin's
+`propertyExpansion` and Gradle's `configProperties`; without one Checkstyle fails
+to load the configuration. Here `checkstyle.xml` sets its severity to
+`${checkstyle.severity}`, which the file names as `warning`:
+
+    @rules=../build.jenesis/checkstyle.xml
+    checkstyle.severity=warning
+
+`config_loc` is the one property the file cannot set. A value `@<key>` stands
+for the setting `-Djenesis.variable.<key>`, `@<key>/<default>` gives it a
+default, and `@@` writes a literal `@`.
+
+One configuration can be shared by several projects. A bound file may lie
+outside the project, and `@rules/checkstyle.xml=<path>` hands it to Checkstyle
+as `checkstyle.xml` whatever it is called:
+
+    mkdir ../shared
+    mv build.jenesis/checkstyle.xml ../shared/company.xml
+    sed -i "s#^@rules=.*#@rules/checkstyle.xml=../../shared/company.xml#" build.jenesis/plugin-checkstyle.properties
 
 Formatting: verify, and how to reformat
 ---------------------------------------
 
-The Java formatter is wired in *verify* mode. It never rewrites your sources
-during a normal build; instead it fails the build when a file is not already
-formatted, which makes it a continuous-integration gate. Try it by indenting
-`Sample.java` with spare spaces and rebuilding: the `format` step fails.
+The google-java-format plugin is wired in *verify* mode. It never rewrites your
+sources during a normal build; instead it fails the build when a file is not
+already formatted, which makes it a continuous-integration gate. Try it by
+indenting `Sample.java` with spare spaces and rebuilding: the `format` step fails.
+
+Its `plugin-googlejavaformat.properties` holds the formatter's own options:
+
+    style=google|aosp     google-java-format's style, AOSP indenting by four
+    reflow=false          leaves a string past the line limit as it is, as
+                          Spotless's googleJavaFormat() does unless told otherwise
+    javadoc=false         leaves Javadoc as it is
+    imports=sort,remove   what is done to the imports: sort, remove the unused
+                          ones, both (the default), or none
+
+A key the formatter does not take fails the build, naming the keys it does take,
+and a changed option verifies every source again. The Palantir plugin,
+`palantir+format=build.jenesis.plugin.palantir`, takes `reflow` and `imports`
+alike.
 
 To apply the formatter and rewrite the sources in place, run the build with the
 rewrite switch:
 
     java -Djenesis.format.rewrite=true build/jenesis/Make.java
 
-The same switch drives `ktlint` and `scalafmt` in the language demos. After a
-rewrite, a plain `java build/jenesis/Make.java` passes the verify gate again.
+The same switch drives the ktlint and scalafmt plugins in the language demos.
+After a rewrite, a plain `java build/jenesis/Make.java` passes the verify gate
+again.
 
-The `eclipse` profile formats with the Eclipse formatter instead: its
-`build.jenesis/eclipse/` folder holds a `javaformat.properties` naming
-`formatter=eclipse` and the formatter profile, which here indents by two spaces,
-so the same source passes it:
+The `eclipse` profile formats with the Eclipse formatter instead. Its
+`build.jenesis/eclipse/` folder holds a `plugin-eclipse.properties`, which binds
+the formatter profile Eclipse exports, here indenting by two spaces, so the same
+source passes it:
+
+    @profile/eclipse-formatter.xml=../build.jenesis/eclipse/eclipse-formatter.xml
+
+Two formatters would fight over the same sources, so `jenesis-eclipse.properties`
+switches google-java-format off under the profile with
+`jenesis.plugin.googlejavaformat=false`:
 
     java -Djenesis.make.profiles=eclipse build/jenesis/Make.java
 
 The formatter runs from `org.eclipse.jdt.core` in a plain JVM, with no Eclipse
 installation. It reads the newest Java its release knows, whatever compiler
 level an exported profile names. Moving the profile file changes nothing, as
-long as `profile=` follows it; editing a setting in it verifies every source
+long as the binding follows it; editing a setting in it verifies every source
 again.
 
 Forbidden APIs
 --------------
 
-A `forbiddenapis.properties` checks the compiled classes, the tests' included,
-for calls the project forbids:
+The forbiddenapis plugin checks the compiled classes, the tests' included, for
+calls the project forbids. Its `plugin-forbiddenapis.properties` names them:
 
     bundled=jdk-unsafe,jdk-deprecated,jdk-non-portable,jdk-system-out
     signatures=forbidden-signatures.txt
+    @signatures=../build.jenesis/forbidden-signatures.txt
 
 `bundled` names signatures forbiddenapis ships: `jdk-unsafe` forbids calls that
 depend on the default locale, charset or time zone, `jdk-deprecated` deprecated
@@ -222,8 +261,8 @@ APIs, `jdk-non-portable` the JDK's internals and `jdk-system-out` printing to
 the console. `jdk-unsafe`, `jdk-deprecated` and `jdk-internal` take the Java
 release the classes are compiled for, as `jdk-unsafe-25`; the build appends it
 where the name leaves it out. `signatures` names files of the project's own
-signatures, beside or below the properties file, written as forbiddenapis reads
-them:
+signatures, each bound into the input `signatures` by a line of its own, written
+as forbiddenapis reads them:
 
     @defaultMessage Name a thread: an unnamed one is hard to tell apart in a thread dump
     java.lang.Thread#<init>(java.lang.Runnable)
@@ -302,16 +341,17 @@ the same sources on every day it runs:
 
     java -Djenesis.format.rewrite=true build/jenesis/Make.java
 
-`-Djenesis.format.license=false` skips the check, as `jenesis.format.java=false`
-skips the formatter.
+`-Djenesis.format.license=false` skips the check, as
+`jenesis.plugin.googlejavaformat=false` skips the formatter.
 
 Pinning
 -------
 
-Each tool resolves in its own group (`checkstyle`, `pmd`, `spotbugs`,
-`forbiddenapis`, `google-java-format`, and `eclipse-java-format` under the `eclipse` profile),
-kept separate from the module's `main`-group dependencies, and floats a
-`RELEASE` version until pinned. The license header check, jdeps and jdeprscan need no tool. The `dependencies`
+Each tool resolves in its own group (`checkstyle:tool`, `pmd:tool`, `spotbugs:tool`,
+`forbiddenapis:tool`, `googlejavaformat:tool`, and `eclipse:tool` under the `eclipse`
+profile), kept separate from the module's `main`-group dependencies, and floats a
+`RELEASE` version until pinned; a plugin's own jars are pinned apart, in the group
+of its name. The license header check, jdeps and jdeprscan need no tool. The `dependencies`
 selector therefore shows none of them as a dependency of the module;
 `-Djenesis.tree.tools=true` prints each tool's closure apart, under a heading
 naming its group. Running

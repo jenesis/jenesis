@@ -10,19 +10,19 @@ public enum Pinning {
 
     IGNORE;
 
-    private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<Integer, Permits> PERMITS = new ConcurrentHashMap<>();
 
-    public static Semaphore permits() {
+    public static Permits permits() {
         return permits(Environment.NONE);
     }
 
-    public static Semaphore permits(Environment environment) {
+    public static Permits permits(Environment environment) {
         int concurrency = environment.number("pin.concurrency",
                                              Runtime.getRuntime().availableProcessors());
         if (concurrency < 0) {
             throw new IllegalArgumentException("Pin concurrency must not be negative: " + concurrency);
         }
-        return concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Semaphore::new);
+        return concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Permits::of);
     }
 
     public static Pinning ofEnvironment(Environment environment) {

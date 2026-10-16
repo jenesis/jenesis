@@ -330,21 +330,87 @@ public class ProjectPluginsTest {
     }
 
     @Test
-    public void hands_an_exporter_what_its_module_depends_on() {
-        buildExecutor.addModule("export",
-                new ProjectPlugins().export("publish", new RequireFile("app.jar")).export(new LinkedHashSet<>()),
-                "build");
-
-        assertThat(buildExecutor.execute("export").keySet()).anyMatch(key -> key.startsWith("export/custom/publish"));
-    }
-
-    @Test
     public void hands_a_releaser_what_its_module_depends_on() {
         buildExecutor.addModule("release",
-                new ProjectPlugins().release("announce", new RequireFile("app.jar")).release(new LinkedHashSet<>()),
+                new ProjectPlugins().release("announce", new RequireFile("app.jar")).release(new LinkedHashSet<>(), root),
                 "build");
 
         assertThat(buildExecutor.execute("release").keySet()).anyMatch(key -> key.startsWith("release/custom/announce"));
+    }
+
+    @Test
+    public void runs_a_releaser_the_project_declares_only_where_its_properties_are_found() throws Exception {
+        Path configuration = Files.createDirectories(root.resolve("build.jenesis"));
+        Path profile = Files.createDirectories(configuration.resolve("release"));
+        List<SequencedMap<String, String>> received = new ArrayList<>();
+        ProjectPlugins plugins = new ProjectPlugins()
+                .resolutions(new LinkedHashMap<>(Map.of("announce", (_, _) -> { })))
+                .releasers(new LinkedHashMap<>(Map.of("announce", values -> {
+                    received.add(values);
+                    return new RequireFile("app.jar").asModule("announce");
+                })));
+        buildExecutor.addModule("release", plugins.release(new LinkedHashSet<>(List.of(configuration)), root), "build");
+
+        assertThat(buildExecutor.execute("release").keySet())
+                .as("without its properties in a configuration folder, the releaser does not run")
+                .noneMatch(key -> key.startsWith("release/custom"));
+        assertThat(received).isEmpty();
+
+        Files.writeString(profile.resolve("plugin-announce.properties"), "channel=releases\n");
+        setUp();
+        buildExecutor.addModule("release",
+                plugins.release(new LinkedHashSet<>(List.of(profile, configuration)), root),
+                "build");
+
+        assertThat(buildExecutor.execute("release").keySet()).anyMatch(key -> key.startsWith("release/custom/announce"));
+        assertThat(received).containsExactly(new LinkedHashMap<>(Map.of("channel", "releases")));
+    }
+
+    @Test
+    public void hands_a_releaser_the_root_the_staged_trees_and_the_metadata_the_build_resolved() throws IOException {
+        buildExecutor.addModule("stage", (stage, _) -> stage.addStep("maven", (_, context, _) -> {
+            Files.writeString(context.next().resolve("app.jar"), "jar");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }));
+        buildExecutor.addModule("metadata", (metadata, _) -> {
+            metadata.addStep("file", new Metadata(Map.of("name", "Example", "version", "1.0")));
+            metadata.addStep("command", new Metadata(Map.of("version", "2.0")));
+        });
+        buildExecutor.addModule("release",
+                new ProjectPlugins().release("announce", new Copy(List.of(ProjectPlugins.ROOT, BuildStep.METADATA)))
+                        .release(new LinkedHashSet<>(), root),
+                "stage",
+                "metadata");
+
+        Path released = buildExecutor.execute("release").get("release/custom/announce");
+
+        SequencedProperties located = SequencedProperties.ofFiles(released.resolve(ProjectPlugins.ROOT));
+        assertThat(located.getProperty(ProjectPlugins.ROOT_KEY)).isEqualTo(root.toAbsolutePath().normalize().toString());
+        assertThat(Path.of(located.getProperty("stage.maven")).resolve("app.jar")).hasContent("jar");
+        SequencedProperties metadata = SequencedProperties.ofFiles(released.resolve(BuildStep.METADATA));
+        assertThat(metadata.getProperty("name")).isEqualTo("Example");
+        assertThat(metadata.getProperty("version"))
+                .as("the version given on the command line wins over the one a file names")
+                .isEqualTo("2.0");
+    }
+
+    @Test
+    public void refuses_an_argument_for_a_releaser_that_reads_its_properties_file() throws IOException {
+        Path arguments = Files.writeString(root.resolve("jenesis.plugins.arguments.properties"), "announce.channel=releases\n");
+        Path configuration = Files.createDirectories(root.resolve("build.jenesis"));
+        Files.writeString(configuration.resolve("plugin-announce.properties"), "");
+        ProjectPlugins plugins = new ProjectPlugins()
+                .arguments(arguments)
+                .resolutions(new LinkedHashMap<>(Map.of("announce", (_, _) -> { })))
+                .releasers(new LinkedHashMap<>(Map.of("announce", _ -> new RequireFile("app.jar").asModule("announce"))))
+                .transform("licenses", new Attach("licenses", "module-app"));
+        wire(plugins);
+
+        assertThatThrownBy(() -> buildExecutor.execute("postprocess"))
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The argument announce.channel")
+                .hasMessageContaining("plugin-announce.properties");
     }
 
     @Test
@@ -355,15 +421,6 @@ public class ProjectPluginsTest {
                 "build");
 
         assertThat(buildExecutor.execute("plugin/bench").keySet()).anyMatch(key -> key.startsWith("plugin/bench"));
-    }
-
-    @Test
-    public void refuses_a_second_exporter_of_the_same_name() {
-        ProjectPlugins plugins = new ProjectPlugins().export("publish", new RequireFile("app.jar"));
-
-        assertThatThrownBy(() -> plugins.export("publish", new RequireFile("app.jar")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("An exporter named publish is added already");
     }
 
     @Test
@@ -384,8 +441,8 @@ public class ProjectPluginsTest {
     }
 
     @Test
-    public void merges_what_a_stage_transform_adds_into_the_tree_it_names() {
-        buildExecutor.addModule("stage", new ProjectPlugins().stageTransform("checksums", (_, context, _) -> {
+    public void merges_what_a_supplement_adds_into_the_tree_it_names() {
+        buildExecutor.addModule("stage", new ProjectPlugins().supplement("checksums", (_, context, _) -> {
             Path sum = Files.createDirectories(context.next().resolve("maven/demo")).resolve("app.jar.sha256");
             Files.writeString(sum, "sum");
             return CompletableFuture.completedStage(new BuildStepResult(true));
@@ -398,8 +455,8 @@ public class ProjectPluginsTest {
     }
 
     @Test
-    public void refuses_a_stage_transform_that_adds_a_file_staged_already() {
-        buildExecutor.addModule("stage", new ProjectPlugins().stageTransform("replace", (_, context, _) -> {
+    public void refuses_a_supplement_that_adds_a_file_staged_already() {
+        buildExecutor.addModule("stage", new ProjectPlugins().supplement("replace", (_, context, _) -> {
             Files.writeString(Files.createDirectories(context.next().resolve("maven/demo")).resolve("app.jar"), "other");
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }).stage(new LinkedHashSet<>(), trees()), "build");
@@ -411,8 +468,8 @@ public class ProjectPluginsTest {
     }
 
     @Test
-    public void fails_the_stage_when_a_stage_inspection_fails() {
-        buildExecutor.addModule("stage", new ProjectPlugins().stageInspect("signed", (_, _, _) -> {
+    public void fails_the_stage_when_an_audit_fails() {
+        buildExecutor.addModule("stage", new ProjectPlugins().audit("signed", (_, _, _) -> {
             throw new IllegalStateException("app.jar is not signed");
         }).stage(new LinkedHashSet<>(), trees()), "build");
 
@@ -422,15 +479,15 @@ public class ProjectPluginsTest {
     }
 
     @Test
-    public void stages_again_once_a_stage_transform_is_left_out() throws Exception {
+    public void stages_again_once_a_supplement_is_left_out() throws Exception {
         BuildStep pass = (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true));
-        buildExecutor.addModule("stage", new ProjectPlugins().stageTransform("checksums", (_, context, _) -> {
+        buildExecutor.addModule("stage", new ProjectPlugins().supplement("checksums", (_, context, _) -> {
             Files.writeString(Files.createDirectories(context.next().resolve("maven/demo")).resolve("app.jar.sha256"), "sum");
             return CompletableFuture.completedStage(new BuildStepResult(true));
-        }).stageInspect("complete", pass).stage(new LinkedHashSet<>(), trees()), "build");
+        }).audit("complete", pass).stage(new LinkedHashSet<>(), trees()), "build");
         buildExecutor.execute("stage");
         setUp();
-        buildExecutor.addModule("stage", new ProjectPlugins().stageInspect("complete", pass).stage(new LinkedHashSet<>(), trees()), "build");
+        buildExecutor.addModule("stage", new ProjectPlugins().audit("complete", pass).stage(new LinkedHashSet<>(), trees()), "build");
 
         Path maven = buildExecutor.execute("stage").get("stage/maven");
 
@@ -489,6 +546,40 @@ public class ProjectPluginsTest {
                 throws IOException {
             new RequireFile(required).apply(executor, context, arguments);
             return new Attach(classifier, "module-app").apply(executor, context, arguments);
+        }
+    }
+
+    private record Metadata(Map<String, String> values) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            SequencedProperties properties = new SequencedProperties();
+            new TreeMap<>(values).forEach(properties::setProperty);
+            properties.store(context.next().resolve(BuildStep.METADATA));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    private record Copy(List<String> names) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            for (BuildStepArgument argument : arguments.values()) {
+                for (String name : names) {
+                    if (Files.isRegularFile(argument.folder().resolve(name))) {
+                        Files.copy(argument.folder().resolve(name),
+                                context.next().resolve(name),
+                                StandardCopyOption.REPLACE_EXISTING);
+                    }
+                }
+            }
+            return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }
 

@@ -350,17 +350,14 @@ public class MavenDefaultRepositoryTest {
     }
 
     @Test
-    public void can_validate_cached_dependency() throws IOException, NoSuchAlgorithmException {
+    public void serves_a_cached_file_without_asking_for_its_checksum() throws IOException, NoSuchAlgorithmException {
         Files.writeString(Files
                 .createDirectories(local.resolve("group/artifact/1"))
                 .resolve("artifact-1.jar"), "foo");
-        MessageDigest digest = MessageDigest.getInstance("MD5");
-        byte[] hash = digest.digest("foo".getBytes(StandardCharsets.UTF_8));
-        try (Writer writer = Files.newBufferedWriter(Files
+        Files.writeString(Files
                 .createDirectories(repository.resolve("group/artifact/1"))
-                .resolve("artifact-1.jar.md5"))) {
-            writer.write(HexFormat.of().formatHex(hash));
-        }
+                .resolve("artifact-1.jar.md5"), HexFormat.of().formatHex(
+                MessageDigest.getInstance("MD5").digest("foo".getBytes(StandardCharsets.UTF_8))));
         Path dependency = result.resolve("dependency.jar");
         try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(),
                 local,
@@ -375,22 +372,18 @@ public class MavenDefaultRepositoryTest {
             Files.copy(inputStream, dependency);
         }
         assertThat(dependency).content().isEqualTo("foo");
-        assertThat(local.resolve("group/artifact/1/artifact-1.jar")).content().isEqualTo("foo");
-        assertThat(local.resolve("group/artifact/1/artifact-1.jar.md5")).content().isEqualTo(HexFormat.of().formatHex(hash));
+        assertThat(local.resolve("group/artifact/1/artifact-1.jar.md5"))
+                .as("a file in the local repository is served as Maven serves it, without asking for its checksum")
+                .doesNotExist();
     }
 
     @Test
-    public void can_validate_cached_dependency_with_cached_hash() throws IOException, NoSuchAlgorithmException {
+    public void serves_a_cached_file_whatever_its_stored_checksum_says() throws IOException, NoSuchAlgorithmException {
         Files.writeString(Files
                 .createDirectories(local.resolve("group/artifact/1"))
                 .resolve("artifact-1.jar"), "foo");
-        MessageDigest digest = MessageDigest.getInstance("MD5");
-        byte[] hash = digest.digest("foo".getBytes(StandardCharsets.UTF_8));
-        try (Writer writer = Files.newBufferedWriter(Files
-                .createDirectories(local.resolve("group/artifact/1"))
-                .resolve("artifact-1.jar.md5"))) {
-            writer.write(HexFormat.of().formatHex(hash));
-        }
+        Files.writeString(local.resolve("group/artifact/1/artifact-1.jar.md5"), HexFormat.of().formatHex(
+                MessageDigest.getInstance("MD5").digest("bar".getBytes(StandardCharsets.UTF_8))));
         Path dependency = result.resolve("dependency.jar");
         try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(),
                 local,
@@ -404,35 +397,11 @@ public class MavenDefaultRepositoryTest {
                 null).orElseThrow().toInputStream()) {
             Files.copy(inputStream, dependency);
         }
-        assertThat(dependency).content().isEqualTo("foo");
+        assertThat(dependency)
+                .as("a checksum is checked when a file is downloaded, never again once it is stored, as in Maven")
+                .content()
+                .isEqualTo("foo");
         assertThat(local.resolve("group/artifact/1/artifact-1.jar")).content().isEqualTo("foo");
-        assertThat(local.resolve("group/artifact/1/artifact-1.jar.md5")).content().isEqualTo(HexFormat.of().formatHex(hash));
-    }
-
-    @Test
-    public void can_fail_validate_cached_dependency() throws IOException, NoSuchAlgorithmException {
-        Files.writeString(Files
-                .createDirectories(local.resolve("group/artifact/1"))
-                .resolve("artifact-1.jar"), "foo");
-        MessageDigest digest = MessageDigest.getInstance("MD5");
-        try (Writer writer = Files.newBufferedWriter(Files
-                .createDirectories(local.resolve("group/artifact/1"))
-                .resolve("artifact-1.jar.md5"))) {
-            writer.write(HexFormat.of().formatHex(digest.digest("bar".getBytes(StandardCharsets.UTF_8))));
-        }
-        MavenRepository repository = new MavenDefaultRepository(this.repository.toUri(),
-                local,
-                Map.of("MD5", this.repository.toUri()),
-                null);
-        assertThat(repository.fetch(Runnable::run,
-                "group",
-                "artifact",
-                "1",
-                "jar",
-                null,
-                null)).isEmpty();
-        assertThat(local.resolve("group/artifact/1/artifact-1.jar")).doesNotExist();
-        assertThat(local.resolve("group/artifact/1/artifact-1.jar.md5")).doesNotExist();
     }
 
     @Test
@@ -670,24 +639,23 @@ public class MavenDefaultRepositoryTest {
     }
 
     @Test
-    public void stops_probing_sidecars_of_a_cached_artifact_once_the_strongest_validated()
-            throws IOException, NoSuchAlgorithmException {
-        Files.writeString(Files
-                .createDirectories(local.resolve("group/artifact/1"))
-                .resolve("artifact-1.jar"), "foo");
-        byte[] hash = MessageDigest.getInstance("SHA512").digest("foo".getBytes(StandardCharsets.UTF_8));
+    public void serves_a_file_installed_locally_as_it_stands() throws IOException, NoSuchAlgorithmException {
+        Path version = Files.createDirectories(local.resolve("group/artifact/1"));
+        Files.writeString(version.resolve("artifact-1.jar"), "installed");
+        Files.writeString(version.resolve("artifact-1.jar.sha1"), HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA1").digest("published".getBytes(StandardCharsets.UTF_8))));
+        Files.writeString(version.resolve("_remote.repositories"), """
+                #NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+                artifact-1.jar>=
+                artifact-1.jar>central=
+                """);
         Files.writeString(Files
                 .createDirectories(repository.resolve("group/artifact/1"))
-                .resolve("artifact-1.jar.sha512"), HexFormat.of().formatHex(hash));
-        Files.writeString(repository.resolve("group/artifact/1/artifact-1.jar.sha1"),
-                HexFormat.of().formatHex(new byte[20]));
-        Map<String, URI> validations = new LinkedHashMap<>();
-        validations.put("SHA512", repository.toUri());
-        validations.put("SHA1", repository.toUri());
+                .resolve("artifact-1.jar"), "published");
         Path dependency = result.resolve("dependency.jar");
         try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(),
                 local,
-                validations,
+                Map.of("SHA1", repository.toUri()),
                 null).fetch(Runnable::run,
                 "group",
                 "artifact",
@@ -697,10 +665,14 @@ public class MavenDefaultRepositoryTest {
                 null).orElseThrow().toInputStream()) {
             Files.copy(inputStream, dependency);
         }
-        assertThat(dependency).content().isEqualTo("foo");
-        assertThat(local.resolve("group/artifact/1/artifact-1.jar.sha1"))
-                .as("a weaker sidecar must not be read once a stronger one validated")
-                .doesNotExist();
+        assertThat(dependency)
+                .as("a file the marker lists as installed locally is served without a checksum, as Maven serves it")
+                .content()
+                .isEqualTo("installed");
+        assertThat(version.resolve("artifact-1.jar"))
+                .as("a stale checksum left by an earlier download does not replace what was installed")
+                .content()
+                .isEqualTo("installed");
     }
 
     @Test

@@ -17,13 +17,14 @@ public class GroupTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, left, right;
+    private Path previous, next, supplement, persistent, left, right;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         left = Files.createDirectory(root.resolve("left"));
         right = Files.createDirectory(root.resolve("right"));
     }
@@ -43,7 +44,7 @@ public class GroupTest {
         rightDependencies.store(right.resolve(BuildStep.REQUIRES));
         BuildStepResult result = new Group(Optional::of).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of(
                         "left", new BuildStepArgument(
                                 left,
@@ -76,7 +77,7 @@ public class GroupTest {
         rightDependencies.store(right.resolve(BuildStep.REQUIRES));
         BuildStepResult result = new Group(Optional::of).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of(
                         "left", new BuildStepArgument(
                                 left,
@@ -105,7 +106,7 @@ public class GroupTest {
         leftDependencies.store(left.resolve(BuildStep.REQUIRES));
         BuildStepResult result = new Group(Optional::of).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of(
                         "left", new BuildStepArgument(
                                 left,
@@ -126,7 +127,7 @@ public class GroupTest {
         requires.store(right.resolve(BuildStep.REQUIRES));
         new Group(Optional::of).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of(
                         "left", new BuildStepArgument(left, Map.of(Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED))),
                         "right", new BuildStepArgument(right, Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED))))))

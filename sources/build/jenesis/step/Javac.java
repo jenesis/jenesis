@@ -84,6 +84,13 @@ public class Javac extends ProcessBuildStep {
         ProcessBuildStep.store(folder, ProcessBuildStep.PROCESS, "javac", properties);
     }
 
+    @Override
+    protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
+        return commands.stream().anyMatch(option -> option.startsWith("-J"))
+                ? ProcessHandler.OfProcess.ofJavaHome("bin/javac").apply(commands).daemon(terms.daemon())
+                : super.handler(context, commands);
+    }
+
     public Javac factory(ProcessHandler.Factory factory) {
         return new Javac(factory.apply("javac", "bin/javac"), includeResources, pathPlacement, group, headers, terms);
     }
@@ -110,7 +117,35 @@ public class Javac extends ProcessBuildStep {
 
     @Override
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
-        return hasRelevantChange(arguments, Set.of(".java"), Set.of("javac"), includeResources);
+        Path resolved = Path.of(Dependencies.RESOLVED);
+        SequencedMap<String, BuildStepArgument> compared = new LinkedHashMap<>();
+        for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
+            BuildStepArgument argument = entry.getValue();
+            if (argument.removed()) {
+                compared.put(entry.getKey(), argument);
+                continue;
+            }
+            Set<Path> processors = new HashSet<>();
+            for (String group : List.of("plugin", "javac")) {
+                for (Path jar : Dependencies.select(argument.folder(), group, "plugin")) {
+                    processors.add(argument.folder().relativize(jar));
+                }
+            }
+            Map<Path, Checksum> files = new HashMap<>(argument.files());
+            argument.files().forEach((path, checksum) -> {
+                Checksum abi = path.startsWith(resolved) && path.getFileName().toString().endsWith(".jar")
+                        ? argument.files().get(path.resolveSibling(Abi.companion(path.getFileName().toString())))
+                        : null;
+                if (checksum.status() == ChecksumStatus.ALTERED
+                        && abi != null
+                        && abi.status() == ChecksumStatus.RETAINED
+                        && !processors.contains(path)) {
+                    files.put(path, Checksum.of(ChecksumStatus.RETAINED));
+                }
+            });
+            compared.put(entry.getKey(), new BuildStepArgument(argument.folder(), files));
+        }
+        return hasRelevantChange(compared, Set.of(".java"), Set.of("javac"), includeResources);
     }
 
     public static boolean hasRelevantChange(SequencedMap<String, BuildStepArgument> arguments,
@@ -125,6 +160,9 @@ public class Javac extends ProcessBuildStep {
         Path modularIndex = Path.of(Dependencies.MODULAR);
         Path modularDir = Path.of(Dependencies.MODULAR_PATH);
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                return true;
+            }
             Set<Path> processFiles = new HashSet<>();
             processFiles.add(Path.of(ProcessBuildStep.PROCESS, ProcessBuildStep.INDEX));
             for (String tool : tools) {
@@ -661,7 +699,7 @@ public class Javac extends ProcessBuildStep {
         commands.add("@" + argumentFile(context.supplement().resolve("javac-" + release + ".args"), options));
         Path output = context.supplement().resolve("output-" + release);
         Path error = context.supplement().resolve("error-" + release);
-        ProcessHandler handler = factory.apply(commands);
+        ProcessHandler handler = handler(context, commands);
         Files.writeString(context.supplement().resolve("command-" + release), shell(handler.commands()));
         ProcessHandler.Tee tee = tee(executor, handler);
         CompletableFuture<Void> future = new CompletableFuture<>();

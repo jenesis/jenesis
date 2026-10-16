@@ -2,9 +2,9 @@ Code-coverage demo
 ===================
 
 Measure test coverage with JaCoCo. A small Maven project has one class and a test
-that exercises part of it; a `jacoco.properties` file turns coverage on, the tests
-run under the JaCoCo agent, and an HTML and XML report is rendered from what they
-touched. No build script and no JaCoCo configuration are needed.
+that exercises part of it; the JaCoCo plugin turns coverage on, the tests run under
+the JaCoCo agent, and an HTML and XML report is rendered from what they touched. No
+build script is needed.
 
 Where the code-quality demos read your sources and your classes, this one watches
 the tests as they run.
@@ -16,8 +16,8 @@ From this directory:
 
     java build/jenesis/Make.java
 
-The project ships a `jacoco.properties` file, so a plain build collects
-coverage. Jenesis compiles the project, runs the test
+The project names the JaCoCo plugin and ships its `plugin-jacoco.properties`, so a
+plain build collects coverage. Jenesis compiles the project, runs the test
 under the JaCoCo agent, and renders the report. The first build downloads JUnit
 and the JaCoCo tooling, so it takes a while.
 
@@ -27,7 +27,8 @@ Layout
     demo/demo-39-code-coverage
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
     |-- pom.xml                    pins JUnit; sources in sources/, tests in test/
-    |-- build.jenesis/jacoco.properties         enables JaCoCo; minimum.method=0.6
+    |-- jenesis.plugins.properties names the JaCoCo plugin
+    |-- build.jenesis/plugin-jacoco.properties  enables JaCoCo; minimum.method=0.6
     |-- build.jenesis/profiling/jfr.properties  settings=profile, under a profile
     |-- sources
     |   `-- coverage
@@ -39,10 +40,13 @@ Layout
 How coverage is inferred
 ------------------------
 
-The default Java assembler runs tests through an `InferredTestObservationModule`,
-which bundles the observation engines that are switched on. Today that is JaCoCo,
-enabled by the presence of a `jacoco.properties` file (the `jenesis.observe.jacoco`
-system property defaults to `true` and can be set to `false` to suppress it):
+`jenesis.plugins.properties` names JaCoCo at the hook point `observe`, which
+attaches an engine to the JVM the tests run in and reports over what it recorded:
+
+    jacoco+observe=build.jenesis.plugin.jacoco
+
+It runs in a module where its `plugin-jacoco.properties` is found, and
+`-Djenesis.plugin.jacoco=false` leaves it out:
 
 - With no engine enabled (the default for most projects), it is a plain test run.
 - With coverage on, the test step is launched with the JaCoCo agent prepended as
@@ -59,11 +63,11 @@ Where the report lands
 ----------------------
 
     target/build/.../assemble/observed/test/executed/output/jacoco.exec
-    target/build/.../assemble/observed/jacoco/report/output/reports/jacoco/index.html
-    target/build/.../assemble/observed/jacoco/report/output/reports/jacoco/jacoco.xml
+    target/build/.../assemble/observed/observations/jacoco/report/output/reports/jacoco/index.html
+    target/build/.../assemble/observed/observations/jacoco/report/output/reports/jacoco/jacoco.xml
 
 A `stage` build collects the report, like every other report kind, under
-`target/stage/reports/jacoco/<module>/`.
+`target/stage/reports/output/jacoco/<module>/`.
 
 Open `index.html` to browse coverage. Because `CalculatorTest` exercises
 `add(...)` but not `subtract(...)`, the report shows the project as partially
@@ -72,15 +76,15 @@ covered - coverage is reported, not enforced, so the build stays green.
 Pinning
 -------
 
-JUnit is pinned in the POM the usual way. JaCoCo's agent and CLI resolve a
-floating `RELEASE` in the `jacoco` group; run `java build/jenesis/Make.java
+JUnit is pinned in the POM the usual way. JaCoCo's CLI resolves a floating
+`RELEASE` in the `jacoco:tool` group and its agent in `jacoco:agent`; run `java build/jenesis/Make.java
 pin` to record them with checksums when you want a reproducible tool chain.
 The pins sit in the POM's `<!--jenesis.pin-->` comment, each line prefixed with
 the group. The agent writes the data the CLI reads, so it follows the release
-the group pins: pinning only the CLI by hand, as
+the tool group pins: pinning only the CLI by hand, as
 
     <!--jenesis.pin
-    jacoco/maven/org.jacoco/org.jacoco.cli 0.8.14
+    jacoco:tool/maven/org.jacoco/org.jacoco.cli 0.8.14
     -->
 
 runs the tests under the 0.8.14 agent as well, until `pin` records both.
@@ -88,7 +92,7 @@ runs the tests under the 0.8.14 agent as well, until `pin` records both.
 Failing the build on too little coverage
 ----------------------------------------
 
-`jacoco.properties` may set limits on the module's coverage, as the `check` goal of
+`plugin-jacoco.properties` may set limits on the module's coverage, as the `check` goal of
 jacoco-maven-plugin does for a bundle. `minimum.<counter>` is the least covered
 ratio, from 0 to 1, and `maximum.missed.<counter>` the most items left uncovered,
 for each of JaCoCo's counters `instruction`, `branch`, `line`, `complexity`,

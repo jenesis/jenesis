@@ -143,8 +143,12 @@ public interface Resolver extends Serializable {
                 digest.update(buffer, 0, read);
             }
         }
-        if (!Arrays.equals(digest.digest(), HexFormat.of().parseHex(checksum.substring(slash + 1)))) {
-            throw new IllegalStateException("Mismatched digest for " + coordinate);
+        byte[] actual = digest.digest();
+        if (!Arrays.equals(actual, HexFormat.of().parseHex(checksum.substring(slash + 1)))) {
+            throw new IllegalStateException("Mismatched digest for " + coordinate + ": " + file + " is "
+                    + checksum.substring(0, slash) + "/" + HexFormat.of().formatHex(actual) + " where the pin names "
+                    + checksum + " - pin what the version holds, or delete that copy if the version was"
+                    + " republished on purpose");
         }
     }
 

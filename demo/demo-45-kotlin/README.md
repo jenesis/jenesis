@@ -3,8 +3,9 @@ Kotlin demo
 
 Build a project that mixes Java and Kotlin in one module of the Java module
 system, and export a package that holds only Kotlin. You point Jenesis at the
-project, it compiles the `.java` and `.kt` sources together, and emits a modular
-jar alongside a generated POM - there is no build script to write.
+project and name the Kotlin plugin, it compiles the `.java` and `.kt` sources
+together, and emits a modular jar alongside a generated POM - there is no build
+script to write.
 
 Build it
 --------
@@ -17,6 +18,15 @@ Jenesis auto-detects the MODULAR_TO_MAVEN layout (a `module-info.java`, no
 `pom.xml`), resolves the Kotlin compiler, compiles the module, and emits a
 modular jar alongside a generated POM.
 
+Kotlin is a plugin of the hook point `language`, named in
+`jenesis.plugins.properties`:
+
+    kotlin+language=build.jenesis.plugin.kotlin
+
+The plugin runs in every module that holds a `.kt` source and needs no other
+configuration. A module with a `.kt` source and no such line fails the build
+and names the line to add.
+
 Layout
 ------
 
@@ -25,12 +35,12 @@ sources out under one package:
 
     demo/demo-45-kotlin
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
+    |-- jenesis.plugins.properties names the Kotlin plugin
     |-- sources
     |   |-- module-info.java       requires kotlin.stdlib; exports sample; exports sample.pure
     |   |-- messages.properties    a root resource, read by Greeter at run time
     |   |-- META-INF/build.jenesis
-    |   |   |-- dokka.properties   configures Dokka, when the build documents the module
-    |   |   `-- Module.md          the module and package documentation Dokka includes
+    |   |   `-- plugin-kotlin.properties  configures Dokka, when the build documents the module
     |   `-- sample
     |       |-- Greeter.java       a Java type in the exported 'sample' package; loads the resource
     |       |-- Sample.kt          Kotlin that calls Greeter
@@ -44,15 +54,15 @@ sources out under one package:
 How Jenesis builds it
 ---------------------
 
-Jenesis detects the `.kt` sources and drives the Kotlin compiler as part of the
-standard build, with `javac` participating for `module-info.java` and the
+The Kotlin plugin finds the `.kt` sources and drives the Kotlin compiler as part
+of the standard build, with `javac` participating for `module-info.java` and the
 companion `.java` file. The module exports both a mixed package and a package
 that holds only Kotlin.
 
 Compile order and exporting a Kotlin package
 --------------------------------------------
 
-The inferred chain compiles Kotlin first, then `javac`. `kotlinc` reads the
+The plugin compiles Kotlin first, then `javac`. `kotlinc` reads the
 `.java` sources for symbol resolution, so `Sample.kt` can call `Greeter`, but it
 emits only Kotlin classes; `javac` then compiles `Greeter.java` and
 `module-info.java`. When `javac` validates the `exports` directives, it sees the
@@ -63,7 +73,7 @@ That is what `sample.pure` shows: it contains a single Kotlin class and no Java
 type, yet `module-info.java` exports it. The order is what makes this work -
 `javac` validates `exports <package>` against the classes already in the module,
 so the Kotlin classes must exist first. `kotlinc` and `scalac` can read `.java`
-as source, so they run ahead of `javac`; `groovyc` cannot, which is why a
+as source, so their plugins run ahead of `javac`; `groovyc` cannot, which is why a
 Groovy-only exported package still needs a Java type.
 
 Packaging a resource in a mixed-language module
@@ -111,30 +121,28 @@ Documenting the Kotlin sources
 ------------------------------
 
 With `-Djenesis.project.documentation=true`, Jenesis documents the module and
-archives the documentation as its javadoc jar. A module with Kotlin sources is
-documented by Dokka, resolved and pinned in a `dokka` group of its own:
+archives the documentation as its javadoc jar. The Kotlin plugin documents the
+Kotlin sources with Dokka, resolved and pinned in a `kotlin:dokka` group of its
+own, in a `kotlin/` folder beside the Javadoc of the Java sources:
 
     java -Djenesis.project.documentation=true build/jenesis/Make.java
 
-`sources/META-INF/build.jenesis/dokka.properties` configures Dokka with the
-options the Dokka Gradle plugin and the `dokka-maven-plugin` take:
+`sources/META-INF/build.jenesis/plugin-kotlin.properties` configures Dokka with
+the options the Dokka Gradle plugin and the `dokka-maven-plugin` take, each as a
+`dokka.` value:
 
-    module-name=Kotlin demo
-    includes=META-INF/build.jenesis/Module.md
-    source-link=https://github.com/jenesis/jenesis/tree/main/demo/demo-45-kotlin/sources
-    footer-message=Documented by Dokka, built by Jenesis
+    dokka.module-name=Kotlin demo
+    dokka.source-link=https://github.com/jenesis/jenesis/tree/main/demo/demo-45-kotlin/sources
+    dokka.footer-message=Documented by Dokka, built by Jenesis
 
-A file the properties name, here `Module.md`, is resolved against the module's
-folder, the one holding `module-info.java`, and is an input of the build:
-editing it renders the documentation again. The pages name the module
-`Kotlin demo`, open with the text of `Module.md`, link every declaration to its
-line on GitHub, and carry the footer. The other keys are `documented-visibilities`,
-`suppress-obvious-functions`, `suppress-inherited-members`, `skip-empty-packages`,
-`skip-deprecated`, `report-undocumented`, `suppressed-packages`, `fail-on-warning`,
-`jdk-version`, `source-link-suffix`, `external-link.<name>` with its
-`external-link.<name>.package-list`, `format=html|javadoc`, `custom-assets` and
-`custom-styles`; an unknown key fails the build, and so does Dokka when it
-fails, as javadoc does.
+The pages name the module `Kotlin demo`, link every declaration to its line on
+GitHub, and carry the footer. The other values are `dokka.documented-visibilities`,
+`dokka.suppress-obvious-functions`, `dokka.suppress-inherited-members`,
+`dokka.skip-empty-packages`, `dokka.skip-deprecated`, `dokka.report-undocumented`,
+`dokka.suppressed-packages`, `dokka.fail-on-warning`, `dokka.jdk-version`,
+`dokka.source-link-suffix`, `dokka.external-link.<name>` with its
+`dokka.external-link.<name>.package-list`, and `dokka.format=html|javadoc`; an
+unknown value fails the build, and so does Dokka when it fails, as javadoc does.
 
 Compiling incrementally
 -----------------------
@@ -148,13 +156,13 @@ The first build compiles every source. After an edit, the next build recompiles
 the sources the change reaches and keeps every other class: a changed function body
 recompiles its own file, and a changed signature also the files that use it. A
 module that depends on this one recompiles only what uses a changed declaration.
-The compiler runs in the Kotlin daemon, a JVM of its own that outlives the build,
-so it stays loaded from one module and one build to the next. A `-J` line of
-`process-kotlinc.properties` configures that daemon's JVM.
+The compiler runs in a JVM of its own that the build keeps warm, so it stays loaded
+from one module to the next, and from one build to the next under the build daemon.
+A `-J` line of `process-kotlinc.properties` configures that JVM.
 
 This needs Kotlin 2.3 or newer, whose compiler is driven through the Kotlin Build
 Tools API, `org.jetbrains.kotlin:kotlin-build-tools-impl`. The module pins it in the
-`kotlinc` group beside the compiler, at the compiler's version.
+`kotlin` group beside the compiler, at the compiler's version.
 
 Pinning
 -------
@@ -163,10 +171,9 @@ The module's closure is pinned with `@jenesis.pin` tags on the module
 declaration: the module's own dependencies in the default `main` group (the Java
 module `kotlin.stdlib`, plus the non-modular transitives as
 `org.jetbrains.kotlin/kotlin-stdlib` and `org.jetbrains/annotations`) and the
-Kotlin compiler toolchain in its own `kotlinc` group (each
-`kotlinc/maven/...` coordinate with a version and SHA-256 checksum, the Build Tools
-API included), and Dokka
-in its `dokka` group. Because the groups are separate, the running compiler is
+Kotlin compiler toolchain in the tool group of the plugin, `kotlin:tool` (each
+`kotlin:tool/maven/...` coordinate with a version and SHA-256 checksum, the Build Tools
+API included), and Dokka in its `kotlin:dokka` group. Because the groups are separate, the running compiler is
 locked independently of the `kotlin.stdlib` the module ships against. Run
 `java build/jenesis/Make.java pin` to record or refresh the tags; re-running
 leaves the declaration unchanged.

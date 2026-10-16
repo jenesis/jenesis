@@ -16,13 +16,14 @@ public class LegalTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, module, dependencies;
+    private Path previous, next, supplement, persistent, module, dependencies;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         module = Files.createDirectories(root.resolve("module").resolve(BuildStep.ARTIFACTS));
         dependencies = Files.createDirectories(root.resolve("dependencies").resolve("resolved"));
         Files.writeString(dependencies.resolveSibling(BuildStep.DEPENDENCIES), "main/runtime/module/org.dep/1.0=resolved/org.dep-1.0.jar\n");
@@ -72,7 +73,7 @@ public class LegalTest {
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
         arguments.put("module", new BuildStepArgument(module.getParent(), Map.of(Path.of("artifacts/classes.jar"), Checksum.of(ChecksumStatus.ADDED))));
         arguments.put("dependencies", new BuildStepArgument(dependencies.getParent(), Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))));
-        Legal.ofEnvironment(environment).apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+        Legal.ofEnvironment(environment).apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture()
                 .join();
     }

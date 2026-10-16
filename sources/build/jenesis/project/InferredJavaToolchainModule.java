@@ -9,6 +9,7 @@ import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
+import build.jenesis.step.Abi;
 import build.jenesis.step.ClassPathCompatibility;
 import build.jenesis.step.Jar;
 import build.jenesis.step.JarSigner;
@@ -24,6 +25,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
     private final InferredByteCodeQualityModule validatorModule;
     private final JarSigner signerStep;
     private final ClassPathCompatibility classpathStep;
+    private final Abi abiStep;
     private final Function<InferredSourceGenerationModule, BuildExecutorModule> generator;
     private final Function<InferredCompilerChainModule, BuildExecutorModule> compiler;
     private final Function<InferredByteCodeQualityModule, BuildExecutorModule> validator;
@@ -31,19 +33,23 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
     private final BuildExecutorModule archiver;
     private final Function<JarSigner, BuildStep> signer;
     private final Function<ClassPathCompatibility, BuildStep> classpath;
+    private final Function<Abi, BuildStep> abi;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredJavaToolchainModule(SequencedSet<Path> configuration,
+                                       Path location,
+                                       Path root,
                                        Map<String, Repository> repositories,
                                        Map<String, Resolver> resolvers) {
         this(configuration,
                 null,
                 PathPlacement.INFERRED,
-                new InferredSourceGenerationModule(configuration, repositories, resolvers),
-                new InferredCompilerChainModule(configuration, repositories, resolvers),
+                new InferredSourceGenerationModule(configuration, location, root, repositories, resolvers),
+                new InferredCompilerChainModule(repositories, resolvers),
                 new InferredByteCodeQualityModule(configuration, repositories, resolvers),
                 new JarSigner(),
                 new ClassPathCompatibility(),
+                new Abi(Abi.Mode.MODULAR),
                 value -> value,
                 value -> value,
                 value -> value,
@@ -51,21 +57,26 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 new Jar(ProcessHandler.Factory.of(), Jar.Sort.CLASSES).asModule("jar"),
                 step -> step.configured() ? step : null,
                 value -> value,
+                null,
                 Collections.emptyNavigableMap());
     }
 
     public static InferredJavaToolchainModule ofEnvironment(Environment environment,
                                                             SequencedSet<Path> configuration,
+                                                            Path location,
+                                                            Path root,
                                                             Map<String, Repository> repositories,
                                                             Map<String, Resolver> resolvers) {
+        String mode = environment.value("abi.mode");
         InferredJavaToolchainModule module = new InferredJavaToolchainModule(configuration,
                 null,
                 PathPlacement.INFERRED,
-                InferredSourceGenerationModule.ofEnvironment(environment, configuration, repositories, resolvers),
-                InferredCompilerChainModule.ofEnvironment(environment, configuration, repositories, resolvers),
+                InferredSourceGenerationModule.ofEnvironment(environment, configuration, location, root, repositories, resolvers),
+                InferredCompilerChainModule.ofEnvironment(environment, repositories, resolvers),
                 InferredByteCodeQualityModule.ofEnvironment(environment, configuration, repositories, resolvers),
                 JarSigner.ofEnvironment(environment),
                 new ClassPathCompatibility(),
+                new Abi(mode == null ? Abi.Mode.MODULAR : Abi.Mode.of(mode)),
                 value -> value,
                 value -> value,
                 value -> value,
@@ -73,6 +84,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 Jar.ofEnvironment(environment, ProcessHandler.Factory.ofEnvironment(environment), Jar.Sort.CLASSES).asModule("jar"),
                 step -> step.configured() ? step : null,
                 value -> value,
+                mode == null ? null : value -> value,
                 Collections.emptyNavigableMap());
         return environment.flag("generate.classpath", true) ? module : module.classpath(null);
     }
@@ -85,6 +97,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                                         InferredByteCodeQualityModule validatorModule,
                                         JarSigner signerStep,
                                         ClassPathCompatibility classpathStep,
+                                        Abi abiStep,
                                         Function<InferredSourceGenerationModule, BuildExecutorModule> generator,
                                         Function<InferredCompilerChainModule, BuildExecutorModule> compiler,
                                         Function<InferredByteCodeQualityModule, BuildExecutorModule> validator,
@@ -92,6 +105,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                                         BuildExecutorModule archiver,
                                         Function<JarSigner, BuildStep> signer,
                                         Function<ClassPathCompatibility, BuildStep> classpath,
+                                        Function<Abi, BuildStep> abi,
                                         SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
         this.pinning = pinning;
@@ -101,6 +115,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
         this.validatorModule = validatorModule;
         this.signerStep = signerStep;
         this.classpathStep = classpathStep;
+        this.abiStep = abiStep;
         this.generator = generator;
         this.compiler = compiler;
         this.validator = validator;
@@ -108,6 +123,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
         this.archiver = archiver;
         this.signer = signer;
         this.classpath = classpath;
+        this.abi = abi;
         this.custom = custom;
     }
 
@@ -120,6 +136,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 validatorModule,
                 signerStep,
                 classpathStep,
+                abiStep,
                 generator,
                 compiler,
                 validator,
@@ -127,6 +144,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 archiver,
                 signer,
                 classpath,
+                abi,
                 custom);
     }
 
@@ -139,6 +157,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 validatorModule,
                 signerStep,
                 classpathStep,
+                abiStep,
                 generator,
                 compiler,
                 validator,
@@ -146,6 +165,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 archiver,
                 signer,
                 classpath,
+                abi,
                 custom);
     }
 
@@ -158,6 +178,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 validatorModule,
                 signerStep,
                 classpathStep,
+                abiStep,
                 generator,
                 compiler,
                 validator,
@@ -165,6 +186,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 archiver,
                 signer,
                 classpath,
+                abi,
                 custom);
     }
 
@@ -177,6 +199,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 validatorModule,
                 signerStep,
                 classpathStep,
+                abiStep,
                 generator,
                 compiler,
                 validator,
@@ -184,6 +207,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 archiver,
                 signer,
                 classpath,
+                abi,
                 custom);
     }
 
@@ -196,6 +220,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 validatorModule,
                 signerStep,
                 classpathStep,
+                abiStep,
                 generator,
                 compiler,
                 validator,
@@ -203,6 +228,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 archiver,
                 signer,
                 classpath,
+                abi,
                 custom);
     }
 
@@ -215,6 +241,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 validatorModule,
                 signerStep,
                 classpathStep,
+                abiStep,
                 generator,
                 compiler,
                 validator,
@@ -222,6 +249,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 archiver,
                 signer,
                 classpath,
+                abi,
                 custom);
     }
 
@@ -234,6 +262,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 validatorModule,
                 signerStep,
                 classpathStep,
+                abiStep,
                 generator,
                 compiler,
                 validator,
@@ -241,6 +270,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 archiver,
                 signer,
                 classpath,
+                abi,
                 custom);
     }
 
@@ -253,6 +283,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 validatorModule,
                 signerStep,
                 classpathStep,
+                abiStep,
                 generator,
                 compiler,
                 validator,
@@ -260,6 +291,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 archiver,
                 signer,
                 classpath,
+                abi,
                 custom);
     }
 
@@ -272,6 +304,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 validatorModule,
                 signerStep,
                 classpathStep,
+                abiStep,
                 generator,
                 compiler,
                 validator,
@@ -279,6 +312,28 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 archiver,
                 signer,
                 classpath,
+                abi,
+                custom);
+    }
+
+    public InferredJavaToolchainModule abi(Function<Abi, BuildStep> abi) {
+        return new InferredJavaToolchainModule(configuration,
+                pinning,
+                pathPlacement,
+                generatorModule,
+                compilerModule,
+                validatorModule,
+                signerStep,
+                classpathStep,
+                abiStep,
+                generator,
+                compiler,
+                validator,
+                transformer,
+                archiver,
+                signer,
+                classpath,
+                abi,
                 custom);
     }
 
@@ -291,6 +346,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 validatorModule,
                 signerStep,
                 classpathStep,
+                abiStep,
                 generator,
                 compiler,
                 validator,
@@ -298,6 +354,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 archiver,
                 signer,
                 classpath,
+                abi,
                 custom);
     }
 
@@ -310,6 +367,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 validatorModule,
                 signerStep,
                 classpathStep,
+                abiStep,
                 generator,
                 compiler,
                 validator,
@@ -317,6 +375,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 archiver,
                 signer,
                 classpath,
+                abi,
                 custom);
     }
 
@@ -329,6 +388,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 validatorModule,
                 signerStep,
                 classpathStep,
+                abiStep,
                 generator,
                 compiler,
                 validator,
@@ -336,6 +396,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 archiver,
                 signer,
                 classpath,
+                abi,
                 custom);
     }
 
@@ -348,6 +409,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 validatorModule,
                 signerStep,
                 classpathStep,
+                abiStep,
                 generator,
                 compiler,
                 validator,
@@ -355,6 +417,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 archiver,
                 signer,
                 classpath,
+                abi,
                 custom);
     }
 
@@ -388,7 +451,6 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
 
     private JavaToolchainModule toolchain(BuildStep signing) {
         BuildExecutorModule compiled = compiler == null ? null : compiler.apply(compilerModule
-                .pinning(pinning)
                 .pathPlacement(pathPlacement));
         if (compiled == null) {
             throw new IllegalStateException("A Java toolchain requires a compiler but none is configured");
@@ -397,13 +459,15 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 || BuildStep.locate(configuration, ClassPathCompatibility.CONFIGURATION) == null
                 ? null
                 : classpath.apply(classpathStep);
+        BuildStep extraction = abi == null ? null : abi.apply(abiStep);
         return new JavaToolchainModule(
-                generator == null ? null : generator.apply(generatorModule.pinning(pinning)),
+                generator == null ? null : generator.apply(generatorModule),
                 compiled,
                 transformer,
-                validator == null ? null : validator.apply(validatorModule.pinning(pinning)),
+                validator == null ? null : validator.apply(validatorModule),
                 signing == null || archiver == null ? archiver : new SignedArchive(archiver, signing),
-                compatibility == null ? null : compatibility.asModule("services"));
+                compatibility == null ? null : compatibility.asModule("services"),
+                extraction == null ? null : extraction.asModule("extract"));
     }
 
     private record SignedArchive(BuildExecutorModule archiver, BuildStep signer) implements BuildExecutorModule {

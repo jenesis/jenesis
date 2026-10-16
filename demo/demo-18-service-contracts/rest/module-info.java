@@ -7,9 +7,11 @@
  * @jenesis.pin com.fasterxml.jackson.datatype/jackson-datatype-jsr310 2.22.3 SHA-256/ec7052ee48c9d873bb8148338a643f02cf89c01d035dd219411473030d6d2b22
  * @jenesis.pin jakarta.annotation 3.0.0 SHA-256/b01f55552284cfb149411e64eabca75e942d26d2e1786b32914250e4330afaa2
  * @jenesis.pin jakarta.annotation/jakarta.annotation-api 3.0.0 SHA-256/b01f55552284cfb149411e64eabca75e942d26d2e1786b32914250e4330afaa2
- * @jenesis.pin openapi/maven/org.openapitools/openapi-generator-cli 7.26.0 SHA-256/1760050094997b9cc790cc1350be095f15da8c08a996b184d3eadc4ccda5e35e
+ * @jenesis.pin openapi:tool/maven/org.openapitools/openapi-generator-cli 7.26.0 SHA-256/1760050094997b9cc790cc1350be095f15da8c08a996b184d3eadc4ccda5e35e
  * @jenesis.pin org.openapitools.jackson.nullable 0.2.12 SHA-256/cdcf0d46f9d7f076be4298145616035123b76b2ae390ae61752c06b1c5068210
  * @jenesis.pin org.openapitools/jackson-databind-nullable 0.2.12 SHA-256/cdcf0d46f9d7f076be4298145616035123b76b2ae390ae61752c06b1c5068210
+ * @jenesis.pin openapi/module/build.jenesis 0.16.0 SHA-256/bf8d90a8e3251fcb2519e11793ab87a68f37419f12a6b3275f9dd1d263149c98
+ * @jenesis.pin openapi/module/build.jenesis.plugin.openapi 0.16.0 SHA-256/fb5a38c59ba77ead5d5bda518123d9a81a13b5142c7f2b16e8ec9ec3c1eab5c5
  */
 module demo.contract.rest {
     requires java.net.http;

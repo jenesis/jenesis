@@ -11,6 +11,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.Project;
 import build.jenesis.project.AssemblyDescriptor;
+import build.jenesis.project.AssemblyRequirement;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -25,7 +26,7 @@ public class ProjectReproductionTest {
     @Test
     public void reads_the_folder_of_the_second_build_from_its_setting_and_checks_nothing_without_it() {
         assertThat(Project.ofEnvironment(new Environment(Map.of("project.reproduce", "again")), root).reproduce())
-                .isEqualTo(Path.of("again"));
+                .isEqualTo(root.resolve("again"));
         assertThat(Project.ofEnvironment(Environment.NONE, root).reproduce()).isNull();
     }
 
@@ -99,11 +100,11 @@ public class ProjectReproductionTest {
                 .target(root.resolve(target))
                 .reproduce(root.resolve("reproduced"))
                 .layout(Project.Layout.MODULAR)
-                .assembler((_, _, _) -> new AssemblyDescriptor((executor, _) -> {
+                .assembler((_, _, _) -> AssemblyDescriptor.of((executor, _) -> {
                     executor.addStep("stamp", stamp);
                     executor.addStep("copy", new Copy(""), "stamp");
                     executor.addStep("archive", new Copy(BuildStep.ARTIFACTS), "copy");
-                }));
+                }, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD)));
     }
 
     record Stamp(boolean random) implements BuildStep {

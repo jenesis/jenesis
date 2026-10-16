@@ -19,6 +19,7 @@ import build.jenesis.module.ModularProject;
 import build.jenesis.module.ModularStaging;
 import build.jenesis.module.PinModuleInfo;
 import build.jenesis.project.AssemblyDescriptor;
+import build.jenesis.project.AssemblyRequirement;
 import build.jenesis.project.ExternalModule;
 import build.jenesis.project.Ide;
 import build.jenesis.project.InferredMultiProjectAssembler;
@@ -82,7 +83,6 @@ public record Project(
             PROMPT = "prompt",
             PROPERTIES = "properties",
             CONFIGURATION = "configuration";
-    private static final Pattern INPUT_NAME = Pattern.compile("[A-Za-z0-9._-]+");
 
     @FunctionalInterface
     public interface Layout {
@@ -130,7 +130,7 @@ public record Project(
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(PROMPT, new PromptModule(project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
-            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler,
+            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await")),
                     null,
                     null,
                     project.environment().flag("maven.embed", true));
@@ -141,7 +141,7 @@ public record Project(
                         : null;
                 repositories.putIfAbsent("maven",
                         MavenDefaultRepository.ofEnvironment(project.environment(), discovery)
-                                .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                                .cached(project.artifacts() == null ? null : skipped(project.artifacts())));
                 repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofEnvironment(project.environment()));
                 if (discovery != null) {
                     repositories.putIfAbsent(DiscoverySources.NAME,
@@ -153,7 +153,7 @@ public record Project(
                 inherited.sequencedKeySet().stream()
                         .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + METADATA + "/"))
                         .forEach(mavenDeps::add);
-                sub.addModule(ProjectPlugins.PREPROCESS, project.plugins().preprocess(project.profiles()));
+                sub.addModule(ProjectPlugins.PREPROCESS, project.toolPlugins().preprocess(project.profiles()));
                 mavenDeps.add(ProjectPlugins.PREPROCESS);
                 Function<List<Path>, SequencedSet<Path>> locations =
                         locals -> configurations(locals, project.configuration(), project.profiles());
@@ -181,7 +181,7 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               mavenDeps);
-                sub.addModule(ProjectPlugins.POSTPROCESS, project.plugins().postprocess(project.profiles()), "maven");
+                sub.addModule(ProjectPlugins.POSTPROCESS, project.toolPlugins().postprocess(project.profiles()), "maven");
             }, METADATA);
             SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
             trees.put("maven", MavenRepositoryStaging.ofEnvironment(project.environment()));
@@ -190,29 +190,28 @@ public record Project(
             trees.put("docker", new ImageStaging("docker"));
             trees.put("reports", new ReportStaging());
             trees.put(ProjectPlugins.PROJECT, new ProjectFiles());
-            executor.addModule(STAGE, project.plugins().stage(project.profiles(), trees), BUILD);
-            executor.addModule(EXPORT, (export, inherited) -> {
-                export.addStep("maven", MavenRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/maven");
-                project.plugins().export(project.profiles()).accept(export, inherited);
-            }, STAGE);
+            executor.addModule(STAGE, project.toolPlugins().stage(project.profiles(), trees), BUILD);
+            executor.addModule(EXPORT, (export, _) -> export.addStep("maven", MavenRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/maven"), STAGE);
             String prefix = BUILD + "/maven/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
-            executor.addModule(PIN, PinModule.ofEnvironment(project.environment(),
-                    project.root(),
-                    "pom.xml",
-                    (path, file) -> PinPom.ofEnvironment(project.environment(), "maven", path, List.of(file), project.hashFunction()),
-                    project.hashFunction()).plugins(project.plugins()), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", Tree.ofEnvironment(project.environment()), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
             executor.addModule(RELEASE, (release, inherited) -> {
-                ReleaseModule.ofEnvironment(project.environment(), project.root(), project.version()).accept(release, inherited);
-                project.plugins().release(project.profiles()).accept(release, inherited);
-            }, STAGE);
-            executor.addModule(PLUGIN, project.plugins().goal(project.profiles()));
+                ReleaseModule.ofEnvironment(project.environment()).accept(release, inherited);
+                project.toolPlugins()
+                        .release(configurations((Path) null, project.configuration(), project.profiles()), project.root())
+                        .accept(release, inherited);
+            }, STAGE, METADATA);
+            executor.addModule(PIN, PinModule.ofEnvironment(project.environment(),
+                    project.root(),
+                    "pom.xml",
+                    (path, file) -> PinPom.ofEnvironment(project.environment(), "maven", path, List.of(file), project.hashFunction()),
+                    project.hashFunction()).plugins(project.toolPlugins()), BUILD, RELEASE);
+            executor.addModule(PLUGIN, project.toolPlugins().goal(project.profiles()));
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
-                return prefix + "/module-" + BuildExecutorModule.encodePath(module)
+                return prefix + "/" + AssemblyDescriptor.BUILD + "-module-" + BuildExecutorModule.encodePath(module)
                         + (slash == -1 ? "" : "/" + name.substring(slash + 1));
             };
         };
@@ -225,7 +224,7 @@ public record Project(
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(PROMPT, new PromptModule(project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
-            MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(assembler, project.hashFunction());
+            MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await")), project.hashFunction());
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
                 Discovery discovery = project.environment().flag("repository.discovery")
@@ -235,7 +234,7 @@ public record Project(
                         JenesisRepository.ofEnvironment(project.environment(),
                                         JenesisRepository.Scope.MODULE,
                                         discovery)
-                                .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                                .cached(project.artifacts() == null ? null : skipped(project.artifacts())));
                 repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofEnvironment(project.environment()));
                 if (discovery != null) {
                     repositories.putIfAbsent(DiscoverySources.NAME,
@@ -247,7 +246,7 @@ public record Project(
                 inherited.sequencedKeySet().stream()
                         .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + METADATA + "/"))
                         .forEach(modulesDeps::add);
-                sub.addModule(ProjectPlugins.PREPROCESS, project.plugins().preprocess(project.profiles()));
+                sub.addModule(ProjectPlugins.PREPROCESS, project.toolPlugins().preprocess(project.profiles()));
                 modulesDeps.add(ProjectPlugins.PREPROCESS);
                 sub.addModule("modules",
                               ModularProject.make(project.environment(),
@@ -279,7 +278,7 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
-                sub.addModule(ProjectPlugins.POSTPROCESS, project.plugins().postprocess(project.profiles()), "modules");
+                sub.addModule(ProjectPlugins.POSTPROCESS, project.toolPlugins().postprocess(project.profiles()), "modules");
             }, METADATA);
             SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
             trees.put("modular", ModularStaging.ofEnvironment(project.environment()));
@@ -290,29 +289,28 @@ public record Project(
             trees.put("docker", new ImageStaging("docker"));
             trees.put("reports", new ReportStaging());
             trees.put(ProjectPlugins.PROJECT, new ProjectFiles());
-            executor.addModule(STAGE, project.plugins().stage(project.profiles(), trees), BUILD);
-            executor.addModule(EXPORT, (export, inherited) -> {
-                export.addStep("modular", JenesisModuleRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/modular");
-                project.plugins().export(project.profiles()).accept(export, inherited);
-            }, STAGE);
+            executor.addModule(STAGE, project.toolPlugins().stage(project.profiles(), trees), BUILD);
+            executor.addModule(EXPORT, (export, _) -> export.addStep("modular", JenesisModuleRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/modular"), STAGE);
             String prefix = BUILD + "/modules/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
-            executor.addModule(PIN, PinModule.ofEnvironment(project.environment(),
-                    project.root(),
-                    "module-info.java",
-                    (path, file) -> PinModuleInfo.ofEnvironment(project.environment(), "module", path, List.of(file), project.hashFunction()),
-                    project.hashFunction()).plugins(project.plugins()), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", Tree.ofEnvironment(project.environment()), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
             executor.addModule(RELEASE, (release, inherited) -> {
-                ReleaseModule.ofEnvironment(project.environment(), project.root(), project.version()).accept(release, inherited);
-                project.plugins().release(project.profiles()).accept(release, inherited);
-            }, STAGE);
-            executor.addModule(PLUGIN, project.plugins().goal(project.profiles()));
+                ReleaseModule.ofEnvironment(project.environment()).accept(release, inherited);
+                project.toolPlugins()
+                        .release(configurations((Path) null, project.configuration(), project.profiles()), project.root())
+                        .accept(release, inherited);
+            }, STAGE, METADATA);
+            executor.addModule(PIN, PinModule.ofEnvironment(project.environment(),
+                    project.root(),
+                    "module-info.java",
+                    (path, file) -> PinModuleInfo.ofEnvironment(project.environment(), "module", path, List.of(file), project.hashFunction()),
+                    project.hashFunction()).plugins(project.toolPlugins()), BUILD, RELEASE);
+            executor.addModule(PLUGIN, project.toolPlugins().goal(project.profiles()));
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
-                return prefix + "/module-" + BuildExecutorModule.encodePath(module)
+                return prefix + "/" + AssemblyDescriptor.BUILD + "-module-" + BuildExecutorModule.encodePath(module)
                         + (slash == -1 ? "" : "/" + name.substring(slash + 1));
             };
         };
@@ -325,7 +323,7 @@ public record Project(
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(PROMPT, new PromptModule(project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
-            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler,
+            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await")),
                     BuildExecutorModule.PREVIOUS.repeat(2) + MultiProjectModule.MANIFESTS,
                     "module",
                     project.environment().flag("maven.embed", true));
@@ -337,12 +335,12 @@ public record Project(
                         : null;
                 repositories.putIfAbsent("maven",
                         MavenDefaultRepository.ofEnvironment(project.environment(), discovery)
-                                .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                                .cached(project.artifacts() == null ? null : skipped(project.artifacts())));
                 repositories.putIfAbsent("module",
                         JenesisRepository.ofEnvironment(project.environment(),
                                         JenesisRepository.Scope.ARTIFACT,
                                         discovery)
-                                .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                                .cached(project.artifacts() == null ? null : skipped(project.artifacts())));
                 repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofEnvironment(project.environment()));
                 if (discovery != null) {
                     repositories.putIfAbsent(DiscoverySources.NAME,
@@ -357,7 +355,7 @@ public record Project(
                 inherited.sequencedKeySet().stream()
                         .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + METADATA + "/"))
                         .forEach(modulesDeps::add);
-                sub.addModule(ProjectPlugins.PREPROCESS, project.plugins().preprocess(project.profiles()));
+                sub.addModule(ProjectPlugins.PREPROCESS, project.toolPlugins().preprocess(project.profiles()));
                 modulesDeps.add(ProjectPlugins.PREPROCESS);
                 sub.addModule("modules",
                               ModularProject.make(project.environment(),
@@ -385,7 +383,7 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
-                sub.addModule(ProjectPlugins.POSTPROCESS, project.plugins().postprocess(project.profiles()), "modules");
+                sub.addModule(ProjectPlugins.POSTPROCESS, project.toolPlugins().postprocess(project.profiles()), "modules");
             }, METADATA);
             SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
             trees.put("maven", MavenRepositoryStaging.ofEnvironment(project.environment()));
@@ -397,31 +395,33 @@ public record Project(
             trees.put("docker", new ImageStaging("docker"));
             trees.put("reports", new ReportStaging());
             trees.put(ProjectPlugins.PROJECT, new ProjectFiles());
-            executor.addModule(STAGE, project.plugins().stage(project.profiles(), trees), BUILD);
-            executor.addModule(EXPORT, (export, inherited) -> {
+            executor.addModule(STAGE, project.toolPlugins().stage(project.profiles(), trees), BUILD);
+            executor.addModule(EXPORT, (export, _) -> {
                 export.addStep("maven", MavenRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/maven");
                 export.addStep("modular", JenesisModuleRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/modular");
-                project.plugins().export(project.profiles()).accept(export, inherited);
             }, STAGE);
             String prefix = BUILD + "/modules/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
+            executor.addStep(DEPENDENCIES, Tree.ofEnvironment(project.environment()), BUILD);
+            executor.addModule(IDE, new Ide(project.root()), BUILD);
+            executor.addModule(RELEASE, (release, inherited) -> {
+                ReleaseModule.ofEnvironment(project.environment()).accept(release, inherited);
+                project.toolPlugins()
+                        .release(configurations((Path) null, project.configuration(), project.profiles()), project.root())
+                        .accept(release, inherited);
+            }, STAGE, METADATA);
             executor.addModule(PIN,
                     PinModule.ofEnvironment(project.environment(),
                             project.root(),
                             "module-info.java",
                             (path, file) -> PinModuleInfo.ofEnvironment(project.environment(), "module", path, List.of(file), project.hashFunction()),
-                            project.hashFunction()).plugins(project.plugins()),
-                    BUILD);
-            executor.addStep(DEPENDENCIES, Tree.ofEnvironment(project.environment()), BUILD);
-            executor.addModule(IDE, new Ide(project.root()), BUILD);
-            executor.addModule(RELEASE, (release, inherited) -> {
-                ReleaseModule.ofEnvironment(project.environment(), project.root(), project.version()).accept(release, inherited);
-                project.plugins().release(project.profiles()).accept(release, inherited);
-            }, STAGE);
-            executor.addModule(PLUGIN, project.plugins().goal(project.profiles()));
+                            project.hashFunction()).plugins(project.toolPlugins()),
+                    BUILD,
+                    RELEASE);
+            executor.addModule(PLUGIN, project.toolPlugins().goal(project.profiles()));
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
-                return prefix + "/module-" + BuildExecutorModule.encodePath(module)
+                return prefix + "/" + AssemblyDescriptor.BUILD + "-module-" + BuildExecutorModule.encodePath(module)
                         + (slash == -1 ? "" : "/" + name.substring(slash + 1));
             };
         };
@@ -577,9 +577,12 @@ public record Project(
                       %{name}stage%{reset}         Stage produced artifacts into a local repository
                       %{name}export%{reset}        Export the staged repository as the build deliverable
                       %{name}release%{reset}       Release the staged trees: into jenesis.release.uri and
-                                    jenesis.deploy.uri, and by a jreleaser.yml
+                                    jenesis.deploy.uri, and by the plugins of the hook point release;
+                                    a dry run that publishes nothing unless the command line passes
+                                    %{name}-Djenesis.release.publish=true%{reset}
                       %{name}plugin/<name>%{reset} Run a plugin the project names under the hook point plugin, on demand
-                      %{name}pin%{reset}           Rewrite version/checksum pins into pom.xml or module-info.java
+                      %{name}pin%{reset}           Rewrite version/checksum pins into pom.xml or module-info.java,
+                                    after building, staging and releasing dry what it pins
                       %{name}dependencies%{reset}  Print each module's resolved dependency graph; with
                                     %{name}-Djenesis.test.skip=true%{reset} it runs no tests on the way
                       %{name}ide%{reset}           Generate IntelliJ IDEA, VS Code, and Eclipse project metadata
@@ -724,7 +727,8 @@ public record Project(
 
                     - Never delete target/ and never pass -Djenesis.executor.rebuild=true: every step
                       is keyed by its inputs, so a build re-runs exactly what changed.
-                    - What a step produced is in %{target}/build/<step path>/output/, and
+                    - What a step produced is in %{target}/<step path>/output/ - a build step's
+                      below %{target}/build/, a staged tree's in %{target}/stage/<tree>/ - and
                       that path without the target/ prefix and /output is a selector of its own.
                     - After editing a build step's code, bump its serialVersionUID, or its cached
                       output is reused.
@@ -943,9 +947,9 @@ public record Project(
                                  local or fetched, where it declares none;
                                  sourceDirectory, testSourceDirectory and the <directory> of each
                                  resource, a local parent's where the module names none, and
-                                 beside them src/main/kotlin, src/test/kotlin, src/main/groovy and
-                                 src/test/groovy where they exist, as the Kotlin and GMavenPlus
-                                 plugins read them by default; the <!--jenesis.plugin--> and
+                                 beside them src/main/<name> and src/test/<name> where they exist
+                                 for each name -Djenesis.maven.sources lists, as kotlin,groovy where
+                                 the Kotlin and GMavenPlus plugins read those folders; the <!--jenesis.plugin--> and
                                  <!--jenesis.alias--> comments of the module's POM and of a local
                                  parent; the <!--jenesis.pin--> comment of the module's own POM,
                                  where `pin` writes it, and never a parent's;
@@ -1050,7 +1054,7 @@ public record Project(
                           var placed = Pattern.compile("(main|test)/(compile|runtime)/.+");
                           var closure = new TreeSet<Path>();
                           try (var files = Files.walk(Path.of("target/build"))) {
-                              for (var index : files.filter(file -> file.toString().contains("test-module-")
+                              for (var index : files.filter(file -> file.toString().contains("testmodule-")
                                       && file.getFileName().toString().equals("dependencies.properties")).toList()) {
                                   var dependencies = new Properties();
                                   try (var reader = Files.newBufferedReader(index)) {
@@ -1191,15 +1195,14 @@ public record Project(
                     src/test/build.jenesis/ for the tests alone, in a module-info.java build the
                     META-INF/build.jenesis/ folder beside the module's sources, and build.jenesis/ at
                     the root for every module. A tool resolves in a group named after it, such as
-                    checkstyle, pmd or jacoco, and once per module, since each module resolves alone.
+                    checkstyle or jacoco, and once per module, since each module resolves alone.
                     A pom.xml pins it with a comment that is a child of <project>, one coordinate per
                     line, `<!--jenesis.pin checkstyle/maven/<groupId>/<artifactId> <version>-->`,
                     which `pin` completes with the tool's closure. That comment is the module's own:
                     `pin` writes it into every module's POM and a parent's is not inherited, while a
                     <!--jenesis.plugin--> comment is, from a local parent but never from a POM that only
                     lists the module under <modules>. A module-info.java pins it with
-                    @jenesis.pin checkstyle/maven/<groupId>/<artifactId> <version>. JaCoCo's
-                    agent follows the release its group pins for the CLI. Configuration that lived
+                    @jenesis.pin checkstyle/maven/<groupId>/<artifactId> <version>. Configuration that lived
                     inside a plugin moves here:
 
                       compilerArgs, options.compilerArgs   process-javac.properties
@@ -1337,7 +1340,13 @@ public record Project(
                     -Djenesis.test.jars=false runs them against its classes and resources folders
                     instead, as Maven does, while the modules it depends on stay jars. A build prints
                     no test totals: -Djenesis.print.tests streams the runner's summary, and the test
-                    step's supplement/output keeps it.
+                    step's supplement/output keeps it. A test run writes no report unless
+                    -Djenesis.test.reporting=true asks for the legacy JUnit XML and the
+                    open-test-reporting XML in the module's reports/tests, whose folder a failed run
+                    then names above the runner's output: pass it when a failure needs the record of
+                    every test, as when more tests failed than the printed tail of the output holds,
+                    or when CI reads the reports, and leave it off otherwise, as writing them slows a
+                    test run.
 
                     A plugin the registry marks as having no built-in is either something done
                     differently here, which the line names, or a plugin to write: skill/extend.
@@ -1349,7 +1358,9 @@ public record Project(
                     with a pre-release qualifier such as -rc-1 or -M2 while a version without one
                     is published, so the first pin also settles those. `pin` runs the build it
                     pins, so whatever the changed versions reach, a module's tests included, runs
-                    again; -Djenesis.test.skip=true leaves the tests to the next build.
+                    again; -Djenesis.test.skip=true leaves the tests to the next build. It runs
+                    last, after `stage` and a dry `release`, so the tool of a release plugin such
+                    as JReleaser is resolved and pinned with the rest.
                     Commit before the first `pin`. It rewrites each pom.xml's <dependencyManagement>
                     with the versions and checksums it resolved, keeping only the imported BOMs, so
                     review that diff. An entry keeps the ${...} its coordinate was written with, and
@@ -1376,11 +1387,11 @@ public record Project(
                     Remove what Jenesis now replaces - the plugin configuration, the wrapper and the CI
                     steps that called it. A CI job that built runs `java
                     -Djenesis.dependency.pin=strict build/jenesis/Make.java`; one that published
-                    runs the `release` selector, which stages first, with a jreleaser.yml at the
-                    root, JReleaser installed on the runner, the version as
-                    -Djenesis.project.version and -Djenesis.jreleaser.dry=false. The job's
-                    credentials become the JRELEASER_* variables JReleaser reads, which the release
-                    is handed (72). A job that deployed to a repository of its own rather than to
+                    runs the `release` selector with -Djenesis.release.publish=true, which stages
+                    first, with a jreleaser.yml at the project's root, and the version as
+                    -Djenesis.project.version. Without that setting, `release` and every `pin` run
+                    the release dry and publish nothing. The job's credentials become the JRELEASER_*
+                    variables JReleaser reads (72). A job that deployed to a repository of its own rather than to
                     Maven Central names it in MAVEN_RELEASE_URI and its key in MAVEN_RELEASE_TOKEN
                     instead (72). Then let `ide` write the IntelliJ, VS Code or Eclipse
                     project so no IDE depends on the old build: one IDE module per module, its
@@ -1427,42 +1438,52 @@ public record Project(
                           -> maven.compiler.testRelease in pom.xml, the test module's @jenesis.release
                       compilerArgs / options.compilerArgs -> process-javac.properties (13)
                       maven-compiler-plugin fork with -J options, meminitial, maxmem
-                          -> jenesis.process.factory=fork in jenesis.properties and -J<option>= in
-                          process-javac.properties; javac otherwise runs in the build's JVM, which
-                          refuses a -J option
+                          -> -J<option>= in process-javac.properties, which runs javac in a JVM of
+                          its own, as the build's JVM refuses a -J option
                       annotationProcessorPaths / annotationProcessor -> @jenesis.plugin (14, 42)
                       Error Prone / net.ltgt.errorprone
-                          -> errorprone.properties with @jenesis.plugin javac <coordinate> (15), in
-                          a pom.xml <!--jenesis.plugin javac maven/<groupId>/<artifactId>-->
-                      kotlin-maven-plugin / kotlin("jvm") -> .kt sources, found on their own (45, 47);
+                          -> @jenesis.plugin javac <coordinate>, in a pom.xml
+                          <!--jenesis.plugin javac maven/<groupId>/<artifactId>-->, with the javac
+                          options it needs in process-javac.properties (15)
+                      kotlin-maven-plugin / kotlin("jvm") -> .kt sources, found on their own and
+                          compiled by the Kotlin plugin the build resolves for every module that
+                          holds one (45, 47); a pom.xml build names src/main/kotlin as
+                          jenesis.maven.sources=kotlin in jenesis.properties, as it does groovy;
                           the tests see the tested module's internal declarations, as the tested jar
                           is their friend path, so no -Xfriend-paths is written; kotlin-stdlib, which
                           kotlin("jvm") adds on its own, is declared, as kotlinc compiles against the
-                          module's dependencies alone; a Kotlin Multiplatform library is named by its
-                          JVM variant, <artifactId>-jvm, where its root artifact holds no class and its
-                          POM does not depend on that variant, as Gradle module metadata is not read;
-                          Gradle's incremental Kotlin compilation (kotlin.incremental, the default) is
-                          jenesis.kotlin.incremental=true, which needs Kotlin 2.3 or newer and
-                          pins org.jetbrains.kotlin:kotlin-build-tools-impl in the group kotlinc
-                      scala-maven-plugin / scala -> .scala sources, compiled by Scala 3 (49); Scala 2
-                          is not supported; the incremental compilation of Zinc, which sbt, Gradle and
-                          the plugin's recompileMode=incremental use, is
+                          module's dependencies alone; a compiler plugin is
+                          @jenesis.plugin kotlin:tool <coordinate>; a Kotlin Multiplatform library is named
+                          by its JVM variant, <artifactId>-jvm, where its root artifact holds no class
+                          and its POM does not depend on that variant, as Gradle module metadata is
+                          not read; Gradle's incremental Kotlin compilation (kotlin.incremental, the
+                          default) is jenesis.kotlin.incremental=true, which needs Kotlin 2.3 or newer
+                      scala-maven-plugin / scala -> .scala sources, compiled by the Scala plugin
+                          the build resolves where a module holds one, with Scala 3 (49);
+                          Scala 2 is not supported; the incremental compilation of Zinc, which sbt,
+                          Gradle and the plugin's recompileMode=incremental use, is
                           jenesis.scala.incremental=true
-                      gmavenplus / groovy -> .groovy sources, compiled by Groovy 4 or newer after
-                          javac (51), so Groovy uses Java types and Java no Groovy type: gmavenplus
-                          stubs for a joint compilation have no counterpart, and Java code that uses
-                          Groovy moves to a module that requires the Groovy one
-                      jaxb2-maven-plugin / a JAXB plugin -> xjc.properties (17)
-                      protobuf-maven-plugin / com.google.protobuf -> protoc.properties (17)
-                      avro-maven-plugin / an Avro plugin -> avro.properties (17)
-                      jaxws-maven-plugin / a JAX-WS plugin -> wsimport.properties (18)
-                      openapi-generator-maven-plugin / org.openapi.generator
-                          -> openapi.properties (18)
-                      antlr4-maven-plugin / antlr -> antlr.properties (19)
+                      gmavenplus / groovy -> .groovy sources, compiled by the Groovy plugin the
+                          build resolves where a module holds one, with Groovy 4 or newer after javac, so Groovy uses Java types and Java no Groovy type:
+                          gmavenplus stubs for a joint compilation have no counterpart, and Java code
+                          that uses Groovy moves to a module that requires the Groovy one
+                      jaxb2-maven-plugin / a JAXB plugin -> xjc.properties, binding the schemas
+                          as @schemas/xjc=<folder> (17)
+                      protobuf-maven-plugin / com.google.protobuf -> protoc.properties, binding
+                          the definitions as @definitions/protoc=<folder> (17); protoc is a per-platform
+                          executable, so each platform needs its own checksum pin
+                      avro-maven-plugin / an Avro plugin -> avro.properties, binding the
+                          schemas as @schemas/avro=<folder> (17)
+                      jaxws-maven-plugin / a JAX-WS plugin -> wsimport.properties, binding the
+                          descriptions as @descriptions/wsimport=<folder> (18)
+                      openapi-generator-maven-plugin / org.openapi.generator -> openapi.properties,
+                          binding the specification as @specification/openapi/openapi.yaml=<file> (18)
+                      antlr4-maven-plugin / antlr -> antlr.properties, binding the grammars as
+                          @grammars/antlr=<folder> (19)
                       com.google.devtools.ksp / ksp(...) dependencies -> ksp.properties (48), each ksp(...)
-                          processor as @jenesis.plugin ksp <coordinate> or a pom.xml
-                          <!--jenesis.plugin ksp maven/<groupId>/<artifactId>-->, and ksp { arg(...) }
-                          as the lines of ksp.properties
+                          processor as @jenesis.plugin ksp:processor <coordinate> or a pom.xml
+                          <!--jenesis.plugin ksp:processor maven/<groupId>/<artifactId>-->, and ksp { arg(...) }
+                          as its lines
                       javacc-maven-plugin, JJTree / org.javacc.javacc -> no built-in; a plugin at
                           binary/generated that forks JavaCC, which the project resolves with
                           @jenesis.plugin javacc maven/<groupId>/<artifactId>, in a pom.xml
@@ -1495,20 +1516,22 @@ public record Project(
 
                     ## Check and test
 
-                      maven-checkstyle-plugin / checkstyle -> checkstyle.xml (37), with the
-                          properties of its propertyExpansion or Gradle's configProperties in a
-                          checkstyle.properties beside it; the build sets ${config_loc} itself;
+                      maven-checkstyle-plugin / checkstyle -> checkstyle.xml (37), with the files
+                          it names as ${config_loc}/<path> beside it, and checkstyle.properties
+                          for its propertyExpansion or Gradle's configProperties; the build sets
+                          ${config_loc} itself;
                           a jar of custom checks among the plugin's dependencies -> @jenesis.plugin
-                          checkstyle maven/<groupId>/<artifactId>, in a pom.xml
-                          <!--jenesis.plugin checkstyle maven/<groupId>/<artifactId>-->
-                      maven-pmd-plugin / pmd -> pmd.xml (37); minimumPriority / rulesMinimumPriority
-                          -> jenesis.pmd.priority
+                          checkstyle:tool maven/<groupId>/<artifactId>, in a pom.xml
+                          <!--jenesis.plugin checkstyle:tool maven/<groupId>/<artifactId>-->
+                      maven-pmd-plugin / pmd -> pmd.xml (37); minimumPriority /
+                          rulesMinimumPriority -> jenesis.pmd.priority
                       spotbugs-maven-plugin / com.github.spotbugs -> spotbugs-exclude.xml (37)
                       forbiddenapis (de.thetaphi) check and testCheck / the same
-                          -> forbiddenapis.properties (37), checking main and test classes alike:
+                          -> forbiddenapis.properties (37), checking main and test classes alike,
+                          which takes
                           bundledSignatures -> bundled=jdk-unsafe,jdk-deprecated,..., a JDK
                           version appended from the classes' release as targetVersion would;
-                          signaturesFiles -> signatures=<files beside or below it>;
+                          signaturesFiles -> signatures=<files beside it>;
                           suppressAnnotations -> suppress; includes, excludes;
                           signaturesWithSeverityWarn -> warn; failOnMissingClasses=false ->
                           allowmissingclasses; ignoreSignaturesOfMissingClasses ->
@@ -1526,26 +1549,23 @@ public record Project(
                       fmt-maven-plugin, Spotless googleJavaFormat() / the same
                           -> javaformat.properties with formatter=google (37), which verifies and
                           fails the build on an unformatted source; -Djenesis.format.rewrite=true
-                          rewrites. style AOSP, googleJavaFormat().aosp() -> style=aosp;
-                          formatJavadoc(false) -> javadoc=false; skipReflowingLongStrings ->
-                          reflow=false, which a Spotless googleJavaFormat() without
-                          reflowLongStrings() needs as well, as Spotless leaves a long string as it
-                          is where the formatter's own command line reflows it; skipSortingImports
-                          and skipRemovingUnusedImports -> imports=remove, imports=sort, or
-                          imports=none for both. A key the formatter does not take is refused
+                          rewrites. It takes style=aosp for googleJavaFormat().aosp(), javadoc=false for
+                          formatJavadoc(false), reflow=false for skipReflowingLongStrings, which a
+                          Spotless googleJavaFormat() without reflowLongStrings() needs as well, and
+                          imports=remove, imports=sort or imports=none for skipSortingImports and
+                          skipRemovingUnusedImports
                       Spotless palantirJavaFormat() / com.palantir.java-format, the same
                           -> formatter=palantir, which takes reflow and imports alike
                       Spotless eclipse().configFile(...), formatter-maven-plugin (net.revelc)
-                          configFile -> formatter=eclipse and profile=<file>, the profile Eclipse
-                          exports, beside or below javaformat.properties (37); the formatter
-                          reads the newest Java its release knows, whatever compiler level the
-                          profile names, and Spotless's importOrder and the formatter plugin's
-                          import and cache settings have no counterpart
-                      Spotless ktfmt() / the same -> ktfmt.properties, in place of ktlint's
-                          formatting (46): style=google for googleStyle(), kotlinlang for
-                          kotlinlangStyle(), meta, the default, otherwise; removeUnusedImports
-                          false -> imports=sort; maxWidth and the indents have no counterpart, as
-                          ktfmt's command line takes none
+                          configFile -> formatter=eclipse with profile=<the profile Eclipse exports,
+                          beside it> (37); Spotless's importOrder and the
+                          formatter plugin's import and cache settings have no counterpart
+                      Spotless ktlint() / the same -> .editorconfig (46)
+                      Spotless ktfmt() / the same -> ktfmt.properties (46): style=google for googleStyle(),
+                          kotlinlang for kotlinlangStyle(), meta, the default, otherwise;
+                          removeUnusedImports false -> imports=sort; maxWidth and the indents have
+                          no counterpart, as ktfmt's command line takes none
+                      Spotless scalafmt() / the same -> .scalafmt.conf (50)
                       Spotless licenseHeader(), licenseHeaderFile() / the same,
                           license-maven-plugin (com.mycila) check and format
                           -> licenseheader.properties (37), text=<the header>, which every Java,
@@ -1555,9 +1575,12 @@ public record Project(
                           and mycila's ${...} properties are written out, a year included; without
                           text, the header is // SPDX-FileCopyrightText: <copyright> and
                           // SPDX-License-Identifier: <id> of the one license the project declares
-                      detekt, ktlint / the same -> detekt.yml, .editorconfig (46)
-                      scalastyle, scalafmt / the same -> scalastyle-config.xml, .scalafmt.conf (50)
-                      codenarc / codenarc -> codenarc.xml (52)
+                      detekt, ktlint / the same -> the detekt and ktlint plugins at the hook point
+                          check, binding detekt.yml and .editorconfig (46)
+                      scalastyle, scalafmt / the same -> the scalastyle and scalafmt plugins at the
+                          hook point check, binding scalastyle-config.xml and .scalafmt.conf (50)
+                      codenarc / codenarc -> the CodeNarc plugin at the hook point check, binding
+                          codenarc.xml (52)
                       maven-surefire-plugin / test -> on by default; test.properties names the
                           framework where inference does not (38), and only changed tests re-run (40)
                       surefire systemPropertyVariables of ${project.artifactId} or ${project.version}
@@ -1582,7 +1605,8 @@ public record Project(
                           -> no phase of its own: -Djenesis.test.tag, or a @jenesis.test module
                       jacoco-maven-plugin / jacoco -> jacoco.properties, a report (39); the check
                           goal's bundle rules / jacocoTestCoverageVerification -> minimum.<counter>
-                          (a covered ratio) and maximum.missed.<counter> there, which fail the build
+                          (a covered ratio) and maximum.missed.<counter> in it,
+                          which fail the build
                       pitest-maven / info.solidsoft.pitest -> pitest.properties (41)
                       jmh-maven-plugin / me.champeau.jmh -> @jenesis.plugin and @jenesis.main (42)
                       byte-buddy-maven-plugin / net.bytebuddy.byte-buddy-gradle-plugin -> no built-in:
@@ -1591,15 +1615,17 @@ public record Project(
                           binary/transform constructs the net.bytebuddy.build.Plugin instances in Java,
                           with values from plugin-<name>.properties, and runs them with Plugin.Engine
                           over the module's compiled classes and its compile class path (63)
-                      japicmp-maven-plugin / me.champeau.gradle.japicmp -> japicmp.properties (44)
-                      revapi-maven-plugin / org.revapi.revapi-gradle-plugin -> revapi.properties (44):
-                          oldArtifacts -> baseline=<groupId>/<artifactId>[/<version>], the last
-                          release by default; failSeverity -> severity=equivalent|non-breaking|
-                          potentially-breaking|breaking, the least severe difference reported;
-                          analysisConfiguration or analysisConfigurationFiles -> configuration=<a JSON
-                          file beside it>, revapi's own configuration as an array of extensions, as
-                          revapi.differences ignores; failing the build ->
-                          jenesis.artifact.revapi=strict
+                      japicmp-maven-plugin / me.champeau.gradle.japicmp -> japicmp.properties (44),
+                          which takes the plugin's parameters
+                      revapi-maven-plugin / org.revapi.revapi-gradle-plugin -> revapi.properties
+                          (44): oldArtifacts ->
+                          baseline=<groupId>/<artifactId>[/<version>], the last release by default;
+                          failSeverity -> severity=equivalent|non-breaking|potentially-breaking|
+                          breaking, the least severe difference reported; analysisConfiguration or
+                          analysisConfigurationFiles -> configuration=<a JSON file beside it>,
+                          revapi's own configuration as an array of
+                          extensions, as revapi.differences ignores; failing the build ->
+                          jenesis.artifact.revapi=strict; a test module is never compared
 
                     ## Dependencies
 
@@ -1647,7 +1673,10 @@ public record Project(
                           jenesis.project.version names one
                       maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (8, 72),
                           whose jar holds the sources and, as Maven's and Gradle's do, the resources,
-                          including those of -Djenesis.project.resources
+                          including those of -Djenesis.project.resources; set it, and the next one,
+                          in the profile a release activates, such as jenesis-release.properties,
+                          never in jenesis.properties, so that a regular build neither archives the
+                          sources nor renders the documentation and nothing waits for either
                       maven-javadoc-plugin / withJavadocJar(), Dokka
                           -> -Djenesis.project.documentation=true (8, 72), which documents
                           the main modules, a test module only under jenesis.stage.tests, one with a
@@ -1656,8 +1685,8 @@ public record Project(
                           -Xdoclint:none unless process-javadoc.properties names an -Xdoclint flag,
                           and fails the build on an error, -Werror= making a warning one;
                           excludePackageNames -> -exclude=<package>[:<package>...] there, which
-                          leaves those packages and their subpackages undocumented; Dokka, which
-                          documents Kotlin sources, fails the build as javadoc does when it fails
+                          leaves those packages and their subpackages undocumented; the language
+                          plugins document their sources beside it, the Kotlin plugin with Dokka
                       maven-jar-plugin <classifier> executions, build-helper attach-artifact of a
                           prepared file -> classifiers.properties, one <classifier>=<folder>[,...]
                           line per variant: the module's jar plus each folder's files, staged
@@ -1679,23 +1708,19 @@ public record Project(
                           new Javac(ProcessHandler.Factory.of()).headers(true), which compiles the
                           module's sources and hands on nothing but headers/, one header per class
                           with a native method, for the C compiler's include path (66)
-                      dokka-maven-plugin / org.jetbrains.dokka -> dokka.properties (45), whose
-                          files are resolved against the module's folder and are inputs of the
-                          build: moduleName -> module-name (documentation by default), includes ->
-                          includes=<file>[,<file>...], documentedVisibilities ->
+                      dokka-maven-plugin / org.jetbrains.dokka -> dokka.properties (45): moduleName
+                          -> module-name (documentation by default), documentedVisibilities ->
                           documented-visibilities=public,internal,..., suppressObviousFunctions,
                           suppressInheritedMembers, skipEmptyPackages, skipDeprecated,
                           reportUndocumented and failOnWarning -> the same names in kebab case,
-                          perPackageOption suppress -> suppressed-packages=<regex>[,<regex>...],
+                          perPackageOption suppress -> suppressed-packages=<regex>[,...],
                           jdkVersion -> jdk-version, sourceLink -> source-link=<the URL of the
-                          source folder> and source-link-suffix (#L by default), one URL for every
-                          source folder of the module, externalDocumentationLink ->
-                          external-link.<name>=<url> and external-link.<name>.package-list,
-                          dokkaJavadoc / the javadoc format -> format=javadoc, the DokkaBase
-                          plugin's customAssets, customStyleSheets and footerMessage ->
-                          custom-assets, custom-styles and footer-message; an unknown key fails
-                          the build, and a Gradle source set or a multi-module aggregate has no
-                          counterpart: each module is documented on its own
+                          source folder> and source-link-suffix (#L by default),
+                          externalDocumentationLink -> external-link.<name>=<url> and
+                          external-link.<name>.package-list, dokkaJavadoc / the javadoc format ->
+                          format=javadoc, the DokkaBase plugin's footerMessage -> footer-message; includes, customAssets and customStyleSheets have
+                          no counterpart, an unknown key fails the build, and a Gradle source set or
+                          a multi-module aggregate has none either: each module is documented alone
                       maven-shade-plugin / shadow -> launcher=true, one executable jar (9)
                       Spring Boot repackage / bootJar -> launcher=true, one executable jar (9), or
                           bundle=true, its jars and the argument file that launches them (11)
@@ -1717,14 +1742,14 @@ public record Project(
                           setting on the command line
                       deploy to Maven Central, central-publishing, maven-gpg-plugin / maven-publish
                           to Central, signing
-                          -> `release` with a jreleaser.yml, handed JRELEASER_PROJECT_VERSION from
-                          jenesis.project.version, which a pom.xml build sets for a release whose
-                          configuration names no version (72). JReleaser
-                          is not resolved like the other tools but run as the `jreleaser` program
-                          on the PATH, or the one jenesis.jreleaser.executable names, so it is
-                          installed apart from the build. It runs with --dry-run, publishing
-                          nothing, unless -Djenesis.jreleaser.dry=false, as jenesis.jreleaser.dry
-                          defaults to true
+                          -> `release` with a jreleaser.yml at the project's root, which runs
+                          JReleaser in the build's JVM in the project's root, with the
+                          version the build resolved, which a pom.xml build sets as
+                          jenesis.project.version for a release whose configuration names none, and
+                          the staged trees as template properties (72), the values of a
+                          jreleaser.properties beside the configuration, and with --dry-run,
+                          publishing nothing, unless the command line passes
+                          -Djenesis.release.publish=true
                       distributionManagement <relocation> / a relocated publication -> kept: a
                           module that relocates its artifact is staged as its POM alone, the
                           relocation in it, and fails the build if it holds sources (3)
@@ -1808,17 +1833,18 @@ public record Project(
                     what the step wrote and a .jenesis.failed marker beside its output/ and
                     supplement/, until the step runs again. A tool that fails prints the last 200
                     lines of its output and of its error (jenesis.process.tail), out of how many,
-                    naming the file under supplement/ that holds all of them; a failed test run
-                    first names its failed tests, read from the reports the runner writes under
-                    supplement/ (or reports/tests with jenesis.test.reporting), so a test that
-                    swallows the console still says which failed. One build at a time per target:
-                    the root holds an exclusive .jenesis.lock and a second process fails fast.
+                    naming the file under supplement/ that holds all of them, which for a failed
+                    test run names each failed test as the runner printed it. One build at a time
+                    per target: the root holds an exclusive .jenesis.lock and a second process fails
+                    fast.
 
                     Read the outcome of the latest build from %{target}/.jenesis.events.jsonl rather
                     than from the progress lines, whose [EVENTS] line names the file: one JSON object
                     per line, each led by its `status`. A step's is executed, skipped, failed, loaded
                     or stored beside its `step` path, a module's resolved or failed beside its
-                    `module` path; a failure carries its `error` class and `message`, an executed or
+                    `module` path; a step and a module carry their `start` in seconds since the
+                    build began, which places them on its timeline beside how many `seconds` they
+                    took; a failure carries its `error` class and `message`, an executed or
                     skipped step the `folder` holding its output, and a failed step the `folder` ending
                     in `~` that holds what it wrote before it failed, such as a tool's reports and its
                     argument files. The first line is `started`, with the `target` folder and the
@@ -1834,13 +1860,27 @@ public record Project(
                     output/, with `cached=true` when it came from a build cache. That file never
                     reaches a checksum or a build cache.
 
+                    ## A module builds in phases
+
+                    Each module of a project builds in phases, each a module of its own beside the
+                    others under compose/module and named <phase>-<module>: build (dependencies,
+                    compilation, the jar, and the tests of a test module), verify (check, format,
+                    compliance, the validators of binary/validate, and artifact), document and source
+                    (the javadoc and sources jars, only with jenesis.project.documentation and
+                    jenesis.project.sources) and package. A phase starts once what it reads is built:
+                    a module's build waits for the builds of the modules it depends on and for nothing
+                    else, so the checks of one module never hold up another, while the build still
+                    fails once a check failed. -Djenesis.project.await=verify makes a build wait for
+                    the checks of the modules it depends on as well. +<module> selects a module's
+                    build.
+
                     ## Turn a folder into a selector
 
                     target/build/ mirrors the build graph, so any folder under it is a selector: drop
                     the `target/` prefix and any trailing `/output` or `/supplement`.
 
-                      target/build/maven/compose/module/<m>/produce/assemble/binary/artifacts/output
-                      -> build/maven/compose/module/<m>/produce/assemble/binary/artifacts
+                      target/build/maven/compose/module/build-<m>/produce/assemble/binary/artifacts/output
+                      -> build/maven/compose/module/build-<m>/produce/assemble/binary/artifacts
 
                     ## Read per-module state from the properties files
 
@@ -1937,8 +1977,9 @@ public record Project(
                       @jenesis.plugin [<group>] <token>
                           Resolve a compiler plugin or a tool apart from this module's paths, in the
                           group named first: plugin, the default, is javac's annotation processor
-                          path, javac its plugins such as Error Prone, kotlinc and scalac those
-                          compilers' plugins, any other name a group a plugin of the project reads.
+                          path, javac its plugins such as Error Prone, and any other name a group a
+                          plugin of the project reads, named <name>:<purpose> after that plugin -
+                          kotlin:tool and scala:tool the plugins of those languages' compilers.
                           A version is written into the token, as maven/<groupId>/<artifactId>/<ver>,
                           or pinned as <group>/maven/<groupId>/<artifactId>; else the newest release
                           resolves. A module of the project resolves from the build, in any group.
@@ -2194,53 +2235,7 @@ public record Project(
                                                 (Jenesis repository only)
                       licensing.properties      license check: allowed/denied/unknown/override.<coord>
                       vulnerability.properties  OSV check: severity, warn
-                      jacoco.properties         test-coverage report: minimum.<counter>, maximum.missed.<counter>
                       graal.properties          native-image reachability agent during the test run
-                      pitest.properties         PIT mutation testing
-                      japicmp.properties        japicmp compares the built jar against the last release of
-                                                the module's own coordinate, or of baseline=<groupId>/
-                                                <artifactId>[/<version>]; report-only until an
-                                                error-on-<kind> key says otherwise; a test
-                                                module is never compared
-                                                (access, include, exclude, format, ignore-missing-classes,
-                                                only-incompatible, only-modified, semantic-versioning,
-                                                error-on-binary-incompatibility, ...)
-                      revapi.properties         revapi compares the built jar against the same
-                                                baseline as japicmp, reporting what reaches severity
-                                                (potentially-breaking by default) in
-                                                reports/revapi/revapi.json; configuration=<file> merges
-                                                revapi's own JSON; a test module is never compared
-                      dokka.properties          configures Dokka, which documents a module's Kotlin
-                                                sources under -Djenesis.project.documentation=true;
-                                                the files it names are resolved against the
-                                                module's folder and are inputs of the build, and
-                                                an unknown key fails it
-                                                (module-name, includes, format=html|javadoc,
-                                                documented-visibilities, suppress-obvious-functions,
-                                                suppress-inherited-members, skip-empty-packages,
-                                                skip-deprecated, report-undocumented,
-                                                suppressed-packages, fail-on-warning, jdk-version,
-                                                source-link, source-link-suffix,
-                                                external-link.<name>[.package-list], custom-assets,
-                                                custom-styles, footer-message)
-                      errorprone.properties     turns on the Error Prone declared with
-                                                @jenesis.plugin javac <coordinate>; javac forks so the
-                                                compiler internals it reads can be exported to it
-                                                (arguments, appended to -Xplugin:ErrorProne)
-                      javaformat.properties     the Java formatter, verifying unless
-                                                -Djenesis.format.rewrite=true: formatter=google
-                                                (style=google|aosp, reflow, javadoc,
-                                                imports=sort,remove|sort|remove|none),
-                                                formatter=palantir (reflow, imports), or
-                                                formatter=eclipse (profile=<file> beside or below,
-                                                the formatter profile Eclipse exports)
-                      ktfmt.properties          ktfmt formats Kotlin in place of ktlint
-                                                (style=meta|google|kotlinlang,
-                                                imports=sort,remove|sort)
-                      forbiddenapis.properties  forbiddenapis over the compiled classes (bundled,
-                                                signatures, suppress, includes, excludes, warn,
-                                                allowmissingclasses,
-                                                ignoresignaturesofmissingclasses)
                       jdeps.properties          jdeps --jdk-internals over the compiled classes
                                                 (accept)
                       jdeprscan.properties      jdeprscan --for-removal over the compiled classes
@@ -2249,34 +2244,6 @@ public record Project(
                                                 with>, as a block comment, matched and written
                                                 exactly as it stands; without text, SPDX lines
                                                 naming the declared license and copyright
-                      xjc.properties            JAXB: every .xsd compiled, every .xjb a binding; the
-                                                generated package is compiled into the module
-                                                (folders, package, catalog, arguments)
-                      protoc.properties         every .proto compiled, the folders are the include
-                                                path, and so is every .proto of a compile dependency,
-                                                as the well-known types protobuf-java carries;
-                                                protoc is a per-platform native executable, so
-                                                each platform needs its own checksum pin, a line
-                                                guarded as (macos,aarch64) per classifier, which `pin`
-                                                refreshes only on that platform: elsewhere, write the
-                                                SHA-256 of protoc-<version>-<classifier>.exe from
-                                                Maven Central
-                                                (folders, classifier, plugins=<name>=<g>/<a>, arguments)
-                      avro.properties           .avsc and .avpr, each in its own step (folders, arguments)
-                      antlr.properties          ANTLR: every .g4 compiled into package=<name>, which
-                                                also decides where the sources land
-                                                (folders, package, arguments)
-                      ksp.properties            KSP over the module's own Kotlin and Java sources,
-                                                each line an option handed to the processors, which
-                                                @jenesis.plugin ksp <coordinate> names; the sources
-                                                they write are compiled and their resources jarred
-                      wsimport.properties       JAX-WS client from .wsdl; location=<url> is required
-                                                and states where the description is served at run time
-                                                (folders, package, catalog, arguments)
-                      openapi.properties        OpenAPI Generator; a lone .yaml/.json is the
-                                                specification, else name it with specification=<file>;
-                                                only its source folder is collected
-                                                (folders, generator, package, sources, arguments)
                       spdx.properties           extend the license alias/category tables
                       classpath.properties      make a module's jar serve the class path too: a
                                                 META-INF/services file per provides clause, checking
@@ -2301,21 +2268,15 @@ public record Project(
                                                 as Maven compiles a source and target without a
                                                 release - a guarded call of a newer API compiles
                                                 for an older release this way;
-                                                process-kotlinc.properties hands its lines to
-                                                kotlinc, as -api-version=2.0 or -java-parameters=,
-                                                and a -J<option> or -D line to the JVM running it,
-                                                as the kotlinc command does;
                                                 process-test.properties targets the test JVM, merged
                                                 over process-java.properties, which Execute, a
                                                 bundle's and a Docker context's argument files
                                                 carry as well, and an
                                                 executable jar its --add-reads, --add-exports,
                                                 --add-opens and --enable-native-access lines alone;
-                                                a linter reads only its own configuration file, and
-                                                a formatter takes its options from
-                                                javaformat.properties or ktfmt.properties, the lines
-                                                of its process-<tool>.properties being options of
-                                                the JVM it runs in
+                                                a plugin reads only what its plugin-<name>.properties
+                                                binds, the lines of its process-<tool>.properties
+                                                being options of the JVM it runs in
                       environment-<tool>.properties
                                                 variables for a program the build forks (java, test,
                                                 pitest, native-image), which otherwise sees only
@@ -2330,22 +2291,26 @@ public record Project(
                     (-Dstdout.encoding and -Dstderr.encoding) unless process-<tool>.properties names
                     another.
 
-                    Linters and the ktlint/scalafmt formatters activate from their own native config
-                    files instead (checkstyle.xml, pmd.xml, spotbugs-exclude.xml, forbiddenapis.properties, jdeps.properties, .editorconfig,
-                    .scalafmt.conf, ...). A linter reports its findings, as its setting
+                    The linters of the sources - Checkstyle, PMD, detekt, ktlint, Scalastyle, scalafmt
+                    and CodeNarc - and of the classes - SpotBugs and forbiddenapis - each activate on
+                    the tool's own configuration file in a configuration folder (checkstyle.xml,
+                    pmd.xml, detekt.yml, .editorconfig, scalastyle-config.xml, .scalafmt.conf,
+                    codenarc.xml, spotbugs-exclude.xml, forbiddenapis.properties), and the build
+                    resolves the tool's plugin from jenesis-plugins on its own, as it does the JDK's
+                    checks (jdeps.properties, jdeprscan.properties). A linter reports its findings, as its setting
                     jenesis.source.<tool> (jenesis.validator.<tool> for SpotBugs, forbiddenapis, jdeps and jdeprscan) is report by default;
                     strict fails the build on them instead, and ignore skips the linter. Whether a
                     [FINDINGS] line with their number and its report is printed is
                     jenesis.print.findings, true by default.
                     A linter that cannot load its configuration
                     fails the build either way. Checkstyle's ${config_loc} is the
-                    folder of checkstyle.xml, and a ${config_loc}/<path> it names is handed over with it.
-                    Every other ${<property>} it names is a line of a checkstyle.properties beside it,
-                    or Checkstyle fails to load it. A jar of custom checks or filters joins Checkstyle's
-                    class path when @jenesis.plugin checkstyle maven/<groupId>/<artifactId> names it,
-                    in a pom.xml <!--jenesis.plugin checkstyle maven/<groupId>/<artifactId>-->, which
-                    a local parent's POM hands to every module; it resolves in the checkstyle group,
-                    where @jenesis.pin checkstyle/maven/<groupId>/<artifactId> <version> pins it.
+                    folder its checkstyle.xml is bound into, and every other ${<property>} it names is a
+                    value of the checkstyle.properties beside it, or Checkstyle fails to load it. A jar of custom checks or filters joins Checkstyle's
+                    class path when @jenesis.plugin checkstyle:tool maven/<groupId>/<artifactId> names
+                    it, in a pom.xml <!--jenesis.plugin checkstyle:tool maven/<groupId>/<artifactId>-->,
+                    which a local parent's POM hands to every module; it resolves in the checkstyle:tool
+                    group, where @jenesis.pin checkstyle:tool/maven/<groupId>/<artifactId> <version>
+                    pins it.
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
@@ -2498,7 +2463,7 @@ public record Project(
                     which is how a local bill of materials is refreshed rather than hand-edited. Only
                     a module-info.java reads it back, by @jenesis.bom
                     pin-<name>.properties: a tool's closure, as Checkstyle's with the jars
-                    @jenesis.plugin checkstyle adds, stays a @jenesis.pin <tool>/... line that `pin`
+                    @jenesis.plugin checkstyle:tool adds, stays a @jenesis.pin <name>:tool/... line that `pin`
                     without the file writes, and a pom.xml build keeps every pin in its POMs, a
                     -SNAPSHOT from the local repository among them, whose checksum strict pinning
                     then holds until that snapshot is installed anew. Each
@@ -2522,40 +2487,54 @@ public record Project(
                 case "plugins" -> """
                     # Jenesis - Add to the stock build with plugins
 
+                    The plugins of jenesis/jenesis-plugins need no line: the build resolves each by its
+                    module name where its own file is found - checkstyle.xml, pmd.xml, xjc.properties,
+                    jacoco.properties and the like in a configuration folder, a .kt, .scala or .groovy
+                    source, a jreleaser.yml at the project's root - and that file's values reach it, so
+                    plugin-<name>.properties is for no plugin of theirs. Its setting switches it off as
+                    a built-in tool's does (jenesis.source.pmd=ignore, jenesis.generate.xjc=false, ...).
+
                     To add to the stock build, name plugins in jenesis.plugins.properties beside
                     jenesis.properties, one line each: <name>+<hook point>=<module name>, or =./<folder>
                     for a plugin compiled from source, where the hook point is a module of the build (check,
                     binary/generated, artifact, package, ...) or left out for the module build itself, and
                     =<module>@<provider> selects the provider annotated @BuildModuleName. A plugin
                     runs in a module only where plugin-<name>.properties is found in its configuration
-                    locations; a provider is created with that file's values when it declares a
-                    public constructor taking a SequencedMap of them, and with its no-argument one when
-                    the file is empty. A key @<input>[/<target>]=<path> binds a file or folder of the
+                    locations; its BuildModuleFactory creates it from that file's values, where @<key> or
+                    @<key>/<default> stands for jenesis.variable.<key> and @@ for a literal @. A key @<input>[/<target>]=<path> binds a file or folder of the
                     project, relative to the module, into an input the plugin reads as ../inputs/<input>,
                     placed at <target> inside it; one input takes a key per target, and @@<key> is the
-                    value @<key>. A path must stay within the project. A plugin adds to its module and
+                    value @<key>. A path may be @<key> as well; a folder must stay within the project,
+                    while a file may lie outside it, so one configuration serves several. A plugin adds to its module and
                     replaces nothing but the compiled classes a binary/transform plugin rewrites; a build
                     that changes what the stock steps do is an entry point of its own. A plugin runs the
                     project's code, as its tests do, so build an untrusted project with
                     -Djenesis.project.docker=true.
 
-                    Eight hook points run a plugin once for the whole project. preprocess runs as
+                    Seven hook points run a plugin once for the whole project. preprocess runs as
                     build/preprocess/custom/<name> before any module is built, sees only the inputs it
                     binds and hands the build nothing, so it can only stop it. postprocess/transform
                     and postprocess/inspect run over every module built, as
                     build/postprocess/transform/<name> and build/postprocess/inspect/<name>, before
-                    anything is staged. export and release run as export/custom/<name> and
-                    release/custom/<name> beside the stock steps of their goal, and are handed
-                    everything staged. stage/transform runs after the stock staging, and
+                    anything is staged. release runs as release/custom/<name> beside the stock steps
+                    of its goal, and is handed everything staged; export has no hook point, as it
+                    only installs on this machine what was staged. A plugin of release runs only
+                    where a configuration folder holds its plugin-<name>.properties, takes its values
+                    from that file, and is handed root.properties, naming the project's root as
+                    root and each staged tree as stage.<tree>, beside metadata.properties, the
+                    project's metadata as the build resolved it, its version included. stage/transform runs after the stock staging, and
                     what it writes under a folder named after a staged tree joins that tree, so export
                     and release ship it; stage/inspect checks the result before either runs. plugin
                     runs as plugin/<name> only when that selector is named, depends on nothing and is
                     handed only what it binds. Switch an expensive one off with
                     -Djenesis.plugin.<name>=false or in a profile, and every plugin with
-                    -Djenesis.project.plugins=false. Such a plugin
+                    -Djenesis.project.plugins=false. Any other such plugin
                     reads its values as <name>.<key> from jenesis.plugins.arguments.properties, and
                     from a jenesis.plugins.arguments-<profile>.properties per active profile, and pin
-                    writes its pins to jenesis.plugins.pin.properties. A transform adds files to a
+                    writes its pins to jenesis.plugins.pin.properties. A releaser reads
+                    jenesis.release.publish and publishes nothing without it, and pin runs last, after
+                    a dry release, so it pins a releaser's tool as <name>/maven/<groupId>/<artifactId>
+                    with the rest. A transform adds files to a
                     module by naming them in an inventory.properties of its own under any
                     <module>.<key>, such as <module>.attachment.<classifier> or <module>.report.<name>,
                     and what belongs to no module in a project/ folder that stage copies as it stands
@@ -2577,8 +2556,8 @@ public record Project(
 
                       plugin/module-info.java    module demo.plugin {
                                                      requires build.jenesis;
-                                                     provides build.jenesis.BuildExecutorModule
-                                                             with demo.plugin.ToolModule;
+                                                     provides build.jenesis.BuildModuleFactory
+                                                             with demo.plugin.ToolFactory;
                                                  }
                       plugin/.jenesis.skip       keeps the project from building plugin/ as a module
                       jenesis.plugins.properties tool+binary/generated=./plugin
@@ -2586,17 +2565,28 @@ public record Project(
                                                  switches it on in a module, and carries its values
 
                     `requires build.jenesis` resolves a published build.jenesis, as any module the
-                    plugin requires, pinned as plugin-<name>/module/build.jenesis: not the vendored
+                    plugin requires, pinned as <name>/module/build.jenesis: not the vendored
                     build/jenesis that runs the build, which reaches the plugin's own copy through a
                     bridge. Read the API of the version that pin names, from its sources jar, and pin
                     a newer one where the plugin needs what only that one has.
 
-                    The provider implements BuildExecutorModule and adds its steps in accept, with
+                    The provider implements BuildModuleFactory, whose create is handed the values of
+                    plugin-<name>.properties, the build's Environment, the build's process permits, the
+                    plugin's name as the group of its own closure, and its repositories and resolvers, and
+                    returns a BuildExecutorModule. A value is resolved already, @<key> or
+                    @<key>/<default> to jenesis.variable.<key>; a file the plugin reads is an input it
+                    is handed, never a path among its values.
+                    That module adds its steps in accept, with
                     executor.addStep("<name>", step, inherited.sequencedKeySet()) to be handed what
-                    the hook point reads. It needs a public no-argument constructor, and one taking a
-                    SequencedMap<String, String> when plugin-<name>.properties holds values; a
-                    module offering several providers marks each @BuildModuleName("<name>") and the
-                    plugins file picks one as =<module>@<name>.
+                    the hook point reads; it resolves a tool in <group>:tool and anything else in
+                    <group>:<purpose> - a step resolving in a group of another name fails - through the
+                    repositories and resolvers it was handed, and runs it within the permits it was
+                    handed. A module offering several
+                    factories marks each @BuildModuleName("<name>") and the plugins file picks one as
+                    =<module>@<name>.
+                    The layer a plugin is loaded into is kept for the next build in the same JVM,
+                    the daemon's included, while its jars stay the same, so a factory keeps no static
+                    state that must not outlive one build.
 
                     ## A step is a pure function of folders
 
@@ -2635,20 +2625,30 @@ public record Project(
                                              jar carry them too, and the resources/ it writes,
                                              as a service file, join the module's jar
                       check, format          a verdict on the sources, beside Checkstyle and the
-                                             formatters
-                      compliance             a verdict on the resolved dependencies
-                      binary/compiled        a compiler of its own, beside javac and kotlinc
+                                             formatters, in the module's verify phase
+                      compliance             a verdict on the resolved dependencies, in verify
+                      language               a language: the file extensions it compiles, its
+                                             compiler, placed before or after javac, and its
+                                             documentation tool, from a LanguageFactory; it runs
+                                             wherever its extensions are found, so it needs no
+                                             plugin-<name>.properties but reads its values there
+                      binary/compiled        a compiler of its own, beside javac
                       binary/transform       classes/ rewritten from what the compilers wrote, the
                                              place of a bytecode enhancer
-                      binary/validate        a verdict on the compiled classes, beside SpotBugs
-                                             and jdeps
-                      artifact               a step over the jar, beside japicmp and revapi
-                      observed               a step over the tests' run, beside JaCoCo and PIT
+                      binary/validate        a verdict on the compiled classes, beside jdeps and
+                                             jdeprscan, in verify
+                      artifact               a step over the jar, as japicmp and revapi, in verify
+                      observed               a step over the tests' run, as PIT
+                      observe                an engine attached to the tests' JVM and a report
+                                             over what it recorded, from an ObservabilityFactory
+                      test                   a framework the tests run on, from a
+                                             TestFrameworkFactory, consulted before the built-in
+                                             ones in the order the file names it
                       package                packages/, staged in stage/packages
-                      documentation          beside javadoc
+                      documentation          beside javadoc, in the module's document phase
                       postprocess/transform  files for every module's inventory, or project/
                       stage/transform        files joining a staged tree
-                      export, release        delivering what was staged
+                      release                delivering what was staged
                       plugin                 a task that runs only when named, like an exec goal
 
                     A file the tests need, as a model a framework builds for them or a bundle they
@@ -2669,7 +2669,7 @@ public record Project(
 
                     Prefer a tool's Java API to a process: require it in the plugin's module-info.java
                     and it resolves by module name into the plugin's own layer, pinned as
-                    plugin-<name>/module/<module>. The plugin's module-info.java takes every tag a
+                    <name>/module/<module>. The plugin's module-info.java takes every tag a
                     project's does, and none of the project's own apply to it: a tool the module
                     index does not serve, as one named by an Automatic-Module-Name alone, is
                     required through @jenesis.alias <module> <groupId>/<artifactId>, with
@@ -2681,19 +2681,23 @@ public record Project(
                     as Byte Buddy's build plugin does, the provider constructs them in Java and reads
                     only plain values from plugin-<name>.properties, as demo-63 does with Byte Buddy. A JDK tool is forked by extending ProcessBuildStep,
                     which also reads process-<tool>.properties; one that runs a program extends
-                    EnvironmentalProcessBuildStep for environment-<tool>.properties. Write nothing
-                    outside context.next(): a step that must, as an exporter does, overrides
+                    EnvironmentalProcessBuildStep for environment-<tool>.properties. A tool's main
+                    method, as java -cp <jars> <class or Launcher.java> <arguments>, runs through
+                    ProcessHandler.OfProcess.ofJavaMain() in a JVM of its own, or, in the daemon or
+                    under -Djenesis.process.mode=daemon, in one kept warm for the next call with the
+                    same jars, wherever each module resolved them. Write nothing
+                    outside context.next(): a step that must, as the export step does, overrides
                     shouldRun to say it always runs. context.next() is a temporary folder, renamed
                     when the step succeeds or filled from the cache, so never write its absolute
                     path into a file: write a path relative to the folder that reads it.
 
                     A tool that cannot be a module at all, as one with a class in the unnamed
                     package, is forked instead, and the project resolves it rather than the plugin:
-                    @jenesis.plugin <group> maven/<groupId>/<artifactId> in its module-info.java, or
-                    <!--jenesis.plugin <group> maven/<groupId>/<artifactId>--> in its pom.xml, pinned
-                    as <group>/maven/<groupId>/<artifactId>. A module's hook point hands it over
-                    among the resolved dependencies, the input whose key ends in
-                    /dependencies/artifacts, where Dependencies.select(folder, "<group>", "plugin")
+                    @jenesis.plugin <name>:<purpose> maven/<groupId>/<artifactId> in its
+                    module-info.java, or <!--jenesis.plugin <name>:<purpose> maven/<groupId>/<artifactId>-->
+                    in its pom.xml, pinned as <name>:<purpose>/maven/<groupId>/<artifactId>. A module's
+                    hook point hands it over among the resolved dependencies, the input whose key ends in
+                    /dependencies/artifacts, where Dependencies.select(folder, group + ":<purpose>", "plugin")
                     lists the jars for a java -cp. Hand a step only the inputs it reads, since each
                     is part of its key: a generator handed sources/ runs again on every edit. The
                     keys are relative paths, as ../../../../../../../dependencies/artifacts, so
@@ -2851,6 +2855,11 @@ public record Project(
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+            String prefix = BuildExecutorModule.PREVIOUS + RELEASE + "/";
+            SequencedSet<String> built = new LinkedHashSet<>(), released = new LinkedHashSet<>();
+            for (String key : inherited.sequencedKeySet()) {
+                (key.startsWith(prefix) ? released : built).add(key);
+            }
             SequencedSet<String> paths = new LinkedHashSet<>();
             for (Path folder : inherited.values()) {
                 Path inventoryFile = folder.resolve(Inventory.INVENTORY);
@@ -2873,28 +2882,34 @@ public record Project(
                     }
                     buildExecutor.addStep("module-" + BuildExecutorModule.encodePath(path),
                             stepFactory.apply(path, file),
-                            new LinkedHashSet<>(inherited.sequencedKeySet()));
+                            built);
                 }
             } else {
                 buildExecutor.addStep("file",
                         new Pins(paths, file, provided, hashFunction),
-                        new LinkedHashSet<>(inherited.sequencedKeySet()));
+                        built);
             }
             buildExecutor.addStep("divergence",
                     new Divergence(paths, printing, palette),
-                    new LinkedHashSet<>(inherited.sequencedKeySet()));
+                    built);
             if (!plugins.resolutions().isEmpty()) {
-                SequencedSet<String> groups = new LinkedHashSet<>();
-                plugins.resolutions().keySet().forEach(name -> groups.add("plugin-" + name));
-                buildExecutor.addModule("plugins", (pinned, _) -> {
+                buildExecutor.addModule("plugins", (pinned, given) -> {
                     pinned.addModule(ProjectPlugins.RESOLVED, plugins.resolution());
-                    pinned.addStep("file", new PluginPins(plugins.pins(), groups, hashFunction), ProjectPlugins.RESOLVED);
-                });
+                    SequencedSet<String> inputs = new LinkedHashSet<>(List.of(ProjectPlugins.RESOLVED));
+                    given.sequencedKeySet().stream()
+                            .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + prefix))
+                            .forEach(inputs::add);
+                    pinned.addStep("file", new PluginPins(plugins.pins(),
+                            new LinkedHashSet<>(plugins.resolutions().sequencedKeySet()),
+                            hashFunction), inputs);
+                }, released);
             }
         }
     }
 
-    private record PluginPins(Path file, SequencedSet<String> groups, HashDigestFunction hashFunction) implements BuildStep {
+    private record PluginPins(Path file,
+                              SequencedSet<String> plugins,
+                              HashDigestFunction hashFunction) implements BuildStep {
 
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
@@ -2907,6 +2922,7 @@ public record Project(
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
             SequencedMap<String, String> pins = new TreeMap<>();
+            Set<String> resolvedTools = new HashSet<>();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
@@ -2919,8 +2935,13 @@ public record Project(
                 for (String key : dependencies.stringPropertyNames()) {
                     String[] segments = key.split("/", 3);
                     int version = segments.length < 3 ? -1 : segments[2].lastIndexOf('/');
-                    if (version <= 0 || !groups.contains(segments[0])) {
+                    int colon = segments[0].indexOf(':');
+                    String plugin = colon < 0 ? segments[0] : segments[0].substring(0, colon);
+                    if (version <= 0 || !plugins.contains(plugin)) {
                         continue;
+                    }
+                    if (colon >= 0) {
+                        resolvedTools.add(plugin);
                     }
                     String value = dependencies.getProperty(key).trim();
                     int space = value.indexOf(' ');
@@ -2930,6 +2951,17 @@ public record Project(
                             : space < 0 ? null : value.substring(space + 1).trim();
                     pins.putIfAbsent(segments[0] + "/" + segments[2].substring(0, version),
                             segments[2].substring(version + 1) + (checksum == null ? "" : " " + checksum));
+                }
+            }
+            if (Files.isRegularFile(file)) {
+                SequencedProperties existing = SequencedProperties.ofFiles(file);
+                for (String key : existing.stringPropertyNames()) {
+                    String group = key.substring(0, Math.max(key.indexOf('/'), 0));
+                    int colon = group.indexOf(':');
+                    if (colon >= 0 && plugins.contains(group.substring(0, colon))
+                            && !resolvedTools.contains(group.substring(0, colon))) {
+                        pins.putIfAbsent(key, existing.getProperty(key));
+                    }
                 }
             }
             SequencedProperties written = new SequencedProperties();
@@ -3105,7 +3137,8 @@ public record Project(
             SequencedSet<String> described = new LinkedHashSet<>();
             Stream.of(descriptor.sources(), descriptor.manifests(), descriptor.coordinates(), descriptor.artifacts())
                     .forEach(described::addAll);
-            return base.apply(nested.synthetics(synthetics), repositories, resolvers).mapBuild(delegate -> (sub, inherited) -> {
+            AssemblyDescriptor assembly = base.apply(nested.synthetics(synthetics), repositories, resolvers);
+            return assembly.nest(assembly.build(), "assemble", delegate -> (sub, inherited) -> {
                 sub.addModule("describe",
                         (describe, describeInherited) -> {
                             describe.addStep("pom",
@@ -3122,6 +3155,25 @@ public record Project(
         }
     }
 
+    private record AwaitingAssembler(MultiProjectAssembler<? super ProjectModuleDescriptor> base,
+                                     List<String> phases) implements MultiProjectAssembler<ProjectModuleDescriptor> {
+
+        @Override
+        public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
+                                        Map<String, Repository> repositories,
+                                        Map<String, Resolver> resolvers) throws IOException {
+            AssemblyDescriptor assembly = base.apply(descriptor, repositories, resolvers);
+            if (phases == null) {
+                return assembly;
+            }
+            AssemblyRequirement awaiting = AssemblyRequirement.of();
+            for (String phase : phases) {
+                awaiting = awaiting.upstream(phase);
+            }
+            return assembly.andThen(AssemblyDescriptor.BUILD, (_, _) -> { }, awaiting);
+        }
+    }
+
     private record BomAwareAssembler(MultiProjectAssembler<? super ProjectModuleDescriptor> base,
                                      HashDigestFunction hashFunction) implements MultiProjectAssembler<ProjectModuleDescriptor> {
 
@@ -3133,10 +3185,9 @@ public record Project(
             if (BuildStep.locate(descriptor.configuration(), "bom.properties") == null) {
                 return assembly;
             }
-            return assembly.mapBuild(delegate -> (sub, inherited) -> {
-                delegate.accept(sub, inherited);
-                sub.addStep("bom", new Bom(hashFunction), inherited.sequencedKeySet().stream());
-            });
+            return assembly.andThen(AssemblyDescriptor.BUILD,
+                    (sub, inherited) -> sub.addStep("bom", new Bom(hashFunction), inherited.sequencedKeySet().stream()),
+                    AssemblyRequirement.of());
         }
     }
 
@@ -3173,9 +3224,9 @@ public record Project(
         SequencedSet<Path> configuration = Collections.unmodifiableSequencedSet(
                 new LinkedHashSet<>(List.of(resolved.resolve("build.jenesis"))));
         this(resolved,
-                Path.of("target"),
+                resolved.resolve("target").normalize(),
                 null,
-                Path.of(".jenesis", "artifacts"),
+                resolved.resolve(".jenesis").resolve("artifacts").normalize(),
                 null,
                 configuration,
                 configuration,
@@ -3214,23 +3265,6 @@ public record Project(
         return relative.toString().isEmpty() ? Path.of(".") : relative;
     }
 
-    private static Path contained(Path root, Path path, String origin) {
-        Path project = root.toAbsolutePath().normalize(), located = path.toAbsolutePath().normalize();
-        boolean inside = located.startsWith(project);
-        if (inside && Files.exists(located)) {
-            try {
-                inside = located.toRealPath().startsWith(project.toRealPath());
-            } catch (IOException e) {
-                throw new UncheckedIOException("Cannot resolve " + located, e);
-            }
-        }
-        if (!inside) {
-            throw new IllegalArgumentException(origin + " names " + located + ", which lies outside the project "
-                    + project + " - name a folder the project holds");
-        }
-        return located;
-    }
-
     public static Project ofEnvironment(Environment environment, Path root) {
         InferredMultiProjectAssembler assembler = InferredMultiProjectAssembler.ofEnvironment(environment);
         ProjectPlugins projectPlugins = new ProjectPlugins();
@@ -3243,7 +3277,6 @@ public record Project(
                     ProjectPlugins.POSTPROCESS + "/" + ProjectPlugins.INSPECT,
                     STAGE + "/" + ProjectPlugins.TRANSFORM,
                     STAGE + "/" + ProjectPlugins.INSPECT,
-                    EXPORT,
                     RELEASE,
                     PLUGIN)) {
                 hooks.put(hook, new LinkedHashMap<>());
@@ -3257,12 +3290,8 @@ public record Project(
                 throw new UncheckedIOException("Cannot read " + file, e);
             }
             boolean switchedOn = environment.flag("project.plugins", true);
-            Map<String, Repository> pluginRepositories = Map.of(
-                    "module", JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE),
-                    "maven", MavenDefaultRepository.ofEnvironment(environment));
-            Map<String, Resolver> pluginResolvers = Map.of(
-                    "module", ModularJarResolver.ofEnvironment(environment, true),
-                    "maven", MavenPomResolver.ofEnvironment(environment));
+            Map<String, Repository> pluginRepositories = ProjectPlugins.repositories(Map.of(), environment);
+            Map<String, Resolver> pluginResolvers = ProjectPlugins.resolvers(Map.of(), environment);
             declared.forEachProperty((key, value) -> {
                 String name = key.indexOf('+') == -1 ? key : key.substring(0, key.indexOf('+'));
                 String hook = key.indexOf('+') == -1 ? "" : key.substring(key.indexOf('+') + 1);
@@ -3274,7 +3303,7 @@ public record Project(
                 if (!projectWide && !enabled) {
                     return;
                 }
-                String group = "plugin-" + name;
+                String group = name;
                 int at = value.lastIndexOf('@');
                 String location = (at == -1 ? value : value.substring(0, at)).trim();
                 String provider = at == -1 ? null : value.substring(at + 1).trim();
@@ -3295,7 +3324,7 @@ public record Project(
                         ? InternalModule.ofEnvironment(environment,
                                         "module",
                                         group,
-                                        contained(root, root.resolve(location), "The plugin " + key + " in " + file),
+                                        Bind.contained(root, root.resolve(location), "The plugin " + key + " in " + file),
                                         pluginRepositories,
                                         pluginResolvers)
                                 .buildModuleName(provider)
@@ -3309,50 +3338,9 @@ public record Project(
                                         pluginResolvers)
                                 .buildModuleName(provider);
                 BuildExecutorModule resolution = folder ? internal.resolution() : external.resolution();
-                BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule> plugin = (base, given) -> {
-                    SequencedMap<String, String> values = new LinkedHashMap<>();
-                    SequencedMap<String, SequencedMap<Path, Path>> inputs = new LinkedHashMap<>();
-                    given.forEach((declaration, declaredValue) -> {
-                        if (declaration.startsWith("@@")) {
-                            values.put(declaration.substring(1), declaredValue);
-                            return;
-                        } else if (!declaration.startsWith("@")) {
-                            values.put(declaration, declaredValue);
-                            return;
-                        }
-                        int slash = declaration.indexOf('/');
-                        String input = declaration.substring(1, slash == -1 ? declaration.length() : slash);
-                        String target = slash == -1 ? null : declaration.substring(slash + 1);
-                        String origin = "The input " + declaration + " of the plugin " + name;
-                        if (!INPUT_NAME.matcher(input).matches()) {
-                            throw new IllegalArgumentException(origin + " does not start with a name - name an input"
-                                    + " with letters, digits, ., _ and -, as @<input> or @<input>/<target>, or write @@"
-                                    + declaration.substring(1) + " for a value whose key starts with @");
-                        }
-                        if (declaredValue.isBlank()) {
-                            throw new IllegalArgumentException(origin + " binds nothing - name a file or folder of the"
-                                    + " project");
-                        }
-                        Path source = contained(root, (base == null ? root : base).resolve(declaredValue.trim()), origin);
-                        if (!Files.exists(source)) {
-                            throw new IllegalArgumentException(origin + " binds " + source + ", which does not exist");
-                        }
-                        Path placed = target == null
-                                ? Files.isDirectory(source) ? Path.of("") : source.getFileName()
-                                : Path.of(target).normalize();
-                        if (placed.getRoot() != null || placed.startsWith("..")) {
-                            throw new IllegalArgumentException(origin + " places its files at " + target
-                                    + " - name a relative folder inside the input, without ..");
-                        }
-                        if (inputs.computeIfAbsent(input, _ -> new LinkedHashMap<>()).putIfAbsent(placed, source) != null) {
-                            throw new IllegalArgumentException(origin + " places its files where another binding of @"
-                                    + input + " places its own - give each binding a target of its own");
-                        }
-                    });
-                    return folder
-                            ? internal.properties(values).inputs(inputs)
-                            : external.properties(values).inputs(inputs);
-                };
+                BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule> plugin = (base, given) -> folder
+                        ? internal.configured(base == null ? root : base, root, given)
+                        : external.configured(base == null ? root : base, root, given);
                 if (!projectWide) {
                     plugins.put(key, plugin);
                     return;
@@ -3381,10 +3369,30 @@ public record Project(
                     hooks.get(ProjectPlugins.POSTPROCESS + "/" + ProjectPlugins.INSPECT),
                     hooks.get(STAGE + "/" + ProjectPlugins.TRANSFORM),
                     hooks.get(STAGE + "/" + ProjectPlugins.INSPECT),
-                    hooks.get(EXPORT),
                     hooks.get(RELEASE),
                     hooks.get(PLUGIN),
                     resolutions);
+        }
+        Path jreleaser = ProjectPlugins.jreleaser(root);
+        if (jreleaser != null && environment.flag("release.jreleaser", true)) {
+            if (projectPlugins.releasers().containsKey(ProjectPlugins.JRELEASER)) {
+                throw new IllegalArgumentException("The releaser " + ProjectPlugins.JRELEASER + " in " + file + " takes"
+                        + " the name of the plugin the build releases with by itself where the project holds "
+                        + jreleaser.getFileName() + " - remove its line");
+            }
+            ExternalModule official = ExternalModule.official(environment, ProjectPlugins.JRELEASER, null, Map.of(), Map.of());
+            SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> releasers = new LinkedHashMap<>(projectPlugins.releasers());
+            releasers.put(ProjectPlugins.JRELEASER, values -> {
+                SequencedMap<String, String> given = new LinkedHashMap<>(values);
+                given.put("@" + ProjectPlugins.JRELEASER, jreleaser.getFileName().toString());
+                return official.configured(root, root, given);
+            });
+            SequencedMap<String, BuildExecutorModule> resolutions = new LinkedHashMap<>(projectPlugins.resolutions());
+            resolutions.put(ProjectPlugins.JRELEASER, official.resolution());
+            projectPlugins = projectPlugins.pins(root.resolve("jenesis.plugins.pin.properties"))
+                    .arguments(root.resolve("jenesis.plugins.arguments.properties"))
+                    .releasers(releasers)
+                    .resolutions(resolutions);
         }
         List<String> included = environment.entries("project.resources");
         if (included != null) {
@@ -3396,7 +3404,7 @@ public record Project(
                     throw new IllegalArgumentException(origin + " does not name a file and where to place it - write"
                             + " <path>:<target>");
                 }
-                Path source = contained(root, root.resolve(entry.substring(0, colon).trim()), origin);
+                Path source = Bind.contained(root, root.resolve(entry.substring(0, colon).trim()), origin);
                 if (!Files.exists(source)) {
                     throw new IllegalArgumentException(origin + " names " + source + ", which does not exist");
                 }
@@ -3429,15 +3437,15 @@ public record Project(
         }
         String target = environment.getProperty("project.target");
         if (target != null) {
-            project = project.target(Path.of(target));
+            project = project.target(project.root().resolve(target).normalize());
         }
         String reproduce = environment.getProperty("project.reproduce");
         if (reproduce != null) {
-            project = project.reproduce(Path.of(reproduce));
+            project = project.reproduce(project.root().resolve(reproduce).normalize());
         }
         String artifacts = environment.getProperty("project.artifacts");
         if (artifacts != null) {
-            project = project.artifacts(Path.of(artifacts));
+            project = project.artifacts(project.root().resolve(artifacts).normalize());
         }
         String cache = environment.getProperty("project.cache");
         if (cache != null) {
@@ -4266,6 +4274,11 @@ public record Project(
                 environment);
     }
 
+    private ProjectPlugins toolPlugins() {
+        return plugins.tools(ProjectPlugins.repositories(repositories, environment),
+                ProjectPlugins.resolvers(resolvers, environment));
+    }
+
     public Project plugins(ProjectPlugins plugins) {
         return new Project(root,
                 target,
@@ -4401,6 +4414,15 @@ public record Project(
                 .toArray(String[]::new));
     }
 
+    private static Path skipped(Path folder) throws IOException {
+        Files.createDirectories(folder);
+        try {
+            Files.createFile(folder.resolve(BuildExecutor.SKIP_MARKER));
+        } catch (FileAlreadyExistsException _) {
+        }
+        return folder;
+    }
+
     private void watch(String... selectors) throws IOException {
         Path absoluteRoot = root().toAbsolutePath().normalize();
         Set<Path> excluded = new LinkedHashSet<>();
@@ -4420,6 +4442,7 @@ public record Project(
     private static final String CATALOGUE = """
                 project.target|target|Folder the build writes its outputs to; a file a project provides names only a folder inside the project
                 project.reproduce||Build the selection a second time into this folder, which must be absent or empty, consulting and filling no build cache, then compare what every step wrote in both builds, printing a fingerprint over every step's output: a clean comparison deletes the folder, while a difference keeps it, without failing the build, and names the steps that wrote a different output from the same input first, and the steps handed that output after them, as jenesis.print.reproduce asks; read by Make.java and jenesis-make, not by Execute.java; a file a project provides names only a folder inside the project
+                project.await||Phases of the modules a module depends on that its build waits for, comma-separated, such as verify for their checks, so that a module builds only once the modules it depends on passed them; by default a build waits for their builds alone, and every phase runs as soon as what it reads is built
                 project.artifacts||Folder resolved dependencies and repository metadata are cached in; a file a project provides names only a folder inside the project
                 project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project
                 project.sources|false|Assemble a sources jar for every module
@@ -4452,14 +4475,12 @@ public record Project(
                 make.profiles||Comma-separated profiles layered over jenesis.properties
                 make.global||Folder holding the user-global .jenesis/jenesis.properties; default: the home folder; only settable on the command line
                 make.provided||Settings that the files a project provides supplied, comma-separated and named without the jenesis. prefix; derived by Make and settable in no file, so that a repository or cache URL a project named is never sent a credential
-                make.compile|true|Compile the build sources once and run from those classes
+                make.mode|compiled|How the engine runs: source runs it from the build sources, compiled compiles them once and runs from those classes, aot runs those classes in a JVM that loads them from an ahead-of-time cache in aot.folder, trained on the first build that finds none and reused by every later one, and daemon hands the build to a reused JVM, which --stop as the only selector shuts down; aot applies where the engine runs compiled, as the installed CLI runs it, and in source mode caches only the tools, whose JVM is running before it could be handed a cache; aot and daemon set process.mode to the same unless it is set
                 make.classes|.jenesis/classes|Where those classes land, relative to the root; a file a project provides names only a folder inside the project
-                make.daemon|false|Hand the build to a reused JVM; --stop as the only selector shuts it down
                 daemon.idle|10800|Seconds an idle daemon waits before exiting
                 daemon.options|-Xmx2g|JVM options for the daemon process itself, whitespace separated; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
-                make.aot|false|Run the build in a JVM that loads the engine from an ahead-of-time cache, trained on the first build that finds none and reused by every later one; it applies where the engine runs compiled, as the installed CLI runs it, and not in source mode, whose JVM is running before it could be handed a cache; refused beside make.daemon, which keeps that engine loaded instead, and beside make.compile=false, which leaves nothing compiled to cache
-                aot.file|.jenesis/engine.aot|Where that cache lives, relative to the project root, with the engine and the JVM it is trained for hashed into its name, as engine-<hex>.aot, so a build trains a new one when either changes and sweeps the ones that no longer fit; a file the project provides names only a location inside the project
-                aot.lifetime||ISO-8601 age after which the cache is trained again, as PT12H or P7D; empty keeps it until the engine or the JVM changes
+                aot.folder|.jenesis/aot|The folder of every ahead-of-time cache, the engine's and the tools', relative to the project root; aot.properties in it records the engine and the JVM the folder was started for and when, and a build that finds either changed or the folder older than aot.lifetime clears it at once; a file the project provides names only a location inside the project
+                aot.lifetime||ISO-8601 age after which the folder of caches is cleared and every cache in it trained again, as PT12H or P7D; empty keeps it until the engine or the JVM changes
                 toolchain.version||JDK the build runs on, as 25, 25.0.3 or 25-temurin: the numbers match as a prefix, every word must be one of the vendor and version words in the JDK's release file, and a pre-release matches only when its word is named; Make and Execute relaunch on a match when the running JVM is none
                 toolchain.searchpath|@|Comma-separated JDK folders searched for toolchain.version, absolute or under ~, * standing for any one folder name; @ splices this system's usual JDK locations and empty only checks the running JVM; settable only on the command line or in ~/.jenesis/jenesis.properties
                 toolchain.installer||Program run with the requested version as its last argument when no JDK under toolchain.searchpath matches, such as jenesis-jdk from the SDK; a name is looked up on the absolute folders of the PATH, a path must be absolute or start with ~; settable only on the command line or in ~/.jenesis/jenesis.properties, and an empty value names none (env JENESIS_TOOLCHAIN_INSTALLER, which the jenesis command sets to its own jenesis-jdk for the run it starts where SDKMAN, mise or Scoop installed it)
@@ -4471,6 +4492,7 @@ public record Project(
                 executor.events|true|Write each step's outcome of the latest build as one JSON object per line to .jenesis.events.jsonl in the target folder, replaced by every build
                 process.concurrency|(processor count)|Run at most this many tool runs at once - a compiler, a JDK tool, a forked JVM such as a test run; 0 is unbounded
                 process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
+                process.mode|fork|How the main method of a tool that a plugin starts through ProcessHandler.OfProcess.ofJavaMain() runs, and javac where a -J option forks it: fork starts a JVM for every call, so that a build without the daemon leaves no JVM running; aot starts that JVM from an ahead-of-time cache of the tool in aot.folder, which its first run trains and every later one reads, one per JVM, options and jars, with the jars linked into it; daemon runs it in one JVM that runs its compilations side by side, as it runs the calls a plugin marks shared, kept for the next call with the same jars on its class path, wherever a module resolved them, and the same options and environment, idle ones ending after ten minutes; make.mode=aot and make.mode=daemon set it to the same unless it is set
                 process.tail|200|Lines of a failed tool's output and of its error printed with the failure, the last ones, beside how many there were and the file under supplement/ that holds all of them; 0 prints every line
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
                 archive.timestamp|1980-02-01T00:00:00Z|ISO-8601 date-time with an offset recorded on every entry of the jars, jmods and zips the build writes; empty keeps the times the tools record and makes the archives unreproducible; set explicitly, it is also the creation time a generated Docker image is labelled with
@@ -4488,7 +4510,6 @@ public record Project(
                 print.divergence|false|Each coordinate the project pins at more than one version
                 print.aliases|false|Each module alias whose target already declares that name
                 print.docker|true|The image notice when a build or run is containerized
-                print.jreleaser|true|The JReleaser command line when a release runs
                 print.reproduce|true|The steps that did not reproduce when jenesis.project.reproduce builds twice, beside the summary line
                 dependency.pin||strict|versions|ignore; unset keeps existing pins and tolerates missing ones
                 dependency.native|ignore|ignore|warn|strict: what to do when a module runs a jar whose Jenesis-Native-Access names a module it does not grant with @jenesis.native; warn reports it, strict fails the build
@@ -4501,7 +4522,7 @@ public record Project(
                 pin.bom|keep|keep|flatten: whether pinning keeps BOM references or resolves them away
                 pin.retain|groups|groups|all|none: which pins no closure resolved a refresh keeps - those of groups it did not resolve, all, or none
                 platform.<token>||true adds a platform token and false removes one, selecting guarded pins
-                variable.<key>||What a value @<key> or @<key>/<default> in a process-<tool>.properties or environment-<tool>.properties stands for, and so part of the key of every step it reaches; @@ writes a literal @
+                variable.<key>||What a value @<key> or @<key>/<default> in a process-<tool>.properties, environment-<tool>.properties or plugin-<name>.properties stands for, and so part of the key of every step it reaches; @@ writes a literal @
                 plugin.<name>|true|false leaves out the plugin <name> that jenesis.plugins.properties names
                 repository.insecure|false|Allow plaintext http:// repositories, and over https accept a certificate that does not verify, as a self-signed one; only the command line or ~/.jenesis/jenesis.properties may allow it, never a file a project provides
                 repository.retries|2|Retries after a failed fetch; 0 disables
@@ -4516,6 +4537,7 @@ public record Project(
                 maven.local||Local Maven cache folder (env MAVEN_REPOSITORY_LOCAL); only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 maven.token||Authorization header value for the Maven remotes, sent as given, so it names its scheme, as Bearer <token> or Basic <credentials> (env MAVEN_REPOSITORY_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one; a token the environment provides is sent only to the remotes the environment names, a remote a project's own files named is never sent one, and neither is the built-in public repository
                 maven.embed|true|Carry the POM and a pom.properties in the jar under META-INF/maven/<groupId>/<artifactId>/, as Maven does, where the layout publishes to Maven
+                maven.sources||Folders beside src/main/java and src/test/java that a pom.xml module compiles too, comma-separated names such as kotlin,groovy, each read as src/main/<name> and src/test/<name> where it exists
                 maven.segments|2|Leading dot-separated segments of a module name that form its Maven groupId, when a module is published or resolved by the coordinate convention; a shorter name becomes the groupId in full
                 module.uri||Jenesis module remotes, likewise, where a |<module> suffix asks a remote only for that module and the modules whose name it prefixes, and a maven:[<segments>:]<uri> entry reads a remote as a Maven repository by the publishing convention, taking that many leading segments of a module name as its groupId where it names a count and jenesis.maven.segments where it does not, and a mapped:<uri or @>:<list>[;<list>...] entry reads a module only from the Maven repository at that URI, or the one jenesis.maven.uri configures for @, at the <groupId>/<artifactId>[/<type>[/<classifier>]] that one of the properties lists, each a URI or an absolute path, maps it to; an empty value names no remote at all, so only discovery, the local module folder and the artifacts a build stored answer (env JENESIS_REPOSITORY_URI)
                 module.local||Local module cache folder (env JENESIS_REPOSITORY_LOCAL), which also keeps the answers of discovery under well-known/; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
@@ -4540,7 +4562,7 @@ public record Project(
                 test.jars|true|Run the tests against the packaged test jar; false runs them against the module's classes and resources folders instead, as Maven and Gradle do, so a test can read its own resources as files, while the modules it depends on stay jars; a module tested on the module path refuses false
                 test.incremental||Run only the tests a change can reach: true, or the setting named with no value, detects changes with MD5, the name of another message digest with that one, and false runs every test
                 test.parallel|false|Let the engine execute the matched tests concurrently
-                test.reporting|false|Keep the reports every test run writes - the legacy JUnit XML and the open-test-reporting XML - in the module's reports/tests folder rather than under the step's supplement/reports
+                test.reporting|false|Write a test run's reports into the module's reports/tests folder - the legacy JUnit XML and the open-test-reporting XML - and name that folder when the run fails; without it the JUnit Platform writes none
                 stage.tests|false|Stage test-variant artifacts alongside the main ones
                 tree.format|full|full|compact: what the dependencies selector prints
                 tree.merge|true|One tree per module whose every node names the scopes it applies to; false prints one tree per module and scope
@@ -4560,39 +4582,39 @@ public record Project(
                 compliance.vulnerability|true|Run the vulnerability check a vulnerability.properties activates
                 source.checkstyle|report|ignore|report|strict: Checkstyle, activated by a checkstyle.xml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
                 source.pmd|report|ignore|report|strict: PMD, activated by a pmd.xml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
-                pmd.priority|5|The lowest rule priority PMD runs, from 1, the highest, to 5, the lowest, as maven-pmd-plugin's minimumPriority
-                validator.spotbugs|report|ignore|report|strict: SpotBugs, activated by a spotbugs-exclude.xml; ignore skips it, report records its findings, strict fails the build on any of them
-                validator.forbiddenapis|report|ignore|report|strict: forbiddenapis, activated by a forbiddenapis.properties; ignore skips it, report records its findings, strict fails the build on any of them
-                validator.jdeps|report|ignore|report|strict: jdeps --jdk-internals, activated by a jdeps.properties; ignore skips it, report records the JDK internal APIs the classes use, strict fails the build on any of them
-                validator.jdeprscan|report|ignore|report|strict: jdeprscan, activated by a jdeprscan.properties; ignore skips it, report records the uses of APIs deprecated for removal, strict fails the build on any of them
                 source.detekt|report|ignore|report|strict: detekt, activated by a detekt.yml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
                 source.ktlint|report|ignore|report|strict: ktlint linting, activated by an .editorconfig; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
                 source.scalastyle|report|ignore|report|strict: Scalastyle, activated by a scalastyle-config.xml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
                 source.scalafmt|report|ignore|report|strict: scalafmt checking, activated by a .scalafmt.conf; ignore skips it, report lists a source it would format differently, strict fails the build on one
                 source.codenarc|report|ignore|report|strict: CodeNarc, activated by a codenarc.xml; ignore skips it, report records its findings, strict fails the build on any of them
-                compile.errorprone|true|Error Prone over the javac plugin declared with @jenesis.plugin javac, activated by an errorprone.properties; javac forks to grant it the compiler internals it reads
-                kotlin.incremental|false|Compile Kotlin incrementally in the Kotlin daemon through the Kotlin Build Tools API of Kotlin 2.3 or newer, resolved as org.jetbrains.kotlin:kotlin-build-tools-impl, which recompiles only what a change reaches and keeps the compiler warm between builds; the -J and -D lines of process-kotlinc.properties configure the daemon's JVM
-                scala.incremental|false|Compile Scala incrementally with Zinc, resolved as org.scala-sbt:zinc_2.13 in a zinc group and driving the compiler through org.scala-lang:scala3-sbt-bridge at the compiler's version, in a JVM forked per compile, which recompiles only what a change reaches; the lines of process-scalac.properties configure that JVM
+                validator.spotbugs|report|ignore|report|strict: SpotBugs, activated by a spotbugs-exclude.xml; ignore skips it, report records its findings, strict fails the build on any of them
+                validator.forbiddenapis|report|ignore|report|strict: forbiddenapis, activated by a forbiddenapis.properties; ignore skips it, report records its findings, strict fails the build on any of them
+                validator.jdeps|report|ignore|report|strict: jdeps --jdk-internals, activated by a jdeps.properties; ignore skips it, report records the JDK internal APIs the classes use, strict fails the build on any of them
+                validator.jdeprscan|report|ignore|report|strict: jdeprscan, activated by a jdeprscan.properties; ignore skips it, report records the uses of APIs deprecated for removal, strict fails the build on any of them
                 format.java|true|The Java formatter a javaformat.properties selects - google, palantir or eclipse - with its options
                 format.ktlint|true|ktlint formatting, activated by an .editorconfig
                 format.ktfmt|true|ktfmt formatting, activated by a ktfmt.properties, which names its style and what it does to the imports; refused beside ktlint formatting the same sources
                 format.scalafmt|true|scalafmt formatting
                 format.license|true|The license header check, activated by a licenseheader.properties, whose text every Java, Kotlin, Scala and Groovy source of a module must start with as a block comment, exactly as it stands, or, without text, as SPDX lines naming the license and copyright the project declares
                 format.rewrite|false|Let the formatters rewrite sources instead of verifying them
+                generate.classpath|true|META-INF/services entries generated from a module-info's provides, and Enable-Native-Access for a module granting itself, so its jar also serves the class path, activated by a classpath.properties
+                abi.mode||The ABI a module's classes offer, written as abi.properties with one hash per class file: modular for the public and protected members of the packages a module exports, classpath for every package with its package-private members as well; a module whose dependencies changed only below their ABI is not compiled again, save a test module against the module it tests; empty writes none and compiles every dependent again
                 generate.xjc|true|JAXB generation, activated by an xjc.properties
                 generate.protoc|true|protoc generation, activated by a protoc.properties
                 generate.avro|true|Avro generation, activated by an avro.properties
                 generate.wsimport|true|JAX-WS generation, activated by a wsimport.properties
                 generate.openapi|true|OpenAPI generation, activated by an openapi.properties
                 generate.antlr|true|ANTLR generation, activated by an antlr.properties
-                generate.ksp|true|Kotlin Symbol Processing over the module's sources, activated by a ksp.properties, with the processors named by @jenesis.plugin ksp <coordinate>
-                generate.classpath|true|META-INF/services entries generated from a module-info's provides, and Enable-Native-Access for a module granting itself, so its jar also serves the class path, activated by a classpath.properties
-                observe.jacoco|true|JaCoCo coverage, activated by a jacoco.properties
+                generate.ksp|true|Kotlin Symbol Processing over the module's sources, activated by a ksp.properties, with the processors named by @jenesis.plugin ksp:processor <coordinate>
                 observe.native|true|native-image reachability agent, activated by a graal.properties
                 observe.jfr|true|Java Flight Recorder in the test JVM, activated by a jfr.properties whose lines are the options of the recording
+                observe.jacoco|true|JaCoCo coverage, activated by a jacoco.properties
                 mutate.pitest|true|PIT mutation testing, activated by a pitest.properties
                 artifact.japicmp|true|japicmp API comparison, activated by a japicmp.properties
                 artifact.revapi|report|ignore|report|strict: revapi API comparison, activated by a revapi.properties; ignore skips it, report records the differences that reach its severity, strict fails the build on any of them
+                pmd.priority|5|The lowest rule priority PMD runs, from 1, the highest, to 5, the lowest, as maven-pmd-plugin's minimumPriority
+                kotlin.incremental|false|Compile Kotlin incrementally in the Kotlin daemon through the Kotlin Build Tools API of Kotlin 2.3 or newer, resolved as org.jetbrains.kotlin:kotlin-build-tools-impl, which recompiles only what a change reaches and keeps the compiler warm between builds; the -J and -D lines of process-kotlinc.properties configure the daemon's JVM
+                scala.incremental|false|Compile Scala incrementally with Zinc, resolved as org.scala-sbt:zinc_2.13 in a zinc group and driving the compiler through org.scala-lang:scala3-sbt-bridge at the compiler's version, in a JVM forked per compile, which recompiles only what a change reaches; the lines of process-scalac.properties configure that JVM
                 jarsigner.keystore||Key store jarsigner signs the produced jar with, in place of the unsigned one; a release machine supplies it, and a build that names any jarsigner setting without it fails rather than shipping unsigned; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jarsigner.alias||Name of the key within that store; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jarsigner.storepass||Where that store's password is read from: env <variable>, or file <path>; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
@@ -4601,13 +4623,11 @@ public record Project(
                 jarsigner.tsa||Timestamp authority to stamp the signature with, so it outlives the certificate; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jarsigner.arguments||Further jarsigner arguments, whitespace separated; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 release.uri||Jenesis module repository a release puts each staged module's jar into, one put per module at module/<module>/<version>/<module>.jar, so every module needs a version; the https address of a Jenesis Repository's jenesis repository, as jenesis.module.uri names it; a java repository takes Maven publishes only and refuses the put (env JENESIS_RELEASE_URI)
+                release.publish|false|Publish what a release puts and runs - the jenesis.release.uri and jenesis.deploy.uri puts and the plugins of the hook point release, JReleaser's without --dry-run; without it, release and every pin run the release dry, checking what was staged and naming what it would put; only the command line may set it
+                release.jreleaser|true|JReleaser, activated by a jreleaser.yml, .yaml, .toml or .json at the project root, with the values of a jreleaser.properties of the configuration folder
                 release.token||Authorization header value for that repository, sent as given (env JENESIS_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named
-                deploy.uri||Maven repository a release puts the staged Maven tree into, every file at <group path>/<artifactId>/<version>/<file> with its .md5, .sha1, .sha256 and .sha512, then the artifact's maven-metadata.xml merged with the one the repository holds; a SNAPSHOT version is put under a unique timestamped name beside its own maven-metadata.xml, as Maven deploys one; nothing is signed, and Maven Central is refused, as a jreleaser.yml releases there (env MAVEN_RELEASE_URI)
+                deploy.uri||Maven repository a release puts the staged Maven tree into, every file at <group path>/<artifactId>/<version>/<file> with its .md5, .sha1, .sha256 and .sha512, then the artifact's maven-metadata.xml merged with the one the repository holds; a SNAPSHOT version is put under a unique timestamped name beside its own maven-metadata.xml, as Maven deploys one; nothing is signed, and Maven Central is refused, as the JReleaser plugin releases there (env MAVEN_RELEASE_URI)
                 deploy.token||Authorization header value for that repository, sent as given, so it names its scheme, as Bearer <token> or Basic <credentials> (env MAVEN_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named
-                jreleaser.executable|jreleaser|The JReleaser executable a release runs; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
-                jreleaser.command|full-release|The JReleaser command a release runs
-                jreleaser.config||JReleaser configuration file
-                jreleaser.dry|true|Run JReleaser without actually publishing
                 """;
 
     private static SortedMap<String, String> settings(Environment environment) {

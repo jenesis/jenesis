@@ -7,10 +7,6 @@ public class ZipModule implements BuildExecutorModule {
 
     private final String name;
 
-    public ZipModule() {
-        this(Collections.emptyNavigableMap());
-    }
-
     public ZipModule(SequencedMap<String, String> properties) {
         name = properties.getOrDefault("name", "distribution");
     }

@@ -26,13 +26,14 @@ public class MavenRepositoryRelease implements BuildStep {
     private static final String METADATA = "maven-metadata.xml", SNAPSHOT = "SNAPSHOT";
 
     private final URI repository;
+    private final boolean publish;
     private final transient String token;
     private final transient Repository.Connection connection;
     private final transient Consumer<String> printing;
     private final transient Palette palette;
 
     public MavenRepositoryRelease(URI repository) {
-        this(repository, null, new Repository.Connection(), null, Palette.NONE);
+        this(repository, false, null, new Repository.Connection(), null, Palette.NONE);
     }
 
     public static URI configured(Environment environment) {
@@ -48,6 +49,7 @@ public class MavenRepositoryRelease implements BuildStep {
                 ? Repository.Origin.of(environment, "deploy.uri")
                 : System.getenv("MAVEN_RELEASE_URI") != null ? Repository.Origin.ENVIRONMENT : Repository.Origin.USER;
         return new MavenRepositoryRelease(repository,
+                environment.flag("release.publish"),
                 Repository.Credential.of(environment, "deploy.token", "MAVEN_RELEASE_TOKEN").grant(origin),
                 Repository.Connection.ofEnvironment(environment),
                 environment.out(),
@@ -55,6 +57,7 @@ public class MavenRepositoryRelease implements BuildStep {
     }
 
     private MavenRepositoryRelease(URI repository,
+                                   boolean publish,
                                    String token,
                                    Repository.Connection connection,
                                    Consumer<String> printing,
@@ -67,11 +70,12 @@ public class MavenRepositoryRelease implements BuildStep {
         if (CENTRAL.stream().anyMatch(domain -> host.equals(domain) || host.endsWith("." + domain))) {
             throw new IllegalArgumentException("Cannot release to " + repository
                     + ": Maven Central takes a release signed and through its own publishing service, which"
-                    + " JReleaser handles - describe that release in a jreleaser.yml at the project root, which adds"
-                    + " the release/jreleaser step, and name only a repository of your own in jenesis.deploy.uri");
+                    + " JReleaser handles - place a jreleaser.yml at the project's root, and name only a repository of"
+                    + " your own in jenesis.deploy.uri");
         }
         String text = repository.toString();
         this.repository = text.endsWith("/") ? repository : URI.create(text + "/");
+        this.publish = publish;
         this.token = token;
         this.connection = connection;
         this.printing = printing;
@@ -79,19 +83,23 @@ public class MavenRepositoryRelease implements BuildStep {
     }
 
     public MavenRepositoryRelease repository(URI repository) {
-        return new MavenRepositoryRelease(repository, token, connection, printing, palette);
+        return new MavenRepositoryRelease(repository, publish, token, connection, printing, palette);
+    }
+
+    public MavenRepositoryRelease publish(boolean publish) {
+        return new MavenRepositoryRelease(repository, publish, token, connection, printing, palette);
     }
 
     public MavenRepositoryRelease token(String token) {
-        return new MavenRepositoryRelease(repository, token, connection, printing, palette);
+        return new MavenRepositoryRelease(repository, publish, token, connection, printing, palette);
     }
 
     public MavenRepositoryRelease connection(Repository.Connection connection) {
-        return new MavenRepositoryRelease(repository, token, connection, printing, palette);
+        return new MavenRepositoryRelease(repository, publish, token, connection, printing, palette);
     }
 
     public MavenRepositoryRelease printing(Consumer<String> printing, Palette palette) {
-        return new MavenRepositoryRelease(repository, token, connection, printing, palette);
+        return new MavenRepositoryRelease(repository, publish, token, connection, printing, palette);
     }
 
     @Override
@@ -104,7 +112,7 @@ public class MavenRepositoryRelease implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        if (connection.offline()) {
+        if (publish && connection.offline()) {
             throw new IllegalStateException("Cannot release to " + repository
                     + " while offline (unset -Djenesis.repository.offline to release)");
         }
@@ -154,6 +162,23 @@ public class MavenRepositoryRelease implements BuildStep {
                     throw new IllegalStateException("Cannot release " + relative + ": it is staged more than once");
                 }
             }
+        }
+        if (!publish) {
+            if (printing != null) {
+                for (Map.Entry<String, SequencedMap<String, SequencedMap<String, Path>>> artifact : staged.entrySet()) {
+                    String artifactId = artifact.getKey().substring(artifact.getKey().lastIndexOf('/') + 1);
+                    for (Map.Entry<String, SequencedMap<String, Path>> version : artifact.getValue().entrySet()) {
+                        URI folder = repository.resolve(artifact.getKey() + "/" + version.getKey() + "/");
+                        for (String file : version.getValue().keySet()) {
+                            printing.accept("%s%-11s%s %s".formatted(palette.status(),
+                                    "[DRY RUN]",
+                                    palette.reset(),
+                                    folder.resolve(artifactId + "-" + version.getKey() + file)));
+                        }
+                    }
+                }
+            }
+            return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         Instant now = Instant.now();
         String updated = UPDATED.format(now);

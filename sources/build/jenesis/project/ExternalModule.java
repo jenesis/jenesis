@@ -1,7 +1,6 @@
 package build.jenesis.project;
 
 import module java.base;
-import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
@@ -13,38 +12,16 @@ import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
-import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
 
-public class ExternalModule implements BuildExecutorModule {
+public class ExternalModule extends PluginModule<ExternalModule> {
 
-    public static final String COORDINATE = "coordinate",
-            DEPENDENCIES = "dependencies",
-            DELEGATE = "delegate",
-            INPUTS = "inputs";
+    public static final String COORDINATE = "coordinate";
+    static final String RULES = "rules";
 
     private final String coordinate;
     private final Dependencies dependencyModule;
     private final SequencedSet<String> additionalDependencies;
-    private final String buildModuleName;
-    private final Pinning pinning;
-    private final String group;
-    private final SequencedMap<String, String> properties;
-    private final SequencedMap<String, SequencedMap<Path, Path>> inputs;
-
-    public ExternalModule(String coordinate,
-                          String group,
-                          Map<String, Repository> repositories,
-                          Map<String, Resolver> resolvers) {
-        this(coordinate,
-                new Dependencies(repositories, resolvers),
-                Collections.emptyNavigableSet(),
-                null,
-                null,
-                group == null ? "main" : group,
-                Collections.emptyNavigableMap(),
-                Collections.emptyNavigableMap());
-    }
 
     public static ExternalModule ofEnvironment(Environment environment,
                                                String coordinate,
@@ -55,28 +32,43 @@ public class ExternalModule implements BuildExecutorModule {
                 Dependencies.ofEnvironment(environment, repositories, resolvers),
                 Collections.emptyNavigableSet(),
                 null,
-                null,
-                group == null ? "main" : group,
+                group,
                 Collections.emptyNavigableMap(),
-                Collections.emptyNavigableMap());
+                Collections.emptyNavigableMap(),
+                repositories,
+                resolvers,
+                environment);
+    }
+
+    public static ExternalModule official(Environment environment,
+                                          String name,
+                                          String provider,
+                                          Map<String, Repository> repositories,
+                                          Map<String, Resolver> resolvers) {
+        return ofEnvironment(environment,
+                "module/build.jenesis.plugin." + name,
+                name,
+                ProjectPlugins.repositories(Map.of(), environment),
+                ProjectPlugins.resolvers(Map.of(), environment))
+                .buildModuleName(provider)
+                .repositories(ProjectPlugins.repositories(repositories, environment))
+                .resolvers(ProjectPlugins.resolvers(resolvers, environment));
     }
 
     private ExternalModule(String coordinate,
                            Dependencies dependencyModule,
                            SequencedSet<String> additionalDependencies,
                            String buildModuleName,
-                           Pinning pinning,
                            String group,
                            SequencedMap<String, String> properties,
-                           SequencedMap<String, SequencedMap<Path, Path>> inputs) {
+                           SequencedMap<String, SequencedMap<Path, Path>> inputs,
+                           Map<String, Repository> repositories,
+                           Map<String, Resolver> resolvers,
+                           Environment environment) {
+        super(buildModuleName, group, properties, inputs, repositories, resolvers, environment);
         this.coordinate = coordinate;
         this.dependencyModule = dependencyModule;
         this.additionalDependencies = additionalDependencies;
-        this.buildModuleName = buildModuleName;
-        this.pinning = pinning;
-        this.group = group;
-        this.properties = properties;
-        this.inputs = inputs;
     }
 
     public ExternalModule dependencies(String... dependencies) {
@@ -88,10 +80,12 @@ public class ExternalModule implements BuildExecutorModule {
                 dependencyModule,
                 dependencies,
                 buildModuleName,
-                pinning,
                 group,
                 properties,
-                inputs);
+                inputs,
+                repositories,
+                resolvers,
+                environment);
     }
 
     public ExternalModule buildModuleName(String name) {
@@ -99,32 +93,25 @@ public class ExternalModule implements BuildExecutorModule {
                 dependencyModule,
                 additionalDependencies,
                 name,
-                pinning,
                 group,
                 properties,
-                inputs);
+                inputs,
+                repositories,
+                resolvers,
+                environment);
     }
 
     public ExternalModule pinning(Pinning pinning) {
         return new ExternalModule(coordinate,
-                dependencyModule,
+                dependencyModule.pinning(pinning),
                 additionalDependencies,
                 buildModuleName,
-                pinning,
                 group,
                 properties,
-                inputs);
-    }
-
-    public ExternalModule group(String group) {
-        return new ExternalModule(coordinate,
-                dependencyModule,
-                additionalDependencies,
-                buildModuleName,
-                pinning,
-                group,
-                properties,
-                inputs);
+                inputs,
+                repositories,
+                resolvers,
+                environment);
     }
 
     public ExternalModule properties(SequencedMap<String, String> properties) {
@@ -132,10 +119,12 @@ public class ExternalModule implements BuildExecutorModule {
                 dependencyModule,
                 additionalDependencies,
                 buildModuleName,
-                pinning,
                 group,
                 properties,
-                inputs);
+                inputs,
+                repositories,
+                resolvers,
+                environment);
     }
 
     public ExternalModule inputs(SequencedMap<String, SequencedMap<Path, Path>> inputs) {
@@ -143,24 +132,38 @@ public class ExternalModule implements BuildExecutorModule {
                 dependencyModule,
                 additionalDependencies,
                 buildModuleName,
-                pinning,
                 group,
                 properties,
-                inputs);
+                inputs,
+                repositories,
+                resolvers,
+                environment);
     }
 
-    @Override
-    public Optional<String> resolve(String path) {
-        if (path.equals(DELEGATE)) {
-            return Optional.of("");
-        }
-        if (path.startsWith(DELEGATE + "/")) {
-            return Optional.of(path.substring(DELEGATE.length() + 1));
-        }
-        if (path.equals(DEPENDENCIES)) {
-            return Optional.of(path);
-        }
-        return Optional.empty();
+    public ExternalModule repositories(Map<String, Repository> repositories) {
+        return new ExternalModule(coordinate,
+                dependencyModule,
+                additionalDependencies,
+                buildModuleName,
+                group,
+                properties,
+                inputs,
+                repositories,
+                resolvers,
+                environment);
+    }
+
+    public ExternalModule resolvers(Map<String, Resolver> resolvers) {
+        return new ExternalModule(coordinate,
+                dependencyModule,
+                additionalDependencies,
+                buildModuleName,
+                group,
+                properties,
+                inputs,
+                repositories,
+                resolvers,
+                environment);
     }
 
     public BuildExecutorModule resolution() {
@@ -172,34 +175,31 @@ public class ExternalModule implements BuildExecutorModule {
                     new WriteCoordinates(group, coordinates),
                     inherited.sequencedKeySet().stream());
             buildExecutor.addModule(DEPENDENCIES,
-                    dependencyModule.pinning(pinning).pathPlacement(PathPlacement.MODULE_PATH),
+                    dependencyModule.pathPlacement(PathPlacement.MODULE_PATH),
                     COORDINATE);
         };
     }
 
     @Override
-    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        resolution().accept(buildExecutor, inherited);
-        if (!inputs.isEmpty()) {
-            buildExecutor.addModule(INPUTS, Bind.asInputs(inputs));
-        }
-        buildExecutor.addModule(DELEGATE, (delegateExecutor, delegated) -> {
-            List<Path> artifacts = new ArrayList<>(
-                    Dependencies.select(delegated.get(PREVIOUS + DEPENDENCIES), group, "runtime"));
-            artifacts.sort(null);
-            JenesisClassLoaderBridge bridge;
-            Object foreignModule;
-            try {
-                bridge = new JenesisClassLoaderBridge(artifacts);
-                foreignModule = bridge.findProvider(buildModuleName, properties);
-            } catch (Exception e) {
-                throw new IllegalStateException("Failed to resolve external build execution module " + coordinate, e);
-            }
-            SequencedMap<String, Path> forwarded = new LinkedHashMap<>(delegated);
-            forwarded.remove(PREVIOUS + DEPENDENCIES);
-            bridge.accept(foreignModule, delegateExecutor, forwarded);
-        }, Stream.of(Stream.of(DEPENDENCIES), inputs.isEmpty() ? Stream.<String>empty() : Stream.of(INPUTS), inherited.sequencedKeySet().stream())
-                .flatMap(Function.identity()));
+    public BuildExecutorModule preparation() {
+        return resolution();
+    }
+
+    @Override
+    String identity() {
+        return coordinate;
+    }
+
+    @Override
+    SequencedSet<String> prepared() {
+        return new LinkedHashSet<>(List.of(DEPENDENCIES));
+    }
+
+    @Override
+    List<Path> artifacts(SequencedMap<String, Path> prepared) throws IOException {
+        List<Path> artifacts = new ArrayList<>(Dependencies.select(prepared.get(PREVIOUS + DEPENDENCIES), group, "runtime"));
+        artifacts.sort(null);
+        return artifacts;
     }
 
     private record WriteCoordinates(String group, List<String> coordinates) implements BuildStep {

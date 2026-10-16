@@ -20,7 +20,7 @@ public class Demo {
         built("pinned: rebuilt offline from the artifacts it stored", true, "pinned", null,
                 Map.of("repository.offline", "true"));
 
-        wipe(Path.of(".jenesis", "artifacts"));
+        wipe(Path.of("pinned", ".jenesis", "artifacts"));
         built("pinned: offline, with nothing stored to build from", false, "pinned", null,
                 Map.of("repository.offline", "true", "maven.local", "target/empty"));
 
@@ -36,6 +36,7 @@ public class Demo {
                               Pinning pinning,
                               Map<String, String> settings) throws Exception {
         wipe(Path.of("target"));
+        wipe(Path.of(project, "target"));
         Files.createDirectories(Path.of("target", "empty"));
         try {
             Map<String, String> keys = new HashMap<>(Make.settings(Path.of(project)).keys());
