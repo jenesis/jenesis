@@ -4598,6 +4598,7 @@ public record Project(
                 format.license|true|The license header check, activated by a licenseheader.properties, whose text every Java, Kotlin, Scala and Groovy source of a module must start with as a block comment, exactly as it stands, or, without text, as SPDX lines naming the license and copyright the project declares
                 format.rewrite|false|Let the formatters rewrite sources instead of verifying them
                 generate.classpath|true|META-INF/services entries generated from a module-info's provides, and Enable-Native-Access for a module granting itself, so its jar also serves the class path, activated by a classpath.properties
+                abi.mode||The ABI a module's classes offer, written as abi.properties with one hash per class file: modular for the public and protected members of the packages a module exports, classpath for every package with its package-private members as well; empty writes none
                 generate.xjc|true|JAXB generation, activated by an xjc.properties
                 generate.protoc|true|protoc generation, activated by a protoc.properties
                 generate.avro|true|Avro generation, activated by an avro.properties

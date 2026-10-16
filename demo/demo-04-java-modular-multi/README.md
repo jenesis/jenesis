@@ -406,3 +406,32 @@ below the trees now counts `org.slf4j`, the one dependency the project ships,
 rather than the twelve a test run resolves. Passed on its own, the flag prunes the same
 modules from the full graph. The default `full` format prints the whole graph;
 any other value is rejected.
+
+The ABI of each module
+----------------------
+
+`-Djenesis.abi.mode=modular` has every module record the ABI of its classes -
+what another module compiles against:
+
+    java -Djenesis.abi.mode=modular build/jenesis/Make.java
+
+Each module writes an `abi.properties` with one hash per class file, which
+`find target -name abi.properties` lists. The one of `greeter` reads:
+
+    module-info.class=870132835338581573e842fae025a98d37da623eb44a05dfb7a67051922f57d4
+    sample/greeter/Greeter.class=68cc9cb2e4968617d195d7fec4abb639102b0ef95584f15e5f5a073a04ed5d2c
+
+A hash covers what a module compiling against the class can see: the class's
+type, supertypes and generic signature, its public and protected fields and
+methods with their annotations, the exceptions they declare and the values of
+constants, and for the module descriptor its exports and the modules it requires
+transitively. Method bodies and private members are no part of it, so editing
+the body of `Greeter.prefix()` leaves the file as it was. Only the packages a
+module exports are listed, beside any class whose members an exported class
+inherits; `app` and `greeter-test` export nothing and list their descriptor
+alone.
+
+`-Djenesis.abi.mode=classpath` records what a class on the class path reaches
+instead: every package, with its package-private classes and members. A module
+reads again only the class files that changed since its last build, and keeps
+the hash of every other one.
