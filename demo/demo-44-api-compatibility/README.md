@@ -2,12 +2,16 @@ API-compatibility demo
 ======================
 
 Compare the jar you just built against the one you released last, with
-[japicmp](https://siom79.github.io/japicmp/), inferred from a `japicmp.properties` file. japicmp reads
-byte code, not sources, so it sees exactly what a caller compiled against the old jar would see: a
-removed method, a narrowed return type, a field that changed its modifiers. No build script and no
-japicmp configuration beyond the one file are needed.
+[japicmp](https://siom79.github.io/japicmp/), a plugin that `jenesis.plugins.properties` names at the hook
+point `artifact`:
 
-The `japicmp.properties` here names nothing at all. That is the point: with no baseline declared,
+    japicmp+artifact=build.jenesis.plugin.japicmp
+
+japicmp reads byte code, not sources, so it sees exactly what a caller compiled against the old jar would
+see: a removed method, a narrowed return type, a field that changed its modifiers. No build script and no
+japicmp configuration beyond its `plugin-japicmp.properties` are needed.
+
+The `plugin-japicmp.properties` here names nothing at all. That is the point: with no baseline declared,
 japicmp compares against the last release of **this module's own coordinate**, so every build measures
 the change you are about to publish against the release before it.
 
@@ -45,9 +49,10 @@ Layout
     |   |-- jenesis            symlink to ../../../sources/build/jenesis
     |   `-- Demo.java          publishes 1.0.0, then builds 1.1.0 against it
     |-- pom.xml                this module: build.jenesis.demo:api-compatibility:1.1.0
+    |-- jenesis.plugins.properties  names the japicmp and revapi plugins
     |-- build.jenesis
-    |   |-- japicmp.properties activates japicmp; names no baseline
-    |   `-- revapi.properties  activates revapi; reports non-breaking differences too
+    |   |-- plugin-japicmp.properties  runs japicmp; names no baseline
+    |   `-- plugin-revapi.properties   runs revapi; reports non-breaking differences too
     |-- released               the previous release, built and published by Demo.java
     |   |-- .jenesis.skip      keeps this project out of the outer build's module scan
     |   |-- pom.xml            the same coordinate at 1.0.0
@@ -70,7 +75,7 @@ not by any suffix:
     <repository>/<groupId>/<artifactId>/<version>   served from a named repository
 
 A module with no Maven coordinate has nothing to default to, so leaving the key out there fails with a
-message naming it. The file is read per module, so a project-wide `japicmp.properties` with no
+message naming it. The file is read per module, so a project-wide `plugin-japicmp.properties` with no
 `baseline` gives every module its own coordinate; a `baseline` there would point every module at the
 same artifact, so a per-module baseline belongs in that module's own configuration location. A test
 module, such as the tests variant of a Maven module, has no release of its own and is never compared.
@@ -79,8 +84,7 @@ The remaining keys map onto japicmp's own options and all default to off: `acces
 `exclude`, `format` (`xml`, `html`, or both), `ignore-missing-classes` (on by default, because the
 baseline resolves without its own dependencies), `only-incompatible`, `only-modified`,
 `semantic-versioning`, and the four `error-on-*` gates below. An unknown key fails the build and lists
-the ones that exist. Anything japicmp accepts but the file does not model can be appended with a
-`process-japicmp.properties`, like for every other forked tool.
+the ones that exist.
 
 Report-only, until you ask for a gate
 -------------------------------------
@@ -88,7 +92,7 @@ Report-only, until you ask for a gate
 Like the linters, japicmp records what it finds and keeps the build green. The report lands in the
 step's own output:
 
-    target/build/.../assemble/artifact/japicmp/compare/output/reports/japicmp/japicmp-report.xml
+    target/build/.../assemble/artifact/custom/japicmp/delegate/compare/output/reports/japicmp/japicmp-report.xml
 
 and a `stage` build collects it with every other report kind, one folder per module.
 
@@ -110,15 +114,16 @@ compiled against 1.0.0, so the build stops and names the change:
 Switching it off
 ----------------
 
-`-Djenesis.artifact.japicmp=false` keeps `japicmp.properties` in place and skips the comparison,
-the same opt-out every inferred tool has.
+`-Djenesis.plugin.japicmp=false` keeps `plugin-japicmp.properties` in place and skips the comparison,
+the same opt-out every plugin has.
 
 revapi beside japicmp
 ---------------------
 
-A `revapi.properties` beside `japicmp.properties` runs [revapi](https://revapi.org) against the same
-baseline, read the same way. revapi classifies every difference by how severe it is for a caller,
-binary and source alike, and reports those that reach the `severity` the file names:
+The revapi plugin, `revapi+artifact=build.jenesis.plugin.revapi`, runs [revapi](https://revapi.org)
+against the same baseline, read the same way. revapi classifies every difference by how severe it is for a caller,
+binary and source alike, and reports those that reach the `severity` its `plugin-revapi.properties`
+names:
 
     severity=non-breaking
 
@@ -126,13 +131,13 @@ binary and source alike, and reports those that reach the `severity` the file na
 demo's `non-breaking` reports the added overload, which the default leaves out. The report is revapi's
 own JSON, one entry per difference with its code and classification:
 
-    target/build/.../assemble/artifact/revapi/compare/output/reports/revapi/revapi.json
+    target/build/.../assemble/artifact/custom/revapi/delegate/compare/output/reports/revapi/revapi.json
 
     "code" : "java.method.added",
     "new" : "method java.lang.String library.Library::greet(java.lang.String, java.lang.String)",
 
 revapi's own configuration, as a `revapi.differences` list of the differences a release accepts, stays in
-revapi's JSON: `configuration=revapi.json` names such a file beside `revapi.properties`, an array of
+revapi's JSON: `@analysis/revapi.json=<path>` binds such a file, an array of
 `{"extension": ..., "configuration": ...}` objects as revapi documents it. Any other key fails the build.
 
 Like a linter, revapi reports and keeps the build green; `-Djenesis.artifact.revapi=strict` fails it on

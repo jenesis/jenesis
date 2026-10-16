@@ -21,13 +21,14 @@ public class JavaTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, classes;
+    private Path previous, next, supplement, persistent, classes;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         classes = Files.createDirectory(root.resolve("classes"));
     }
 
@@ -39,7 +40,7 @@ public class JavaTest {
         }
         BuildStepResult result = Java.of(PathPlacement.CLASS_PATH, false, "sample.Sample").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(
                         classes,
                         Map.of(Path.of("sample/Sample.class"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -81,7 +82,7 @@ public class JavaTest {
         };
         BuildStepResult result = Java.of(factory, PathPlacement.INFERRED, false, "-version").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(
                         classes,
                         Map.of(Path.of("artifacts/named.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -109,7 +110,7 @@ public class JavaTest {
         };
         BuildStepResult result = Java.of(factory, PathPlacement.CLASS_PATH, false, "sample.Sample").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(
                         classes,
                         Map.of(Path.of("sample/Sample.class"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -151,7 +152,7 @@ public class JavaTest {
         };
         BuildStepResult result = Java.of(factory, PathPlacement.CLASS_PATH, false, "sample.Sample").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(classes, tracked))))
                 .toCompletableFuture()
                 .join();

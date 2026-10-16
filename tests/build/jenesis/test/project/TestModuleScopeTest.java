@@ -3,10 +3,10 @@ package build.jenesis.test.project;
 import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.SequencedProperties;
+import build.jenesis.TestTags;
 import build.jenesis.project.JUnitPlatform;
 import build.jenesis.project.TestModule;
 import build.jenesis.project.TestNG;
-import build.jenesis.project.TestTags;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

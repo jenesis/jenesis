@@ -8,6 +8,7 @@ import build.jenesis.Environment;
 import build.jenesis.Execution;
 import build.jenesis.Make;
 import build.jenesis.Project;
+import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.InferredMultiProjectAssembler;
 
 public class Demo {
@@ -32,7 +33,7 @@ public class Demo {
         }));
         Project project = Project.ofEnvironment(environment, Path.of(".")).assembler((descriptor, repositories, resolvers) -> checked
                 .apply(descriptor.sources("preprocess"), repositories, resolvers)
-                .mapBuild(stock -> (sub, inherited) -> {
+                .nest(AssemblyDescriptor.BUILD, "", stock -> (sub, inherited) -> {
                     sub.addStep("preprocess", (executor, context, arguments) -> {
                         Path target = context.next().resolve(BuildStep.SOURCES);
                         for (BuildStepArgument argument : arguments.values()) {

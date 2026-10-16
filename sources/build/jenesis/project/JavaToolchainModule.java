@@ -17,13 +17,15 @@ public record JavaToolchainModule(BuildExecutorModule generator,
                                   BuildExecutorModule transformer,
                                   BuildExecutorModule validator,
                                   BuildExecutorModule archiver,
-                                  BuildExecutorModule classpath) implements BuildExecutorModule {
+                                  BuildExecutorModule classpath,
+                                  BuildExecutorModule abi) implements BuildExecutorModule {
 
     public static final String ARTIFACTS = "artifacts",
             CLASSES = "classes",
             TRANSFORM = "transform",
             VALIDATE = "validate",
             CLASSPATH = "classpath",
+            ABI = "abi",
             PROCESSED = "processed";
     private static final String GENERATED = "generated", COMPILED = "compiled";
 
@@ -33,31 +35,36 @@ public record JavaToolchainModule(BuildExecutorModule generator,
                 null,
                 null,
                 new Jar(ProcessHandler.Factory.of(), Jar.Sort.CLASSES).asModule("jar"),
+                null,
                 null);
     }
 
     public JavaToolchainModule generator(BuildExecutorModule generator) {
-        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver, classpath);
+        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver, classpath, abi);
     }
 
     public JavaToolchainModule compiler(BuildExecutorModule compiler) {
-        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver, classpath);
+        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver, classpath, abi);
     }
 
     public JavaToolchainModule archiver(BuildExecutorModule archiver) {
-        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver, classpath);
+        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver, classpath, abi);
     }
 
     public JavaToolchainModule transformer(BuildExecutorModule transformer) {
-        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver, classpath);
+        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver, classpath, abi);
     }
 
     public JavaToolchainModule validator(BuildExecutorModule validator) {
-        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver, classpath);
+        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver, classpath, abi);
     }
 
     public JavaToolchainModule classpath(BuildExecutorModule classpath) {
-        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver, classpath);
+        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver, classpath, abi);
+    }
+
+    public JavaToolchainModule abi(BuildExecutorModule abi) {
+        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver, classpath, abi);
     }
 
     @Override
@@ -88,6 +95,9 @@ public record JavaToolchainModule(BuildExecutorModule generator,
                     Stream.of(classes),
                     inherited.sequencedKeySet().stream()));
         }
+        if (abi != null) {
+            buildExecutor.addModule(ABI, abi, classes);
+        }
         if (classpath != null) {
             buildExecutor.addModule(CLASSPATH, classpath, Stream.concat(
                     Stream.of(classes),
@@ -104,7 +114,9 @@ public record JavaToolchainModule(BuildExecutorModule generator,
 
     @Override
     public Optional<String> resolve(String path) {
-        if (path.startsWith(COMPILED + "/") && !path.startsWith(COMPILED + "/custom/")) {
+        if (path.startsWith(COMPILED + "/")
+                && !path.startsWith(COMPILED + "/custom/")
+                && !path.equals(COMPILED + "/" + InferredCompilerChainModule.RESOLVED)) {
             return Optional.empty();
         }
         return switch (path) {

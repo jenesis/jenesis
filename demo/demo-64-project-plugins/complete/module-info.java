@@ -1,4 +1,4 @@
 module demo.complete {
     requires build.jenesis;
-    provides build.jenesis.BuildExecutorModule with demo.complete.CompleteModule;
+    provides build.jenesis.BuildModuleFactory with demo.complete.CompleteFactory;
 }

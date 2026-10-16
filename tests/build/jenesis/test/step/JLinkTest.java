@@ -22,13 +22,14 @@ public class JLinkTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, bundle;
+    private Path previous, next, supplement, persistent, bundle;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         bundle = Files.createDirectory(root.resolve("bundle"));
     }
 
@@ -57,7 +58,7 @@ public class JLinkTest {
         ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jlink", configuration);
         BuildStepResult result = new JLink(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -89,7 +90,7 @@ public class JLinkTest {
         ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jlink", configuration);
         BuildStepResult result = new JLink(ProcessHandler.Factory.FORK).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -133,7 +134,7 @@ public class JLinkTest {
         ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jlink", configuration);
         BuildStepResult result = new JLink(ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -151,7 +152,7 @@ public class JLinkTest {
         Files.writeString(Files.createDirectory(bundle.resolve(BuildStep.ARTIFACTS)).resolve("sample.jar"), "jar");
         BuildStepResult result = new JLink(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -164,7 +165,7 @@ public class JLinkTest {
     public void skips_when_no_modules_are_present(boolean process) throws IOException {
         BuildStepResult result = new JLink(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("metadata.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();

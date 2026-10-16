@@ -7,10 +7,6 @@ public class LicenceModule implements BuildExecutorModule {
 
     private final String name;
 
-    public LicenceModule() {
-        this(Collections.emptyNavigableMap());
-    }
-
     public LicenceModule(SequencedMap<String, String> properties) {
         name = properties.getOrDefault("name", "Apache License, Version 2.0");
     }

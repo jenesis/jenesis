@@ -15,13 +15,14 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
     private final URI repository;
+    private final boolean publish;
     private final transient String token;
     private final transient Repository.Connection connection;
     private final transient Consumer<String> printing;
     private final transient Palette palette;
 
     public JenesisModuleRepositoryRelease(URI repository) {
-        this(repository, null, new Repository.Connection(), null, Palette.NONE);
+        this(repository, false, null, new Repository.Connection(), null, Palette.NONE);
     }
 
     public static URI configured(Environment environment) {
@@ -37,6 +38,7 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
                 ? Repository.Origin.of(environment, "release.uri")
                 : System.getenv("JENESIS_RELEASE_URI") != null ? Repository.Origin.ENVIRONMENT : Repository.Origin.USER;
         return new JenesisModuleRepositoryRelease(repository,
+                environment.flag("release.publish"),
                 Repository.Credential.of(environment, "release.token", "JENESIS_RELEASE_TOKEN").grant(origin),
                 Repository.Connection.ofEnvironment(environment),
                 environment.out(),
@@ -44,6 +46,7 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
     }
 
     private JenesisModuleRepositoryRelease(URI repository,
+                                           boolean publish,
                                            String token,
                                            Repository.Connection connection,
                                            Consumer<String> printing,
@@ -54,6 +57,7 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
         }
         String text = repository.toString();
         this.repository = text.endsWith("/") ? repository : URI.create(text + "/");
+        this.publish = publish;
         this.token = token;
         this.connection = connection;
         this.printing = printing;
@@ -61,19 +65,23 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
     }
 
     public JenesisModuleRepositoryRelease repository(URI repository) {
-        return new JenesisModuleRepositoryRelease(repository, token, connection, printing, palette);
+        return new JenesisModuleRepositoryRelease(repository, publish, token, connection, printing, palette);
+    }
+
+    public JenesisModuleRepositoryRelease publish(boolean publish) {
+        return new JenesisModuleRepositoryRelease(repository, publish, token, connection, printing, palette);
     }
 
     public JenesisModuleRepositoryRelease token(String token) {
-        return new JenesisModuleRepositoryRelease(repository, token, connection, printing, palette);
+        return new JenesisModuleRepositoryRelease(repository, publish, token, connection, printing, palette);
     }
 
     public JenesisModuleRepositoryRelease connection(Repository.Connection connection) {
-        return new JenesisModuleRepositoryRelease(repository, token, connection, printing, palette);
+        return new JenesisModuleRepositoryRelease(repository, publish, token, connection, printing, palette);
     }
 
     public JenesisModuleRepositoryRelease printing(Consumer<String> printing, Palette palette) {
-        return new JenesisModuleRepositoryRelease(repository, token, connection, printing, palette);
+        return new JenesisModuleRepositoryRelease(repository, publish, token, connection, printing, palette);
     }
 
     @Override
@@ -86,7 +94,7 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        if (connection.offline()) {
+        if (publish && connection.offline()) {
             throw new IllegalStateException("Cannot release to " + repository
                     + " while offline (unset -Djenesis.repository.offline to release)");
         }
@@ -132,10 +140,12 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
         }
         for (Map.Entry<String, Path> entry : released.sequencedValues()) {
             URI target = repository.resolve(entry.getKey());
-            upload(target, entry.getValue());
+            if (publish) {
+                upload(target, entry.getValue());
+            }
             if (printing != null) {
                 printing.accept("%s%-11s%s %s".formatted(palette.status(),
-                        "[RELEASED]",
+                        publish ? "[RELEASED]" : "[DRY RUN]",
                         palette.reset(),
                         target));
             }

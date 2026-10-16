@@ -21,13 +21,14 @@ public class PinPomTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, input;
+    private Path previous, next, supplement, persistent, input;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         input = Files.createDirectory(root.resolve("input"));
     }
 
@@ -84,7 +85,7 @@ public class PinPomTest {
         new PinPom("maven", "", List.of(pomFile), new HashDigestFunction("SHA-256"))
                 .platform(platform)
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                                 input,
                                 Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
@@ -116,7 +117,7 @@ public class PinPomTest {
         arguments.put("vanished", new BuildStepArgument(null, Checksum.removed(Set.of(Path.of(Inventory.INVENTORY)))));
         new PinPom("maven", "", List.of(pom), new HashDigestFunction("SHA-256"))
                 .platform(Platform.of("linux,x86_64"))
-                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture()
                 .join();
         assertThat(Files.readString(pom))

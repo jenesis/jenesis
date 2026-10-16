@@ -15,9 +15,9 @@ From this directory:
 
 | command                                     | cold  | warm  |
 |---------------------------------------------|-------|-------|
-| `... -Djenesis.make.compile=false`          | 8.0s  | 8.6s  |
+| `... -Djenesis.make.mode=source`           | 8.0s  | 8.6s  |
 | `java build/jenesis/Make.java` (default)    | 3.6s  | 0.75s |
-| `... -Djenesis.make.daemon=true`            | 3.7s  | 0.66s |
+| `... -Djenesis.make.mode=daemon`           | 3.7s  | 0.66s |
 | `jenesis` (the installed command)           | 3.7s  | 0.15s |
 
 Measured in this folder, deleting `target/` before every run so each does the
@@ -31,8 +31,8 @@ Reusing the JVM
 A daemon is never started unless you ask for it, either in a `jenesis.properties`
 at the project root or on the command line:
 
-    java -Djenesis.make.daemon=true build/jenesis/Make.java   # first call starts it
-    java -Djenesis.make.daemon=true build/jenesis/Make.java   # later calls reuse it
+    java -Djenesis.make.mode=daemon build/jenesis/Make.java   # first call starts it
+    java -Djenesis.make.mode=daemon build/jenesis/Make.java   # later calls reuse it
     java build/jenesis/Make.java --stop                       # shut it down
 
 What it saves is compile time, so it pays in proportion to how much a build
@@ -65,8 +65,8 @@ What travels with a call
 `-Djenesis.*` flags travel with every call and are cleared again afterwards, so
 two calls with different flags cannot contaminate each other:
 
-    java -Djenesis.make.daemon=true -Djenesis.project.layout=modular build/jenesis/Make.java help
-    java -Djenesis.make.daemon=true build/jenesis/Make.java help
+    java -Djenesis.make.mode=daemon -Djenesis.project.layout=modular build/jenesis/Make.java help
+    java -Djenesis.make.mode=daemon build/jenesis/Make.java help
 
 The second call reports `modular_to_maven`, the layout this demo's `module-info.java`
 infers, rather than the `modular` the first call asked for.
@@ -98,17 +98,18 @@ It needs no process, no idle timeout and no memory between builds, and it
 survives a reboot. Turn it on in `jenesis.properties` or in
 `~/.jenesis/jenesis.properties`:
 
-    jenesis.make.aot=true
+    jenesis.make.mode=aot
 
 It applies where the engine runs compiled, which is how the installed `jenesis`
 command runs it: the first build trains the cache, and every later one starts
 from it. Source mode is out of its reach - `java build/jenesis/Make.java` runs in
 a JVM that is already running by the time the cache could be handed to it - so
-there the setting changes nothing. The compiled engine the default leaves in
-`.jenesis/classes` shows the effect as well:
+there only the tools a build starts in JVMs of their own are cached. The
+compiled engine the default leaves in `.jenesis/classes` shows the effect as
+well:
 
-    java -cp .jenesis/classes build.jenesis.Make -Djenesis.make.aot=true   # trains the cache
-    java -cp .jenesis/classes build.jenesis.Make -Djenesis.make.aot=true   # starts from it
+    java -cp .jenesis/classes build.jenesis.Make -Djenesis.make.mode=aot   # trains the cache
+    java -cp .jenesis/classes build.jenesis.Make -Djenesis.make.mode=aot   # starts from it
 
 | no-op build of this demo                  | plain  | cache  |
 |-------------------------------------------|--------|--------|
@@ -118,20 +119,21 @@ there the setting changes nothing. The compiled engine the default leaves in
 Training costs a build of about two to three seconds and some 22 MB on disk. The
 installed command gains most, because it runs the engine from a jar the cache
 reads directly; from `.jenesis/classes`, the build first packs the classes into
-`.jenesis/engine.jar` and starts a second JVM that can use the cache, which costs
+`.jenesis/aot/engine.jar` and starts a second JVM that can use the cache, which costs
 part of what the cache saves.
 
-The cache lives at `.jenesis/engine-<hex>.aot`, where the hex names the engine
-and the JVM it was trained for, so a changed engine or an upgraded JDK trains a
-new one and the old one is removed. Two settings configure it:
+The cache lives in `.jenesis/aot/`, beside the caches of the tools a build
+starts in JVMs of their own, which the same setting gives caches as well. The
+folder records the engine and the JVM it was started for, so a changed engine or
+an upgraded JDK clears it at once and the caches are trained again. Two settings
+configure it:
 
-    -Djenesis.aot.file=.jenesis/engine.aot   # where it lives, relative to the project
-    -Djenesis.aot.lifetime=P7D               # train it again once it is this old
+    -Djenesis.aot.folder=.jenesis/aot   # where it lives, relative to the project
+    -Djenesis.aot.lifetime=P7D          # clear it once it is this old
 
 `help`, `skill` and its pages, `configuration` and `properties` only print, so they never train
-or use a cache. The daemon and the cache are two answers to the same cost, so
-naming both - or the cache beside `-Djenesis.make.compile=false`, which leaves
-nothing compiled to cache - stops the build with a message naming both settings.
-Where builds are frequent and small, or where a machine builds many projects now
+or use a cache. The daemon and the cache are two answers to the same cost, and
+`jenesis.make.mode` names one of them - `source`, `compiled`, `aot` or `daemon` -
+so a build never runs with both. Where builds are frequent and small, or where a machine builds many projects now
 and then, the cache is the better trade; in a tight edit-build loop on a large
 project, the daemon's warm JIT still wins.

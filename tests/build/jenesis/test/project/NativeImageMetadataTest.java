@@ -15,13 +15,14 @@ public class NativeImageMetadataTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, source;
+    private Path previous, next, supplement, persistent, source;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         source = Files.createDirectory(root.resolve("source"));
     }
 
@@ -32,8 +33,8 @@ public class NativeImageMetadataTest {
         Path testOfTwo = testInventory("test.two", "app.two", "two.Greeter");
 
         run(argument("../inventory", own),
-                argument("../selection/test.two/inventory", testOfTwo),
-                argument("../selection/test.one/inventory", testOfOne));
+                argument("../tested/test.two/inventory", testOfTwo),
+                argument("../tested/test.one/inventory", testOfOne));
 
         Path metadata = next.resolve("native-image").resolve("reachability-metadata.json");
         assertThat(metadata)
@@ -46,7 +47,7 @@ public class NativeImageMetadataTest {
     @Test
     public void collects_nothing_when_no_test_module_names_this_modules_artifact() throws IOException {
         run(argument("../inventory", ownInventory("app.one")),
-                argument("../selection/test.two/inventory", testInventory("test.two", "app.two", "two.Greeter")));
+                argument("../tested/test.two/inventory", testInventory("test.two", "app.two", "two.Greeter")));
 
         assertThat(next.resolve("native-image"))
                 .as("a module with no test capture for it produces no metadata")
@@ -95,7 +96,7 @@ public class NativeImageMetadataTest {
             map.put(argument.getKey(), argument.getValue());
         }
         BuildStepResult result = new NativeImageMetadata().apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         map)
                 .toCompletableFuture()
                 .join();

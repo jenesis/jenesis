@@ -7,7 +7,9 @@ import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.step.Abi;
 import build.jenesis.project.InferredJavaToolchainModule;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -103,6 +105,71 @@ public class InferredJavaToolchainModuleTest {
         }
     }
 
+    @Test
+    public void writes_the_abi_of_the_classes_when_its_mode_is_set() throws IOException {
+        Path sources = Files.createDirectories(input.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sources.resolve("Sample.java"), "package sample; public class Sample { }");
+        Files.writeString(sources.resolve("Helper.java"), "package sample; class Helper { }");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("input", input);
+        Environment environment = new Environment(Map.of("abi.mode", "modular"));
+        InferredJavaToolchainModule toolchain = InferredJavaToolchainModule.ofEnvironment(environment,
+                new LinkedHashSet<>(List.of(input)),
+                input,
+                input,
+                Map.of(),
+                Map.of());
+        executor.addModule("output", toolchain, "input");
+        SequencedMap<String, Path> steps = executor.execute();
+
+        assertThat(steps.get("output/abi").resolve(Abi.ABI))
+                .content()
+                .contains("sample/Sample.class=")
+                .doesNotContain("sample/Helper.class");
+    }
+
+    @Test
+    public void writes_no_abi_without_a_mode() throws IOException {
+        Path sources = Files.createDirectories(input.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sources.resolve("Sample.java"), "package sample; public class Sample { }");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("input", input);
+        Environment environment = new Environment(Map.of());
+        InferredJavaToolchainModule toolchain = InferredJavaToolchainModule.ofEnvironment(environment,
+                new LinkedHashSet<>(List.of(input)),
+                input,
+                input,
+                Map.of(),
+                Map.of());
+        executor.addModule("output", toolchain, "input");
+
+        assertThat(executor.execute()).doesNotContainKey("output/abi");
+    }
+
+    @Test
+    public void keeps_the_abi_when_a_rebuild_changes_only_a_method_body() throws IOException {
+        Path sources = Files.createDirectories(input.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sources.resolve("Sample.java"),
+                "package sample; public class Sample { public int value() { return 1; } }");
+        Files.writeString(sources.resolve("Other.java"), "package sample; public class Other { }");
+        InferredJavaToolchainModule toolchain = toolchain().abi(abi -> abi.mode(Abi.Mode.CLASSPATH));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("input", input);
+        executor.addModule("output", toolchain, "input");
+        String before = Files.readString(executor.execute().get("output/abi").resolve(Abi.ABI));
+
+        Files.writeString(sources.resolve("Sample.java"),
+                "package sample; public class Sample { public int value() { return 2; } }");
+        BuildExecutor again = newExecutor();
+        again.addSource("input", input);
+        again.addModule("output", toolchain, "input");
+
+        assertThat(again.execute().get("output/abi").resolve(Abi.ABI)).hasContent(before);
+    }
+
     private void generateKey() throws IOException {
         Path password = input.resolve("test.pass");
         Files.writeString(password, "test-store-password");
@@ -129,7 +196,7 @@ public class InferredJavaToolchainModuleTest {
     }
 
     private InferredJavaToolchainModule toolchain() {
-        return new InferredJavaToolchainModule(new LinkedHashSet<>(List.of(input)), Map.of(), Map.of());
+        return new InferredJavaToolchainModule(new LinkedHashSet<>(List.of(input)), input, input, Map.of(), Map.of());
     }
 
     private static String keytool() {

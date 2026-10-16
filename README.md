@@ -126,7 +126,7 @@ nothing, compiles itself in 5.01 s, fetches 111 KB and builds in 14.49 s.
 
 The same run measured `macos-latest` and `windows-latest`, where every Jenesis column is ahead of Maven in
 every row as well; both tools are about twice as slow on Windows. Two settings do not pay off on this
-project: `jenesis.make.aot` is no faster than the precompiled engine alone (0.77 s against 0.66 s for a
+project: `jenesis.make.mode=aot` is no faster than the precompiled engine alone (0.77 s against 0.66 s for a
 no-op, after a 1.90 s training build), and stripping checksums with `jenesis.dependency.pin=versions` saves
 nothing measurable (13.35 s against 13.49 s cold).
 

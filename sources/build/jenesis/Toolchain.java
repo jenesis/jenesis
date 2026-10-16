@@ -548,15 +548,22 @@ public final class Toolchain {
             }
 
             private FileVisitResult check(Path path) throws IOException {
-                PosixFileAttributes attributes = Files.readAttributes(path, PosixFileAttributes.class);
+                Path existing = path;
+                Set<Path> followed = new HashSet<>();
+                while (!Files.exists(existing)) {
+                    existing = Files.isSymbolicLink(existing) && followed.add(existing)
+                            ? existing.resolveSibling(Files.readSymbolicLink(existing))
+                            : existing.getParent();
+                }
+                PosixFileAttributes attributes = Files.readAttributes(existing, PosixFileAttributes.class);
                 if (!owners.contains(attributes.owner())) {
-                    problem[0] = printable(path) + " is owned by " + printable(attributes.owner().getName())
+                    problem[0] = printable(existing) + " is owned by " + printable(attributes.owner().getName())
                             + ", neither the current user nor root";
                 } else if (attributes.permissions().contains(PosixFilePermission.OTHERS_WRITE)) {
-                    problem[0] = printable(path) + " is writable by every user";
+                    problem[0] = printable(existing) + " is writable by every user";
                 } else if (attributes.permissions().contains(PosixFilePermission.GROUP_WRITE)
                         && !attributes.group().getName().equals(attributes.owner().getName())) {
-                    problem[0] = printable(path) + " is writable by the group "
+                    problem[0] = printable(existing) + " is writable by the group "
                             + printable(attributes.group().getName());
                 } else {
                     return FileVisitResult.CONTINUE;

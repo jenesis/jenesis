@@ -152,10 +152,10 @@ M_F()  { echo "$1 package -o -q -ntp"; }
 # the Maven jar; pin the Maven layout so a Jenesis build produces the same single artifact
 # as the Maven baseline and the comparison stays like-for-like (as it was before the default).
 LAYOUT="-Djenesis.project.layout=maven"
-DAEMON="-Djenesis.make.daemon=true"
-AOT="-Djenesis.make.aot=true"
+DAEMON="-Djenesis.make.mode=daemon"
+AOT="-Djenesis.make.mode=aot"
 SRC_NT="java $LAYOUT -Djenesis.test.skip=true $ENGINE/Make.java build"
-NOCOMPILE_NT="java $LAYOUT -Djenesis.make.compile=false -Djenesis.test.skip=true $ENGINE/Make.java build"
+NOCOMPILE_NT="java $LAYOUT -Djenesis.make.mode=source -Djenesis.test.skip=true $ENGINE/Make.java build"
 JAVAC_NT="java $LAYOUT -Djenesis.test.skip=true -cp $TOOL build.jenesis.Make build"
 DAEMON_NT="java $LAYOUT $DAEMON -Djenesis.test.skip=true -cp $TOOL build.jenesis.Make build"
 AOT_NT="java $LAYOUT $AOT -Djenesis.test.skip=true -cp $TOOL build.jenesis.Make build"
@@ -169,7 +169,7 @@ AOT_F="java $LAYOUT $AOT -cp $TOOL build.jenesis.Make build"
 table_launch() {
   note "Table: build-tool launch overhead (run 'help', no project work)"
   build_tool
-  bench      "source (compile=false)"   "$RUNS_WARM" "" "java -Djenesis.make.compile=false $ENGINE/Make.java help"
+  bench      "source (mode=source)"     "$RUNS_WARM" "" "java -Djenesis.make.mode=source $ENGINE/Make.java help"
   bench      "source (engine recompiled)" "$RUNS_WARM" "rm -rf $CLASSES $STAMP" "java $ENGINE/Make.java help"
   bench_warm "source (engine cached)"   "$RUNS_WARM" "java $ENGINE/Make.java help" "java $ENGINE/Make.java help"
   bench_warm "precompiled"              "$RUNS_WARM" "java -cp $TOOL build.jenesis.Make help" "java -cp $TOOL build.jenesis.Make help"
@@ -181,15 +181,15 @@ table_launch() {
 }
 
 table_make() {
-  note "Table: how the engine is launched and kept - jenesis.make.compile, .classes, .daemon, .aot"
+  note "Table: how the engine is launched and kept - jenesis.make.mode and jenesis.make.classes"
   build_tool
   echo "-- warm no-op build (nothing changed; the engine is the only variable) --"
-  bench_warm "source (compile=false)"   "$RUNS_WARM" "rm -rf target; $NOCOMPILE_NT" "$NOCOMPILE_NT"
+  bench_warm "source (mode=source)"     "$RUNS_WARM" "rm -rf target; $NOCOMPILE_NT" "$NOCOMPILE_NT"
   bench_warm "source (engine cached)"   "$RUNS_WARM" "rm -rf target; $SRC_NT"       "$SRC_NT"
   bench_warm "precompiled"              "$RUNS_WARM" "rm -rf target; $JAVAC_NT"     "$JAVAC_NT"
   bench_warm "precompiled + daemon"     "$RUNS_WARM" "rm -rf target; $DAEMON_NT"    "$DAEMON_NT"
-  bench_warm "precompiled + aot"        "$RUNS_WARM" "rm -f $ROOT/.jenesis/engine*.aot; rm -rf target; $AOT_NT" "$AOT_NT"
-  bench "precompiled + aot (training)"  "$RUNS_WARM" "rm -f $ROOT/.jenesis/engine*.aot; $JAVAC_NT" "$AOT_NT"
+  bench_warm "precompiled + aot"        "$RUNS_WARM" "rm -rf $ROOT/.jenesis/aot; rm -rf target; $AOT_NT" "$AOT_NT"
+  bench "precompiled + aot (training)"  "$RUNS_WARM" "rm -rf $ROOT/.jenesis/aot; $JAVAC_NT" "$AOT_NT"
   SOURCE_DAEMON=1
   bench_warm "source + daemon"          "$RUNS_WARM" "rm -rf target; $SRC_DAEMON_NT" "$SRC_DAEMON_NT"
   echo "-- first build after an engine source changed (the stamp misses, the engine recompiles) --"

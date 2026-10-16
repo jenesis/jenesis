@@ -1,383 +1,271 @@
 # AGENTS.md
 
 Jenesis, the build tool, and jpx, the module runner, in one repository. The tool builds itself: `build/jenesis`
-links to `sources/build/jenesis`, so `java build/jenesis/Make.java` compiles, tests and packages this
-project with the very sources it is working on. `README.md` covers the layout, the demos, CI and releasing;
-this file is how the code is written and changed. The user documentation is
-[jenesis.build](https://jenesis.build) ([jenesis/jenesis-documentation](https://github.com/jenesis/jenesis-documentation)),
-and `java build/jenesis/Make.java skill/start` prints an onboarding briefing from the same material, an overview
-whose pages `skill/<page>` prints one at a time and `skill` all at once.
+links to `sources/build/jenesis`, so `java build/jenesis/Make.java` compiles, tests and packages this project with
+the sources it is working on. `README.md` covers the layout, the demos, CI and releasing; this file is how the code
+is written and changed. The user documentation is [jenesis.build](https://jenesis.build)
+([jenesis/jenesis-documentation](https://github.com/jenesis/jenesis-documentation)); `skill/start` prints an
+onboarding briefing from the same material, `skill/<page>` one page and `skill` all of them.
 
 ## Build & test
 
-- **JDK 25 or newer**, nothing else. `java build/jenesis/Make.java` builds and tests everything;
-  `stage` lays out the release tree; `pin` rewrites the pins; `help` lists every selector and `-D` flag.
+- **JDK 25 or newer**, nothing else. `java build/jenesis/Make.java` builds and tests everything; `stage` lays out
+  the release tree, `pin` rewrites the pins, `help` lists every selector and `-D` flag.
 - One test class: `java -Djenesis.test.filter='.*BuildExecutorTest' -Djenesis.test.force=true
-  -Djenesis.print.tests=true build/jenesis/Make.java +tests`. The filter is a regex over class names,
-  `force=true` runs tests whose inputs did not change, `print.tests` streams the JUnit output. Classes named
-  `*RunTest` run the real external tool and need the network.
-- CI builds under `-Djenesis.dependency.pin=strict`: after changing a dependency, run `pin` and commit the
-  rewritten `module-info.java` / `pom.xml` lines, or CI fails on the unpinned coordinate.
-- When the tool cannot build itself, `mvn test` (the root `pom.xml`) compiles and tests the sources without
-  Jenesis. It validates only; it stages and pins nothing.
-- Every feature ships a demo under `demo/` with a README and a verification command in
-  `.github/workflows/demos.yml`, which `build.yml` calls once per operating system; the demos are the
-  end-to-end suite and the documentation's examples.
+  -Djenesis.print.tests=true build/jenesis/Make.java +tests` - a regex over class names, run even when nothing
+  changed, with the JUnit output streamed. Classes named `*RunTest` run the real tool and need the network.
+- CI builds under `-Djenesis.dependency.pin=strict`: after changing a dependency, run `pin` and commit the rewritten
+  `module-info.java` / `pom.xml` lines.
+- When the tool cannot build itself, `mvn test` (the root `pom.xml`) compiles and tests the sources; it stages and
+  pins nothing.
+- Every feature ships a demo under `demo/` with a README and a verification command in `.github/workflows/demos.yml`,
+  which `build.yml` runs once per operating system. The demos are the end-to-end suite and the documentation's
+  examples.
 
 ## How the code is written
 
-**No comments, no Javadoc.** The sources carry neither, and a change adds none - not inline, not on a type,
-not on a method, in `sources/` or `tests/`. A name, a type or a smaller method carries the meaning; if a
-construct seems to need a comment, restructure it or name it better. The one place Javadoc appears is
-`module-info.java`, because the `@jenesis.*` tags there (`@jenesis.main`, `@jenesis.test`, `@jenesis.pin`,
-…) are configuration the tool reads, not commentary.
+- **No comments, no Javadoc**, in `sources/` and `tests/`. A name, a type or a smaller method carries the meaning.
+  The `@jenesis.*` tags in `module-info.java` are configuration, not commentary, and the one exception.
+- **One caller, no method.** A private method with one caller is inlined, unless it is a self-contained algorithm
+  with a name, has early returns the caller would be restructured around, holds an anonymous class, or is a pattern
+  switch over a sealed type. A static whose first argument is one of our own types is an instance method of that
+  type - without inventing a type to make the call virtual.
+- **Static fields are one block**, without blank lines. Constants that belong together share one declaration
+  (`private static final String MAVEN_GROUP = "org.antlr", MAVEN_ARTIFACT = "antlr4";`); a `Set` or `Pattern`
+  initializer keeps a declaration of its own.
+- **What wraps, wraps one per line.** A declaration with several variables and an argument or parameter list that
+  does not fit on its line put each variable or argument on a line of its own; `Map.of` keeps a key and its value
+  together.
+- **Zero dependencies.** The tool ships as source, vendored into every project that uses it: `build.jenesis`
+  requires only `jdk.compiler` and `java.xml`, and nothing third-party is added for convenience. JSON is `Json.java`,
+  HTTP is `HttpURLConnection`, XML is `java.xml`. A tool the build runs - a compiler, a linter, a packager - is
+  resolved in a group of its own and forked or loaded in a module layer, never required.
+- **Java 25.** Every file starts with `import module java.base;`. Records, sealed types, pattern switches and `_`
+  are the normal idiom.
+- **Immutable objects with withers.** Configuration is a record or a final class; each value has a method named
+  exactly like it that returns a copy with that value replaced (`new Project(root).version("1.0.0")`). No setters,
+  no builders, no `with` prefix.
+- **Fail loudly, name the fix.** Bad input is an `IllegalArgumentException` naming what was given and what would be
+  valid; a missing prerequisite is an `IllegalStateException` naming it. Nothing silently falls back; a lenient
+  wildcard selector is the one documented exception.
 
-**One caller, no method.** A private method with one caller is inlined at it. It survives only where
-inlining would hurt: a self-contained algorithm that has a name, a body with early returns that the caller
-would have to be restructured around, one holding an anonymous class, or a pattern switch over a sealed type.
-A static whose first argument is one of our own types belongs on that type as an instance method instead -
-without inventing a type to make the call virtual.
+## Settings
 
-**Static fields are one block.** No blank line separates them, and constants that belong together share one
-declaration, wrapped onto continuation lines where they are long
-(`private static final String MAVEN_GROUP = "org.antlr", MAVEN_ARTIFACT = "antlr4";`). A separate declaration
-is what marks a separate concept, so a `Set` or `Pattern` initializer keeps its own line, where a declarator
-comma would read as one of its own.
+**Every setting is a `jenesis.<group>.<key>` property** - three segments, never two, never a nested group - read once,
+where the object is built:
 
-**Zero dependencies.** The tool ships as source, vendored into every project that uses it, and runs with a
-JDK and nothing else - that is the promise, and it is not negotiable. `build.jenesis` `requires` only
-`jdk.compiler` and `java.xml`; there is no third-party library anywhere in `sources/`, and none is added for
-convenience. What the JDK does not provide is written against what it does: JSON is `Json.java` over
-`java.base`, HTTP is `HttpURLConnection`, XML is `java.xml`. A tool the build needs at run time - a compiler, a
-linter, a packager - is resolved as a dependency in its own group and forked or loaded in a module layer,
-never added to the module's own `requires`.
+- `ofEnvironment(environment, …)` reads every setting from the `Environment` it is handed
+  (`environment.value("executor.digest", "MD5")`), with what the object cannot do without as further arguments
+  (`Project.ofEnvironment(environment, root)`);
+- the public short constructor reads nothing and takes every default, as `Environment.NONE` would;
+- the canonical constructor takes every value; a wither replaces one and calls it.
 
-**Java 25 idiom.** Every file starts with `import module java.base;` (plus `jdk.compiler` or `java.xml` where
-used). Records, sealed types, pattern switches and unnamed variables (`_`) are the normal idiom.
+An object that builds children calls their `ofEnvironment` and keeps the result, so no module, step, repository or
+resolver carries an environment, and every setting a child resolved is a wither of its own.
 
-**Immutable records with withers.** Configuration objects are records or final classes whose state never
-changes after construction. Each exposes one method per component, named exactly like the component, that
-returns a new instance with that value replaced (`new Project(Path.of(".")).version("1.0.0").sources(true)`,
-`new BuildExecutor.Configuration().concurrency(4)`). No setters, no builders, no `with` prefix.
+**`Environment` is what a run is given**: the immutable map of settings in force and a `Consumer<String>` each for
+output and errors. Nothing in the engine writes to `System.out` or `System.err`. Colour is a `Palette` resolved from
+`jenesis.palette.colors` where the printing object is built, `transient` in a step; it names roles (`status`,
+`failure`, …), and no escape sequence is written outside it. An object built without an environment prints nothing
+until a wither hands it a consumer. `Environment.NONE` holds no setting and writes to the JVM's streams;
+`new Environment(keys)` and `new Environment(keys, out, err)` add settings and writers, each a wither too
+(`Environment.NONE.out(printed::add)`). No environment reads the JVM's properties as they stand, as code running in a
+build could change one between two reads.
 
-**System properties are the defaults.** Every setting is a `jenesis.<group>.<key>` system property - three
-elements, never two and never a nested group - read once where the object is built:
+The environment is an argument of construction, never a field: what keeps talking keeps the consumer it resolved. Only
+`Project` and the multi-project assembler hold one, as they build a module per scanned project module long after the
+settings were read, and `ExternalModule` and `InternalModule`, which hand it to a plugin they create once its closure
+is resolved - so neither has a public constructor. `Make`, `Toolchain` and the daemon are the process boundary and may
+use the streams.
 
-- `ofEnvironment(environment, …)` is the static factory that reads every setting from the `Environment` it is
-  given (`environment.value("executor.digest", "MD5")`, `environment.number("executor.concurrency", 0)`,
-  `environment.flag("test.skip")`), with a value the object cannot do without following it as a
-  further argument (`Project.ofEnvironment(environment, root)`);
-- the public no-argument or short constructor reads nothing and takes each setting's default, exactly as
-  if the environment answered for none of them - that is what `Environment.NONE` is;
-- a canonical constructor takes every value explicitly;
-- the wither overrides one value and calls the canonical constructor.
+**`Make` reads the JVM once.** It copies every `jenesis.*` property when an entry point starts, lays the command
+line's `-Djenesis.*` arguments over it and hands the map down; a program of its own reads the same through
+`Make.settings(root).keys()`. `Make.keys` is the one place the `jenesis.` prefix is spelt. A setting whose keys cannot
+be named in advance (`jenesis.platform.<token>`, `jenesis.plugin.<name>`) is found by listing the map. `Make` and
+`Toolchain` read a bare `Map<String, String>`, because `MakeClosureTest` holds each to compiling alone; `Project.perform`
+and `Project.run` take that map, so the reflective handoff names JDK types alone. A rule both sides need - how a flag
+parses, what `@<file>` expands to - lives in `Make`, package-private, and the engine calls it (`flagOrNull` and
+`arguments` on `SequencedProperties`).
 
-An object that hands settings to children it builds resolves them where it is built: its `ofEnvironment`
-calls each child's own `ofEnvironment` and keeps the result, so no module, step, repository or resolver
-carries an environment and no public signature mentions one. The exceptions are the two types an entry point hands a command line to -
-`Project` and the assembler it gives a multi-project build - because they build a module per project module a
-scan discovers, long after the settings were read. Every setting a child resolved is a wither of its own as
-well, so a caller that names no strings configures the same object programmatically.
+**Reading a value.** The accessors are `getProperty` for the raw value, `value` for the trimmed one that reads blank as
+absent, `flag`, `flagOrNull`, `number`, `entries`, `words`, and `variable` for a file value naming
+`jenesis.variable.<key>` as `@<key>`. A boolean is the default when absent, true when named with no value or
+`=true`, false at `=false`, and any other value is refused naming the valid ones; `flagOrNull` answers `null` when
+absence is a third state. `Boolean.getBoolean` and `Integer.getInteger` are not used. Environment variables are
+fallbacks for the repository settings (`MAVEN_REPOSITORY_URI`, `JENESIS_REPOSITORY_TOKEN`, …) and the toolchain
+installer alone.
 
-**One `Environment` says what a run reads and where it talks.** `Environment` is the record of the three
-things a run is given - the immutable `Map<String, String>` of the settings in force, and the `Consumer<String>` for
-its output and for its errors - and it is the single argument every `ofEnvironment` takes. Nothing in the
-engine writes to `System.out` or `System.err`; a line goes to the consumer the run was handed. Colour is a
-`Palette` resolved from `jenesis.palette.colors` where the printing object is built and handed over with the consumer
-it colours, `transient` in a step. It names roles - `status`, `failure`, `info`, `warning`, … - rather than colours,
-and no escape sequence is written anywhere but in `Palette`, so `NONE` leaves plain text. An object built without an
-environment prints nothing: its consumer is `null` and its palette `NONE` until a wither hands it both.
-`Environment.NONE` holds no setting and writes to the JVM's streams, `new Environment(keys)` is a map of
-settings with the JVM's streams, and `new Environment(keys, out, err)` is a tool's writers. There is deliberately no
-environment that reads the JVM's properties as they stand: code running inside a build - a plugin, an
-annotation processor - could change one between two reads. Each component is a wither of its own
-(`Environment.NONE.out(printed::add)`), so a caller sends one run's lines somewhere else without touching
-the rest. The environment is an argument, never a field: what must keep talking after it was built keeps the
-`Consumer<String>` it resolved, as every step does, and only `Project` and the multi-project assembler hold an
-`Environment`, because they build a module per project module long after the settings were read. It is an
-argument of construction alone - an `ofEnvironment` factory and an entry point take one, a wither, a decorator
-such as `Repository.cached` or a step never does - so what an object does never depends on which overload built
-it. `Make`,
-`Toolchain` and the daemon are the exception to the streams rule, because they are the process boundary rather
-than the build.
+**Files and command lines.** `Make.settings` layers `jenesis.properties` at the project root and the profile files
+under what the entry point holds and hands the result down as one map; nothing is copied into the JVM, so two builds
+in one JVM never see each other's settings. `Make`, `Execute`, `Jpx` and the three tools read `@<file>` as the
+arguments it holds, as the JDK's tools do (`@@` escapes, `#` comments, quotes, no nested expansion), and a file may
+lead with `-Djenesis.<key>=<value>` lines. A process the build hands a command line to - a container, the daemon - is
+given the settings rather than left to read its JVM: the daemon receives them with every request and keys its
+fingerprint on the JVM alone, and a container receives every setting save the `jenesis.project.docker` keys that
+start it.
 
-A process the build hands a command line to - a container, the daemon - is given the settings rather than left to
-read the JVM, because a setting a `jenesis.properties` or a profile supplied was never in the JVM to begin with.
-`Make.Settings` therefore names the keys its layers declare, the daemon is handed their values with every request
-and keys its fingerprint on the JVM it would otherwise have to fork rather than on them, and what `Project`
-forwards into a container is every setting the environment holds, save the keys that start the container -
-`jenesis.project.docker` and its `image`, `readable`, `writable` and `env`.
+**A project's own files are untrusted.** `Make.settings` refuses, in a project's `jenesis.properties` and profiles,
+every key naming a program the build runs or a JVM's options, a credential, a cache, folder or trust root shared
+between projects, the signing key, or a container's boundary, and keeps the folders it names for writing below the
+project root. `~/.jenesis/jenesis.properties` and its profiles outrank the project, the command line outranks both. A
+new property of those kinds joins those lists in the same commit.
 
-**A command line can live in a file.** `Make`, `Execute`, `Jpx` and the three tools read `@<file>` as the
-arguments it holds and `@@<text>` as an argument starting with an `@`, with `#` to the end of a line a comment
-and both quote kinds holding what would otherwise split, exactly as the JDK's own tools read an argument file -
-including that a file is not expanded again from within one. A setting may lead the arguments as
-`-Djenesis.<key>=<value>` there, so a file carries a whole run.
+**Who reads what.** `jenesis.make.*` is read by `Make` and the main methods it launches, before a `Project` exists:
+`root`, `profiles`, `global`, `mode` (`source`, `compiled`, `aot` or `daemon`) and `classes`. Everything `Project`
+reads is `jenesis.project.*`, read nowhere else; its root is a constructor argument and its profiles are handed in.
+`jenesis.toolchain.*` picks the JVM: `Toolchain` reads `version`, `searchpath` and `installer`, is reached by
+reflection only when a version is set, depends on `java.base` alone, and identifies a JDK by its `release` file
+without running it. The search path and the installer decide what runs, so no project file may set them; Jenesis
+installs nothing itself. The installer falls back to `JENESIS_TOOLCHAIN_INSTALLER`, which `jenesis-make` and
+`jenesis-exec` set to their own `jenesis-jdk` where SDKMAN, mise or Scoop installed them (`jpx` to `jpx-jdk`, a
+byte-identical copy the SDK tests hold to it).
 
-**What the launcher and the engine must agree on lives in `Make`.** `Make` is the one type that may reference
-nothing else of this project, so a rule both of them read - how a flag parses, what an `@<file>` argument
-expands to - is written there, package-private, and the engine's own accessors call it: `flagOrNull` and
-`arguments` on `SequencedProperties` are the names the rest of the code knows it by. The dependency points at
-the launcher rather than away from it, which is what keeps a setting from meaning one thing before the build
-starts and another inside it.
+**A new property is added in three places**: the constructor that reads it, the catalogue behind the `configuration`
+selector in `Project.java` (`<key>|<default>|<description>`), and the reference table of the user documentation, in
+the same commit as a rename or removal. A property the code reads and the catalogue lacks, or a default that drifted,
+is a bug. `help` grows for a new selector, never for a property.
 
-A setting that decides which process a build runs in cannot be honoured by the `jenesis-make`, `jenesis-exec`
-and `jpx` tools, which run inside another program's JVM: `jenesis.toolchain.version`, `jenesis.project.docker`
-and `jenesis.execute.docker` are refused by name there rather than ignored. Nothing else about a tool run
-differs, because a run is configured by the provider and the output it is handed, so two of them in one JVM
-never collide and none of them touches the JVM's own properties or streams.
+**`build.jenesis` is a `ToolProvider`.** `MakeTool`, `ExecuteTool` and `JpxTool` publish `jenesis-make`,
+`jenesis-exec` and `jpx`, declared by `provides` in `module-info.java`; the empty `build.jenesis/classpath.properties`
+has the build write the `META-INF/services` file for the class path. `JenesisTool` takes the leading `-Djenesis.*`
+arguments as the run's settings and writes to the writers it is handed without flushing them. A setting that would
+replace the process - `jenesis.toolchain.version`, `jenesis.project.docker`, `jenesis.execute.docker` - is refused by
+name, and `run` reports a failure through `err` and its code. Source mode registers no service; a program there
+builds `new MakeTool()`.
 
-A setting is therefore never read again later, and a caller that builds the object itself is never
-surprised by its surroundings: `new Project(root)` is the defaults and nothing else. The JVM's properties are
-read once, by `Make`: it copies every `jenesis.*` property when an entry point starts, lays the command line's
-`-Djenesis.*` arguments over the copy, and hands the result down, so a property set later changes nothing. A
-program of its own reads the same copy through `Make.settings(root).keys()`. Every setting is read through the
-environment's map, never off `System` directly, and `Make.keys` is the one place the shared `jenesis.` prefix is
-spelt, so a key is named without it everywhere else. Because the map holds every setting in force, a setting
-whose keys cannot be named in advance - `jenesis.platform.<token>`, `jenesis.plugin.<name>` - is found by
-listing the keys rather than by a list derived for it; only `make.provided`, which records where a value came
-from, is derived. `Environment.NONE` is written out where it is used rather than static imported. `Make` and
-`Toolchain` are the exception and read a bare `Map<String, String>` with their own parsing, because
-`MakeClosureTest` holds each of them to compiling alone - naming `Environment` there would drag the engine into
-every build's first step. `Make` therefore hands the engine the map and `Project.perform` and `Project.run`
-take a `Map<String, String>` of their own that builds the default environment, so the reflective handoff names
-JDK types alone. Where the rule itself must not differ, `Make` holds it and
-`Environment` calls `Make`, rather than either side keeping a copy.
-The accessors are `environment.getProperty(key)` and `getProperty(key, default)` for the raw value, `value`
-for the trimmed one that reads a blank as absent, `flag`, `flagOrNull`, `number`, `entries` and `words` -
-and nothing else, so no reader hand-rolls a parse. A boolean is the setting absent being the default,
-`=true` or the setting named with no value at all being true, `=false` being false, and any other value an
-`IllegalArgumentException` naming what would be valid; `flagOrNull` answers `null` for the absent setting,
-for one whose third state is the absence itself. A number refuses a value that is not one the same way.
-`Boolean.getBoolean` and `Integer.getInteger` are not used, because they read `=false` and a bare `-Dkey`
-alike as false and a misspelt value as false or as the default rather than as the mistake it is.
-Environment variables are fallbacks for the repository settings (`MAVEN_REPOSITORY_URI`,
-`JENESIS_REPOSITORY_TOKEN`, …) and for the toolchain installer (`JENESIS_TOOLCHAIN_INSTALLER`) only. `jenesis.properties` at the project root and the profile files are read by
-`Make.settings`, which layers them under whatever the entry point already holds and hands
-the result down as one provider; nothing is ever copied into the JVM's own properties, so
-two builds in one JVM never see each other's settings. A new property is added in three places - the constructor that reads it, the catalogue behind the
-`configuration` selector in `Project.java`, and the reference table in the user documentation. That catalogue
-is the tool's own property reference: one line per property, `<key>|<default>|<description>`, printed with the
-value in force, so **adding, renaming or removing a property means editing it in the same commit** - a
-`jenesis.*` the code reads and the catalogue does not list is a bug, and so is a line whose default has drifted
-from the constructor that reads it. `help` and `skill` point at `configuration` rather than listing properties,
-so neither grows for a new property; `help` grows for a new selector.
+## Plugins
 
-**A project's own files are untrusted input.** `Make.settings` refuses, in the project's `jenesis.properties`
-and its profiles, every key that names a program the build runs or the options a JVM runs with, a credential,
-a cache, a folder or a trust root this machine shares between projects, the signing key, or the boundary of a
-container; the folders such a file names for the build to write to stay below the project root. Your own
-`~/.jenesis/jenesis.properties` and its profiles outrank a project for every key, and the command line outranks
-both, so what a machine settles a project cannot undo. A new property of any of those kinds joins those lists
-in `Make` in the same commit.
+**`jenesis.plugins.properties` names the plugins the build does not discover** - one per line, `<name>+<hook
+point>=<module>` or `<name>=<module>` for the module build. A value starting with `./` is a folder of the project
+compiled by an `InternalModule`; anything else a module an `ExternalModule` resolves as `module/<name>` from the
+Jenesis module repository, its closure pinned in the group `<name>` (handed on as `+closure`, which `pin` writes into
+every module that runs the plugin); `@<provider>` selects the provider annotated `@BuildModuleName`.
+`Project.ofEnvironment` reads the file, and the assembler wires a plugin into the `custom` namespace of its hook point,
+in a module only where `plugin-<name>.properties` is found in its configuration locations.
 
-**`jenesis.make.*` and `jenesis.project.*` split by who reads them.** `Make` and the main methods it launches
-read `jenesis.make.*`: where the project is (`root`), which profiles to layer (`profiles`), where the
-user-global file lives (`global`), and how the engine is compiled and reused (`compile`, `classes`, `daemon`,
-`aot`). All of it has to be read before a `Project` can exist, which is why it belongs to the entry point rather
-than to the project. Everything the `Project` record reads for itself is `jenesis.project.*`. `Project` therefore
-takes its root as a required constructor argument and its profiles as a value handed in by the entry point -
-neither is a property it reads, and no `jenesis.project.*` key is read outside it.
+**A plugin provides a factory**, created by `ServiceLoader`, whose `create` validates its values - the engine checks
+none - and is handed the loading build's environment, its process `Permits`, the plugin's name as its group, and the
+build's repositories and resolvers. Everything a plugin resolves lies in a group `<name>:<purpose>`, its tool in
+`<name>:tool`; a step resolving in any other group fails. The contracts live in `build.jenesis`:
+`BuildModuleFactory` returns the module that is wired; `ObservabilityFactory`, for the hook point `observe`, an
+`Observation` pairing the engine that joins the tests' JVM (resolved as `observers/<name>`, its agent in
+`<name>:agent`) with the module reporting over what it recorded; `TestFrameworkFactory`, for `test`, a
+`TestFramework` prepared as `frameworks/<name>` and consulted before the built-in JUnit Platform, JUnit 4 and TestNG
+(`framework=<name>` in `test.properties` picks one); `LanguageFactory`, for `language`, a `Language` naming its
+extensions, its compiler before or after javac and its documentation tool, which runs wherever a module holds such a
+file, resolved as `languages/<name>`, its documentation joining the aggregate. Kotlin, Scala and Groovy are official
+plugins the chains resolve only where the scan finds their extension; a source of a switched-off language fails the
+build, and a `pom.xml` module reads a folder beside `src/main/java` only where `jenesis.maven.sources` names it.
 
-**`build.jenesis` is a `ToolProvider`.** `MakeTool`, `ExecuteTool` and `JpxTool` publish
-`jenesis-make`, `jenesis-exec` and `jpx` through `java.util.spi.ToolProvider`, under the names the
-commands already answer to, so a program with the module resolved builds a project, runs what it
-built, or runs a published program in its own JVM. They share `JenesisTool`, which takes the
-leading `-Djenesis.*` arguments as that run's settings, hands the rest to the tool as a command
-line would, and builds the `Environment` that writes everything printed to the writers it was given. It
-never flushes them: whoever owns a writer decides when it drains, and an autoflushing one already does.
-`java.util.spi.ToolProvider` is in `java.base`, so this costs no dependency. The three are declared
-once, by `provides` in `module-info.java`, and the empty `build.jenesis/classpath.properties` has the
-build write `META-INF/services/java.util.spi.ToolProvider` from that clause, because a named module
-reads the first and a jar on the class path reads the second, and the tools answer to their names
-either way. A setting that would
-replace the running process - `jenesis.toolchain.version`, `jenesis.project.docker`, and
-`jenesis.execute.docker` for what `jenesis-exec` runs - is refused by name rather than ignored,
-and `run` reports a failure through `err` and a code rather than throwing. `jenesis-exec` forks
-the program it runs, as its command does, so only the build's own output reaches the writers.
-Source mode registers no service, so a program there builds `new MakeTool()` itself; the contract
-is the same.
+**Values and inputs.** A value is a string the host resolved (`@<key>` or `@<key>/<default>` is
+`jenesis.variable.<key>`, `@@` a literal `@`), never a path. A key `@<input>[/<target>]=<path>` binds a file or folder
+of the project, resolved against the module's folder, into the named input at `<target>`, handed to the plugin as
+`../inputs/<input>`; one input takes a key per target, merged by `Bind.asInputs`. A folder must resolve, through any
+link, inside the project; a file may lie outside, so projects can share one.
 
-**`jenesis.toolchain.*` picks the JVM, and only the user says where to look.** `Toolchain` reads
-`jenesis.toolchain.version`, `jenesis.toolchain.searchpath` and `jenesis.toolchain.installer`. `Make.main`
-and `Execute.main` reach it by reflection, and only when a version is set, so source mode compiles it only
-then; it depends on `java.base` alone, which `MakeClosureTest` holds it to. A JDK is identified by its
-`release` file and never executed before it is chosen. The search path and the installer decide what the
-build executes, so `Make.settings` refuses both in every file a project provides: a new way to read
-properties keeps that rule, and the relaunch never takes a JVM option that configuration could supply.
-Jenesis itself installs nothing; the installer is a program the user names, such as the SDK's
-`jenesis-jdk`, which translates a version for the tool that installed Jenesis. The installer falls back to
-`JENESIS_TOOLCHAIN_INSTALLER`, which `jenesis-make` and `jenesis-exec` set, for the one run they start, to their
-own `jenesis-jdk` where SDKMAN, mise or Scoop installed them and the variable is unset, so `jenesis-jdk` calls
-that tool back, and `jpx` does the same with `jpx-jdk`, a byte-identical copy that the jpx SDK tests hold to
-`jenesis-jdk`. Nothing in the tool writes to a file of the user to arrange it.
+**Hook points of the project**: `preprocess`, `postprocess/transform`, `postprocess/inspect`, `stage/transform`,
+`stage/inspect`, `release` and `plugin`, each keeping its plugins apart from its own steps (`custom/`, `transform/`,
+`inspect/`). A preprocessor sees only what it binds and exports nothing: it can order and stop the build, never feed
+it. A transform adds a file to a module by naming it under `<module>.<key>` in an `inventory.properties` of its own,
+and what belongs to no module under `project/`, gathered by `postprocess/project` and copied by `stage/project`; a
+module that does not exist or a path written twice is refused. An inspection fails the build by throwing, or by
+changing a file it was handed. With a plugin of `stage`, the stock staging moves to `stage/staged/<tree>` and
+`stage/<tree>` merges what the transforms wrote, refusing a file staged twice. A releaser runs where a configuration
+folder holds its `plugin-<name>.properties`, is handed everything staged plus `root.properties` and
+`metadata.properties`, and publishes only under `jenesis.release.publish=true`, which only a command line may set;
+`pin` runs after that dry release. The `plugin` module holds plugins run only by their selector, each handed only
+what it binds; they are switched on by their line alone, configured by `<name>.<key>` lines of
+`jenesis.plugins.arguments.properties` and `jenesis.plugins.arguments-<profile>.properties` (an earlier profile wins),
+and pinned into `jenesis.plugins.pin.properties`. `export` has no hook point. `jenesis.project.plugins=false` leaves
+out every plugin the file names, while `pin` still resolves them.
 
-**`jenesis.plugins.properties` adds to the stock build.** It sits beside `jenesis.properties` and names one plugin
-per line, `<name>+<hook point>=<module>`, or `<name>=<module>` for the module build itself: a value starting with `./`
-is a folder of the project compiled from source by an `InternalModule`, anything else a module name an `ExternalModule`
-resolves as `module/<name>` through the Jenesis module repository, whatever the project's layout, with its closure
-pinned in the group `plugin-<name>`; either may end in `@<provider>` to select the provider annotated
-`@BuildModuleName` with that name. `Project.ofEnvironment` reads the file, so every entry point that builds a
-project from settings builds with its plugins, and the assembler wires a plugin into the `custom` namespace of the hook point the key
-names, in a module only where `plugin-<name>.properties` is found in that module's configuration locations; a
-provider is created with that file's values through a public constructor taking a `SequencedMap` of them, with
-its no-argument constructor when the file is empty, and a file with values for a provider without that
-constructor fails the build. A key `@<input>[/<target>]=<path>` among those values is not handed over as one:
-it binds a file or folder of the project, resolved against the module's own folder, into the input named before
-the first `/`, placed at `<target>` inside it or at its root, and the plugin receives the input beside what its hook point
-reads as `../inputs/<input>`. The same input takes one key per target, which `Bind.asInputs` binds as a source each
-and merges into one folder, so a plugin module holds its inputs as a map from name to target to source; `@@<key>`
-is the value `@<key>`, and a path is refused unless it resolves, through any symbolic link, to the project itself -
-as a plugin's own `./<folder>` is.
-Eight hook points are not modules of a project module but of the project: `preprocess`, `postprocess/transform`,
-`postprocess/inspect`, `stage/transform`, `stage/inspect`, `export`, `release` and `plugin`. Every layout registers `build/preprocess` inside `build` before its
-project module, which depends on it, and `build/postprocess` after it; `export` and `release` wire their plugins
-beside their own steps. Each keeps its plugins in a namespace apart from its own steps - `custom/`, or `transform/`
-and `inspect/` in `postprocess` - so that no plugin name is taken. A preprocessor is handed only what it binds and
-exports nothing, so it orders the build and can stop it but never feeds it; everything depending on `build` sees
-what the transforms added and nothing runs past a failed inspection. With a plugin of `stage`, the stock staging
-moves to `stage/staged/<tree>` and `stage/<tree>` merges it with what the transforms of stage wrote under `<tree>/`,
-refusing a file staged already, so every staged tree stays where `export`, `release` and a `jreleaser.yml` read it and
-a plugin's additions propagate like anything staged; the inspections of stage check the merged trees. An exporter and
-a releaser are handed everything staged. The top-level `plugin` module holds nothing but the plugins of its hook point, each as `plugin/<name>`
-beside the source that binds `jenesis.plugins.pin.properties` - a name no plugin can take - and depends on nothing,
-so such a plugin runs only when its selector is named and is handed only what it binds. An
-expensive one is switched off by its setting, in a profile if need be, and
-`jenesis.project.plugins=false` leaves out every plugin the file names, while `pin` still resolves those of the
-project: such a plugin is switched on by its line alone and configured, never from the command
-line, by the `<name>.<key>` lines of `jenesis.plugins.arguments.properties` and of a
-`jenesis.plugins.arguments-<profile>.properties` per active profile, read when the layout knows the profiles, so an
-earlier profile wins over a later one and each over the file itself; its inputs resolve against the project root,
-and `pin` resolves every one of them, a switched-off
-one included, into `jenesis.plugins.pin.properties` rather than into a module's declaration. A transform adds a
-file to a module by naming it in an `inventory.properties` of its own under any `<module>.<key>`, which `transform`
-collects per module, and places what belongs to no module in a `project/` folder, which `postprocess/project`
-gathers and `stage/project` copies as it stands; those are its only outputs, and what they hold is the plugin's
-responsibility, refusing only a module that does not exist and a key or path written twice; an inspection
-fails the build by throwing, and `inspect` fails it as well when
-an inspection changed a file it was handed. The module hook point `package` is the one whose output is staged beyond the
-module: what its plugins write into `packages/` is merged with the stock `jpackage` output, refusing a name written
-twice, and staged in `stage/packages/`. A plugin adds and
-never replaces, with one exception: the plugins of the module hook point `binary/transform` rewrite the module's
-compiled classes, in the order they are named, each handed what the one before wrote, and what one writes replaces
-the class file of that name - bytecode enhancement, and nothing else. Any other change to what the stock steps do is
-an entry point of its own that wires its assembler in code. A plugin runs the project's code, as its tests and annotation processors do, so the project
-names it itself; what isolates an untrusted project is `jenesis.project.docker`, under which the host runs no
-build, `watch` included, before the container is up, and `Make.settings` refuses `jenesis.project.docker` and
-`jenesis.execute.docker` and the `image`, `readable`, `writable` and `env` of either group in a file the project
-provides, so a project can neither switch the isolation off nor widen it.
+**Plugins add, never replace** - except `binary/transform`, whose plugins rewrite the compiled classes in order, for
+bytecode enhancement. The module hook point `package` merges what its plugins write to `packages/` with `jpackage`'s
+output into `stage/packages/`. Changing what stock steps do takes an entry point that wires its assembler in code. A
+plugin runs the project's code, so the project names it; `jenesis.project.docker` isolates an untrusted project, and
+no project file may set or widen it.
 
-**Configuration files are read through `SequencedProperties`.** A file is read with the type's own accessors -
-`value`, `value(key, default)`, `flag`, `flag(key, default)`, `flagOrNull`, `entries` for a comma-separated
-list, `words` for a whitespace-separated command line - which trim and treat a blank value as an absent one,
-so no reader hand-rolls that again. A flag is the one exception and reads exactly as a `jenesis.*` setting
-does: a key named with no value at all is true rather than absent, and a value that is neither `true` nor
-`false` is refused, so one word never means one thing on a command line and another in a file. `getProperty` stays the raw `Properties` contract for the few readers that must tell
-an empty value from a missing one (an alias line whose emptiness removes an entry, a coordinate whose empty
-location marks it unresolved). A convention of the file format belongs on the type; parsing that belongs to
-one file's schema - a `<name>=<coordinate>` plugin list, a key whitelist - stays a private static in that
-reader.
+**A plugin is kept warm.** Its module layer is kept per plugin and jar digest, softly reachable, and handed to the
+next build in the JVM loading the same jars; a static field of a plugin must stay right for that next build.
 
-**Steps are pure functions of folders.** A `BuildStep` reads its `arguments` (one folder per predecessor) and
-writes into `context.next()`, nothing else. It is `Serializable` and its serialised form is part of the cache
-key, so every value that should trigger a re-run is a non-`transient` field and every field is serialisable
-(`Path` is hashed by its string form; a lambda field must be typed as a serialisable functional interface).
-What a step holds is serialised with it - a `Resolver`, a version negotiator, a lambda typed as a
-serialisable functional interface - so those types are `Serializable` too, and their scaffolding (a parser
-factory, a lookup cache) is `transient` rather than left to drift into the key. A module is not serialisable
-and never reaches a key at all, so a field of one is never `transient`.
-Steps compose by folder conventions - `sources/`, `classes/`, `artifacts/` - never by inspecting predecessor
-names. Two builds of the same inputs write the same bytes, which `jenesis.project.reproduce` checks step by step
-as a debugging aid that reports rather than fails: an output that cannot repeat by its nature - a report that
-records when it ran, coverage data, a recording - shows up there as one, and anything else that differs, a path
-into the target folder above all, is a defect of the step. A step that forks a JDK tool extends `ProcessBuildStep` and thereby accepts
-`process-<tool>.properties`.
-A forked process is handed the platform's own variables (`PATH`, `HOME`, `LANG`, `TMPDIR`, Windows' `SystemRoot`
-and its kin) and nothing else of the build's environment, because a variable is no input of its step. A step that
-runs a program - `java`, the tests, an external binary - extends `EnvironmentalProcessBuildStep` and so also
-accepts `environment-<tool>.properties`, whose variables it is handed beyond those, and one whose contract is a
-variable, as JReleaser's credentials are, names it in `inherits`. A JDK tool such as `javac` takes none: it may run
-in the build's own JVM, which no environment reaches. The program `Execute` or `jpx` runs is no step but what the
-user asked to run, and is handed the whole environment, as a shell would hand it. In either file a value `@<key>` or
-`@<key>/<default>` is the setting `jenesis.variable.<key>`, resolved where the assembler reads the file, so it is
-part of the key of `prepare` and of every step reading what it writes; `@@` is a literal `@`.
+**Official plugins are discovered.** A module under `project/` (`JDepsModule`, `LicenseHeaderModule`, …) runs what
+the JDK ships, activates when its file is in a configuration folder, and is switched by `jenesis.<kind>.<tool>`:
+`ignore`, `report` (default) or `strict`. A tool the build would download is an official plugin of
+`jenesis/jenesis-plugins` instead: the inferred module that ran it holds it as `ExternalModule.official`, resolved as
+`module/build.jenesis.plugin.<name>` in the group `<name>`, behind a boolean named like it, and wires it where the
+tool's file is found (`pmd.xml`, `checkstyle.xml`, a `.kt` source, `jreleaser.yml`, …). A `.properties` file is its
+values, any other file the input `rules`; it needs no line in `jenesis.plugins.properties`, and a declared plugin of
+the same name is refused where it runs. A generator reads only the folder it names (`xjc/`, `protoc/`); the project
+binds its contracts there with `@<input>/<folder>=<path>`, under the customary name where the tool expects one.
 
-**Modules activate on a file.** A build module under `project/` (`CheckstyleModule`, `JaCoCoModule`, …)
-switches itself on when its configuration file is present in a configuration folder
-(`configurationFile(configuration)`), resolves its tool in a dependency group named after the tool, and is
-switched by its `jenesis.<kind>.<tool>` property: `ignore` leaves it out, `report` (the default) records its
-findings, `strict` fails the build on them; whether they are printed is a `jenesis.print.*` flag of its own. The inferred assembler wires the modules; a new
-tool is a new module in the same shape, plus a demo.
+## Modules and steps
 
-**A tool reads one folder, the inference fills it.** A generator module (`XjcModule`,
-`ProtocModule`, …) declares the folder it reads - `xjc/`, `protoc/` - and reads nothing else:
-it never searches `sources/` or `resources/`, and it never learns where a contract lives. The
-inferred module binds the configured `folders` (default `META-INF/build.jenesis`) into that
-folder, filtered to the file kinds the tool compiles and keeping each file's path below the
-folder it came from, so moving a contract elsewhere changes no step's inputs. An input the
-tool identifies by name rather than by kind - a catalog, an OpenAPI document - is linked
-under the customary name the tool expects, so renaming the file in the project does not
-re-run the step either.
+**A module configures only its own children.** Every `Inferred*Module` holds a `Function<Child, BuildExecutorModule>`
+per child, named like it, the identity by default or `null` when the child's property switches it off (`null`, also
+as a result, skips it). The child is built by its own `ofEnvironment` and kept beside its configurator, named for it
+(`checkstyleModule`, `javacStep`). A caller nests (`assembler.toolchain(toolchain -> toolchain.compiler(compiler ->
+compiler.javac(javac -> …)))`); a new child is a configurator on its parent, never on the assembler. Every
+`Inferred*Module` and the module build also hold `custom`, extra children wired in a sub-module `custom`, added by
+`custom(name, module)` or `custom(name, step)`, refusing a name taken.
 
-**A module configures only its own children.** Every `Inferred*Module` holds one
-`Function<Child, BuildExecutorModule>` per module it wires, named exactly like the child it configures and
-defaulting to the identity, or to `null` when that child's `jenesis.*` property switches it off; `null`
-skips the child, and so does a configurator that returns `null`. That property is read in `ofEnvironment` and
-nowhere else, so the plain constructor wires every child whatever the environment says, and a module that
-wires another module builds that child with its own `ofEnvironment` and keeps the result beside the configurator
-that shapes it, named for the child it holds (`checkstyleModule`, `javacStep`) - which is how one provider
-handed to `Project` reaches the whole tree without being carried into it. A caller reaches
-further down by nesting -
-`assembler.toolchain(toolchain -> toolchain.compiler(compiler -> compiler.javac(javac -> …)))` - and no
-module ever exposes a configurator for a module it does not wire itself, so a new child is a new
-configurator on its own parent, never a new component on the assembler. Beside its configurators every
-`Inferred*Module`, and the assembler's module build, holds `custom`, a `SequencedMap<String, BuildExecutorModule>`
-of additional children it wires inside one sub-module named `custom`, each handed the inputs the module itself
-reads. No module names a child of its own `custom`, so an added name never collides with a stock one, and a
-plugin or an entry point adds a module without wrapping or replacing another. Beside the wither that sets the map,
-`custom(name, module)` and `custom(name, step)` add one entry - a step as `step.asModule(name)` - and refuse a
-name that is taken already.
+**Configuration files are read through `SequencedProperties`**: `value`, `flag`, `flagOrNull`, `entries`, `words`
+trim and read a blank as absent, and a flag reads as a `jenesis.*` setting does. `getProperty` is for the readers
+that must tell an empty value from a missing one; a file's own schema is parsed by a private static of its reader.
 
-**Fail loudly, name the fix.** Bad input is an `IllegalArgumentException` whose message says what was given
-and what would be valid; a missing prerequisite is an `IllegalStateException` that names it. Nothing
-silently falls back, and a lenient wildcard selector is the one deliberate exception, documented as such.
+**Steps are pure functions of folders.** A `BuildStep` reads its `arguments` and writes `context.next()`. Its
+serialised form is part of the cache key: a value that should trigger a re-run is a non-`transient` field, and what a
+step holds (a `Resolver`, a lambda typed as a serialisable functional interface) is `Serializable`, its scaffolding
+`transient`; a module never reaches a key. Steps compose by folders (`sources/`, `classes/`, `artifacts/`), never by
+names. Two builds of the same inputs write the same bytes, which `jenesis.project.reproduce` reports step by step.
+What a step keeps for its next run - an incremental compiler's state - goes to `context.persistent()`: the folder of
+the last successful run, moved and handed only with `previous`, discarded after a failure, empty when the step changed
+or the build cache supplied its output, kept when a run reports nothing new. A run from an empty folder writes the same
+bytes, only more slowly.
+
+**Processes.** A step forking a JDK tool extends `ProcessBuildStep` and accepts `process-<tool>.properties`; one running
+a program extends `EnvironmentalProcessBuildStep` and accepts `environment-<tool>.properties`, whose variables (with
+`@<key>` as `jenesis.variable.<key>`) it is handed beside the platform's own (`PATH`, `HOME`, `LANG`, `TMPDIR`,
+`SystemRoot`, …); a contract variable is named in `inherits`. What `Execute` or `jpx` runs gets the whole environment.
+A tool's main method runs through `ProcessHandler.OfProcess.ofJavaMain()`, by `jenesis.process.mode`:
+
+- `fork` (default) runs each call in a JVM of its own through `build.jenesis.daemon.Worker --once`, so a returned
+  code counts and a lingering thread ends with the JVM;
+- `aot` does so from an ahead-of-time cache of the tool in `jenesis.aot.folder`, trained by the first run with the
+  JVM's messages off;
+- `daemon`, set for every build the daemon runs, keeps a `Worker` JVM per JVM, options, class path (by file
+  identity) and environment, which compiles a `.java` launcher once, captures each call's output, is replaced after
+  a `System.exit` and ends after ten idle minutes.
+
+`jenesis.make.mode=aot` and `=daemon` set the process mode alike unless it is set. The AOT folder holds every cache,
+the engine's and the tools', and `Make` clears it whole when `aot.properties` records another engine or JVM or the
+folder outlived `jenesis.aot.lifetime`. The build daemon is the same `Worker` on a loopback socket behind a token,
+running `DaemonBuild` per request. A tool whose main method exits is called through a `<Tool>Driver` of its plugin
+with an `int main(String[])`, compiled against the tool by `requires static` or reaching it by reflection where that does
+not compile; `OfProcess.driver` writes it once per JVM to a private folder ahead of the tool's jars. `javac` with
+`-J` options runs in one warm JVM whose calls run side by side; a tool keeping its state per call asks for the same
+with `shared(true)`. A command line of another shape forks as `ofJavaHome("bin/java")` does.
 
 ## Tests
 
-- `tests/` is the `@jenesis.test` module of `build.jenesis`, on JUnit Jupiter with AssertJ. A test method is
-  a sentence in `snake_case` stating the behaviour it proves (`replaces_a_stale_staging_folder_from_a_crashed_run`);
-  the assertion carries the reason as its `.as(...)` description where one is needed.
-- A step is hashed with what it captures, so a step lambda that uses only its parameters and locals needs
-  nothing more, and a resolver or step with state of its own is a static nested record rather than an
-  anonymous class, which would capture the test. A test whose step lambdas use its own fields (a `@TempDir`)
-  implements `Serializable` so they can be hashed; state a step must not capture (a latch, a socket) lives in
-  a static field.
-- A test names the settings it needs in `new Environment(Map.of(…))` and collects what a run prints by
-  giving that environment a consumer of its own (`.out(printed::add)`). Setting a system property or swapping
-  `System.out` is what the environment exists to avoid, and it survives only where the test is about the JVM's
-  own properties (`EnvironmentTest`) or proves that a build ignores them.
-- `@TempDir` folders for every build; `BuildExecutorCallback.nop()` and `BuildExecutorCache.nop()` unless the
-  test is about them; `Runnable::run` as the executor when ordering matters.
-- Behaviour that is user-visible gets a demo as well as a test.
+- `tests/` is the `@jenesis.test` module on JUnit Jupiter and AssertJ. A test method is a sentence in `snake_case`
+  stating what it proves; an assertion carries its reason in `.as(...)` where needed.
+- A step is hashed with what it captures: a step with state is a static nested record, a test whose step lambdas use
+  its fields implements `Serializable`, and state a step must not capture (a latch, a socket) is static.
+- A test names its settings in `new Environment(Map.of(…))` and collects output with `.out(printed::add)`; it sets no
+  system property and swaps no stream unless it is about the JVM's own properties.
+- `@TempDir` for every build, `BuildExecutorCallback.nop()` and `BuildExecutorCache.nop()` unless under test,
+  `Runnable::run` where ordering matters. User-visible behaviour gets a demo as well.
 
 ## Public surface and the documentation
 
-`build.jenesis` is published to Maven Central and vendored as source into every project that uses the tool, so
-every public type is API: renaming a method, a property or a selector is a breaking change and is done
-deliberately, with the demos, the `help`/`skill` text and the user documentation updated in the same pass.
-The documentation repository's `AGENTS.md` describes how a change is verified and where each setting is
-documented; a property that exists only in the code and not on jenesis.build is not finished.
-
-A demo's README is a user guide: what to declare, what to run and what comes out, never how the engine
-arrives there. The demos are read in order, so a page refers to the others by name and only backwards, and
-the launchers under `build/` carry no comments either. A demo that teaches what another one already shows is
-folded into it.
+`build.jenesis` is published to Maven Central and vendored as source, so every public type is API: a rename of a
+method, property or selector updates the demos, the `help`/`skill` text and the user documentation in the same pass,
+and a property missing from jenesis.build is not finished. A demo's README is a user guide - what to declare, what to
+run, what comes out - read in order, referring only backwards; a demo repeating another is folded into it.
 
 ## Releasing and downstream
 
-A release is a manual run of the release workflow from the Actions tab, so any commit is releasable: its
-optional `sha` input names the commit (default: the head it runs on) and its optional `tag` input names the
-tag (default: the next minor of the highest `vX.Y.Z` tag). The workflow stages, signs, publishes to Maven
-Central, SDKMAN, Homebrew and Scoop, and cuts the `vX.Y.Z` tag. `jenesis-launcher`, `jenesis-modules` and
-`jenesis-repository` pin this repository as the `build/.upstream` git submodule; after a release they are
-moved to the release commit.
+A release is a manual run of the release workflow: its optional `sha` input names the commit, its optional `tag` the
+tag (default: the next minor of the highest `vX.Y.Z`). It stages, signs, publishes to Maven Central, SDKMAN, Homebrew
+and Scoop, and tags. `jenesis-launcher`, `jenesis-modules` and `jenesis-repository` pin this repository as the
+`build/.upstream` submodule and are moved to the release commit afterwards.

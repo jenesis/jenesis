@@ -133,20 +133,31 @@ takes Maven publishes only, and serves the modular jars among them by module nam
     cd ../library
     java -Djenesis.project.version=1.0.0 \
          -Djenesis.release.uri=https://repo.example.com/repository/releases/<repo>/ \
-         -Djenesis.release.token=<key> \
          build/jenesis/Make.java release
 
-Each module is put once, as its jar under its version, below `module/`:
+A release is a dry run unless the command line asks for more: it checks what was
+staged and names each jar it would put, once per module, as its jar under its
+version, below `module/`, and sends nothing:
 
-    https://repo.example.com/repository/releases/<repo>/module/demo.greeter/1.0.0/demo.greeter.jar
+    [DRY RUN]   https://repo.example.com/repository/releases/<repo>/module/demo.greeter/1.0.0/demo.greeter.jar
+
+`-Djenesis.release.publish=true` puts them, with the key the repository asks for:
+
+    java -Djenesis.project.version=1.0.0 \
+         -Djenesis.release.uri=https://repo.example.com/repository/releases/<repo>/ \
+         -Djenesis.release.token=<key> \
+         -Djenesis.release.publish=true \
+         build/jenesis/Make.java release
+
+Only the command line may pass that setting, never `jenesis.properties` or a
+profile, so no file makes every release publish.
 
 A project built with the `modular` layout then resolves the version it pins -
 `app` pins 1.0.0 since the section above - once `jenesis.module.uri` names the
 same address.
 
-A release without a version fails before anything is sent, as does a release to
-a plaintext `http:` address unless `-Djenesis.repository.insecure=true` allows
-it.
+A release without a version fails, dry or not, as does a release to a plaintext
+`http:` address unless `-Djenesis.repository.insecure=true` allows it.
 
 The key is sent as the `Authorization` header. A release reads the
 `JENESIS_RELEASE_URI` and `JENESIS_RELEASE_TOKEN` environment variables where the

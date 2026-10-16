@@ -12,7 +12,6 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.InferredTestObservationModule;
 import build.jenesis.project.Jfr;
-import build.jenesis.project.PiTestModule;
 import build.jenesis.project.TestModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,20 +21,6 @@ public class InferredTestObservationModuleTest {
 
     @TempDir
     private Path root, project;
-
-    @Test
-    public void wires_jacoco_when_a_jacoco_properties_file_is_present() throws IOException {
-        Files.writeString(project.resolve("jacoco.properties"), "");
-        BuildExecutor executor = newExecutor();
-        executor.addSource("project", project);
-        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
-        executor.execute("observed/jacoco/required");
-
-        Path requiredOutput = root.resolve("observed").resolve("jacoco").resolve("required").resolve("output");
-        SequencedProperties requires = SequencedProperties.ofFiles(requiredOutput.resolve(BuildStep.REQUIRES));
-        assertThat(requires.stringPropertyNames())
-                .containsExactly("jacoco/runtime/maven/org.jacoco/org.jacoco.cli/RELEASE");
-    }
 
     @Test
     public void hands_the_test_run_everything_but_what_it_is_told_to_leave_untested() throws IOException {
@@ -63,38 +48,13 @@ public class InferredTestObservationModuleTest {
     }
 
     @Test
-    public void refuses_a_key_of_jacoco_properties_that_names_no_limit_of_a_counter() throws IOException {
-        Files.writeString(project.resolve("jacoco.properties"), "minimum.lines=0.8\n");
-        BuildExecutor executor = newExecutor();
-        executor.addSource("project", project);
-        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
-        assertThatThrownBy(executor::execute)
-                .hasStackTraceContaining("minimum.lines")
-                .hasStackTraceContaining("line");
-    }
-
-    @Test
-    public void refuses_a_limit_of_jacoco_properties_that_is_no_ratio_or_count() throws IOException {
-        Files.writeString(project.resolve("jacoco.properties"), "minimum.line=80%\n");
-        BuildExecutor ratio = newExecutor();
-        ratio.addSource("project", project);
-        ratio.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
-        assertThatThrownBy(ratio::execute).hasStackTraceContaining("from 0 to 1");
-        Files.writeString(project.resolve("jacoco.properties"), "maximum.missed.class=-1\n");
-        BuildExecutor count = newExecutor();
-        count.addSource("project", project);
-        count.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
-        assertThatThrownBy(count::execute).hasStackTraceContaining("at least 0");
-    }
-
-    @Test
     public void does_not_wire_an_engine_without_a_config_file() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
         executor.execute();
 
-        assertThat(root.resolve("observed").resolve("jacoco"))
+        assertThat(root.resolve("observed").resolve("native-image"))
                 .as("no observation engine is wired without its config file")
                 .doesNotExist();
     }
@@ -102,7 +62,7 @@ public class InferredTestObservationModuleTest {
     @Test
     public void observes_nothing_of_a_module_its_description_declares_no_or_an_abstract_test_module()
             throws IOException {
-        Files.writeString(project.resolve("jacoco.properties"), "");
+        Files.writeString(project.resolve("graal.properties"), "");
         Path main = Files.createDirectory(project.resolve("main")), base = Files.createDirectory(project.resolve("base"));
         Files.writeString(main.resolve(BuildStep.MODULE), "module=sample\n");
         Files.writeString(base.resolve(BuildStep.MODULE), "test=sample\nabstract=true\n");
@@ -113,23 +73,12 @@ public class InferredTestObservationModuleTest {
         executor.addModule("base-observed", observation().test(_ -> (_, _) -> {}), "base");
         executor.execute();
 
-        assertThat(root.resolve("main-observed").resolve("jacoco"))
+        assertThat(root.resolve("main-observed").resolve("native-image"))
                 .as("a module that declares no tests is not observed")
                 .doesNotExist();
-        assertThat(root.resolve("base-observed").resolve("jacoco"))
+        assertThat(root.resolve("base-observed").resolve("native-image"))
                 .as("an abstract test module runs no tests of its own")
                 .doesNotExist();
-    }
-
-    @Test
-    public void the_observe_override_switches_off_jacoco() throws IOException {
-        Files.writeString(project.resolve("jacoco.properties"), "");
-        BuildExecutor executor = newExecutor();
-        executor.addSource("project", project);
-        executor.addModule("observed", observation().test(_ -> (_, _) -> {}).jacoco(null), "project");
-        executor.execute();
-
-        assertThat(root.resolve("observed").resolve("jacoco")).doesNotExist();
     }
 
     @Test
@@ -189,7 +138,7 @@ public class InferredTestObservationModuleTest {
 
     @Test
     public void the_test_configurator_decorates_the_inferred_test_module() throws IOException {
-        Files.writeString(project.resolve("jacoco.properties"), "");
+        Files.writeString(project.resolve("graal.properties"), "");
         List<TestModule> decorated = new ArrayList<>();
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
@@ -197,7 +146,7 @@ public class InferredTestObservationModuleTest {
             decorated.add(module);
             return (_, _) -> {};
         }), "project");
-        executor.execute("observed/jacoco/required");
+        executor.execute();
 
         assertThat(decorated)
                 .as("the observation module hands its own test module to the configurator")
@@ -206,105 +155,16 @@ public class InferredTestObservationModuleTest {
 
     @Test
     public void the_test_override_switches_off_the_test_run_and_its_reports() throws IOException {
-        Files.writeString(project.resolve("jacoco.properties"), "");
+        Files.writeString(project.resolve("graal.properties"), "");
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule("observed", observation().test(null), "project");
         executor.execute();
 
         assertThat(root.resolve("observed").resolve("test")).doesNotExist();
-        assertThat(root.resolve("observed").resolve("jacoco"))
+        assertThat(root.resolve("observed").resolve("native-image"))
                 .as("an observation report is not wired without the test run it observes")
                 .doesNotExist();
-    }
-
-    @Test
-    public void wires_mutate_when_a_pitest_config_is_present() throws IOException {
-        Files.writeString(project.resolve("pitest.properties"), "targetClasses=sample.*\ntargetTests=sample.*\n");
-        BuildExecutor executor = newExecutor();
-        executor.addSource("project", project);
-        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
-        executor.execute("observed/mutate/required");
-
-        Path requiredOutput = root.resolve("observed").resolve("mutate").resolve("required").resolve("output");
-        SequencedProperties requires = SequencedProperties.ofFiles(requiredOutput.resolve(BuildStep.REQUIRES));
-        assertThat(requires.stringPropertyNames())
-                .containsExactlyInAnyOrder(
-                        "pitest/runtime/maven/org.pitest/pitest-command-line/RELEASE",
-                        "pitest/runtime/maven/org.pitest/pitest-junit5-plugin/RELEASE");
-    }
-
-    @Test
-    public void refuses_a_key_of_pitest_properties_that_names_no_option_of_the_mutation() throws IOException {
-        Files.writeString(project.resolve("pitest.properties"), "targetClass=sample.*\n");
-        BuildExecutor executor = newExecutor();
-        executor.addSource("project", project);
-        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
-        assertThatThrownBy(executor::execute)
-                .hasRootCauseInstanceOf(IllegalArgumentException.class)
-                .rootCause()
-                .hasMessageContaining("Unknown key targetClass in " + project.resolve("pitest.properties"))
-                .hasMessageContaining("[targetClasses, targetTests, outputFormats, mutators, failWhenNoMutations]");
-    }
-
-    @Test
-    public void refuses_an_output_format_or_a_flag_of_pitest_properties_that_pit_does_not_know() throws IOException {
-        Files.writeString(project.resolve("pitest.properties"), "outputFormats=XML,PDF\n");
-        BuildExecutor format = newExecutor();
-        format.addSource("project", project);
-        format.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
-        assertThatThrownBy(format::execute)
-                .hasRootCauseInstanceOf(IllegalArgumentException.class)
-                .rootCause()
-                .hasMessageContaining("Unknown format PDF of outputFormats")
-                .hasMessageContaining("[XML, HTML, CSV]");
-        Files.writeString(project.resolve("pitest.properties"), "failWhenNoMutations=yes\n");
-        BuildExecutor flag = newExecutor();
-        flag.addSource("project", project);
-        flag.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
-        assertThatThrownBy(flag::execute)
-                .hasRootCauseInstanceOf(IllegalArgumentException.class)
-                .rootCause()
-                .hasMessageContaining("The value yes of failWhenNoMutations")
-                .hasMessageContaining("expected true, false");
-    }
-
-    @Test
-    public void reads_an_output_format_of_pitest_properties_whatever_its_case() throws IOException {
-        Files.writeString(project.resolve("pitest.properties"), "outputFormats=xml,Html\nfailWhenNoMutations\n");
-        List<PiTestModule> configured = new ArrayList<>();
-        BuildExecutor executor = newExecutor();
-        executor.addSource("project", project);
-        executor.addModule("observed", observation().test(_ -> (_, _) -> {}).pitest(module -> {
-            configured.add(module);
-            return null;
-        }), "project");
-        executor.execute();
-
-        assertThat(configured).as("the file is read into the typed module rather than refused").hasSize(1);
-    }
-
-    @Test
-    public void does_not_wire_mutate_without_a_pitest_config() throws IOException {
-        BuildExecutor executor = newExecutor();
-        executor.addSource("project", project);
-        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
-        executor.execute();
-
-        assertThat(root.resolve("observed").resolve("mutate"))
-                .as("mutation testing is not wired without pitest.properties")
-                .doesNotExist();
-    }
-
-    @Test
-    public void the_mutate_override_switches_off_pitest() throws IOException {
-        Files.writeString(project.resolve("pitest.properties"), "targetClasses=sample.*\n");
-        BuildExecutor executor = newExecutor();
-        executor.addSource("project", project);
-        executor.addModule("observed", observation().test(_ -> (_, _) -> {}).pitest(null), "project");
-        executor.execute();
-
-        assertThat(root.resolve("observed").resolve("mutate")).doesNotExist();
     }
 
     @Test

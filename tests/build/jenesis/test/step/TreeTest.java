@@ -19,13 +19,14 @@ public class TreeTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, argument, testArgument;
+    private Path previous, next, supplement, persistent, argument, testArgument;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         argument = Files.createDirectory(root.resolve("argument"));
         testArgument = Files.createDirectory(root.resolve("test-argument"));
     }
@@ -56,7 +57,7 @@ public class TreeTest {
             List<String> printed = new ArrayList<>();
             Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
                     Runnable::run,
-                    new BuildStepContext(previous, next, supplement),
+                    new BuildStepContext(previous, next, supplement, persistent),
                     new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                             argument,
                             Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
@@ -98,7 +99,7 @@ public class TreeTest {
             List<String> printed = new ArrayList<>();
             Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
                     Runnable::run,
-                    new BuildStepContext(previous, next, supplement),
+                    new BuildStepContext(previous, next, supplement, persistent),
                     arguments)
                     .toCompletableFuture().join();
             String text = String.join(System.lineSeparator(), printed).replaceAll("\033\\[[0-9;]*m", "")
@@ -131,7 +132,7 @@ public class TreeTest {
         List<String> printed = new ArrayList<>();
         BuildStepResult result = Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                         argument,
                         Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
@@ -163,7 +164,7 @@ public class TreeTest {
                 Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))));
         Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 arguments).toCompletableFuture().join();
         assertThat(String.join(System.lineSeparator(), printed)).contains("maven/org.foo/bar");
     }
@@ -184,7 +185,7 @@ public class TreeTest {
         List<String> printed = new ArrayList<>();
         Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                         argument,
                         Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
@@ -252,7 +253,7 @@ public class TreeTest {
         List<String> printed = new ArrayList<>();
         Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                         argument,
                         Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
@@ -277,7 +278,7 @@ public class TreeTest {
         List<String> printed = new ArrayList<>();
         Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                         argument,
                         Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
@@ -301,7 +302,7 @@ public class TreeTest {
         List<String> printed = new ArrayList<>();
         Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                         argument,
                         Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
@@ -377,7 +378,7 @@ public class TreeTest {
         List<String> printed = new ArrayList<>();
         configured.apply(Tree.ofEnvironment(new Environment(keys, printed::add, printed::add))).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                         argument,
                         Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
@@ -413,7 +414,7 @@ public class TreeTest {
         List<String> printed = new ArrayList<>();
         Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 arguments)
                 .toCompletableFuture().join();
         return printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")).toList();

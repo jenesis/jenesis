@@ -479,7 +479,7 @@ public class ExecutionTest {
         inventory.store(tests.resolve("inventory.properties"));
         SequencedMap<String, Path> modules = new LinkedHashMap<>();
         modules.put("module-", main);
-        modules.put("test-module-", tests);
+        modules.put("testmodule-", tests);
         Project project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layoutWithModules(modules));
         assertThat(Execution.ofEnvironment(Environment.NONE, project).execute())
                 .as("the tests of a folder describe it under its own path, and the program runs on what its main half needs")

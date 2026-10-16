@@ -172,6 +172,7 @@ public interface BuildExecutorCallback {
 
             private Writer writer;
             private String run;
+            private long begun;
             private int executed, skipped, failed;
 
             @Override
@@ -190,6 +191,7 @@ public interface BuildExecutorCallback {
                         } catch (IOException e) {
                             throw new UncheckedIOException("Cannot write the build events to " + file, e);
                         }
+                        begun = started;
                         executed = 0;
                         skipped = 0;
                         failed = 0;
@@ -209,7 +211,7 @@ public interface BuildExecutorCallback {
                         }
                     };
                 }
-                String step = ",\"step\":\"" + Json.escaped(identity) + "\"",
+                String step = ",\"step\":\"" + Json.escaped(identity) + "\"" + start(started),
                         folder = ",\"folder\":\"" + Json.escaped(root.resolve(identity).toString()) + "\"";
                 Path local = root.resolve(identity).resolve(BuildExecutor.LOCAL),
                         next = root.resolve(identity + BuildExecutor.NEXT);
@@ -245,7 +247,7 @@ public interface BuildExecutorCallback {
             public Consumer<Throwable> module(String identity) {
                 long started = System.nanoTime();
                 return throwable -> write("{\"status\":\"" + (throwable == null ? "resolved" : "failed") + "\""
-                        + ",\"module\":\"" + Json.escaped(identity) + "\""
+                        + ",\"module\":\"" + Json.escaped(identity) + "\"" + start(started)
                         + (throwable == null
                         ? ",\"seconds\":" + seconds(System.nanoTime() - started)
                         : failure(throwable)) + "}");
@@ -261,6 +263,10 @@ public interface BuildExecutorCallback {
             public void stored(String identity, long duration) {
                 write("{\"status\":\"stored\",\"step\":\"" + Json.escaped(identity) + "\",\"seconds\":"
                         + seconds(duration) + "}");
+            }
+
+            private synchronized String start(long started) {
+                return ",\"start\":" + seconds(started - begun);
             }
 
             private synchronized void write(String line) {

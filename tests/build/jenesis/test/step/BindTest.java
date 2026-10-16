@@ -20,13 +20,14 @@ public class BindTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, original;
+    private Path previous, next, supplement, persistent, original;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         original = Files.createDirectory(root.resolve("original"));
     }
 
@@ -53,6 +54,34 @@ public class BindTest {
 
         assertThat(input.resolve("order.xsd")).content().isEqualTo("<order/>");
         assertThat(input.resolve("xjc/catalog.xml")).content().isEqualTo("<catalog/>");
+    }
+
+    @Test
+    public void leaves_out_a_folder_that_a_build_marked_as_its_own() throws IOException {
+        Path module = Files.createDirectory(root.resolve("module"));
+        Files.writeString(module.resolve("module-info.java"), "module sample {}");
+        Files.createFile(module.resolve(BuildExecutor.SKIP_MARKER));
+        Path artifacts = Files.createDirectories(module.resolve(".jenesis/artifacts"));
+        Files.createFile(artifacts.resolve(BuildExecutor.SKIP_MARKER));
+        Files.writeString(artifacts.resolve("cached.jar"), "cached");
+        BuildExecutor buildExecutor = BuildExecutor.of(root.resolve("target"),
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        buildExecutor.addSource("sources", Bind.asSources(), module);
+
+        Path sources = buildExecutor.execute().get("sources").resolve("sources");
+
+        assertThat(sources.resolve("module-info.java")).exists();
+        assertThat(sources.resolve(".jenesis/artifacts/cached.jar"))
+                .as("what a build caches inside a module's folder is no source of the module")
+                .doesNotExist();
+        assertThat(sources.resolve(BuildExecutor.SKIP_MARKER)).doesNotExist();
     }
 
     @Test
@@ -92,7 +121,7 @@ public class BindTest {
         Files.writeString(Files.createDirectories(original.resolve("sample")).resolve("layout.iml"), "kept");
         BuildStepResult result = Bind.asSources().apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("original", new BuildStepArgument(
                         original,
                         Map.of(Path.of("module-info.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -113,7 +142,7 @@ public class BindTest {
                         Path.of("file"), Path.of("other/copied"),
                         Path.of("folder"), Path.of("other"))).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("original", new BuildStepArgument(
                         original,
                         Map.of(Path.of("file"), Checksum.of(ChecksumStatus.ADDED),
@@ -130,7 +159,7 @@ public class BindTest {
         Files.createSymbolicLink(original.resolve("folder"), shared);
         BuildStepResult result = new Bind(Map.of(Path.of("folder"), Path.of("linked"))).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("original", new BuildStepArgument(
                         original,
                         Map.of(Path.of("folder/pin-lib.properties"), Checksum.of(ChecksumStatus.ADDED))))))
@@ -149,7 +178,7 @@ public class BindTest {
         Files.createSymbolicLink(folder.resolve("LICENSE"), Path.of("../../LICENSE"));
         BuildStepResult result = Bind.asResources().apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("original", new BuildStepArgument(
                         original,
                         Map.of(Path.of("META-INF/LICENSE"), Checksum.of(ChecksumStatus.ADDED))))))

@@ -3,6 +3,7 @@ package build.jenesis.test;
 import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.Environment;
+import build.jenesis.Permits;
 import build.jenesis.Pinning;
 import build.jenesis.SequencedProperties;
 
@@ -17,7 +18,9 @@ public class PinningTest {
         assertThat(Pinning.permits(new Environment(keys)))
                 .as("a pom writer and a module-info writer bound one fan-out between them, not one each")
                 .isSameAs(Pinning.permits(new Environment(keys)));
-        assertThat(Pinning.permits(new Environment(keys)).availablePermits()).isEqualTo(3);
+        assertThat(Pinning.permits(new Environment(keys)))
+                .isInstanceOfSatisfying(Permits.Counted.class,
+                        counted -> assertThat(counted.semaphore().availablePermits()).isEqualTo(3));
     }
 
     @Test

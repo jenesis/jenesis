@@ -7,10 +7,6 @@ public class LinesModule implements BuildExecutorModule {
 
     private final String file;
 
-    public LinesModule() {
-        this(Collections.emptyNavigableMap());
-    }
-
     public LinesModule(SequencedMap<String, String> properties) {
         file = properties.getOrDefault("file", "LINES");
     }

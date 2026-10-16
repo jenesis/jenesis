@@ -28,13 +28,14 @@ public class JarTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, classes;
+    private Path previous, next, supplement, persistent, classes;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         classes = Files.createDirectory(root.resolve("classes"));
     }
 
@@ -49,7 +50,7 @@ public class JarTest {
         }
         BuildStepResult result = Jar.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         classes,
                         Map.of(Path.of("sample/Sample.class"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -94,7 +95,7 @@ public class JarTest {
                 """);
         BuildStepResult result = Jar.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.SOURCES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         classes,
                         Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -112,7 +113,7 @@ public class JarTest {
         Files.writeString(folder.resolve("META-INF/LICENSE"), "licence");
         BuildStepResult result = Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, sort).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of())))).toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         Path jar;
@@ -140,7 +141,7 @@ public class JarTest {
                 """);
         BuildStepResult result = Jar.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.JAVADOC).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         classes,
                         Map.of(Path.of("sample/Sample.html"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -160,7 +161,7 @@ public class JarTest {
         Files.writeString(classes.resolve("manifest.mf"), "Manifest-Version: 1.0\r\nMulti-Release: true\r\n");
         BuildStepResult result = Jar.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         classes,
                         Map.of(Path.of("sample/Sample.class"), Checksum.of(ChecksumStatus.ADDED),
@@ -193,7 +194,7 @@ public class JarTest {
                 "Manifest-Version: 1.0\r\nMain-Class: sample.Sample\r\nImplementation-Title: example\r\n");
         BuildStepResult result = Jar.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of(
                         "classes", new BuildStepArgument(
                                 classes,
@@ -226,7 +227,7 @@ public class JarTest {
         Files.writeString(second.resolve("manifest.mf"), "Manifest-Version: 1.0\r\nMulti-Release: true\r\n");
         BuildStepResult result = Jar.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of(
                         "classes", new BuildStepArgument(
                                 classes,
@@ -248,7 +249,7 @@ public class JarTest {
         args.put("second", new BuildStepArgument(second, Map.of(Path.of("manifest.mf"), Checksum.of(ChecksumStatus.ADDED))));
         assertThatThrownBy(() -> Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 args).toCompletableFuture().join())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Conflicting manifest attribute 'Main-Class' in "
@@ -272,10 +273,10 @@ public class JarTest {
                 Map.of(Path.of("sample/Sample.class"), Checksum.of(ChecksumStatus.ADDED)));
         Jar jar = Jar.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES);
         jar.apply(Runnable::run,
-                new BuildStepContext(previous, firstNext, supplement),
+                new BuildStepContext(previous, firstNext, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", argument))).toCompletableFuture().join();
         jar.apply(Runnable::run,
-                new BuildStepContext(previous, secondNext, supplement),
+                new BuildStepContext(previous, secondNext, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", argument))).toCompletableFuture().join();
         assertThat(Files.readAllBytes(firstNext.resolve(BuildStep.ARTIFACTS + "classes.jar")))
                 .isEqualTo(Files.readAllBytes(secondNext.resolve(BuildStep.ARTIFACTS + "classes.jar")));
@@ -292,7 +293,7 @@ public class JarTest {
         }
         Jar.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         classes,
                         Map.of(Path.of("classes/sample/Sample.class"), Checksum.of(ChecksumStatus.ADDED))))))
@@ -311,7 +312,7 @@ public class JarTest {
         Jar jar;
         jar = Jar.ofEnvironment(new Environment(Map.of("archive.timestamp", "")), process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES);
         jar.apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
                 .toCompletableFuture().join();
         assertThat(supplement.resolve("command")).content()
@@ -325,7 +326,7 @@ public class JarTest {
         Files.createDirectory(classes.resolve(Javac.CLASSES));
         Jar.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
                 .toCompletableFuture().join();
 
@@ -344,7 +345,7 @@ public class JarTest {
                 """);
         Jar.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
                 .toCompletableFuture().join();
 
@@ -400,7 +401,7 @@ public class JarTest {
     private void jar() throws IOException {
         Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
                 .toCompletableFuture().join();
     }
@@ -420,7 +421,7 @@ public class JarTest {
                 """);
         Jar.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
                 .toCompletableFuture().join();
 
@@ -445,7 +446,7 @@ public class JarTest {
         Files.writeString(classes.resolve("manifest.mf"), "Manifest-Version: 1.0\nMulti-Release: true\n");
         assertThatThrownBy(() -> Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
                 .toCompletableFuture().join())
                 .isInstanceOf(IllegalStateException.class)
@@ -463,7 +464,7 @@ public class JarTest {
         ProcessBuildStep.store(classes, ProcessBuildStep.PROCESS, "jar", jar);
         assertThatThrownBy(() -> Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
                 .toCompletableFuture().join())
                 .as("a manifest named on the command line would silently replace the one the step merges")
@@ -485,7 +486,7 @@ public class JarTest {
         mainClass(source);
         Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
                 .toCompletableFuture().join();
         assertThat(mainAttributes().getValue(Attributes.Name.MAIN_CLASS)).isEqualTo("app.Main");
@@ -513,7 +514,7 @@ public class JarTest {
         mainClass(source);
         assertThatThrownBy(() -> Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
                 .toCompletableFuture().join())
                 .as("java would refuse to run the jar's main class, so the build refuses to package it")
@@ -528,7 +529,7 @@ public class JarTest {
         Files.delete(classes.resolve(Javac.CLASSES).resolve("app/Base.class"));
         Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
                 .toCompletableFuture().join();
         assertThat(mainAttributes().getValue(Attributes.Name.MAIN_CLASS))

@@ -7,6 +7,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Permits;
 import build.jenesis.Pinning;
 import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
@@ -27,7 +28,7 @@ public class PinPom implements BuildStep {
     private static final Pattern COORDINATE_ELEMENT = Pattern.compile(
             "[ \\t]*<(groupId|artifactId|version|type|classifier)>\\s*([^<]*?)\\s*</\\1>[ \\t]*\\n?");
 
-    private final transient Semaphore permits;
+    private final transient Permits permits;
 
     private final String prefix;
     private final String path;
@@ -54,7 +55,7 @@ public class PinPom implements BuildStep {
                    List<Path> pomFiles,
                    HashDigestFunction hashFunction,
                    Platform platform,
-                   Semaphore permits) {
+                   Permits permits) {
         this.permits = permits;
         this.prefix = prefix;
         this.path = path;
@@ -63,7 +64,7 @@ public class PinPom implements BuildStep {
         this.platform = platform;
     }
 
-    public PinPom permits(Semaphore permits) {
+    public PinPom permits(Permits permits) {
         return new PinPom(prefix, path, pomFiles, hashFunction, platform, permits);
     }
 
@@ -81,7 +82,7 @@ public class PinPom implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        Semaphore permits = this.permits;
+        Permits permits = this.permits;
         if (permits == null) {
             return pin(arguments);
         }

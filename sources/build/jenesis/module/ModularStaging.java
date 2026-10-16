@@ -34,6 +34,7 @@ public class ModularStaging implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         SequencedMap<String, SequencedMap<String, Path>> attachments = Inventory.attachments(arguments.values());
+        SequencedMap<String, List<Path>> supplements = Inventory.supplements(arguments.values());
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -59,13 +60,13 @@ public class ModularStaging implements BuildStep {
                         true,
                         ".jar",
                         inventoryFile);
-                Path sources = single(Inventory.paths(inventory, argument.folder(), prefix + ".sources"),
+                Path sources = single(Inventory.supplemented(inventory, argument.folder(), prefix + ".sources", supplements),
                         prefix,
                         "sources",
                         false,
                         ".jar",
                         inventoryFile);
-                Path javadoc = single(Inventory.paths(inventory, argument.folder(), prefix + ".documentation"),
+                Path javadoc = single(Inventory.supplemented(inventory, argument.folder(), prefix + ".documentation", supplements),
                         prefix,
                         "documentation",
                         false,

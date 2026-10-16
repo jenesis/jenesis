@@ -8,7 +8,6 @@ import build.jenesis.Environment;
 import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
-import build.jenesis.SequencedProperties;
 
 public class MavenDefaultRepository implements MavenRepository {
 
@@ -398,41 +397,7 @@ public class MavenDefaultRepository implements MavenRepository {
         Path cached = store == null ? null : BuildStep.resolveContained(store, path);
         if (cached != null) {
             if (Files.exists(cached)) {
-                boolean valid = true;
-                if (validate) {
-                    for (Map.Entry<String, URI> entry : validations.entrySet()) {
-                        LazyRepositoryItem item = fetch(
-                                entry.getValue(),
-                                store,
-                                path + "." + entry.getKey().toLowerCase(Locale.ROOT),
-                                false);
-                        if (connection.offline() && item instanceof LatentRepositoryItem) {
-                            continue;
-                        }
-                        Optional<InputStream> candidate = item.toLazyInputStream();
-                        if (candidate.isEmpty()) {
-                            continue;
-                        }
-                        byte[] published;
-                        try (InputStream inputStream = candidate.get()) {
-                            published = inputStream.readAllBytes();
-                        }
-                        valid = Arrays.equals(toChecksum(published), digest(entry.getKey(), cached));
-                        if (valid) {
-                            item.storeIfNotPresent(published);
-                        } else if (writable) {
-                            try {
-                                Files.delete(cached);
-                                item.deleteIfPresent();
-                            } catch (IOException _) {
-                            }
-                        }
-                        break;
-                    }
-                }
-                if (valid) {
-                    return new StoredRepositoryItem(cached);
-                }
+                return new StoredRepositoryItem(cached);
             } else if (writable) {
                 try {
                     Files.createDirectories(cached.getParent());
@@ -545,19 +510,6 @@ public class MavenDefaultRepository implements MavenRepository {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("Unknown checksum algorithm: " + algorithm, e);
         }
-    }
-
-    private static byte[] digest(String algorithm, Path file) throws IOException {
-        MessageDigest digest = digest(algorithm);
-        try (FileChannel channel = FileChannel.open(file)) {
-            ByteBuffer buffer = ByteBuffer.allocate(1 << 16);
-            while (channel.read(buffer) != -1) {
-                buffer.flip();
-                digest.update(buffer);
-                buffer.clear();
-            }
-        }
-        return digest.digest();
     }
 
     private static byte[] toChecksum(byte[] published) {

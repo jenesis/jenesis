@@ -1,11 +1,10 @@
 /**
  * A module compiled with Error Prone. The plugin is declared the way every
  * compiler plugin is, with `@jenesis.plugin <compiler> <coordinate>`, so it
- * resolves in the `javac` group and joins the compiler's processor path. An
- * `errorprone.properties` in the configuration folder is what turns it on and
- * carries its flags; here it promotes one of its checks to an error, so the
- * reference comparison in `Comparison` fails the build. `javac` forks so that
- * the compiler internals the plugin reads can be exported to it.
+ * resolves in the `javac` group and joins the compiler's processor path. The
+ * `process-javac.properties` of the `errorprone` profile is what turns it on:
+ * it hands `javac` the options Error Prone needs and promotes one of its checks
+ * to an error, so the reference comparison in `Comparison` fails the build.
  *
  * @jenesis.release 25
  * @jenesis.main demo.errorprone.Comparison

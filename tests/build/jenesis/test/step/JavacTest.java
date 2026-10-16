@@ -11,6 +11,8 @@ import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Abi;
+import build.jenesis.step.Dependencies;
 import build.jenesis.step.Javac;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
@@ -25,13 +27,14 @@ public class JavacTest {
 
     @TempDir(cleanup = CleanupMode.NEVER)
     private Path root;
-    private Path previous, next, supplement, sources;
+    private Path previous, next, supplement, persistent, sources;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         sources = Files.createDirectory(root.resolve("sources"));
     }
 
@@ -46,7 +49,7 @@ public class JavacTest {
             writer.newLine();
         }
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -64,7 +67,7 @@ public class JavacTest {
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
                 .headers(true)
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                                 sources,
                                 Map.of(Path.of("sources/sample/Native.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -85,7 +88,7 @@ public class JavacTest {
         Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Native.java"),
                 "package sample; public class Native { public static native int add(int a, int b); }\n");
         BuildStepResult result = new Javac(ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Native.java"), Checksum.of(ChecksumStatus.ADDED))))))
@@ -143,7 +146,7 @@ public class JavacTest {
                 "module sample { }\n");
         Javac.writeRelease(sources, release, Runtime.version().feature());
         assertThatThrownBy(() -> new Javac(ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -153,6 +156,22 @@ public class JavacTest {
                 .hasMessageContaining("META-INF/versions/9/");
     }
 
+    @Test
+    public void compiles_again_when_an_input_it_compiled_against_is_gone() throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES)).resolve("Sample.java"),
+                "class Sample { }\n");
+        assertThat(Javac.hasRelevantChange(new LinkedHashMap<>(Map.of(
+                        "sources", new BuildStepArgument(sources, Map.of(
+                                Path.of("sources/Sample.java"), Checksum.of(ChecksumStatus.RETAINED))),
+                        "generated", new BuildStepArgument(null, Map.of(
+                                Path.of("sources/Generated.java"), Checksum.of(ChecksumStatus.REMOVED))))),
+                Set.of(".java"),
+                Set.of("javac"),
+                true))
+                .as("a step a profile no longer wires leaves its successor's input removed")
+                .isTrue();
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void compiles_a_module_that_declares_no_release_for_the_running_one(boolean process) throws IOException {
@@ -160,7 +179,7 @@ public class JavacTest {
                 "module sample { }\n");
         Javac.writeRelease(sources, null, Runtime.version().feature());
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -229,6 +248,61 @@ public class JavacTest {
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
         arguments.put("input", argument);
         assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(arguments)).isTrue();
+    }
+
+    @Test
+    public void shouldRun_skips_a_dependency_whose_abi_did_not_change() throws IOException {
+        assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(dependency(
+                ChecksumStatus.ALTERED,
+                ChecksumStatus.RETAINED)))
+                .as("only what the dependency's callers cannot see changed")
+                .isFalse();
+    }
+
+    @Test
+    public void shouldRun_fires_when_the_abi_of_a_dependency_changed() throws IOException {
+        assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(dependency(
+                ChecksumStatus.ALTERED,
+                ChecksumStatus.ALTERED))).isTrue();
+    }
+
+    @Test
+    public void shouldRun_fires_when_a_changed_dependency_has_no_abi() throws IOException {
+        assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(dependency(ChecksumStatus.ALTERED, null))).isTrue();
+    }
+
+    @Test
+    public void shouldRun_fires_when_a_dependency_and_its_abi_are_added() throws IOException {
+        assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(dependency(
+                ChecksumStatus.ADDED,
+                ChecksumStatus.ADDED))).isTrue();
+    }
+
+    @Test
+    public void shouldRun_fires_when_an_annotation_processor_changed_although_its_abi_did_not() throws IOException {
+        for (String group : List.of("plugin", "javac")) {
+            Files.createDirectories(sources.resolve(Dependencies.RESOLVED));
+            Files.writeString(sources.resolve(Dependencies.RESOLVED + "lib.jar"), "jar");
+            SequencedProperties index = new SequencedProperties();
+            index.setProperty(group + "/plugin/maven/sample/lib/1", Dependencies.RESOLVED + "lib.jar");
+            index.store(sources.resolve(BuildStep.DEPENDENCIES));
+            assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(dependency(
+                    ChecksumStatus.ALTERED,
+                    ChecksumStatus.RETAINED)))
+                    .as("the code of a processor in " + group + " runs in the compiler, so its abi does not cover it")
+                    .isTrue();
+        }
+    }
+
+    private SequencedMap<String, BuildStepArgument> dependency(ChecksumStatus jar, ChecksumStatus abi) {
+        Map<Path, Checksum> files = new HashMap<>();
+        files.put(Path.of(Dependencies.RESOLVED + "lib.jar"), Checksum.of(jar));
+        if (abi != null) {
+            files.put(Path.of(Dependencies.RESOLVED + Abi.companion("lib.jar")), Checksum.of(abi));
+        }
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("input", new BuildStepArgument(sources, files));
+        return arguments;
     }
 
     @Test
@@ -302,12 +376,37 @@ public class JavacTest {
         }
         Javac.writeRelease(sources, "21", Runtime.version().feature());
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
                                 Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
         assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "sample/Sample.class")).isNotEmptyFile();
+    }
+
+    @Test
+    public void runs_javac_in_a_jvm_of_its_own_for_an_option_of_that_jvm() throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample;\npublic class Sample { }\n");
+        Javac.writeRelease(sources, "21", Runtime.version().feature());
+        Path configuration = Files.createDirectories(root.resolve("configuration"));
+        SequencedProperties options = new SequencedProperties();
+        options.setProperty("-J-Xmx256m", "");
+        ProcessBuildStep.store(configuration, ProcessBuildStep.PROCESS, "javac", options);
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("configuration", new BuildStepArgument(configuration, Map.of(
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        assertThat(Files.readString(supplement.resolve("command")))
+                .as("the build's own JVM refuses an option of the JVM javac runs in, so javac forks to take it")
+                .contains("bin" + File.separator + "javac", "-J-Xmx256m");
         assertThat(next.resolve(Javac.CLASSES + "sample/Sample.class")).isNotEmptyFile();
     }
 
@@ -335,7 +434,7 @@ public class JavacTest {
         arguments.put("configuration", new BuildStepArgument(configuration, Map.of(
                 Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
-                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture()
                 .join();
         assertThat(result.next()).isTrue();
@@ -378,7 +477,7 @@ public class JavacTest {
         arguments.put("configuration", new BuildStepArgument(configuration, Map.of(
                 Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
-                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture()
                 .join();
         assertThat(result.next()).isTrue();
@@ -411,7 +510,7 @@ public class JavacTest {
         javac.setProperty("--module-version", "1.2.3");
         ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javac", javac);
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(this.previous, next, supplement),
+                new BuildStepContext(this.previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -432,7 +531,7 @@ public class JavacTest {
             writer.newLine();
         }
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(this.previous, next, supplement),
+                new BuildStepContext(this.previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -457,7 +556,7 @@ public class JavacTest {
                 public class Sample { public String greet() { return "21"; } }
                 """);
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -486,7 +585,7 @@ public class JavacTest {
         javac.setProperty("-g:none", "");
         ProcessBuildStep.store(sources, ProcessBuildStep.PROCESS, "javac", javac);
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -514,7 +613,7 @@ public class JavacTest {
         Files.writeString(versioned.resolve("Sample.java"), "package sample; public class Sample { }\n");
         Javac.writeRelease(sources, "17", Runtime.version().feature());
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -550,7 +649,7 @@ public class JavacTest {
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
                 .pathPlacement(PathPlacement.CLASS_PATH)
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                                 sources,
                                 Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -602,7 +701,7 @@ public class JavacTest {
                 Path.of("resolved/marker.jar"), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
                 .pathPlacement(PathPlacement.CLASS_PATH)
-                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture()
                 .join();
         assertThat(result.next()).isTrue();
@@ -661,7 +760,7 @@ public class JavacTest {
                 Map.of(Path.of("resolved/processor.jar"), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
                 .pathPlacement(PathPlacement.CLASS_PATH)
-                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture()
                 .join();
         assertThat(result.next()).isTrue();
@@ -695,7 +794,7 @@ public class JavacTest {
                 public class Caller { public String forward() { return Helper.name() + "/21"; } }
                 """);
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -729,7 +828,7 @@ public class JavacTest {
                 public class Caller { public String value() { return Helper.name(); } }
                 """);
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Helper.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -766,7 +865,7 @@ public class JavacTest {
                 Path.of("sources/sample/Helper.java"), Checksum.of(ChecksumStatus.ADDED),
                 Path.of("sources/META-INF/versions/21/sample/Caller.java"), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 arguments).toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         assertThat(next.resolve(Javac.CLASSES + "META-INF/versions/21/sample/Caller.class"))
@@ -790,7 +889,7 @@ public class JavacTest {
                 public class Caller { public String value() { return Helper.name(); } }
                 """);
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -811,7 +910,7 @@ public class JavacTest {
         Files.writeString(sources.resolve("manifest.mf"),
                 "Manifest-Version: 1.0\r\nMulti-Release: true\r\nMain-Class: sample.Sample\r\n");
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -833,7 +932,7 @@ public class JavacTest {
         Files.writeString(sources.resolve("manifest.mf"),
                 "Manifest-Version: 1.0\r\nMain-Class: sample.Sample\r\n");
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -849,7 +948,7 @@ public class JavacTest {
         Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(folder.resolve("Sample.java"), "package sample; public class Sample { }\n");
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -881,7 +980,7 @@ public class JavacTest {
                 sources,
                 Map.of(Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 arguments).toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         Path moduleInfo = next.resolve(Javac.CLASSES + "module-info.class");
@@ -911,7 +1010,7 @@ public class JavacTest {
 
         Throwable thrown = catchThrowable(() -> new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Main.java"), Checksum.of(ChecksumStatus.ADDED))))))
@@ -946,7 +1045,7 @@ public class JavacTest {
                 """);
         assertThatThrownBy(() -> new Javac(ProcessHandler.Factory.FORK).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Main.java"), Checksum.of(ChecksumStatus.ADDED))))))
@@ -980,7 +1079,7 @@ public class JavacTest {
         Javac.writeRelease(sources, "17", Runtime.version().feature());
         assertThatThrownBy(() -> new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -1019,7 +1118,7 @@ public class JavacTest {
 
         assertThatThrownBy(() -> new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -1048,7 +1147,7 @@ public class JavacTest {
 
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -1083,7 +1182,7 @@ public class JavacTest {
         arguments.put("processors/artifacts", new BuildStepArgument(processorRoot,
                 Map.of(Path.of("resolved/processor.jar"), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
-                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         assertThat(next.resolve(Javac.CLASSES + "sample/Sample.class")).isNotEmptyFile();
@@ -1118,7 +1217,7 @@ public class JavacTest {
         arguments.put("processors/artifacts", new BuildStepArgument(processorRoot,
                 Map.of(Path.of("resolved/processor.jar"), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
-                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         assertThat(next.resolve(Javac.CLASSES + "gen/GeneratedOne.class")).isNotEmptyFile();
@@ -1158,7 +1257,7 @@ public class JavacTest {
                 Path.of("resolved/plain.jar"), Checksum.of(ChecksumStatus.ADDED),
                 Path.of("resolved/modular.jar"), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
-                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         assertThat(next.resolve(Javac.CLASSES + "gen/GeneratedPlain.class"))
@@ -1200,7 +1299,7 @@ public class JavacTest {
                 Path.of("resolved/plain.jar"), Checksum.of(ChecksumStatus.ADDED),
                 Path.of("resolved/modular.jar"), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
-                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         String args = Files.readString(supplement.resolve("javac.args"));
@@ -1234,7 +1333,7 @@ public class JavacTest {
         arguments.put("processors/artifacts", new BuildStepArgument(root.resolve("processor"), Map.of(
                 Path.of("resolved/org.example%2Fplain-processor%2F1.0.jar"), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
-                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         assertThat(next.resolve(Javac.CLASSES + "gen/GeneratedPlain.class"))
@@ -1274,7 +1373,7 @@ public class JavacTest {
                 Path.of("resolved/plain.jar"), Checksum.of(ChecksumStatus.ADDED),
                 Path.of("resolved/library.jar"), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
-                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         assertThat(next.resolve(Javac.CLASSES + "gen/GeneratedPlain.class"))
@@ -1315,7 +1414,7 @@ public class JavacTest {
                 Path.of("resolved/library.jar"), Checksum.of(ChecksumStatus.ADDED),
                 Path.of("resolved/modular.jar"), Checksum.of(ChecksumStatus.ADDED))));
         assertThatThrownBy(() -> new Javac(ProcessHandler.Factory.TOOL)
-                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture().join())
                 .hasMessageContaining("requires library")
                 .hasMessageContaining("proc.modular declares its processor in its module-info.java alone");
@@ -1333,7 +1432,7 @@ public class JavacTest {
 
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                                 sources,
                                 Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED))))))
@@ -1540,7 +1639,7 @@ public class JavacTest {
         Files.writeString(folder.resolve("foo"), "bar");
         Files.createDirectory(sources.resolve(BuildStep.SOURCES + "folder"));
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                         sources,
                         Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -1560,7 +1659,7 @@ public class JavacTest {
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
                 .includeResources(false)
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                                 sources,
                                 Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -1587,7 +1686,7 @@ public class JavacTest {
         Files.writeString(versioned.resolve("overlay.json"), "{}");
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                                 sources,
                                 Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
@@ -1613,7 +1712,7 @@ public class JavacTest {
         Files.writeString(buildJenesis.resolve("checkstyle.xml"), "<module name=\"Checker\"/>");
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
                 .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
+                        new BuildStepContext(previous, next, supplement, persistent),
                         new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
                                 sources,
                                 Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),

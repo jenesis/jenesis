@@ -15,6 +15,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.module.ModularJarResolver;
 import build.jenesis.module.ModularProject;
 import build.jenesis.project.AssemblyDescriptor;
+import build.jenesis.project.AssemblyRequirement;
 import build.jenesis.project.JavaToolchainModule;
 import build.jenesis.project.MultiProjectModule;
 import build.jenesis.step.Bind;
@@ -523,6 +524,27 @@ public class ModularProjectTest {
     }
 
     @Test
+    public void pins_the_artifact_an_alias_names_by_the_module_name_the_alias_gives_it() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias compile.testing com.google.testing.compile/compile-testing
+                 * @jenesis.pin compile.testing 0.23.0
+                 */
+                module foo {
+                  requires compile.testing;
+                }
+                """);
+        Path manifests = manifests(new ModularProject("module", project));
+        assertThat(SequencedProperties.ofFiles(manifests.resolve(BuildStep.REQUIRES)))
+                .as("the module requires the artifact the alias names, at the version its name is pinned to")
+                .containsOnly(Map.entry("main/compile/maven/com.google.testing.compile/compile-testing/0.23.0", ""),
+                        Map.entry("main/runtime/maven/com.google.testing.compile/compile-testing/0.23.0", ""));
+        assertThat(SequencedProperties.ofFiles(manifests.resolve(BuildStep.VERSIONS)))
+                .containsEntry("main/maven/com.google.testing.compile/compile-testing", "0.23.0")
+                .doesNotContainKey("main/module/compile.testing");
+    }
+
+    @Test
     public void refuses_an_alias_in_the_layout_that_resolves_modules_by_name_alone() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
@@ -990,9 +1012,11 @@ public class ModularProjectTest {
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
-                (_, _, _) -> new AssemblyDescriptor((buildExecutor, _) -> buildExecutor.addModule("java",
+                (_, _, _) -> AssemblyDescriptor.of((buildExecutor, _) -> buildExecutor.addModule("java",
                         new JavaToolchainModule(),
-                        "../sources", "../manifests", "../dependencies/artifacts"))));
+                        "../sources",
+                        "../manifests",
+                        "../dependencies/artifacts"), AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD))));
         root.execute(Runnable::run).toCompletableFuture().join();
         assertThat(printed).containsExactly("[RELEASE]   unset compiles for release " + Runtime.version().feature()
                 + ", the JDK the build runs on, as unset" + File.separator + "module-info.java declares no"
@@ -1054,7 +1078,7 @@ public class ModularProjectTest {
                         }
                         default -> fail("Unexpected module: " + descriptor.name());
                     }
-                    return new AssemblyDescriptor((buildExecutor, inherited) -> {
+                    return AssemblyDescriptor.of((buildExecutor, inherited) -> {
                         switch (descriptor.name()) {
                             case "module-foo" -> assertThat(inherited).containsOnlyKeys(
                                     "../manifests",
@@ -1066,38 +1090,40 @@ public class ModularProjectTest {
                                     "../coordinates",
                                     "../sources",
                                     "../dependencies/artifacts",
-                                    "../../module-foo/dependencies/prepare",
-                                    "../../module-foo/dependencies/artifacts",
-                                    "../../module-foo/produce/java/processed",
-                                    "../../module-foo/produce/java/classes",
-                                    "../../module-foo/produce/java/artifacts",
-                                    "../../module-foo/assign",
-                                    "../../module-foo/inventory");
+                                    "../../build-module-foo/dependencies/prepare",
+                                    "../../build-module-foo/dependencies/artifacts",
+                                    "../../build-module-foo/java/processed",
+                                    "../../build-module-foo/java/classes",
+                                    "../../build-module-foo/java/artifacts",
+                                    "../../build-module-foo/assign",
+                                    "../../build-module-foo/inventory");
                             default -> fail("Unexpected module: " + descriptor.name());
                         }
-                        buildExecutor.addModule("java", new JavaToolchainModule(),
-                                "../sources", "../manifests",
+                        buildExecutor.addModule("java",
+                                new JavaToolchainModule(),
+                                "../sources",
+                                "../manifests",
                                 "../dependencies/artifacts");
-                    });
+                    }, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
                 }));
         SequencedMap<String, Path> results = root.execute(Runnable::run).toCompletableFuture().join();
         SequencedProperties foo = SequencedProperties.ofFiles(results
-                .get("modules/module-foo/assign")
+                .get("modules/build-module-foo/assign")
                 .resolve(BuildStep.IDENTITY));
         assertThat(foo.stringPropertyNames()).containsExactly("module/foo");
         assertThat(foo.getProperty("module/foo"))
                 .isEqualTo("../../produce/java/artifacts/jar/output/artifacts/foo-0-SNAPSHOT.jar");
         SequencedProperties bar = SequencedProperties.ofFiles(results
-                .get("modules/module-bar/assign")
+                .get("modules/build-module-bar/assign")
                 .resolve(BuildStep.IDENTITY));
         assertThat(bar.stringPropertyNames()).containsExactly("module/bar");
         assertThat(bar.getProperty("module/bar"))
                 .isEqualTo("../../produce/java/artifacts/jar/output/artifacts/bar-0-SNAPSHOT.jar");
         assertThat(results.keySet())
-                .contains("modules/module-foo/inventory", "modules/module-bar/inventory")
+                .contains("modules/build-module-foo/inventory", "modules/build-module-bar/inventory")
                 .doesNotContain("modules/module-foo/coordinates", "modules/module-bar/coordinates");
         SequencedProperties fooInventory = SequencedProperties.ofFiles(results
-                .get("modules/module-foo/inventory")
+                .get("modules/build-module-foo/inventory")
                 .resolve("inventory.properties"));
         assertThat(fooInventory.getProperty("module-foo.module")).isEqualTo("foo");
         assertThat(fooInventory.getProperty("module-foo.runtime.0"))
@@ -1105,7 +1131,7 @@ public class ModularProjectTest {
         assertThat(fooInventory.getProperty("module-foo.artifacts.0"))
                 .endsWith("/foo-0-SNAPSHOT.jar");
         SequencedProperties barInventory = SequencedProperties.ofFiles(results
-                .get("modules/module-bar/inventory")
+                .get("modules/build-module-bar/inventory")
                 .resolve("inventory.properties"));
         assertThat(barInventory.getProperty("module-bar.module")).isEqualTo("bar");
         assertThat(barInventory.getProperty("module-bar.runtime.0"))

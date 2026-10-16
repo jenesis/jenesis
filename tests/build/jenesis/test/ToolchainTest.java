@@ -182,6 +182,30 @@ public class ToolchainTest {
     }
 
     @Test
+    public void accepts_a_jdk_holding_a_link_to_a_file_that_does_not_exist() throws IOException, InterruptedException {
+        Path home = jdk(folder.resolve("jdk"), "25.0.1+3", "Acme Labs", null);
+        Assumptions.assumeTrue(posix(home), "POSIX permissions");
+        Files.setPosixFilePermissions(Files.createDirectory(home.resolve("lib")),
+                PosixFilePermissions.fromString("rwxr-xr-x"));
+        Files.createSymbolicLink(home.resolve("lib/libwrapper.so"), home.resolve("lib/missing/libwrapper.so"));
+
+        assertThat(new Toolchain().version("25-acme").searchpath(home.toString()).home()).isEqualTo(home);
+    }
+
+    @Test
+    public void refuses_a_jdk_holding_a_link_to_a_missing_file_every_user_could_create() throws IOException, InterruptedException {
+        Path home = jdk(folder.resolve("jdk"), "25.0.1+3", "Acme Labs", null);
+        Assumptions.assumeTrue(posix(home), "POSIX permissions");
+        Path shared = Files.createDirectory(folder.resolve("shared"));
+        Files.setPosixFilePermissions(shared, PosixFilePermissions.fromString("rwxrwxrwx"));
+        Files.createSymbolicLink(home.resolve("libwrapper.so"), shared.resolve("libwrapper.so"));
+
+        assertThatThrownBy(() -> new Toolchain().version("25-acme").searchpath(home.toString()).home())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(shared + " is writable by every user");
+    }
+
+    @Test
     public void accepts_a_jdk_writable_by_the_private_group_of_its_owner() throws IOException, InterruptedException {
         Path home = jdk(folder.resolve("jdk"), "25.0.1+3", "Acme Labs", null);
         Assumptions.assumeTrue(posix(home), "POSIX permissions");

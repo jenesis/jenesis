@@ -1,4 +1,4 @@
 module demo.zip {
     requires build.jenesis;
-    provides build.jenesis.BuildExecutorModule with demo.zip.ZipModule;
+    provides build.jenesis.BuildModuleFactory with demo.zip.ZipFactory;
 }

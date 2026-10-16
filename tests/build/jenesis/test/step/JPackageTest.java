@@ -27,13 +27,14 @@ public class JPackageTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, bundle;
+    private Path previous, next, supplement, persistent, bundle;
 
     @BeforeEach
     public void setUp() throws Exception {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         bundle = Files.createDirectory(root.resolve("bundle"));
     }
 
@@ -58,7 +59,7 @@ public class JPackageTest {
         ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", configuration);
         BuildStepResult result = new JPackage(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -92,7 +93,7 @@ public class JPackageTest {
         ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage-deb", installer);
         BuildStepResult result = new JPackage(ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -133,7 +134,7 @@ public class JPackageTest {
         Files.writeString(Files.createDirectory(bundle.resolve("legal")).resolve("LICENSE"), "licence");
         new JPackage(ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -154,7 +155,7 @@ public class JPackageTest {
         Files.writeString(licence, "licence");
         new JPackage(ProcessHandler.Factory.TOOL).type("deb").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -173,7 +174,7 @@ public class JPackageTest {
         mainJar();
         new JPackage(ProcessHandler.Factory.TOOL).type("deb").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -229,7 +230,7 @@ public class JPackageTest {
         ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", configuration);
         BuildStepResult result = new JPackage(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("process/jpackage.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -262,7 +263,7 @@ public class JPackageTest {
         ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", configuration);
         BuildStepResult result = new JPackage(ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -301,7 +302,7 @@ public class JPackageTest {
         ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", configuration);
         BuildStepResult result = new JPackage(ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("runtime", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("process/jpackage.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -351,7 +352,7 @@ public class JPackageTest {
         ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", configuration);
         BuildStepResult result = new JPackage(ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("runtime", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("process/jpackage.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -381,7 +382,7 @@ public class JPackageTest {
         ProcessBuildStep.store(bundle, ProcessBuildStep.PROCESS, "jpackage", configuration);
         assertThatThrownBy(() -> new JPackage(ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -404,7 +405,7 @@ public class JPackageTest {
         }
         BuildStepResult result = new JPackage(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).type("app-image").apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
                         bundle,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();

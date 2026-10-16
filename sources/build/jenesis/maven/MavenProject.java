@@ -63,6 +63,7 @@ public class MavenProject implements BuildExecutorModule {
     private final Consumer<String> printing;
     private final Palette palette;
     private final Function<List<Path>, SequencedSet<Path>> configurations;
+    private final List<String> sources;
 
     public MavenProject(Path root,
                         String prefix,
@@ -76,7 +77,8 @@ public class MavenProject implements BuildExecutorModule {
                 new Platform(),
                 null,
                 Palette.NONE,
-                OWN_CONFIGURATIONS);
+                OWN_CONFIGURATIONS,
+                List.of());
     }
 
     public static MavenProject ofEnvironment(Environment environment,
@@ -84,7 +86,9 @@ public class MavenProject implements BuildExecutorModule {
                                       String prefix,
                                       MavenRepository repository,
                                       MavenResolver resolver) {
+        List<String> sources = environment.entries("maven.sources");
         return new MavenProject(root, prefix, repository, resolver)
+                .sources(sources == null ? List.of() : sources)
                 .platform(Platform.ofEnvironment(environment))
                 .printing(environment.flag("print.progress", true) ? environment.out() : null,
                         Palette.ofEnvironment(environment));
@@ -98,7 +102,8 @@ public class MavenProject implements BuildExecutorModule {
                          Platform platform,
                          Consumer<String> printing,
                          Palette palette,
-                         Function<List<Path>, SequencedSet<Path>> configurations) {
+                         Function<List<Path>, SequencedSet<Path>> configurations,
+                         List<String> sources) {
         this.root = root;
         this.group = group;
         this.prefix = prefix;
@@ -108,22 +113,42 @@ public class MavenProject implements BuildExecutorModule {
         this.printing = printing;
         this.palette = palette;
         this.configurations = configurations;
+        this.sources = sources;
     }
 
     public MavenProject group(String group) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources);
     }
 
     public MavenProject platform(Platform platform) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources);
     }
 
     public MavenProject printing(Consumer<String> printing, Palette palette) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources);
+    }
+
+    public MavenProject sources(List<String> sources) {
+        for (String source : sources) {
+            if (source.isBlank() || source.contains("/") || source.contains("\\") || source.equals("..")) {
+                throw new IllegalArgumentException("jenesis.maven.sources names " + source + " - name a folder"
+                        + " beside src/main/java and src/test/java, such as kotlin or groovy");
+            }
+        }
+        return new MavenProject(root,
+                group,
+                prefix,
+                repository,
+                resolver,
+                platform,
+                printing,
+                palette,
+                configurations,
+                List.copyOf(sources));
     }
 
     public MavenProject configurations(Function<List<Path>, SequencedSet<Path>> configurations) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources);
     }
 
     public static BuildExecutorModule make(Environment environment,
@@ -171,13 +196,12 @@ public class MavenProject implements BuildExecutorModule {
                             new MavenModuleDescriptor(name, dependencies.sequencedKeySet(), Collections.emptyNavigableSet(), spdxInherited, location, test),
                             repositories,
                             resolvers);
-                    AssemblyDescriptor assembly = new AssemblyDescriptor((buildExecutor, inherited) -> {
+                    return packaging.nest(packaging.build(), PRODUCE, _ -> (buildExecutor, inherited) -> {
                     Map<String, Repository> mergedRepositories = Repository.prepend(repositories,
                             Repository.ofProperties(BuildStep.IDENTITY,
                                     inherited.entrySet().stream()
                                             .filter(entry ->
-                                                    (entry.getKey().startsWith(PREVIOUS + SIBLING_MODULE_PREFIX)
-                                                            || entry.getKey().startsWith(PREVIOUS + "test-" + SIBLING_MODULE_PREFIX))
+                                                    entry.getKey().startsWith(PREVIOUS + packaging.build() + "-")
                                                             && entry.getKey().endsWith("/" + ASSIGN))
                                             .map(Map.Entry::getValue)
                                             .toList(),
@@ -236,7 +260,7 @@ public class MavenProject implements BuildExecutorModule {
                     buildExecutor.addModule(PRODUCE,
                             assembler.apply(new MavenModuleDescriptor(name, dependencies.sequencedKeySet(), resources, spdxInherited, location, test),
                                     mergedRepositories,
-                                    resolvers).build(),
+                                    resolvers).toBuildModule(),
                             produceDeps);
                     buildExecutor.addStep(ASSIGN,
                             new Assign(),
@@ -249,10 +273,6 @@ public class MavenProject implements BuildExecutorModule {
                             PRODUCE,
                             DEPENDENCIES + "/" + ARTIFACTS);
                     });
-                    for (Map.Entry<String, BuildExecutorModule> phase : packaging.tail().entrySet()) {
-                        assembly = assembly.then(phase.getKey(), phase.getValue());
-                    }
-                    return assembly;
                 });
     }
 
@@ -274,7 +294,7 @@ public class MavenProject implements BuildExecutorModule {
         Platform platform = this.platform;
         buildExecutor.addStep(SCAN, new Scan(root));
         buildExecutor.addStep(PREPARE,
-                new Prepare(prefix, resolver, repository),
+                new Prepare(prefix, resolver, repository, sources),
                 Stream.concat(Stream.of(SCAN), inherited.sequencedKeySet().stream()));
         buildExecutor.addModule(BOMS, (boms, prepared) -> {
             SortedSet<String> unstaged = new TreeSet<>();
@@ -845,12 +865,14 @@ public class MavenProject implements BuildExecutorModule {
 
         private final String prefix;
         private final MavenResolver resolver;
+        private final List<String> sources;
         private final transient MavenRepository repository;
 
-        private Prepare(String prefix, MavenResolver resolver, MavenRepository repository) {
+        private Prepare(String prefix, MavenResolver resolver, MavenRepository repository, List<String> sources) {
             this.prefix = prefix;
             this.resolver = resolver;
             this.repository = repository;
+            this.sources = sources;
         }
 
         @Override
@@ -942,7 +964,7 @@ public class MavenProject implements BuildExecutorModule {
                 String qualifiedDependencies = value.qualifiedDependencies() == null ? "" : value.qualifiedDependencies().entrySet().stream()
                         .map(requires -> requires.getKey() + "=" + requires.getValue())
                         .collect(Collectors.joining("\t"));
-                String main = SIBLING_MODULE_PREFIX + BuildExecutorModule.encodePath(relativePath), tests = "test-" + main;
+                String main = SIBLING_MODULE_PREFIX + BuildExecutorModule.encodePath(relativePath), tests = "test" + main;
                 writeModule(maven.resolve(main + ".properties"),
                         tests,
                         value,
@@ -1262,9 +1284,8 @@ public class MavenProject implements BuildExecutorModule {
             properties.setProperty("sources.0", sourceDirectory == null
                     ? (test ? "src/test/java" : "src/main/java")
                     : sourceDirectory.replace(File.separatorChar, '/'));
-            List<String> languages = List.of("kotlin", "groovy");
-            for (int index = 0; index < languages.size(); index++) {
-                properties.setProperty("sources." + (index + 1), "src/" + (test ? "test" : "main") + "/" + languages.get(index));
+            for (int index = 0; index < sources.size(); index++) {
+                properties.setProperty("sources." + (index + 1), "src/" + (test ? "test" : "main") + "/" + sources.get(index));
             }
             List<String> resourceDirectories = test ? value.testResourceDirectories() : value.resourceDirectories();
             List<String> resources = resourceDirectories == null

@@ -19,12 +19,13 @@ public class IdeTest {
 
     @TempDir
     private Path root;
-    private Path next, supplement;
+    private Path next, supplement, persistent;
 
     @BeforeEach
     public void setUp() throws IOException {
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
     }
 
     @Test
@@ -270,7 +271,7 @@ public class IdeTest {
             properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
         });
         library(main, "lib.jar");
-        Path test = inventory("test-module-greeter", properties -> {
+        Path test = inventory("testmodule-greeter", properties -> {
             properties.setProperty("module-greeter.path", "greeter");
             properties.setProperty("module-greeter.test", "greeter");
             properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/any-name.jar");
@@ -381,7 +382,7 @@ public class IdeTest {
             properties.setProperty("module-greeter.path", "greeter");
             properties.setProperty("module-greeter.generated.0", "generated/sources");
         });
-        Path test = inventory("test-module-greeter", properties -> {
+        Path test = inventory("testmodule-greeter", properties -> {
             properties.setProperty("module-greeter.path", "greeter");
             properties.setProperty("module-greeter.test", "greeter");
             properties.setProperty("module-greeter.generated.0", "generated/sources");
@@ -414,7 +415,7 @@ public class IdeTest {
             properties.setProperty("module-greeter.path", "greeter");
             properties.setProperty("module-greeter.generated.0", "generated/sources");
         });
-        Path test = inventory("test-module-greeter", properties -> {
+        Path test = inventory("testmodule-greeter", properties -> {
             properties.setProperty("module-greeter.path", "greeter");
             properties.setProperty("module-greeter.test", "greeter");
             properties.setProperty("module-greeter.generated.0", "generated/sources");
@@ -733,7 +734,7 @@ public class IdeTest {
             default -> throw new IllegalArgumentException(tool);
         };
         BuildStepResult result = step.apply(Runnable::run,
-                        new BuildStepContext(root.resolve("previous"), next, supplement),
+                        new BuildStepContext(root.resolve("previous"), next, supplement, persistent),
                         arguments)
                 .toCompletableFuture()
                 .join();

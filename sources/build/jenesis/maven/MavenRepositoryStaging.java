@@ -44,6 +44,7 @@ public class MavenRepositoryStaging implements BuildStep {
         SequencedMap<String, Module> stagedByArtifactId = new LinkedHashMap<>();
         List<Module> testModules = new ArrayList<>();
         Set<String> unstaged = new HashSet<>();
+        SequencedMap<String, List<Path>> supplements = Inventory.supplements(arguments.values());
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -75,12 +76,12 @@ public class MavenRepositoryStaging implements BuildStep {
                         "artifacts",
                         packaged,
                         inventoryFile);
-                Path sources = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".sources"),
+                Path sources = singleJar(Inventory.supplemented(inventory, argument.folder(), prefix + ".sources", supplements),
                         prefix,
                         "sources",
                         false,
                         inventoryFile);
-                Path javadoc = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".documentation"),
+                Path javadoc = singleJar(Inventory.supplemented(inventory, argument.folder(), prefix + ".documentation", supplements),
                         prefix,
                         "documentation",
                         false,

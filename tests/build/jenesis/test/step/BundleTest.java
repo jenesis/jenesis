@@ -20,13 +20,14 @@ public class BundleTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, input;
+    private Path previous, next, supplement, persistent, input;
 
     @BeforeEach
     public void setUp() throws IOException {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+        persistent = Files.createDirectory(root.resolve("persistent"));
         input = Files.createDirectory(root.resolve("input"));
     }
 
@@ -43,7 +44,7 @@ public class BundleTest {
 
         BuildStepResult result = Bundle.ofEnvironment(Environment.NONE).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -75,7 +76,7 @@ public class BundleTest {
 
         BuildStepResult result = Bundle.ofEnvironment(new Environment(Map.of("palette.colors", "none")).out(printed::add)).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -104,7 +105,7 @@ public class BundleTest {
 
         Bundle.ofEnvironment(Environment.NONE).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(input, Map.of())))).toCompletableFuture().join();
 
         Path zip = next.resolve(Bundle.BUNDLE).resolve("bundle.zip");
@@ -142,7 +143,7 @@ public class BundleTest {
 
         BuildStepResult result = Bundle.ofEnvironment(Environment.NONE).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -182,7 +183,7 @@ public class BundleTest {
 
         BuildStepResult result = Bundle.ofEnvironment(Environment.NONE).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -237,7 +238,7 @@ public class BundleTest {
 
         BuildStepResult result = Bundle.ofEnvironment(Environment.NONE).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -262,7 +263,7 @@ public class BundleTest {
 
         BuildStepResult result = Bundle.ofEnvironment(Environment.NONE).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
@@ -280,7 +281,7 @@ public class BundleTest {
 
         BuildStepResult result = Bundle.ofEnvironment(Environment.NONE).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -308,7 +309,7 @@ public class BundleTest {
 
         BuildStepResult result = bundle.apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
@@ -330,7 +331,7 @@ public class BundleTest {
 
         BuildStepResult result = Bundle.ofEnvironment(Environment.NONE).apply(
                 Runnable::run,
-                new BuildStepContext(previous, next, supplement),
+                new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                         input,
                         Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
