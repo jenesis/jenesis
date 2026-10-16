@@ -9,6 +9,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Abi;
 import build.jenesis.step.Assign;
 import build.jenesis.step.Classifiers;
 
@@ -100,6 +101,52 @@ public class AssignTest {
                 .isEqualTo(next.relativize(jar).toString().replace(File.separatorChar, '/'));
         assertThat(coordinates.getProperty("module/foo:jmod"))
                 .isEqualTo(next.relativize(jmod).toString().replace(File.separatorChar, '/'));
+    }
+
+    @Test
+    public void names_the_abi_of_the_module_for_every_coordinate_it_assigns() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("module/foo", "");
+        properties.setProperty("maven/foo/foo/1", "");
+        properties.store(argument.resolve(BuildStep.IDENTITY));
+        Files.writeString(Files.createDirectory(argument.resolve(BuildStep.ARTIFACTS)).resolve("classes.jar"), "classes");
+        Path abi = Files.writeString(argument.resolve(Abi.ABI), "foo/Foo.class=0\n");
+        new Assign().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement, persistent),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(
+                                        Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.ARTIFACTS + "classes.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(Abi.ABI), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        SequencedProperties abis = SequencedProperties.ofFiles(next.resolve(Abi.ABIS));
+        String relative = next.relativize(abi).toString().replace(File.separatorChar, '/');
+        assertThat(abis.stringPropertyNames()).containsExactlyInAnyOrder("module/foo", "maven/foo/foo/1");
+        assertThat(abis.getProperty("module/foo")).isEqualTo(relative);
+        assertThat(abis.getProperty("maven/foo/foo/1")).isEqualTo(relative);
+        assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.IDENTITY)).stringPropertyNames())
+                .as("the abi is no artifact of the module")
+                .containsExactlyInAnyOrder("module/foo", "maven/foo/foo/1");
+    }
+
+    @Test
+    public void names_no_abi_for_a_module_without_one() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("module/foo", "");
+        properties.store(argument.resolve(BuildStep.IDENTITY));
+        Files.writeString(Files.createDirectory(argument.resolve(BuildStep.ARTIFACTS)).resolve("classes.jar"), "classes");
+        new Assign().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement, persistent),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(
+                                        Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.ARTIFACTS + "classes.jar"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        assertThat(next.resolve(Abi.ABIS)).doesNotExist();
     }
 
     @Test
