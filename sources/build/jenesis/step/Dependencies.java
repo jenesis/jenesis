@@ -204,6 +204,7 @@ public class Dependencies implements BuildExecutorModule {
                     Path.of(DEPENDENCIES),
                     Path.of(MODULAR),
                     Path.of(Assign.VARIANTS),
+                    Path.of(Abi.FOLDER),
                     Path.of(RESOLVED)));
         }
 
@@ -490,6 +491,7 @@ public class Dependencies implements BuildExecutorModule {
                     }
                     SequencedProperties index = SequencedProperties.ofFiles(context.next().resolve(DEPENDENCIES));
                     Set<Path> refreshed = new HashSet<>();
+                    SequencedMap<String, Path> refreshedInternals = new LinkedHashMap<>();
                     for (String key : index.stringPropertyNames()) {
                         String[] parts = split(key);
                         String location = parts == null
@@ -503,6 +505,7 @@ public class Dependencies implements BuildExecutorModule {
                         String relative = space < 0 ? value : value.substring(0, space);
                         String checksum = space < 0 ? "" : value.substring(space + 1);
                         Path target = context.next().resolve(relative).normalize();
+                        refreshedInternals.put(parts[2] + "/" + parts[3], target);
                         if (refreshed.add(target)) {
                             Files.deleteIfExists(target);
                             BuildStep.linkOrCopy(target, current.get(location).file().orElseThrow(() ->
@@ -522,6 +525,14 @@ public class Dependencies implements BuildExecutorModule {
                         index.setProperty(key, checksum.isEmpty() ? relative : relative + " " + checksum);
                     }
                     index.store(context.next().resolve(DEPENDENCIES));
+                    try (Stream<Path> files = Files.list(libs)) {
+                        for (Path file : files.toList()) {
+                            if (file.getFileName().toString().endsWith("." + Abi.ABI)) {
+                                Files.delete(file);
+                            }
+                        }
+                    }
+                    companions(arguments, refreshedInternals);
                     return CompletableFuture.completedStage(new BuildStepResult(true));
                 }
                 fetched.clear();
@@ -1039,6 +1050,14 @@ public class Dependencies implements BuildExecutorModule {
                 aliased.forEach(properties::setProperty);
                 properties.store(context.next().resolve(ALIASED));
             }
+            SequencedMap<String, Path> placedInternals = new LinkedHashMap<>();
+            internals.forEach((dependency, internal) -> {
+                Path jar = placed.get(dependency);
+                if (internal && jar != null && jar.startsWith(libs)) {
+                    placedInternals.put(dependency, jar);
+                }
+            });
+            companions(arguments, placedInternals);
             SequencedProperties produced = new SequencedProperties();
             internals.forEach((dependency, internal) -> {
                 if (internal) {
@@ -1153,6 +1172,26 @@ public class Dependencies implements BuildExecutorModule {
                                     ? "internal"
                                     : value)))));
             return digest(List.of(declared, List.of(inputs)));
+        }
+
+        private static void companions(SequencedMap<String, BuildStepArgument> arguments,
+                                       SequencedMap<String, Path> internals) throws IOException {
+            for (Map.Entry<String, Path> internal : internals.entrySet()) {
+                Path jar = internal.getValue();
+                for (BuildStepArgument argument : arguments.values()) {
+                    Path abi = argument.removed()
+                            ? null
+                            : argument.folder().resolve(Abi.FOLDER
+                                    + BuildExecutorModule.encode(internal.getKey())
+                                    + ".properties");
+                    if (abi != null && Files.isRegularFile(abi)) {
+                        Files.copy(abi,
+                                jar.resolveSibling(Abi.companion(jar.getFileName().toString())),
+                                StandardCopyOption.REPLACE_EXISTING);
+                        break;
+                    }
+                }
+            }
         }
 
         private static String fingerprint(RepositoryItem item) throws IOException {

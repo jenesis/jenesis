@@ -117,7 +117,35 @@ public class Javac extends ProcessBuildStep {
 
     @Override
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
-        return hasRelevantChange(arguments, Set.of(".java"), Set.of("javac"), includeResources);
+        Path resolved = Path.of(Dependencies.RESOLVED);
+        SequencedMap<String, BuildStepArgument> compared = new LinkedHashMap<>();
+        for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
+            BuildStepArgument argument = entry.getValue();
+            if (argument.removed()) {
+                compared.put(entry.getKey(), argument);
+                continue;
+            }
+            Set<Path> processors = new HashSet<>();
+            for (String group : List.of("plugin", "javac")) {
+                for (Path jar : Dependencies.select(argument.folder(), group, "plugin")) {
+                    processors.add(argument.folder().relativize(jar));
+                }
+            }
+            Map<Path, Checksum> files = new HashMap<>(argument.files());
+            argument.files().forEach((path, checksum) -> {
+                Checksum abi = path.startsWith(resolved) && path.getFileName().toString().endsWith(".jar")
+                        ? argument.files().get(path.resolveSibling(Abi.companion(path.getFileName().toString())))
+                        : null;
+                if (checksum.status() == ChecksumStatus.ALTERED
+                        && abi != null
+                        && abi.status() == ChecksumStatus.RETAINED
+                        && !processors.contains(path)) {
+                    files.put(path, Checksum.of(ChecksumStatus.RETAINED));
+                }
+            });
+            compared.put(entry.getKey(), new BuildStepArgument(argument.folder(), files));
+        }
+        return hasRelevantChange(compared, Set.of(".java"), Set.of("javac"), includeResources);
     }
 
     public static boolean hasRelevantChange(SequencedMap<String, BuildStepArgument> arguments,

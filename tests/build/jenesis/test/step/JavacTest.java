@@ -11,6 +11,8 @@ import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Abi;
+import build.jenesis.step.Dependencies;
 import build.jenesis.step.Javac;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
@@ -246,6 +248,61 @@ public class JavacTest {
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
         arguments.put("input", argument);
         assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(arguments)).isTrue();
+    }
+
+    @Test
+    public void shouldRun_skips_a_dependency_whose_abi_did_not_change() throws IOException {
+        assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(dependency(
+                ChecksumStatus.ALTERED,
+                ChecksumStatus.RETAINED)))
+                .as("only what the dependency's callers cannot see changed")
+                .isFalse();
+    }
+
+    @Test
+    public void shouldRun_fires_when_the_abi_of_a_dependency_changed() throws IOException {
+        assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(dependency(
+                ChecksumStatus.ALTERED,
+                ChecksumStatus.ALTERED))).isTrue();
+    }
+
+    @Test
+    public void shouldRun_fires_when_a_changed_dependency_has_no_abi() throws IOException {
+        assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(dependency(ChecksumStatus.ALTERED, null))).isTrue();
+    }
+
+    @Test
+    public void shouldRun_fires_when_a_dependency_and_its_abi_are_added() throws IOException {
+        assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(dependency(
+                ChecksumStatus.ADDED,
+                ChecksumStatus.ADDED))).isTrue();
+    }
+
+    @Test
+    public void shouldRun_fires_when_an_annotation_processor_changed_although_its_abi_did_not() throws IOException {
+        for (String group : List.of("plugin", "javac")) {
+            Files.createDirectories(sources.resolve(Dependencies.RESOLVED));
+            Files.writeString(sources.resolve(Dependencies.RESOLVED + "lib.jar"), "jar");
+            SequencedProperties index = new SequencedProperties();
+            index.setProperty(group + "/plugin/maven/sample/lib/1", Dependencies.RESOLVED + "lib.jar");
+            index.store(sources.resolve(BuildStep.DEPENDENCIES));
+            assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(dependency(
+                    ChecksumStatus.ALTERED,
+                    ChecksumStatus.RETAINED)))
+                    .as("the code of a processor in " + group + " runs in the compiler, so its abi does not cover it")
+                    .isTrue();
+        }
+    }
+
+    private SequencedMap<String, BuildStepArgument> dependency(ChecksumStatus jar, ChecksumStatus abi) {
+        Map<Path, Checksum> files = new HashMap<>();
+        files.put(Path.of(Dependencies.RESOLVED + "lib.jar"), Checksum.of(jar));
+        if (abi != null) {
+            files.put(Path.of(Dependencies.RESOLVED + Abi.companion("lib.jar")), Checksum.of(abi));
+        }
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("input", new BuildStepArgument(sources, files));
+        return arguments;
     }
 
     @Test
