@@ -87,7 +87,9 @@ public class Javac extends ProcessBuildStep {
     @Override
     protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
         return commands.stream().anyMatch(option -> option.startsWith("-J"))
-                ? ProcessHandler.OfProcess.ofJavaHome("bin/javac").apply(commands).daemon(terms.daemon())
+                ? ProcessHandler.OfProcess.ofJavaHome("bin/javac").apply(commands)
+                        .daemon(terms.daemon())
+                        .scoped(terms.shared())
                 : super.handler(context, commands);
     }
 
