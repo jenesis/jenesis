@@ -841,7 +841,7 @@ public class MavenProjectTest {
         for (String manifests : List.of("maven/module-/manifests", "maven/testmodule-/manifests")) {
             Path module = results.get(manifests);
             SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
-            assertThat(requires.stringPropertyNames()).contains("main/runtime/maven/org.example/agent/2.0");
+            assertThat(requires.stringPropertyNames()).contains("main/agent/maven/org.example/agent/2.0");
         }
     }
 
@@ -876,7 +876,9 @@ public class MavenProjectTest {
             Path module = results.get(manifests);
             SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
             assertThat(requires.stringPropertyNames())
-                    .contains("main/runtime/maven/io.opentelemetry.javaagent/opentelemetry-javaagent");
+                    .contains("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent")
+                    .as("an agent is resolved for the runs it joins, never published as a dependency of the module")
+                    .noneMatch(key -> key.startsWith("main/runtime/maven/io.opentelemetry.javaagent/"));
             assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.ATTACHMENTS))).containsOnly(
                     Map.entry("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=value"));
         }
