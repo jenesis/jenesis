@@ -29,8 +29,7 @@ Layout
 
     demo/demo-48-ksp
     |-- build/jenesis            symlink to ../../../sources/build/jenesis
-    |-- jenesis.plugins.properties     names the Kotlin and KSP plugins
-    |-- build.jenesis/plugin-ksp.properties   one option per line
+    |-- build.jenesis/ksp.properties   one option per line
     |-- pom.xml                  names the processor and pins every group
     `-- sources/sample/
         |-- Point.kt             @JsonClass(generateAdapter = true)
@@ -39,20 +38,20 @@ Layout
 Declaring a processor
 ---------------------
 
-`jenesis.plugins.properties` names the KSP plugin at the hook point
-`binary/generated`, and it runs where its `plugin-ksp.properties` is found,
-beside the Kotlin plugin that compiles the module, as in `../demo-45-kotlin`:
+KSP is an official plugin: the build resolves it as
+`module/build.jenesis.plugin.ksp` and runs it in every module whose
+configuration folder holds a `ksp.properties`, beside the Kotlin plugin that
+compiles the module's `.kt` sources, as in `../demo-45-kotlin`. Neither needs a
+line in `jenesis.plugins.properties`, and `-Djenesis.generate.ksp=false`
+switches KSP off.
 
-    kotlin+language=build.jenesis.plugin.kotlin
-    ksp+binary/generated=build.jenesis.plugin.ksp
-
-The processors are named like a compiler plugin, by coordinate in the group `ksp`, here as a
-comment in the `pom.xml`:
+The processors are named like a compiler plugin, by coordinate in the group
+`ksp:processor`, here as a comment in the `pom.xml`:
 
     <!--jenesis.plugin ksp:processor maven/com.squareup.moshi/moshi-kotlin-codegen-->
 
 or with `@jenesis.plugin ksp:processor maven/com.squareup.moshi/moshi-kotlin-codegen` in a
-`module-info.java`. Each line of `plugin-ksp.properties` is an option handed to the
+`module-info.java`. Each line of `ksp.properties` is an option handed to the
 processors, as Gradle's `ksp { arg(...) }` hands them:
 
     moshi.generated=javax.annotation.processing.Generated
@@ -67,7 +66,7 @@ the ProGuard rules, join the jar.
 Pinning
 -------
 
-KSP resolves in the group `ksp:runtime`, apart from the processors in `ksp`: a
-processor brings a Kotlin standard library of its own, here Kotlin 1.8, which KSP
-does not use. `pin` writes both groups into the `pom.xml`, as the `jenesis.pin`
-comment at its end shows.
+The plugin resolves in the group `ksp`, KSP itself in `ksp:tool` and the
+processors in `ksp:processor`: a processor brings a Kotlin standard library of
+its own, here Kotlin 1.8, which KSP does not use. `pin` writes every group into
+the `pom.xml`, as the `jenesis.pin` comment at its end shows.

@@ -731,6 +731,8 @@ public record Project(
                     - What a step produced is in %{target}/<step path>/output/ - a build step's
                       below %{target}/build/, a staged tree's in %{target}/stage/<tree>/ - and
                       that path without the target/ prefix and /output is a selector of its own.
+                    - A step prints [EXECUTED] when it ran, [SKIPPED] when its inputs had not changed
+                      and its last output was reused, and [FAILED] with the error.
                     - After editing a build step's code, bump its serialVersionUID, or its cached
                       output is reused.
                     - Whenever you add or change a dependency, offer to run `pin`.
@@ -873,13 +875,14 @@ public record Project(
                     package is split: held by the tests and the main code of one project, as
                     white-box tests are, or by two projects of the build. This program prints each
                     split package and where it is held, per project and across the main sources of
-                    all of them, counting Java, Kotlin, Groovy and Scala sources. Write it to a file outside the sources, and run it from the root as
+                    all of them, counting Java, Kotlin, Groovy and Scala sources of every source set,
+                    so a Gradle integrationTest or jmh set counts as the tests do. Write it to a file outside the sources, and run it from the root as
                     `java SplitPackages.java`: the JDK the build runs on runs a source file as it
                     stands, on any operating system, so no shell tool is needed.
 
                       void main() throws IOException {
                           var source = Pattern.compile(
-                                  "(.*)src/(main|test)/(?:java|kotlin|groovy|scala)/(.+)/[^/]+[.](?:java|kt|groovy|scala)");
+                                  "(.*)src/([a-zA-Z0-9]+)/(?:java|kotlin|groovy|scala)/(.+)/[^/]+[.](?:java|kt|groovy|scala)");
                           var owners = new TreeMap<String, Set<String>>();
                           try (var files = Files.walk(Path.of("."))) {
                               files.map(file -> file.toString().replace(File.separatorChar, '/'))
@@ -890,8 +893,8 @@ public record Project(
                           }
                           owners.forEach((folder, held) -> {
                               if (held.stream().filter(owner -> owner.startsWith("main ")).count() > 1
-                                      || held.stream().anyMatch(owner -> owner.startsWith("test ")
-                                              && held.contains("main " + owner.substring(5)))) {
+                                      || held.stream().anyMatch(owner -> !owner.startsWith("main ")
+                                              && held.contains("main " + owner.substring(owner.indexOf(' ') + 1)))) {
                                   IO.println(folder.replace('/', '.') + " " + held);
                               }
                           });
@@ -963,8 +966,11 @@ public record Project(
                                  matches them, or by <activeByDefault> when no
                                  other profile of that POM is active, with its <properties>,
                                  dependencies, <dependencyManagement> and resource directories
-                      ignored    <build><plugins> and <pluginManagement>, a profile activated by
-                                 a property, a file or -P, a profile's <modules>,
+                      ignored    <build><plugins> and <pluginManagement>, so a compiler's
+                                 <includes> and <excludes> as well and every source of a source
+                                 directory compiles, a profile activated by
+                                 a property, a file or -P, a profile's <modules>, which move
+                                 into the POM's own <modules> to be built,
                                  <repositories> and settings.xml, a resource's includes,
                                  excludes, targetPath and filtering, system scope, and every
                                  packaging but jar and bundle
@@ -995,6 +1001,12 @@ public record Project(
                     compiles, so the tests run on the class path against the main jar and an
                     --add-opens of theirs targets ALL-UNNAMED; with module-info.java, give the tests
                     a module of their own, as step 3b takes white-box tests apart.
+                    Tests that ran on the module path behave differently on the class path: a
+                    service the main module-info.java provides is found only where a
+                    META-INF/services file names it, a stack trace and Class.getModule name no
+                    module, and resources are found by scanning the class path. A test that
+                    asserts one of them stays with the old build until the project moves to
+                    module-info.java.
 
                     Nothing ignored is reported, so list the old build's plugins, profiles and
                     repositories before deleting anything: each needs an answer in step 4. A
@@ -1005,9 +1017,13 @@ public record Project(
                     A source directory gives the jar only what its compilers read - .java, .kt,
                     .scala, .groovy - as Maven's does, so a template beside the sources stays
                     out of it, and a file that must ship moves to a resource directory.
-                    A module's tests do not run in its folder and see no basedir property, as
-                    Surefire's do, so a test that opens src/test/... by a relative path is changed
-                    to read the file as a test resource.
+                    A module's tests run in the folder the build was started in, the project's
+                    root, rather than in the module's folder as Surefire's do, and see no basedir
+                    property: a test that opens src/test/... by a relative path reads the file as
+                    a test resource instead, or resolves it against a -Dbasedir\\=<module folder>
+                    line of the module's process-test.properties, its = escaped as a property
+                    key's is. The tests run without -ea, which Surefire and Gradle set, so a test
+                    that relies on an assert names -ea in that file as well.
                     A module inherits its parents' metadata as Maven's model does: the url and the
                     scm locations with the module's artifactId appended, unless the parent sets
                     child.*.inherit.append.path="false", and licenses or developers only as a whole.
@@ -1035,10 +1051,13 @@ public record Project(
                       package-private      a member a test reaches in a package the module
                                            exports already is called by reflection rather than
                                            made public, which would widen the published API:
-                                           JUnit's ReflectionSupport finds and invokes it, given
+                                           JUnit's ReflectionSupport finds and invokes a method
+                                           and reads a field (tryToReadFieldValue), given
                                            `--add-opens=<module>/<package>=org.junit.platform.commons`
                                            in process-test.properties, since the package opens to
-                                           the module that makes the member accessible
+                                           the module that makes the member accessible; it writes
+                                           no field, so a test that sets one opens the package to
+                                           the test module as well and calls Field.set itself
                       two projects         move the classes so each package lives in one module,
                                            or merge the projects, keeping a qualified export for
                                            a package only a sibling uses
@@ -1195,15 +1214,17 @@ public record Project(
                     for both halves, src/main/build.jenesis/ for the main code alone and
                     src/test/build.jenesis/ for the tests alone, in a module-info.java build the
                     META-INF/build.jenesis/ folder beside the module's sources, and build.jenesis/ at
-                    the root for every module. A tool resolves in a group named after it, such as
-                    checkstyle or jacoco, and once per module, since each module resolves alone.
+                    the root for every module. The plugin that runs a tool resolves in a group named
+                    after it, such as checkstyle or jacoco, and the tool in <name>:tool, such as
+                    checkstyle:tool, JaCoCo's agent in jacoco:agent; each resolves once per module,
+                    since each module resolves alone, and a pin naming any other group is ignored.
                     A pom.xml pins it with a comment that is a child of <project>, one coordinate per
-                    line, `<!--jenesis.pin checkstyle/maven/<groupId>/<artifactId> <version>-->`,
+                    line, `<!--jenesis.pin checkstyle:tool/maven/<groupId>/<artifactId> <version>-->`,
                     which `pin` completes with the tool's closure. That comment is the module's own:
                     `pin` writes it into every module's POM and a parent's is not inherited, while a
                     <!--jenesis.plugin--> comment is, from a local parent but never from a POM that only
                     lists the module under <modules>. A module-info.java pins it with
-                    @jenesis.pin checkstyle/maven/<groupId>/<artifactId> <version>. Configuration that lived
+                    @jenesis.pin checkstyle:tool/maven/<groupId>/<artifactId> <version>. Configuration that lived
                     inside a plugin moves here:
 
                       compilerArgs, options.compilerArgs   process-javac.properties
@@ -1375,6 +1396,11 @@ public record Project(
                     contents, the dependency tree (`dependencies` against mvn dependency:tree or
                     gradle dependencies), the number of tests run, and the POM a consumer receives,
                     which is generated here rather than copied from yours.
+                    An edit to a method body compiles every module that depends on the edited one
+                    again, unless jenesis.abi.mode is set in jenesis.properties - modular for a
+                    module-info.java build, classpath for a pom.xml one - which skips a dependent
+                    whose dependencies changed only below their ABI; set it before timing an edit
+                    against the old build.
                     A pom.xml resolves a conflict as Maven does, the version nearest the root
                     winning, where Gradle takes the highest version requested. No setting of
                     jenesis.resolver.maven does the latter: latest takes the newest version the
@@ -1390,7 +1416,10 @@ public record Project(
                     -Djenesis.dependency.pin=strict build/jenesis/Make.java`; one that published
                     runs the `release` selector with -Djenesis.release.publish=true, which stages
                     first, with a jreleaser.yml at the project's root, and the version as
-                    -Djenesis.project.version. Without that setting, `release` and every `pin` run
+                    -Djenesis.project.version. A pom.xml build passes it too, to `release` and to
+                    `pin`, which runs the release dry: JReleaser is handed the version the build
+                    was given, never a POM's, and fails on a blank one unless jreleaser.yml names
+                    it. Without that setting, `release` and every `pin` run
                     the release dry and publish nothing. The job's credentials become the JRELEASER_*
                     variables JReleaser reads (72). A job that deployed to a repository of its own rather than to
                     Maven Central names it in MAVEN_RELEASE_URI and its key in MAVEN_RELEASE_TOKEN
@@ -1458,7 +1487,11 @@ public record Project(
                           by its JVM variant, <artifactId>-jvm, where its root artifact holds no class
                           and its POM does not depend on that variant, as Gradle module metadata is
                           not read; Gradle's incremental Kotlin compilation (kotlin.incremental, the
-                          default) is jenesis.kotlin.incremental=true, which needs Kotlin 2.3 or newer
+                          default) is jenesis.kotlin.incremental=true, which needs Kotlin 2.3 or newer;
+                          the plugin's <args> and Gradle's freeCompilerArgs are lines of
+                          process-kotlinc.properties, one option per line as
+                          process-javac.properties holds javac's, as -Xjsr305\\=strict, a -J
+                          line one of the compiler's JVM
                       scala-maven-plugin / scala -> .scala sources, compiled by the Scala plugin
                           the build resolves where a module holds one, with Scala 3 (49);
                           Scala 2 is not supported; the incremental compilation of Zinc, which sbt,
@@ -1745,8 +1778,9 @@ public record Project(
                           to Central, signing
                           -> `release` with a jreleaser.yml at the project's root, which runs
                           JReleaser in the build's JVM in the project's root, with the
-                          version the build resolved, which a pom.xml build sets as
-                          jenesis.project.version for a release whose configuration names none, and
+                          version the build was given as -Djenesis.project.version, which a
+                          pom.xml build passes to `release` and `pin` alike, as no POM's version
+                          reaches it, unless jreleaser.yml names one, and
                           the staged trees as template properties (72), the values of a
                           jreleaser.properties beside the configuration, and with --dry-run,
                           publishing nothing, unless the command line passes
@@ -1763,8 +1797,11 @@ public record Project(
                           the rest; drop the plugin
                       maven-toolchains-plugin / java toolchains -> jenesis.toolchain.version (7)
                       a test run on another JDK, as Surefire's jvm or a Test task's javaLauncher
-                          -> the whole build again with -Djenesis.toolchain.version=<feature>, as a
-                          CI matrix leg; the module's release stays what it declares
+                          -> on a JDK of 25 or newer, the whole build again with
+                          -Djenesis.toolchain.version=<feature>, as a CI matrix leg; the module's
+                          release stays what it declares. An older JDK has no counterpart: Jenesis
+                          runs on 25 or newer and refuses an older toolchain, so the tests run on
+                          the build's JDK against the release the module compiles for
                       <profiles> chosen with -P or a property / properties and conventions
                           -> jenesis-<profile>.properties; those activated by <jdk> or
                           <activeByDefault> are read from the POM (8)
@@ -1780,6 +1817,9 @@ public record Project(
                           bootstrap over the jar, and the tests are handed the model its test
                           support reads; @QuarkusTest runs on the class path only
                       war, ear -> none; a war module is skipped with a [SKIPPED] line
+                      maven-invoker-plugin, an integration-test project under src/it -> none;
+                          one that needs no @...@ filtering becomes a module of the reactor,
+                          with coordinates of its own, the others stay with the old build
                       spring-boot-devtools, kept out by repackage's excludeDevtools or Gradle's
                           developmentOnly -> none; declare it in a pom.xml profile activated by a
                           property, as <property><name>!noDevtools</name></property>, which Maven
@@ -1939,6 +1979,11 @@ public record Project(
                       +<module>         module subgraph inside `build` (not stage/export/pin).
                                         <module> is the source folder holding its pom.xml or
                                         module-info.java; nested, foo/bar is written +foo+bar.
+                                        In a pom.xml build a module's tests are a module of
+                                        their own, which +<module> does not reach: name
+                                        build/maven/compose/module/build-testmodule-<module>,
+                                        or run the whole build with
+                                        -Djenesis.test.filter=<module>/<regex>.
                       +<module>/<step>  one step in it, e.g. +foo+bar/compile/dependencies/resolved
                       pin/module-<path> one module's pins. `pin` is an entry point of its own and
                                         always rewrites every module, so `pin +foo` runs both and
@@ -2413,7 +2458,8 @@ public record Project(
                                            --add-opens=<a>/<p>=<b> in the process file
                       ... has been compiled by a more recent version of the Java Runtime
                                            a class newer than the JVM: run on that release, with
-                                           -Djenesis.toolchain.version=<n>, or compile for this one
+                                           -Djenesis.toolchain.version=<n> where n is 25 or newer,
+                                           or compile for this one
                       Preview features are not enabled for ...
                                            declare the release as <n>-preview, as
                                            @jenesis.release <n>-preview
@@ -2609,7 +2655,9 @@ public record Project(
                     file's checksum. Beside the source folders, a module's hook point is handed its
                     metadata.properties (version, name, ...) and its module.properties, whose `test`
                     tells the test half of a pom from the main one, so a step that belongs to one of
-                    them returns early on the other. The resolved dependencies arrive as a folder too:
+                    them returns early on the other. No argument is named for either: find each
+                    with BuildStep.locate over the arguments' folders, as BuildStep.locate(folders,
+                    BuildStep.METADATA). The resolved dependencies arrive as a folder too:
                     Dependencies.select(folder, "main", "compile") lists the jars of one group and
                     scope, Dependencies.all(folder) every one. What a step at binary/compiled writes
                     as classes/ and a manifest.mf is merged into the module's jar beside what javac

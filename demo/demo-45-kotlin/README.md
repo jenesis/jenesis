@@ -3,7 +3,7 @@ Kotlin demo
 
 Build a project that mixes Java and Kotlin in one module of the Java module
 system, and export a package that holds only Kotlin. You point Jenesis at the
-project and name the Kotlin plugin, it compiles the `.java` and `.kt` sources
+project, it compiles the `.java` and `.kt` sources
 together, and emits a modular jar alongside a generated POM - there is no build
 script to write.
 
@@ -18,14 +18,10 @@ Jenesis auto-detects the MODULAR_TO_MAVEN layout (a `module-info.java`, no
 `pom.xml`), resolves the Kotlin compiler, compiles the module, and emits a
 modular jar alongside a generated POM.
 
-Kotlin is a plugin of the hook point `language`, named in
-`jenesis.plugins.properties`:
-
-    kotlin+language=build.jenesis.plugin.kotlin
-
-The plugin runs in every module that holds a `.kt` source and needs no other
-configuration. A module with a `.kt` source and no such line fails the build
-and names the line to add.
+Kotlin is an official plugin of the hook point `language`. The build resolves it
+by itself, as `module/build.jenesis.plugin.kotlin`, in every module that holds a
+`.kt` source, with no line in `jenesis.plugins.properties` and no other
+configuration.
 
 Layout
 ------
@@ -35,12 +31,11 @@ sources out under one package:
 
     demo/demo-45-kotlin
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
-    |-- jenesis.plugins.properties names the Kotlin plugin
     |-- sources
     |   |-- module-info.java       requires kotlin.stdlib; exports sample; exports sample.pure
     |   |-- messages.properties    a root resource, read by Greeter at run time
     |   |-- META-INF/build.jenesis
-    |   |   `-- plugin-kotlin.properties  configures Dokka, when the build documents the module
+    |   |   `-- dokka.properties  configures Dokka, when the build documents the module
     |   `-- sample
     |       |-- Greeter.java       a Java type in the exported 'sample' package; loads the resource
     |       |-- Sample.kt          Kotlin that calls Greeter
@@ -127,21 +122,19 @@ own, in a `kotlin/` folder beside the Javadoc of the Java sources:
 
     java -Djenesis.project.documentation=true build/jenesis/Make.java
 
-`sources/META-INF/build.jenesis/plugin-kotlin.properties` configures Dokka with
-the options the Dokka Gradle plugin and the `dokka-maven-plugin` take, each as a
-`dokka.` value:
+`sources/META-INF/build.jenesis/dokka.properties` configures Dokka with the options
+the Dokka Gradle plugin and the `dokka-maven-plugin` take:
 
-    dokka.module-name=Kotlin demo
-    dokka.source-link=https://github.com/jenesis/jenesis/tree/main/demo/demo-45-kotlin/sources
-    dokka.footer-message=Documented by Dokka, built by Jenesis
+    module-name=Kotlin demo
+    source-link=https://github.com/jenesis/jenesis/tree/main/demo/demo-45-kotlin/sources
+    footer-message=Documented by Dokka, built by Jenesis
 
 The pages name the module `Kotlin demo`, link every declaration to its line on
-GitHub, and carry the footer. The other values are `dokka.documented-visibilities`,
-`dokka.suppress-obvious-functions`, `dokka.suppress-inherited-members`,
-`dokka.skip-empty-packages`, `dokka.skip-deprecated`, `dokka.report-undocumented`,
-`dokka.suppressed-packages`, `dokka.fail-on-warning`, `dokka.jdk-version`,
-`dokka.source-link-suffix`, `dokka.external-link.<name>` with its
-`dokka.external-link.<name>.package-list`, and `dokka.format=html|javadoc`; an
+GitHub, and carry the footer. The other values are `documented-visibilities`,
+`suppress-obvious-functions`, `suppress-inherited-members`, `skip-empty-packages`,
+`skip-deprecated`, `report-undocumented`, `suppressed-packages`, `fail-on-warning`,
+`jdk-version`, `source-link-suffix`, `external-link.<name>` with its
+`external-link.<name>.package-list`, and `format=html|javadoc`; an
 unknown value fails the build, and so does Dokka when it fails, as javadoc does.
 
 Compiling incrementally
@@ -162,7 +155,7 @@ A `-J` line of `process-kotlinc.properties` configures that JVM.
 
 This needs Kotlin 2.3 or newer, whose compiler is driven through the Kotlin Build
 Tools API, `org.jetbrains.kotlin:kotlin-build-tools-impl`. The module pins it in the
-`kotlin` group beside the compiler, at the compiler's version.
+`kotlin:tool` group beside the compiler, at the compiler's version.
 
 Pinning
 -------
