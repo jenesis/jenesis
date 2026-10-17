@@ -4589,6 +4589,34 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_expands_a_reference_to_its_own_metadata_as_maven_interpolates_the_model() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <url>${project.organization.url}#${project.artifactId}</url>
+                    <organization>
+                        <name>Example Ltd</name>
+                        <url>https://example.com</url>
+                    </organization>
+                    <scm>
+                        <url>${project.url}/source</url>
+                    </scm>
+                </project>
+                """);
+        MavenPomEmitter.Metadata metadata = mavenPomResolver.local(Runnable::run, mavenRepository, project)
+                .get(Path.of(""))
+                .metadata();
+        assertThat(metadata.url()).isEqualTo("https://example.com#artifact");
+        assertThat(metadata.scm().url())
+                .as("a reference resolves through the value it names, which may itself refer on")
+                .isEqualTo("https://example.com#artifact/source");
+    }
+
+    @Test
     public void local_pom_reads_a_developers_details_and_the_issue_and_ci_management_and_inherits_them() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

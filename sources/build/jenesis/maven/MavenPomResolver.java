@@ -813,6 +813,9 @@ public class MavenPomResolver implements MavenResolver {
                                 (previous, next) -> new MavenDependencyKey.Versioned(previous.key(),
                                         previous.version() == null ? next.version() : previous.version()));
                     });
+            Map<String, String> modelled = new HashMap<>();
+            pom.metadata().properties().forEach((key, value) -> modelled.put("project." + key, value));
+            modelled.putAll(pom.properties());
             SequencedMap<MavenDependencyKey, MavenDependencyValue> reactor = new LinkedHashMap<>();
             for (DependencyKey declared : pom.declaredManagement()) {
                 MavenDependencyKey key = declared.resolve(pom.properties());
@@ -853,7 +856,7 @@ public class MavenPomResolver implements MavenResolver {
                     pom.aliases(),
                     pom.signatures(),
                     property(pom.properties().get("mainClass"), pom.properties()),
-                    pom.metadata().expand(value -> property(value, pom.properties())),
+                    pom.metadata().expand(value -> property(value, modelled)),
                     expressions,
                     pom.relocation() == null ? null : new MavenPomEmitter.Relocation(
                             property(pom.relocation().groupId(), pom.properties()),
