@@ -462,7 +462,7 @@ public class PinPom implements BuildStep {
             int space = value.indexOf(' ');
             String version = space < 0 ? value : value.substring(0, space);
             String checksum = space < 0 ? null : value.substring(space + 1).trim();
-            String expression = expressions.get(entry.getKey());
+            String pinned = version, expression = expressions.get(entry.getKey());
             if (expression != null) {
                 String[] words = expression.split(" ");
                 String[] raw = words[0].split("/", -1);
@@ -507,7 +507,9 @@ public class PinPom implements BuildStep {
                 sb.append(prefix).append(indent).append("</exclusions>\n");
             }
             if (checksum != null) {
-                sb.append(prefix).append(indent).append("<!--Checksum/").append(checksum).append("-->\n");
+                sb.append(prefix).append(indent).append("<!--Checksum/").append(checksum)
+                        .append(version.equals(pinned) ? "" : " " + pinned)
+                        .append("-->\n");
             }
             sb.append(prefix).append("</dependency>\n");
         }

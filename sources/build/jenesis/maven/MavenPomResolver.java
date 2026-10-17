@@ -2119,6 +2119,7 @@ public class MavenPomResolver implements MavenResolver {
             String resolvedScope = property(scope, properties);
             String resolvedVersion = property(version, properties);
             MavenDependencyKey.validate("version", resolvedVersion);
+            int space = checksum == null ? -1 : checksum.indexOf(' ');
             return new MavenDependencyValue(resolvedVersion,
                     resolvedScope == null ? null : MavenDependencyScope.of(resolvedScope),
                     systemPath == null ? null : Path.of(property(systemPath, properties)),
@@ -2126,7 +2127,9 @@ public class MavenPomResolver implements MavenResolver {
                             property(exclusion.groupId(), properties),
                             property(exclusion.artifactId(), properties))).toList(),
                     optional == null ? null : Boolean.valueOf(property(optional, properties)),
-                    checksum
+                    space < 0 ? checksum : checksum.substring(space + 1).trim().equals(resolvedVersion)
+                            ? checksum.substring(0, space)
+                            : null
             );
         }
     }
