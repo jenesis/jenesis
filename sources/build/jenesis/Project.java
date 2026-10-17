@@ -737,7 +737,7 @@ public record Project(
                       output is reused.
                     - Whenever you add or change a dependency, offer to run `pin`.
                     - Find the demo that matches the task and copy its shape rather than inventing
-                      configuration. A number a page cites, as (61), is the demo-61-* folder of
+                      configuration. A number a page cites, as (62), is the demo-62-* folder of
                       https://github.com/jenesis/jenesis/tree/main/demo; skill/demos lists them.
                     - Moving a Maven or Gradle build here? Follow skill/migrate step by step, and end
                       with the summary of the migration it asks for. A user hands an agent that task by
@@ -1423,9 +1423,9 @@ public record Project(
                     was given, never a POM's, and fails on a blank one unless jreleaser.yml names
                     it. Without that setting, `release` and every `pin` run
                     the release dry and publish nothing. The job's credentials become the JRELEASER_*
-                    variables JReleaser reads (72). A job that deployed to a repository of its own rather than to
+                    variables JReleaser reads (73). A job that deployed to a repository of its own rather than to
                     Maven Central names it in MAVEN_RELEASE_URI and its key in MAVEN_RELEASE_TOKEN
-                    instead (72). Then let `ide` write the IntelliJ, VS Code or Eclipse
+                    instead (73). Then let `ide` write the IntelliJ, VS Code or Eclipse
                     project so no IDE depends on the old build: one IDE module per module, its
                     tests in its test sources. The IDE files it writes into a source folder never
                     reach a jar. A Maven layout keeps its pom.xml files, which are now its build
@@ -1472,14 +1472,14 @@ public record Project(
                       maven-compiler-plugin fork with -J options, meminitial, maxmem
                           -> -J<option>= in process-javac.properties, which runs javac in a JVM of
                           its own, as the build's JVM refuses a -J option
-                      annotationProcessorPaths / annotationProcessor -> @jenesis.plugin (14, 42)
+                      annotationProcessorPaths / annotationProcessor -> @jenesis.plugin (14, 43)
                       Error Prone / net.ltgt.errorprone
                           -> @jenesis.plugin javac <coordinate>, in a pom.xml
                           <!--jenesis.plugin javac maven/<groupId>/<artifactId>-->, with the javac
                           options it needs in process-javac.properties (15)
                       kotlin-maven-plugin / kotlin("jvm") -> .kt sources, found on their own and
                           compiled by the Kotlin plugin the build resolves for every module that
-                          holds one (45, 47); a pom.xml build names src/main/kotlin as
+                          holds one (46, 48); a pom.xml build names src/main/kotlin as
                           jenesis.maven.sources=kotlin in jenesis.properties, as it does groovy;
                           the tests see the tested module's internal declarations, as the tested jar
                           is their friend path, so no -Xfriend-paths is written; kotlin-stdlib, which
@@ -1495,7 +1495,7 @@ public record Project(
                           process-javac.properties holds javac's, as -Xjsr305=strict, a -J
                           line one of the compiler's JVM
                       scala-maven-plugin / scala -> .scala sources, compiled by the Scala plugin
-                          the build resolves where a module holds one, with Scala 3 (49);
+                          the build resolves where a module holds one, with Scala 3 (50);
                           Scala 2 is not supported; the incremental compilation of Zinc, which sbt,
                           Gradle and the plugin's recompileMode=incremental use, is
                           jenesis.scala.incremental=true
@@ -1516,7 +1516,7 @@ public record Project(
                           binding the specification as @specification/openapi/openapi.yaml=<file> (18)
                       antlr4-maven-plugin / antlr -> antlr.properties, binding the grammars as
                           @grammars/antlr=<folder> (19)
-                      com.google.devtools.ksp / ksp(...) dependencies -> ksp.properties (48), each ksp(...)
+                      com.google.devtools.ksp / ksp(...) dependencies -> ksp.properties (49), each ksp(...)
                           processor as @jenesis.plugin ksp:processor <coordinate> or a pom.xml
                           <!--jenesis.plugin ksp:processor maven/<groupId>/<artifactId>-->, and ksp { arg(...) }
                           as its lines
@@ -1529,14 +1529,14 @@ public record Project(
                       multi-release jar configuration -> sources/META-INF/versions/<N>/ (12), Java
                           and Kotlin alike: kotlinc compiles a .kt there for release <N> into the
                           jar's META-INF/versions/<N>/, as javac does a .java, and sees the module's
-                          internal declarations (45). No second source root is read, so the sources
+                          internal declarations (46). No second source root is read, so the sources
                           of a src/main/java<N> folder, a compiler execution with multiReleaseOutput
                           or a Gradle java<N> source set move below META-INF/versions/<N>/ of the
                           module's sources - src/main/java/META-INF/versions/<N>/ in a pom.xml
                       moditect add-module-info, a descriptor for a Java 8 base
                           -> module-info.java in sources/META-INF/versions/9/ (12)
                       replacer, templating, a generated version class
-                          -> a plugin at binary/generated that writes the source (61)
+                          -> a plugin at binary/generated that writes the source (62)
                       maven-resources-plugin targetPath, a file outside the resource folders
                           -> -Djenesis.project.resources=<file>:<path in the jar>
                       animal-sniffer with a JDK signature -> maven.compiler.release, as javac
@@ -1596,12 +1596,12 @@ public record Project(
                           configFile -> formatter=eclipse with profile=<the profile Eclipse exports,
                           beside it> (37); Spotless's importOrder and the
                           formatter plugin's import and cache settings have no counterpart
-                      Spotless ktlint() / the same -> .editorconfig (46)
-                      Spotless ktfmt() / the same -> ktfmt.properties (46): style=google for googleStyle(),
+                      Spotless ktlint() / the same -> .editorconfig (47)
+                      Spotless ktfmt() / the same -> ktfmt.properties (47): style=google for googleStyle(),
                           kotlinlang for kotlinlangStyle(), meta, the default, otherwise;
                           removeUnusedImports false -> imports=sort; maxWidth and the indents have
                           no counterpart, as ktfmt's command line takes none
-                      Spotless scalafmt() / the same -> .scalafmt.conf (50)
+                      Spotless scalafmt() / the same -> .scalafmt.conf (51)
                       Spotless licenseHeader(), licenseHeaderFile() / the same,
                           license-maven-plugin (com.mycila) check and format
                           -> licenseheader.properties (37), text=<the header>, which every Java,
@@ -1612,13 +1612,13 @@ public record Project(
                           text, the header is // SPDX-FileCopyrightText: <copyright> and
                           // SPDX-License-Identifier: <id> of the one license the project declares
                       detekt, ktlint / the same -> the detekt and ktlint plugins at the hook point
-                          check, binding detekt.yml and .editorconfig (46)
+                          check, binding detekt.yml and .editorconfig (47)
                       scalastyle, scalafmt / the same -> the scalastyle and scalafmt plugins at the
-                          hook point check, binding scalastyle-config.xml and .scalafmt.conf (50)
+                          hook point check, binding scalastyle-config.xml and .scalafmt.conf (51)
                       codenarc / codenarc -> the CodeNarc plugin at the hook point check, binding
-                          codenarc.xml (52)
+                          codenarc.xml (53)
                       maven-surefire-plugin / test -> on by default; test.properties names the
-                          framework where inference does not (38), and only changed tests re-run (40)
+                          framework where inference does not (38), and only changed tests re-run (39)
                       surefire systemPropertyVariables of ${project.artifactId} or ${project.version}
                           -> read at run time from the tested jar's META-INF/maven/<groupId>/
                           <artifactId>/pom.properties or its Implementation-* manifest entries, or a
@@ -1631,30 +1631,33 @@ public record Project(
                       maven-surefire-plugin dependenciesToScan / testClassesDirs += zipTree(<jar>)
                           -> scan=<module>|<groupId>/<artifactId> in the module's test.properties,
                           as no plugin block of a pom.xml is read, runs the test classes of those
-                          dependencies of the tests among the module's own (43)
+                          dependencies of the tests among the module's own (40)
                       a second surefire <execution> with another argLine / an extra Test task
                           -> a sibling module that requires the first one's tests, by a
                           <type>test-jar</type> dependency in a pom.xml, and scans them, with
                           its argLine in a process-test.properties of its own; a run is a
-                          module (43)
+                          module (40)
                       maven-failsafe-plugin / an integration test task
                           -> no phase of its own: -Djenesis.test.tag, or a @jenesis.test module
-                      jacoco-maven-plugin / jacoco -> jacoco.properties, a report (39); the check
+                      jacoco-maven-plugin / jacoco -> jacoco.properties, a report (41); the check
                           goal's bundle rules / jacocoTestCoverageVerification -> minimum.<counter>
                           (a covered ratio) and maximum.missed.<counter> in it,
                           which fail the build
-                      pitest-maven / info.solidsoft.pitest -> pitest.properties (41)
-                      jmh-maven-plugin / me.champeau.jmh -> @jenesis.plugin and @jenesis.main (42)
+                      pitest-maven / info.solidsoft.pitest -> pitest.properties (42)
+                      jmh-maven-plugin / me.champeau.jmh -> @jenesis.plugin and @jenesis.main (43)
+                      jcstress (a shaded jar run by org.openjdk.jcstress.Main) -> jcstress-core as a
+                          dependency and again with <type>processor</type>, the mainClass property,
+                          and no module-info.java, as jcstress runs from the class path (44)
                       byte-buddy-maven-plugin / net.bytebuddy.byte-buddy-gradle-plugin -> no built-in:
                           those plugins discover Byte Buddy plugins themselves and take their settings
                           as XML or DSL, which configures awkwardly; here a plugin of the project at
                           binary/transform constructs the net.bytebuddy.build.Plugin instances in Java,
                           with values from plugin-<name>.properties, and runs them with Plugin.Engine
-                          over the module's compiled classes and its compile class path (63)
-                      japicmp-maven-plugin / me.champeau.gradle.japicmp -> japicmp.properties (44),
+                          over the module's compiled classes and its compile class path (64)
+                      japicmp-maven-plugin / me.champeau.gradle.japicmp -> japicmp.properties (45),
                           which takes the plugin's parameters
                       revapi-maven-plugin / org.revapi.revapi-gradle-plugin -> revapi.properties
-                          (44): oldArtifacts ->
+                          (45): oldArtifacts ->
                           baseline=<groupId>/<artifactId>[/<version>], the last release by default;
                           failSeverity -> severity=equivalent|non-breaking|potentially-breaking|
                           breaking, the least severe difference reported; analysisConfiguration or
@@ -1707,14 +1710,14 @@ public record Project(
                           (13); addDefaultImplementationEntries -> on by default: Implementation-Title
                           and -Vendor, and -Version where the POM, project.properties or
                           jenesis.project.version names one
-                      maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (8, 72),
+                      maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (8, 73),
                           whose jar holds the sources and, as Maven's and Gradle's do, the resources,
                           including those of -Djenesis.project.resources; set it, and the next one,
                           in the profile a release activates, such as jenesis-release.properties,
                           never in jenesis.properties, so that a regular build neither archives the
                           sources nor renders the documentation and nothing waits for either
                       maven-javadoc-plugin / withJavadocJar(), Dokka
-                          -> -Djenesis.project.documentation=true (8, 72), which documents
+                          -> -Djenesis.project.documentation=true (8, 73), which documents
                           the main modules, a test module only under jenesis.stage.tests, one with a
                           module-info.java as that module (module-summary.html, its pages below the
                           module's name), as maven-javadoc-plugin and Gradle do; javadoc runs with
@@ -1730,21 +1733,21 @@ public record Project(
                           <module>-<classifier>.jar; <classifier>= republishes the jar as it is.
                           A platform's variant goes into the classifiers.properties of a profile
                           folder, and a consumer selects one with @jenesis.pin <module>
-                          :<classifier> or a pom.xml <classifier> (65)
+                          :<classifier> or a pom.xml <classifier> (66)
                       exec-maven-plugin or maven-antrun-plugin running make, cmake or cargo,
                           nar-maven-plugin, Gradle's cpp-library or an Exec task calling cargo
                           -> a plugin at binary/compiled that forks the native tool as an
                           EnvironmentalProcessBuildStep and writes its library below a folder of
                           its output, as library/linux-x86_64/, which classifiers.properties names
-                          as linux-x86_64=library/linux-x86_64 (65); os-maven-plugin's
+                          as linux-x86_64=library/linux-x86_64 (66); os-maven-plugin's
                           ${os.detected.classifier} -> one profile per platform, each building on
                           its own machine; the compiler is the machine's, as with Maven and Gradle.
                           javac -h, as maven-compiler-plugin's <headerOutputDirectory> or Gradle's
                           options.headerOutputDirectory -> the same plugin first wires
                           new Javac(ProcessHandler.Factory.of()).headers(true), which compiles the
                           module's sources and hands on nothing but headers/, one header per class
-                          with a native method, for the C compiler's include path (66)
-                      dokka-maven-plugin / org.jetbrains.dokka -> dokka.properties (45): moduleName
+                          with a native method, for the C compiler's include path (67)
+                      dokka-maven-plugin / org.jetbrains.dokka -> dokka.properties (46): moduleName
                           -> module-name (documentation by default), documentedVisibilities ->
                           documented-visibilities=public,internal,..., suppressObviousFunctions,
                           suppressInheritedMembers, skipEmptyPackages, skipDeprecated,
@@ -1767,14 +1770,14 @@ public record Project(
                       jib-maven-plugin / com.google.cloud.tools.jib
                           -> docker=<image>, a build context; the build never runs Docker (9, 10)
                       native-maven-plugin / org.graalvm.buildtools.native
-                          -> native=true, graal.properties (56)
-                      maven-jarsigner-plugin / jar signing -> jenesis.jarsigner.* (70)
-                      maven-install-plugin / publishToMavenLocal -> `export` (71)
+                          -> native=true, graal.properties (57)
+                      maven-jarsigner-plugin / jar signing -> jenesis.jarsigner.* (71)
+                      maven-install-plugin / publishToMavenLocal -> `export` (72)
                       maven-deploy-plugin, distributionManagement to a repository of your own /
                           maven-publish to one -> `release` with jenesis.deploy.uri and
                           jenesis.deploy.token, which puts the staged Maven tree there
                           with its checksums and maven-metadata.xml, unsigned, a SNAPSHOT under
-                          a unique timestamped name (72); altDeploymentRepository -> the same
+                          a unique timestamped name (73); altDeploymentRepository -> the same
                           setting on the command line
                       deploy to Maven Central, central-publishing, maven-gpg-plugin / maven-publish
                           to Central, signing
@@ -1783,7 +1786,7 @@ public record Project(
                           version the build was given as -Djenesis.project.version, which a
                           pom.xml build passes to `release` and `pin` alike, as no POM's version
                           reaches it, unless jreleaser.yml names one, and
-                          the staged trees as template properties (72), the values of a
+                          the staged trees as template properties (73), the values of a
                           jreleaser.properties beside the configuration, and with --dry-run,
                           publishing nothing, unless the command line passes
                           -Djenesis.release.publish=true; JReleaser releases versions without
@@ -1811,7 +1814,7 @@ public record Project(
                       <profiles> chosen with -P or a property / properties and conventions
                           -> jenesis-<profile>.properties; those activated by <jdk> or
                           <activeByDefault> are read from the POM (8)
-                      a Gradle build cache -> jenesis.cache.uri (57)
+                      a Gradle build cache -> jenesis.cache.uri (58)
 
                     ## No built-in
 
@@ -2488,7 +2491,7 @@ public record Project(
                     than the JVM, so two runs in one program never clash; everything after them is
                     what the command line would take. A setting that replaces the process a build
                     runs in - toolchain.version, project.docker, execute.docker - is refused by name
-                    there, and so is a -J option, as the JDK's own tools refuse one; demo-77-tools-api
+                    there, and so is a -J option, as the JDK's own tools refuse one; demo-78-tools-api
                     shows the whole contract.
 
                     Every command line here, the commands and the tools alike, reads @<file> as the
@@ -2604,9 +2607,9 @@ public record Project(
 
                     Write one only when skill/registry has no line for the job. A plugin adds steps
                     to the stock build and replaces none; skill/plugins wires it in. The smallest
-                    whole example is demo-61-internal-module, the same plugin published is
-                    demo-62-external-module, demo-63-byte-buddy rewrites compiled classes with
-                    Byte Buddy, and demo-64-project-plugins uses every project-wide hook point.
+                    whole example is demo-62-internal-module, the same plugin published is
+                    demo-63-external-module, demo-64-byte-buddy rewrites compiled classes with
+                    Byte Buddy, and demo-65-project-plugins uses every project-wide hook point.
 
                     ## The shape
 
@@ -2772,7 +2775,7 @@ public record Project(
                 case "demos" -> """
                     # Jenesis - Copy a demo
 
-                    77 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    78 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -2808,35 +2811,37 @@ public record Project(
                                          step by step, with a fingerprint over all of them)
                       Quality and tests  37 java-quality,
                                          38 test-framework (what the tests are written against),
-                                         39 code-coverage (JaCoCo), 40 test-selection (incremental),
-                                         41 pitest (mutation), 42 jmh (benchmark harness),
-                                         43 test-runs (the tests of a scanned jar, run again
+                                         39 test-selection (incremental),
+                                         40 test-runs (the tests of a scanned jar, run again
                                          with other flags by another module),
-                                         44 api-compatibility (japicmp, revapi)
-                      Other languages    45 kotlin, 46 kotlin-quality, 47 kotlin-plugin,
-                                         48 ksp (a Kotlin symbol processor), 49 scala,
-                                         50 scala-quality, 51 groovy, 52 groovy-quality
-                      At run time        53 agents (@jenesis.attach),
-                                         54 native-access (@jenesis.native),
-                                         55 native-access-layer (passed on to a layer),
-                                         56 native-image (GraalVM)
-                      Operating it       57 build-cache, 58 docker-isolation
-                      Extending it       59 custom-assembler, 60 custom-jmod, 61 internal-module,
-                                         62 external-module,
-                                         63 byte-buddy (Byte Buddy's plugins over the compiled classes),
-                                         64 project-plugins (hooks from a first check to release),
-                                         65 classifiers (variants a module of the build publishes,
+                                         41 code-coverage (JaCoCo), 42 pitest (mutation),
+                                         43 jmh (benchmark harness),
+                                         44 jcstress (concurrency stress tests, from the class path),
+                                         45 api-compatibility (japicmp, revapi)
+                      Other languages    46 kotlin, 47 kotlin-quality, 48 kotlin-plugin,
+                                         49 ksp (a Kotlin symbol processor), 50 scala,
+                                         51 scala-quality, 52 groovy, 53 groovy-quality
+                      At run time        54 agents (@jenesis.attach),
+                                         55 native-access (@jenesis.native),
+                                         56 native-access-layer (passed on to a layer),
+                                         57 native-image (GraalVM)
+                      Operating it       58 build-cache, 59 docker-isolation
+                      Extending it       60 custom-assembler, 61 custom-jmod, 62 internal-module,
+                                         63 external-module,
+                                         64 byte-buddy (Byte Buddy's plugins over the compiled classes),
+                                         65 project-plugins (hooks from a first check to release),
+                                         66 classifiers (variants a module of the build publishes,
                                          selected by a sibling),
-                                         66 jni (a C library a plugin compiles against the headers),
-                                         67 custom-maven, 68 custom-modular,
-                                         69 custom-build (no Project at all)
-                      Shipping it        70 code-signing (jarsigner), 71 export (into the local repositories),
-                                         72 publishing (Maven Central),
-                                         73 module-convention (resolving what you published),
-                                         74, 75 discovery (a dependency resolved from its
+                                         67 jni (a C library a plugin compiles against the headers),
+                                         68 custom-maven, 69 custom-modular,
+                                         70 custom-build (no Project at all)
+                      Shipping it        71 code-signing (jarsigner), 72 export (into the local repositories),
+                                         73 publishing (Maven Central),
+                                         74 module-convention (resolving what you published),
+                                         75, 76 discovery (a dependency resolved from its
                                          publisher's own domain, as a module or by coordinate),
-                                         76 jpx (run a released program without building),
-                                         77 tools-api (a build inside another program's JVM)
+                                         77 jpx (run a released program without building),
+                                         78 tools-api (a build inside another program's JVM)
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
