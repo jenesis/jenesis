@@ -603,6 +603,7 @@ public class Javac extends ProcessBuildStep {
                             mainTarget,
                             roots,
                             overlays,
+                            classRoots,
                             release,
                             files);
                 } catch (IOException e) {
@@ -657,6 +658,7 @@ public class Javac extends ProcessBuildStep {
                                                Path mainTarget,
                                                List<String> versionedRoots,
                                                List<String> overlays,
+                                               List<Path> siblings,
                                                int release,
                                                List<String> files) throws IOException {
         Path target = Files.createDirectories(context.next()
@@ -682,9 +684,13 @@ public class Javac extends ProcessBuildStep {
                 patchModule.addAll(versionedRoots);
             }
             patchModule.addAll(overlays);
+            List<String> patchedSiblings = siblings.stream().map(Path::toString).toList();
+            patchModule.addAll(patchedSiblings);
             PathPlacement pathPlacement = this.pathPlacement.forModuleInfo(true);
             for (String entry : dependencyPath) {
-                (pathPlacement.test(Path.of(entry)) ? modulePath : classPath).add(entry);
+                if (!patchedSiblings.contains(entry)) {
+                    (pathPlacement.test(Path.of(entry)) ? modulePath : classPath).add(entry);
+                }
             }
         } else {
             classPath.addAll(overlays);

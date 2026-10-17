@@ -1043,6 +1043,42 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void patches_sibling_classes_into_a_module_declared_in_the_multi_release_folder(boolean process) throws IOException {
+        Path siblingSource = Files.createDirectories(root.resolve("gen").resolve("pure")).resolve("Generated.java");
+        Files.writeString(siblingSource, """
+                package pure;
+                public class Generated { public String value() { return "generated"; } }
+                """);
+        Path siblingClasses = Files.createDirectories(root.resolve("sibling").resolve(Javac.CLASSES));
+        ToolProvider javac = ToolProvider.findFirst("javac").orElseThrow();
+        int code = javac.run(System.out, System.err, "-d", siblingClasses.toString(), siblingSource.toString());
+        assertThat(code).isZero();
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample;\npublic class Sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/9")).resolve("module-info.java"),
+                "module sample { exports sample; exports pure; }\n");
+
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sibling", new BuildStepArgument(
+                root.resolve("sibling"),
+                Map.of(Path.of(Javac.CLASSES + "pure/Generated.class"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("sources", new BuildStepArgument(
+                sources,
+                Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                        Path.of("sources/META-INF/versions/9/module-info.java"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
+                new BuildStepContext(previous, next, supplement, persistent),
+                arguments).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        Path moduleInfo = next.resolve(Javac.CLASSES + "META-INF/versions/9/module-info.class");
+        assertThat(moduleInfo).isNotEmptyFile();
+        assertThat(ModuleDescriptor.read(Files.newInputStream(moduleInfo)).exports().stream().map(ModuleDescriptor.Exports::source))
+                .as("the descriptor of a multi-release jar sees the other compilers' packages, as the main descriptor does")
+                .contains("sample", "pure");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void a_failure_is_reproduced_by_the_command_that_ran_with_its_argument_file(boolean process)
             throws IOException {
         SequencedProperties javac = new SequencedProperties();
