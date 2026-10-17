@@ -122,8 +122,8 @@ public class TestModule implements BuildExecutorModule {
 
     private static Predicate<String> defaultIsTest() {
         List<Pattern> patterns = Stream.of(
-                        "Test[a-zA-Z0-9]*", "[^.$]*Test", "[^.$]*Tests", "[^.$]*TestCase",
-                        "IT[a-zA-Z0-9]*", "[^.$]*IT", "[^.$]*ITCase")
+                        "Test[^.$]*", "[^.$]*Test", "[^.$]*Tests", "[^.$]*TestCase",
+                        "IT[^.$]*", "[^.$]*IT", "[^.$]*ITCase")
                 .map(pattern -> Pattern.compile("(?:.*\\.)?" + pattern))
                 .toList();
         return (Predicate<String> & Serializable)
