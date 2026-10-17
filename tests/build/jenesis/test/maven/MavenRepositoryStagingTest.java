@@ -416,6 +416,24 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
+    public void test_variant_naming_its_main_by_module_name_is_routed_to_an_artifact_id_of_another_name() throws IOException {
+        Path main = mainInventory("disruptor", "com.lmax", "disruptor", "4.0.0", "classes.jar");
+        writeArtifact(main, "classes.jar", "main");
+        SequencedProperties inventory = SequencedProperties.ofFiles(main.resolve(Inventory.INVENTORY));
+        inventory.setProperty("module-disruptor.module", "com.lmax.disruptor");
+        inventory.store(main.resolve(Inventory.INVENTORY));
+        Path test = testInventory("disruptor-test", "com.lmax", "disruptor.test", "4.0.0", "com.lmax.disruptor",
+                List.of(), "classes.jar");
+        writeArtifact(test, "classes.jar", "test-classes");
+
+        run(true, main, test);
+
+        assertThat(next.resolve("com/lmax/disruptor/4.0.0/disruptor-4.0.0-tests.jar"))
+                .as("a modular build's test names the module it tests, which publishes under an artifactId of its own")
+                .hasContent("test-classes");
+    }
+
+    @Test
     public void two_tests_for_the_same_main_fail_loudly() throws IOException {
         Path main = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(main, "classes.jar", "main");
