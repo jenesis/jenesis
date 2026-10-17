@@ -139,7 +139,7 @@ public class JpxTest {
         SequencedProperties properties = installation.properties();
         assertThat(properties.getProperty("mainModule")).isNull();
         assertThat(properties.getProperty("mainClass")).isEqualTo("plaintool.Main");
-        assertThat(properties.getProperty("classpath")).isEqualTo("org.example%2Fplain-tool%2F2.0.jar");
+        assertThat(properties.getProperty("classpath")).isEqualTo("org.example~plain-tool~2.0.jar");
 
         Path marker = work.resolve("marker.txt");
         assertThat(installation.launch(List.of(marker.toString()))).isEqualTo(5);
@@ -208,7 +208,7 @@ public class JpxTest {
         assertThat(properties.getProperty("modulepath")).isEqualTo("tool.lib-1.0.jar,tool.main-1.0.jar");
         assertThat(properties.getProperty("classpath"))
                 .as("a module name infers the placement jar by jar, so a plain dependency stays unnamed")
-                .isEqualTo("org.example%2Fplain-tool%2F1.0.jar");
+                .isEqualTo("org.example~plain-tool~1.0.jar");
 
         Path marker = work.resolve("marker.txt");
         assertThat(installation.launch(List.of(marker.toString()))).isEqualTo(7);

@@ -382,7 +382,7 @@ public class JavacTest {
     public void shouldRun_fires_when_a_resolved_jar_is_replaced_in_place() throws IOException {
         BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
                 Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.RETAINED),
-                Path.of("resolved/maven%2Fsample%2Fsample%2F1-SNAPSHOT.jar"), Checksum.of(ChecksumStatus.ALTERED)));
+                Path.of("resolved/maven~sample~sample~1-SNAPSHOT.jar"), Checksum.of(ChecksumStatus.ALTERED)));
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
         arguments.put("input", argument);
         assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(arguments))
@@ -1368,9 +1368,9 @@ public class JavacTest {
                 "package sample; public class Sample { }\n");
         Path processorRoot = Files.createDirectories(root.resolve("processor").resolve("resolved"));
         Files.copy(buildProcessorJar(Files.createDirectories(root.resolve("plain")), "plain", "Plain", null),
-                processorRoot.resolve("org.example%2Fplain-processor%2F1.0.jar"));
+                processorRoot.resolve("org.example~plain-processor~1.0.jar"));
         SequencedProperties index = new SequencedProperties();
-        index.setProperty("plugin/plugin/maven/plain", "resolved/org.example%2Fplain-processor%2F1.0.jar");
+        index.setProperty("plugin/plugin/maven/plain", "resolved/org.example~plain-processor~1.0.jar");
         index.store(root.resolve("processor").resolve(BuildStep.DEPENDENCIES));
 
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
@@ -1378,7 +1378,7 @@ public class JavacTest {
                 Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
                 Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED))));
         arguments.put("processors/artifacts", new BuildStepArgument(root.resolve("processor"), Map.of(
-                Path.of("resolved/org.example%2Fplain-processor%2F1.0.jar"), Checksum.of(ChecksumStatus.ADDED))));
+                Path.of("resolved/org.example~plain-processor~1.0.jar"), Checksum.of(ChecksumStatus.ADDED))));
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
                 .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture().join();

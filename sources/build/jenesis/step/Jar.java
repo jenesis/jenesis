@@ -6,6 +6,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Environment;
+import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import java.util.jar.Attributes;
 
@@ -341,7 +342,7 @@ public class Jar extends ProcessBuildStep {
                 return kind + ".jar";
             }
             String group = metadata.value("project");
-            return BuildExecutorModule.encode((group == null ? "" : group + "/") + artifact + (version == null ? "" : "/" + version))
+            return PathPlacement.stem((group == null ? "" : group + "/") + artifact + (version == null ? "" : "/" + version))
                     + (module != null && module.value("test") != null ? "-tests" : "") + suffix + ".jar";
         }
     }

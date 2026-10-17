@@ -44,7 +44,7 @@ public interface Repository {
             if (item == null || item.file().isPresent()) {
                 return candidate;
             }
-            return Optional.of(item.spill(folder.resolve(BuildExecutorModule.encode(coordinate)
+            return Optional.of(item.spill(folder.resolve(PathPlacement.stem(coordinate)
                     + (extension == null ? ".jar" : "." + extension))));
         };
     }
@@ -69,7 +69,7 @@ public interface Repository {
                                                     String suffix,
                                                     String extension) throws IOException {
                 try {
-                    Path candidate = folder.resolve(BuildExecutorModule.encode(coordinate) + suffix);
+                    Path candidate = folder.resolve(PathPlacement.stem(coordinate) + suffix);
                     Path target = cache.computeIfAbsent(coordinate + suffix, key -> {
                         if (Files.exists(candidate)) {
                             return candidate;
