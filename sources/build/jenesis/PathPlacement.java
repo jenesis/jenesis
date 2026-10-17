@@ -60,7 +60,13 @@ public enum PathPlacement {
     }
 
     public static String fileName(String coordinate) {
-        return BuildExecutorModule.encode(coordinate) + ".jar";
+        return stem(coordinate) + ".jar";
+    }
+
+    public static String stem(String coordinate) {
+        return Arrays.stream(coordinate.split("/", -1))
+                .map(BuildExecutorModule::encode)
+                .collect(Collectors.joining("~"));
     }
 
     public static String fileName(String coordinate, String module, boolean declared) {

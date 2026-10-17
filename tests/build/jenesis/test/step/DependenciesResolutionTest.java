@@ -155,7 +155,7 @@ public class DependenciesResolutionTest {
         try (Stream<Path> files = Files.list(next.resolve("resolved"))) {
             assertThat(files.map(file -> file.getFileName().toString()))
                     .as("nothing is kept that the index no longer names")
-                    .containsExactlyInAnyOrder("baz.jar", "transitive%2Fbaz.jar");
+                    .containsExactlyInAnyOrder("baz.jar", "transitive~baz.jar");
         }
     }
 

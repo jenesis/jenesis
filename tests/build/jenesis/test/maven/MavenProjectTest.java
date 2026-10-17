@@ -2441,7 +2441,7 @@ public class MavenProjectTest {
                 .resolve(BuildStep.IDENTITY));
         assertThat(foo.stringPropertyNames()).containsExactly("maven/group/foo/1", "maven/group/foo/pom/1");
         assertThat(foo.getProperty("maven/group/foo/1"))
-                .isEqualTo("../../produce/java/artifacts/jar/output/artifacts/group%2Ffoo%2F1.jar");
+                .isEqualTo("../../produce/java/artifacts/jar/output/artifacts/group~foo~1.jar");
         assertThat(foo.getProperty("maven/group/foo/pom/1"))
                 .isEqualTo("../../../../../identifier/scan/output/pom/foo/pom.xml");
         SequencedProperties bar = SequencedProperties.ofFiles(results
@@ -2449,7 +2449,7 @@ public class MavenProjectTest {
                 .resolve(BuildStep.IDENTITY));
         assertThat(bar.stringPropertyNames()).containsExactly("maven/group/bar/1", "maven/group/bar/pom/1");
         assertThat(bar.getProperty("maven/group/bar/1"))
-                .isEqualTo("../../produce/java/artifacts/jar/output/artifacts/group%2Fbar%2F1.jar");
+                .isEqualTo("../../produce/java/artifacts/jar/output/artifacts/group~bar~1.jar");
         assertThat(bar.getProperty("maven/group/bar/pom/1"))
                 .isEqualTo("../../../../../identifier/scan/output/pom/bar/pom.xml");
         assertThat(results.keySet())
@@ -2459,16 +2459,16 @@ public class MavenProjectTest {
                 .get("maven/build-module-foo/inventory")
                 .resolve("inventory.properties"));
         assertThat(fooInventory.getProperty("module-foo.runtime.0"))
-                .endsWith("/group%2Ffoo%2F1.jar");
+                .endsWith("/group~foo~1.jar");
         assertThat(fooInventory.getProperty("module-foo.artifacts.0"))
-                .endsWith("/group%2Ffoo%2F1.jar");
+                .endsWith("/group~foo~1.jar");
         SequencedProperties barInventory = SequencedProperties.ofFiles(results
                 .get("maven/build-module-bar/inventory")
                 .resolve("inventory.properties"));
         assertThat(barInventory.getProperty("module-bar.runtime.0"))
-                .endsWith("/group%2Fbar%2F1.jar");
+                .endsWith("/group~bar~1.jar");
         assertThat(barInventory.getProperty("module-bar.artifacts.0"))
-                .endsWith("/group%2Fbar%2F1.jar");
+                .endsWith("/group~bar~1.jar");
     }
 
     @Test

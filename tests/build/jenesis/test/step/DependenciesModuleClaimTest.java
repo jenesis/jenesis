@@ -85,7 +85,7 @@ public class DependenciesModuleClaimTest {
                 "main/compile/maven/org.example/lib-tests/1.0");
 
         assertThat(next.resolve(Dependencies.RESOLVED + "lib.shared-1.0.jar")).exists();
-        assertThat(next.resolve(Dependencies.RESOLVED + "org.example%2Flib-tests%2F1.0.jar"))
+        assertThat(next.resolve(Dependencies.RESOLVED + "org.example~lib-tests~1.0.jar"))
                 .as("a second jar of the module and its version takes the file name of its coordinate")
                 .exists();
     }

@@ -64,8 +64,8 @@ public class JarTest {
             "SOURCES | modular=true;module=demo.app | version=1.0         | demo.app-1.0-sources.jar",
             "JAVADOC | modular=true;module=demo.app | -                   | demo.app-javadoc.jar",
             "CLASSES | modular=true;module=demo.app | project=demo        | demo.app-0-SNAPSHOT.jar",
-            "CLASSES | modular=false                | project=g;artifact=a;version=1 | g%2Fa%2F1.jar",
-            "SOURCES | modular=false;test=a         | project=g;artifact=a;version=1 | g%2Fa%2F1-tests-sources.jar",
+            "CLASSES | modular=false                | project=g;artifact=a;version=1 | g~a~1.jar",
+            "SOURCES | modular=false;test=a         | project=g;artifact=a;version=1 | g~a~1-tests-sources.jar",
             "CLASSES | -                            | -                   | classes.jar"})
     public void names_a_jar_as_a_dependency_on_it_is_named(Jar.Sort sort, String module, String metadata, String name)
             throws IOException {

@@ -15,9 +15,9 @@ public class PathPlacementTest {
     @Test
     public void a_class_path_artifact_is_named_by_its_encoded_coordinate() {
         assertThat(PathPlacement.fileName("org.example/plain-lib/1.0"))
-                .isEqualTo("org.example%2Fplain-lib%2F1.0.jar");
+                .isEqualTo("org.example~plain-lib~1.0.jar");
         assertThat(PathPlacement.fileName("org.example/native-lib/jar/linux/1.0"))
-                .isEqualTo("org.example%2Fnative-lib%2Fjar%2Flinux%2F1.0.jar");
+                .isEqualTo("org.example~native-lib~jar~linux~1.0.jar");
     }
 
     @Test

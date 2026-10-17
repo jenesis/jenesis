@@ -52,7 +52,7 @@ commons-logging and commons-collections are never mentioned. They arrive as comm
 dependencies, carry no identity, and become the layer's unnamed module. The descriptor says so:
 
     layer.modulepath.demo.legacy.library.beans=demo.legacy.impl-0-SNAPSHOT.jar,commons.beanutils-1.9.4.jar
-    layer.classpath.demo.legacy.library.beans=commons-logging%2Fcommons-logging%2F1.2.jar,...
+    layer.classpath.demo.legacy.library.beans=commons-logging~commons-logging~1.2.jar,...
 
 The rule that decides the shape
 -------------------------------
