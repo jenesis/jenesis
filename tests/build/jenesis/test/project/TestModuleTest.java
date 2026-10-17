@@ -288,6 +288,32 @@ public class TestModuleTest {
     }
 
     @Test
+    public void selects_a_class_whose_name_starts_with_test_whatever_follows_as_surefire_does() throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "TestClose_Java", """
+                package sample;
+                public class TestClose_Java {
+                    @org.junit.jupiter.api.Test
+                    public void test() { System.out.println("Underscore!"); }
+                }
+                """, bootModuleJars());
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .jarsOnly(false),
+                "dependencies", "classes");
+        executor.execute();
+
+        assertThat(root.resolve("test").resolve("executed").resolve("supplement").resolve("output")).content()
+                .as("Test*, as Surefire's **/Test*.java, takes an underscore after the prefix")
+                .contains("Underscore!");
+    }
+
+    @Test
     public void selects_the_tests_a_change_reaches_when_incremental_is_true() throws IOException {
         settings.put("test.incremental", "true");
         BuildExecutor executor = newExecutor();
