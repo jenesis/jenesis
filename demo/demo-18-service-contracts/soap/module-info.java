@@ -4,8 +4,8 @@
  * @jenesis.pin jakarta.xml.soap/jakarta.xml.soap-api 3.0.2 SHA-256/62ecd5c3b5c107779e5ffe84922594c381f7a8e397320a05c3ee3957b5b7863f
  * @jenesis.pin jakarta.xml.ws 4.0.3 SHA-256/e2244d1046363f21a1dbb9485d592f6697b219b8086de70de759c7c5d725517f
  * @jenesis.pin jakarta.xml.ws/jakarta.xml.ws-api 4.0.3 SHA-256/e2244d1046363f21a1dbb9485d592f6697b219b8086de70de759c7c5d725517f
- * @jenesis.pin wsimport/module/build.jenesis 0.16.0 SHA-256/bf8d90a8e3251fcb2519e11793ab87a68f37419f12a6b3275f9dd1d263149c98
- * @jenesis.pin wsimport/module/build.jenesis.plugin.wsimport 0.16.0 SHA-256/ba430a4bb4d50dc67b61ba77d66c3cd1f33718bae7c31d8851c6ae7eae6413ca
+ * @jenesis.pin wsimport/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
+ * @jenesis.pin wsimport/module/build.jenesis.plugin.wsimport 0.16.0 SHA-256/c2963a1c5b98f479d9d9ac7fe56d4cc852ceede6cd58969fbfd9a87792c26cdd
  * @jenesis.pin wsimport:tool/maven/com.fasterxml.woodstox/woodstox-core 7.2.0 SHA-256/689f5be95f9bb369d6c0e8db99a99f930b0c48d6a69b46151782b5816c7ea820
  * @jenesis.pin wsimport:tool/maven/com.sun.xml.bind/jaxb-core 4.0.9 SHA-256/209eb94452d89644380e398e4ac126974718eeb3aa94ed1786654837ebcd3097
  * @jenesis.pin wsimport:tool/maven/com.sun.xml.bind/jaxb-impl 4.0.9 SHA-256/6ec4361ade0b7e0267ee4d1ef495928bf722570af25904e1618c9949b67fdd86

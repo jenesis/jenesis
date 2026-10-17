@@ -103,9 +103,9 @@
     ksp:tool/maven/com.google.devtools.ksp/symbol-processing-common-deps 2.3.12 SHA-256/30510a4364e02880ce2fbf0c4f0ef564dead3818eef4fc0500cbcee23fc362af
     ksp:tool/maven/org.jetbrains.kotlin/kotlin-stdlib 2.3.20 SHA-256/0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e
     ksp:tool/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
-    kotlin/module/build.jenesis 0.16.0 SHA-256/bf8d90a8e3251fcb2519e11793ab87a68f37419f12a6b3275f9dd1d263149c98
-    kotlin/module/build.jenesis.plugin.kotlin 0.16.0 SHA-256/b8864fdc7d262ee7a177261a15adb287b6232c0280f983caf8875492c1427391
-    ksp/module/build.jenesis 0.16.0 SHA-256/bf8d90a8e3251fcb2519e11793ab87a68f37419f12a6b3275f9dd1d263149c98
-    ksp/module/build.jenesis.plugin.ksp 0.16.0 SHA-256/747377908e17532ce14a905ae9b541f2139a4a02e50f21d2f7791f659e868922
+    kotlin/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
+    kotlin/module/build.jenesis.plugin.kotlin 0.16.0 SHA-256/7d7382020af0a2e0a44de509bd90d80f08715546c869cfed840af48ca5e9f9a3
+    ksp/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
+    ksp/module/build.jenesis.plugin.ksp 0.16.0 SHA-256/457a13fd4298bdd50a176c72d9e9dedf7051b97fd1824fb94e85a88145944341
     -->
 </project>

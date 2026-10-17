@@ -17,14 +17,15 @@ From this directory:
 
 which prints where each file came from and then what the program found:
 
-    [FETCHED]   https://github.com/jenesis/jenesis/releases/download/v0.15.4/build.jenesis-0.15.4.jar
-    jenesis-make from build.jenesis-0.15.4.jar
+    [FETCHED]   https://github.com/jenesis/jenesis/releases/download/v0.16.0/build.jenesis-0.16.0.pom
+    [FETCHED]   https://github.com/jenesis/jenesis/releases/download/v0.16.0/build.jenesis-0.16.0.jar
+    jenesis-make from build.jenesis-0.16.0.jar
 
 `jenesis.properties` empties `jenesis.maven.uri` and `jenesis.module.uri`, which
 name no remote at all, so a file the location does not hold is found nowhere -
-there is no fallback. The 0.15.4 release attaches no POM, so the dependency is
-resolved without one, as an artifact without dependencies of its own; a release that
-attaches its POM serves that as well. Remove the two lines and what the location
+there is no fallback. The release attaches its POM, which is read before the jar; a
+release that attaches none is resolved without one, as an artifact without
+dependencies of its own. Remove the two lines and what the location
 does not hold comes from Maven Central again. Each download is checked against the
 pin in `pom.xml`. As in the module demo, a pinned jar is reused from `.jenesis/artifacts/`
 once downloaded; delete that folder and `target/` to watch the download again.
@@ -35,7 +36,7 @@ Layout
     demo/demo-75-discovery-maven
     |-- build/jenesis          symlink to ../../../sources/build/jenesis
     |-- jenesis.properties     discovery on, and no repository
-    |-- pom.xml                depends on build.jenesis:build.jenesis:0.15.4, pinned
+    |-- pom.xml                depends on build.jenesis:build.jenesis:0.16.0, pinned
     `-- sources
         `-- demo/discovery/Tools.java    prints the jenesis-make tool and the jar it came from
 
