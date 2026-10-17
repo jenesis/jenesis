@@ -24,6 +24,7 @@ import build.jenesis.project.ProjectModule;
 import build.jenesis.step.Assign;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Group;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Javac;
 import build.jenesis.step.Versions;
@@ -529,6 +530,14 @@ public class MavenProject implements BuildExecutorModule {
                                                 : ""), "");
                             }
                             requires.store(context.next().resolve(BuildStep.REQUIRES));
+                            String reactor = properties.getProperty("reactor", "");
+                            if (!reactor.isEmpty()) {
+                                SequencedProperties ordered = new SequencedProperties();
+                                for (String coordinate : reactor.split("\t")) {
+                                    ordered.setProperty(coordinate, "");
+                                }
+                                ordered.store(context.next().resolve(Group.REACTOR));
+                            }
                             String keys = properties.getProperty("signatures", "");
                             if (!keys.isEmpty()) {
                                 SequencedProperties signatures = new SequencedProperties();
@@ -906,7 +915,8 @@ public class MavenProject implements BuildExecutorModule {
                             .bom(versioned(value.bom(), siblings, version))
                             .plugins(versionedPlugins(value.plugins(), siblings, version))
                             .testPlugins(versionedPlugins(value.testPlugins(), siblings, version))
-                            .pluginExclusions(versionedPlugins(value.pluginExclusions(), siblings, version));
+                            .pluginExclusions(versionedPlugins(value.pluginExclusions(), siblings, version))
+                            .reactor(versioned(value.reactor(), siblings, version));
                 }
                 Path pomFile = entry.getKey().resolve("pom.xml");
                 String unresolved = unresolved(value.version());
@@ -1232,6 +1242,11 @@ public class MavenProject implements BuildExecutorModule {
                             + (dep.getValue().checksum() == null ? "" : " " + dep.getValue().checksum()))
                     .collect(Collectors.joining("\t"));
             properties.setProperty("managedDependencies", managed);
+            if (value.reactor() != null && !value.reactor().isEmpty()) {
+                properties.setProperty("reactor", value.reactor().entrySet().stream()
+                        .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version()))
+                        .collect(Collectors.joining("\t")));
+            }
             if (!qualifiedDependencies.isEmpty()) {
                 properties.setProperty("qualifiedDependencies", qualifiedDependencies);
             }
