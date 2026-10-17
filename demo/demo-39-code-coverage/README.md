@@ -16,8 +16,8 @@ From this directory:
 
     java build/jenesis/Make.java
 
-The project names the JaCoCo plugin and ships its `plugin-jacoco.properties`, so a
-plain build collects coverage. Jenesis compiles the project, runs the test
+The project ships a `jacoco.properties` in its configuration folder, so a plain
+build collects coverage. Jenesis compiles the project, runs the test
 under the JaCoCo agent, and renders the report. The first build downloads JUnit
 and the JaCoCo tooling, so it takes a while.
 
@@ -27,8 +27,7 @@ Layout
     demo/demo-39-code-coverage
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
     |-- pom.xml                    pins JUnit; sources in sources/, tests in test/
-    |-- jenesis.plugins.properties names the JaCoCo plugin
-    |-- build.jenesis/plugin-jacoco.properties  enables JaCoCo; minimum.method=0.6
+    |-- build.jenesis/jacoco.properties  enables JaCoCo; minimum.method=0.6
     |-- build.jenesis/profiling/jfr.properties  settings=profile, under a profile
     |-- sources
     |   `-- coverage
@@ -40,13 +39,12 @@ Layout
 How coverage is inferred
 ------------------------
 
-`jenesis.plugins.properties` names JaCoCo at the hook point `observe`, which
-attaches an engine to the JVM the tests run in and reports over what it recorded:
-
-    jacoco+observe=build.jenesis.plugin.jacoco
-
-It runs in a module where its `plugin-jacoco.properties` is found, and
-`-Djenesis.plugin.jacoco=false` leaves it out:
+JaCoCo is an official plugin of the hook point `observe`, which attaches an engine
+to the JVM the tests run in and reports over what it recorded. A `jacoco.properties`
+in a configuration folder switches it on: the build resolves the plugin by itself
+as `module/build.jenesis.plugin.jacoco`, with no line in `jenesis.plugins.properties`,
+in every module where it finds the file, and `-Djenesis.observe.jacoco=false` leaves
+it out:
 
 - With no engine enabled (the default for most projects), it is a plain test run.
 - With coverage on, the test step is launched with the JaCoCo agent prepended as
@@ -56,8 +54,8 @@ It runs in a module where its `plugin-jacoco.properties` is found, and
   the compiled tests themselves.
 
 The agent instruments the run without touching your sources, and JaCoCo resolves
-its agent and CLI in their own `jacoco` group, kept separate from the project's
-dependencies.
+its agent in the group `jacoco:agent` and its CLI in `jacoco:tool`, kept separate
+from the project's dependencies.
 
 Where the report lands
 ----------------------
@@ -92,7 +90,7 @@ runs the tests under the 0.8.14 agent as well, until `pin` records both.
 Failing the build on too little coverage
 ----------------------------------------
 
-`plugin-jacoco.properties` may set limits on the module's coverage, as the `check` goal of
+`jacoco.properties` may set limits on the module's coverage, as the `check` goal of
 jacoco-maven-plugin does for a bundle. `minimum.<counter>` is the least covered
 ratio, from 0 to 1, and `maximum.missed.<counter>` the most items left uncovered,
 for each of JaCoCo's counters `instruction`, `branch`, `line`, `complexity`,
