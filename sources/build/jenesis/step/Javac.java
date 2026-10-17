@@ -318,6 +318,7 @@ public class Javac extends ProcessBuildStep {
                 .findFirst()
                 .orElse(null);
         boolean module = moduleInfo != null;
+        moduleVersion(properties, module);
         if (module) {
             List<String> declared = prepended(properties);
             String release = null;
@@ -387,6 +388,22 @@ public class Javac extends ProcessBuildStep {
         options.addAll(files);
         return CompletableFuture.completedStage(List.of("@" + argumentFile(context.supplement().resolve("javac.args"),
                 options)));
+    }
+
+    private static void moduleVersion(SequencedMap<String, SequencedMap<String, String>> properties, boolean module) {
+        for (SequencedMap<String, String> folder : properties.values()) {
+            String version = module ? folder.get("--module-version") : folder.remove("--module-version");
+            if (version != null && module) {
+                try {
+                    ModuleDescriptor.Version.parse(version);
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException("The module is versioned " + version + ", which is no module"
+                            + " version, so javac cannot stamp it into the module-info.class: a module version starts"
+                            + " with a digit, as 1.2.0 or 0-HEAD-SNAPSHOT do - set one of that form as the POM's"
+                            + " <version> or as -Djenesis.project.version", e);
+                }
+            }
+        }
     }
 
     private static boolean names(SequencedMap<String, SequencedMap<String, String>> properties, Set<String> options) {
@@ -530,6 +547,7 @@ public class Javac extends ProcessBuildStep {
             return CompletableFuture.completedStage(null);
         }
         SequencedMap<String, SequencedMap<String, String>> properties = properties(arguments);
+        moduleVersion(properties, !versionedModules.isEmpty());
         boolean named = names(properties, SOURCE_OPTIONS) || names(properties, TARGET_OPTIONS);
         properties.values().forEach(folder -> folder.keySet().removeIf(option -> option.equals("--release")
                 || SOURCE_OPTIONS.contains(option)

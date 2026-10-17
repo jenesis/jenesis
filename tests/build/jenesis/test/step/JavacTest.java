@@ -139,6 +139,53 @@ public class JavacTest {
                 .containsEntry("--release", "26");
     }
 
+    @Test
+    public void compiles_class_path_code_of_a_version_that_is_no_module_version() throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample;\npublic class Sample { }\n");
+        Javac.writeRelease(sources, "21", Runtime.version().feature());
+        Path configuration = Files.createDirectories(root.resolve("configuration"));
+        SequencedProperties options = new SequencedProperties();
+        options.setProperty("--module-version", "HEAD-SNAPSHOT");
+        ProcessBuildStep.store(configuration, ProcessBuildStep.PROCESS, "javac", options);
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("configuration", new BuildStepArgument(configuration, Map.of(
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "sample/Sample.class"))
+                .as("a version stamps no class of the class path, so one javac would refuse is not handed over")
+                .isNotEmptyFile();
+    }
+
+    @Test
+    public void refuses_a_module_of_a_version_that_is_no_module_version_naming_the_form() throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES)).resolve("module-info.java"),
+                "module sample { }\n");
+        Javac.writeRelease(sources, "21", Runtime.version().feature());
+        Path configuration = Files.createDirectories(root.resolve("configuration"));
+        SequencedProperties options = new SequencedProperties();
+        options.setProperty("--module-version", "HEAD-SNAPSHOT");
+        ProcessBuildStep.store(configuration, ProcessBuildStep.PROCESS, "javac", options);
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("configuration", new BuildStepArgument(configuration, Map.of(
+                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED))));
+        assertThatThrownBy(() -> new Javac(ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
+                .toCompletableFuture()
+                .join())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("HEAD-SNAPSHOT")
+                .hasMessageContaining("starts with a digit");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"8", "1.8"})
     public void refuses_a_module_descriptor_at_a_release_below_9_naming_the_multi_release_folder(String release) throws IOException {
