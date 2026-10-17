@@ -1020,10 +1020,10 @@ public record Project(
                     A module's tests run in the folder the build was started in, the project's
                     root, rather than in the module's folder as Surefire's do, and see no basedir
                     property: a test that opens src/test/... by a relative path reads the file as
-                    a test resource instead, or resolves it against a -Dbasedir\\=<module folder>
-                    line of the module's process-test.properties, its = escaped as a property
-                    key's is. The tests run without -ea, which Surefire and Gradle set, so a test
-                    that relies on an assert names -ea in that file as well.
+                    a test resource instead, or resolves it against a -Dbasedir=<module folder>
+                    line of the module's process-test.properties. The tests run without -ea,
+                    which Surefire and Gradle set, so a test that relies on an assert names -ea in
+                    that file as well.
                     A module inherits its parents' metadata as Maven's model does: the url and the
                     scm locations with the module's artifactId appended, unless the parent sets
                     child.*.inherit.append.path="false", and licenses or developers only as a whole.
@@ -1492,7 +1492,7 @@ public record Project(
                           default) is jenesis.kotlin.incremental=true, which needs Kotlin 2.3 or newer;
                           the plugin's <args> and Gradle's freeCompilerArgs are lines of
                           process-kotlinc.properties, one option per line as
-                          process-javac.properties holds javac's, as -Xjsr305\\=strict, a -J
+                          process-javac.properties holds javac's, as -Xjsr305=strict, a -J
                           line one of the compiler's JVM
                       scala-maven-plugin / scala -> .scala sources, compiled by the Scala plugin
                           the build resolves where a module holds one, with Scala 3 (49);
