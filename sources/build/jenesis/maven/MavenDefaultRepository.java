@@ -319,16 +319,19 @@ public class MavenDefaultRepository implements MavenRepository {
         String folder = groupId.replace('.', '/') + "/" + artifactId + "/" + version + "/",
                 suffix = (classifier == null ? "" : "-" + classifier) + "." + type + (checksum == null ? "" : ("." + checksum)),
                 path = folder + artifactId + "-" + version + suffix;
+        boolean unstamped = false;
         if (version.endsWith("-SNAPSHOT") && (local == null || !Files.exists(BuildStep.resolveContained(local, path)))) {
             String snapshot = snapshot(folder, version, type, classifier);
             if (snapshot != null) {
                 path = folder + artifactId + "-" + snapshot + suffix;
+            } else {
+                unstamped = true;
             }
         }
         if (callback != null) {
             callback.accept(path);
         }
-        return fetch(repository, local, path, checksum == null).materialize();
+        return fetch(repository, unstamped ? null : local, path, checksum == null).materialize();
     }
 
     private String snapshot(String folder, String version, String type, String classifier) throws IOException {
