@@ -19,8 +19,8 @@ From this directory:
 
 which prints where each file came from and then what the program found:
 
-    [FETCHED]   https://github.com/jenesis/jenesis/releases/download/v0.15.4/build.jenesis-0.15.4.jar
-    jenesis-make from build.jenesis-0.15.4.jar
+    [FETCHED]   https://github.com/jenesis/jenesis/releases/download/v0.16.0/build.jenesis-0.16.0.jar
+    jenesis-make from build.jenesis-0.16.0.jar
 
 One file is downloaded, the module's jar, straight from the release, and nothing
 else is asked: `jenesis.properties` empties `jenesis.maven.uri` and
@@ -178,7 +178,7 @@ link to the newest release. Jenesis sends the link a `HEAD` request, follows no
 redirect, and reads the version from where the link redirects to, matched against
 the template up to the end of the path segment that holds `{version}`. GitHub
 redirects `releases/latest/download/<name>` to `releases/download/v<version>/<name>`
-of the newest release, whatever `<name>` is, so the link above names `0.15.4` for
+of the newest release, whatever `<name>` is, so the link above names `0.16.0` for
 `build.jenesis` without downloading anything. A Jenesis module service, such as
 `https://repo.jenesis.build/module/{module}/{module}.jar`, names the version in its
 `Jenesis-ModuleVersion` header instead, which is read first. The version is then

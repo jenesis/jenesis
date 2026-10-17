@@ -19,8 +19,8 @@
             <dependency>
                 <groupId>build.jenesis</groupId>
                 <artifactId>build.jenesis</artifactId>
-                <version>0.15.4</version>
-                <!--Checksum/SHA-256/4cc814b3d08839e137b82fb84559381cb1945afdc210964db880051686616236-->
+                <version>0.16.0</version>
+                <!--Checksum/SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4-->
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -28,7 +28,7 @@
         <dependency>
             <groupId>build.jenesis</groupId>
             <artifactId>build.jenesis</artifactId>
-            <version>0.15.4</version>
+            <version>0.16.0</version>
         </dependency>
     </dependencies>
 </project>

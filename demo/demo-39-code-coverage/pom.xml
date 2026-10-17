@@ -98,7 +98,7 @@
     jacoco:tool/maven/org.ow2.asm/asm 9.10.1 SHA-256/ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb
     jacoco:tool/maven/org.ow2.asm/asm-commons 9.10.1 SHA-256/6d0abefb7cbf972ea16edb37ec14835372505063a45f976ab7ea889ed9497895
     jacoco:tool/maven/org.ow2.asm/asm-tree 9.10.1 SHA-256/3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b
-    jacoco/module/build.jenesis 0.16.0 SHA-256/bf8d90a8e3251fcb2519e11793ab87a68f37419f12a6b3275f9dd1d263149c98
-    jacoco/module/build.jenesis.plugin.jacoco 0.16.0 SHA-256/d9a9a05ff1f1f828b58cf036ac7eedd16e1736761934b1385a88569ec8ee2623
+    jacoco/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
+    jacoco/module/build.jenesis.plugin.jacoco 0.16.0 SHA-256/6fe04653c9f8b7b86e35ed131c6672fa96da5aaa0b92ff4267141e786f556b16
     -->
 </project>
