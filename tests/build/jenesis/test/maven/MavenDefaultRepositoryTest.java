@@ -175,6 +175,27 @@ public class MavenDefaultRepositoryTest {
     }
 
     @Test
+    public void keeps_a_snapshot_a_repository_serves_without_a_timestamp_out_of_the_local_repository() throws IOException {
+        Path folder = Files.createDirectories(repository.resolve("group/artifact/1.0-SNAPSHOT"));
+        Files.writeString(folder.resolve("artifact-1.0-SNAPSHOT.jar"), "first");
+        MavenDefaultRepository mavenRepository = new MavenDefaultRepository(repository.toUri(), local, Map.of(), null);
+        try (InputStream inputStream = mavenRepository.fetch(Runnable::run, "group", "artifact", "1.0-SNAPSHOT", "jar", null, null)
+                .orElseThrow()
+                .toInputStream()) {
+            assertThat(new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("first");
+        }
+        assertThat(local.resolve("group/artifact/1.0-SNAPSHOT/artifact-1.0-SNAPSHOT.jar"))
+                .as("the local repository prefers a snapshot it holds, so a copy there would shadow every later one")
+                .doesNotExist();
+        Files.writeString(folder.resolve("artifact-1.0-SNAPSHOT.jar"), "second");
+        try (InputStream inputStream = mavenRepository.fetch(Runnable::run, "group", "artifact", "1.0-SNAPSHOT", "jar", null, null)
+                .orElseThrow()
+                .toInputStream()) {
+            assertThat(new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("second");
+        }
+    }
+
+    @Test
     public void prefers_a_snapshot_the_local_repository_holds() throws IOException {
         Path folder = Files.createDirectories(repository.resolve("group/artifact/1.0-SNAPSHOT"));
         Files.writeString(folder.resolve("maven-metadata.xml"), """
