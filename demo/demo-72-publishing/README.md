@@ -231,15 +231,17 @@ project, and it is never sent to a repository that a file of the project named.
 
 Any answer other than success stops the release and names the address and the
 status, as does an address that is not `http:` or `https:`, or plain `http:`
-without `-Djenesis.repository.insecure=true`. Nothing is signed. Maven Central is
-refused by name, because it takes a signed bundle through its own publishing
-service - which is the next section's job:
+without `-Djenesis.repository.insecure=true`. Nothing is signed, so a release to
+Maven Central, which takes a signed bundle through its own publishing service, is
+the next section's job. A snapshot is the exception: JReleaser deploys versions
+without `-SNAPSHOT`, and Central's snapshot repository takes a snapshot from
+`jenesis.deploy.uri` as any repository does:
 
-    java -Djenesis.deploy.uri=https://repo1.maven.org/maven2/ build/jenesis/Make.java release
-
-    Cannot release to https://repo1.maven.org/maven2/: Maven Central takes a release signed and
-    through its own publishing service, which JReleaser handles - place a jreleaser.yml at the
-    project's root, ...
+    java -Djenesis.project.version=1.0.0-SNAPSHOT \
+         -Djenesis.deploy.uri=https://central.sonatype.com/repository/maven-snapshots/ \
+         -Djenesis.deploy.token="Basic <credentials>" \
+         -Djenesis.release.publish=true \
+         build/jenesis/Make.java release
 
 Publishing to Maven Central
 ---------------------------
