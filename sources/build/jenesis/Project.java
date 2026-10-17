@@ -35,6 +35,7 @@ import build.jenesis.step.Bom;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.ImageStaging;
 import build.jenesis.step.Inventory;
+import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.ProjectFiles;
 import build.jenesis.step.ReportStaging;
 import build.jenesis.step.Tree;
@@ -2453,7 +2454,10 @@ public record Project(
                     to pin whenever you add or change one. `pin` records resolved versions and
                     checksums back into pom.xml (<dependencyManagement> with <!--Checksum/<algo>/<hex>-->
                     and a <!--jenesis.pin ... --> comment) or module-info.java (@jenesis.pin tags),
-                    idempotently, refreshing only the lines matching the local platform. It covers the
+                    idempotently, refreshing only the lines matching the local platform. An entry whose
+                    version is a property keeps it, and its checksum names the version it was taken of
+                    (<!--Checksum/SHA-256/<hex> 2.2.20-->), so it applies to no other: pin again after
+                    the property changes. It covers the
                     whole project; to pin one module, name its step (pin/module-foo+bar) rather than
                     adding +<module>. A pom.xml's main and test halves share one <dependencyManagement>,
                     so where they resolve a coordinate at different versions its entry takes the
@@ -4410,9 +4414,11 @@ public record Project(
         }
         BuildExecutor executor = configuration.of(target, callback);
         Function<String, String> resolver = layout.apply(executor, this, assembler);
-        return executor.execute(Arrays.stream(selectors.length == 0 ? defaultTarget.toArray(String[]::new) : selectors)
-                .map(selector -> selector.startsWith("+") ? resolver.apply(selector.substring(1)) : selector)
-                .toArray(String[]::new));
+        try (Closeable _ = ProcessHandler.scope()) {
+            return executor.execute(Arrays.stream(selectors.length == 0 ? defaultTarget.toArray(String[]::new) : selectors)
+                    .map(selector -> selector.startsWith("+") ? resolver.apply(selector.substring(1)) : selector)
+                    .toArray(String[]::new));
+        }
     }
 
     private static Path skipped(Path folder) throws IOException {
@@ -4493,7 +4499,8 @@ public record Project(
                 executor.events|true|Write each step's outcome of the latest build as one JSON object per line to .jenesis.events.jsonl in the target folder, replaced by every build
                 process.concurrency|(processor count)|Run at most this many tool runs at once - a compiler, a JDK tool, a forked JVM such as a test run; 0 is unbounded
                 process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
-                process.mode|fork|How the main method of a tool that a plugin starts through ProcessHandler.OfProcess.ofJavaMain() runs, and javac where a -J option forks it: fork starts a JVM for every call, so that a build without the daemon leaves no JVM running; aot starts that JVM from an ahead-of-time cache of the tool in aot.folder, which its first run trains and every later one reads, one per JVM, options and jars, with the jars linked into it; daemon runs it in one JVM that runs its compilations side by side, as it runs the calls a plugin marks shared, kept for the next call with the same jars on its class path, wherever a module resolved them, and the same options and environment, idle ones ending after ten minutes; make.mode=aot and make.mode=daemon set it to the same unless it is set
+                process.mode|fork|How the main method of a tool that a plugin starts through ProcessHandler.OfProcess.ofJavaMain() runs, and javac where a -J option forks it: fork starts a JVM for every call that process.shared does not hand to a shared JVM, so that a build without the daemon leaves no JVM running; aot starts that JVM from an ahead-of-time cache of the tool in aot.folder, which its first run trains and every later one reads, one per JVM, options and jars, with the jars linked into it; daemon runs it in one JVM that runs its compilations side by side, as it runs the calls a plugin marks shared, kept for the next call with the same jars on its class path, wherever a module resolved them, and the same options and environment, idle ones ending after ten minutes; make.mode=aot and make.mode=daemon set it to the same unless it is set
+                process.shared|true|Run the calls a plugin marks shared, a compiler above all, and javac where a -J option forks it, side by side in one JVM per JVM, options, jars and environment, ended when the build ends, under process.mode fork and aot as under daemon, which keeps it for the next build; false starts a JVM for every such call
                 process.tail|200|Lines of a failed tool's output and of its error printed with the failure, the last ones, beside how many there were and the file under supplement/ that holds all of them; 0 prints every line
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
                 archive.timestamp|1980-02-01T00:00:00Z|ISO-8601 date-time with an offset recorded on every entry of the jars, jmods and zips the build writes; empty keeps the times the tools record and makes the archives unreproducible; set explicitly, it is also the creation time a generated Docker image is labelled with

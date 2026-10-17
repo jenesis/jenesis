@@ -4847,6 +4847,44 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_dependency_management_checksum_of_a_property_version_applies_only_to_the_version_it_names() throws IOException {
+        for (String version : List.of("1", "2")) {
+            Files.writeString(project.resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>project</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                        <properties>
+                            <managed.version>%s</managed.version>
+                        </properties>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>group</groupId>
+                                    <artifactId>artifact</artifactId>
+                                    <version>${managed.version}</version>
+                                    <!--Checksum/SHA256/cafebabe 1-->
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>group</groupId>
+                                <artifactId>artifact</artifactId>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                    """.formatted(version));
+            SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+            assertThat(poms.get(Path.of("")).dependencies().get(new MavenDependencyKey("group", "artifact", "jar", null)).checksum())
+                    .as("a checksum pinned for version 1 applies while the property names 1, and to no other version")
+                    .isEqualTo(version.equals("1") ? "SHA256/cafebabe" : null);
+        }
+    }
+
+    @Test
     public void local_pom_dependency_management_wins_over_a_parent_entry_naming_the_artifact_by_a_property() throws IOException {
         Path subproject = Files.createDirectory(project.resolve("subproject"));
         Files.writeString(project.resolve("pom.xml"), """

@@ -3,8 +3,17 @@ package build.jenesis.step;
 import module java.base;
 import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
+import build.jenesis.daemon.Worker;
 
 public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHandler.OfProcess {
+
+    static Closeable scope() {
+        return JavaWorker.scope();
+    }
+
+    static boolean nest(Closeable nested) {
+        return JavaWorker.nest(nested);
+    }
 
     List<String> commands();
 
@@ -193,7 +202,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         private final List<String> commands;
         private final SortedMap<String, String> environment;
         private final Charset output, error;
-        private final boolean main, daemon, shared;
+        private final boolean main, daemon, scoped, shared;
         private final Path aot;
 
         private OfProcess(List<String> commands) {
@@ -207,7 +216,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     environment.put(name, value);
                 }
             });
-            this(commands, environment, output, error, false, false, false, null);
+            this(commands, environment, output, error, false, false, false, false, null);
         }
 
         private OfProcess(List<String> commands,
@@ -216,6 +225,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                           Charset error,
                           boolean main,
                           boolean daemon,
+                          boolean scoped,
                           boolean shared,
                           Path aot) {
             this.commands = commands;
@@ -224,6 +234,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             this.error = error;
             this.main = main;
             this.daemon = daemon;
+            this.scoped = scoped;
             this.shared = shared;
             this.aot = aot;
         }
@@ -262,6 +273,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                         process.error,
                         true,
                         true,
+                        false,
                         false,
                         null);
             };
@@ -409,7 +421,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess environment(SortedMap<String, String> environment) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, shared, aot);
+            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
         }
 
         public boolean daemon() {
@@ -417,7 +429,15 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess daemon(boolean daemon) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, shared, aot);
+            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
+        }
+
+        public boolean scoped() {
+            return scoped;
+        }
+
+        public OfProcess scoped(boolean scoped) {
+            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
         }
 
         public boolean shared() {
@@ -425,7 +445,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess shared(boolean shared) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, shared, aot);
+            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
         }
 
         public Path aot() {
@@ -433,7 +453,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess aot(Path aot) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, shared, aot);
+            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
         }
 
         @Override
@@ -443,9 +463,9 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
         @Override
         public int execute(Path output, Path error, Tee tee) throws IOException {
-            JavaWorker.Call call = main || daemon ? JavaWorker.call(commands) : null;
-            if (call != null && daemon) {
-                return JavaWorker.execute(call, shared, environment, output, error, tee);
+            JavaWorker.Call call = main || daemon || scoped ? JavaWorker.call(commands) : null;
+            if (call != null && (daemon || scoped && (shared || call.main().equals(Worker.TOOL)))) {
+                return JavaWorker.execute(call, shared, daemon, environment, output, error, tee);
             }
             JavaWorker.Once once = call == null || !main || call.main().endsWith(".java")
                     ? null

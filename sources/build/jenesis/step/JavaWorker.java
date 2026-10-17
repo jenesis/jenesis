@@ -24,8 +24,10 @@ final class JavaWorker {
     private static final Set<String> CLASS_PATH = Set.of("-cp", "-classpath", "--class-path");
     private static final Map<Key, Deque<Running>> IDLE = new ConcurrentHashMap<>();
     private static final Map<Key, Shared> SHARED = new HashMap<>();
+    private static final List<Closeable> NESTED = new ArrayList<>();
     private static final AtomicBoolean HOOKED = new AtomicBoolean();
     private static Path compiled;
+    private static int scopes;
 
     private JavaWorker() {
     }
@@ -80,6 +82,7 @@ final class JavaWorker {
 
     static int execute(Call call,
                        boolean shared,
+                       boolean lasting,
                        SortedMap<String, String> environment,
                        Path output,
                        Path error,
@@ -121,6 +124,7 @@ final class JavaWorker {
                     worker = new Shared(start(key, entries));
                     SHARED.put(key, worker);
                 }
+                worker.lasting |= lasting;
             }
             try (OutputStream out = Files.newOutputStream(output); OutputStream err = Files.newOutputStream(error)) {
                 Lines printed = new Lines(out, tee == null ? null : tee.out()),
@@ -357,6 +361,53 @@ final class JavaWorker {
                 new DataInputStream(new BufferedInputStream(process.getInputStream())));
     }
 
+    static Closeable scope() {
+        synchronized (SHARED) {
+            scopes++;
+        }
+        AtomicBoolean closed = new AtomicBoolean();
+        return () -> {
+            if (!closed.compareAndSet(false, true)) {
+                return;
+            }
+            List<Shared> ending = new ArrayList<>();
+            List<Closeable> nested = new ArrayList<>();
+            synchronized (SHARED) {
+                if (--scopes == 0) {
+                    SHARED.values().removeIf(worker -> !worker.lasting && ending.add(worker));
+                    nested.addAll(NESTED);
+                    NESTED.clear();
+                }
+            }
+            ending.forEach(worker -> worker.running.process().destroy());
+            IOException failure = null;
+            for (Closeable closeable : nested) {
+                try {
+                    closeable.close();
+                } catch (IOException e) {
+                    if (failure == null) {
+                        failure = e;
+                    } else {
+                        failure.addSuppressed(e);
+                    }
+                }
+            }
+            if (failure != null) {
+                throw failure;
+            }
+        };
+    }
+
+    static boolean nest(Closeable nested) {
+        synchronized (SHARED) {
+            if (scopes > 0) {
+                NESTED.add(nested);
+                return true;
+            }
+        }
+        return false;
+    }
+
     record Call(String java, List<String> options, String classpath, String main, List<String> arguments) {
     }
 
@@ -372,6 +423,7 @@ final class JavaWorker {
         private final AtomicInteger calls = new AtomicInteger();
         private final Map<Integer, Pending> pending = new ConcurrentHashMap<>();
         private volatile boolean ended;
+        private boolean lasting;
 
         private Shared(Running running) {
             this.running = running;

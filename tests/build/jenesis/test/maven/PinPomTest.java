@@ -575,7 +575,8 @@ public class PinPomTest {
         String result = run(pom);
         assertThat(result)
                 .as("the classifier a property selects stays that property, so another platform's build still finds"
-                        + " its managed entry, and so does a version the property still names")
+                        + " its managed entry, and so does a version the property still names, its checksum"
+                        + " naming the version it was taken of")
                 .contains("""
                                 <dependency>
                                     <groupId>org.openjfx</groupId>
@@ -588,7 +589,7 @@ public class PinPomTest {
                                             <artifactId>javafx-base</artifactId>
                                         </exclusion>
                                     </exclusions>
-                                    <!--Checksum/SHA-256/cafebabe-->
+                                    <!--Checksum/SHA-256/cafebabe 17.0.20-->
                                 </dependency>
                     """)
                 .as("a version resolved to another than the property names is written as the version pinned")

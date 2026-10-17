@@ -320,6 +320,66 @@ public class WarmJavaTest {
         }
     }
 
+    @Test
+    public void runs_shared_calls_of_a_build_in_one_jvm_that_ends_with_the_build_unless_it_is_kept_warm() throws Exception {
+        Path source = Files.writeString(classes.resolve("Pid.java"), """
+                public class Pid {
+                    public static void main(String[] arguments) {
+                        System.out.println(ProcessHandle.current().pid());
+                    }
+                }
+                """);
+        assertThat(ToolProvider.getSystemJavaCompiler().run(null,
+                null,
+                null,
+                "-d",
+                classes.toString(),
+                source.toString())).isZero();
+
+        long shared, lasting;
+        try (Closeable _ = ProcessHandler.scope()) {
+            shared = pid(false, true, true);
+            assertThat(pid(false, true, true))
+                    .as("the shared calls of a build run in one JVM")
+                    .isEqualTo(shared);
+            assertThat(pid(false, true, false))
+                    .as("a call that is not shared runs in a JVM of its own")
+                    .isNotEqualTo(pid(false, true, false))
+                    .isNotEqualTo(shared);
+            Files.createDirectory(classes.resolve("lasting"));
+            lasting = pid(true, false, true, "lasting");
+        }
+        ProcessHandle.of(shared).ifPresent(handle -> handle.onExit().orTimeout(10, TimeUnit.SECONDS).join());
+        assertThat(ProcessHandle.of(shared).map(ProcessHandle::isAlive))
+                .as("the shared JVM of a build ends when the build ends")
+                .isNotEqualTo(Optional.of(true));
+        assertThat(ProcessHandle.of(lasting).map(ProcessHandle::isAlive))
+                .as("a shared JVM kept warm for the next build outlives the build")
+                .contains(true);
+        try (Closeable _ = ProcessHandler.scope()) {
+            assertThat(pid(false, true, true))
+                    .as("the next build starts a shared JVM of its own")
+                    .isNotEqualTo(shared);
+        }
+    }
+
+    private long pid(boolean daemon, boolean scoped, boolean shared, String... classpath) throws IOException {
+        Path output = run.resolve("pid-output-" + index + ".txt"), error = run.resolve("pid-error-" + index + ".txt");
+        index++;
+        List<String> printed = new ArrayList<>();
+        String path = Stream.concat(Stream.of(classes.toString()), Stream.of(classpath).map(file -> classes.resolve(file).toString()))
+                .collect(Collectors.joining(File.pathSeparator));
+        int code = ProcessHandler.OfProcess.ofJavaMain()
+                .apply(List.of("-cp", path, "Pid"))
+                .daemon(daemon)
+                .scoped(scoped)
+                .shared(shared)
+                .execute(output, error, new ProcessHandler.Tee(Thread.ofVirtual()::start, printed::add, _ -> { }));
+        assertThat(code).isZero();
+        assertThat(printed).singleElement();
+        return Long.parseLong(printed.getFirst().trim());
+    }
+
     private String sleeper(boolean shared, String name, int index) throws IOException {
         Path output = run.resolve("sleeper-output-" + index + ".txt"), error = run.resolve("sleeper-error-" + index + ".txt");
         List<String> printed = new ArrayList<>();
