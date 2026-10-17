@@ -813,6 +813,16 @@ public class MavenPomResolver implements MavenResolver {
                                 (previous, next) -> new MavenDependencyKey.Versioned(previous.key(),
                                         previous.version() == null ? next.version() : previous.version()));
                     });
+            SequencedMap<MavenDependencyKey, MavenDependencyValue> reactor = new LinkedHashMap<>();
+            for (DependencyKey declared : pom.declaredManagement()) {
+                MavenDependencyKey key = declared.resolve(pom.properties());
+                MavenDependencyValue value = managedDependencies.get(key);
+                if (value != null
+                        && value.version() != null
+                        && value.version().equals(subprojects.get(new MavenDependencyName(key.groupId(), key.artifactId())))) {
+                    reactor.put(key, value);
+                }
+            }
             results.put(root.relativize(module), new MavenLocalPom(property(pom.groupId(), pom.properties()),
                     property(pom.artifactId(), pom.properties()),
                     property(pom.version(), pom.properties()),
@@ -849,7 +859,8 @@ public class MavenPomResolver implements MavenResolver {
                             property(pom.relocation().groupId(), pom.properties()),
                             property(pom.relocation().artifactId(), pom.properties()),
                             property(pom.relocation().version(), pom.properties()),
-                            property(pom.relocation().message(), pom.properties()))));
+                            property(pom.relocation().message(), pom.properties())),
+                    reactor));
         }
         return results;
     }
@@ -1208,7 +1219,8 @@ public class MavenPomResolver implements MavenResolver {
                                         toElementText(relocation, "artifactId").orElse(null),
                                         toElementText(relocation, "version").orElse(null),
                                         toElementText(relocation, "message").orElse(null)))
-                                .orElse(null));
+                                .orElse(null),
+                        declaredManagedDependencies.keySet());
             }
             default -> throw new IllegalArgumentException("Unknown namespace: " + namespace);
         };
@@ -1257,7 +1269,8 @@ public class MavenPomResolver implements MavenResolver {
                             Set.of(),
                             null,
                             true,
-                            null);
+                            null,
+                            Set.of());
                 } else {
                     Path localPath = candidate.file().map(Path::getParent).orElse(null);
                     Map<Path, UnresolvedPom> localPaths = localPath == null ? null : new HashMap<>();
@@ -2163,7 +2176,8 @@ public class MavenPomResolver implements MavenResolver {
                                  Set<String> verbatim,
                                  Map<DependencyKey, DependencyValue> bom,
                                  boolean missing,
-                                 MavenPomEmitter.Relocation relocation) {
+                                 MavenPomEmitter.Relocation relocation,
+                                 Set<DependencyKey> declaredManagement) {
     }
 
     private record ResolvedPom(Map<MavenDependencyKey, MavenDependencyValue> managedDependencies,

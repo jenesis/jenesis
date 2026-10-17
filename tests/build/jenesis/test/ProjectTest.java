@@ -1899,6 +1899,97 @@ public class ProjectTest {
     }
 
     @Test
+    public void a_sibling_reached_only_transitively_at_the_version_a_module_manages_is_the_module_of_the_build() throws IOException {
+        Path repository = Files.createDirectories(elsewhere.resolve("repository/external/bridge/1"));
+        Files.writeString(repository.resolve("bridge-1.pom"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>external</groupId>
+                    <artifactId>bridge</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>base</artifactId>
+                            <version>0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        try (JarOutputStream _ = new JarOutputStream(Files.newOutputStream(repository.resolve("bridge-1.jar")))) {
+        }
+        Files.writeString(root.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>user</module>
+                        <module>base</module>
+                    </modules>
+                </project>
+                """);
+        for (String module : List.of("base", "user")) {
+            Files.writeString(Files.createDirectories(root.resolve(module + "/src/main/java/" + module)).resolve("Type.java"),
+                    "package " + module + "; public class Type { }\n");
+        }
+        Files.writeString(root.resolve("base/pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>base</artifactId>
+                </project>
+                """);
+        Files.writeString(root.resolve("user/pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>user</artifactId>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>group</groupId>
+                                <artifactId>base</artifactId>
+                                <version>${project.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>external</groupId>
+                            <artifactId>bridge</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        settings.put("maven.uri", elsewhere.resolve("repository").toUri().toString());
+        settings.put("maven.local", Files.createDirectories(elsewhere.resolve("local")).toString());
+        SequencedMap<String, Path> outputs = Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .layout(Project.Layout.MAVEN)
+                .build(Project.BUILD);
+        Path resolved = outputs.entrySet().stream()
+                .filter(entry -> entry.getKey().endsWith("/build-module-user/dependencies/artifacts"))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElseThrow();
+        assertThat(SequencedProperties.ofFiles(resolved.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
+                .as("as Maven's reactor does, the module the build builds answers for its coordinate, which no repository holds")
+                .contains("main/compile/maven/group/base/1");
+    }
+
+    @Test
     public void a_build_awaits_the_phases_project_await_names_in_the_modules_it_depends_on() throws IOException {
         writeMavenProjectWithSibling();
         SequencedMap<String, String> awaiting = new LinkedHashMap<>(settings);
