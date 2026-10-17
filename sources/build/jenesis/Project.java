@@ -1788,9 +1788,9 @@ public record Project(
                           publishing nothing, unless the command line passes
                           -Djenesis.release.publish=true; JReleaser releases versions without
                           -SNAPSHOT, as the staged tree names a snapshot as Maven installs one,
-                          without the timestamp its Maven deployers read, so a snapshot goes to a
-                          repository of your own through jenesis.deploy.uri, which refuses Maven
-                          Central's snapshot repository as it refuses Central
+                          without the timestamp its Maven deployers read, so a snapshot goes
+                          through jenesis.deploy.uri, to Central's snapshot repository as to any
+                          other
                       distributionManagement <relocation> / a relocated publication -> kept: a
                           module that relocates its artifact is staged as its POM alone, the
                           relocation in it, and fails the build if it holds sources (3)
@@ -4688,7 +4688,7 @@ public record Project(
                 release.publish|false|Publish what a release puts and runs - the jenesis.release.uri and jenesis.deploy.uri puts and the plugins of the hook point release, JReleaser's without --dry-run; without it, release and every pin run the release dry, checking what was staged and naming what it would put; only the command line may set it
                 release.jreleaser|true|JReleaser, activated by a jreleaser.yml, .yaml, .toml or .json at the project root, with the values of a jreleaser.properties of the configuration folder
                 release.token||Authorization header value for that repository, sent as given (env JENESIS_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named
-                deploy.uri||Maven repository a release puts the staged Maven tree into, every file at <group path>/<artifactId>/<version>/<file> with its .md5, .sha1, .sha256 and .sha512, then the artifact's maven-metadata.xml merged with the one the repository holds; a SNAPSHOT version is put under a unique timestamped name beside its own maven-metadata.xml, as Maven deploys one; nothing is signed, and Maven Central is refused, as the JReleaser plugin releases there (env MAVEN_RELEASE_URI)
+                deploy.uri||Maven repository a release puts the staged Maven tree into, every file at <group path>/<artifactId>/<version>/<file> with its .md5, .sha1, .sha256 and .sha512, then the artifact's maven-metadata.xml merged with the one the repository holds; a SNAPSHOT version is put under a unique timestamped name beside its own maven-metadata.xml, as Maven deploys one; nothing is signed, so a release to Maven Central goes through the JReleaser plugin, which signs it and uses Central's publishing service, while its snapshot repository takes a SNAPSHOT from here as any repository does (env MAVEN_RELEASE_URI)
                 deploy.token||Authorization header value for that repository, sent as given, so it names its scheme, as Bearer <token> or Basic <credentials> (env MAVEN_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named
                 """;
 

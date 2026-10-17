@@ -14,11 +14,6 @@ import build.jenesis.SafeSegment;
 public class MavenRepositoryRelease implements BuildStep {
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
-    private static final Set<String> CENTRAL = Set.of("maven.org",
-            "maven.apache.org",
-            "sonatype.org",
-            "central.sonatype.com",
-            "maven-central.storage-download.googleapis.com");
     private static final List<String> CHECKSUMS = List.of("md5", "sha1", "sha256", "sha512"),
             UNCHECKED = List.of(".asc", ".sigstore", ".sigstore.json");
     private static final DateTimeFormatter UPDATED = DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneOffset.UTC),
@@ -65,13 +60,6 @@ public class MavenRepositoryRelease implements BuildStep {
         if (!"https".equals(repository.getScheme()) && !"http".equals(repository.getScheme())) {
             throw new IllegalArgumentException("Cannot release to " + repository
                     + ": a Maven repository is addressed by an https: or http: URI");
-        }
-        String host = repository.getHost() == null ? "" : repository.getHost().toLowerCase(Locale.ROOT);
-        if (CENTRAL.stream().anyMatch(domain -> host.equals(domain) || host.endsWith("." + domain))) {
-            throw new IllegalArgumentException("Cannot release to " + repository
-                    + ": Maven Central takes a release signed and through its own publishing service, which"
-                    + " JReleaser handles - place a jreleaser.yml at the project's root, and name only a repository of"
-                    + " your own in jenesis.deploy.uri");
         }
         String text = repository.toString();
         this.repository = text.endsWith("/") ? repository : URI.create(text + "/");
