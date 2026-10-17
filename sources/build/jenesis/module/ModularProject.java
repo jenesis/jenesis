@@ -456,7 +456,7 @@ public class ModularProject implements BuildExecutorModule {
                     return;
                 }
                 requires.setProperty(key.substring(0, slash)
-                        + "/runtime/"
+                        + "/agent/"
                         + key.substring(slash + 1)
                         + (repository.equals("module") ? "" : version(versions, key)), "");
             });

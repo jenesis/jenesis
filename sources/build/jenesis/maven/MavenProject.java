@@ -509,12 +509,9 @@ public class MavenProject implements BuildExecutorModule {
                                 String version = space < 0 ? null : left.substring(space + 1);
                                 int slash = key.indexOf('/');
                                 String seeded = key.substring(0, slash) + "/agent/" + key.substring(slash + 1);
-                                String required = key.substring(0, slash)
-                                        + "/runtime/"
-                                        + key.substring(slash + 1)
-                                        + (version == null ? "" : "/" + version);
-                                if (requires.getProperty(required) == null) {
-                                    requires.setProperty(required, "");
+                                String coordinate = key.substring(slash + 1) + (version == null ? "" : "/" + version);
+                                if (requires.getProperty(key.substring(0, slash) + "/runtime/" + coordinate) == null) {
+                                    requires.setProperty(key.substring(0, slash) + "/agent/" + coordinate, "");
                                 }
                                 attachments.setProperty(seeded, arguments);
                             }
