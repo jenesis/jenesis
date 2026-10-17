@@ -403,7 +403,7 @@ public class PinPomTest {
     }
 
     @Test
-    public void replaces_existing_dependency_management() throws IOException {
+    public void replaces_an_entry_pin_wrote_that_nothing_resolves_any_longer() throws IOException {
         Path pom = root.resolve("pom.xml");
         Files.writeString(pom, """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -418,6 +418,7 @@ public class PinPomTest {
                                 <groupId>stale</groupId>
                                 <artifactId>old</artifactId>
                                 <version>0.1</version>
+                                <!--Checksum/SHA-256/cafebabe-->
                             </dependency>
                         </dependencies>
                     </dependencyManagement>
@@ -431,6 +432,64 @@ public class PinPomTest {
         assertThat(result).contains("<artifactId>fresh</artifactId>");
         assertThat(result).contains("<version>3.0</version>");
         assertThat(result).contains("<!--Checksum/SHA-256/deadbeef-->");
+    }
+
+    @Test
+    public void keeps_every_entry_and_comment_it_does_not_pin_where_it_stands() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <!-- the module of this build, which the tests use -->
+                            <dependency>
+                                <groupId>group</groupId>
+                                <artifactId>sibling</artifactId>
+                                <version>${project.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.example</groupId>
+                                <artifactId>pinned</artifactId>
+                                <version>1.0</version>
+                                <scope>test</scope>
+                            </dependency>
+                            <!-- read by another tool of the old build, never resolved here -->
+                            <dependency>
+                                <groupId>org.eclipse.platform</groupId>
+                                <artifactId>org.eclipse.osgi</artifactId>
+                                <version>3.23.0</version>
+                                <scope>test</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        writeResolved(Map.of(
+                "maven/org.example/pinned", "1.0 SHA-256/deadbeef",
+                "maven/org.example/fresh", "3.0 SHA-256/cafebabe",
+                "maven/org.example/snapshot", "2.0-SNAPSHOT SHA-256/feedface"));
+        String result = run(pom);
+        assertThat(result)
+                .as("a sibling, an entry no closure reaches and every comment stay as written")
+                .contains("<!-- the module of this build, which the tests use -->",
+                        "<artifactId>sibling</artifactId>",
+                        "<version>${project.version}</version>",
+                        "<!-- read by another tool of the old build, never resolved here -->",
+                        "<artifactId>org.eclipse.osgi</artifactId>")
+                .as("an entry pin resolves keeps its place and its scope and gains its checksum")
+                .containsSubsequence("<artifactId>pinned</artifactId>",
+                        "<scope>test</scope>",
+                        "<!--Checksum/SHA-256/deadbeef-->",
+                        "<artifactId>org.eclipse.osgi</artifactId>",
+                        "<artifactId>fresh</artifactId>")
+                .as("a snapshot is published again under its version, so no checksum can hold for it")
+                .contains("<version>2.0-SNAPSHOT</version>")
+                .doesNotContain("feedface");
     }
 
     @Test
@@ -449,6 +508,7 @@ public class PinPomTest {
                                 <groupId>stale</groupId>
                                 <artifactId>old</artifactId>
                                 <version>0.1</version>
+                                <!--Checksum/SHA-256/cafebabe-->
                             </dependency>
                             <dependency>
                                 <groupId>org.example</groupId>
