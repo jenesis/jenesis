@@ -10,8 +10,9 @@
 #   * submodule - track Jenesis as a git submodule. An existing one (a .gitmodules
 #                 entry whose URL points at the Jenesis repo) is checked out to the
 #                 requested ref; a project that has none gets one added, at
-#                 build/.upstream, with build/jenesis linked into it. Either way
-#                 the new commit is staged in the superproject.
+#                 build/.upstream, with build/jenesis linked into it and only
+#                 sources/ fetched and checked out. Either way the new commit is
+#                 staged in the superproject.
 #
 # Auto picks submodule when the project already tracks one and vendor otherwise,
 # so an existing setup keeps working and a fresh project stays self-contained.
@@ -146,9 +147,25 @@ if [ "$MODE" = "submodule" ] && [ -z "$SUBMODULE_PATH" ]; then
     [ -e "$TARGET/$SUBMODULE_PATH" ] \
         && die "cannot add a submodule at '${SUBMODULE_PATH}': something is already there"
     say "adding Jenesis as a submodule at '${SUBMODULE_PATH}'"
-    git -C "$TARGET" submodule add --depth 1 "https://github.com/${GITHUB_REPO}.git" "$SUBMODULE_PATH" >/dev/null 2>&1 \
-        || git -C "$TARGET" submodule add "https://github.com/${GITHUB_REPO}.git" "$SUBMODULE_PATH" >/dev/null 2>&1 \
-        || die "failed to add the Jenesis submodule at '${SUBMODULE_PATH}'"
+    # A build reads sources/ alone, so the submodule is a partial clone checked
+    # out sparsely: the requested commit's trees and the files under sources/
+    # are all that is fetched. A git or a server without partial clone or
+    # sparse checkout falls back to a full shallow clone.
+    SUB="$TARGET/$SUBMODULE_PATH"
+    if { git init --quiet "$SUB" \
+        && git -C "$SUB" remote add origin "https://github.com/${GITHUB_REPO}.git" \
+        && git -C "$SUB" sparse-checkout set --cone sources \
+        && git -C "$SUB" fetch --quiet --depth 1 --filter=blob:none origin "$REF" \
+        && git -C "$SUB" checkout --quiet FETCH_HEAD \
+        && git -C "$TARGET" submodule add --quiet "https://github.com/${GITHUB_REPO}.git" "$SUBMODULE_PATH"; } >/dev/null 2>&1; then
+        git -C "$TARGET" submodule absorbgitdirs -- "$SUBMODULE_PATH" >/dev/null 2>&1 || true
+        say "checked out only sources/ of the submodule; 'git -C ${SUBMODULE_PATH} sparse-checkout disable' fetches the rest"
+    else
+        rm -rf "$SUB"
+        git -C "$TARGET" submodule add --depth 1 "https://github.com/${GITHUB_REPO}.git" "$SUBMODULE_PATH" >/dev/null 2>&1 \
+            || git -C "$TARGET" submodule add "https://github.com/${GITHUB_REPO}.git" "$SUBMODULE_PATH" >/dev/null 2>&1 \
+            || die "failed to add the Jenesis submodule at '${SUBMODULE_PATH}'"
+    fi
     CREATED_SUBMODULE=1
 fi
 

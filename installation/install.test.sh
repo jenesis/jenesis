@@ -87,12 +87,17 @@ if [ "$SYMLINKS" = "1" ]; then
     grep -q 'shallow = true' "$TMP/submodule/.gitmodules" || fail "the submodule was not recorded as shallow"
     [ -L "$TMP/submodule/build/jenesis" ] || fail "build/jenesis was not linked into the submodule"
     [ -f "$TMP/submodule/build/jenesis/Make.java" ] || fail "the build/jenesis link does not resolve"
+    [ ! -e "$TMP/submodule/build/.upstream/demo" ] && [ ! -e "$TMP/submodule/build/.upstream/tests" ] \
+        || fail "the submodule checked out more than sources/"
+    [ "$(git -C "$TMP/submodule/build/.upstream" config --get remote.origin.partialclonefilter)" = "blob:none" ] \
+        || fail "the submodule is not a partial clone, so it fetched every file"
+    [ ! -d "$TMP/submodule/build/.upstream/.git" ] || fail "the submodule keeps its repository in its working tree"
     git -C "$TMP/submodule" diff --cached --name-only | grep -q '.gitmodules' \
         || fail "the submodule was not staged in the superproject"
     builds submodule || fail "a submodule project does not build: $(cat "$TMP/submodule.build.log")"
     [ -z "$(git -C "$TMP/submodule/build/.upstream" status --porcelain)" ] \
         || fail "building dirtied the submodule, so its path collides with the build's own state"
-    pass "adds a submodule at build/.upstream, links it, and the project builds"
+    pass "adds a submodule at build/.upstream holding only sources/, links it, and the project builds"
 
     install submodule JENESIS_MODE=submodule \
         || fail "re-running against an existing submodule: $(cat "$TMP/submodule.log")"

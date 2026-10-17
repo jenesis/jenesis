@@ -2718,10 +2718,11 @@ public record Project(
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
-                    If this project vendors Jenesis as a git submodule they are already on disk:
-                    resolve the `build/jenesis` symlink and the demos sit under the root it points
-                    into, conventionally `build/.upstream/demo/`. Otherwise read them at
-                    https://github.com/jenesis/jenesis/tree/main/demo.
+                    If this project vendors Jenesis as a git submodule, resolve the `build/jenesis`
+                    symlink and the demos sit under the root it points into, conventionally
+                    `build/.upstream/demo/`; a submodule the installer added checks out only
+                    `sources/`, and `git -C build/.upstream sparse-checkout add demo` fetches them.
+                    Otherwise read them at https://github.com/jenesis/jenesis/tree/main/demo.
 
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
                                          04 java-modular-multi, 05 java-pom-model-4-1-0 (Maven 4's POM model)
