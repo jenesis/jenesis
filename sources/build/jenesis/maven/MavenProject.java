@@ -903,7 +903,10 @@ public class MavenProject implements BuildExecutorModule {
                     value = value.version(version)
                             .dependencies(versioned(value.dependencies(), siblings, version))
                             .managedDependencies(versioned(value.managedDependencies(), siblings, version))
-                            .bom(versioned(value.bom(), siblings, version));
+                            .bom(versioned(value.bom(), siblings, version))
+                            .plugins(versionedPlugins(value.plugins(), siblings, version))
+                            .testPlugins(versionedPlugins(value.testPlugins(), siblings, version))
+                            .pluginExclusions(versionedPlugins(value.pluginExclusions(), siblings, version));
                 }
                 Path pomFile = entry.getKey().resolve("pom.xml");
                 String unresolved = unresolved(value.version());
@@ -1008,6 +1011,24 @@ public class MavenProject implements BuildExecutorModule {
                     Objects.equals(siblings.get(key.groupId() + "/" + key.artifactId()), value.version())
                             ? value.version(version)
                             : value));
+            return versioned;
+        }
+
+        private static SequencedMap<String, String> versionedPlugins(SequencedMap<String, String> plugins,
+                                                                     Map<String, String> siblings,
+                                                                     String version) {
+            if (plugins == null) {
+                return null;
+            }
+            SequencedMap<String, String> versioned = new LinkedHashMap<>();
+            plugins.forEach((plugin, group) -> {
+                String[] segments = plugin.split("/");
+                versioned.put(segments.length == 4
+                        && segments[0].equals("maven")
+                        && segments[3].equals(siblings.get(segments[1] + "/" + segments[2]))
+                        ? String.join("/", segments[0], segments[1], segments[2], version)
+                        : plugin, group);
+            });
             return versioned;
         }
 
