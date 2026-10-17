@@ -3043,6 +3043,61 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void a_commanded_version_replaces_the_version_of_a_sibling_named_as_a_processor() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>HEAD-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>foo</module>
+                        <module>bar</module>
+                    </modules>
+                </project>
+                """);
+        for (String name : List.of("foo", "bar")) {
+            Files.writeString(Files.createDirectory(project.resolve(name)).resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>group</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>HEAD-SNAPSHOT</version>
+                        </parent>
+                        <artifactId>%s</artifactId>
+                        %s
+                    </project>
+                    """.formatted(name, name.equals("bar") ? "<!--jenesis.plugin javac maven/group/foo-->" : ""));
+            Files.writeString(Files.createDirectories(project.resolve(name + "/src/main/java")).resolve("source"), name);
+        }
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addStep("command", (_, context, _) -> {
+            SequencedProperties values = new SequencedProperties();
+            values.setProperty("version", "2");
+            values.store(context.next().resolve(BuildStep.METADATA));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "command");
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-bar/manifests").resolve(BuildStep.REQUIRES)).stringPropertyNames())
+                .as("a sibling named as a processor is the module the build stamps the version on, not a release of the POM's version")
+                .contains("javac/plugin/maven/group/foo/2")
+                .noneMatch(key -> key.endsWith("/HEAD-SNAPSHOT"));
+    }
+
+    @Test
     public void returns_to_the_declared_version_once_the_commanded_one_is_no_longer_given() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
