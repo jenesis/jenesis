@@ -5,12 +5,13 @@ Jenesis
 ![build](https://github.com/jenesis/jenesis/actions/workflows/build.yml/badge.svg)
 
 > ### [Jenesis](https://jenesis.build) - a modern Java build tool
-> _Java-native config, plugin-free, with `module-info.java` treated as a feature, not an afterthought._
+> _Java-native config, everything the JDK provides built in, with `module-info.java` treated as a feature, not an afterthought._
 
 **A build tool for Java, written in Java.** The engine ships *with* your project as plain source under
-`build/jenesis/` and is launched by the JDK directly, so there is no wrapper binary and no fetched plugin tree,
-and nothing runs between builds unless you ask for it. Modules declared with `module-info.java` drive the
-build, every step is content-hashed so unchanged work is reused, and every dependency can be pinned by version
+`build/jenesis/` and is launched by the JDK directly, so there is no wrapper binary, and nothing runs between
+builds unless you ask for it. Everything the JDK provides is built in; a tool the build has to download anyway,
+such as a linter, a code generator or another language's compiler, is an official plugin that only a project using
+it fetches. Modules declared with `module-info.java` drive the build, every step is content-hashed so unchanged work is reused, and every dependency can be pinned by version
 *and* by the checksum of the artifact. It needs a JDK 25 or newer, and nothing else. This repository also holds **jpx**, which runs an already-published module
 or Maven artifact with one command - `npx` for Java.
 
