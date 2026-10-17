@@ -2453,7 +2453,10 @@ public record Project(
                     to pin whenever you add or change one. `pin` records resolved versions and
                     checksums back into pom.xml (<dependencyManagement> with <!--Checksum/<algo>/<hex>-->
                     and a <!--jenesis.pin ... --> comment) or module-info.java (@jenesis.pin tags),
-                    idempotently, refreshing only the lines matching the local platform. It covers the
+                    idempotently, refreshing only the lines matching the local platform. An entry whose
+                    version is a property keeps it, and its checksum names the version it was taken of
+                    (<!--Checksum/SHA-256/<hex> 2.2.20-->), so it applies to no other: pin again after
+                    the property changes. It covers the
                     whole project; to pin one module, name its step (pin/module-foo+bar) rather than
                     adding +<module>. A pom.xml's main and test halves share one <dependencyManagement>,
                     so where they resolve a coordinate at different versions its entry takes the
