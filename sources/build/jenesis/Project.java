@@ -1786,7 +1786,11 @@ public record Project(
                           the staged trees as template properties (72), the values of a
                           jreleaser.properties beside the configuration, and with --dry-run,
                           publishing nothing, unless the command line passes
-                          -Djenesis.release.publish=true
+                          -Djenesis.release.publish=true; JReleaser releases versions without
+                          -SNAPSHOT, as the staged tree names a snapshot as Maven installs one,
+                          without the timestamp its Maven deployers read, so a snapshot goes to a
+                          repository of your own through jenesis.deploy.uri, which refuses Maven
+                          Central's snapshot repository as it refuses Central
                       distributionManagement <relocation> / a relocated publication -> kept: a
                           module that relocates its artifact is staged as its POM alone, the
                           relocation in it, and fails the build if it holds sources (3)
