@@ -1383,9 +1383,11 @@ public record Project(
                     again; -Djenesis.test.skip=true leaves the tests to the next build. It runs
                     last, after `stage` and a dry `release`, so the tool of a release plugin such
                     as JReleaser is resolved and pinned with the rest.
-                    Commit before the first `pin`. It rewrites each pom.xml's <dependencyManagement>
-                    with the versions and checksums it resolved, keeping only the imported BOMs, so
-                    review that diff. An entry keeps the ${...} its coordinate was written with, and
+                    Commit before the first `pin`. It writes the versions and checksums it resolved
+                    into each pom.xml's <dependencyManagement>, updating an entry where it stands and
+                    adding the others at its end; every other entry, an imported BOM, a sibling
+                    module's and a comment, stays as written, a SNAPSHOT is given no checksum, and an
+                    entry `pin` wrote that nothing resolves any longer is dropped. Review that diff. An entry keeps the ${...} its coordinate was written with, and
                     its version property where that still names the version resolved, so a
                     classifier an OS profile selects stays selectable. A pinned entry outranks a BOM, as any managed version does,
                     so it repeats the exclusions and the <scope> the BOM managed for it: to
