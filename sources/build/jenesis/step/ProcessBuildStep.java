@@ -52,6 +52,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                         Consumer<String> reporting,
                         int tail,
                         boolean daemon,
+                        boolean shared,
                         Path aot) {
 
         public Terms() {
@@ -61,6 +62,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                     null,
                     TAIL,
                     false,
+                    true,
                     null);
         }
 
@@ -100,37 +102,42 @@ public abstract class ProcessBuildStep implements BuildStep {
                             : null,
                     tail,
                     mode.equals("daemon"),
+                    environment.flag("process.shared", true),
                     mode.equals("aot")
                             ? Path.of(environment.value("aot.folder", ".jenesis/aot")).toAbsolutePath()
                             : null);
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
         }
 
         public Terms permits(Permits permits) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
         }
 
         public Terms announcing(Consumer<String> announcing) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
         }
 
         public Terms reporting(Consumer<String> reporting) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
         }
 
         public Terms tail(int tail) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
         }
 
         public Terms daemon(boolean daemon) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
+        }
+
+        public Terms shared(boolean shared) {
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
         }
 
         public Terms aot(Path aot) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
         }
     }
 
@@ -175,6 +182,9 @@ public abstract class ProcessBuildStep implements BuildStep {
 
     protected int execute(ProcessHandler handler, Path output, Path error, ProcessHandler.Tee tee)
             throws IOException, InterruptedException {
+        if (handler instanceof ProcessHandler.OfProcess process && process.shared()) {
+            handler = process.scoped(terms.shared());
+        }
         Permits permits = terms.permits();
         if (permits == null) {
             return handler.execute(output, error, tee);

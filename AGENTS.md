@@ -243,7 +243,10 @@ running `DaemonBuild` per request. A tool whose main method exits is called thro
 with an `int main(String[])`, compiled against the tool by `requires static` or reaching it by reflection where that does
 not compile; `OfProcess.driver` writes it once per JVM to a private folder ahead of the tool's jars. `javac` with
 `-J` options runs in one warm JVM whose calls run side by side; a tool keeping its state per call asks for the same
-with `shared(true)`. A command line of another shape forks as `ofJavaHome("bin/java")` does.
+with `shared(true)`, which a compiler does. Under `jenesis.process.shared` (default) that JVM is shared in every
+mode: `fork` and `aot` end it when the last build running in the JVM ends, through the scope `Project.build` holds
+from `ProcessHandler.scope()`, while `daemon` keeps it for the next build; `false` forks such calls as well. A command
+line of another shape forks as `ofJavaHome("bin/java")` does.
 
 ## Tests
 
