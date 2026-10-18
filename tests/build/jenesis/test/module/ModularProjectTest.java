@@ -174,10 +174,10 @@ public class ModularProjectTest {
         SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
         assertThat(requires).containsOnlyKeys("main/compile/module/bar",
                 "main/runtime/module/bar",
-                "main/runtime/maven/org.mockito/mockito-core/5.11.0",
-                "main/runtime/maven/io.opentelemetry.javaagent/opentelemetry-javaagent/RELEASE",
-                "main/runtime/module/some.agent.module");
-        assertThat(requires.getProperty("main/runtime/maven/org.mockito/mockito-core/5.11.0")).isEmpty();
+                "main/agent/maven/org.mockito/mockito-core/5.11.0",
+                "main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent/RELEASE",
+                "main/agent/module/some.agent.module");
+        assertThat(requires.getProperty("main/agent/maven/org.mockito/mockito-core/5.11.0")).isEmpty();
         Path attachmentsFile = module.resolve(BuildStep.ATTACHMENTS);
         assertThat(attachmentsFile).exists();
         assertThat(SequencedProperties.ofFiles(attachmentsFile)).containsOnly(

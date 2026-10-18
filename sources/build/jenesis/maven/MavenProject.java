@@ -24,6 +24,7 @@ import build.jenesis.project.ProjectModule;
 import build.jenesis.step.Assign;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Group;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Javac;
 import build.jenesis.step.Versions;
@@ -508,12 +509,9 @@ public class MavenProject implements BuildExecutorModule {
                                 String version = space < 0 ? null : left.substring(space + 1);
                                 int slash = key.indexOf('/');
                                 String seeded = key.substring(0, slash) + "/agent/" + key.substring(slash + 1);
-                                String required = key.substring(0, slash)
-                                        + "/runtime/"
-                                        + key.substring(slash + 1)
-                                        + (version == null ? "" : "/" + version);
-                                if (requires.getProperty(required) == null) {
-                                    requires.setProperty(required, "");
+                                String coordinate = key.substring(slash + 1) + (version == null ? "" : "/" + version);
+                                if (requires.getProperty(key.substring(0, slash) + "/runtime/" + coordinate) == null) {
+                                    requires.setProperty(key.substring(0, slash) + "/agent/" + coordinate, "");
                                 }
                                 attachments.setProperty(seeded, arguments);
                             }
@@ -529,6 +527,14 @@ public class MavenProject implements BuildExecutorModule {
                                                 : ""), "");
                             }
                             requires.store(context.next().resolve(BuildStep.REQUIRES));
+                            String reactor = properties.getProperty("reactor", "");
+                            if (!reactor.isEmpty()) {
+                                SequencedProperties ordered = new SequencedProperties();
+                                for (String coordinate : reactor.split("\t")) {
+                                    ordered.setProperty(coordinate, "");
+                                }
+                                ordered.store(context.next().resolve(Group.REACTOR));
+                            }
                             String keys = properties.getProperty("signatures", "");
                             if (!keys.isEmpty()) {
                                 SequencedProperties signatures = new SequencedProperties();
@@ -903,7 +909,11 @@ public class MavenProject implements BuildExecutorModule {
                     value = value.version(version)
                             .dependencies(versioned(value.dependencies(), siblings, version))
                             .managedDependencies(versioned(value.managedDependencies(), siblings, version))
-                            .bom(versioned(value.bom(), siblings, version));
+                            .bom(versioned(value.bom(), siblings, version))
+                            .plugins(versionedPlugins(value.plugins(), siblings, version))
+                            .testPlugins(versionedPlugins(value.testPlugins(), siblings, version))
+                            .pluginExclusions(versionedPlugins(value.pluginExclusions(), siblings, version))
+                            .reactor(versioned(value.reactor(), siblings, version));
                 }
                 Path pomFile = entry.getKey().resolve("pom.xml");
                 String unresolved = unresolved(value.version());
@@ -1008,6 +1018,24 @@ public class MavenProject implements BuildExecutorModule {
                     Objects.equals(siblings.get(key.groupId() + "/" + key.artifactId()), value.version())
                             ? value.version(version)
                             : value));
+            return versioned;
+        }
+
+        private static SequencedMap<String, String> versionedPlugins(SequencedMap<String, String> plugins,
+                                                                     Map<String, String> siblings,
+                                                                     String version) {
+            if (plugins == null) {
+                return null;
+            }
+            SequencedMap<String, String> versioned = new LinkedHashMap<>();
+            plugins.forEach((plugin, group) -> {
+                String[] segments = plugin.split("/");
+                versioned.put(segments.length == 4
+                        && segments[0].equals("maven")
+                        && segments[3].equals(siblings.get(segments[1] + "/" + segments[2]))
+                        ? String.join("/", segments[0], segments[1], segments[2], version)
+                        : plugin, group);
+            });
             return versioned;
         }
 
@@ -1211,6 +1239,11 @@ public class MavenProject implements BuildExecutorModule {
                             + (dep.getValue().checksum() == null ? "" : " " + dep.getValue().checksum()))
                     .collect(Collectors.joining("\t"));
             properties.setProperty("managedDependencies", managed);
+            if (value.reactor() != null && !value.reactor().isEmpty()) {
+                properties.setProperty("reactor", value.reactor().entrySet().stream()
+                        .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version()))
+                        .collect(Collectors.joining("\t")));
+            }
             if (!qualifiedDependencies.isEmpty()) {
                 properties.setProperty("qualifiedDependencies", qualifiedDependencies);
             }

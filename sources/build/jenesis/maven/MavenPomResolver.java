@@ -813,6 +813,19 @@ public class MavenPomResolver implements MavenResolver {
                                 (previous, next) -> new MavenDependencyKey.Versioned(previous.key(),
                                         previous.version() == null ? next.version() : previous.version()));
                     });
+            Map<String, String> modelled = new HashMap<>();
+            pom.metadata().properties().forEach((key, value) -> modelled.put("project." + key, value));
+            modelled.putAll(pom.properties());
+            SequencedMap<MavenDependencyKey, MavenDependencyValue> reactor = new LinkedHashMap<>();
+            for (DependencyKey declared : pom.declaredManagement()) {
+                MavenDependencyKey key = declared.resolve(pom.properties());
+                MavenDependencyValue value = managedDependencies.get(key);
+                if (value != null
+                        && value.version() != null
+                        && value.version().equals(subprojects.get(new MavenDependencyName(key.groupId(), key.artifactId())))) {
+                    reactor.put(key, value);
+                }
+            }
             results.put(root.relativize(module), new MavenLocalPom(property(pom.groupId(), pom.properties()),
                     property(pom.artifactId(), pom.properties()),
                     property(pom.version(), pom.properties()),
@@ -843,13 +856,14 @@ public class MavenPomResolver implements MavenResolver {
                     pom.aliases(),
                     pom.signatures(),
                     property(pom.properties().get("mainClass"), pom.properties()),
-                    pom.metadata().expand(value -> property(value, pom.properties())),
+                    pom.metadata().expand(value -> property(value, modelled)),
                     expressions,
                     pom.relocation() == null ? null : new MavenPomEmitter.Relocation(
                             property(pom.relocation().groupId(), pom.properties()),
                             property(pom.relocation().artifactId(), pom.properties()),
                             property(pom.relocation().version(), pom.properties()),
-                            property(pom.relocation().message(), pom.properties()))));
+                            property(pom.relocation().message(), pom.properties())),
+                    reactor));
         }
         return results;
     }
@@ -1208,7 +1222,8 @@ public class MavenPomResolver implements MavenResolver {
                                         toElementText(relocation, "artifactId").orElse(null),
                                         toElementText(relocation, "version").orElse(null),
                                         toElementText(relocation, "message").orElse(null)))
-                                .orElse(null));
+                                .orElse(null),
+                        declaredManagedDependencies.keySet());
             }
             default -> throw new IllegalArgumentException("Unknown namespace: " + namespace);
         };
@@ -1257,7 +1272,8 @@ public class MavenPomResolver implements MavenResolver {
                             Set.of(),
                             null,
                             true,
-                            null);
+                            null,
+                            Set.of());
                 } else {
                     Path localPath = candidate.file().map(Path::getParent).orElse(null);
                     Map<Path, UnresolvedPom> localPaths = localPath == null ? null : new HashMap<>();
@@ -2119,6 +2135,7 @@ public class MavenPomResolver implements MavenResolver {
             String resolvedScope = property(scope, properties);
             String resolvedVersion = property(version, properties);
             MavenDependencyKey.validate("version", resolvedVersion);
+            int space = checksum == null ? -1 : checksum.indexOf(' ');
             return new MavenDependencyValue(resolvedVersion,
                     resolvedScope == null ? null : MavenDependencyScope.of(resolvedScope),
                     systemPath == null ? null : Path.of(property(systemPath, properties)),
@@ -2126,7 +2143,9 @@ public class MavenPomResolver implements MavenResolver {
                             property(exclusion.groupId(), properties),
                             property(exclusion.artifactId(), properties))).toList(),
                     optional == null ? null : Boolean.valueOf(property(optional, properties)),
-                    checksum
+                    space < 0 ? checksum : checksum.substring(space + 1).trim().equals(resolvedVersion)
+                            ? checksum.substring(0, space)
+                            : null
             );
         }
     }
@@ -2160,7 +2179,8 @@ public class MavenPomResolver implements MavenResolver {
                                  Set<String> verbatim,
                                  Map<DependencyKey, DependencyValue> bom,
                                  boolean missing,
-                                 MavenPomEmitter.Relocation relocation) {
+                                 MavenPomEmitter.Relocation relocation,
+                                 Set<DependencyKey> declaredManagement) {
     }
 
     private record ResolvedPom(Map<MavenDependencyKey, MavenDependencyValue> managedDependencies,

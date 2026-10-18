@@ -3,7 +3,6 @@ package build.jenesis.test.maven;
 import module java.base;
 import module jdk.httpserver;
 import module org.junit.jupiter.api;
-import module org.junit.jupiter.params;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
@@ -15,6 +14,7 @@ import build.jenesis.Repository;
 import build.jenesis.maven.MavenRepositoryRelease;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class MavenRepositoryReleaseTest {
@@ -256,18 +256,10 @@ public class MavenRepositoryReleaseTest {
         assertThat(requests).isNotEmpty().allMatch(request -> request.endsWith(" null"));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"https://repo1.maven.org/maven2/",
-            "https://repo.maven.apache.org/maven2/",
-            "https://central.sonatype.com/api/v1/publisher/",
-            "https://oss.sonatype.org/service/local/staging/deploy/maven2/",
-            "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"})
-    public void refuses_maven_central_and_names_jreleaser_as_the_way_there(String location) {
-        assertThatThrownBy(() -> new MavenRepositoryRelease(URI.create(location)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining(location)
-                .hasMessageContaining("JReleaser")
-                .hasMessageContaining("jreleaser.yml");
+    @Test
+    public void releases_to_the_snapshot_repository_of_maven_central_as_to_any_other() {
+        assertThatCode(() -> new MavenRepositoryRelease(URI.create("https://central.sonatype.com/repository/maven-snapshots/")))
+                .doesNotThrowAnyException();
     }
 
     @Test

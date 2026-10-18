@@ -191,7 +191,18 @@ public class Dependencies implements BuildExecutorModule {
         }
 
         @Override
-        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            for (BuildStepArgument argument : arguments.values()) {
+                Path requires = argument.removed() ? null : argument.folder().resolve(REQUIRES);
+                if (requires != null && Files.isRegularFile(requires)) {
+                    SequencedProperties required = SequencedProperties.ofFiles(requires);
+                    for (String key : required.stringPropertyNames()) {
+                        if (key.endsWith("-SNAPSHOT") && required.getProperty(key).isEmpty()) {
+                            return true;
+                        }
+                    }
+                }
+            }
             return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                     Path.of(REQUIRES),
                     Path.of(VERSIONS),
@@ -407,7 +418,7 @@ public class Dependencies implements BuildExecutorModule {
             }
             Path libs = Files.createDirectories(context.next().resolve(RESOLVED));
             SequencedMap<String, Path> previousArtifacts = new LinkedHashMap<>();
-            SequencedSet<String> previousInternal = new LinkedHashSet<>();
+            SequencedSet<String> previousInternal = new LinkedHashSet<>(), previousSnapshots = new LinkedHashSet<>();
             if (context.previous() != null) {
                 Path previousInternalFile = context.previous().resolve(INTERNAL);
                 if (Files.exists(previousInternalFile)) {
@@ -426,7 +437,12 @@ public class Dependencies implements BuildExecutorModule {
                         Path file = context.previous()
                                 .resolve(space < 0 ? value : value.substring(0, space))
                                 .normalize();
-                        if (Files.exists(file) && !previousInternal.contains(parts[3])) {
+                        if (previousInternal.contains(parts[3])) {
+                            return;
+                        }
+                        if (parts[3].endsWith("-SNAPSHOT")) {
+                            previousSnapshots.add(parts[3]);
+                        } else if (Files.exists(file)) {
                             previousArtifacts.putIfAbsent(parts[3], file);
                         }
                     });
@@ -468,7 +484,7 @@ public class Dependencies implements BuildExecutorModule {
                     }
                     current.put(location, item);
                 }
-                if (reusable && key(stored,
+                if (reusable && previousSnapshots.isEmpty() && key(stored,
                         requires,
                         new TreeMap<>(categories),
                         new TreeMap<>(aliases),

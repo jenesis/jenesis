@@ -119,6 +119,35 @@ public class DependenciesResolutionTest {
     }
 
     @Test
+    public void resolves_a_snapshot_again_though_nothing_it_was_handed_changed() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("main/compile/foo/lib/1-SNAPSHOT", "");
+        properties.store(dependencies.resolve(BuildStep.REQUIRES));
+        AtomicReference<String> published = new AtomicReference<>("first");
+        Repository repository = (_, coordinate, _) -> {
+            try {
+                return Optional.of(RepositoryItem.ofFile(Files.writeString(
+                        artifacts.resolve(coordinate.replace('/', '-') + "-" + published.get() + ".jar"),
+                        published.get())));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        };
+        Dependencies module = new Dependencies(Map.of("foo", repository), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+            SequencedMap<String, String> resolved = new LinkedHashMap<>();
+            descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+        }));
+        execute(module);
+        published.set("second");
+        execute(module);
+        String jar = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).getProperty("main/compile/foo/lib/1-SNAPSHOT");
+        assertThat(next.resolve(jar.split(" ")[0]))
+                .as("a snapshot is published again under the same version, so it is asked for on every build")
+                .hasContent("second");
+    }
+
+    @Test
     public void lists_only_what_the_resolutions_it_is_handed_do_not_hold_already() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/qux", "");
@@ -155,7 +184,7 @@ public class DependenciesResolutionTest {
         try (Stream<Path> files = Files.list(next.resolve("resolved"))) {
             assertThat(files.map(file -> file.getFileName().toString()))
                     .as("nothing is kept that the index no longer names")
-                    .containsExactlyInAnyOrder("baz.jar", "transitive%2Fbaz.jar");
+                    .containsExactlyInAnyOrder("baz.jar", "transitive~baz.jar");
         }
     }
 

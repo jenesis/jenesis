@@ -267,8 +267,10 @@ public class Docker implements BuildStep {
                     }
                 }
             }
-            for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
-                jars.putIfAbsent(file.getFileName().toString(), file);
+            for (String scope : List.of("runtime", "agent")) {
+                for (Path file : Dependencies.select(argument.folder(), group, scope)) {
+                    jars.putIfAbsent(file.getFileName().toString(), file);
+                }
             }
             granted.addAll(Inventory.nativeAccess(argument.folder()));
             layers.putAll(Layers.membership(argument.folder()));

@@ -35,7 +35,7 @@ public class MavenRepositoryStaging implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         Collected collected = collectModules(arguments);
-        Pairings pairings = pairTests(collected.stagedByArtifactId(), collected.testModules());
+        Pairings pairings = pairTests(collected.stagedByArtifactId(), collected.artifactIds(), collected.testModules());
         stageModules(context.next(), collected.stagedByArtifactId(), pairings, Inventory.attachments(arguments.values()));
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
@@ -43,6 +43,7 @@ public class MavenRepositoryStaging implements BuildStep {
     private Collected collectModules(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
         SequencedMap<String, Module> stagedByArtifactId = new LinkedHashMap<>();
         List<Module> testModules = new ArrayList<>();
+        Map<String, String> artifactIds = new HashMap<>();
         Set<String> unstaged = new HashSet<>();
         SequencedMap<String, List<Path>> supplements = Inventory.supplements(arguments.values());
         for (BuildStepArgument argument : arguments.values()) {
@@ -60,6 +61,10 @@ public class MavenRepositoryStaging implements BuildStep {
                     continue;
                 }
                 Coordinates coordinates = parseCoordinates(pom);
+                String moduleName = inventory.getProperty(prefix + ".module");
+                if (moduleName != null && inventory.getProperty(prefix + ".test") == null) {
+                    artifactIds.put(moduleName, coordinates.artifactId());
+                }
                 if (!inventory.flag(prefix + ".stage", true)) {
                     if (inventory.getProperty(prefix + ".test") == null) {
                         unstaged.add(coordinates.artifactId());
@@ -117,11 +122,12 @@ public class MavenRepositoryStaging implements BuildStep {
                 }
             }
         }
-        testModules.removeIf(test -> unstaged.contains(test.testsOf()));
-        return new Collected(stagedByArtifactId, testModules);
+        testModules.removeIf(test -> unstaged.contains(artifactIds.getOrDefault(test.testsOf(), test.testsOf())));
+        return new Collected(stagedByArtifactId, artifactIds, testModules);
     }
 
     private static Pairings pairTests(SequencedMap<String, Module> stagedByArtifactId,
+                                      Map<String, String> artifactIds,
                                       List<Module> testModules) throws IOException {
         SequencedMap<String, Module> mainsByArtifactId = new LinkedHashMap<>();
         stagedByArtifactId.forEach((artifactId, module) -> {
@@ -151,7 +157,7 @@ public class MavenRepositoryStaging implements BuildStep {
                 }
                 main = mainsByArtifactId.values().iterator().next();
             } else {
-                main = stagedByArtifactId.get(test.testsOf());
+                main = stagedByArtifactId.get(artifactIds.getOrDefault(test.testsOf(), test.testsOf()));
                 if (main == null) {
                     throw new IllegalStateException("Test module '"
                             + test.prefix()
@@ -236,7 +242,9 @@ public class MavenRepositoryStaging implements BuildStep {
         }
     }
 
-    private record Collected(SequencedMap<String, Module> stagedByArtifactId, List<Module> testModules) {
+    private record Collected(SequencedMap<String, Module> stagedByArtifactId,
+                             Map<String, String> artifactIds,
+                             List<Module> testModules) {
     }
 
     private record Pairings(SequencedMap<String, Module> testByMain,

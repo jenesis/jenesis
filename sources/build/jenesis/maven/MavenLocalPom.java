@@ -26,7 +26,8 @@ public record MavenLocalPom(String groupId,
                             String mainClass,
                             MavenPomEmitter.Metadata metadata,
                             SequencedMap<MavenDependencyKey, MavenDependencyKey.Versioned> expressions,
-                            MavenPomEmitter.Relocation relocation) {
+                            MavenPomEmitter.Relocation relocation,
+                            SequencedMap<MavenDependencyKey, MavenDependencyValue> reactor) {
 
     public MavenLocalPom version(String version) {
         return new MavenLocalPom(groupId,
@@ -53,7 +54,8 @@ public record MavenLocalPom(String groupId,
                 mainClass,
                 metadata,
                 expressions,
-                relocation);
+                relocation,
+                reactor);
     }
 
     public MavenLocalPom dependencies(SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies) {
@@ -81,7 +83,8 @@ public record MavenLocalPom(String groupId,
                 mainClass,
                 metadata,
                 expressions,
-                relocation);
+                relocation,
+                reactor);
     }
 
     public MavenLocalPom managedDependencies(SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies) {
@@ -109,7 +112,8 @@ public record MavenLocalPom(String groupId,
                 mainClass,
                 metadata,
                 expressions,
-                relocation);
+                relocation,
+                reactor);
     }
 
     public MavenLocalPom bom(SequencedMap<MavenDependencyKey, MavenDependencyValue> bom) {
@@ -137,6 +141,123 @@ public record MavenLocalPom(String groupId,
                 mainClass,
                 metadata,
                 expressions,
-                relocation);
+                relocation,
+                reactor);
+    }
+
+    public MavenLocalPom plugins(SequencedMap<String, String> plugins) {
+        return new MavenLocalPom(groupId,
+                artifactId,
+                version,
+                packaging,
+                release,
+                testRelease,
+                sourceDirectory,
+                resourceDirectories,
+                testSourceDirectory,
+                testResourceDirectories,
+                dependencies,
+                managedDependencies,
+                bom,
+                qualifiedDependencies,
+                attachments,
+                natives,
+                plugins,
+                testPlugins,
+                pluginExclusions,
+                aliases,
+                signatures,
+                mainClass,
+                metadata,
+                expressions,
+                relocation,
+                reactor);
+    }
+
+    public MavenLocalPom testPlugins(SequencedMap<String, String> testPlugins) {
+        return new MavenLocalPom(groupId,
+                artifactId,
+                version,
+                packaging,
+                release,
+                testRelease,
+                sourceDirectory,
+                resourceDirectories,
+                testSourceDirectory,
+                testResourceDirectories,
+                dependencies,
+                managedDependencies,
+                bom,
+                qualifiedDependencies,
+                attachments,
+                natives,
+                plugins,
+                testPlugins,
+                pluginExclusions,
+                aliases,
+                signatures,
+                mainClass,
+                metadata,
+                expressions,
+                relocation,
+                reactor);
+    }
+
+    public MavenLocalPom pluginExclusions(SequencedMap<String, String> pluginExclusions) {
+        return new MavenLocalPom(groupId,
+                artifactId,
+                version,
+                packaging,
+                release,
+                testRelease,
+                sourceDirectory,
+                resourceDirectories,
+                testSourceDirectory,
+                testResourceDirectories,
+                dependencies,
+                managedDependencies,
+                bom,
+                qualifiedDependencies,
+                attachments,
+                natives,
+                plugins,
+                testPlugins,
+                pluginExclusions,
+                aliases,
+                signatures,
+                mainClass,
+                metadata,
+                expressions,
+                relocation,
+                reactor);
+    }
+
+    public MavenLocalPom reactor(SequencedMap<MavenDependencyKey, MavenDependencyValue> reactor) {
+        return new MavenLocalPom(groupId,
+                artifactId,
+                version,
+                packaging,
+                release,
+                testRelease,
+                sourceDirectory,
+                resourceDirectories,
+                testSourceDirectory,
+                testResourceDirectories,
+                dependencies,
+                managedDependencies,
+                bom,
+                qualifiedDependencies,
+                attachments,
+                natives,
+                plugins,
+                testPlugins,
+                pluginExclusions,
+                aliases,
+                signatures,
+                mainClass,
+                metadata,
+                expressions,
+                relocation,
+                reactor);
     }
 }

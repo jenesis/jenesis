@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>build.jenesis.demo</groupId>
+    <artifactId>jcstress</artifactId>
+    <version>1.0.0</version>
+
+    <build>
+        <sourceDirectory>sources</sourceDirectory>
+    </build>
+
+    <properties>
+        <mainClass>org.openjdk.jcstress.Main</mainClass>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>net.java.dev.jna</groupId>
+                <artifactId>jna</artifactId>
+                <version>5.8.0</version>
+                <!--Checksum/SHA-256/930273cc1c492f25661ea62413a6da3fd7f6e01bf1c4dcc0817fc8696a7b07ac-->
+            </dependency>
+            <dependency>
+                <groupId>net.java.dev.jna</groupId>
+                <artifactId>jna-platform</artifactId>
+                <version>5.8.0</version>
+                <!--Checksum/SHA-256/ffd93fe1bc07de6f33eabf3d051c3636e01a01c17cb0da8448c53a2ac5e3bf7a-->
+            </dependency>
+            <dependency>
+                <groupId>net.sf.jopt-simple</groupId>
+                <artifactId>jopt-simple</artifactId>
+                <version>4.6</version>
+                <!--Checksum/SHA-256/3fcfbe3203c2ea521bf7640484fd35d6303186ea2e08e72f032d640ca067ffda-->
+            </dependency>
+            <dependency>
+                <groupId>org.openjdk.jcstress</groupId>
+                <artifactId>jcstress-core</artifactId>
+                <version>0.16</version>
+                <!--Checksum/SHA-256/58ee119c227bd02a86ad47f32b6165537e42502ef6cc8140d6454b0cac29f6ac-->
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.openjdk.jcstress</groupId>
+            <artifactId>jcstress-core</artifactId>
+            <version>0.16</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjdk.jcstress</groupId>
+            <artifactId>jcstress-core</artifactId>
+            <version>0.16</version>
+            <type>processor</type>
+        </dependency>
+    </dependencies>
+    <!--jenesis.native net.java.dev.jna/jna-->
+    <!--jenesis.pin
+    plugin/maven/net.java.dev.jna/jna 5.8.0 SHA-256/930273cc1c492f25661ea62413a6da3fd7f6e01bf1c4dcc0817fc8696a7b07ac
+    plugin/maven/net.java.dev.jna/jna-platform 5.8.0 SHA-256/ffd93fe1bc07de6f33eabf3d051c3636e01a01c17cb0da8448c53a2ac5e3bf7a
+    plugin/maven/net.sf.jopt-simple/jopt-simple 4.6 SHA-256/3fcfbe3203c2ea521bf7640484fd35d6303186ea2e08e72f032d640ca067ffda
+    plugin/maven/org.openjdk.jcstress/jcstress-core 0.16 SHA-256/58ee119c227bd02a86ad47f32b6165537e42502ef6cc8140d6454b0cac29f6ac
+    -->
+</project>
