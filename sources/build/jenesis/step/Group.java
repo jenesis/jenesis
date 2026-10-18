@@ -9,7 +9,7 @@ import build.jenesis.SequencedProperties;
 
 public class Group implements BuildStep {
 
-    public static final String GROUPS = "groups.properties";
+    public static final String GROUPS = "groups.properties", REACTOR = "reactor.properties";
 
     private final Function<String, Optional<String>> identification;
     private final String requiresPath;
@@ -30,7 +30,7 @@ public class Group implements BuildStep {
     @Override
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
         return arguments.values().stream().anyMatch(argument ->
-                argument.hasChanged(Path.of(IDENTITY), Path.of(requiresPath)));
+                argument.hasChanged(Path.of(IDENTITY), Path.of(requiresPath), Path.of(REACTOR)));
     }
 
     @Override
@@ -38,7 +38,7 @@ public class Group implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        Map<String, Set<String>> from = new HashMap<>(), to = new LinkedHashMap<>();
+        Map<String, Set<String>> from = new HashMap<>(), to = new LinkedHashMap<>(), ordered = new LinkedHashMap<>();
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
             if (entry.getValue().removed()) {
                 continue;
@@ -55,18 +55,44 @@ public class Group implements BuildStep {
                 int second = coordinate.indexOf('/', coordinate.indexOf('/') + 1);
                 requires.add(coordinate.substring(second + 1));
             }
+            ordered.put(name, toProperties(entry.getValue().folder().resolve(REACTOR)));
         }
-        SequencedProperties groups = new SequencedProperties();
+        Map<String, SequencedSet<String>> edges = new LinkedHashMap<>();
         for (Map.Entry<String, Set<String>> entry : to.entrySet()) {
-            groups.setProperty(entry.getKey(), entry.getValue().stream()
+            edges.put(entry.getKey(), entry.getValue().stream()
                     .flatMap(dependency -> from.getOrDefault(dependency,
                             from.getOrDefault(Assign.unclassified(dependency), Set.of())).stream())
-                    .distinct()
                     .filter(name -> !name.equals(entry.getKey()))
-                    .collect(Collectors.joining(",")));
+                    .collect(Collectors.toCollection(LinkedHashSet::new)));
         }
+        for (Map.Entry<String, Set<String>> entry : ordered.entrySet()) {
+            for (String coordinate : new TreeSet<>(entry.getValue())) {
+                for (String target : from.getOrDefault(coordinate, Set.of())) {
+                    if (!target.equals(entry.getKey()) && !reaches(edges, target, entry.getKey())) {
+                        edges.get(entry.getKey()).add(target);
+                    }
+                }
+            }
+        }
+        SequencedProperties groups = new SequencedProperties();
+        edges.forEach((name, targets) -> groups.setProperty(name, String.join(",", targets)));
         groups.store(context.next().resolve(GROUPS));
         return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    private static boolean reaches(Map<String, SequencedSet<String>> edges, String origin, String target) {
+        Set<String> visited = new HashSet<>();
+        Deque<String> queue = new ArrayDeque<>(List.of(origin));
+        while (!queue.isEmpty()) {
+            String current = queue.remove();
+            if (current.equals(target)) {
+                return true;
+            }
+            if (visited.add(current)) {
+                queue.addAll(edges.getOrDefault(current, Collections.emptySortedSet()));
+            }
+        }
+        return false;
     }
 
     private static Set<String> toProperties(Path file) throws IOException {

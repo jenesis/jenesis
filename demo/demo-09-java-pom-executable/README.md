@@ -109,7 +109,7 @@ Every jar is stored once under `jars/`, and the argument file is the launch itse
 `--class-path` and a main class, because this is a non-modular project:
 
     "--class-path"
-    "jars/build.jenesis.demo%2Fjava-pom-executable%2F1.0.0.jar:jars/org.apache.commons.lang3-3.14.0.jar"
+    "jars/build.jenesis.demo~java-pom-executable~1.0.0.jar:jars/org.apache.commons.lang3-3.14.0.jar"
     "sample.Sample"
 
 What `process-java.properties` gives the program's JVM leads both argument files, as it

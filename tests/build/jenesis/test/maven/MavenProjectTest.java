@@ -841,7 +841,7 @@ public class MavenProjectTest {
         for (String manifests : List.of("maven/module-/manifests", "maven/testmodule-/manifests")) {
             Path module = results.get(manifests);
             SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
-            assertThat(requires.stringPropertyNames()).contains("main/runtime/maven/org.example/agent/2.0");
+            assertThat(requires.stringPropertyNames()).contains("main/agent/maven/org.example/agent/2.0");
         }
     }
 
@@ -876,7 +876,9 @@ public class MavenProjectTest {
             Path module = results.get(manifests);
             SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
             assertThat(requires.stringPropertyNames())
-                    .contains("main/runtime/maven/io.opentelemetry.javaagent/opentelemetry-javaagent");
+                    .contains("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent")
+                    .as("an agent is resolved for the runs it joins, never published as a dependency of the module")
+                    .noneMatch(key -> key.startsWith("main/runtime/maven/io.opentelemetry.javaagent/"));
             assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.ATTACHMENTS))).containsOnly(
                     Map.entry("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=value"));
         }
@@ -2441,7 +2443,7 @@ public class MavenProjectTest {
                 .resolve(BuildStep.IDENTITY));
         assertThat(foo.stringPropertyNames()).containsExactly("maven/group/foo/1", "maven/group/foo/pom/1");
         assertThat(foo.getProperty("maven/group/foo/1"))
-                .isEqualTo("../../produce/java/artifacts/jar/output/artifacts/group%2Ffoo%2F1.jar");
+                .isEqualTo("../../produce/java/artifacts/jar/output/artifacts/group~foo~1.jar");
         assertThat(foo.getProperty("maven/group/foo/pom/1"))
                 .isEqualTo("../../../../../identifier/scan/output/pom/foo/pom.xml");
         SequencedProperties bar = SequencedProperties.ofFiles(results
@@ -2449,7 +2451,7 @@ public class MavenProjectTest {
                 .resolve(BuildStep.IDENTITY));
         assertThat(bar.stringPropertyNames()).containsExactly("maven/group/bar/1", "maven/group/bar/pom/1");
         assertThat(bar.getProperty("maven/group/bar/1"))
-                .isEqualTo("../../produce/java/artifacts/jar/output/artifacts/group%2Fbar%2F1.jar");
+                .isEqualTo("../../produce/java/artifacts/jar/output/artifacts/group~bar~1.jar");
         assertThat(bar.getProperty("maven/group/bar/pom/1"))
                 .isEqualTo("../../../../../identifier/scan/output/pom/bar/pom.xml");
         assertThat(results.keySet())
@@ -2459,16 +2461,16 @@ public class MavenProjectTest {
                 .get("maven/build-module-foo/inventory")
                 .resolve("inventory.properties"));
         assertThat(fooInventory.getProperty("module-foo.runtime.0"))
-                .endsWith("/group%2Ffoo%2F1.jar");
+                .endsWith("/group~foo~1.jar");
         assertThat(fooInventory.getProperty("module-foo.artifacts.0"))
-                .endsWith("/group%2Ffoo%2F1.jar");
+                .endsWith("/group~foo~1.jar");
         SequencedProperties barInventory = SequencedProperties.ofFiles(results
                 .get("maven/build-module-bar/inventory")
                 .resolve("inventory.properties"));
         assertThat(barInventory.getProperty("module-bar.runtime.0"))
-                .endsWith("/group%2Fbar%2F1.jar");
+                .endsWith("/group~bar~1.jar");
         assertThat(barInventory.getProperty("module-bar.artifacts.0"))
-                .endsWith("/group%2Fbar%2F1.jar");
+                .endsWith("/group~bar~1.jar");
     }
 
     @Test
@@ -3040,6 +3042,61 @@ public class MavenProjectTest {
                 .contains("main/runtime/maven/group/foo/2");
         assertThat(SequencedProperties.ofFiles(results.get("maven/module-foo/coordinates").resolve(BuildStep.IDENTITY)).stringPropertyNames())
                 .contains("maven/group/foo/2");
+    }
+
+    @Test
+    public void a_commanded_version_replaces_the_version_of_a_sibling_named_as_a_processor() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>HEAD-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>foo</module>
+                        <module>bar</module>
+                    </modules>
+                </project>
+                """);
+        for (String name : List.of("foo", "bar")) {
+            Files.writeString(Files.createDirectory(project.resolve(name)).resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>group</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>HEAD-SNAPSHOT</version>
+                        </parent>
+                        <artifactId>%s</artifactId>
+                        %s
+                    </project>
+                    """.formatted(name, name.equals("bar") ? "<!--jenesis.plugin javac maven/group/foo-->" : ""));
+            Files.writeString(Files.createDirectories(project.resolve(name + "/src/main/java")).resolve("source"), name);
+        }
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addStep("command", (_, context, _) -> {
+            SequencedProperties values = new SequencedProperties();
+            values.setProperty("version", "2");
+            values.store(context.next().resolve(BuildStep.METADATA));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "command");
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-bar/manifests").resolve(BuildStep.REQUIRES)).stringPropertyNames())
+                .as("a sibling named as a processor is the module the build stamps the version on, not a release of the POM's version")
+                .contains("javac/plugin/maven/group/foo/2")
+                .noneMatch(key -> key.endsWith("/HEAD-SNAPSHOT"));
     }
 
     @Test

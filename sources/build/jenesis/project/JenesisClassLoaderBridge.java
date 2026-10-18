@@ -23,6 +23,7 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.TestFramework;
 import build.jenesis.TestFrameworkFactory;
+import build.jenesis.step.ProcessHandler;
 import java.lang.annotation.Annotation;
 import java.lang.module.Configuration;
 import java.lang.reflect.Proxy;
@@ -39,6 +40,8 @@ class JenesisClassLoaderBridge {
 
     private final MethodHandle foreignAccept, foreignResolve;
     private final MethodHandle foreignApply;
+    private final MethodHandle foreignScope;
+    private final AtomicBoolean scoped = new AtomicBoolean();
     private final MethodHandle foreignShouldRun;
     private final MethodHandle foreignShouldCacheRemotely;
 
@@ -133,6 +136,15 @@ class JenesisClassLoaderBridge {
         foreignApply = lookup.findVirtual(foreignBuildStep,
                 "apply",
                 MethodType.methodType(CompletionStage.class, Executor.class, foreignBuildStepContext, SequencedMap.class));
+        MethodHandle scope;
+        try {
+            scope = MethodHandles.publicLookup().findStatic(Class.forName(ProcessHandler.class.getName(), false, loader),
+                    "scope",
+                    MethodType.methodType(Closeable.class));
+        } catch (NoSuchMethodException _) {
+            scope = null;
+        }
+        foreignScope = scope;
         foreignShouldRun = lookup.findVirtual(foreignBuildStep,
                 "shouldRun",
                 MethodType.methodType(boolean.class, SequencedMap.class));
@@ -630,6 +642,16 @@ class JenesisClassLoaderBridge {
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
             try {
+                if (bridge.foreignScope != null && bridge.scoped.compareAndSet(false, true)) {
+                    Closeable foreignScope = (Closeable) bridge.foreignScope.invoke();
+                    Closeable nested = () -> {
+                        bridge.scoped.set(false);
+                        foreignScope.close();
+                    };
+                    if (!ProcessHandler.nest(nested)) {
+                        nested.close();
+                    }
+                }
                 CompletionStage<Object> foreign = (CompletionStage<Object>) bridge.foreignApply.invoke(
                         foreignStep, executor, bridge.toForeignContext(context), bridge.toForeignArguments(arguments));
                 return foreign.thenApply(result -> {

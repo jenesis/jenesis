@@ -166,17 +166,39 @@ public class PinPom implements BuildStep {
             expressed.put(new MavenDependencyKey(raw[0], raw[1], raw[2], raw[3]).coordinate(null, null), coordinate);
         });
         String existing = Files.readString(pomFile);
+        SequencedMap<String, String> managed = new TreeMap<>();
+        SequencedMap<String, String> qualified = new TreeMap<>();
+        for (Map.Entry<String, String> entry : entries.entrySet()) {
+            String key = entry.getKey();
+            int first = key.indexOf('/');
+            int second = key.indexOf('/', first + 1);
+            String group = key.substring(0, first);
+            String repository = second < 0 ? "" : key.substring(first + 1, second);
+            if (repository.equals("maven") && group.equals("main")) {
+                managed.putIfAbsent(key.substring(second + 1), entry.getValue());
+            } else {
+                qualified.put(key, entry.getValue());
+            }
+        }
+        Matcher pinMatcher = PIN_COMMENT.matcher(existing);
+        StringBuilder pinned = new StringBuilder();
+        while (pinMatcher.find()) {
+            pinned.append(pinMatcher.group(2)).append('\n');
+        }
+        List<String> preserved = pinned.isEmpty()
+                ? List.of()
+                : preserveGuarded(pinned.toString(), qualified, managed);
         Matcher dependencyManagementMatcher = DEPENDENCY_MANAGEMENT.matcher(existing);
-        String indent;
-        List<String> imports = new ArrayList<>();
-        SequencedMap<String, String> retained = new LinkedHashMap<>();
+        String indent, updated;
         if (dependencyManagementMatcher.find()) {
             indent = dependencyManagementMatcher.group(1);
+            SequencedMap<String, String> pending = new TreeMap<>(managed);
+            StringBuilder rewritten = new StringBuilder();
             Matcher dependencyMatcher = MANAGED_DEPENDENCY.matcher(dependencyManagementMatcher.group());
             while (dependencyMatcher.find()) {
                 String dependency = dependencyMatcher.group();
                 if (IMPORT_SCOPE.matcher(dependency).find()) {
-                    imports.add(dependency);
+                    dependencyMatcher.appendReplacement(rewritten, Matcher.quoteReplacement(dependency));
                     continue;
                 }
                 String inner = dependency.substring(dependency.indexOf("<dependency>") + "<dependency>".length(),
@@ -201,58 +223,56 @@ public class PinPom implements BuildStep {
                 } while (nested);
                 String children = retaining.substring(retaining.indexOf("\n") + 1);
                 children = children.substring(0, children.lastIndexOf('\n') + 1);
-                if (coordinate.containsKey("groupId") && coordinate.containsKey("artifactId") && !children.isBlank()) {
+                String key = null;
+                if (coordinate.containsKey("groupId") && coordinate.containsKey("artifactId")) {
                     String written = new MavenDependencyKey(coordinate.get("groupId"),
                             coordinate.get("artifactId"),
                             coordinate.get("type"),
                             coordinate.get("classifier")).coordinate(null, null);
-                    retained.putIfAbsent(expressed.getOrDefault(written, written), children);
+                    key = expressed.getOrDefault(written, written);
                 }
+                String value = key == null ? null : pending.remove(key);
+                dependencyMatcher.appendReplacement(rewritten, Matcher.quoteReplacement(value != null
+                        ? renderEntry(key, value, children.isBlank() ? null : children, exclusions, scopes, expressions, indent)
+                        : CHECKSUM_COMMENT.matcher(dependency).find() ? "" : dependency));
             }
+            dependencyMatcher.appendTail(rewritten);
+            StringBuilder added = new StringBuilder();
+            for (Map.Entry<String, String> entry : pending.entrySet()) {
+                added.append(renderEntry(entry.getKey(), entry.getValue(), null, exclusions, scopes, expressions, indent));
+            }
+            int close = rewritten.lastIndexOf("</dependencies>");
+            if (close < 0) {
+                throw new IllegalStateException("The <dependencyManagement> of " + pomFile + " holds no <dependencies>");
+            }
+            rewritten.insert(rewritten.lastIndexOf("\n", close) + 1, added);
+            updated = existing.substring(0, dependencyManagementMatcher.start())
+                    + rewritten
+                    + existing.substring(dependencyManagementMatcher.end());
         } else {
             Matcher indentMatcher = INDENT.matcher(existing);
             indent = indentMatcher.find() ? indentMatcher.group(1) : "    ";
-        }
-        SequencedMap<String, String> managed = new TreeMap<>();
-        SequencedMap<String, String> qualified = new TreeMap<>();
-        for (Map.Entry<String, String> entry : entries.entrySet()) {
-            String key = entry.getKey();
-            int first = key.indexOf('/');
-            int second = key.indexOf('/', first + 1);
-            String group = key.substring(0, first);
-            String repository = second < 0 ? "" : key.substring(first + 1, second);
-            if (repository.equals("maven") && group.equals("main")) {
-                managed.putIfAbsent(key.substring(second + 1), entry.getValue());
+            if (managed.isEmpty()) {
+                updated = existing;
             } else {
-                qualified.put(key, entry.getValue());
-            }
-        }
-        Matcher pinMatcher = PIN_COMMENT.matcher(existing);
-        StringBuilder pinned = new StringBuilder();
-        while (pinMatcher.find()) {
-            pinned.append(pinMatcher.group(2)).append('\n');
-        }
-        List<String> preserved = pinned.isEmpty()
-                ? List.of()
-                : preserveGuarded(pinned.toString(), qualified, managed);
-        String block = managed.isEmpty() && imports.isEmpty()
-                ? ""
-                : renderBlock(imports, managed, retained, exclusions, scopes, expressions, indent);
-        String updated;
-        if (dependencyManagementMatcher.find(0)) {
-            updated = dependencyManagementMatcher.replaceFirst(Matcher.quoteReplacement(block));
-        } else if (block.isEmpty()) {
-            updated = existing;
-        } else {
-            Matcher dependenciesMatcher = DEPENDENCIES_OPEN.matcher(existing);
-            if (dependenciesMatcher.find()) {
-                updated = existing.substring(0, dependenciesMatcher.start()) + block + existing.substring(dependenciesMatcher.start());
-            } else {
-                Matcher projectCloseMatcher = PROJECT_CLOSE.matcher(existing);
-                if (!projectCloseMatcher.find()) {
-                    throw new IllegalStateException("No </project> tag in " + pomFile);
+                StringBuilder block = new StringBuilder();
+                block.append(indent).append("<dependencyManagement>\n");
+                block.append(indent).append(indent).append("<dependencies>\n");
+                for (Map.Entry<String, String> entry : managed.entrySet()) {
+                    block.append(renderEntry(entry.getKey(), entry.getValue(), null, exclusions, scopes, expressions, indent));
                 }
-                updated = existing.substring(0, projectCloseMatcher.start() + 1) + block + existing.substring(projectCloseMatcher.start() + 1);
+                block.append(indent).append(indent).append("</dependencies>\n");
+                block.append(indent).append("</dependencyManagement>\n");
+                Matcher dependenciesMatcher = DEPENDENCIES_OPEN.matcher(existing);
+                if (dependenciesMatcher.find()) {
+                    updated = existing.substring(0, dependenciesMatcher.start()) + block + existing.substring(dependenciesMatcher.start());
+                } else {
+                    Matcher projectCloseMatcher = PROJECT_CLOSE.matcher(existing);
+                    if (!projectCloseMatcher.find()) {
+                        throw new IllegalStateException("No </project> tag in " + pomFile);
+                    }
+                    updated = existing.substring(0, projectCloseMatcher.start() + 1) + block + existing.substring(projectCloseMatcher.start() + 1);
+                }
             }
         }
         Matcher requiresMatcher = PIN_COMMENT.matcher(updated);
@@ -303,7 +323,7 @@ public class PinPom implements BuildStep {
             }
             String coordinate = key.substring(0, lastSlash);
             String version = key.substring(lastSlash + 1);
-            String checksum = dependency.getValue().checksum(hashFunction);
+            String checksum = version.endsWith("-SNAPSHOT") ? null : dependency.getValue().checksum(hashFunction);
             String value = checksum == null ? version : version + " " + checksum;
             if (declared.contains(dependency.getKey())) {
                 entries.put(group + "/" + coordinate, value);
@@ -438,81 +458,74 @@ public class PinPom implements BuildStep {
         return result.toString();
     }
 
-    private static String renderBlock(List<String> imports,
-                                      SequencedMap<String, String> entries,
-                                      SequencedMap<String, String> retained,
+    private static String renderEntry(String key,
+                                      String value,
+                                      String children,
                                       SequencedMap<String, List<String>> exclusions,
                                       SequencedMap<String, String> scopes,
                                       SequencedMap<String, String> expressions,
                                       String indent) {
         StringBuilder sb = new StringBuilder();
-        sb.append(indent).append("<dependencyManagement>\n");
-        sb.append(indent).append(indent).append("<dependencies>\n");
-        imports.forEach(sb::append);
-        for (Map.Entry<String, String> entry : entries.entrySet()) {
-            String[] elements = entry.getKey().split("/");
-            String groupId, artifactId, type, classifier;
-            switch (elements.length) {
-                case 2 -> { groupId = elements[0]; artifactId = elements[1]; type = null; classifier = null; }
-                case 3 -> { groupId = elements[0]; artifactId = elements[1]; type = elements[2]; classifier = null; }
-                case 4 -> { groupId = elements[0]; artifactId = elements[1]; type = elements[2]; classifier = elements[3]; }
-                default -> throw new IllegalArgumentException("Insufficient Maven coordinate: " + entry.getKey());
-            }
-            String value = entry.getValue();
-            int space = value.indexOf(' ');
-            String version = space < 0 ? value : value.substring(0, space);
-            String checksum = space < 0 ? null : value.substring(space + 1).trim();
-            String expression = expressions.get(entry.getKey());
-            if (expression != null) {
-                String[] words = expression.split(" ");
-                String[] raw = words[0].split("/", -1);
-                groupId = raw[0];
-                artifactId = raw[1];
-                type = raw[2].isEmpty() ? type : raw[2];
-                classifier = raw[3].isEmpty() ? classifier : raw[3];
-                if (words.length == 3 && words[2].equals(version)) {
-                    version = words[1];
-                }
-            }
-            String prefix = indent + indent + indent;
-            sb.append(prefix).append("<dependency>\n");
-            sb.append(prefix).append(indent).append("<groupId>").append(groupId).append("</groupId>\n");
-            sb.append(prefix).append(indent).append("<artifactId>").append(artifactId).append("</artifactId>\n");
-            sb.append(prefix).append(indent).append("<version>").append(version).append("</version>\n");
-            if (type != null && !"jar".equals(type)) {
-                sb.append(prefix).append(indent).append("<type>").append(type).append("</type>\n");
-            }
-            if (classifier != null) {
-                sb.append(prefix).append(indent).append("<classifier>").append(classifier).append("</classifier>\n");
-            }
-            String children = retained.get(entry.getKey());
-            List<String> excluded = exclusions.get(entry.getKey());
-            String scope = scopes.get(entry.getKey());
-            if (children == null && scope != null) {
-                sb.append(prefix).append(indent).append("<scope>").append(scope).append("</scope>\n");
-            }
-            if (children != null) {
-                sb.append(children);
-            } else if (excluded != null && !excluded.isEmpty()) {
-                sb.append(prefix).append(indent).append("<exclusions>\n");
-                for (String exclusion : excluded) {
-                    int slash = exclusion.indexOf('/');
-                    sb.append(prefix).append(indent).append(indent).append("<exclusion>\n");
-                    sb.append(prefix).append(indent).append(indent).append(indent)
-                            .append("<groupId>").append(exclusion, 0, slash).append("</groupId>\n");
-                    sb.append(prefix).append(indent).append(indent).append(indent)
-                            .append("<artifactId>").append(exclusion.substring(slash + 1)).append("</artifactId>\n");
-                    sb.append(prefix).append(indent).append(indent).append("</exclusion>\n");
-                }
-                sb.append(prefix).append(indent).append("</exclusions>\n");
-            }
-            if (checksum != null) {
-                sb.append(prefix).append(indent).append("<!--Checksum/").append(checksum).append("-->\n");
-            }
-            sb.append(prefix).append("</dependency>\n");
+        String[] elements = key.split("/");
+        String groupId, artifactId, type, classifier;
+        switch (elements.length) {
+            case 2 -> { groupId = elements[0]; artifactId = elements[1]; type = null; classifier = null; }
+            case 3 -> { groupId = elements[0]; artifactId = elements[1]; type = elements[2]; classifier = null; }
+            case 4 -> { groupId = elements[0]; artifactId = elements[1]; type = elements[2]; classifier = elements[3]; }
+            default -> throw new IllegalArgumentException("Insufficient Maven coordinate: " + key);
         }
-        sb.append(indent).append(indent).append("</dependencies>\n");
-        sb.append(indent).append("</dependencyManagement>\n");
+        int space = value.indexOf(' ');
+        String version = space < 0 ? value : value.substring(0, space);
+        String checksum = space < 0 ? null : value.substring(space + 1).trim();
+        String pinned = version, expression = expressions.get(key);
+        if (expression != null) {
+            String[] words = expression.split(" ");
+            String[] raw = words[0].split("/", -1);
+            groupId = raw[0];
+            artifactId = raw[1];
+            type = raw[2].isEmpty() ? type : raw[2];
+            classifier = raw[3].isEmpty() ? classifier : raw[3];
+            if (words.length == 3 && words[2].equals(version)) {
+                version = words[1];
+            }
+        }
+        String prefix = indent + indent + indent;
+        sb.append(prefix).append("<dependency>\n");
+        sb.append(prefix).append(indent).append("<groupId>").append(groupId).append("</groupId>\n");
+        sb.append(prefix).append(indent).append("<artifactId>").append(artifactId).append("</artifactId>\n");
+        sb.append(prefix).append(indent).append("<version>").append(version).append("</version>\n");
+        if (type != null && !"jar".equals(type)) {
+            sb.append(prefix).append(indent).append("<type>").append(type).append("</type>\n");
+        }
+        if (classifier != null) {
+            sb.append(prefix).append(indent).append("<classifier>").append(classifier).append("</classifier>\n");
+        }
+        List<String> excluded = exclusions.get(key);
+        String scope = scopes.get(key);
+        if (children == null && scope != null) {
+            sb.append(prefix).append(indent).append("<scope>").append(scope).append("</scope>\n");
+        }
+        if (children != null) {
+            sb.append(children);
+        } else if (excluded != null && !excluded.isEmpty()) {
+            sb.append(prefix).append(indent).append("<exclusions>\n");
+            for (String exclusion : excluded) {
+                int slash = exclusion.indexOf('/');
+                sb.append(prefix).append(indent).append(indent).append("<exclusion>\n");
+                sb.append(prefix).append(indent).append(indent).append(indent)
+                        .append("<groupId>").append(exclusion, 0, slash).append("</groupId>\n");
+                sb.append(prefix).append(indent).append(indent).append(indent)
+                        .append("<artifactId>").append(exclusion.substring(slash + 1)).append("</artifactId>\n");
+                sb.append(prefix).append(indent).append(indent).append("</exclusion>\n");
+            }
+            sb.append(prefix).append(indent).append("</exclusions>\n");
+        }
+        if (checksum != null) {
+            sb.append(prefix).append(indent).append("<!--Checksum/").append(checksum)
+                    .append(version.equals(pinned) ? "" : " " + pinned)
+                    .append("-->\n");
+        }
+        sb.append(prefix).append("</dependency>\n");
         return sb.toString();
     }
 }
