@@ -128,6 +128,7 @@ Quick index
 | 76 | [`discovery-maven`](demo-76-discovery-maven/README.md)            | The same for a Maven dependency, from a release or a Maven repository        | `java build/jenesis/Execute.java` |
 | 77 | [`jpx`](demo-77-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
 | 78 | [`tools-api`](demo-78-tools-api/README.md)                        | Run a build, or a published program, inside another program's JVM            | `java build/Demo.java`            |
+| 79 | [`asciidoctor`](demo-79-asciidoctor/README.md)                    | Convert the project's AsciiDoc documents and stage them beside its modules   | `java build/jenesis/Make.java stage` |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -668,6 +669,10 @@ The linters report; the formatter fails the build when a source is not already
 formatted, and one switch flips it to rewriting in place:
 
     java -Djenesis.format.rewrite=true build/jenesis/Make.java
+
+Its `openrewrite` profile runs OpenRewrite before the formatter: an
+`openrewrite.properties` names the recipes, a `rewrite.yml` beside it declares the
+project's own, and the same switch applies what they would change.
 
 ## 30. The framework that runs the tests - [`test-framework`](demo-38-test-framework/README.md)
 
@@ -1263,3 +1268,18 @@ Three settings cannot be honoured in-process, because they replace the process a
 build runs in - naming another JDK with `jenesis.toolchain.version`, or a container
 with `jenesis.project.docker` or `jenesis.execute.docker` - and each is refused by
 name rather than ignored. Reach for the `jenesis` command there.
+
+## 61. The project's own documents - [`asciidoctor`](demo-79-asciidoctor/README.md)
+
+A project's manual is written beside its code and published with it. An
+`asciidoctor.properties` in the configuration folder converts the AsciiDoc
+documents of `docs/` once for the whole project, after every module is built, and
+`stage` places them beside the modules:
+
+    java build/jenesis/Make.java stage
+    # target/stage/project/output/docs/index.html
+
+Every `.adoc` file keeps its folder, a file whose name starts with `_` is only
+included, and every other file is copied as it stands. The lines of the file are
+AsciiDoc attributes (`attribute.<name>=<value>`), the backend and the output
+folder, and `@docs=<folder>` reads another folder than `docs/`.

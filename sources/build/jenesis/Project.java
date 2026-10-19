@@ -1596,6 +1596,13 @@ public record Project(
                           configFile -> formatter=eclipse with profile=<the profile Eclipse exports,
                           beside it> (37); Spotless's importOrder and the
                           formatter plugin's import and cache settings have no counterpart
+                      rewrite-maven-plugin / org.openrewrite.rewrite, activeRecipes and rewrite.yml
+                          -> openrewrite.properties with recipes=<recipe>[,...] and the rewrite.yml
+                          beside it (37), run before the Java formatter over the module's sources
+                          with its dependencies as the class path; rewrite:dryRun / rewriteDryRun
+                          is the default, which fails the build printing the diff, rewrite:run /
+                          rewriteRun is -Djenesis.format.rewrite=true; a recipe library ->
+                          @jenesis.plugin openrewrite:tool <coordinate> in the module-info.java
                       Spotless ktlint() / the same -> .editorconfig (47)
                       Spotless ktfmt() / the same -> ktfmt.properties (47): style=google for googleStyle(),
                           kotlinlang for kotlinlangStyle(), meta, the default, otherwise;
@@ -1760,6 +1767,13 @@ public record Project(
                           format=javadoc, the DokkaBase plugin's footerMessage -> footer-message; includes, customAssets and customStyleSheets have
                           no counterpart, an unknown key fails the build, and a Gradle source set or
                           a multi-module aggregate has none either: each module is documented alone
+                      asciidoctor-maven-plugin process-asciidoc / org.asciidoctor.jvm.convert
+                          -> asciidoctor.properties in the configuration folder (79), which converts
+                          the documents of docs/, or of the folder @docs=<folder> binds, once for
+                          the whole project, staged as target/stage/project/output/docs/;
+                          attributes -> attribute.<name>=<value>, backend -> backend=html5 or
+                          docbook5, outputDirectory -> output=<folder below the staged project
+                          files>; a file whose name starts with _ is a partial, only included
                       maven-shade-plugin / shadow -> launcher=true, one executable jar (9)
                       Spring Boot repackage / bootJar -> launcher=true, one executable jar (9), or
                           bundle=true, its jars and the argument file that launches them (11)
@@ -2548,8 +2562,9 @@ public record Project(
 
                     The plugins of jenesis/jenesis-plugins need no line: the build resolves each by its
                     module name where its own file is found - checkstyle.xml, pmd.xml, xjc.properties,
-                    jacoco.properties and the like in a configuration folder, a .kt, .scala or .groovy
-                    source, a jreleaser.yml at the project's root - and that file's values reach it, so
+                    jacoco.properties, openrewrite.properties, asciidoctor.properties and the like in a
+                    configuration folder, a .kt, .scala or .groovy source, a jreleaser.yml at the
+                    project's root - and that file's values reach it, so
                     plugin-<name>.properties is for no plugin of theirs. Its setting switches it off as
                     a built-in tool's does (jenesis.source.pmd=ignore, jenesis.generate.xjc=false, ...).
 
@@ -2775,7 +2790,7 @@ public record Project(
                 case "demos" -> """
                     # Jenesis - Copy a demo
 
-                    78 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    79 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -2842,6 +2857,8 @@ public record Project(
                                          publisher's own domain, as a module or by coordinate),
                                          77 jpx (run a released program without building),
                                          78 tools-api (a build inside another program's JVM)
+                      Documenting it     79 asciidoctor (AsciiDoc documents converted for the whole
+                                         project and staged beside its modules)
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
@@ -2957,16 +2974,19 @@ public record Project(
                     new Divergence(paths, printing, palette),
                     built);
             if (!plugins.resolutions().isEmpty()) {
+                SequencedSet<String> tooled = new LinkedHashSet<>(released);
+                built.stream()
+                        .filter(key -> Stream.of(ProjectPlugins.PREPROCESS, ProjectPlugins.POSTPROCESS)
+                                .anyMatch(hook -> key.startsWith(BuildExecutorModule.PREVIOUS + BUILD + "/" + hook + "/")))
+                        .forEach(tooled::add);
                 buildExecutor.addModule("plugins", (pinned, given) -> {
                     pinned.addModule(ProjectPlugins.RESOLVED, plugins.resolution());
                     SequencedSet<String> inputs = new LinkedHashSet<>(List.of(ProjectPlugins.RESOLVED));
-                    given.sequencedKeySet().stream()
-                            .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + prefix))
-                            .forEach(inputs::add);
+                    inputs.addAll(given.sequencedKeySet());
                     pinned.addStep("file", new PluginPins(plugins.pins(),
                             new LinkedHashSet<>(plugins.resolutions().sequencedKeySet()),
                             hashFunction), inputs);
-                }, released);
+                }, tooled);
             }
         }
     }
@@ -3490,6 +3510,46 @@ public record Project(
             project = project.configuration(locations(environment, configuration, project).toArray(Path[]::new));
             project = project.boms(project.configuration().toArray(Path[]::new));
             project = project.signatures(project.configuration().toArray(Path[]::new));
+        }
+        Path asciidoctor = BuildStep.locate(project.configuration(), ProjectPlugins.ASCIIDOCTOR + ".properties");
+        if (asciidoctor != null && environment.flag("project.asciidoctor", true)) {
+            if (project.plugins.resolutions().containsKey(ProjectPlugins.ASCIIDOCTOR)) {
+                throw new IllegalArgumentException("The plugin " + ProjectPlugins.ASCIIDOCTOR + " in " + file + " takes"
+                        + " the name of the plugin the build converts the project's documents with by itself where a"
+                        + " configuration folder holds " + asciidoctor.getFileName() + " - remove its line");
+            }
+            SequencedMap<String, String> given = new LinkedHashMap<>();
+            try {
+                SequencedProperties.ofFiles(asciidoctor).forEachProperty(given::put);
+            } catch (IOException e) {
+                throw new UncheckedIOException("Cannot read " + asciidoctor, e);
+            }
+            if (given.keySet().stream().noneMatch(key -> key.equals("@" + ProjectPlugins.DOCS)
+                    || key.startsWith("@" + ProjectPlugins.DOCS + "/"))) {
+                if (!Files.isDirectory(project.root().resolve(ProjectPlugins.DOCS))) {
+                    throw new IllegalArgumentException(asciidoctor + " converts the documents of "
+                            + ProjectPlugins.DOCS + "/, which the project does not hold - create it, or bind the"
+                            + " folder that holds them with @" + ProjectPlugins.DOCS + "=<folder>");
+                }
+                given.put("@" + ProjectPlugins.DOCS, ProjectPlugins.DOCS);
+            }
+            ExternalModule official = ExternalModule.official(environment, ProjectPlugins.ASCIIDOCTOR, null, Map.of(), Map.of());
+            Path documented = project.root();
+            SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> transforms = new LinkedHashMap<>(project.plugins.transforms());
+            transforms.put(ProjectPlugins.ASCIIDOCTOR, values -> {
+                if (!values.isEmpty()) {
+                    throw new IllegalArgumentException("The plugin " + ProjectPlugins.ASCIIDOCTOR + " takes its values"
+                            + " from " + asciidoctor + ", not from jenesis.plugins.arguments.properties - write "
+                            + String.join(", ", values.sequencedKeySet()) + " there");
+                }
+                return official.configured(documented, documented, given);
+            });
+            SequencedMap<String, BuildExecutorModule> resolutions = new LinkedHashMap<>(project.plugins.resolutions());
+            resolutions.put(ProjectPlugins.ASCIIDOCTOR, official.resolution());
+            project = project.plugins(project.plugins.pins(project.root().resolve("jenesis.plugins.pin.properties"))
+                    .arguments(project.root().resolve("jenesis.plugins.arguments.properties"))
+                    .transforms(transforms)
+                    .resolutions(resolutions));
         }
         String boms = environment.getProperty("project.boms");
         if (boms != null) {
@@ -4531,6 +4591,7 @@ public record Project(
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.resources||Comma-separated <path>:<target> pairs of project files or folders placed among the resources of every module, as NOTICE:META-INF/NOTICE,LICENSE:META-INF/LICENSE
                 project.plugins|true|false leaves out every plugin that jenesis.plugins.properties names, while pin still pins those of the whole project
+                project.asciidoctor|true|Asciidoctor, activated by an asciidoctor.properties of the configuration folder, converting the documents of docs/ or of the folder its @docs line binds and staging them with the project's files
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache; a file a project provides names only a folder inside the project
                 project.docker|false|Run the whole build inside a container
                 project.image||Image for that container
@@ -4658,6 +4719,7 @@ public record Project(
                 validator.forbiddenapis|report|ignore|report|strict: forbiddenapis, activated by a forbiddenapis.properties; ignore skips it, report records its findings, strict fails the build on any of them
                 validator.jdeps|report|ignore|report|strict: jdeps --jdk-internals, activated by a jdeps.properties; ignore skips it, report records the JDK internal APIs the classes use, strict fails the build on any of them
                 validator.jdeprscan|report|ignore|report|strict: jdeprscan, activated by a jdeprscan.properties; ignore skips it, report records the uses of APIs deprecated for removal, strict fails the build on any of them
+                format.openrewrite|true|OpenRewrite, activated by an openrewrite.properties naming its recipes, with the rewrite.yml beside it; it runs before the Java formatter and reads the module's dependencies
                 format.java|true|The Java formatter a javaformat.properties selects - google, palantir or eclipse - with its options
                 format.ktlint|true|ktlint formatting, activated by an .editorconfig
                 format.ktfmt|true|ktfmt formatting, activated by a ktfmt.properties, which names its style and what it does to the imports; refused beside ktlint formatting the same sources

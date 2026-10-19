@@ -12,13 +12,15 @@ import build.jenesis.step.Bind;
 
 public class InferredSourceFormattingModule implements BuildExecutorModule {
 
-    public static final String JAVA = "java", KTFMT = "ktfmt", KTLINT = "ktlint", SCALAFMT = "scalafmt";
+    public static final String OPENREWRITE = "openrewrite", JAVA = "java", KTFMT = "ktfmt", KTLINT = "ktlint", SCALAFMT = "scalafmt";
     private static final String LICENSE = "license", TEXT = "text", FORMATTER = "formatter", PROFILE = "profile";
 
     private final SequencedSet<Path> configuration;
     private final boolean verify;
     private final LicenseHeaderModule licenseModule;
     private final Function<LicenseHeaderModule, BuildExecutorModule> license;
+    private final ExternalModule openRewriteModule;
+    private final boolean openrewrite;
     private final ExternalModule googleJavaFormatModule;
     private final ExternalModule palantirJavaFormatModule;
     private final ExternalModule eclipseJavaFormatModule;
@@ -29,6 +31,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     private final boolean ktlint;
     private final ExternalModule scalafmtModule;
     private final boolean scalafmt;
+    private final SequencedSet<String> dependencies;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredSourceFormattingModule(SequencedSet<Path> configuration,
@@ -38,6 +41,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 true,
                 new LicenseHeaderModule(),
                 value -> value,
+                ExternalModule.official(Environment.NONE, "openrewrite", null, repositories, resolvers),
+                true,
                 ExternalModule.official(Environment.NONE, "googlejavaformat", null, repositories, resolvers),
                 ExternalModule.official(Environment.NONE, "palantir", null, repositories, resolvers),
                 ExternalModule.official(Environment.NONE, "eclipse", null, repositories, resolvers),
@@ -48,6 +53,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 true,
                 ExternalModule.official(Environment.NONE, "scalafmt", "format", repositories, resolvers),
                 true,
+                Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap());
     }
 
@@ -59,6 +65,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 true,
                 new LicenseHeaderModule(),
                 value -> value,
+                ExternalModule.official(environment, "openrewrite", null, repositories, resolvers),
+                true,
                 ExternalModule.official(environment, "googlejavaformat", null, repositories, resolvers),
                 ExternalModule.official(environment, "palantir", null, repositories, resolvers),
                 ExternalModule.official(environment, "eclipse", null, repositories, resolvers),
@@ -69,6 +77,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 true,
                 ExternalModule.official(environment, "scalafmt", "format", repositories, resolvers),
                 true,
+                Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap());
         Boolean rewrite = environment.flagOrNull("format.rewrite");
         if (rewrite != null) {
@@ -77,6 +86,9 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         Boolean license = environment.flagOrNull("format.license");
         if (license != null) {
             module = module.license(license ? value -> value : null);
+        }
+        if (!environment.flag("format.openrewrite", true)) {
+            module = module.openrewrite(false);
         }
         if (!environment.flag("format.java", true)) {
             module = module.java(false);
@@ -97,6 +109,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                                            boolean verify,
                                            LicenseHeaderModule licenseModule,
                                            Function<LicenseHeaderModule, BuildExecutorModule> license,
+                                           ExternalModule openRewriteModule,
+                                           boolean openrewrite,
                                            ExternalModule googleJavaFormatModule,
                                            ExternalModule palantirJavaFormatModule,
                                            ExternalModule eclipseJavaFormatModule,
@@ -107,11 +121,14 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                                            boolean ktlint,
                                            ExternalModule scalafmtModule,
                                            boolean scalafmt,
+                                           SequencedSet<String> dependencies,
                                            SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
         this.verify = verify;
         this.licenseModule = licenseModule;
         this.license = license;
+        this.openRewriteModule = openRewriteModule;
+        this.openrewrite = openrewrite;
         this.googleJavaFormatModule = googleJavaFormatModule;
         this.palantirJavaFormatModule = palantirJavaFormatModule;
         this.eclipseJavaFormatModule = eclipseJavaFormatModule;
@@ -122,6 +139,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         this.ktlint = ktlint;
         this.scalafmtModule = scalafmtModule;
         this.scalafmt = scalafmt;
+        this.dependencies = dependencies;
         this.custom = custom;
     }
 
@@ -130,6 +148,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 licenseModule,
                 license,
+                openRewriteModule,
+                openrewrite,
                 googleJavaFormatModule,
                 palantirJavaFormatModule,
                 eclipseJavaFormatModule,
@@ -140,6 +160,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                dependencies,
                 custom);
     }
 
@@ -148,6 +169,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 licenseModule,
                 license,
+                openRewriteModule,
+                openrewrite,
                 googleJavaFormatModule,
                 palantirJavaFormatModule,
                 eclipseJavaFormatModule,
@@ -158,6 +181,28 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                dependencies,
+                custom);
+    }
+
+    public InferredSourceFormattingModule openrewrite(boolean openrewrite) {
+        return new InferredSourceFormattingModule(configuration,
+                verify,
+                licenseModule,
+                license,
+                openRewriteModule,
+                openrewrite,
+                googleJavaFormatModule,
+                palantirJavaFormatModule,
+                eclipseJavaFormatModule,
+                java,
+                ktfmtModule,
+                ktfmt,
+                ktlintModule,
+                ktlint,
+                scalafmtModule,
+                scalafmt,
+                dependencies,
                 custom);
     }
 
@@ -166,6 +211,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 licenseModule,
                 license,
+                openRewriteModule,
+                openrewrite,
                 googleJavaFormatModule,
                 palantirJavaFormatModule,
                 eclipseJavaFormatModule,
@@ -176,6 +223,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                dependencies,
                 custom);
     }
 
@@ -184,6 +232,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 licenseModule,
                 license,
+                openRewriteModule,
+                openrewrite,
                 googleJavaFormatModule,
                 palantirJavaFormatModule,
                 eclipseJavaFormatModule,
@@ -194,6 +244,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                dependencies,
                 custom);
     }
 
@@ -202,6 +253,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 licenseModule,
                 license,
+                openRewriteModule,
+                openrewrite,
                 googleJavaFormatModule,
                 palantirJavaFormatModule,
                 eclipseJavaFormatModule,
@@ -212,6 +265,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                dependencies,
                 custom);
     }
 
@@ -220,6 +274,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 licenseModule,
                 license,
+                openRewriteModule,
+                openrewrite,
                 googleJavaFormatModule,
                 palantirJavaFormatModule,
                 eclipseJavaFormatModule,
@@ -230,6 +286,28 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                dependencies,
+                custom);
+    }
+
+    public InferredSourceFormattingModule dependencies(SequencedSet<String> dependencies) {
+        return new InferredSourceFormattingModule(configuration,
+                verify,
+                licenseModule,
+                license,
+                openRewriteModule,
+                openrewrite,
+                googleJavaFormatModule,
+                palantirJavaFormatModule,
+                eclipseJavaFormatModule,
+                java,
+                ktfmtModule,
+                ktfmt,
+                ktlintModule,
+                ktlint,
+                scalafmtModule,
+                scalafmt,
+                dependencies,
                 custom);
     }
 
@@ -238,6 +316,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 licenseModule,
                 license,
+                openRewriteModule,
+                openrewrite,
                 googleJavaFormatModule,
                 palantirJavaFormatModule,
                 eclipseJavaFormatModule,
@@ -248,6 +328,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                dependencies,
                 custom);
     }
 
@@ -267,9 +348,13 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        SequencedSet<String> inputs = new LinkedHashSet<>(inherited.sequencedKeySet());
+        SequencedSet<String> inputs = inherited.sequencedKeySet().stream()
+                .filter(key -> dependencies.stream()
+                        .map(name -> PREVIOUS + name)
+                        .noneMatch(name -> key.equals(name) || key.startsWith(name + "/")))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
         if (Bind.configuredByProperties(buildExecutor,
-                inherited.sequencedKeySet(),
+                new LinkedHashSet<>(inputs),
                 LICENSE,
                 license,
                 LicenseHeaderModule.configurationFile(configuration),
@@ -283,6 +368,20 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                     return licenseModule.verify(verify).text(properties.value(TEXT));
                 })) {
             inputs.add(LICENSE);
+        }
+        Path openRewriteFile = BuildStep.locate(configuration, "openrewrite.properties");
+        if (openRewriteFile != null && openrewrite) {
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(openRewriteFile).forEachProperty(values::put);
+            ExternalModule module = openRewriteModule.properties(values);
+            Path recipes = openRewriteFile.resolveSibling("rewrite.yml");
+            if (Files.isRegularFile(recipes)) {
+                module = module.bound(ExternalModule.RULES, recipes.getFileName(), recipes);
+            }
+            SequencedSet<String> rewritten = new LinkedHashSet<>(inputs);
+            inherited.sequencedKeySet().stream().filter(key -> !inputs.contains(key)).forEach(rewritten::add);
+            buildExecutor.addModule(OPENREWRITE, module, rewritten);
+            inputs.add(OPENREWRITE);
         }
         Path javaFormat = BuildStep.locate(configuration, "javaformat.properties");
         if (javaFormat != null && java) {

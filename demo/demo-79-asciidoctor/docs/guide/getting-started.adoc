@@ -1,0 +1,3 @@
+= Getting started
+
+Call `new Greeter().greet("reader")` and print what it returns.
