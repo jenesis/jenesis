@@ -46,15 +46,16 @@ as `build.jenesis/eclipse/`, is read only under that profile:
     |   |-- forbidden-signatures.txt  the project's own forbidden calls
     |   |-- jdeps.properties       switches jdeps on (JDK internal APIs the classes use)
     |   |-- jdeprscan.properties   switches jdeprscan on (APIs deprecated for removal)
-    |   |-- javaformat.properties  selects google-java-format, with its options
+    |   |-- googlejavaformat.properties  switches google-java-format on, with its options
     |   |-- licenseheader.properties  the license header every source starts with
     |   |-- eclipse/
-    |   |   |-- javaformat.properties  selects the Eclipse formatter, under a profile
+    |   |   |-- eclipse.properties     switches the Eclipse formatter on, under a profile
     |   |   `-- eclipse-formatter.xml  the formatter profile Eclipse exports
     |   |-- openrewrite/
     |   |   `-- rewrite.yml        switches OpenRewrite on, under a profile: its recipes
     |   `-- spdx/
     |       `-- licenseheader.properties  no text: the header is derived, under a profile
+    |-- jenesis-eclipse.properties  switches google-java-format off under the eclipse profile
     |-- project.properties         the license and copyright the derived header names
     `-- sources
         |-- module-info.java
@@ -73,7 +74,7 @@ script:
     forbiddenapis.properties    -> forbiddenapis
     jdeps.properties            -> jdeps
     jdeprscan.properties        -> jdeprscan
-    javaformat.properties       -> the Java formatter it selects
+    googlejavaformat.properties -> google-java-format
     licenseheader.properties    -> the license header check
 
 jdeps and jdeprscan are tools of the JDK and the license header check is part of
@@ -114,7 +115,7 @@ skips the tool. It is named after the part of the build the tool runs in:
 
     jenesis.check.<tool>         the source checks: Checkstyle, PMD, ...
     jenesis.validate.<tool>      the checks of the classes: SpotBugs, forbiddenapis, jdeps, jdeprscan
-    jenesis.format.<tool>        the formatters: openrewrite, java (whichever javaformat.properties selects), license
+    jenesis.format.<tool>        the formatters: openrewrite, googlejavaformat, palantir, eclipse, license
 
 A plugin of the project's own, which `jenesis.plugins.properties` names, is
 switched by `jenesis.plugin.<name>` instead, so it shares no setting with an
@@ -209,11 +210,11 @@ whatever it is called. Moved out of this demo, the file is named relative to
 Formatting: verify, and how to reformat
 ---------------------------------------
 
-The Java formatter is selected by `javaformat.properties`: its `formatter` line
-names `google`, `palantir` or `eclipse`, and its other lines are that
-formatter's options. This demo's selects google-java-format:
+Each Java formatter is switched on by a file named after it, whose lines are
+its options: `googlejavaformat.properties`, `palantir.properties` or
+`eclipse.properties`. This demo's `googlejavaformat.properties` switches
+google-java-format on:
 
-    formatter=google
     reflow=false
 
 The formatter runs in *verify* mode. It never rewrites your sources during a
@@ -231,9 +232,10 @@ google-java-format takes these options:
                           ones, both (the default), or none
 
 A key the formatter does not take fails the build, naming the keys it does take,
-and a changed option verifies every source again. A `formatter` other than the
-three fails the build as well. Palantir Java Format, `formatter=palantir`, takes
-`reflow` and `imports` alike.
+and a changed option verifies every source again. Palantir Java Format, switched
+on by a `palantir.properties`, takes `reflow` and `imports` alike. Two Java
+formatters would fight over the same sources, so a build that finds the files of
+two fails, naming them.
 
 To apply the formatter and rewrite the sources in place, run the build with the
 rewrite switch:
@@ -245,16 +247,20 @@ After a rewrite, a plain `java build/jenesis/Make.java` passes the verify gate
 again.
 
 The `eclipse` profile formats with the Eclipse formatter instead. Its
-`build.jenesis/eclipse/` folder holds a `javaformat.properties` of its own:
+`build.jenesis/eclipse/` folder holds an `eclipse.properties`:
 
-    formatter=eclipse
-    profile=eclipse-formatter.xml
+    configuration=eclipse-formatter.xml
 
-A profile's folder is searched before `build.jenesis/`, so under the profile
-this file takes the place of the one selecting google-java-format, and the two
-formatters never fight over the same sources. `profile` names the formatter
-profile Eclipse exports, relative to the properties file, here indenting by two
-spaces, so the same source passes it:
+`configuration` names the formatter profile Eclipse exports, relative to the
+properties file, here indenting by two spaces. An `eclipse-formatter.xml` in a
+configuration folder switches the Eclipse formatter on alone as well, where no
+`eclipse.properties` names another file. The profile's own
+`jenesis-eclipse.properties` switches google-java-format off, so the two never
+fight over the same sources:
+
+    jenesis.format.googlejavaformat=false
+
+The same source passes the Eclipse formatter:
 
     java -Djenesis.make.profiles=eclipse build/jenesis/Make.java
 
@@ -405,7 +411,7 @@ the same sources on every day it runs:
     java -Djenesis.format.rewrite=true build/jenesis/Make.java
 
 `-Djenesis.format.license=false` skips the check, as
-`-Djenesis.format.java=false` skips the Java formatter.
+`-Djenesis.format.googlejavaformat=false` skips google-java-format.
 
 Pinning
 -------
