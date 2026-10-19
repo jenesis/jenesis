@@ -17,6 +17,7 @@ import build.jenesis.LanguageFactory;
 import build.jenesis.ObservabilityEngine;
 import build.jenesis.ObservabilityFactory;
 import build.jenesis.Observation;
+import build.jenesis.PathPlacement;
 import build.jenesis.Permits;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
@@ -66,7 +67,8 @@ class JenesisClassLoaderBridge {
 
     private final byte[] origin;
 
-    static JenesisClassLoaderBridge of(String plugin, List<Path> artifacts) throws ReflectiveOperationException, IOException {
+    static JenesisClassLoaderBridge of(String plugin, List<Path> artifacts, PathPlacement pathPlacement)
+            throws ReflectiveOperationException, IOException {
         MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("SHA-256");
@@ -91,7 +93,7 @@ class JenesisClassLoaderBridge {
         if (kept != null) {
             return kept;
         }
-        JenesisClassLoaderBridge bridge = new JenesisClassLoaderBridge(artifacts, origin);
+        JenesisClassLoaderBridge bridge = new JenesisClassLoaderBridge(artifacts, pathPlacement, origin);
         WARMED.put(plugin, new Warmed(origin, new SoftReference<>(bridge)));
         return bridge;
     }
@@ -99,28 +101,45 @@ class JenesisClassLoaderBridge {
     private record Warmed(byte[] origin, SoftReference<JenesisClassLoaderBridge> bridge) {
     }
 
-    private JenesisClassLoaderBridge(List<Path> artifacts, byte[] origin) throws ReflectiveOperationException, IOException {
-        ModuleFinder finder = ModuleFinder.of(artifacts.toArray(Path[]::new));
-        Set<String> roots = finder.findAll().stream()
-                .map(ref -> ref.descriptor().name())
-                .collect(Collectors.toUnmodifiableSet());
-        if (roots.isEmpty()) {
-            throw new IllegalStateException("No modules found in " + artifacts);
+    private JenesisClassLoaderBridge(List<Path> artifacts, PathPlacement pathPlacement, byte[] origin)
+            throws ReflectiveOperationException, IOException {
+        List<Path> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
+        for (Path artifact : artifacts) {
+            (pathPlacement.test(artifact) ? modulePath : classPath).add(artifact);
         }
-        Configuration config = ModuleLayer.boot().configuration()
-                .resolveAndBind(finder, ModuleFinder.of(), roots);
-        controller = ModuleLayer.defineModulesWithOneLoader(
-                config, List.of(ModuleLayer.boot()), ClassLoader.getPlatformClassLoader());
-        layer = controller.layer();
-        loader = layer.findLoader(roots.iterator().next());
+        Module hostModule = JenesisClassLoaderBridge.class.getModule();
+        ClassLoader parent = ClassLoader.getPlatformClassLoader();
+        if (!classPath.isEmpty()) {
+            List<URL> urls = new ArrayList<>(classPath.size());
+            for (Path artifact : classPath) {
+                urls.add(artifact.toUri().toURL());
+            }
+            parent = new URLClassLoader("plugin", urls.toArray(URL[]::new), parent);
+            hostModule.addReads(parent.getUnnamedModule());
+        }
+        if (modulePath.isEmpty()) {
+            controller = null;
+            layer = null;
+            loader = parent;
+        } else {
+            ModuleFinder finder = ModuleFinder.of(modulePath.toArray(Path[]::new));
+            Set<String> roots = finder.findAll().stream()
+                    .map(ref -> ref.descriptor().name())
+                    .collect(Collectors.toUnmodifiableSet());
+            Configuration config = ModuleLayer.boot().configuration()
+                    .resolveAndBind(finder, ModuleFinder.of(), roots);
+            controller = ModuleLayer.defineModulesWithOneLoader(config, List.of(ModuleLayer.boot()), parent);
+            layer = controller.layer();
+            loader = layer.findLoader(roots.iterator().next());
+            for (Module foreignModule : layer.modules()) {
+                hostModule.addReads(foreignModule);
+            }
+        }
         foreignBuildExecutor = Class.forName(BuildExecutor.class.getName(), false, loader);
         foreignBuildExecutorModule = Class.forName(BuildExecutorModule.class.getName(), false, loader);
-        Module hostModule = JenesisClassLoaderBridge.class.getModule();
-        Module foreignJenesis = foreignBuildExecutor.getModule();
-        for (Module foreignModule : layer.modules()) {
-            hostModule.addReads(foreignModule);
+        if (layer != null && foreignBuildExecutor.getModule().getLayer() == layer) {
+            controller.addOpens(foreignBuildExecutor.getModule(), BuildExecutor.class.getPackageName(), hostModule);
         }
-        controller.addOpens(foreignJenesis, BuildExecutor.class.getPackageName(), hostModule);
         Class<?> foreignBuildStep = Class.forName(BuildStep.class.getName(), false, loader);
         Class<?> foreignBuildStepContext = Class.forName(BuildStepContext.class.getName(), false, loader);
         Class<?> foreignBuildStepArgument = Class.forName(BuildStepArgument.class.getName(), false, loader);
@@ -380,7 +399,7 @@ class JenesisClassLoaderBridge {
     private ServiceLoader.Provider<?> provider(Class<?> service, String name) {
         String kind = service.getSimpleName();
         ServiceLoader.Provider<?> factory = null;
-        for (ServiceLoader.Provider<?> provider : ServiceLoader.load(layer, service).stream().toList()) {
+        for (ServiceLoader.Provider<?> provider : ServiceLoader.load(service, loader).stream().toList()) {
             Annotation annotation = provider.type().getAnnotation(foreignBuildModuleName);
             String providerName;
             if (annotation == null) {
@@ -399,15 +418,15 @@ class JenesisClassLoaderBridge {
             }
             if (factory != null) {
                 throw new IllegalStateException(name == null
-                        ? "Multiple unnamed " + kind + " service providers found in layer"
-                        : "Multiple " + kind + " service providers named " + name + " found in layer");
+                        ? "Multiple unnamed " + kind + " service providers found in the plugin"
+                        : "Multiple " + kind + " service providers named " + name + " found in the plugin");
             }
             factory = provider;
         }
         if (factory == null) {
             throw new IllegalStateException(name == null
-                    ? "No unnamed " + kind + " service provider found in layer"
-                    : "No " + kind + " service provider named " + name + " found in layer");
+                    ? "No unnamed " + kind + " service provider found in the plugin"
+                    : "No " + kind + " service provider named " + name + " found in the plugin");
         }
         return factory;
     }

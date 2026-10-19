@@ -225,7 +225,7 @@ public class InternalModule extends PluginModule<InternalModule> {
             buildExecutor.addStep(MANIFESTS, ModularProject.manifests(group, prefix, platform), SOURCE);
             buildExecutor.addStep(REQUIRES, new Inherited(group, additionalDependencies), inherited.sequencedKeySet());
             buildExecutor.addModule(DEPENDENCIES,
-                    dependencyModule.pathPlacement(PathPlacement.MODULE_PATH),
+                    dependencyModule.pathPlacement(pathPlacement()),
                     MANIFESTS,
                     REQUIRES);
         };
@@ -265,6 +265,11 @@ public class InternalModule extends PluginModule<InternalModule> {
         artifacts.addAll(Dependencies.select(prepared.get(PREVIOUS + DEPENDENCIES), group, "runtime"));
         artifacts.sort(null);
         return artifacts;
+    }
+
+    @Override
+    PathPlacement pathPlacement() {
+        return PathPlacement.MODULE_PATH;
     }
 
     private record Inherited(String group, SequencedSet<String> additionalDependencies) implements BuildStep {

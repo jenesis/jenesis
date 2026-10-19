@@ -7,6 +7,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.Environment;
 import build.jenesis.Language;
 import build.jenesis.Observation;
+import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -112,6 +113,8 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
     abstract SequencedSet<String> prepared();
 
     abstract List<Path> artifacts(SequencedMap<String, Path> prepared) throws IOException;
+
+    abstract PathPlacement pathPlacement();
 
     abstract M properties(SequencedMap<String, String> properties);
 
@@ -253,7 +256,7 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
                     + ", but a plugin that observes or runs the tests is handed no input - remove its @<input> lines");
         }
         try {
-            return JenesisClassLoaderBridge.of(identity(), artifacts(prepared));
+            return JenesisClassLoaderBridge.of(identity(), artifacts(prepared), pathPlacement());
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Failed to load the plugin " + identity(), e);
         }
@@ -274,7 +277,7 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
                 JenesisClassLoaderBridge bridge;
                 Object foreignModule;
                 try {
-                    bridge = JenesisClassLoaderBridge.of(identity(), artifacts(delegated));
+                    bridge = JenesisClassLoaderBridge.of(identity(), artifacts(delegated), pathPlacement());
                     foreignModule = bridge.create(buildModuleName,
                             environment,
                             properties,

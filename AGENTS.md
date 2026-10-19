@@ -137,9 +137,17 @@ builds `new MakeTool()`.
 
 **`jenesis.plugins.properties` names the plugins the build does not discover** - one per line, `<name>+<hook
 point>=<module>` or `<name>=<module>` for the module build. A value starting with `./` is a folder of the project
-compiled by an `InternalModule`; anything else a module an `ExternalModule` resolves as `module/<name>` from the
-Jenesis module repository, its closure pinned in the group `plugin.<name>` (handed on as `+closure`, which `pin` writes
-into every module that runs the plugin); `@<provider>` selects the provider annotated `@BuildModuleName`.
+compiled by an `InternalModule`; a bare name is a module an `ExternalModule` resolves as `module/<name>` from the
+Jenesis module repository, and a coordinate with a repository's prefix (`module/<name>`, `maven/<groupId>/<artifactId>`)
+is resolved by that repository and its resolver, as a dependency is anywhere else, and loads as `jpx` runs it, with the
+JDK's own loaders: `ExternalModule.ofEnvironment` places a Maven coordinate's closure on a class path and infers a
+module's, every jar declaring a module in the plugin's layer and any other on a class path beneath it, which the layer's
+automatic modules read. `jenesis.project.layout=modular`, or `ExternalModule.pathPlacement(PathPlacement.MODULE_PATH)`,
+loads every jar as a module, and the modular layout refuses a Maven coordinate. A class path is parented on the
+platform loader, which hands out the packages of the engine's own modules where the engine runs from a module path, so
+a plugin on a class path then links against the engine's `build.jenesis` rather than its own. The closure is pinned in
+the group `plugin.<name>` (handed on as `+closure`, which `pin` writes into every module that runs the plugin), and
+`@<provider>` selects the provider annotated `@BuildModuleName`.
 `Project.ofEnvironment` reads the file, and the assembler wires a plugin into the `custom` namespace of its hook point,
 in a module only where `plugin-<name>.properties` is found in its configuration locations. Wherever it meets the
 build's own plugins - its group, the languages, observers and frameworks of a module, every hook point of the project -
