@@ -1516,7 +1516,40 @@ public class ProjectTest {
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The plugin gen+check")
-                .hasMessageContaining("neither a module name nor a folder of the project");
+                .hasMessageContaining("neither a module name, nor a coordinate of a repository of [maven, module]");
+    }
+
+    @Test
+    public void refuses_a_plugin_coordinate_of_a_repository_the_build_does_not_hold() throws IOException {
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "gen+check=nexus/org.example/gen\n");
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The plugin gen+check")
+                .hasMessageContaining("maven/<groupId>/<artifactId>");
+    }
+
+    @Test
+    public void refuses_a_plugin_named_by_a_maven_coordinate_under_the_modular_layout() throws IOException {
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "gen+postprocess/transform=maven/org.example/gen\n");
+        Map<String, String> modular = new HashMap<>(settings);
+        modular.put("project.layout", "modular");
+
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(modular), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("a Maven coordinate, which loads on a class path")
+                .hasMessageContaining("name the plugin by its module instead");
+    }
+
+    @Test
+    public void resolves_a_plugin_by_the_coordinate_of_a_repository_its_line_names() throws IOException {
+        Files.writeString(root.resolve("jenesis.plugins.properties"), """
+                gen+postprocess/transform=maven/org.example/gen
+                lint+postprocess/inspect=module/org.example.lint
+                """);
+
+        assertThat(Project.ofEnvironment(new Environment(settings), root).plugins().resolutions())
+                .as("a coordinate of the maven or the module repository names a plugin as a module name does")
+                .containsKeys("plugin.gen", "plugin.lint");
     }
 
     @Test

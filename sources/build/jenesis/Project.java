@@ -2623,8 +2623,9 @@ public record Project(
                     official one, whatever it is named.
 
                     To add to the stock build, name plugins in jenesis.plugins.properties beside
-                    jenesis.properties, one line each: <name>+<hook point>=<module name>, or =./<folder>
-                    for a plugin compiled from source, where the hook point is a module of the build (check,
+                    jenesis.properties, one line each: <name>+<hook point>=<module name>, a coordinate
+                    as =module/<module name> or =maven/<groupId>/<artifactId>, or =./<folder> for a
+                    plugin compiled from source, where the hook point is a module of the build (check,
                     binary/generated, artifact, package, ...) or left out for the module build itself, and
                     =<module>@<provider> selects the provider annotated @BuildModuleName. A plugin
                     runs in a module only where plugin-<name>.properties is found in its configuration
@@ -2804,11 +2805,17 @@ public record Project(
                     project's does, and none of the project's own apply to it: a tool the module
                     index does not serve, as one named by an Automatic-Module-Name alone, is
                     required through @jenesis.alias <module> <groupId>/<artifactId>, with
-                    @jenesis.exclude and @jenesis.pin as in a project. Every jar of that layer is a module of its own, so a
-                    dependency without a module name, or two jars sharing a package, cannot load:
+                    @jenesis.exclude and @jenesis.pin as in a project. A plugin compiled from a folder,
+                    or loaded under a modular layout, makes every jar of that layer a module of its own,
+                    so a dependency without a module name, or two jars sharing a package, cannot load:
                     name it with @jenesis.alias, exclude it, or pin a version of it that names its
-                    module. Configure the tool in that code, too: where a Maven
-                    or Gradle plugin discovers the tool's own extensions and takes their settings as XML,
+                    module; a published plugin its line names by its module otherwise loads such a
+                    jar on a class path beneath its layer, which its automatic modules read. A plugin its
+                    line names as maven/<groupId>/<artifactId> resolves its POM's closure instead,
+                    pinned as plugin.<name>/maven/<groupId>/<artifactId>, and loads all of it on a
+                    class path, as jpx runs a Maven coordinate, its factory found by its
+                    META-INF/services entry; a modular layout refuses it. Configure the tool in that
+                    code, too: where a Maven or Gradle plugin discovers the tool's own extensions and takes their settings as XML,
                     as Byte Buddy's build plugin does, the provider constructs them in Java and reads
                     only plain values from plugin-<name>.properties, as demo-63 does with Byte Buddy. A JDK tool is forked by extending ProcessBuildStep,
                     which also reads process-<tool>.properties; one that runs a program extends
@@ -3420,6 +3427,15 @@ public record Project(
     }
 
     public static Project ofEnvironment(Environment environment, Path root) {
+        String layoutName = environment.getProperty("project.layout");
+        Layout layout = layoutName == null ? null : switch (layoutName.toLowerCase(Locale.ROOT)) {
+            case "auto" -> Layout.AUTO;
+            case "maven" -> Layout.MAVEN;
+            case "modular" -> Layout.MODULAR;
+            case "modular_to_maven" -> Layout.MODULAR_TO_MAVEN;
+            default -> throw new IllegalArgumentException(
+                    "Unknown layout: " + layoutName + " (expected auto, maven, modular, or modular_to_maven)");
+        };
         InferredMultiProjectAssembler assembler = InferredMultiProjectAssembler.ofEnvironment(environment);
         ProjectPlugins projectPlugins = new ProjectPlugins();
         Path file = root.resolve("jenesis.plugins.properties");
@@ -3469,10 +3485,17 @@ public record Project(
                             + " @BuildModuleName");
                 }
                 boolean folder = location.startsWith("./");
-                if (!folder && !SourceVersion.isName(location)) {
+                int slash = location.indexOf('/');
+                if (!folder && (slash == -1
+                        ? !SourceVersion.isName(location)
+                        : slash == location.length() - 1
+                        || !pluginRepositories.containsKey(Resolver.base(location.substring(0, slash)))
+                        || !pluginResolvers.containsKey(Resolver.base(location.substring(0, slash))))) {
                     throw new IllegalArgumentException("The plugin " + key + " in " + file + " names " + location
-                            + ", which is neither a module name nor a folder of the project - name the module that"
-                            + " provides it, or its folder as ./<folder>");
+                            + ", which is neither a module name, nor a coordinate of a repository of "
+                            + new TreeSet<>(pluginRepositories.keySet()) + ", nor a folder of the project - name the"
+                            + " module that provides it, a coordinate as module/<name> or"
+                            + " maven/<groupId>/<artifactId>, or its folder as ./<folder>");
                 }
                 InternalModule internal = folder
                         ? InternalModule.ofEnvironment(environment,
@@ -3483,14 +3506,23 @@ public record Project(
                                         pluginResolvers)
                                 .buildModuleName(provider)
                         : null;
-                ExternalModule external = folder
-                        ? null
-                        : ExternalModule.ofEnvironment(environment,
-                                        "module/" + location,
-                                        group,
-                                        pluginRepositories,
-                                        pluginResolvers)
-                                .buildModuleName(provider);
+                ExternalModule external;
+                if (folder) {
+                    external = null;
+                } else {
+                    ExternalModule resolved = ExternalModule.ofEnvironment(environment,
+                                    slash == -1 ? "module/" + location : location,
+                                    group,
+                                    pluginRepositories,
+                                    pluginResolvers)
+                            .buildModuleName(provider);
+                    if (layout == Layout.MODULAR && resolved.pathPlacement() == PathPlacement.CLASS_PATH) {
+                        throw new IllegalArgumentException("The plugin " + key + " in " + file + " names " + location
+                                + ", a Maven coordinate, which loads on a class path, but the modular layout loads"
+                                + " every plugin as modules - name the plugin by its module instead");
+                    }
+                    external = layout == Layout.MODULAR ? resolved.pathPlacement(PathPlacement.MODULE_PATH) : resolved;
+                }
                 BuildExecutorModule resolution = folder ? internal.resolution() : external.resolution();
                 BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule> plugin = (base, given) -> folder
                         ? internal.configured(base == null ? root : base, root, given)
@@ -3652,16 +3684,8 @@ public record Project(
                     ? Path.of(".jenesis", "cache")
                     : Path.of(cache))));
         }
-        String layout = environment.getProperty("project.layout");
         if (layout != null) {
-            project = project.layout(switch (layout.toLowerCase(Locale.ROOT)) {
-                case "auto" -> Layout.AUTO;
-                case "maven" -> Layout.MAVEN;
-                case "modular" -> Layout.MODULAR;
-                case "modular_to_maven" -> Layout.MODULAR_TO_MAVEN;
-                default -> throw new IllegalArgumentException(
-                        "Unknown layout: " + layout + " (expected auto, maven, modular, or modular_to_maven)");
-            });
+            project = project.layout(layout);
         }
         String metadata = environment.getProperty("project.metadata");
         if (metadata != null) {
@@ -4641,7 +4665,7 @@ public record Project(
                 project.reproduce||Build the selection a second time into this folder, which must be absent or empty, consulting and filling no build cache, then compare what every step wrote in both builds, printing a fingerprint over every step's output: a clean comparison deletes the folder, while a difference keeps it, without failing the build, and names the steps that wrote a different output from the same input first, and the steps handed that output after them, as jenesis.print.reproduce asks; read by Make.java and jenesis-make, not by Execute.java; a file a project provides names only a folder inside the project
                 project.await||Phases of the modules a module depends on that its build waits for, comma-separated, such as verify for their checks, so that a module builds only once the modules it depends on passed them; by default a build waits for their builds alone, and every phase runs as soon as what it reads is built
                 project.artifacts||Folder resolved dependencies and repository metadata are cached in; a file a project provides names only a folder inside the project
-                project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project
+                project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project, and modular also loads every jar of a plugin jenesis.plugins.properties names by its module as a module, where the others load a jar without a module name on the plugin's class path, and refuses one named by a Maven coordinate
                 project.sources|false|Assemble a sources jar for every module
                 project.documentation|false|Assemble a javadoc jar for every module, a test module only where jenesis.stage.tests stages it
                 documentation.empty|false|Archive that javadoc jar holding nothing but an INTENTIONALLY_EMPTY file instead of rendering the documentation, for a repository such as Maven Central that requires the jar but not its content
