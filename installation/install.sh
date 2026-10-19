@@ -4,9 +4,10 @@
 #
 # Installs or updates Jenesis in a project. Two modes:
 #
-#   * vendor    - copy the bootstrap sources from a release's sources jar into
-#                 build/jenesis (self-contained, no git required). This is the
-#                 default for projects that do not track Jenesis as a submodule.
+#   * vendor    - copy the bootstrap sources from the sources jar a release
+#                 publishes to Maven Central into build/jenesis (self-contained,
+#                 no git required). This is the default for projects that do not
+#                 track Jenesis as a submodule.
 #   * submodule - track Jenesis as a git submodule. An existing one (a .gitmodules
 #                 entry whose URL points at the Jenesis repo) is checked out to the
 #                 requested ref; a project that has none gets one added, at
@@ -37,6 +38,8 @@
 #                         ignored when a ref is given
 #   JENESIS_TARGET        Target project directory (default: current working directory)
 #   JENESIS_GITHUB_REPO   Source repository, owner/name (default: jenesis/jenesis)
+#   JENESIS_MAVEN_URI     Maven repository a release's sources jar is read from
+#                         (default: https://repo1.maven.org/maven2/)
 #   JENESIS_MODE          auto (default) | vendor | submodule
 #   JENESIS_SUBMODULE_PATH  Where a newly added submodule goes (default: build/.upstream)
 #
@@ -47,6 +50,7 @@
 set -e
 
 GITHUB_REPO="${JENESIS_GITHUB_REPO:-jenesis/jenesis}"
+MAVEN_URI="${JENESIS_MAVEN_URI:-https://repo1.maven.org/maven2/}"
 MODE="${JENESIS_MODE:-auto}"
 
 say() { echo "jenesis-install: $*"; }
@@ -58,8 +62,8 @@ case "$MODE" in
 esac
 
 if command -v curl >/dev/null 2>&1; then
-    fetch_to()     { curl -fsSL "$1" -o "$2"; }
-    fetch_stdout() { curl -fsSL "$1"; }
+    fetch_to()     { curl -fsSL --retry 3 "$1" -o "$2"; }
+    fetch_stdout() { curl -fsSL --retry 3 "$1"; }
 elif command -v wget >/dev/null 2>&1; then
     fetch_to()     { wget -q "$1" -O "$2"; }
     fetch_stdout() { wget -q "$1" -O -; }
@@ -76,8 +80,9 @@ TARGET="${JENESIS_TARGET:-$PWD}"
 # commit, or a branch. When given, that ref is installed verbatim - the
 # submodule is checked out to it, and vendor mode copies the bootstrap sources
 # from the repository tree at that ref. Without it, the latest release (or
-# JENESIS_VERSION) is installed from its published sources jar. RELEASE marks
-# which path applies; VERSION is only set on the release path.
+# JENESIS_VERSION) is installed from the sources jar it publishes to Maven
+# Central. RELEASE marks which path applies; VERSION is only set on the release
+# path.
 
 REF="${1:-${JENESIS_REF:-}}"
 if [ -n "$REF" ]; then
@@ -247,11 +252,11 @@ trap 'rm -rf "$TMPDIR"' EXIT
 mkdir -p "$TMPDIR/extract"
 
 if [ "$RELEASE" = "1" ]; then
-    # A published release: take the blessed sources jar from the release assets.
-    JAR_URL="https://github.com/${GITHUB_REPO}/releases/download/v${VERSION}/build.jenesis-${VERSION}-sources.jar"
+    # A published release: take the sources jar it publishes to Maven Central.
+    JAR_URL="${MAVEN_URI%/}/build/jenesis/build.jenesis/${VERSION}/build.jenesis-${VERSION}-sources.jar"
     say "downloading ${JAR_URL}"
     fetch_to "$JAR_URL" "$TMPDIR/sources.jar" \
-        || die "failed to download $JAR_URL - check that the release exists on GitHub"
+        || die "failed to download $JAR_URL - check that version ${VERSION} is published, as Maven Central serves a release some minutes after it is tagged, or pass its tag v${VERSION} to install from GitHub"
     extract "$TMPDIR/sources.jar" "$TMPDIR/extract" \
         || die "failed to extract sources jar"
     SRC_DIR="$TMPDIR/extract/build/jenesis"
