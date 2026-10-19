@@ -17,7 +17,6 @@ import build.jenesis.step.Dependencies;
 public class ExternalModule extends PluginModule<ExternalModule> {
 
     public static final String COORDINATE = "coordinate";
-    static final String RULES = "rules";
 
     private final String coordinate;
     private final Dependencies dependencyModule;

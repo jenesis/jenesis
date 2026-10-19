@@ -3,18 +3,25 @@ package build.jenesis.project;
 import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
+import build.jenesis.BuildStep;
 import build.jenesis.Environment;
 import build.jenesis.Language;
 import build.jenesis.Observation;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
+import build.jenesis.SequencedProperties;
 import build.jenesis.TestFramework;
 import build.jenesis.step.Bind;
 import build.jenesis.step.ProcessBuildStep;
 
 abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorModule {
 
-    static final String DELEGATE = "delegate", INPUTS = "inputs", DEPENDENCIES = "dependencies", CLOSURE = "+closure";
+    static final String DELEGATE = "delegate",
+            INPUTS = "inputs",
+            DEPENDENCIES = "dependencies",
+            CLOSURE = "+closure",
+            RULES = "rules";
+    public static final String CONFIGURATION = "configuration";
     private static final Pattern INPUT_NAME = Pattern.compile("[A-Za-z0-9._-]+");
 
     final String buildModuleName;
@@ -156,6 +163,35 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
             }
         });
         return properties(values).inputs(bound);
+    }
+
+    public static Path named(Path properties, String key, String value) {
+        Path named = properties.resolveSibling(value.trim()).normalize();
+        if (!Files.isRegularFile(named)) {
+            throw new IllegalArgumentException(properties + " names " + key + "=" + value.trim() + ", but " + named
+                    + " is no file - name it relative to " + properties.getFileName());
+        }
+        return named;
+    }
+
+    M configuredBy(Path properties, Path target) throws IOException {
+        SequencedMap<String, String> values = new LinkedHashMap<>();
+        SequencedProperties.ofFiles(properties).forEachProperty(values::put);
+        String configuration = values.remove(CONFIGURATION);
+        if (configuration == null || configuration.isBlank()) {
+            throw new IllegalArgumentException(properties + " names no " + CONFIGURATION + " - add " + CONFIGURATION
+                    + "=" + target + ", the file relative to " + properties.getFileName());
+        }
+        return properties(values).bound(RULES, target, named(properties, CONFIGURATION, configuration));
+    }
+
+    M discovered(SequencedSet<Path> configuration, Path conventional) throws IOException {
+        Path properties = BuildStep.locate(configuration, group + ".properties");
+        if (properties != null) {
+            return configuredBy(properties, conventional);
+        }
+        Path file = BuildStep.locate(configuration, conventional.toString());
+        return file == null ? null : bound(RULES, conventional, file);
     }
 
     M bound(String input, Path target, Path source) {

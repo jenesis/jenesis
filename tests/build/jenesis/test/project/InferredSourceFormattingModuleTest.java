@@ -139,6 +139,74 @@ public class InferredSourceFormattingModuleTest {
     }
 
     @Test
+    public void binds_the_rewrite_yml_that_openrewrite_properties_names() throws IOException {
+        Files.writeString(project.resolve("cleanup.yml"), "type: specs.openrewrite.org/v1beta/recipe\nname: demo.Cleanup\n");
+        Files.writeString(project.resolve("openrewrite.properties"), "configuration=cleanup.yml\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()),
+                "project");
+        executor.execute("format/" + InferredSourceFormattingModule.OPENREWRITE + "/inputs");
+
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.OPENREWRITE + "/inputs/rules/bound/output/rewrite.yml"))
+                .as("the file the properties name is handed to OpenRewrite under the name it reads")
+                .content()
+                .contains("demo.Cleanup");
+    }
+
+    @Test
+    public void switches_openrewrite_on_by_a_rewrite_yml_where_no_properties_are_found() throws IOException {
+        Files.writeString(project.resolve("rewrite.yml"), "type: specs.openrewrite.org/v1beta/recipe\nname: demo.Cleanup\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()),
+                "project");
+        executor.execute("format/" + InferredSourceFormattingModule.OPENREWRITE + "/inputs");
+
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.OPENREWRITE + "/inputs/rules/bound/output/rewrite.yml"))
+                .as("the conventional file of a configuration folder switches OpenRewrite on and is handed to it")
+                .content()
+                .contains("demo.Cleanup");
+    }
+
+    @Test
+    public void refuses_openrewrite_properties_that_name_neither_recipes_nor_their_file() throws IOException {
+        Files.writeString(project.resolve("openrewrite.properties"), "");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()),
+                "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names neither configuration nor recipes")
+                .hasMessageContaining("configuration=rewrite.yml");
+    }
+
+    @Test
+    public void refuses_ktlint_properties_that_name_no_configuration_naming_the_key() throws IOException {
+        Files.writeString(project.resolve("ktlint.properties"), "");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()),
+                "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names no configuration - add configuration=.editorconfig");
+    }
+
+    @Test
     public void runs_no_openrewrite_once_switched_off() throws IOException {
         Files.writeString(project.resolve("openrewrite.properties"), "recipes=org.openrewrite.java.RemoveUnusedImports\n");
 

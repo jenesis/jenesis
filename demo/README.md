@@ -365,11 +365,10 @@ from three inputs: an `order.xsd` through the JAXB binding compiler, a
 `avro-tools`. `service-contracts` does the same for the client side of a service:
 a WSDL through `wsimport` and an OpenAPI document through the OpenAPI Generator.
 
-Each generator is a plugin at the hook point `binary/generated`, named in
-`jenesis.plugins.properties`, and runs in a module where its `plugin-<name>.properties`
-is found. The file binds the tool's input and carries whatever else that tool needs
-to be told: `plugin-xjc.properties` names a package, `plugin-protoc.properties` a
-protoc plugin.
+Each generator is an official plugin the build resolves by itself, and runs in a
+module where its `<tool>.properties` is found. The file binds the tool's input and
+carries whatever else that tool needs to be told: `xjc.properties` names a package,
+`protoc.properties` a protoc plugin.
 
 The input goes under `META-INF/build.jenesis/` in the module's sources, where it
 is an input to the build and nothing more - none of these jars carries the schema
@@ -386,7 +385,7 @@ calls into.
 ## 14. Generating a parser - [`antlr`](demo-19-antlr/README.md)
 
 `antlr` is the same three moves for a grammar: a `.g4` under the module's
-`META-INF/build.jenesis/` folder, the ANTLR plugin with a `plugin-antlr.properties`
+`META-INF/build.jenesis/` folder, an `antlr.properties`
 that binds it, and generated sources compiled into the module. What the file adds is
 where the parser lands:
 
@@ -655,11 +654,12 @@ release commit - and the fingerprint moves with it:
 
 ## 29. Code quality for Java - [`java-quality`](demo-37-java-quality/README.md)
 
-`java-quality` turns a set of tools on without a build script. The Checkstyle
-and PMD plugins lint the sources and the google-java-format plugin verifies their
-layout, and the SpotBugs and forbiddenapis plugins check the compiled classes,
-each named in `jenesis.plugins.properties` and configured by its
-`plugin-<name>.properties`; a `jdeps.properties` and a `jdeprscan.properties`
+`java-quality` turns a set of tools on without a build script. Checkstyle and PMD
+lint the sources and google-java-format verifies their layout, and SpotBugs and
+forbiddenapis check the compiled classes, each switched on by a file in the
+configuration folder - the tool's own file, as `pmd.xml`, or a `<tool>.properties`
+naming it as `configuration=`, as `checkstyle.properties` names `checkstyle.xml`
+beside a value of its own; a `jdeps.properties` and a `jdeprscan.properties`
 check the classes for JDK internals and APIs scheduled for removal, and a `licenseheader.properties` holds the header
 every source must start with. Each tool resolves in a group of its own, so its
 dependencies never mix with yours; its `eclipse` profile formats with the Eclipse
@@ -670,9 +670,10 @@ formatted, and one switch flips it to rewriting in place:
 
     java -Djenesis.format.rewrite=true build/jenesis/Make.java
 
-Its `openrewrite` profile runs OpenRewrite before the formatter: an
-`openrewrite.properties` names the recipes, a `rewrite.yml` beside it declares the
-project's own, and the same switch applies what they would change.
+Its `openrewrite` profile runs OpenRewrite before the formatter: a `rewrite.yml`
+switches it on and declares the recipes that run, and the same switch applies what
+they would change. Where a `<tool>.properties` is found, it alone decides, and the
+tool's conventional file is read only as its `configuration=` names it.
 
 ## 30. The framework that runs the tests - [`test-framework`](demo-38-test-framework/README.md)
 
@@ -749,8 +750,8 @@ An outcome the test marks as forbidden fails the run with exit code 1.
 
 ## 34. Guarding a published API - [`api-compatibility`](demo-45-api-compatibility/README.md)
 
-The japicmp plugin, named at the hook point `artifact` with an empty
-`plugin-japicmp.properties`, makes the build compare the bytecode of the jar it
+japicmp, switched on by an empty `japicmp.properties`, makes the build compare the
+bytecode of the jar it
 produced against the bytecode of the last release of the same coordinate - which
 is what a caller actually linked against. With no `baseline` key the coordinate
 is this module's own at `RELEASE`, so every build measures the change you are
@@ -781,13 +782,13 @@ only Kotlin, with a Kotlin class of its own for Java 25 below
 `META-INF/versions/25/`. The Kotlin compiler is resolved and pinned in a `kotlin`
 group of its own, so it never mixes with the project's own dependencies. With
 `-Djenesis.project.documentation=true` Dokka documents the Kotlin sources, and the
-`dokka.` values of a `plugin-kotlin.properties` set what the Dokka Gradle and Maven
+lines of a `dokka.properties` set what the Dokka Gradle and Maven
 plugins configure - the module name, source links, external links and the footer.
 
-`kotlin-quality` lints with the detekt and ktlint plugins, binding `detekt.yml`
-and `.editorconfig`, with ktlint doubling as the formatter and sharing the
-`-Djenesis.format.rewrite=true` switch. Its `ktfmt` profile formats with the
-ktfmt plugin instead, whose `plugin-ktfmt.properties` names its style.
+`kotlin-quality` lints with detekt and ktlint, switched on by the `detekt.yml` and
+the `.editorconfig` of its configuration folder, with ktlint doubling as the formatter and sharing the
+`-Djenesis.format.rewrite=true` switch. Its `ktfmt` profile formats with ktfmt
+instead, whose `ktfmt.properties` names its style.
 
 `kotlin-plugin` adds a compiler plugin, declared with the Kotlin plugin named first:
 
@@ -798,14 +799,14 @@ The kotlinx.serialization plugin then generates `Point.serializer()` for an
 
 ## 36. Kotlin symbol processing - [`ksp`](demo-49-ksp/README.md)
 
-The KSP plugin runs where its `plugin-ksp.properties` is found, and its processors
+The KSP plugin runs where its `ksp.properties` is found, and its processors
 are named like a compiler plugin, in the group `ksp:processor`:
 
     <!--jenesis.plugin ksp:processor maven/com.squareup.moshi/moshi-kotlin-codegen-->
 
 Moshi's code generator then writes `PointJsonAdapter` for the class annotated
 `@JsonClass(generateAdapter = true)`, which compiles with the module's sources,
-and the ProGuard rules it writes join the jar. Each line of `plugin-ksp.properties`
+and the ProGuard rules it writes join the jar. Each line of `ksp.properties`
 is an option for the processors.
 
 Cross-cutting concepts
@@ -854,16 +855,17 @@ separately.
 
 Scala works the same way, named as `scala+language=build.jenesis.plugin.scala`: a
 module that mixes Java and Scala exports a pure-Scala package, and the compiler is
-pinned in a `scala` group. `scala-quality` lints
-with the Scalastyle and scalafmt plugins, binding `scalastyle-config.xml` and
-`.scalafmt.conf`, with scalafmt doubling as the formatter.
+pinned in a `scala` group. `scala-quality` lints with Scalastyle and scalafmt,
+switched on by the `scalastyle-config.xml` and the `.scalafmt.conf` of its
+configuration folder, with scalafmt doubling as the formatter.
 
 ## 38. Groovy - [`groovy`](demo-52-groovy/README.md), [`groovy-quality`](demo-53-groovy-quality/README.md)
 
 Groovy follows the same pattern, named as `groovy+language=build.jenesis.plugin.groovy`,
 with one restriction: an exported package needs at least one Java type in it, which
-the demo's own README explains. The compiler is pinned in a `groovy` group. `groovy-quality` lints with the CodeNarc
-plugin, binding `codenarc.xml`; there is no Groovy formatter.
+the demo's own README explains. The compiler is pinned in a `groovy` group.
+`groovy-quality` lints with CodeNarc, switched on by the `codenarc.xml` of its
+configuration folder; there is no Groovy formatter.
 
 ## 39. Attaching Java agents - [`agents`](demo-54-agents/README.md)
 
@@ -1155,7 +1157,8 @@ staged tree to prove the bundle is complete, all offline.
 The signed upload to Central is left to a release tool pointed at the staged
 tree - which is how Jenesis itself releases - so the demo needs no credentials, no
 key and no network. The JReleaser plugin adds that step to the `release` goal where
-the project's root holds a `jreleaser.yml`, a rehearsal unless told otherwise, and is
+the configuration folder holds the project's `jreleaser.yml`, or a
+`jreleaser.properties` naming it as `configuration=`, a rehearsal unless told otherwise, and is
 how a release reaches Central. A Maven repository of your own
 is reached by `release` itself once `jenesis.deploy.uri` names it, as
 `maven-deploy-plugin` reaches one: every staged file with its checksums, the
@@ -1272,14 +1275,14 @@ name rather than ignored. Reach for the `jenesis` command there.
 ## 61. The project's own documents - [`asciidoctor`](demo-79-asciidoctor/README.md)
 
 A project's manual is written beside its code and published with it. An
-`asciidoctor.properties` in the configuration folder converts the AsciiDoc
-documents of `docs/` once for the whole project, after every module is built, and
-`stage` places them beside the modules:
+`asciidoctor.properties` in the configuration folder names the folder of AsciiDoc
+documents as `documents=../docs`, and the build converts them once for the whole
+project, after every module is built, and `stage` places them beside the modules:
 
     java build/jenesis/Make.java stage
     # target/stage/project/output/docs/index.html
 
 Every `.adoc` file keeps its folder, a file whose name starts with `_` is only
-included, and every other file is copied as it stands. The lines of the file are
-AsciiDoc attributes (`attribute.<name>=<value>`), the backend and the output
-folder, and `@docs=<folder>` reads another folder than `docs/`.
+included, and every other file is copied as it stands. The other lines of the file
+set AsciiDoc attributes (`attribute.<name>=<value>`), the backend and the output
+folder.

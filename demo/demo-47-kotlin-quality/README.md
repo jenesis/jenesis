@@ -2,11 +2,11 @@ Kotlin code-quality demo
 ========================
 
 The Kotlin counterpart to `../demo-37-java-quality`, following the Kotlin demo
-that precedes it. A small pure-Kotlin module is linted by the detekt and ktlint
-plugins, and ktlint doubles as a formatter that verifies the source layout. As
-with the Java demo, no build script is involved: `jenesis.plugins.properties`
-names the plugins, and each runs where its `plugin-<name>.properties` is found in
-the `build.jenesis/` configuration directory.
+that precedes it. A small pure-Kotlin module is linted by detekt and ktlint, and
+ktlint doubles as a formatter that verifies the source layout. As with the Java
+demo, no build script is involved: each tool is an official plugin the build
+resolves by itself where the tool's own file - `detekt.yml`, `.editorconfig` - is
+found in the `build.jenesis/` configuration folder.
 
 Build it
 --------
@@ -24,15 +24,12 @@ Layout
 
     demo/demo-47-kotlin-quality
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
-    |-- jenesis.plugins.properties names the Kotlin, detekt, ktlint and ktfmt plugins
+    |-- jenesis-ktfmt.properties   the ktfmt profile's settings: no ktlint formatting
     |-- build.jenesis/
-    |   |-- plugin-detekt.properties  binds detekt.yml
-    |   |-- detekt.yml             detekt's configuration
-    |   |-- plugin-ktlint.properties  binds .editorconfig for ktlint's checks
-    |   |-- plugin-ktlintformat.properties  binds it for ktlint's formatting
-    |   |-- .editorconfig          ktlint's rules
-    |-- ktfmt/plugin-ktfmt.properties  runs ktfmt, under a profile
-    |-- jenesis-ktfmt.properties   that profile's settings: no ktlint formatting
+    |   |-- detekt.yml             switches detekt on: its configuration
+    |   |-- .editorconfig          switches ktlint on: its rules
+    |   `-- ktfmt/
+    |       `-- ktfmt.properties   switches ktfmt on, under a profile
     `-- sources
         |-- module-info.java
         `-- sample
@@ -41,68 +38,63 @@ Layout
 How the linters are wired
 -------------------------
 
-`jenesis.plugins.properties` names both linters at the hook point `check`, as the
-Java demo names Checkstyle and PMD:
+As `pmd.xml` does in the Java demo, each tool's own file switches it on by
+itself where it lies in a configuration folder. A project that keeps its
+`.editorconfig` elsewhere, or under another name, names it from a
+`ktlint.properties` instead, relative to that file:
 
-    detekt+check=build.jenesis.plugin.detekt
-    ktlint+check=build.jenesis.plugin.ktlint@check
+    configuration=../config/.editorconfig
 
-The ktlint plugin provides a checker and a formatter, and `@check` selects the
-checker. Each `plugin-<name>.properties` binds the file its tool reads into the
-input `rules`:
-
-    @rules=../build.jenesis/detekt.yml
-    @rules=../build.jenesis/.editorconfig
+Where such properties are found, the `.editorconfig` of the configuration folder
+is not read, and properties without `configuration` fail the build, naming the
+key to add. An `.editorconfig` at the project root, where an editor reads it,
+switches nothing on. `detekt.properties` names `detekt.yml` alike.
 
 detekt runs with `--config detekt.yml`; ktlint receives `.editorconfig` as
 `--editorconfig`, so its rules apply as defaults wherever the file lives (an
 `.editorconfig` beside the sources still wins for the properties it sets, per
-editorconfig layering). Both lint the `.kt` sources in the module's `verify` phase,
-which no other module waits for, and write an XML report under their step's output folder. By default they are
-report-only; `-Djenesis.source.detekt=strict` and `-Djenesis.source.ktlint=strict`
-fail the build on their violations instead, as in the Java code-quality demo.
+editorconfig layering). Both lint the `.kt` sources in the module's `verify`
+phase, which no other module waits for, and write an XML report under their
+step's output folder. By default they are report-only;
+`-Djenesis.source.detekt=strict` and `-Djenesis.source.ktlint=strict` fail the
+build on their violations instead, and `ignore` skips them, as in the Java
+code-quality demo.
 
 Formatting: verify, and how to reformat
 ---------------------------------------
 
-ktlint formats as well, as the plugin `ktlintformat` at the hook point `format`,
-whose `@format` selects the formatter of the ktlint plugin:
-
-    ktlintformat+format=build.jenesis.plugin.ktlint@format
-
-Its `plugin-ktlintformat.properties` binds the same `.editorconfig`. It runs in
-verify mode: a normal build fails if a `.kt` file is not already
-ktlint-formatted, but never rewrites it. To apply ktlint and rewrite the sources
-in place, run the build with the rewrite switch:
+The same `.editorconfig` switches ktlint on as a formatter as well. It runs in verify mode: a normal build fails if a `.kt`
+file is not already ktlint-formatted, but never rewrites it. To apply ktlint and
+rewrite the sources in place, run the build with the rewrite switch:
 
     java -Djenesis.format.rewrite=true build/jenesis/Make.java
 
-This is the Kotlin equivalent of the `google-java-format` rewrite shown in
-`../demo-37-java-quality`. The formatters for the other JVM languages work the
-same way.
+This is the Kotlin equivalent of the google-java-format rewrite shown in
+`../demo-37-java-quality`. `-Djenesis.format.ktlint=false` switches ktlint's
+formatting off, while ktlint still lints.
 
 Formatting with ktfmt instead
 -----------------------------
 
-The ktfmt plugin formats the Kotlin sources with ktfmt rather than ktlint:
-
-    ktfmt+format=build.jenesis.plugin.ktfmt
-
-Its `plugin-ktfmt.properties` may be empty, which formats in ktfmt's default
-Meta style, or name ktfmt's options:
+ktfmt formats the Kotlin sources rather than ktlint. It has no file of its own:
+a `ktfmt.properties` switches it on, and may be empty, which formats in ktfmt's
+default Meta style, or name ktfmt's options:
 
     style=kotlinlang      meta, google or kotlinlang
     imports=sort          keeps unused imports; sort,remove, the default,
                           removes them as well
 
-Two formatters would fight over the same sources, so the `ktfmt` profile, whose
-`build.jenesis/ktfmt/` folder adds the `plugin-ktfmt.properties`, switches
-ktlint's formatting off in `jenesis-ktfmt.properties` with
-`jenesis.plugin.ktlintformat=false`, while ktlint still lints:
+The demo's `ktfmt.properties` holds `style=kotlinlang` and sits in the profile
+folder `build.jenesis/ktfmt/`. Two formatters would fight over the same
+sources, so a `ktfmt.properties` found where ktlint formats fails the build,
+asking for `jenesis.format.ktlint=false`. The profile's
+`jenesis-ktfmt.properties` sets exactly that, so ktfmt formats while ktlint
+still lints:
 
     java -Djenesis.make.profiles=ktfmt build/jenesis/Make.java
 
-ktfmt verifies like the other formatters and rewrites under the same switch.
+ktfmt verifies like the other formatters, rewrites under the same switch, and
+is switched off by `-Djenesis.format.ktfmt=false`.
 
 Pinning
 -------

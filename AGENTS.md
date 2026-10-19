@@ -192,12 +192,17 @@ next build in the JVM loading the same jars; a static field of a plugin must sta
 the JDK ships, activates when its file is in a configuration folder, and is switched by `jenesis.<kind>.<tool>`:
 `ignore`, `report` (default) or `strict`. A tool the build would download is an official plugin of
 `jenesis/jenesis-plugins` instead: the inferred module that ran it holds it as `ExternalModule.official`, resolved as
-`module/build.jenesis.plugin.<name>` in the group `<name>`, behind a boolean named like it, and wires it where the
-tool's file is found (`pmd.xml`, `checkstyle.xml`, a `.kt` source, `jreleaser.yml`, `asciidoctor.properties`, …). A
-`.properties` file is its values, any other file the input `rules`; it needs no line in `jenesis.plugins.properties`,
-and a declared plugin of the same name is refused where it runs. A generator reads only the folder it names (`xjc/`,
-`protoc/`); the project binds its contracts there with `@<input>/<folder>=<path>`, under the customary name where the
-tool expects one.
+`module/build.jenesis.plugin.<name>` in the group `<name>`, behind a boolean named like it, and wires it where a
+configuration folder holds its `<name>.properties` (a language plugin where the scan finds a `.kt`, `.scala` or
+`.groovy` source). The properties name the tool's own file as `configuration=<path>`, resolved against their own
+folder and handed to the plugin as the input `rules` under the name the tool reads (`checkstyle.xml`, `.editorconfig`,
+…), and leaving out a key the tool cannot run without fails the build naming it. Only where no configuration folder
+holds the properties does the tool's one conventional file in a configuration folder switch it on, bound as if named
+(`PluginModule.discovered`); a file at the project root never does, and a plugin needing more than a file, as
+Asciidoctor's folder of documents, has no conventional file. The other lines are the plugin's values;
+it needs no line in `jenesis.plugins.properties`, and a declared plugin of the same name is refused where it runs. A
+generator reads only the folder it names (`xjc/`, `protoc/`); the project binds its contracts there with
+`@<input>/<folder>=<path>`, under the customary name where the tool expects one.
 
 ## Modules and steps
 

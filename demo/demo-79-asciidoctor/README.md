@@ -3,9 +3,10 @@ Asciidoctor demo
 
 Convert the AsciiDoc documents of a project to HTML and stage them beside its
 modules. There is no build script: an `asciidoctor.properties` in the
-`build.jenesis/` configuration folder switches Asciidoctor on, and the build
-resolves the official plugin `build.jenesis.plugin.asciidoctor` by itself, as it
-resolves the plugins of the code-quality demo.
+`build.jenesis/` configuration folder switches Asciidoctor on and names the folder
+of documents, and the build resolves the official plugin
+`build.jenesis.plugin.asciidoctor` by itself, as it resolves the plugins of the
+code-quality demo.
 
 Build it
 --------
@@ -31,7 +32,7 @@ Layout
     demo/demo-79-asciidoctor
     |-- build/jenesis                symlink to ../../../sources/build/jenesis
     |-- build.jenesis/
-    |   `-- asciidoctor.properties   switches Asciidoctor on, with its values
+    |   `-- asciidoctor.properties   switches Asciidoctor on: its documents and values
     |-- docs/
     |   |-- index.adoc               the start page
     |   |-- _version.adoc            a partial, which index.adoc includes
@@ -46,7 +47,12 @@ Layout
 What is converted
 -----------------
 
-Every `.adoc` file of `docs/` is converted to HTML and keeps its folder, so
+The properties name the folder of documents as `documents`, relative to the file
+itself:
+
+    documents=../docs
+
+Every `.adoc` file there is converted to HTML and keeps its folder, so
 `docs/guide/getting-started.adoc` becomes `docs/guide/getting-started.html`, and a
 cross reference such as `xref:guide/getting-started.adoc[]` links the two. A file
 or folder whose name starts with `_` is a partial: a document includes it, as
@@ -60,7 +66,7 @@ includes a file that does not exist fails the build.
 Configuring it
 --------------
 
-The lines of `asciidoctor.properties` are the plugin's values:
+The other lines of `asciidoctor.properties` are the plugin's values:
 
     attribute.product-name=Greeter
     attribute.icons=font
@@ -71,16 +77,18 @@ The lines of `asciidoctor.properties` are the plugin's values:
 | `backend` | `html5` (default) or `docbook5` |
 | `output` | the folder below `target/stage/project/output/` the documents go to, `docs` by default |
 
-Any other key fails the build, naming the keys it takes. The plugin reads `docs/`
-of the project's root unless a line binds another folder, relative to the root:
+Any other key fails the build, naming the keys it takes. The documents alone
+switch nothing on, so a project may keep `.adoc` files for another tool; the
+properties switch Asciidoctor on, and properties that name no `documents` fail the
+build naming the line to add. A project whose documents lie where the Maven and
+Gradle plugins of Asciidoctor read them names that folder:
 
-    @docs=src/docs/asciidoc
+    documents=../src/docs/asciidoc
 
-A project without such a folder fails the build, naming the line that would fix
-it. The values are read from this file alone, so a line for Asciidoctor in
+The values are read from this file alone, so a line for Asciidoctor in
 `jenesis.plugins.arguments.properties` is refused.
 
-`-Djenesis.project.asciidoctor=false` switches it off without removing the file:
+`-Djenesis.project.asciidoctor=false` switches it off without removing anything:
 
     java -Djenesis.project.asciidoctor=false build/jenesis/Make.java stage
 
