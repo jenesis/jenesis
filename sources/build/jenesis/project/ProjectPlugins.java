@@ -44,6 +44,8 @@ public record ProjectPlugins(Path pins,
             UNCHANGED = "unchanged",
             RESOLVED = "resolved",
             JRELEASER = "jreleaser",
+            ASCIIDOCTOR = "asciidoctor",
+            DOCS = "docs",
             ROOT = "root.properties",
             ROOT_KEY = "root";
 
@@ -478,7 +480,12 @@ public record ProjectPlugins(Path pins,
         return new BuildExecutorModule() {
             @Override
             public Optional<String> resolve(String path) {
-                return path.startsWith(ADDITIONS + "/") || path.equals(PROJECT) ? Optional.of(path) : Optional.empty();
+                String[] segments = path.split("/");
+                return path.startsWith(ADDITIONS + "/")
+                        || path.equals(PROJECT)
+                        || segments.length > 2
+                        && (segments[0].equals(TRANSFORM) || segments[0].equals(INSPECT))
+                        && segments[2].equals(PluginModule.DEPENDENCIES) ? Optional.of(path) : Optional.empty();
             }
 
             @Override

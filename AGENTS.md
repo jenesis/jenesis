@@ -193,10 +193,11 @@ the JDK ships, activates when its file is in a configuration folder, and is swit
 `ignore`, `report` (default) or `strict`. A tool the build would download is an official plugin of
 `jenesis/jenesis-plugins` instead: the inferred module that ran it holds it as `ExternalModule.official`, resolved as
 `module/build.jenesis.plugin.<name>` in the group `<name>`, behind a boolean named like it, and wires it where the
-tool's file is found (`pmd.xml`, `checkstyle.xml`, a `.kt` source, `jreleaser.yml`, …). A `.properties` file is its
-values, any other file the input `rules`; it needs no line in `jenesis.plugins.properties`, and a declared plugin of
-the same name is refused where it runs. A generator reads only the folder it names (`xjc/`, `protoc/`); the project
-binds its contracts there with `@<input>/<folder>=<path>`, under the customary name where the tool expects one.
+tool's file is found (`pmd.xml`, `checkstyle.xml`, a `.kt` source, `jreleaser.yml`, `asciidoctor.properties`, …). A
+`.properties` file is its values, any other file the input `rules`; it needs no line in `jenesis.plugins.properties`,
+and a declared plugin of the same name is refused where it runs. A generator reads only the folder it names (`xjc/`,
+`protoc/`); the project binds its contracts there with `@<input>/<folder>=<path>`, under the customary name where the
+tool expects one.
 
 ## Modules and steps
 

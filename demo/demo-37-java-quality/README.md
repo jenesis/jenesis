@@ -245,6 +245,47 @@ level an exported profile names. Moving the profile file changes nothing, as
 long as the binding follows it; editing a setting in it verifies every source
 again.
 
+Rewriting with recipes
+----------------------
+
+The `openrewrite` profile adds OpenRewrite. Its `build.jenesis/openrewrite/`
+folder holds an `openrewrite.properties`, which names the recipes to run, and a
+`rewrite.yml` beside it, which declares the project's own:
+
+    recipes=demo.Modernize
+
+    type: specs.openrewrite.org/v1beta/recipe
+    name: demo.Modernize
+    recipeList:
+      - org.openrewrite.java.ChangeMethodName:
+          methodPattern: java.lang.String trim()
+          newMethodName: strip
+
+The build resolves OpenRewrite by itself where it finds the file, and runs it
+before the Java formatter, so what a recipe writes is formatted afterwards. Like
+the formatter it verifies by default: a source calling `trim()` fails the build,
+printing the change as a diff,
+
+    -    return name.trim();
+    +    return name.strip();
+    The recipes demo.Modernize change 1 file - run with -Djenesis.format.rewrite=true to apply them
+
+and the rewrite switch applies it:
+
+    java -Djenesis.make.profiles=openrewrite -Djenesis.format.rewrite=true build/jenesis/Make.java
+
+`recipes` is the one value the file takes. A recipe of OpenRewrite's own Java
+module needs nothing more; a recipe library is named for the plugin to load
+beside OpenRewrite, as
+`@jenesis.plugin openrewrite:tool maven/org.openrewrite.recipe/rewrite-static-analysis`
+in `module-info.java`, and resolves with it in the group `openrewrite:tool`. Where
+the library and OpenRewrite ask for two versions of one module, the build fails
+naming the `@jenesis.pin openrewrite:tool/...` line that settles it. The module's
+dependencies are OpenRewrite's class path, so a recipe that matches a type of a
+library the module uses finds it. A recipe that
+would add, delete or move a file fails the build, and
+`-Djenesis.format.openrewrite=false` switches OpenRewrite off.
+
 Forbidden APIs
 --------------
 

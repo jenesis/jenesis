@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 public class InferredSourceFormattingModuleTest {
 
     @TempDir
-    private Path root, project;
+    private Path root, project, dependencies;
 
     @Test
     public void checks_the_license_header_when_license_header_txt_is_present() throws IOException {
@@ -113,6 +113,43 @@ public class InferredSourceFormattingModuleTest {
                 .as("a formatter that rewrites the sources runs after the header is written, rather than beside it")
                 .content()
                 .contains("Copyright 2026 the authors.");
+    }
+
+    @Test
+    public void hands_the_dependencies_of_a_module_to_no_formatter_but_openrewrite() throws IOException {
+        Files.writeString(project.resolve("licenseheader.properties"), "text=Copyright 2026 the authors.\n");
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "/*\n * Copyright 2026 the authors.\n */\n\npackage sample;\n");
+        Files.writeString(Files.createDirectories(dependencies.resolve(BuildStep.SOURCES + "other")).resolve("Other.java"),
+                "package other;\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addSource("dependencies", dependencies);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of())
+                        .dependencies(new LinkedHashSet<>(List.of("dependencies"))),
+                "project",
+                "dependencies");
+        SequencedMap<String, Path> steps = executor.execute();
+
+        assertThat(steps.keySet())
+                .as("the header check reads the module's own sources, never those of what it depends on")
+                .anyMatch(step -> step.startsWith("format/license/"));
+    }
+
+    @Test
+    public void runs_no_openrewrite_once_switched_off() throws IOException {
+        Files.writeString(project.resolve("openrewrite.properties"), "recipes=org.openrewrite.java.RemoveUnusedImports\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()).openrewrite(false),
+                "project");
+        SequencedMap<String, Path> steps = executor.execute();
+
+        assertThat(steps.keySet()).noneMatch(step -> step.startsWith("format/" + InferredSourceFormattingModule.OPENREWRITE));
     }
 
     private record Formatter(String file) implements BuildStep {

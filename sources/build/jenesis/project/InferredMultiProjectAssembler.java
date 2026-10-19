@@ -447,11 +447,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                     descriptor.configuration(),
                                     repositories,
                                     resolvers)
+                            .dependencies(closed)
                             .custom(hooks.getOrDefault("format", none))),
-                    renamed(inherited, Stream.of(descriptor.sources().stream(),
-                                    descriptor.spdx().stream(),
-                                    descriptor.manifests().stream())
-                            .flatMap(Function.identity())));
+                    renamed(inherited, inputs(descriptor, closed)));
             sub.addModule("compliance",
                     compliance.apply(InferredComplianceModule.ofEnvironment(environment, descriptor.configuration())
                             .custom(hooks.getOrDefault("compliance", none))),

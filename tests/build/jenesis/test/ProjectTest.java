@@ -179,6 +179,43 @@ public class ProjectTest {
                 .doesNotContain("jreleaser:tool/maven/org.jreleaser/jreleaser-gone");
     }
 
+    @Test
+    public void pin_pins_the_tool_a_transform_of_the_whole_project_resolved() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        Path pins = root.resolve("jenesis.plugins.pin.properties");
+        Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .plugins(new ProjectPlugins().pins(pins)
+                        .resolutions(new LinkedHashMap<>(Map.of(
+                                "docs", new Resolved("docs/runtime/module/build.jenesis/0.16.0").asModule("docs"))))
+                        .transform("docs", (transform, _) -> transform.addModule("dependencies", (dependencies, _) ->
+                                dependencies.addStep("resolve", new Resolved("docs:tool/runtime/maven/org.example/tool/2.0")))))
+                .build(Project.PIN);
+
+        assertThat(SequencedProperties.ofFiles(pins).getProperty("docs:tool/maven/org.example/tool"))
+                .as("pin runs after the build, so it pins the tool a transform of the whole project resolved")
+                .isEqualTo("2.0 SHA-256/xyz");
+    }
+
+    @Test
+    public void refuses_asciidoctor_properties_without_a_folder_of_documents_naming_the_binding() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("asciidoctor.properties"), "");
+
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("converts the documents of docs/")
+                .hasMessageContaining("@docs=<folder>");
+    }
+
+    @Test
+    public void reads_no_asciidoctor_properties_once_asciidoctor_is_switched_off() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("asciidoctor.properties"), "");
+        Map<String, String> switched = new HashMap<>(settings);
+        switched.put("project.asciidoctor", "false");
+
+        assertThat(Project.ofEnvironment(new Environment(switched), root)).isNotNull();
+    }
+
     private record Resolved(String dependency) implements BuildStep {
 
         @Override
