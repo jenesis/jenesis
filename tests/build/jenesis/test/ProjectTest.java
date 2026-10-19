@@ -198,6 +198,40 @@ public class ProjectTest {
     }
 
     @Test
+    public void pin_pins_the_tool_a_preprocessor_resolved_without_handing_it_to_the_modules() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        Path pins = root.resolve("jenesis.plugins.pin.properties");
+        Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .plugins(new ProjectPlugins().pins(pins)
+                        .resolutions(new LinkedHashMap<>(Map.of(
+                                "check", new Resolved("check/runtime/module/build.jenesis/0.16.0").asModule("check"))))
+                        .preprocess("check", (preprocess, _) -> preprocess.addModule("dependencies", (dependencies, _) ->
+                                dependencies.addStep("resolve", new Resolved("check:tool/runtime/maven/org.example/tool/3.0")))))
+                .build(Project.PIN);
+
+        assertThat(SequencedProperties.ofFiles(pins).getProperty("check:tool/maven/org.example/tool"))
+                .as("pin pins the tool a preprocessor resolved")
+                .isEqualTo("3.0 SHA-256/xyz");
+        List<String> arguments;
+        try (Stream<Path> walk = Files.walk(root.resolve("target/build/modules"))) {
+            arguments = walk.filter(path -> path.getFileName().toString().equals("arguments.properties"))
+                    .map(path -> {
+                        try {
+                            return Files.readString(path);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    })
+                    .toList();
+        }
+        assertThat(arguments)
+                .as("the modules are built after the preprocessor, but are not handed what it resolved")
+                .isNotEmpty()
+                .noneMatch(argument -> argument.contains("preprocess"));
+    }
+
+    @Test
     public void refuses_asciidoctor_properties_without_a_folder_of_documents_naming_the_binding() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("asciidoctor.properties"), "");
 

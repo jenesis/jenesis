@@ -349,7 +349,10 @@ public record ProjectPlugins(Path pins,
         return new BuildExecutorModule() {
             @Override
             public Optional<String> resolve(String path) {
-                return Optional.empty();
+                String[] segments = path.split("/");
+                return segments.length > 2
+                        && segments[0].equals(CUSTOM)
+                        && segments[2].equals(PluginModule.DEPENDENCIES) ? Optional.of(path) : Optional.empty();
             }
 
             @Override
@@ -367,6 +370,22 @@ public record ProjectPlugins(Path pins,
                                 given.sequencedKeySet());
                     }
                 }, inputs);
+            }
+        };
+    }
+
+    public BuildExecutorModule preprocessed(BuildExecutorModule build) {
+        return new BuildExecutorModule() {
+            @Override
+            public Optional<String> resolve(String path) {
+                return build.resolve(path);
+            }
+
+            @Override
+            public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+                SequencedMap<String, Path> built = new LinkedHashMap<>(inherited);
+                built.keySet().removeIf(key -> key.startsWith(BuildExecutorModule.PREVIOUS + PREPROCESS + "/"));
+                build.accept(buildExecutor, built);
             }
         };
     }

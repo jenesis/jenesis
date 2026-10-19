@@ -159,7 +159,7 @@ public record Project(
                 Function<List<Path>, SequencedSet<Path>> locations =
                         locals -> configurations(locals, project.configuration(), project.profiles());
                 sub.addModule("maven",
-                              MavenProject.make(project.environment(),
+                              project.toolPlugins().preprocessed(MavenProject.make(project.environment(),
                                                          project.root(),
                                                          "main",
                                                          "maven",
@@ -180,7 +180,7 @@ public record Project(
                                                 .pathPlacement(PathPlacement.CLASS_PATH)
                                                 .includeResources(false),
                                         mergedRepos,
-                                        mergedResolvers)),
+                                        mergedResolvers))),
                               mavenDeps);
                 sub.addModule(ProjectPlugins.POSTPROCESS, project.toolPlugins().postprocess(project.profiles()), "maven");
             }, METADATA);
@@ -250,7 +250,7 @@ public record Project(
                 sub.addModule(ProjectPlugins.PREPROCESS, project.toolPlugins().preprocess(project.profiles()));
                 modulesDeps.add(ProjectPlugins.PREPROCESS);
                 sub.addModule("modules",
-                              ModularProject.make(project.environment(),
+                              project.toolPlugins().preprocessed(ModularProject.make(project.environment(),
                                                              project.root(),
                                                              "main",
                                                              "module",
@@ -277,7 +277,7 @@ public record Project(
                                                 .pinning(project.pinning())
                                                 .pathPlacement(PathPlacement.MODULE_PATH),
                                         mergedRepos,
-                                        mergedResolvers)),
+                                        mergedResolvers))),
                               modulesDeps);
                 sub.addModule(ProjectPlugins.POSTPROCESS, project.toolPlugins().postprocess(project.profiles()), "modules");
             }, METADATA);
@@ -359,7 +359,7 @@ public record Project(
                 sub.addModule(ProjectPlugins.PREPROCESS, project.toolPlugins().preprocess(project.profiles()));
                 modulesDeps.add(ProjectPlugins.PREPROCESS);
                 sub.addModule("modules",
-                              ModularProject.make(project.environment(),
+                              project.toolPlugins().preprocessed(ModularProject.make(project.environment(),
                                                              project.root(),
                                                              "main",
                                                              "module",
@@ -382,7 +382,7 @@ public record Project(
                                                 .documentation(project.documentation())
                                                 .pinning(project.pinning()),
                                         mergedRepos,
-                                        mergedResolvers)),
+                                        mergedResolvers))),
                               modulesDeps);
                 sub.addModule(ProjectPlugins.POSTPROCESS, project.toolPlugins().postprocess(project.profiles()), "modules");
             }, METADATA);
