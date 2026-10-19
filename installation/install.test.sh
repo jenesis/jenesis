@@ -6,7 +6,8 @@
 # touches the repository this runs from.
 #
 # The sources are fetched for the ref named by JENESIS_TEST_REF (default: main),
-# so the script under test is the local one while its payload comes from GitHub.
+# so the script under test is the local one while its payload comes from GitHub;
+# the release case installs JENESIS_TEST_VERSION (default: 0.16.1) from Maven Central.
 # Cases that need symbolic links are skipped where the filesystem has none.
 #
 # Exits 0 only when every case passes.
@@ -15,6 +16,7 @@ set -eu
 
 SCRIPT="$(cd "$(dirname "$0")" && pwd -P)/install.sh"
 REF="${JENESIS_TEST_REF:-main}"
+VERSION="${JENESIS_TEST_VERSION:-0.16.1}"
 REPO="${JENESIS_GITHUB_REPO:-jenesis/jenesis}"
 
 TMP="$(mktemp -d)"
@@ -51,6 +53,12 @@ install() {
         bash "$SCRIPT" "$REF" >"$TMP/$name.log" 2>&1
 }
 
+# release <name> - installs the published release VERSION, naming no ref.
+release() {
+    env JENESIS_TARGET="$TMP/$1" JENESIS_GITHUB_REPO="$REPO" JENESIS_VERSION="$VERSION" \
+        bash "$SCRIPT" >"$TMP/$1.log" 2>&1
+}
+
 builds() {
     (cd "$TMP/$1" && java build/jenesis/Make.java >"$TMP/$1.build.log" 2>&1)
 }
@@ -64,6 +72,15 @@ install vendored || fail "vendoring into a plain directory: $(cat "$TMP/vendored
 [ -f "$TMP/vendored/build/jenesis/jenesis.version" ] || fail "vendoring left no jenesis.version stamp"
 builds vendored || fail "a vendored project does not build: $(cat "$TMP/vendored.build.log")"
 pass "vendors into a plain directory, and the project builds"
+
+# --- a release --------------------------------------------------------------
+
+scaffold released
+release released || fail "installing release ${VERSION}: $(cat "$TMP/released.log")"
+[ "$(cat "$TMP/released/build/jenesis/jenesis.version")" = "$VERSION" ] \
+    || fail "the release was not stamped as ${VERSION}"
+builds released || fail "a project on release ${VERSION} does not build: $(cat "$TMP/released.build.log")"
+pass "installs release ${VERSION} from its sources jar, and the project builds"
 
 # --- auto does not reach for a submodule ------------------------------------
 
