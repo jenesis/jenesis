@@ -1589,7 +1589,7 @@ public record Project(
                           build on a newer JDK (jenesis.toolchain.version) finds what that JDK
                           encapsulated or scheduled for removal
                       fmt-maven-plugin, Spotless googleJavaFormat() / the same
-                          -> javaformat.properties with formatter=google (37), which verifies and
+                          -> googlejavaformat.properties (37), which verifies and
                           fails the build on an unformatted source; -Djenesis.format.rewrite=true
                           rewrites. It takes style=aosp for googleJavaFormat().aosp(), javadoc=false for
                           formatJavadoc(false), reflow=false for skipReflowingLongStrings, which a
@@ -1597,10 +1597,10 @@ public record Project(
                           imports=remove, imports=sort or imports=none for skipSortingImports and
                           skipRemovingUnusedImports
                       Spotless palantirJavaFormat() / com.palantir.java-format, the same
-                          -> formatter=palantir, which takes reflow and imports alike
+                          -> palantir.properties, which takes reflow and imports alike
                       Spotless eclipse().configFile(...), formatter-maven-plugin (net.revelc)
-                          configFile -> formatter=eclipse with profile=<the profile Eclipse exports,
-                          relative to it> (37); Spotless's importOrder and the
+                          configFile -> eclipse.properties with configuration=<the profile Eclipse
+                          exports, relative to it>, or an eclipse-formatter.xml alone (37); Spotless's importOrder and the
                           formatter plugin's import and cache settings have no counterpart
                       rewrite-maven-plugin / org.openrewrite.rewrite -> rewrite.yml in
                           build.jenesis/ (37), or an openrewrite.properties with
@@ -2411,7 +2411,8 @@ public record Project(
 
                     The formatters verify a module's sources and fail the build on a source they would
                     change; -Djenesis.format.rewrite=true lets them rewrite it instead. A
-                    javaformat.properties selects google, palantir or eclipse, a ktlint.properties
+                    googlejavaformat.properties, palantir.properties or eclipse.properties switches
+                    on that Java formatter, refused beside another, a ktlint.properties
                     ktlint, a ktfmt.properties ktfmt, a scalafmt.properties scalafmt, and a
                     licenseheader.properties the header every source starts with; without the
                     properties of ktlint or scalafmt, an .editorconfig or .scalafmt.conf of a
@@ -4801,7 +4802,9 @@ public record Project(
                 validate.jdeprscan|true|jdeprscan, activated by a jdeprscan.properties; false leaves it out
                 strict.jdeprscan|false|jdeprscan fails the build on any use of an API deprecated for removal, where it otherwise records them
                 format.openrewrite|true|OpenRewrite, activated by an openrewrite.properties naming a rewrite.yml as configuration=, whose recipes it runs, or recipes as recipes=, or, where none is found, by a rewrite.yml of a configuration folder; it runs before the Java formatter and reads the module's dependencies
-                format.java|true|The Java formatter a javaformat.properties selects - google-java-format, palantir-java-format or the Eclipse formatter as formatter=google, palantir or eclipse - with its options; false leaves it out
+                format.googlejavaformat|true|google-java-format, activated by a googlejavaformat.properties whose lines are its options; refused beside another Java formatter
+                format.palantir|true|palantir-java-format, activated by a palantir.properties whose lines are its options; refused beside another Java formatter
+                format.eclipse|true|The Eclipse formatter, activated by an eclipse.properties, which may name the profile Eclipse exports as configuration=, or, where none is found, by an eclipse-formatter.xml of a configuration folder; refused beside another Java formatter
                 format.ktlint|true|ktlint formatting the Kotlin sources, activated by what activates its linting; false leaves the formatting out while ktlint still lints, as where ktfmt formats them
                 format.ktfmt|true|ktfmt formatting, activated by a ktfmt.properties, which names its style and what it does to the imports; refused beside ktlint formatting the same sources
                 format.scalafmt|true|scalafmt formatting the Scala sources, activated by what activates its check; false leaves the formatting out while scalafmt still checks them

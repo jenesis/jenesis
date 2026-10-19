@@ -10,6 +10,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.BuildStepHashFunction;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.project.InferredSourceFormattingModule;
 
@@ -218,6 +219,68 @@ public class InferredSourceFormattingModuleTest {
         SequencedMap<String, Path> steps = executor.execute();
 
         assertThat(steps.keySet()).noneMatch(step -> step.startsWith("format/" + InferredSourceFormattingModule.OPENREWRITE));
+    }
+
+    @Test
+    public void switches_the_eclipse_formatter_on_by_its_profile_where_no_properties_are_found() throws IOException {
+        Files.writeString(project.resolve("eclipse-formatter.xml"), "<profiles/>");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+        executor.execute("format/" + InferredSourceFormattingModule.ECLIPSE + "/inputs");
+
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.ECLIPSE + "/inputs/rules/bound/output/eclipse-formatter.xml"))
+                .as("the profile Eclipse exports switches the Eclipse formatter on and is handed to it")
+                .hasContent("<profiles/>");
+    }
+
+    @Test
+    public void binds_the_profile_eclipse_properties_names() throws IOException {
+        Files.writeString(project.resolve("eclipse.properties"), "configuration=team.xml\n");
+        Files.writeString(project.resolve("team.xml"), "<profiles/>");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+        executor.execute("format/" + InferredSourceFormattingModule.ECLIPSE + "/inputs");
+
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.ECLIPSE + "/inputs/rules/bound/output/eclipse-formatter.xml"))
+                .as("the profile is handed over under the name the Eclipse formatter reads")
+                .hasContent("<profiles/>");
+    }
+
+    @Test
+    public void refuses_two_java_formatters_naming_both() throws IOException {
+        Files.writeString(project.resolve("googlejavaformat.properties"), "");
+        Files.writeString(project.resolve("palantir.properties"), "");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("[googlejavaformat, palantir]")
+                .hasMessageContaining("jenesis.format.<name>=false");
+    }
+
+    @Test
+    public void switches_a_java_formatter_off_by_its_boolean_setting() throws IOException {
+        Files.writeString(project.resolve("googlejavaformat.properties"), "");
+        Files.writeString(project.resolve("eclipse-formatter.xml"), "<profiles/>");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                InferredSourceFormattingModule.ofEnvironment(new Environment(Map.of("format.googlejavaformat", "false")),
+                        new LinkedHashSet<>(List.of(project)),
+                        Map.of(),
+                        Map.of()),
+                "project");
+        executor.execute("format/" + InferredSourceFormattingModule.ECLIPSE + "/inputs");
+
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.ECLIPSE + "/inputs/rules/bound/output/eclipse-formatter.xml"))
+                .as("the formatter switched off is no second Java formatter beside the one that is on")
+                .hasContent("<profiles/>");
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.GOOGLEJAVAFORMAT)).doesNotExist();
     }
 
     private record Formatter(String file) implements BuildStep {
