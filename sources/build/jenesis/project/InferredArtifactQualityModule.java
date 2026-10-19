@@ -123,17 +123,7 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
             String analysis = values.remove(CONFIGURATION);
             ExternalModule module = revapiModule.properties(values);
             if (analysis != null) {
-                Path sibling = Path.of(analysis.trim()).normalize();
-                if (sibling.isAbsolute() || sibling.startsWith("..")) {
-                    throw new IllegalArgumentException(revapiFile + " names the configuration " + analysis
-                            + ", which is not beside or below it - place the file in the folder of "
-                            + revapiFile.getFileName());
-                }
-                if (!Files.isRegularFile(revapiFile.resolveSibling(sibling))) {
-                    throw new IllegalArgumentException(revapiFile + " names the configuration " + analysis
-                            + ", which does not exist beside it");
-                }
-                module = module.bound(ANALYSIS, Path.of("revapi.json"), revapiFile.resolveSibling(sibling));
+                module = module.bound(ANALYSIS, Path.of("revapi.json"), ExternalModule.named(revapiFile, CONFIGURATION, analysis));
             }
             buildExecutor.addModule(REVAPI, module, inherited.sequencedKeySet());
         }

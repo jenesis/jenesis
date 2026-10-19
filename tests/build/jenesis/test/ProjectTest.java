@@ -232,13 +232,60 @@ public class ProjectTest {
     }
 
     @Test
-    public void refuses_asciidoctor_properties_without_a_folder_of_documents_naming_the_binding() throws IOException {
+    public void refuses_asciidoctor_properties_that_name_no_documents_naming_the_key() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("asciidoctor.properties"), "");
 
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("converts the documents of docs/")
-                .hasMessageContaining("@docs=<folder>");
+                .hasMessageContaining("names no documents")
+                .hasMessageContaining("documents=../docs");
+    }
+
+    @Test
+    public void switches_asciidoctor_on_by_its_properties_alone_never_by_the_documents() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("docs")).resolve("index.adoc"), "= Index\n");
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "asciidoctor+postprocess/transform=./manual\n");
+        Files.createDirectories(root.resolve("manual"));
+
+        assertThat(Project.ofEnvironment(new Environment(settings), root))
+                .as("documents alone switch nothing on, so a plugin may take the name")
+                .isNotNull();
+
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("asciidoctor.properties"),
+                "documents=../docs\n");
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .as("the properties switch Asciidoctor on, so a plugin of that name is refused")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("takes the name of the plugin the build converts the project's AsciiDoc documents");
+    }
+
+    @Test
+    public void switches_jreleaser_on_by_a_configuration_folder_never_by_the_project_root() throws IOException {
+        Files.writeString(root.resolve("jreleaser.yml"), "project:\n  name: example\n");
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "jreleaser+release=./releaser\n");
+        Files.createDirectories(root.resolve("releaser"));
+
+        assertThat(Project.ofEnvironment(new Environment(settings), root))
+                .as("a jreleaser.yml at the root is JReleaser's own, so it switches nothing on and a plugin may take the name")
+                .isNotNull();
+
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("jreleaser.yml"),
+                "project:\n  name: example\n");
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .as("one in a configuration folder switches JReleaser on, so a plugin of that name is refused")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("takes the name of the plugin the build releases with");
+    }
+
+    @Test
+    public void refuses_jreleaser_properties_that_name_no_configuration_naming_the_key() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("jreleaser.properties"),
+                "JRELEASER_GITHUB_TOKEN=unused\n");
+
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names no configuration")
+                .hasMessageContaining("configuration=../jreleaser.yml");
     }
 
     @Test
@@ -653,7 +700,7 @@ public class ProjectTest {
         assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).out(printed::add), root, new LinkedHashSet<>(), Project.SKILL + "/registry")).isEmpty();
         assertThat(String.join("\n", printed))
                 .as("a migrating build is read plugin by plugin, so each line starts from the plugin it replaces")
-                .contains("maven-checkstyle-plugin / checkstyle -> checkstyle.xml (37)", "skill/extend");
+                .contains("maven-checkstyle-plugin / checkstyle -> checkstyle.properties (37)", "skill/extend");
     }
 
     @Test

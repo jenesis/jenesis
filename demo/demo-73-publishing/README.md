@@ -270,11 +270,14 @@ consumers with the same upload.
 
 That division is about credentials and signing keys, not about who types the
 command, so the build does offer to run the release tool for you. Where the project's
-root holds a `jreleaser.yml` (or a `.yaml`, `.toml` or `.json`), `release` runs JReleaser
-through the JReleaser plugin of [jenesis-plugins](https://github.com/jenesis/jenesis-plugins),
-which the build resolves by itself; nothing names it. An optional `jreleaser.properties`
-in the configuration folder holds its values, and `-Djenesis.release.jreleaser=false`
-leaves it out:
+configuration folder holds a `jreleaser.yml` (or a `.yaml`, `.toml` or `.json`), `release`
+runs JReleaser through the JReleaser plugin of
+[jenesis-plugins](https://github.com/jenesis/jenesis-plugins), which the build resolves by
+itself; nothing names it. A `jreleaser.yml` at the project root, where JReleaser's own
+command reads it, switches nothing on. A `jreleaser.properties` in the configuration
+folder takes the file's place where it holds values: it names the file as
+`configuration=<path>`, relative to it, which it then requires, and
+`-Djenesis.release.jreleaser=false` leaves JReleaser out:
 
     java -Djenesis.project.version=1.0.0 -Djenesis.release.publish=true build/jenesis/Make.java release
 

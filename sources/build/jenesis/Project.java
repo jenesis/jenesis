@@ -1417,7 +1417,7 @@ public record Project(
                     steps that called it. A CI job that built runs `java
                     -Djenesis.dependency.pin=strict build/jenesis/Make.java`; one that published
                     runs the `release` selector with -Djenesis.release.publish=true, which stages
-                    first, with a jreleaser.yml at the project's root, and the version as
+                    first, with a jreleaser.properties naming the jreleaser.yml, and the version as
                     -Djenesis.project.version. A pom.xml build passes it too, to `release` and to
                     `pin`, which runs the release dry: JReleaser is handed the version the build
                     was given, never a POM's, and fails on a blank one unless jreleaser.yml names
@@ -1552,22 +1552,28 @@ public record Project(
 
                     ## Check and test
 
-                      maven-checkstyle-plugin / checkstyle -> checkstyle.xml (37), with the files
-                          it names as ${config_loc}/<path> beside it, and checkstyle.properties
-                          for its propertyExpansion or Gradle's configProperties; the build sets
-                          ${config_loc} itself;
+                      maven-checkstyle-plugin / checkstyle -> checkstyle.properties (37), whose
+                          configuration=<path of checkstyle.xml, relative to it> names the
+                          configuration, handed on with the files it names as ${config_loc}/<path>
+                          beside it, and whose other lines are its propertyExpansion or Gradle's
+                          configProperties; the build sets ${config_loc} itself; without
+                          properties, a checkstyle.xml in build.jenesis/ is read as it stands;
                           a jar of custom checks among the plugin's dependencies -> @jenesis.plugin
                           checkstyle:tool maven/<groupId>/<artifactId>, in a pom.xml
                           <!--jenesis.plugin checkstyle:tool maven/<groupId>/<artifactId>-->
-                      maven-pmd-plugin / pmd -> pmd.xml (37); minimumPriority /
+                      maven-pmd-plugin / pmd -> pmd.xml in build.jenesis/ (37), or a pmd.properties
+                          with configuration=<path of pmd.xml, relative to it>;
+                          minimumPriority /
                           rulesMinimumPriority -> jenesis.pmd.priority
-                      spotbugs-maven-plugin / com.github.spotbugs -> spotbugs-exclude.xml (37)
+                      spotbugs-maven-plugin / com.github.spotbugs -> spotbugs.properties, or
+                          excludeFilterFile -> spotbugs-exclude.xml in build.jenesis/ (37), or
+                          configuration=<its path, relative to it> in spotbugs.properties
                       forbiddenapis (de.thetaphi) check and testCheck / the same
                           -> forbiddenapis.properties (37), checking main and test classes alike,
                           which takes
                           bundledSignatures -> bundled=jdk-unsafe,jdk-deprecated,..., a JDK
                           version appended from the classes' release as targetVersion would;
-                          signaturesFiles -> signatures=<files beside it>;
+                          signaturesFiles -> signatures=<files, relative to it>;
                           suppressAnnotations -> suppress; includes, excludes;
                           signaturesWithSeverityWarn -> warn; failOnMissingClasses=false ->
                           allowmissingclasses; ignoreSignaturesOfMissingClasses ->
@@ -1594,21 +1600,28 @@ public record Project(
                           -> formatter=palantir, which takes reflow and imports alike
                       Spotless eclipse().configFile(...), formatter-maven-plugin (net.revelc)
                           configFile -> formatter=eclipse with profile=<the profile Eclipse exports,
-                          beside it> (37); Spotless's importOrder and the
+                          relative to it> (37); Spotless's importOrder and the
                           formatter plugin's import and cache settings have no counterpart
-                      rewrite-maven-plugin / org.openrewrite.rewrite, activeRecipes and rewrite.yml
-                          -> openrewrite.properties with recipes=<recipe>[,...] and the rewrite.yml
-                          beside it (37), run before the Java formatter over the module's sources
-                          with its dependencies as the class path; rewrite:dryRun / rewriteDryRun
-                          is the default, which fails the build printing the diff, rewrite:run /
-                          rewriteRun is -Djenesis.format.rewrite=true; a recipe library ->
-                          @jenesis.plugin openrewrite:tool <coordinate> in the module-info.java
-                      Spotless ktlint() / the same -> .editorconfig (47)
+                      rewrite-maven-plugin / org.openrewrite.rewrite -> rewrite.yml in
+                          build.jenesis/ (37), or an openrewrite.properties with
+                          configuration=<path of rewrite.yml, relative to it>, which runs
+                          every recipe the file declares before the Java formatter over the
+                          module's sources, with its dependencies as the class path;
+                          activeRecipes / activeRecipe(...) -> recipes=<recipe>[,...] there;
+                          rewrite:dryRun / rewriteDryRun is the default, which fails the build
+                          printing the diff, rewrite:run / rewriteRun is
+                          -Djenesis.format.rewrite=true; a recipe library -> @jenesis.plugin
+                          openrewrite:tool <coordinate> in the module-info.java, and a module the
+                          library and OpenRewrite ask two versions of -> the @jenesis.pin
+                          openrewrite:tool/... line the build names
+                      Spotless ktlint() / the same -> .editorconfig in build.jenesis/ (47), or a
+                          ktlint.properties with configuration=<path of .editorconfig>
                       Spotless ktfmt() / the same -> ktfmt.properties (47): style=google for googleStyle(),
                           kotlinlang for kotlinlangStyle(), meta, the default, otherwise;
                           removeUnusedImports false -> imports=sort; maxWidth and the indents have
                           no counterpart, as ktfmt's command line takes none
-                      Spotless scalafmt() / the same -> .scalafmt.conf (51)
+                      Spotless scalafmt() / the same -> .scalafmt.conf in build.jenesis/ (51), or
+                          a scalafmt.properties with configuration=<path of .scalafmt.conf>
                       Spotless licenseHeader(), licenseHeaderFile() / the same,
                           license-maven-plugin (com.mycila) check and format
                           -> licenseheader.properties (37), text=<the header>, which every Java,
@@ -1618,12 +1631,14 @@ public record Project(
                           and mycila's ${...} properties are written out, a year included; without
                           text, the header is // SPDX-FileCopyrightText: <copyright> and
                           // SPDX-License-Identifier: <id> of the one license the project declares
-                      detekt, ktlint / the same -> the detekt and ktlint plugins at the hook point
-                          check, binding detekt.yml and .editorconfig (47)
-                      scalastyle, scalafmt / the same -> the scalastyle and scalafmt plugins at the
-                          hook point check, binding scalastyle-config.xml and .scalafmt.conf (51)
-                      codenarc / codenarc -> the CodeNarc plugin at the hook point check, binding
-                          codenarc.xml (53)
+                      detekt, ktlint / the same -> detekt.yml and .editorconfig in build.jenesis/
+                          (47), or detekt.properties and ktlint.properties naming them as
+                          configuration=
+                      scalastyle, scalafmt / the same -> scalastyle-config.xml and .scalafmt.conf in
+                          build.jenesis/ (51), or scalastyle.properties and scalafmt.properties
+                          naming them as configuration=
+                      codenarc / codenarc -> codenarc.xml in build.jenesis/ (53), or a
+                          codenarc.properties naming it as configuration=
                       maven-surefire-plugin / test -> on by default; test.properties names the
                           framework where inference does not (38), and only changed tests re-run (39)
                       surefire systemPropertyVariables of ${project.artifactId} or ${project.version}
@@ -1768,12 +1783,13 @@ public record Project(
                           no counterpart, an unknown key fails the build, and a Gradle source set or
                           a multi-module aggregate has none either: each module is documented alone
                       asciidoctor-maven-plugin process-asciidoc / org.asciidoctor.jvm.convert
-                          -> asciidoctor.properties in the configuration folder (79), which converts
-                          the documents of docs/, or of the folder @docs=<folder> binds, once for
-                          the whole project, staged as target/stage/project/output/docs/;
-                          attributes -> attribute.<name>=<value>, backend -> backend=html5 or
-                          docbook5, outputDirectory -> output=<folder below the staged project
-                          files>; a file whose name starts with _ is a partial, only included
+                          -> asciidoctor.properties in the configuration folder (79), whose
+                          documents=<folder, relative to it> - ../src/docs/asciidoc for their
+                          default - is converted once for the whole project, staged as
+                          target/stage/project/output/docs/; a file whose name starts with _ is a
+                          partial, only included; attributes -> attribute.<name>=<value>, backend
+                          -> backend=html5 or docbook5, outputDirectory -> output=<folder below the
+                          staged project files>
                       maven-shade-plugin / shadow -> launcher=true, one executable jar (9)
                       Spring Boot repackage / bootJar -> launcher=true, one executable jar (9), or
                           bundle=true, its jars and the argument file that launches them (11)
@@ -1795,13 +1811,15 @@ public record Project(
                           setting on the command line
                       deploy to Maven Central, central-publishing, maven-gpg-plugin / maven-publish
                           to Central, signing
-                          -> `release` with a jreleaser.yml at the project's root, which runs
+                          -> `release` with a jreleaser.yml in the configuration folder, or a
+                          jreleaser.properties there naming it as configuration=<path, relative to
+                          it>, which runs
                           JReleaser in the build's JVM in the project's root, with the
                           version the build was given as -Djenesis.project.version, which a
                           pom.xml build passes to `release` and `pin` alike, as no POM's version
                           reaches it, unless jreleaser.yml names one, and
-                          the staged trees as template properties (73), the values of a
-                          jreleaser.properties beside the configuration, and with --dry-run,
+                          the staged trees as template properties (73), the other values of
+                          jreleaser.properties, and with --dry-run,
                           publishing nothing, unless the command line passes
                           -Djenesis.release.publish=true; JReleaser releases versions without
                           -SNAPSHOT, as the staged tree names a snapshot as Maven installs one,
@@ -2362,10 +2380,17 @@ public record Project(
 
                     The linters of the sources - Checkstyle, PMD, detekt, ktlint, Scalastyle, scalafmt
                     and CodeNarc - and of the classes - SpotBugs and forbiddenapis - each activate on
-                    the tool's own configuration file in a configuration folder (checkstyle.xml,
-                    pmd.xml, detekt.yml, .editorconfig, scalastyle-config.xml, .scalafmt.conf,
-                    codenarc.xml, spotbugs-exclude.xml, forbiddenapis.properties), and the build
-                    resolves the tool's plugin from jenesis-plugins on its own, as it does the JDK's
+                    a <tool>.properties in a configuration folder (checkstyle.properties,
+                    pmd.properties, detekt.properties, ktlint.properties, scalastyle.properties,
+                    scalafmt.properties, codenarc.properties, spotbugs.properties,
+                    forbiddenapis.properties), which name the tool's own file as
+                    configuration=<path, relative to them> - required, save for SpotBugs, whose
+                    exclusion filter is optional. Where no such properties are found, the tool's one
+                    conventional file in a configuration folder (checkstyle.xml, pmd.xml, detekt.yml,
+                    .editorconfig, scalastyle-config.xml, .scalafmt.conf, codenarc.xml,
+                    spotbugs-exclude.xml) activates it alone and is handed on as if named so. The
+                    build resolves the tool's
+                    plugin from jenesis-plugins on its own, as it does the JDK's
                     checks (jdeps.properties, jdeprscan.properties). A linter reports its findings, as its setting
                     jenesis.source.<tool> (jenesis.validator.<tool> for SpotBugs, forbiddenapis, jdeps and jdeprscan) is report by default;
                     strict fails the build on them instead, and ignore skips the linter. Whether a
@@ -2373,13 +2398,27 @@ public record Project(
                     jenesis.print.findings, true by default.
                     A linter that cannot load its configuration
                     fails the build either way. Checkstyle's ${config_loc} is the
-                    folder its checkstyle.xml is bound into, and every other ${<property>} it names is a
-                    value of the checkstyle.properties beside it, or Checkstyle fails to load it. A jar of custom checks or filters joins Checkstyle's
+                    folder its configuration is bound into, and every other ${<property>} it names is
+                    a line of checkstyle.properties, or Checkstyle fails to load it. A jar of custom checks or filters joins Checkstyle's
                     class path when @jenesis.plugin checkstyle:tool maven/<groupId>/<artifactId> names
                     it, in a pom.xml <!--jenesis.plugin checkstyle:tool maven/<groupId>/<artifactId>-->,
                     which a local parent's POM hands to every module; it resolves in the checkstyle:tool
                     group, where @jenesis.pin checkstyle:tool/maven/<groupId>/<artifactId> <version>
                     pins it.
+
+                    The formatters verify a module's sources and fail the build on a source they would
+                    change; -Djenesis.format.rewrite=true lets them rewrite it instead. A
+                    javaformat.properties selects google, palantir or eclipse, a ktlint.properties
+                    ktlint, a ktfmt.properties ktfmt, a scalafmt.properties scalafmt, and a
+                    licenseheader.properties the header every source starts with; without the
+                    properties of ktlint or scalafmt, an .editorconfig or .scalafmt.conf of a
+                    configuration folder activates it. An openrewrite.properties runs every OpenRewrite
+                    recipe of the rewrite.yml it names as configuration=, or the recipes it names as
+                    recipes=<recipe>[,...], and without one a rewrite.yml of a configuration folder
+                    runs its recipes, before the Java
+                    formatter and with the module's dependencies as its class path, printing the diff
+                    it would apply; a recipe library joins OpenRewrite by @jenesis.plugin
+                    openrewrite:tool maven/<groupId>/<artifactId>.
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
@@ -2561,10 +2600,16 @@ public record Project(
                     # Jenesis - Add to the stock build with plugins
 
                     The plugins of jenesis/jenesis-plugins need no line: the build resolves each by its
-                    module name where its own file is found - checkstyle.xml, pmd.xml, xjc.properties,
-                    jacoco.properties, openrewrite.properties, asciidoctor.properties and the like in a
-                    configuration folder, a .kt, .scala or .groovy source, a jreleaser.yml at the
-                    project's root - and that file's values reach it, so
+                    module name where its <name>.properties is found in a configuration folder -
+                    checkstyle.properties, xjc.properties, jacoco.properties, asciidoctor.properties,
+                    jreleaser.properties and the like - or, for a language, where a .kt, .scala or
+                    .groovy source is. The properties name the tool's own file as
+                    configuration=<path, relative to them>, and fail the build naming the key where
+                    they leave it out; only where no properties are found does the tool's one
+                    conventional file in a configuration folder - checkstyle.xml, pmd.xml, rewrite.yml,
+                    jreleaser.yml and the like - switch it on alone, handed on as if named so.
+                    Asciidoctor needs its properties, as they name the folder of documents. The
+                    file's other values reach the plugin, so
                     plugin-<name>.properties is for no plugin of theirs. Its setting switches it off as
                     a built-in tool's does (jenesis.source.pmd=ignore, jenesis.generate.xjc=false, ...).
 
@@ -3349,6 +3394,20 @@ public record Project(
         return relative.toString().isEmpty() ? Path.of(".") : relative;
     }
 
+    private static String required(Path properties, String key, String example) {
+        String value;
+        try {
+            value = SequencedProperties.ofFiles(properties).value(key);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot read " + properties, e);
+        }
+        if (value == null) {
+            throw new IllegalArgumentException(properties + " names no " + key + " - add " + key + "=" + example
+                    + ", relative to " + properties.getFileName());
+        }
+        return value;
+    }
+
     public static Project ofEnvironment(Environment environment, Path root) {
         InferredMultiProjectAssembler assembler = InferredMultiProjectAssembler.ofEnvironment(environment);
         ProjectPlugins projectPlugins = new ProjectPlugins();
@@ -3457,27 +3516,6 @@ public record Project(
                     hooks.get(PLUGIN),
                     resolutions);
         }
-        Path jreleaser = ProjectPlugins.jreleaser(root);
-        if (jreleaser != null && environment.flag("release.jreleaser", true)) {
-            if (projectPlugins.releasers().containsKey(ProjectPlugins.JRELEASER)) {
-                throw new IllegalArgumentException("The releaser " + ProjectPlugins.JRELEASER + " in " + file + " takes"
-                        + " the name of the plugin the build releases with by itself where the project holds "
-                        + jreleaser.getFileName() + " - remove its line");
-            }
-            ExternalModule official = ExternalModule.official(environment, ProjectPlugins.JRELEASER, null, Map.of(), Map.of());
-            SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> releasers = new LinkedHashMap<>(projectPlugins.releasers());
-            releasers.put(ProjectPlugins.JRELEASER, values -> {
-                SequencedMap<String, String> given = new LinkedHashMap<>(values);
-                given.put("@" + ProjectPlugins.JRELEASER, jreleaser.getFileName().toString());
-                return official.configured(root, root, given);
-            });
-            SequencedMap<String, BuildExecutorModule> resolutions = new LinkedHashMap<>(projectPlugins.resolutions());
-            resolutions.put(ProjectPlugins.JRELEASER, official.resolution());
-            projectPlugins = projectPlugins.pins(root.resolve("jenesis.plugins.pin.properties"))
-                    .arguments(root.resolve("jenesis.plugins.arguments.properties"))
-                    .releasers(releasers)
-                    .resolutions(resolutions);
-        }
         List<String> included = environment.entries("project.resources");
         if (included != null) {
             SequencedMap<Path, Path> resources = new LinkedHashMap<>();
@@ -3511,12 +3549,50 @@ public record Project(
             project = project.boms(project.configuration().toArray(Path[]::new));
             project = project.signatures(project.configuration().toArray(Path[]::new));
         }
-        Path asciidoctor = BuildStep.locate(project.configuration(), ProjectPlugins.ASCIIDOCTOR + ".properties");
-        if (asciidoctor != null && environment.flag("project.asciidoctor", true)) {
+        Path jreleaser = environment.flag("release.jreleaser", true)
+                ? BuildStep.locate(project.configuration(), ProjectPlugins.JRELEASER + ".properties")
+                : null;
+        Path jreleaserConfiguration = environment.flag("release.jreleaser", true) && jreleaser == null
+                ? ProjectPlugins.jreleaser(project.configuration())
+                : null;
+        if (jreleaser != null || jreleaserConfiguration != null) {
+            Path declaration = jreleaser == null ? jreleaserConfiguration : jreleaser;
+            if (project.plugins.resolutions().containsKey(ProjectPlugins.JRELEASER)) {
+                throw new IllegalArgumentException("The plugin " + ProjectPlugins.JRELEASER + " in " + file + " takes"
+                        + " the name of the plugin the build releases with by itself where a configuration folder holds "
+                        + declaration.getFileName() + " - remove its line");
+            }
+            if (jreleaser != null) {
+                ExternalModule.named(jreleaser, ExternalModule.CONFIGURATION, required(jreleaser,
+                        ExternalModule.CONFIGURATION,
+                        "../jreleaser.yml, the JReleaser configuration"));
+            }
+            ExternalModule official = ExternalModule.official(environment, ProjectPlugins.JRELEASER, null, Map.of(), Map.of());
+            Path released = project.root();
+            SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> releasers = new LinkedHashMap<>(project.plugins.releasers());
+            releasers.put(ProjectPlugins.JRELEASER, values -> {
+                SequencedMap<String, String> given = new LinkedHashMap<>(values);
+                String named = given.remove(ExternalModule.CONFIGURATION);
+                given.put("@" + ProjectPlugins.JRELEASER, (jreleaser == null
+                        ? jreleaserConfiguration
+                        : ExternalModule.named(jreleaser, ExternalModule.CONFIGURATION, named == null ? "" : named)).toString());
+                return official.configured(released, released, given);
+            });
+            SequencedMap<String, BuildExecutorModule> resolutions = new LinkedHashMap<>(project.plugins.resolutions());
+            resolutions.put(ProjectPlugins.JRELEASER, official.resolution());
+            project = project.plugins(project.plugins.pins(project.root().resolve("jenesis.plugins.pin.properties"))
+                    .arguments(project.root().resolve("jenesis.plugins.arguments.properties"))
+                    .releasers(releasers)
+                    .resolutions(resolutions));
+        }
+        Path asciidoctor = environment.flag("project.asciidoctor", true)
+                ? BuildStep.locate(project.configuration(), ProjectPlugins.ASCIIDOCTOR + ".properties")
+                : null;
+        if (asciidoctor != null) {
             if (project.plugins.resolutions().containsKey(ProjectPlugins.ASCIIDOCTOR)) {
                 throw new IllegalArgumentException("The plugin " + ProjectPlugins.ASCIIDOCTOR + " in " + file + " takes"
-                        + " the name of the plugin the build converts the project's documents with by itself where a"
-                        + " configuration folder holds " + asciidoctor.getFileName() + " - remove its line");
+                        + " the name of the plugin the build converts the project's AsciiDoc documents with by itself"
+                        + " where a configuration folder holds " + asciidoctor.getFileName() + " - remove its line");
             }
             SequencedMap<String, String> given = new LinkedHashMap<>();
             try {
@@ -3524,15 +3600,9 @@ public record Project(
             } catch (IOException e) {
                 throw new UncheckedIOException("Cannot read " + asciidoctor, e);
             }
-            if (given.keySet().stream().noneMatch(key -> key.equals("@" + ProjectPlugins.DOCS)
-                    || key.startsWith("@" + ProjectPlugins.DOCS + "/"))) {
-                if (!Files.isDirectory(project.root().resolve(ProjectPlugins.DOCS))) {
-                    throw new IllegalArgumentException(asciidoctor + " converts the documents of "
-                            + ProjectPlugins.DOCS + "/, which the project does not hold - create it, or bind the"
-                            + " folder that holds them with @" + ProjectPlugins.DOCS + "=<folder>");
-                }
-                given.put("@" + ProjectPlugins.DOCS, ProjectPlugins.DOCS);
-            }
+            String documents = required(asciidoctor, ProjectPlugins.DOCUMENTS, "../docs, the folder of AsciiDoc documents");
+            given.remove(ProjectPlugins.DOCUMENTS);
+            given.put("@" + ProjectPlugins.DOCS, asciidoctor.resolveSibling(documents.trim()).normalize().toString());
             ExternalModule official = ExternalModule.official(environment, ProjectPlugins.ASCIIDOCTOR, null, Map.of(), Map.of());
             Path documented = project.root();
             SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> transforms = new LinkedHashMap<>(project.plugins.transforms());
@@ -4591,7 +4661,7 @@ public record Project(
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.resources||Comma-separated <path>:<target> pairs of project files or folders placed among the resources of every module, as NOTICE:META-INF/NOTICE,LICENSE:META-INF/LICENSE
                 project.plugins|true|false leaves out every plugin that jenesis.plugins.properties names, while pin still pins those of the whole project
-                project.asciidoctor|true|Asciidoctor, activated by an asciidoctor.properties of the configuration folder, converting the documents of docs/ or of the folder its @docs line binds and staging them with the project's files
+                project.asciidoctor|true|Asciidoctor, activated by an asciidoctor.properties of the configuration folder naming the folder of documents as documents=, whose documents it converts and stages with the project's files
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache; a file a project provides names only a folder inside the project
                 project.docker|false|Run the whole build inside a container
                 project.image||Image for that container
@@ -4708,22 +4778,22 @@ public record Project(
                 graalvm.license||Licence the SBOM beside a native image records for the GraalVM that compiled it, as an SPDX identifier or a name; empty records none
                 compliance.license|true|Run the license check a licensing.properties activates
                 compliance.vulnerability|true|Run the vulnerability check a vulnerability.properties activates
-                source.checkstyle|report|ignore|report|strict: Checkstyle, activated by a checkstyle.xml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
-                source.pmd|report|ignore|report|strict: PMD, activated by a pmd.xml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
-                source.detekt|report|ignore|report|strict: detekt, activated by a detekt.yml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
-                source.ktlint|report|ignore|report|strict: ktlint linting, activated by an .editorconfig; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
-                source.scalastyle|report|ignore|report|strict: Scalastyle, activated by a scalastyle-config.xml; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
-                source.scalafmt|report|ignore|report|strict: scalafmt checking, activated by a .scalafmt.conf; ignore skips it, report lists a source it would format differently, strict fails the build on one
-                source.codenarc|report|ignore|report|strict: CodeNarc, activated by a codenarc.xml; ignore skips it, report records its findings, strict fails the build on any of them
-                validator.spotbugs|report|ignore|report|strict: SpotBugs, activated by a spotbugs-exclude.xml; ignore skips it, report records its findings, strict fails the build on any of them
+                source.checkstyle|report|ignore|report|strict: Checkstyle, activated by a checkstyle.properties naming its checkstyle.xml as configuration= or, where none is found, by a checkstyle.xml of a configuration folder; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
+                source.pmd|report|ignore|report|strict: PMD, activated by a pmd.properties naming its pmd.xml as configuration= or, where none is found, by a pmd.xml of a configuration folder; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
+                source.detekt|report|ignore|report|strict: detekt, activated by a detekt.properties naming its detekt.yml as configuration= or, where none is found, by a detekt.yml of a configuration folder; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
+                source.ktlint|report|ignore|report|strict: ktlint linting, activated by a ktlint.properties naming its .editorconfig as configuration= or, where none is found, by a .editorconfig of a configuration folder; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
+                source.scalastyle|report|ignore|report|strict: Scalastyle, activated by a scalastyle.properties naming its scalastyle-config.xml as configuration= or, where none is found, by a scalastyle-config.xml of a configuration folder; ignore skips it, report records its findings, strict fails the build when it exits reporting a violation
+                source.scalafmt|report|ignore|report|strict: scalafmt checking, activated by a scalafmt.properties naming its .scalafmt.conf as configuration= or, where none is found, by a .scalafmt.conf of a configuration folder; ignore skips it, report lists a source it would format differently, strict fails the build on one
+                source.codenarc|report|ignore|report|strict: CodeNarc, activated by a codenarc.properties naming its codenarc.xml as configuration= or, where none is found, by a codenarc.xml of a configuration folder; ignore skips it, report records its findings, strict fails the build on any of them
+                validator.spotbugs|report|ignore|report|strict: SpotBugs, activated by a spotbugs.properties, which may name an exclusion filter as configuration=, or, where none is found, by a spotbugs-exclude.xml of a configuration folder; ignore skips it, report records its findings, strict fails the build on any of them
                 validator.forbiddenapis|report|ignore|report|strict: forbiddenapis, activated by a forbiddenapis.properties; ignore skips it, report records its findings, strict fails the build on any of them
                 validator.jdeps|report|ignore|report|strict: jdeps --jdk-internals, activated by a jdeps.properties; ignore skips it, report records the JDK internal APIs the classes use, strict fails the build on any of them
                 validator.jdeprscan|report|ignore|report|strict: jdeprscan, activated by a jdeprscan.properties; ignore skips it, report records the uses of APIs deprecated for removal, strict fails the build on any of them
-                format.openrewrite|true|OpenRewrite, activated by an openrewrite.properties naming its recipes, with the rewrite.yml beside it; it runs before the Java formatter and reads the module's dependencies
+                format.openrewrite|true|OpenRewrite, activated by an openrewrite.properties naming a rewrite.yml as configuration=, whose recipes it runs, or recipes as recipes=, or, where none is found, by a rewrite.yml of a configuration folder; it runs before the Java formatter and reads the module's dependencies
                 format.java|true|The Java formatter a javaformat.properties selects - google, palantir or eclipse - with its options
-                format.ktlint|true|ktlint formatting, activated by an .editorconfig
+                format.ktlint|true|ktlint formatting, activated by a ktlint.properties naming its .editorconfig as configuration= or, where none is found, by an .editorconfig of a configuration folder
                 format.ktfmt|true|ktfmt formatting, activated by a ktfmt.properties, which names its style and what it does to the imports; refused beside ktlint formatting the same sources
-                format.scalafmt|true|scalafmt formatting
+                format.scalafmt|true|scalafmt formatting, activated by a scalafmt.properties naming its .scalafmt.conf as configuration= or, where none is found, by a .scalafmt.conf of a configuration folder
                 format.license|true|The license header check, activated by a licenseheader.properties, whose text every Java, Kotlin, Scala and Groovy source of a module must start with as a block comment, exactly as it stands, or, without text, as SPDX lines naming the license and copyright the project declares
                 format.rewrite|false|Let the formatters rewrite sources instead of verifying them
                 generate.classpath|true|META-INF/services entries generated from a module-info's provides, and Enable-Native-Access for a module granting itself, so its jar also serves the class path, activated by a classpath.properties
@@ -4753,7 +4823,7 @@ public record Project(
                 jarsigner.arguments||Further jarsigner arguments, whitespace separated; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 release.uri||Jenesis module repository a release puts each staged module's jar into, one put per module at module/<module>/<version>/<module>.jar, so every module needs a version; the https address of a Jenesis Repository's jenesis repository, as jenesis.module.uri names it; a java repository takes Maven publishes only and refuses the put (env JENESIS_RELEASE_URI)
                 release.publish|false|Publish what a release puts and runs - the jenesis.release.uri and jenesis.deploy.uri puts and the plugins of the hook point release, JReleaser's without --dry-run; without it, release and every pin run the release dry, checking what was staged and naming what it would put; only the command line may set it
-                release.jreleaser|true|JReleaser, activated by a jreleaser.yml, .yaml, .toml or .json at the project root, with the values of a jreleaser.properties of the configuration folder
+                release.jreleaser|true|JReleaser, activated by a jreleaser.properties of the configuration folder naming its jreleaser.yml as configuration=, with the other values of that file, or, where none is found, by a jreleaser.yml, .yaml, .toml or .json of a configuration folder
                 release.token||Authorization header value for that repository, sent as given (env JENESIS_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named
                 deploy.uri||Maven repository a release puts the staged Maven tree into, every file at <group path>/<artifactId>/<version>/<file> with its .md5, .sha1, .sha256 and .sha512, then the artifact's maven-metadata.xml merged with the one the repository holds; a SNAPSHOT version is put under a unique timestamped name beside its own maven-metadata.xml, as Maven deploys one; nothing is signed, so a release to Maven Central goes through the JReleaser plugin, which signs it and uses Central's publishing service, while its snapshot repository takes a SNAPSHOT from here as any repository does (env MAVEN_RELEASE_URI)
                 deploy.token||Authorization header value for that repository, sent as given, so it names its scheme, as Bearer <token> or Basic <credentials> (env MAVEN_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named

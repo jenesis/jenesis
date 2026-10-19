@@ -13,7 +13,11 @@ import build.jenesis.step.Bind;
 public class InferredSourceFormattingModule implements BuildExecutorModule {
 
     public static final String OPENREWRITE = "openrewrite", JAVA = "java", KTFMT = "ktfmt", KTLINT = "ktlint", SCALAFMT = "scalafmt";
-    private static final String LICENSE = "license", TEXT = "text", FORMATTER = "formatter", PROFILE = "profile";
+    private static final String LICENSE = "license",
+            TEXT = "text",
+            FORMATTER = "formatter",
+            PROFILE = "profile",
+            RECIPES = "recipes";
 
     private final SequencedSet<Path> configuration;
     private final boolean verify;
@@ -369,14 +373,27 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 })) {
             inputs.add(LICENSE);
         }
-        Path openRewriteFile = BuildStep.locate(configuration, "openrewrite.properties");
-        if (openRewriteFile != null && openrewrite) {
-            SequencedMap<String, String> values = new LinkedHashMap<>();
-            SequencedProperties.ofFiles(openRewriteFile).forEachProperty(values::put);
-            ExternalModule module = openRewriteModule.properties(values);
-            Path recipes = openRewriteFile.resolveSibling("rewrite.yml");
-            if (Files.isRegularFile(recipes)) {
-                module = module.bound(ExternalModule.RULES, recipes.getFileName(), recipes);
+        Path openRewriteFile = BuildStep.locate(configuration, "openrewrite.properties"),
+                recipesFile = BuildStep.locate(configuration, "rewrite.yml");
+        if ((openRewriteFile != null || recipesFile != null) && openrewrite) {
+            ExternalModule module = openRewriteModule;
+            if (openRewriteFile == null) {
+                module = module.bound(ExternalModule.RULES, Path.of("rewrite.yml"), recipesFile);
+            } else {
+                SequencedMap<String, String> values = new LinkedHashMap<>();
+                SequencedProperties.ofFiles(openRewriteFile).forEachProperty(values::put);
+                String recipes = values.remove(ExternalModule.CONFIGURATION);
+                if ((recipes == null || recipes.isBlank()) && (values.get(RECIPES) == null || values.get(RECIPES).isBlank())) {
+                    throw new IllegalArgumentException(openRewriteFile + " names neither " + ExternalModule.CONFIGURATION
+                            + " nor " + RECIPES + " - add " + ExternalModule.CONFIGURATION + "=rewrite.yml, the file"
+                            + " declaring the recipes relative to it, or " + RECIPES + "=<recipe>[,<recipe>...]");
+                }
+                module = module.properties(values);
+                if (recipes != null && !recipes.isBlank()) {
+                    module = module.bound(ExternalModule.RULES,
+                            Path.of("rewrite.yml"),
+                            ExternalModule.named(openRewriteFile, ExternalModule.CONFIGURATION, recipes));
+                }
             }
             SequencedSet<String> rewritten = new LinkedHashSet<>(inputs);
             inherited.sequencedKeySet().stream().filter(key -> !inputs.contains(key)).forEach(rewritten::add);
@@ -396,19 +413,9 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                     if (profile == null) {
                         yield eclipseJavaFormatModule;
                     }
-                    Path relative = Path.of(profile.trim()).normalize();
-                    if (relative.isAbsolute() || relative.startsWith("..")) {
-                        throw new IllegalArgumentException("javaformat.properties names " + PROFILE + "=" + profile
-                                + ", which is not beside or below it - place the profile in the folder of"
-                                + " javaformat.properties");
-                    }
-                    Path resolved = javaFormat.resolveSibling(relative);
-                    if (!Files.isRegularFile(resolved)) {
-                        throw new IllegalArgumentException("javaformat.properties names " + PROFILE + "=" + profile
-                                + ", but " + resolved + " is no file - export the formatter profile from Eclipse"
-                                + " there");
-                    }
-                    yield eclipseJavaFormatModule.bound(PROFILE, Path.of("eclipse-formatter.xml"), resolved);
+                    yield eclipseJavaFormatModule.bound(PROFILE,
+                            Path.of("eclipse-formatter.xml"),
+                            ExternalModule.named(javaFormat, PROFILE, profile));
                 }
                 case null -> {
                     if (!values.isEmpty()) {
@@ -425,27 +432,23 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
             }
         }
         Path ktfmtFile = ktfmt ? BuildStep.locate(configuration, "ktfmt.properties") : null;
-        Path editorConfig = BuildStep.locate(configuration, ".editorconfig");
-        if (ktfmtFile != null && ktlint && editorConfig != null) {
-            throw new IllegalArgumentException(ktfmtFile + " selects ktfmt while " + editorConfig + " selects ktlint"
-                    + " to format the same Kotlin sources - set jenesis.format.ktlint=false to format with ktfmt"
-                    + " alone, or remove ktfmt.properties");
+        ExternalModule ktlintDiscovered = ktlint ? ktlintModule.discovered(configuration, Path.of(".editorconfig")) : null;
+        if (ktfmtFile != null && ktlintDiscovered != null) {
+            throw new IllegalArgumentException(ktfmtFile + " selects ktfmt while ktlint formats the same Kotlin sources,"
+                    + " as a configuration folder holds a ktlint.properties or an .editorconfig - set"
+                    + " jenesis.format.ktlint=false to format with ktfmt alone, or remove ktfmt.properties");
         }
         if (ktfmtFile != null && ktfmt) {
             SequencedMap<String, String> values = new LinkedHashMap<>();
             SequencedProperties.ofFiles(ktfmtFile).forEachProperty(values::put);
             buildExecutor.addModule(KTFMT, ktfmtModule.properties(values), inputs);
         }
-        if (editorConfig != null && ktlint) {
-            buildExecutor.addModule(KTLINT,
-                    ktlintModule.bound(ExternalModule.RULES, editorConfig.getFileName(), editorConfig),
-                    inputs);
+        if (ktlintDiscovered != null) {
+            buildExecutor.addModule(KTLINT, ktlintDiscovered, inputs);
         }
-        Path scalafmtFile = BuildStep.locate(configuration, ".scalafmt.conf");
-        if (scalafmtFile != null && scalafmt) {
-            buildExecutor.addModule(SCALAFMT,
-                    scalafmtModule.bound(ExternalModule.RULES, scalafmtFile.getFileName(), scalafmtFile),
-                    inputs);
+        ExternalModule scalafmtDiscovered = scalafmt ? scalafmtModule.discovered(configuration, Path.of(".scalafmt.conf")) : null;
+        if (scalafmtDiscovered != null) {
+            buildExecutor.addModule(SCALAFMT, scalafmtDiscovered, inputs);
         }
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->

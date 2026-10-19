@@ -46,6 +46,7 @@ public record ProjectPlugins(Path pins,
             JRELEASER = "jreleaser",
             ASCIIDOCTOR = "asciidoctor",
             DOCS = "docs",
+            DOCUMENTS = "documents",
             ROOT = "root.properties",
             ROOT_KEY = "root";
 
@@ -78,10 +79,10 @@ public record ProjectPlugins(Path pins,
         return Collections.unmodifiableMap(merged);
     }
 
-    public static Path jreleaser(Path root) {
+    public static Path jreleaser(SequencedSet<Path> configurations) {
         return Stream.of("jreleaser.yml", "jreleaser.yaml", "jreleaser.toml", "jreleaser.json")
-                .map(root::resolve)
-                .filter(Files::isRegularFile)
+                .map(name -> BuildStep.locate(configurations, name))
+                .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
     }
@@ -452,7 +453,9 @@ public record ProjectPlugins(Path pins,
                     plugins.put(releaser.getKey(), releaser.getValue().apply(Collections.emptyNavigableMap()));
                     continue;
                 }
-                boolean official = releaser.getKey().equals(JRELEASER) && jreleaser(root) != null;
+                boolean official = releaser.getKey().equals(JRELEASER)
+                        && (BuildStep.locate(configurations, JRELEASER + ".properties") != null
+                        || jreleaser(configurations) != null);
                 Path file = BuildStep.locate(configurations, (official ? "" : "plugin-") + releaser.getKey() + ".properties");
                 if (file != null || official) {
                     SequencedMap<String, String> values = new LinkedHashMap<>();
