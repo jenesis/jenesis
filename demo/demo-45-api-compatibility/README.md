@@ -9,9 +9,9 @@ point `artifact`:
 
 japicmp reads byte code, not sources, so it sees exactly what a caller compiled against the old jar would
 see: a removed method, a narrowed return type, a field that changed its modifiers. No build script and no
-japicmp configuration beyond its `plugin-japicmp.properties` are needed.
+japicmp configuration beyond its `japicmp.properties` are needed.
 
-The `plugin-japicmp.properties` here names nothing at all. That is the point: with no baseline declared,
+The `japicmp.properties` here names nothing at all. That is the point: with no baseline declared,
 japicmp compares against the last release of **this module's own coordinate**, so every build measures
 the change you are about to publish against the release before it.
 
@@ -51,8 +51,8 @@ Layout
     |-- pom.xml                this module: build.jenesis.demo:api-compatibility:1.1.0
     |-- jenesis.plugins.properties  names the japicmp and revapi plugins
     |-- build.jenesis
-    |   |-- plugin-japicmp.properties  runs japicmp; names no baseline
-    |   `-- plugin-revapi.properties   runs revapi; reports non-breaking differences too
+    |   |-- japicmp.properties  runs japicmp; names no baseline
+    |   `-- revapi.properties   runs revapi; reports non-breaking differences too
     |-- released               the previous release, built and published by Demo.java
     |   |-- .jenesis.skip      keeps this project out of the outer build's module scan
     |   |-- pom.xml            the same coordinate at 1.0.0
@@ -75,7 +75,7 @@ not by any suffix:
     <repository>/<groupId>/<artifactId>/<version>   served from a named repository
 
 A module with no Maven coordinate has nothing to default to, so leaving the key out there fails with a
-message naming it. The file is read per module, so a project-wide `plugin-japicmp.properties` with no
+message naming it. The file is read per module, so a project-wide `japicmp.properties` with no
 `baseline` gives every module its own coordinate; a `baseline` there would point every module at the
 same artifact, so a per-module baseline belongs in that module's own configuration location. A test
 module, such as the tests variant of a Maven module, has no release of its own and is never compared.
@@ -114,7 +114,7 @@ compiled against 1.0.0, so the build stops and names the change:
 Switching it off
 ----------------
 
-`-Djenesis.plugin.japicmp=false` keeps `plugin-japicmp.properties` in place and skips the comparison,
+`-Djenesis.artifact.japicmp=false` keeps `japicmp.properties` in place and skips the comparison,
 the same opt-out every plugin has.
 
 revapi beside japicmp
@@ -122,7 +122,7 @@ revapi beside japicmp
 
 The revapi plugin, `revapi+artifact=build.jenesis.plugin.revapi`, runs [revapi](https://revapi.org)
 against the same baseline, read the same way. revapi classifies every difference by how severe it is for a caller,
-binary and source alike, and reports those that reach the `severity` its `plugin-revapi.properties`
+binary and source alike, and reports those that reach the `severity` its `revapi.properties`
 names:
 
     severity=non-breaking
@@ -140,8 +140,8 @@ revapi's own configuration, as a `revapi.differences` list of the differences a 
 revapi's JSON: `@analysis/revapi.json=<path>` binds such a file, an array of
 `{"extension": ..., "configuration": ...}` objects as revapi documents it. Any other key fails the build.
 
-Like a linter, revapi reports and keeps the build green; `-Djenesis.artifact.revapi=strict` fails it on
-any difference reported, and `ignore` skips it. revapi resolves in its own `revapi` group: `revapi-java`,
+Like a linter, revapi reports and keeps the build green; `-Djenesis.strict.revapi=true` fails it on
+any difference reported, and `-Djenesis.artifact.revapi=false` skips it. revapi resolves in its own `revapi` group: `revapi-java`,
 `revapi-basic-features` and `revapi-reporter-json` with what they depend on, beside the baseline.
 
 Pinning

@@ -67,11 +67,11 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 ExternalModule.official(environment, InferredCompilerChainModule.KOTLIN, null, repositories, resolvers),
-                true,
+                environment.flag("language.kotlin", true),
                 ExternalModule.official(environment, InferredCompilerChainModule.SCALA, null, repositories, resolvers),
-                true,
+                environment.flag("language.scala", true),
                 ExternalModule.official(environment, InferredCompilerChainModule.GROOVY, null, repositories, resolvers),
-                true);
+                environment.flag("language.groovy", true));
     }
 
     private InferredDocumentationChainModule(SequencedSet<Path> configuration,
@@ -219,7 +219,7 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
         for (String name : official.keySet()) {
             if (languages.containsKey(name)) {
                 throw new IllegalArgumentException("The language plugin " + name + " takes the name of the language"
-                        + " the build documents by itself - remove its line from jenesis.plugins.properties");
+                        + " the build documents by itself - give it another name");
             }
         }
         if (!official.isEmpty() || !languages.isEmpty()) {

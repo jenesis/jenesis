@@ -12,11 +12,11 @@ Run it
 
 | Module | Config file                                         | Input                                  | Ships? | Generator | Generated |
 | ------ | --------------------------------------------------- | -------------------------------------- | --- | --------- | --------- |
-| `soap` | `soap/META-INF/build.jenesis/plugin-wsimport.properties` | `soap/wsdl/greeter.wsdl`                 | yes | `wsimport` | `demo.greeter` |
-| `rest` | `rest/META-INF/build.jenesis/plugin-openapi.properties`  | `rest/META-INF/build.jenesis/greeting.yaml` | no | OpenAPI Generator | `demo.greeting` |
+| `soap` | `soap/META-INF/build.jenesis/wsimport.properties` | `soap/wsdl/greeter.wsdl`                 | yes | `wsimport` | `demo.greeter` |
+| `rest` | `rest/META-INF/build.jenesis/openapi.properties`  | `rest/META-INF/build.jenesis/greeting.yaml` | no | OpenAPI Generator | `demo.greeting` |
 
 `jenesis.plugins.properties` names both generators as plugins at the hook point
-`binary/generated`, and each runs in the module where its `plugin-<name>.properties`
+`binary/generated`, and each runs in the module where its `<name>.properties`
 is found:
 
     openapi+binary/generated=build.jenesis.plugin.openapi
@@ -136,12 +136,12 @@ Layout
     |-- jenesis.plugins.properties  names the wsimport and OpenAPI plugins
     |-- soap
     |   |-- module-info.java     requires jakarta.xml.ws
-    |   |-- META-INF/build.jenesis/plugin-wsimport.properties
+    |   |-- META-INF/build.jenesis/wsimport.properties
     |   |-- wsdl/greeter.wsdl                          named, so the client can read it
     |   `-- demo/contract/soap/Greeters.java
     `-- rest
         |-- module-info.java     requires the generated client's Jackson modules
         |-- META-INF/build.jenesis
-        |   |-- plugin-openapi.properties
+        |   |-- openapi.properties
         |   `-- greeting.yaml                          the input, which does not ship
         `-- demo/contract/rest/Greetings.java

@@ -62,44 +62,22 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
                                                                 SequencedSet<Path> configuration,
                                                                 Map<String, Repository> repositories,
                                                                 Map<String, Resolver> resolvers) {
-        InferredSourceCodeQualityModule module = new InferredSourceCodeQualityModule(configuration,
+        return new InferredSourceCodeQualityModule(configuration,
                 ExternalModule.official(environment, "checkstyle", null, repositories, resolvers),
-                true,
+                environment.flag("check.checkstyle", true),
                 ExternalModule.official(environment, "pmd", null, repositories, resolvers),
-                true,
+                environment.flag("check.pmd", true),
                 ExternalModule.official(environment, "detekt", null, repositories, resolvers),
-                true,
+                environment.flag("check.detekt", true),
                 ExternalModule.official(environment, "ktlint", "check", repositories, resolvers),
-                true,
+                environment.flag("check.ktlint", true),
                 ExternalModule.official(environment, "scalastyle", null, repositories, resolvers),
-                true,
+                environment.flag("check.scalastyle", true),
                 ExternalModule.official(environment, "scalafmt", "check", repositories, resolvers),
-                true,
+                environment.flag("check.scalafmt", true),
                 ExternalModule.official(environment, "codenarc", null, repositories, resolvers),
-                true,
+                environment.flag("check.codenarc", true),
                 Collections.emptyNavigableMap());
-        if (Enforcement.ofEnvironment(environment, "source.checkstyle") == Enforcement.IGNORE) {
-            module = module.checkstyle(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "source.pmd") == Enforcement.IGNORE) {
-            module = module.pmd(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "source.detekt") == Enforcement.IGNORE) {
-            module = module.detekt(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "source.ktlint") == Enforcement.IGNORE) {
-            module = module.ktlint(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "source.scalastyle") == Enforcement.IGNORE) {
-            module = module.scalastyle(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "source.scalafmt") == Enforcement.IGNORE) {
-            module = module.scalafmt(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "source.codenarc") == Enforcement.IGNORE) {
-            module = module.codenarc(false);
-        }
-        return module;
     }
 
     private InferredSourceCodeQualityModule(SequencedSet<Path> configuration,

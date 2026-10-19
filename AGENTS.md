@@ -138,15 +138,19 @@ builds `new MakeTool()`.
 **`jenesis.plugins.properties` names the plugins the build does not discover** - one per line, `<name>+<hook
 point>=<module>` or `<name>=<module>` for the module build. A value starting with `./` is a folder of the project
 compiled by an `InternalModule`; anything else a module an `ExternalModule` resolves as `module/<name>` from the
-Jenesis module repository, its closure pinned in the group `<name>` (handed on as `+closure`, which `pin` writes into
-every module that runs the plugin); `@<provider>` selects the provider annotated `@BuildModuleName`.
+Jenesis module repository, its closure pinned in the group `plugin.<name>` (handed on as `+closure`, which `pin` writes
+into every module that runs the plugin); `@<provider>` selects the provider annotated `@BuildModuleName`.
 `Project.ofEnvironment` reads the file, and the assembler wires a plugin into the `custom` namespace of its hook point,
-in a module only where `plugin-<name>.properties` is found in its configuration locations.
+in a module only where `plugin-<name>.properties` is found in its configuration locations. Wherever it meets the
+build's own plugins - its group, the languages, observers and frameworks of a module, every hook point of the project -
+it is `plugin.<name>` (`ProjectPlugins.declared`), so an official plugin of the same name, present or added later, runs
+beside it untouched; the line naming it, `plugin-<name>.properties`, the `<name>.<key>` arguments and the
+`plugin/<name>` selector spell the name as written.
 
 **A plugin provides a factory**, created by `ServiceLoader`, whose `create` validates its values - the engine checks
-none - and is handed the loading build's environment, its process `Permits`, the plugin's name as its group, and the
-build's repositories and resolvers. Everything a plugin resolves lies in a group `<name>:<purpose>`, its tool in
-`<name>:tool`; a step resolving in any other group fails. The contracts live in `build.jenesis`:
+none - and is handed the loading build's environment, its process `Permits`, its group - its name for an official
+plugin, `plugin.<name>` for a declared one - and the build's repositories and resolvers. Everything a plugin resolves
+lies in a group `<group>:<purpose>`, its tool in `<group>:tool`; a step resolving in any other group fails. The contracts live in `build.jenesis`:
 `BuildModuleFactory` returns the module that is wired; `ObservabilityFactory`, for the hook point `observe`, an
 `Observation` pairing the engine that joins the tests' JVM (resolved as `observers/<name>`, its agent in
 `<name>:agent`) with the module reporting over what it recorded; `TestFrameworkFactory`, for `test`, a
@@ -189,10 +193,16 @@ no project file may set or widen it.
 next build in the JVM loading the same jars; a static field of a plugin must stay right for that next build.
 
 **Official plugins are discovered.** A module under `project/` (`JDepsModule`, `LicenseHeaderModule`, …) runs what
-the JDK ships, activates when its file is in a configuration folder, and is switched by `jenesis.<kind>.<tool>`:
-`ignore`, `report` (default) or `strict`. A tool the build would download is an official plugin of
-`jenesis/jenesis-plugins` instead: the inferred module that ran it holds it as `ExternalModule.official`, resolved as
-`module/build.jenesis.plugin.<name>` in the group `<name>`, behind a boolean named like it, and wires it where a
+the JDK ships and activates when its file is in a configuration folder. Every tool the build discovers, shipped or
+downloaded, is switched off by `jenesis.<part>.<tool>=false`, named after the part of the build it belongs to -
+`check`, `format`, `validate`, `artifact`, `generate`, `language`, `observe`, `compliance`, `documentation`, `release` -
+and read by the `ofEnvironment` of the inferred module that wires it, as the boolean beside its child; a tool wired in
+two namespaces, as ktlint lints in `check` and formats in `format`, is switched in each apart. A checker's findings
+fail the build only under `jenesis.strict.<name>=true` and are reported otherwise. A plugin `jenesis.plugins.properties`
+names is switched off by `jenesis.plugin.<name>=false` instead, so the two never share a setting and no name is
+reserved. A tool the build would download is an official plugin of `jenesis/jenesis-plugins`: the inferred module that
+ran it holds it as `ExternalModule.official`, resolved as `module/build.jenesis.plugin.<name>` in the group `<name>`,
+and wires it where a
 configuration folder holds its `<name>.properties` (a language plugin where the scan finds a `.kt`, `.scala` or
 `.groovy` source). The properties name the tool's own file as `configuration=<path>`, resolved against their own
 folder and handed to the plugin as the input `rules` under the name the tool reads (`checkstyle.xml`, `.editorconfig`,
@@ -200,7 +210,7 @@ folder and handed to the plugin as the input `rules` under the name the tool rea
 holds the properties does the tool's one conventional file in a configuration folder switch it on, bound as if named
 (`PluginModule.discovered`); a file at the project root never does, and a plugin needing more than a file, as
 Asciidoctor's folder of documents, has no conventional file. The other lines are the plugin's values;
-it needs no line in `jenesis.plugins.properties`, and a declared plugin of the same name is refused where it runs. A
+it needs no line in `jenesis.plugins.properties`, and a declared plugin of the same name runs beside it. A
 generator reads only the folder it names (`xjc/`, `protoc/`); the project binds its contracts there with
 `@<input>/<folder>=<path>`, under the customary name where the tool expects one.
 

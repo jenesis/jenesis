@@ -88,9 +88,9 @@ Gradle plugins of Asciidoctor read them names that folder:
 The values are read from this file alone, so a line for Asciidoctor in
 `jenesis.plugins.arguments.properties` is refused.
 
-`-Djenesis.project.asciidoctor=false` switches it off without removing anything:
+`-Djenesis.documentation.asciidoctor=false` switches it off without removing anything:
 
-    java -Djenesis.project.asciidoctor=false build/jenesis/Make.java stage
+    java -Djenesis.documentation.asciidoctor=false build/jenesis/Make.java stage
 
 Where it runs
 -------------

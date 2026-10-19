@@ -21,7 +21,7 @@ from the project's dependencies, runs the analysis against the compiled classes 
 the tests' class path, and writes an HTML and XML report under its `mutate` step,
 `reports/pitest/`. PIT runs the tests with the JUnit Platform launcher of the version
 the test module resolved, so it lines up with the test framework the project uses
-rather than floating independently. `-Djenesis.mutate.pitest=false` switches it off.
+rather than floating independently. `-Djenesis.observe.pitest=false` switches it off.
 
 The modules
 -----------

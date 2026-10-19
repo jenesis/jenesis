@@ -51,21 +51,15 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 JDeprScanModule.ofEnvironment(environment),
                 value -> value,
                 ExternalModule.official(environment, "spotbugs", null, repositories, resolvers),
-                true,
+                environment.flag("validate.spotbugs", true),
                 ExternalModule.official(environment, "forbiddenapis", null, repositories, resolvers),
-                true,
+                environment.flag("validate.forbiddenapis", true),
                 Collections.emptyNavigableMap());
-        if (Enforcement.ofEnvironment(environment, "validator.jdeps") == Enforcement.IGNORE) {
+        if (!environment.flag("validate.jdeps", true)) {
             module = module.jdeps(null);
         }
-        if (Enforcement.ofEnvironment(environment, "validator.jdeprscan") == Enforcement.IGNORE) {
+        if (!environment.flag("validate.jdeprscan", true)) {
             module = module.jdeprscan(null);
-        }
-        if (Enforcement.ofEnvironment(environment, "validator.spotbugs") == Enforcement.IGNORE) {
-            module = module.spotbugs(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "validator.forbiddenapis") == Enforcement.IGNORE) {
-            module = module.forbiddenapis(false);
         }
         return module;
     }

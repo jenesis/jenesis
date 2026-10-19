@@ -65,7 +65,7 @@ the module repository finds `demo.plugin` there:
 A plugin found in the local export is pinned and checked like one from a
 repository, which is why the plugin is exported as version `1.0.0`: `pin` records
 it in `sources/module-info.java` with the dependencies it brings - `build.jenesis`
-and `org.json` - under the group named after the plugin, `plugin-greeting`, so the
+and `org.json` - under the group named after the plugin, `plugin.greeting`, so the
 build runs under `-Djenesis.dependency.pin=strict`. Change the plugin and its
 checksum changes with it; `-Djenesis.dependency.pin=versions` with `pin` records
 what the export now holds.

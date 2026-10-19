@@ -16,7 +16,7 @@ import build.jenesis.step.ProcessHandler;
 public class JDepsModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
-    private static final String SETTING = "validator.jdeps", REPORT = BuildStep.REPORTS + "jdeps/jdeps.txt";
+    private static final String STRICT = "strict.jdeps", REPORT = BuildStep.REPORTS + "jdeps/jdeps.txt";
     private static final Pattern FINDING = Pattern.compile("^\\s+(\\S+)\\s+->\\s+(\\S+)\\s+(JDK (?:removed )?internal API.*?)\\s*$"),
             REPLACEMENT = Pattern.compile("^(\\S+)\\s{2,}(\\S.*?)\\s*$");
 
@@ -33,7 +33,7 @@ public class JDepsModule implements BuildExecutorModule {
     public static JDepsModule ofEnvironment(Environment environment) {
         return new JDepsModule(ProcessHandler.Factory.ofEnvironment(environment),
                 "main",
-                Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
+                environment.flag(STRICT, false),
                 List.of(),
                 ProcessBuildStep.Terms.ofEnvironment(environment, "jdeps"));
     }
@@ -136,7 +136,7 @@ public class JDepsModule implements BuildExecutorModule {
             Files.createDirectories(report.getParent());
             Files.write(report, findings);
             return new Findings("jdeps", report, findings.size())
-                    .acceptable(code, context, false, strict, SETTING, terms.reporting());
+                    .acceptable(code, context, false, strict, STRICT, terms.reporting());
         }
 
         @Override

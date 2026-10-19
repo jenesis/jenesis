@@ -244,37 +244,75 @@ public class ProjectTest {
     @Test
     public void switches_asciidoctor_on_by_its_properties_alone_never_by_the_documents() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("docs")).resolve("index.adoc"), "= Index\n");
-        Files.writeString(root.resolve("jenesis.plugins.properties"), "asciidoctor+postprocess/transform=./manual\n");
-        Files.createDirectories(root.resolve("manual"));
 
-        assertThat(Project.ofEnvironment(new Environment(settings), root))
-                .as("documents alone switch nothing on, so a plugin may take the name")
-                .isNotNull();
+        assertThat(Project.ofEnvironment(new Environment(settings), root).plugins().transforms())
+                .as("documents alone switch nothing on")
+                .doesNotContainKey("asciidoctor");
 
         Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("asciidoctor.properties"),
                 "documents=../docs\n");
-        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
-                .as("the properties switch Asciidoctor on, so a plugin of that name is refused")
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("takes the name of the plugin the build converts the project's AsciiDoc documents");
+        assertThat(Project.ofEnvironment(new Environment(settings), root).plugins().transforms())
+                .as("the properties switch Asciidoctor on")
+                .containsKey("asciidoctor");
     }
 
     @Test
     public void switches_jreleaser_on_by_a_configuration_folder_never_by_the_project_root() throws IOException {
         Files.writeString(root.resolve("jreleaser.yml"), "project:\n  name: example\n");
-        Files.writeString(root.resolve("jenesis.plugins.properties"), "jreleaser+release=./releaser\n");
-        Files.createDirectories(root.resolve("releaser"));
 
-        assertThat(Project.ofEnvironment(new Environment(settings), root))
-                .as("a jreleaser.yml at the root is JReleaser's own, so it switches nothing on and a plugin may take the name")
-                .isNotNull();
+        assertThat(Project.ofEnvironment(new Environment(settings), root).plugins().releasers())
+                .as("a jreleaser.yml at the root is JReleaser's own, so it switches nothing on")
+                .doesNotContainKey("jreleaser");
 
         Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("jreleaser.yml"),
                 "project:\n  name: example\n");
-        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
-                .as("one in a configuration folder switches JReleaser on, so a plugin of that name is refused")
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("takes the name of the plugin the build releases with");
+        assertThat(Project.ofEnvironment(new Environment(settings), root).plugins().releasers())
+                .as("one in a configuration folder switches JReleaser on")
+                .containsKey("jreleaser");
+    }
+
+    @Test
+    public void switches_an_official_plugin_off_by_the_setting_named_after_its_part_of_the_build() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("jreleaser.yml"),
+                "project:\n  name: example\n");
+        Map<String, String> switchedOff = new HashMap<>(settings);
+        switchedOff.put("release.jreleaser", "false");
+
+        assertThat(Project.ofEnvironment(new Environment(switchedOff), root).plugins().releasers())
+                .as("an official plugin is switched off by jenesis.<part>.<name>")
+                .doesNotContainKey("jreleaser");
+    }
+
+    @Test
+    public void switches_a_declared_plugin_by_its_declared_setting_never_by_the_official_one_of_its_name() throws IOException {
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "pmd+postprocess/transform=./linter\n");
+        Files.createDirectories(root.resolve("linter"));
+        Map<String, String> official = new HashMap<>(settings), declared = new HashMap<>(settings);
+        official.put("check.pmd", "false");
+        declared.put("plugin.pmd", "false");
+
+        assertThat(Project.ofEnvironment(new Environment(official), root).plugins().transforms())
+                .as("the official plugin's switch leaves a declared plugin of its name in")
+                .containsKey("plugin.pmd");
+        assertThat(Project.ofEnvironment(new Environment(declared), root).plugins().transforms())
+                .as("a declared plugin is switched by jenesis.plugin.<name>")
+                .doesNotContainKey("plugin.pmd");
+    }
+
+    @Test
+    public void runs_an_official_and_a_declared_plugin_of_one_name_side_by_side() throws IOException {
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "jreleaser+release=./releaser\n");
+        Files.createDirectories(root.resolve("releaser"));
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("jreleaser.yml"),
+                "project:\n  name: example\n");
+
+        Project project = Project.ofEnvironment(new Environment(settings), root);
+        assertThat(project.plugins().releasers())
+                .as("the declared plugin is plugin.jreleaser, so it takes nothing from the official one")
+                .containsOnlyKeys("jreleaser", "plugin.jreleaser");
+        assertThat(project.plugins().resolutions())
+                .as("each resolves and pins in a group of its own")
+                .containsOnlyKeys("jreleaser", "plugin.jreleaser");
     }
 
     @Test
@@ -292,7 +330,7 @@ public class ProjectTest {
     public void reads_no_asciidoctor_properties_once_asciidoctor_is_switched_off() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("asciidoctor.properties"), "");
         Map<String, String> switched = new HashMap<>(settings);
-        switched.put("project.asciidoctor", "false");
+        switched.put("documentation.asciidoctor", "false");
 
         assertThat(Project.ofEnvironment(new Environment(switched), root)).isNotNull();
     }
@@ -1277,15 +1315,15 @@ public class ProjectTest {
         Project project = Project.ofEnvironment(new Environment(settings), root);
         assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
                 assembler -> assertThat(assembler.plugins()).containsOnlyKeys("greeting+binary/generated"));
-        assertThat(project.plugins().preprocessors()).containsOnlyKeys("headers");
-        assertThat(project.plugins().transforms()).containsOnlyKeys("licenses");
-        assertThat(project.plugins().inspections()).containsOnlyKeys("audit");
-        assertThat(project.plugins().releasers()).containsOnlyKeys("announce");
-        assertThat(project.plugins().goals()).containsOnlyKeys("bench");
-        assertThat(project.plugins().supplements()).containsOnlyKeys("sums");
-        assertThat(project.plugins().audits()).containsOnlyKeys("signed");
+        assertThat(project.plugins().preprocessors()).containsOnlyKeys("plugin.headers");
+        assertThat(project.plugins().transforms()).containsOnlyKeys("plugin.licenses");
+        assertThat(project.plugins().inspections()).containsOnlyKeys("plugin.audit");
+        assertThat(project.plugins().releasers()).containsOnlyKeys("plugin.announce");
+        assertThat(project.plugins().goals()).containsOnlyKeys("plugin.bench");
+        assertThat(project.plugins().supplements()).containsOnlyKeys("plugin.sums");
+        assertThat(project.plugins().audits()).containsOnlyKeys("plugin.signed");
         assertThat(project.plugins().resolutions())
-                .containsOnlyKeys("headers", "licenses", "audit", "announce", "bench", "sums", "signed");
+                .containsOnlyKeys("plugin.headers", "plugin.licenses", "plugin.audit", "plugin.announce", "plugin.bench", "plugin.sums", "plugin.signed");
         assertThat(project.plugins().pins()).isEqualTo(root.resolve("jenesis.plugins.pin.properties"));
     }
 
@@ -1304,11 +1342,11 @@ public class ProjectTest {
                 audit+postprocess/inspect=demo.audit
                 """);
         Project project = Project.ofEnvironment(new Environment(Map.of("plugin.audit", "false")), root);
-        assertThat(project.plugins().transforms()).containsOnlyKeys("licenses");
+        assertThat(project.plugins().transforms()).containsOnlyKeys("plugin.licenses");
         assertThat(project.plugins().inspections()).isEmpty();
         assertThat(project.plugins().resolutions())
                 .as("pin must capture a plugin that only a profile switches on")
-                .containsOnlyKeys("licenses", "audit");
+                .containsOnlyKeys("plugin.licenses", "plugin.audit");
     }
 
     @Test
@@ -1325,7 +1363,7 @@ public class ProjectTest {
         assertThat(project.plugins().inspections()).isEmpty();
         assertThat(project.plugins().resolutions())
                 .as("pin still pins the plugins it leaves out")
-                .containsOnlyKeys("licenses", "audit");
+                .containsOnlyKeys("plugin.licenses", "plugin.audit");
     }
 
     @Test
@@ -1377,7 +1415,7 @@ public class ProjectTest {
     public void refuses_an_input_that_leaves_the_project() throws IOException {
         assertThatThrownBy(() -> plugin("@schemas", root.relativize(elsewhere).toString()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("The input @schemas of the plugin gen")
+                .hasMessageContaining("The input @schemas of the plugin plugin.gen")
                 .hasMessageContaining("lies outside the project");
     }
 
@@ -1485,7 +1523,7 @@ public class ProjectTest {
     public void refuses_a_plugin_value_naming_a_variable_that_is_not_set() {
         assertThatThrownBy(() -> plugin("level", "@level"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("The plugin gen sets level to @level, but jenesis.variable.level is not set");
+                .hasMessageContaining("The plugin plugin.gen sets level to @level, but jenesis.variable.level is not set");
     }
 
     @Test

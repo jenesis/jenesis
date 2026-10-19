@@ -54,7 +54,8 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
         SequencedMap<String, PluginModule<?>> plugins = new LinkedHashMap<>();
         modules.forEach((name, module) -> {
             if (!(module instanceof PluginModule<?> plugin)) {
-                throw new IllegalArgumentException("The plugin " + name + "+" + hook + " is no plugin module - name a"
+                throw new IllegalArgumentException("The plugin " + name.substring(name.indexOf('.') + 1) + "+" + hook
+                        + " is no plugin module - name a"
                         + " module that provides an " + factory + " in jenesis.plugins.properties, or build it with"
                         + " ExternalModule.ofEnvironment or InternalModule.ofEnvironment");
             }
