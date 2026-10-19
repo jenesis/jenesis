@@ -109,16 +109,18 @@ with no filter at all.
 
 A discovered tool can be switched off without deleting its file through its
 setting, so the file alone decides until the setting says
-otherwise. A linter's setting is `report` by default, and `ignore` skips it; the
-Java formatter's and the license header check's are `true` by default, and
-`false` skips them:
+otherwise. Every such setting is a boolean, `true` by default, and `false`
+skips the tool. It is named after the part of the build the tool runs in:
 
-    jenesis.source.<tool>        Checkstyle, PMD, detekt, ktlint, Scalastyle, scalafmt, CodeNarc
-    jenesis.validator.<tool>     SpotBugs, forbiddenapis, jdeps, jdeprscan
-    jenesis.format.java          the Java formatter javaformat.properties selects
-    jenesis.format.license       the license header check
+    jenesis.check.<tool>         the source checks: Checkstyle, PMD, ...
+    jenesis.validate.<tool>      the checks of the classes: SpotBugs, forbiddenapis, jdeps, jdeprscan
+    jenesis.format.<tool>        the formatters: openrewrite, java (whichever javaformat.properties selects), license
 
-For example `-Djenesis.source.checkstyle=ignore` keeps `checkstyle.properties`
+A plugin of the project's own, which `jenesis.plugins.properties` names, is
+switched by `jenesis.plugin.<name>` instead, so it shares no setting with an
+official plugin, whatever it is named.
+
+For example `-Djenesis.check.checkstyle=false` keeps `checkstyle.properties`
 in place but skips Checkstyle, while PMD and SpotBugs still run.
 
 Per-module configuration
@@ -167,8 +169,8 @@ with the number of findings and where its report is:
     [FINDINGS] checkstyle found 2 findings, reported in target/build/.../checkstyle/delegate/check/output/reports/checkstyle/checkstyle-report.xml
 
 `-Djenesis.print.findings=false` leaves that line out. To turn findings into a
-build failure, set the tool's property to `strict`, on the command line or in
-`jenesis.properties`. For example `-Djenesis.source.checkstyle=strict` fails the
+build failure, set the tool's `jenesis.strict.<tool>` to `true`, on the command
+line or in `jenesis.properties`. For example `-Djenesis.strict.checkstyle=true` fails the
 build when Checkstyle reports a violation, naming the number of findings and the
 report.
 Checkstyle, PMD, detekt, ktlint, Scalastyle and scalafmt fail as their own exit

@@ -65,11 +65,11 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 ExternalModule.official(environment, KOTLIN, null, repositories, resolvers),
-                true,
+                environment.flag("language.kotlin", true),
                 ExternalModule.official(environment, SCALA, null, repositories, resolvers),
-                true,
+                environment.flag("language.scala", true),
                 ExternalModule.official(environment, GROOVY, null, repositories, resolvers),
-                true);
+                environment.flag("language.groovy", true));
     }
 
     private InferredCompilerChainModule(PathPlacement pathPlacement,
@@ -252,7 +252,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
         configured.forEach((name, module) -> {
             if (languages.containsKey(name)) {
                 throw new IllegalArgumentException("The language plugin " + name + " takes the name of the language"
-                        + " the build compiles by itself - remove its line from jenesis.plugins.properties");
+                        + " the build compiles by itself - give it another name");
             }
             prepared.put(name, module);
             official.put(name, EXTENSIONS_OF.get(name));
@@ -370,7 +370,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 if (found.contains(language.getValue()) && !compiled.contains(language.getValue())) {
                     throw new IllegalStateException("The module holds " + language.getValue() + " sources, which no"
                             + " language compiles - the build compiles them with its plugin " + language.getKey()
-                            + " unless that is switched off");
+                            + " unless jenesis.language." + language.getKey() + "=false switches it off");
                 }
             }
             boolean hasJava = scan.flag(JAVAC) && javac != null;

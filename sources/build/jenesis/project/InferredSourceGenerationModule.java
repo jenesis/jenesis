@@ -69,46 +69,24 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                                                                Path root,
                                                                Map<String, Repository> repositories,
                                                                Map<String, Resolver> resolvers) {
-        InferredSourceGenerationModule module = new InferredSourceGenerationModule(configuration,
+        return new InferredSourceGenerationModule(configuration,
                 location,
                 root,
                 ExternalModule.official(environment, "xjc", null, repositories, resolvers),
-                true,
+                environment.flag("generate.xjc", true),
                 ExternalModule.official(environment, "protoc", null, repositories, resolvers),
-                true,
+                environment.flag("generate.protoc", true),
                 ExternalModule.official(environment, "avro", null, repositories, resolvers),
-                true,
+                environment.flag("generate.avro", true),
                 ExternalModule.official(environment, "wsimport", null, repositories, resolvers),
-                true,
+                environment.flag("generate.wsimport", true),
                 ExternalModule.official(environment, "openapi", null, repositories, resolvers),
-                true,
+                environment.flag("generate.openapi", true),
                 ExternalModule.official(environment, "antlr", null, repositories, resolvers),
-                true,
+                environment.flag("generate.antlr", true),
                 ExternalModule.official(environment, "ksp", null, repositories, resolvers),
-                true,
+                environment.flag("generate.ksp", true),
                 Collections.emptyNavigableMap());
-        if (!environment.flag("generate.xjc", true)) {
-            module = module.xjc(false);
-        }
-        if (!environment.flag("generate.protoc", true)) {
-            module = module.protoc(false);
-        }
-        if (!environment.flag("generate.avro", true)) {
-            module = module.avro(false);
-        }
-        if (!environment.flag("generate.wsimport", true)) {
-            module = module.wsimport(false);
-        }
-        if (!environment.flag("generate.openapi", true)) {
-            module = module.openapi(false);
-        }
-        if (!environment.flag("generate.antlr", true)) {
-            module = module.antlr(false);
-        }
-        if (!environment.flag("generate.ksp", true)) {
-            module = module.ksp(false);
-        }
-        return module;
     }
 
     private InferredSourceGenerationModule(SequencedSet<Path> configuration,

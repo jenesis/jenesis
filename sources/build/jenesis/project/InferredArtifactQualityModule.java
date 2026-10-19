@@ -36,19 +36,12 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
                                                               SequencedSet<Path> configuration,
                                                               Map<String, Repository> repositories,
                                                               Map<String, Resolver> resolvers) {
-        InferredArtifactQualityModule module = new InferredArtifactQualityModule(configuration,
+        return new InferredArtifactQualityModule(configuration,
                 ExternalModule.official(environment, "japicmp", null, repositories, resolvers),
-                true,
+                environment.flag("artifact.japicmp", true),
                 ExternalModule.official(environment, "revapi", null, repositories, resolvers),
-                true,
+                environment.flag("artifact.revapi", true),
                 Collections.emptyNavigableMap());
-        if (!environment.flag("artifact.japicmp", true)) {
-            module = module.japicmp(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "artifact.revapi") == Enforcement.IGNORE) {
-            module = module.revapi(false);
-        }
-        return module;
     }
 
     private InferredArtifactQualityModule(SequencedSet<Path> configuration,

@@ -70,17 +70,17 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 new LicenseHeaderModule(),
                 value -> value,
                 ExternalModule.official(environment, "openrewrite", null, repositories, resolvers),
-                true,
+                environment.flag("format.openrewrite", true),
                 ExternalModule.official(environment, "googlejavaformat", null, repositories, resolvers),
                 ExternalModule.official(environment, "palantir", null, repositories, resolvers),
                 ExternalModule.official(environment, "eclipse", null, repositories, resolvers),
-                true,
+                environment.flag("format.java", true),
                 ExternalModule.official(environment, "ktfmt", null, repositories, resolvers),
-                true,
+                environment.flag("format.ktfmt", true),
                 ExternalModule.official(environment, "ktlint", "format", repositories, resolvers),
-                true,
+                environment.flag("format.ktlint", true),
                 ExternalModule.official(environment, "scalafmt", "format", repositories, resolvers),
-                true,
+                environment.flag("format.scalafmt", true),
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap());
         Boolean rewrite = environment.flagOrNull("format.rewrite");
@@ -90,21 +90,6 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         Boolean license = environment.flagOrNull("format.license");
         if (license != null) {
             module = module.license(license ? value -> value : null);
-        }
-        if (!environment.flag("format.openrewrite", true)) {
-            module = module.openrewrite(false);
-        }
-        if (!environment.flag("format.java", true)) {
-            module = module.java(false);
-        }
-        if (!environment.flag("format.ktfmt", true)) {
-            module = module.ktfmt(false);
-        }
-        if (!environment.flag("format.ktlint", true)) {
-            module = module.ktlint(false);
-        }
-        if (!environment.flag("format.scalafmt", true)) {
-            module = module.scalafmt(false);
         }
         return module;
     }
@@ -438,7 +423,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                     + " as a configuration folder holds a ktlint.properties or an .editorconfig - set"
                     + " jenesis.format.ktlint=false to format with ktfmt alone, or remove ktfmt.properties");
         }
-        if (ktfmtFile != null && ktfmt) {
+        if (ktfmtFile != null) {
             SequencedMap<String, String> values = new LinkedHashMap<>();
             SequencedProperties.ofFiles(ktfmtFile).forEachProperty(values::put);
             buildExecutor.addModule(KTFMT, ktfmtModule.properties(values), inputs);

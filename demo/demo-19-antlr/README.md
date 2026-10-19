@@ -36,7 +36,7 @@ out of the jar:
 
     sources/META-INF/build.jenesis/Calc.g4
 
-A `plugin-antlr.properties` in the configuration folder binds that folder as the
+A `antlr.properties` in the configuration folder binds that folder as the
 plugin's grammars and names the package the parser lands in:
 
     package=demo.antlr.calc
@@ -82,7 +82,7 @@ reach the jar:
     demo/antlr/calc/CalcBaseVisitor.class
     demo/antlr/Calculator.class
 
-Turn it off with `-Djenesis.plugin.antlr=false`, the same way every other
+Turn it off with `-Djenesis.generate.antlr=false`, the same way every other
 plugin is left out.
 
 In the editor

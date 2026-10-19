@@ -96,13 +96,19 @@ Seven hook points run a plugin once for the whole project rather than once per m
 
 | Hook point | Runs as | Runs | Is handed |
 | --- | --- | --- | --- |
-| `preprocess` | `build/preprocess/custom/<name>` | before any module is built | only what it binds |
-| `postprocess/transform` | `build/postprocess/transform/<name>` | after every module is built | every module's inventory |
-| `postprocess/inspect` | `build/postprocess/inspect/<name>` | after the transforms | the same, plus what they added |
-| `stage/transform` | `stage/transform/<name>` | after the stock staging | everything staged |
-| `stage/inspect` | `stage/inspect/<name>` | after the transforms of stage | the staged trees with what they added |
-| `release` | `release/custom/<name>` | with `release`, beside its stock steps, where its `plugin-<name>.properties` is found | everything staged, the project's root and its resolved metadata |
+| `preprocess` | `build/preprocess/custom/plugin.<name>` | before any module is built | only what it binds |
+| `postprocess/transform` | `build/postprocess/transform/plugin.<name>` | after every module is built | every module's inventory |
+| `postprocess/inspect` | `build/postprocess/inspect/plugin.<name>` | after the transforms | the same, plus what they added |
+| `stage/transform` | `stage/transform/plugin.<name>` | after the stock staging | everything staged |
+| `stage/inspect` | `stage/inspect/plugin.<name>` | after the transforms of stage | the staged trees with what they added |
+| `release` | `release/custom/plugin.<name>` | with `release`, beside its stock steps, where its `plugin-<name>.properties` is found | everything staged, the project's root and its resolved metadata |
 | `plugin` | `plugin/<name>` | only when `plugin/<name>` is named | only what it binds |
+
+A plugin the file names runs as `plugin.<name>` wherever the build's own plugins run
+beside it, and resolves and pins in the group `plugin.<name>` - its pins read
+`plugin.audit/module/...` - so an official plugin of the same name, such as the
+`jreleaser` the build runs where it finds a `jreleaser.yml`, runs alongside it
+without either touching the other.
 
 No `plugin-<name>.properties` switches such a plugin on in a module: the line itself
 does. A releaser is the exception: it runs only where a configuration folder holds its
@@ -324,7 +330,7 @@ in each plugin's closure:
 A plugin of a module, the `zip` packager among them, is pinned in the module's own
 declaration, as the `internal-module` demo's generator is:
 
-    @jenesis.pin zip/module/build.jenesis 0.14.1 SHA-256/...
+    @jenesis.pin plugin.zip/module/build.jenesis 0.14.1 SHA-256/...
 
 `java build/jenesis/Make.java pin` writes the file, pinning every plugin the file
 names, including one a setting switches off, so a plugin that only a profile

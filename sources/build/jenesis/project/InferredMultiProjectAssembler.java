@@ -60,6 +60,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             "package",
             "documentation",
             "documentation/generate");
+    private static final Set<String> SHARED = Set.of("language", "observe", "test");
 
     public InferredMultiProjectAssembler() {
         this(Environment.NONE);
@@ -291,7 +292,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         for (Map.Entry<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugin : plugins.entrySet()) {
             int plus = plugin.getKey().indexOf('+');
             String name = plus == -1 ? plugin.getKey() : plugin.getKey().substring(0, plus);
-            Path file = BuildStep.locate(descriptor.configuration(), "plugin-" + name + ".properties");
+            Path file = BuildStep.locate(descriptor.configuration(), ProjectPlugins.PLUGIN + "-" + name + ".properties");
             if (file == null && !plugin.getKey().endsWith("+language")) {
                 continue;
             }
@@ -299,15 +300,14 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             if (file != null) {
                 SequencedProperties.ofFiles(file).forEachProperty(properties::put);
             }
-            SequencedMap<String, BuildExecutorModule> hooked = hooks.computeIfAbsent(plus == -1
-                    ? ""
-                    : plugin.getKey().substring(plus + 1), _ -> new LinkedHashMap<>());
+            String hook = plus == -1 ? "" : plugin.getKey().substring(plus + 1);
+            SequencedMap<String, BuildExecutorModule> hooked = hooks.computeIfAbsent(hook, _ -> new LinkedHashMap<>());
             BuildExecutorModule module = plugin.getValue().apply(descriptor.location(), properties);
             if (module instanceof PluginModule<?> tooled) {
                 module = tooled.repositories(ProjectPlugins.repositories(repositories, environment))
                         .resolvers(ProjectPlugins.resolvers(resolvers, environment));
             }
-            if (hooked.putIfAbsent(name, module) != null) {
+            if (hooked.putIfAbsent(SHARED.contains(hook) ? ProjectPlugins.declared(name) : name, module) != null) {
                 throw new IllegalArgumentException("The plugin " + plugin.getKey() + " takes the name of a custom module"
                         + " that is added already - give the plugin another name");
             }
