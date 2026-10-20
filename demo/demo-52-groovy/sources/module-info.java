@@ -10,8 +10,8 @@
  * @jenesis.pin groovy:tool/maven/org.commonmark/commonmark 0.30.0 SHA-256/090f0a758ac2f4f51aa86dff9dff0fdf7403666d0efd29f59886dc8e8b1eac53
  * @jenesis.pin org.apache.groovy 5.0.6 SHA-256/32338cdd9f6d842a534ea086242bf874385ee5be6973dc3de72f7605bf600394
  * @jenesis.pin org.apache.groovy/groovy 5.0.6 SHA-256/32338cdd9f6d842a534ea086242bf874385ee5be6973dc3de72f7605bf600394
- * @jenesis.pin groovy/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
- * @jenesis.pin groovy/module/build.jenesis.plugin.groovy 0.16.0 SHA-256/dfac8f33fdfbd80286125153a42e835f1ae3bd7fe45a446172c7664aa6f30dbf
+ * @jenesis.pin groovy/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin groovy/module/build.jenesis.plugin.groovy 0.1.0 SHA-256/17bba3b2379c626bceaf5bb5a1a8e1eff699045df80fecd488bcd90e3403d423
  */
 module sample {
     requires org.apache.groovy;

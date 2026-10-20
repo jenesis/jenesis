@@ -81,7 +81,7 @@
     </dependencies>
     <!--jenesis.pin
     avro:tool/maven/org.apache.avro/avro-tools 1.12.2 SHA-256/6220e8bc089aaf917cdad4cd358bd651fc0394c0e5ddb8b36da402012c294a68
-    avro/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
-    avro/module/build.jenesis.plugin.avro 0.16.0 SHA-256/c2c001fe0803876c83a21ca5cbcb9d8a7af7f5c3c75e00567cffb049811d3ef6
+    avro/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+    avro/module/build.jenesis.plugin.avro 0.1.0 SHA-256/9de7f19f5d9f2b41163d2266b49744cd09fe290fcd8bcf335bff9b690c15f316
     -->
 </project>

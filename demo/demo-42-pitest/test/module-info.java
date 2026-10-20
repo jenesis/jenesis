@@ -34,8 +34,8 @@
  * @jenesis.pin pitest:tool/maven/org.pitest/pitest-entry 1.25.4 SHA-256/eb49ebafdac8338ae43d14b68fbf6ff697cafb633eb70c5e09d1ee98c7d599e1
  * @jenesis.pin pitest:tool/maven/org.pitest/pitest-html-report 1.25.4 SHA-256/da45d9aa9418b12dfa64c352eda94d10afef6d3b108299a356e6a4a6d02edb17
  * @jenesis.pin pitest:tool/maven/org.pitest/pitest-junit5-plugin 1.2.3 SHA-256/d3e2fcc8db5fd52c0c4ac2fe0d937e64da3df39b657093a1581b5fd463f9be64
- * @jenesis.pin pitest/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
- * @jenesis.pin pitest/module/build.jenesis.plugin.pitest 0.16.0 SHA-256/7b24f2266947d9ea40cefc37588d48b4141e805ac1c2a3466be7f71d07420a47
+ * @jenesis.pin pitest/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin pitest/module/build.jenesis.plugin.pitest 0.1.0 SHA-256/91cd2c4dc8fe0d334b092d9cfea01218aebc386ed3d9a8b609bdbb7c8e98446b
  */
 module demo.mutation.test {
     requires demo.mutation;

@@ -38,8 +38,8 @@
         </dependency>
     </dependencies>
     <!--jenesis.pin
-    xjc/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
-    xjc/module/build.jenesis.plugin.xjc 0.16.0 SHA-256/c9b614a55014a1ea9f21600c5aec1bba1b835a65bd6fbb4bb70f6110097fa985
+    xjc/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+    xjc/module/build.jenesis.plugin.xjc 0.1.0 SHA-256/cbafa0124050e290731e52c73c4d1f71689c5c2ab538f74f741e25b22d24f047
     xjc:tool/maven/com.sun.istack/istack-commons-runtime 4.1.2 SHA-256/7fd6792361f4dd00f8c56af4a20cecc0066deea4a8f3dec38348af23fc2296ee
     xjc:tool/maven/com.sun.istack/istack-commons-tools 4.1.2 SHA-256/85b4fe7ad6fdfc64a586133f039d3de7b51db2c8111a1aa98a267891e27f386f
     xjc:tool/maven/com.sun.xml.bind.external/relaxng-datatype 4.0.9 SHA-256/89933721c2dc654049ebea84a33e2f3d36e918e5871ccb6f08df1960779c5cb9
