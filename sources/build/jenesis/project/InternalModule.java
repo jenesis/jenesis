@@ -66,7 +66,14 @@ public class InternalModule extends PluginModule<InternalModule> {
                            Map<String, Repository> repositories,
                            Map<String, Resolver> resolvers,
                            Environment environment) {
-        super(buildModuleName, group, properties, inputs, repositories, resolvers, environment);
+        super(buildModuleName,
+                group,
+                PathPlacement.MODULE_PATH,
+                properties,
+                inputs,
+                repositories,
+                resolvers,
+                environment);
         this.prefix = prefix;
         this.source = source;
         this.dependencyModule = dependencyModule;
@@ -225,7 +232,7 @@ public class InternalModule extends PluginModule<InternalModule> {
             buildExecutor.addStep(MANIFESTS, ModularProject.manifests(group, prefix, platform), SOURCE);
             buildExecutor.addStep(REQUIRES, new Inherited(group, additionalDependencies), inherited.sequencedKeySet());
             buildExecutor.addModule(DEPENDENCIES,
-                    dependencyModule.pathPlacement(pathPlacement()),
+                    dependencyModule.pathPlacement(pathPlacement),
                     MANIFESTS,
                     REQUIRES);
         };
@@ -265,11 +272,6 @@ public class InternalModule extends PluginModule<InternalModule> {
         artifacts.addAll(Dependencies.select(prepared.get(PREVIOUS + DEPENDENCIES), group, "runtime"));
         artifacts.sort(null);
         return artifacts;
-    }
-
-    @Override
-    PathPlacement pathPlacement() {
-        return PathPlacement.MODULE_PATH;
     }
 
     private record Inherited(String group, SequencedSet<String> additionalDependencies) implements BuildStep {
