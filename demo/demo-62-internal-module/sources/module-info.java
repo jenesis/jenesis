@@ -1,7 +1,7 @@
 /**
  * @jenesis.release 25
  * @jenesis.main sample.Sample
- * @jenesis.pin plugin.greeting/module/build.jenesis 0.17.0 SHA-256/0dfd1715ecb35e8dd398b5fc9ceb49c120aa59e3d6063606882717f41d84b284
+ * @jenesis.pin plugin.greeting/module/build.jenesis 0.17.0 SHA-256/c73dbb0a30f1bae340e0c6adfa433c76980528cf45a7a8836119b038e710886f
  * @jenesis.pin plugin.greeting/module/org.json 20260522 SHA-256/d671b45e5954211f3566722aa614fbd3b5d46e95f4f9da4dc58c173280bb1799
  */
 module demo.internal {
