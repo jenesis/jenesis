@@ -216,12 +216,6 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
         if (groovy) {
             official.put(InferredCompilerChainModule.GROOVY, groovyModule);
         }
-        for (String name : official.keySet()) {
-            if (languages.containsKey(name)) {
-                throw new IllegalArgumentException("The language plugin " + name + " takes the name of the language"
-                        + " the build documents by itself - give it another name");
-            }
-        }
         if (!official.isEmpty() || !languages.isEmpty()) {
             SequencedSet<String> languageInputs = new LinkedHashSet<>(inherited.sequencedKeySet());
             languageInputs.add(SCAN);
@@ -234,13 +228,14 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                 List<String> found = Objects.requireNonNullElse(
                         SequencedProperties.ofFiles(scanFolder.resolve(SCAN_FILE)).entries(EXTENSIONS),
                         List.of());
+                SequencedMap<String, BuildExecutorModule> preparations = new LinkedHashMap<>();
                 official.forEach((name, module) -> {
                     if (found.contains(EXTENSIONS_OF.get(name))) {
-                        nested.addModule(name, module.preparation(), nestedInherited.sequencedKeySet());
+                        preparations.put(name, module.preparation());
                     }
                 });
-                languages.forEach((name, plugin) ->
-                        nested.addModule(name, plugin.preparation(), nestedInherited.sequencedKeySet()));
+                languages.forEach((name, plugin) -> preparations.put(name, plugin.preparation()));
+                PluginModule.addModules(nested, preparations, nestedInherited.sequencedKeySet());
             }, languageInputs);
             documentInputs.add(LANGUAGES);
         }
@@ -334,10 +329,11 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
             SequencedMap<String, String> within = new LinkedHashMap<>();
             boolean alone = documented.size() == 1 && !hasJava;
             for (Map.Entry<String, BuildExecutorModule> language : documented.entrySet()) {
-                buildExecutor.addModule(language.getKey(), language.getValue(), sourceInputs);
-                outputs.add(language.getKey());
+                String name = BuildExecutorModule.encodePath(language.getKey());
+                buildExecutor.addModule(name, language.getValue(), sourceInputs);
+                outputs.add(name);
                 if (!alone) {
-                    within.put(language.getKey(), language.getKey());
+                    within.put(name, language.getKey());
                 }
             }
             if (hasJava) {

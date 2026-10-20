@@ -19,7 +19,6 @@ import build.jenesis.project.InferredDocumentationChainModule;
 import build.jenesis.project.InternalModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class LanguageTest {
 
@@ -223,7 +222,7 @@ public class LanguageTest {
         SequencedMap<String, Path> result = compile(Language.Order.BEFORE_JAVAC);
 
         Path compile = root.resolve("chain").resolve(InferredCompilerChainModule.COMPILE);
-        assertThat(compile.resolve("greet/compile/output").resolve(BuildStep.CLASSES).resolve("sample/Greeting.class"))
+        assertThat(compile.resolve("plugin+greet/compile/output").resolve(BuildStep.CLASSES).resolve("sample/Greeting.class"))
                 .isNotEmptyFile();
         assertThat(compile.resolve(InferredCompilerChainModule.JAVAC).resolve("output").resolve(BuildStep.CLASSES)
                 .resolve("sample/Caller.class"))
@@ -279,7 +278,7 @@ public class LanguageTest {
 
         compile(Language.Order.AFTER_JAVAC);
 
-        assertThat(root.resolve("chain").resolve(InferredCompilerChainModule.COMPILE).resolve("greet/compile/output")
+        assertThat(root.resolve("chain").resolve(InferredCompilerChainModule.COMPILE).resolve("plugin+greet/compile/output")
                 .resolve("seen.txt"))
                 .as("the language is handed what javac compiled")
                 .content()
@@ -301,26 +300,27 @@ public class LanguageTest {
         executor.execute();
 
         Path compile = root.resolve("chain").resolve(InferredCompilerChainModule.COMPILE);
-        assertThat(compile.resolve("kotlin/compile/output").resolve(BuildStep.CLASSES).resolve("sample/Greeting.class"))
+        assertThat(compile.resolve("plugin+kotlin/compile/output").resolve(BuildStep.CLASSES).resolve("sample/Greeting.class"))
                 .isNotEmptyFile();
     }
 
     @Test
-    public void refuses_a_language_plugin_named_like_a_language_the_build_compiles_by_itself() throws IOException {
-        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Greeting.kt"),
+    public void holds_a_language_plugin_named_like_a_language_the_build_compiles_by_itself_apart_from_it()
+            throws IOException {
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Greeting.greet"),
                 "Hello");
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule("chain",
                 new InferredCompilerChainModule(Map.of(), Map.of())
-                        .languages(new LinkedHashMap<>(Map.of("kotlin", greet(Language.Order.BEFORE_JAVAC, ".kt")))),
+                        .languages(new LinkedHashMap<>(Map.of("kotlin", greet(Language.Order.BEFORE_JAVAC, ".greet")))),
                 "project");
+        executor.execute();
 
-        assertThatThrownBy(executor::execute)
-                .rootCause()
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("kotlin")
-                .hasMessageContaining("give it another name");
+        assertThat(root.resolve("chain").resolve(InferredCompilerChainModule.COMPILE).resolve("plugin+kotlin/compile/output")
+                .resolve(BuildStep.CLASSES).resolve("sample/Greeting.class"))
+                .as("a plugin handed in under the name of an official language runs under plugin/, apart from it")
+                .isNotEmptyFile();
     }
 
     @Test
@@ -330,7 +330,7 @@ public class LanguageTest {
 
         compile(Language.Order.BEFORE_JAVAC);
 
-        assertThat(root.resolve("chain").resolve(InferredCompilerChainModule.COMPILE).resolve("greet")).doesNotExist();
+        assertThat(root.resolve("chain").resolve(InferredCompilerChainModule.COMPILE).resolve("plugin+greet")).doesNotExist();
     }
 
     @Test
@@ -351,7 +351,7 @@ public class LanguageTest {
 
         Path javadoc = document().resolve("javadoc");
 
-        assertThat(javadoc.resolve("greet/index.html")).hasContent("greet");
+        assertThat(javadoc.resolve("plugin/greet/index.html")).hasContent("greet");
         assertThat(javadoc.resolve("sample/Caller.html")).isNotEmptyFile();
     }
 

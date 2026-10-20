@@ -136,7 +136,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         }
         String framework = properties.value(FRAMEWORK), engines = properties.value(ENGINES);
         List<String> scan = properties.entries(SCAN);
-        String named = framework == null ? null : ProjectPlugins.declared(framework);
+        String named = framework == null ? null : ProjectPlugins.PLUGIN + "/" + framework;
         TestModule declared = framework == null ? module
                 : frameworks.containsKey(named) ? frameworks.get(named) == null ? module : module.framework(frameworks.get(named))
                 : module.framework(TestFrameworks.named(framework));
@@ -505,11 +505,6 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         for (Map.Entry<String, ExternalModule> observer : official.entrySet()) {
             Path file = BuildStep.locate(configuration, observer.getKey() + ".properties");
             if (file != null) {
-                if (this.observers.containsKey(observer.getKey())) {
-                    throw new IllegalArgumentException("The observer " + observer.getKey() + " takes the name of the"
-                            + " plugin the build runs by itself where " + observer.getKey() + ".properties is found"
-                            + " - give it another name");
-                }
                 SequencedMap<String, String> values = new LinkedHashMap<>();
                 SequencedProperties.ofFiles(file).forEachProperty(values::put);
                 observers.put(observer.getKey(), observer.getValue().properties(values));
@@ -556,10 +551,11 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                             Map.entry(OBSERVERS, observers),
                             Map.entry(FRAMEWORKS, frameworks))) {
                         if (!plugins.getValue().isEmpty()) {
-                            buildExecutor.addModule(plugins.getKey(), (nested, nestedInherited) -> plugins.getValue()
-                                    .forEach((name, plugin) -> nested.addModule(name,
-                                            plugin.preparation(),
-                                            nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());
+                            buildExecutor.addModule(plugins.getKey(), (nested, nestedInherited) -> {
+                                SequencedMap<String, BuildExecutorModule> preparations = new LinkedHashMap<>();
+                                plugins.getValue().forEach((name, plugin) -> preparations.put(name, plugin.preparation()));
+                                PluginModule.addModules(nested, preparations, nestedInherited.sequencedKeySet());
+                            }, inherited.sequencedKeySet());
                             testInputs.add(plugins.getKey());
                         }
                     }
@@ -583,14 +579,16 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                         SequencedSet<String> observationInputs = new LinkedHashSet<>(reportInputs);
                         observationInputs.add(OBSERVERS);
                         buildExecutor.addModule(OBSERVATIONS, (nested, nestedInherited) -> {
+                            SequencedMap<String, BuildExecutorModule> reported = new LinkedHashMap<>();
                             for (Map.Entry<String, PluginModule<?>> observer : observers.entrySet()) {
-                                nested.addModule(observer.getKey(), (reported, reportInherited) -> {
+                                reported.put(observer.getKey(), (reporting, reportInherited) -> {
                                     BuildExecutorModule report = observation(observations, observer, reportInherited).report();
                                     if (report != null) {
-                                        report.accept(reported, PluginModule.unprepared(Set.of(OBSERVERS, FRAMEWORKS), reportInherited));
+                                        report.accept(reporting, PluginModule.unprepared(Set.of(OBSERVERS, FRAMEWORKS), reportInherited));
                                     }
-                                }, nestedInherited.sequencedKeySet());
+                                });
                             }
+                            PluginModule.addModules(nested, reported, nestedInherited.sequencedKeySet());
                         }, observationInputs);
                     }
                 }
