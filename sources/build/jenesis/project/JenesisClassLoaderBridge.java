@@ -155,11 +155,14 @@ class JenesisClassLoaderBridge {
         foreignApply = lookup.findVirtual(foreignBuildStep,
                 "apply",
                 MethodType.methodType(CompletionStage.class, Executor.class, foreignBuildStepContext, SequencedMap.class));
+        Class<?> foreignProcessHandler = Class.forName(ProcessHandler.class.getName(), false, loader);
         MethodHandle scope;
         try {
-            scope = MethodHandles.publicLookup().findStatic(Class.forName(ProcessHandler.class.getName(), false, loader),
-                    "scope",
-                    MethodType.methodType(Closeable.class));
+            scope = foreignProcessHandler == ProcessHandler.class
+                    ? null
+                    : MethodHandles.publicLookup().findStatic(foreignProcessHandler,
+                            "scope",
+                            MethodType.methodType(Closeable.class));
         } catch (NoSuchMethodException _) {
             scope = null;
         }

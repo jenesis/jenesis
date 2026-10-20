@@ -16,6 +16,7 @@ import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.module.ModularJarResolver;
 import build.jenesis.project.ExternalModule;
+import build.jenesis.step.ProcessHandler;
 import javax.tools.ToolProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -186,6 +187,9 @@ public class ExternalModuleTest {
         assertThat(buildExecutor.execute().get("external/marker").resolve("out.txt"))
                 .as("a plugin named by a Maven coordinate runs from a class path")
                 .hasContent("false");
+        assertThat(ProcessHandler.nest(() -> { }))
+                .as("a plugin linked against the engine's own classes leaves no process scope of the build open")
+                .isFalse();
     }
 
     @Test
