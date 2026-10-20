@@ -149,7 +149,8 @@ public final class DaemonClient {
         return HexFormat.of().formatHex(digest.digest());
     }
 
-    private Integer request(String fingerprint, boolean stop, String... selectors) throws IOException {
+    private Integer request(String fingerprint, boolean stop, String... selectors)
+            throws IOException, InterruptedException {
         if (outputs != null) {
             outputs.clear();
         }
@@ -211,6 +212,19 @@ public final class DaemonClient {
             } catch (EOFException e) {
                 throw new IllegalStateException("The build daemon died while the build was running"
                         + " - its output above is incomplete and the build did not finish", e);
+            }
+            if (stop) {
+                long pid = in.readLong();
+                Optional<ProcessHandle> daemon = ProcessHandle.of(pid);
+                if (daemon.isPresent()) {
+                    try {
+                        daemon.get().onExit().get(30, TimeUnit.SECONDS);
+                    } catch (ExecutionException | TimeoutException e) {
+                        throw new IllegalStateException("The build daemon under " + folder + " acknowledged the stop"
+                                + " but its process " + pid + " did not end within 30 seconds - end it, and see"
+                                + " daemon.log there", e);
+                    }
+                }
             }
             if (produced != null && code == 0 && Files.size(produced) > 0) {
                 SequencedProperties.ofFiles(produced).forEachProperty(outputs::put);

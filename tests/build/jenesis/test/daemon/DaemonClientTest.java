@@ -21,8 +21,12 @@ public class DaemonClientTest {
                         .toString()),
                 "build.jenesis.Project",
                 new LinkedHashMap<>(Map.of("jenesis.daemon.options", "-Xmx256m", "jenesis.daemon.idle", "60")));
+        String folder = root.resolve(".jenesis").toString();
         try {
             assertThat(client.dispatch("engine", "help")).isEqualTo(0);
+            assertThat(daemons(folder))
+                    .as("the first build starts a daemon serving this folder")
+                    .hasSize(1);
             String port = Files.readString(root.resolve(".jenesis").resolve(Worker.PORT));
             assertThat(client.dispatch("engine", "help")).isEqualTo(0);
             assertThat(Files.readString(root.resolve(".jenesis").resolve(Worker.PORT)))
@@ -31,11 +35,17 @@ public class DaemonClientTest {
         } finally {
             assertThat(client.dispatch("engine", "--stop")).isEqualTo(0);
         }
-        for (int attempt = 0; attempt < 400 && Files.exists(root.resolve(".jenesis").resolve(Worker.PORT)); attempt++) {
-            Thread.sleep(25);
-        }
+        assertThat(daemons(folder))
+                .as("the stop returns once the daemon's process has ended, so nothing holds its log open")
+                .isEmpty();
         assertThat(root.resolve(".jenesis").resolve(Worker.PORT))
                 .as("a stopped daemon takes its port file with it")
                 .doesNotExist();
+    }
+
+    private static List<ProcessHandle> daemons(String folder) {
+        return ProcessHandle.allProcesses()
+                .filter(process -> process.info().arguments().stream().flatMap(Arrays::stream).anyMatch(folder::equals))
+                .toList();
     }
 }
