@@ -29,6 +29,7 @@ Layout
     |-- pom.xml                    pins JUnit; sources in sources/, tests in test/
     |-- build.jenesis/jacoco.properties  enables JaCoCo; minimum.method=0.6
     |-- build.jenesis/profiling/jfr.properties  settings=profile, under a profile
+    |-- build.jenesis/profiling/asyncprofiler.properties  event=cpu, under a profile
     |-- sources
     |   `-- coverage
     |       `-- Calculator.java    add(...) and subtract(...)
@@ -125,3 +126,22 @@ recording in JDK Mission Control, or summarise it with `jfr summary`. Changing t
 file runs the tests again, and `-Djenesis.observe.jfr=false` switches the recording
 off.
 
+Profiling the tests with async-profiler
+---------------------------------------
+
+An `asyncprofiler.properties` in a configuration folder profiles the test JVM with
+async-profiler, an official plugin of the hook point `observe` like JaCoCo. Each
+line is an option of the profiler, as `event=cpu` or `interval=1ms`, or a flag
+without a value, as `threads`. The demo ships the file beside `jfr.properties`,
+under the same profile, so the build above writes both:
+
+    java -Djenesis.make.profiles=profiling build/jenesis/Make.java stage
+
+    target/stage/reports/output/asyncprofiler/module/tests.html
+
+The build resolves `tools.profiler:async-profiler`, a Java agent that carries the
+profiler's native library, in the group `asyncprofiler:agent`, attaches it to the
+test JVM with native access, and names the file itself. The report is a flame
+graph you open in a browser; an option selecting another format, such as `jfr` or
+`collapsed`, writes `tests.jfr` or `tests.collapsed` instead. async-profiler runs
+on Linux and macOS, and `-Djenesis.observe.asyncprofiler=false` switches it off.

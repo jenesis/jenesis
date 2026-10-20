@@ -2892,7 +2892,8 @@ public record Project(
                                          39 test-selection (incremental),
                                          40 test-runs (the tests of a scanned jar, run again
                                          with other flags by another module),
-                                         41 code-coverage (JaCoCo), 42 pitest (mutation),
+                                         41 code-coverage (JaCoCo, JFR, async-profiler),
+                                         42 pitest (mutation),
                                          43 jmh (benchmark harness),
                                          44 jcstress (concurrency stress tests, from the class path),
                                          45 api-compatibility (japicmp, revapi)
@@ -4848,6 +4849,7 @@ public record Project(
                 observe.native|true|native-image reachability agent, activated by a graal.properties
                 observe.jfr|true|Java Flight Recorder in the test JVM, activated by a jfr.properties whose lines are the options of the recording
                 observe.jacoco|true|JaCoCo coverage, activated by a jacoco.properties
+                observe.asyncprofiler|true|async-profiler in the test JVM, activated by an asyncprofiler.properties whose lines are the options of the profiler
                 observe.pitest|true|PIT mutation testing, activated by a pitest.properties
                 artifact.japicmp|true|japicmp API comparison, activated by a japicmp.properties
                 artifact.revapi|true|revapi API comparison, activated by a revapi.properties
