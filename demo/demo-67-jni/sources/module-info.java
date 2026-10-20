@@ -5,7 +5,7 @@
  * @jenesis.release 25
  * @jenesis.main sample.adder.Main
  * @jenesis.native demo.adder
- * @jenesis.pin plugin.jni/module/build.jenesis 0.17.0 SHA-256/c73dbb0a30f1bae340e0c6adfa433c76980528cf45a7a8836119b038e710886f
+ * @jenesis.pin plugin.jni/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
  */
 module demo.adder {
     exports sample.adder;
