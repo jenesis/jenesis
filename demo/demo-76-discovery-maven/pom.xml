@@ -20,7 +20,7 @@
                 <groupId>build.jenesis</groupId>
                 <artifactId>build.jenesis</artifactId>
                 <version>0.16.0</version>
-                <!--Checksum/SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4-->
+                <!--Checksum/SHA-256/f3cec5e4a8926976e7497a290146be1a571399b4601297821e450f2e44e3d0dd-->
             </dependency>
         </dependencies>
     </dependencyManagement>
