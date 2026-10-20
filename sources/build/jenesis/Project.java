@@ -2088,7 +2088,8 @@ public record Project(
                           where a processor without a version takes <dependencyManagement>'s, and a
                           module of the project its own. One coordinate resolves in one group only.
                       @jenesis.test [<module>|abstract]
-                          Test variant of <module>. `abstract` supplies infrastructure only: declares
+                          Test variant of <module>, one tag per module: a further module its tests
+                          need is a requires. `abstract` supplies infrastructure only: declares
                           no tests, runs none, is staged only with the test modules.
                       @jenesis.pin <token> <ver> [<algo>/<hex>] [(<guard>)]
                           Pin a version and optionally a content checksum. A module name pins a
