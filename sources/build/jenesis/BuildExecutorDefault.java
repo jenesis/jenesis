@@ -738,9 +738,12 @@ class BuildExecutorDefault implements BuildExecutor {
                         throws IOException {
                     SequencedMap<String, StepSummary> extended = new LinkedHashMap<>(summaries);
                     for (Path path : paths) {
-                        extended.put(
-                                ":" + BuildExecutorModule.encode(path.toString()),
-                                new StepSummary(path, HashFunction.read(path, hash, executor)));
+                        String name = ":" + BuildExecutorModule.encode(Objects.toString(path.getFileName(), "")),
+                                key = name;
+                        for (int index = 1; extended.containsKey(key); index++) {
+                            key = name + "-" + index;
+                        }
+                        extended.put(key, new StepSummary(path, HashFunction.read(path, hash, executor)));
                     }
                     return delegate.apply(identity, executor, extended, selectors);
                 }

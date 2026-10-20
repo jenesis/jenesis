@@ -109,6 +109,40 @@ public class BuildExecutorTest implements Serializable {
     }
 
     @Test
+    public void a_source_bound_by_a_step_is_not_rerun_when_its_folder_moves_with_the_target() throws IOException {
+        RUNS.set(0);
+        Path input = Files.createDirectory(source.resolve("input")),
+                moved = Files.createDirectory(source2.resolve("input"));
+        Files.writeString(input.resolve("file"), "foo");
+        Files.writeString(moved.resolve("file"), "foo");
+        buildExecutor.addSource("source", counting(), input);
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        try (Stream<Path> files = Files.walk(root)) {
+            for (Path file : files.toList()) {
+                Path copy = root2.resolve(root.relativize(file).toString());
+                if (Files.isDirectory(file)) {
+                    Files.createDirectories(copy);
+                } else {
+                    Files.copy(file, copy);
+                }
+            }
+        }
+        BuildExecutor relocated = BuildExecutor.of(root2,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        relocated.addSource("source", counting(), moved);
+        relocated.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(RUNS.get()).as("the folder holds the same files, only elsewhere").isEqualTo(1);
+        assertThat(root2.resolve("source").resolve("output").resolve("file")).content().isEqualTo("value1");
+    }
+
+    @Test
     public void a_step_is_written_to_the_folder_named_like_it_and_selected_by_that_name() throws IOException {
         buildExecutor.addStep("module-api+client%20v2", (_, context, _) -> {
             Files.writeString(context.next().resolve("file"), "foo");
