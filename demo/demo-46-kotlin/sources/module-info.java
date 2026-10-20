@@ -35,8 +35,8 @@
  * @jenesis.pin org.jetbrains.kotlin/kotlin-stdlib 1.9.10 SHA-256/55e989c512b80907799f854309f3bc7782c5b3d13932442d0379d5c472711504
  * @jenesis.pin org.jetbrains.kotlin/kotlin-stdlib-common 1.9.10 SHA-256/cde3341ba18a2ba262b0b7cf6c55b20c90e8d434e42c9a13e6a3f770db965a88
  * @jenesis.pin org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
- * @jenesis.pin kotlin/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
- * @jenesis.pin kotlin/module/build.jenesis.plugin.kotlin 0.16.0 SHA-256/7d7382020af0a2e0a44de509bd90d80f08715546c869cfed840af48ca5e9f9a3
+ * @jenesis.pin kotlin/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin kotlin/module/build.jenesis.plugin.kotlin 0.1.0 SHA-256/ceb06085b2d45c16c94ca8205ba90902441b5423e7427027f21a543022de2447
  */
 module sample.kotlin {
     requires kotlin.stdlib;

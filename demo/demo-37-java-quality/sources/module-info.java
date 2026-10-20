@@ -74,18 +74,18 @@
  * @jenesis.pin googlejavaformat:tool/maven/com.google.guava/listenablefuture 9999.0-empty-to-avoid-conflict-with-guava SHA-256/b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99
  * @jenesis.pin googlejavaformat:tool/maven/com.google.j2objc/j2objc-annotations 2.8 SHA-256/f02a95fa1a5e95edb3ed859fd0fb7df709d121a35290eff8b74dce2ab7f4d6ed
  * @jenesis.pin googlejavaformat:tool/maven/org.checkerframework/checker-qual 3.37.0 SHA-256/e4ce1376cc2735e1dde220b62ad0913f51297704daad155a33f386bc5db0d9f7
- * @jenesis.pin checkstyle/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
- * @jenesis.pin checkstyle/module/build.jenesis.plugin.checkstyle 0.16.0 SHA-256/06d3302700de22b2a6c756f0b1ac9ce856940ffc9153eeee9996a992bff2fcc1
- * @jenesis.pin eclipse/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
- * @jenesis.pin eclipse/module/build.jenesis.plugin.eclipse 0.16.0 SHA-256/639f88138c7f2e307e2c36a6cbf6281dd5e6c6be804d2f4f665b6eb63997cf07
- * @jenesis.pin forbiddenapis/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
- * @jenesis.pin forbiddenapis/module/build.jenesis.plugin.forbiddenapis 0.16.0 SHA-256/fcc4c49c7aaa8d143468ca13e6a8c803a8cc988b01c72692ea1e60a56e60d61c
- * @jenesis.pin googlejavaformat/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
- * @jenesis.pin googlejavaformat/module/build.jenesis.plugin.googlejavaformat 0.16.0 SHA-256/e594f7b7169d6256c5858c4af7ae5b28b8c4c34d24dfbfcdef543015f969f01e
- * @jenesis.pin pmd/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
- * @jenesis.pin pmd/module/build.jenesis.plugin.pmd 0.16.0 SHA-256/3f3215a0f874efe66d436d98a07be9411bd09506dea081ddb43a5f7f410862af
- * @jenesis.pin spotbugs/module/build.jenesis 0.16.0 SHA-256/6c7ca48b61d71ca04a929bfc937f49ca5ba899c083b0a011fc29115d44b522c4
- * @jenesis.pin spotbugs/module/build.jenesis.plugin.spotbugs 0.16.0 SHA-256/4146c03dac9230ae9880868a950f7fd00229591fef70d791ae73c5b525e4d713
+ * @jenesis.pin checkstyle/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin checkstyle/module/build.jenesis.plugin.checkstyle 0.1.0 SHA-256/b7006102fdba775a73c5acc65c89ce072c5c6ffcefe904603c4e161e729df960
+ * @jenesis.pin eclipse/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin eclipse/module/build.jenesis.plugin.eclipse 0.1.0 SHA-256/8835b24fb676616961e6d72625b7cc8a9dd4e7c8ebc00555d9b0b21f5a8b67ae
+ * @jenesis.pin forbiddenapis/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin forbiddenapis/module/build.jenesis.plugin.forbiddenapis 0.1.0 SHA-256/baa58b5a4d91a3a264e4921ea90a4b28368f159aa6efdc6bf17fcce246376b64
+ * @jenesis.pin googlejavaformat/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin googlejavaformat/module/build.jenesis.plugin.googlejavaformat 0.1.0 SHA-256/61916b8adc2527c03fd3574595c0896c80a3983ccf160b7b8258f77c32138f38
+ * @jenesis.pin pmd/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin pmd/module/build.jenesis.plugin.pmd 0.1.0 SHA-256/2ce8138f6b7887e12e50305a31d298be815b4d198a61a9ab6b7b2ebedde45451
+ * @jenesis.pin spotbugs/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin spotbugs/module/build.jenesis.plugin.spotbugs 0.1.0 SHA-256/3c55346b2cad4367203ec44383448f09397c73f0536a4325672ea87200774e75
  * @jenesis.pin pmd:tool/maven/com.github.nawforce/scala-json-rpc-upickle-json-serializer_2.13 1.1.0 SHA-256/4ce9d100d26080a7b8813b6c3c6bc568c7c33b500b2b42120862c3f9fda926ff
  * @jenesis.pin pmd:tool/maven/com.github.nawforce/scala-json-rpc_2.13 1.1.0 SHA-256/0fcac451d102a687a1be2d8cb3ad4854a0beb9a26398f01db03d95f9851fa3e1
  * @jenesis.pin pmd:tool/maven/com.github.oowekyala.ooxml/nice-xml-messages 3.1 SHA-256/0b4ceb5b8362d43c9c6c49b1bd57f1c5da54d3c5c7c305fa39c0a04462bb4799
