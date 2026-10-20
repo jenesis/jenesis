@@ -90,11 +90,11 @@
         </dependency>
     </dependencies>
     <!--jenesis.pin
-    asyncprofiler/module/build.jenesis 0.17.0 SHA-256/0dfd1715ecb35e8dd398b5fc9ceb49c120aa59e3d6063606882717f41d84b284
-    asyncprofiler/module/build.jenesis.plugin.asyncprofiler 0.1.0 SHA-256/7cabc19acab1b957cd48115ec8d1222b96f05d1db5c87f98d11b8118d6afbe87
+    asyncprofiler/module/build.jenesis 0.17.0 SHA-256/c73dbb0a30f1bae340e0c6adfa433c76980528cf45a7a8836119b038e710886f
+    asyncprofiler/module/build.jenesis.plugin.asyncprofiler 0.1.0 SHA-256/10f0348cdc1b0eaef3afb919634b2f5e7f346f99bb37937e6ba4d2dd07bd2456
     asyncprofiler:agent/maven/tools.profiler/async-profiler 4.5 SHA-256/d0184907de67ca63363f1a6333c75eb7414fb3e13c564641304fe0fdca97363e
-    jacoco/module/build.jenesis 0.17.0 SHA-256/0dfd1715ecb35e8dd398b5fc9ceb49c120aa59e3d6063606882717f41d84b284
-    jacoco/module/build.jenesis.plugin.jacoco 0.1.0 SHA-256/c145fdddfe76188270bda15e4bc51015086c260dfaf944a559a58cf32956aeed
+    jacoco/module/build.jenesis 0.17.0 SHA-256/c73dbb0a30f1bae340e0c6adfa433c76980528cf45a7a8836119b038e710886f
+    jacoco/module/build.jenesis.plugin.jacoco 0.1.0 SHA-256/54a49d595b02f78cc5a96bce1b5b3ada50fbf1c04f2976da6c51d6c0a8e69712
     jacoco:agent/maven/org.jacoco/org.jacoco.agent/jar/runtime 0.8.15 SHA-256/fb5b0036a0899ea97edfa0fc2c7985b55f3f7c5695028163e5e60d4f3cf6075d
     jacoco:tool/maven/args4j/args4j 2.0.28 SHA-256/11b029a602e787e2bc08eb3b77eda1a4f5e8b263d22e3c5d6220cd5c51f30b18
     jacoco:tool/maven/org.jacoco/org.jacoco.cli 0.8.15 SHA-256/be5e57a018398b0476e8a3837cc7a0a1e075259ba8a00f349d2b86f854230c23

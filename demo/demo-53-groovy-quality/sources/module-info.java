@@ -25,10 +25,10 @@
  * @jenesis.pin groovy:tool/maven/org.apache.groovy/groovy 6.0.0-alpha-1 SHA-256/f98453919a23cb8cfa36dcf7176fdcf13350cb2baa65236b081a601848f0350f
  * @jenesis.pin org.apache.groovy 5.0.6 SHA-256/32338cdd9f6d842a534ea086242bf874385ee5be6973dc3de72f7605bf600394
  * @jenesis.pin org.apache.groovy/groovy 5.0.6 SHA-256/32338cdd9f6d842a534ea086242bf874385ee5be6973dc3de72f7605bf600394
- * @jenesis.pin codenarc/module/build.jenesis 0.17.0 SHA-256/0dfd1715ecb35e8dd398b5fc9ceb49c120aa59e3d6063606882717f41d84b284
- * @jenesis.pin codenarc/module/build.jenesis.plugin.codenarc 0.1.0 SHA-256/feb44a43fa2ab090231ab7fe1ccbb467032ca10b1347ef5d283cbd5486e257a5
- * @jenesis.pin groovy/module/build.jenesis 0.17.0 SHA-256/0dfd1715ecb35e8dd398b5fc9ceb49c120aa59e3d6063606882717f41d84b284
- * @jenesis.pin groovy/module/build.jenesis.plugin.groovy 0.1.0 SHA-256/c3900321882d73fcc13a175b8cf3f4d6d5d8acb999dea36473fe7fcbef158787
+ * @jenesis.pin codenarc/module/build.jenesis 0.17.0 SHA-256/c73dbb0a30f1bae340e0c6adfa433c76980528cf45a7a8836119b038e710886f
+ * @jenesis.pin codenarc/module/build.jenesis.plugin.codenarc 0.1.0 SHA-256/4930a7b5474e41d2bdfbf939cd55d6c21d8a1a92e0c9399cb5e98305bcefd9ab
+ * @jenesis.pin groovy/module/build.jenesis 0.17.0 SHA-256/c73dbb0a30f1bae340e0c6adfa433c76980528cf45a7a8836119b038e710886f
+ * @jenesis.pin groovy/module/build.jenesis.plugin.groovy 0.1.0 SHA-256/a5770fe56bd1f7de30f6a16a41f79fea67a7e0da9488840fe9bca4327d7b0a01
  */
 module sample {
     requires org.apache.groovy;

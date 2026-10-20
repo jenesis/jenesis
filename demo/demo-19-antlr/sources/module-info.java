@@ -15,8 +15,8 @@
  * @jenesis.pin antlr:tool/maven/org.antlr/antlr4-runtime 4.13.2 SHA-256/dd3e8a13a2d669bf84fb8d834de35ce4875f27157698d206241ec8488aadcaf7
  * @jenesis.pin org.antlr.antlr4.runtime 4.13.2 SHA-256/dd3e8a13a2d669bf84fb8d834de35ce4875f27157698d206241ec8488aadcaf7
  * @jenesis.pin org.antlr/antlr4-runtime 4.13.2 SHA-256/dd3e8a13a2d669bf84fb8d834de35ce4875f27157698d206241ec8488aadcaf7
- * @jenesis.pin antlr/module/build.jenesis 0.17.0 SHA-256/0dfd1715ecb35e8dd398b5fc9ceb49c120aa59e3d6063606882717f41d84b284
- * @jenesis.pin antlr/module/build.jenesis.plugin.antlr 0.1.0 SHA-256/d0487190eeb48d46af17445e121573acc9176b50f7997293bcda564603d9ed7d
+ * @jenesis.pin antlr/module/build.jenesis 0.17.0 SHA-256/c73dbb0a30f1bae340e0c6adfa433c76980528cf45a7a8836119b038e710886f
+ * @jenesis.pin antlr/module/build.jenesis.plugin.antlr 0.1.0 SHA-256/d992d1e82316420d3866eb95ded428689b13aca5de38c17e64606e52291173da
  */
 module demo.antlr {
     requires org.antlr.antlr4.runtime;

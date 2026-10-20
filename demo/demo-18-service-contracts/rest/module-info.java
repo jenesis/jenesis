@@ -10,8 +10,8 @@
  * @jenesis.pin openapi:tool/maven/org.openapitools/openapi-generator-cli 7.26.0 SHA-256/1760050094997b9cc790cc1350be095f15da8c08a996b184d3eadc4ccda5e35e
  * @jenesis.pin org.openapitools.jackson.nullable 0.2.12 SHA-256/cdcf0d46f9d7f076be4298145616035123b76b2ae390ae61752c06b1c5068210
  * @jenesis.pin org.openapitools/jackson-databind-nullable 0.2.12 SHA-256/cdcf0d46f9d7f076be4298145616035123b76b2ae390ae61752c06b1c5068210
- * @jenesis.pin openapi/module/build.jenesis 0.17.0 SHA-256/0dfd1715ecb35e8dd398b5fc9ceb49c120aa59e3d6063606882717f41d84b284
- * @jenesis.pin openapi/module/build.jenesis.plugin.openapi 0.1.0 SHA-256/083983f5ab7077a1f8c52ccc64f1231973c1a9e43d44526500708baa9fc50b1c
+ * @jenesis.pin openapi/module/build.jenesis 0.17.0 SHA-256/c73dbb0a30f1bae340e0c6adfa433c76980528cf45a7a8836119b038e710886f
+ * @jenesis.pin openapi/module/build.jenesis.plugin.openapi 0.1.0 SHA-256/01051a2d4e2cc8c031e9b576ad98e3e2e092e44c81223c22bfb3d0a3d9cc6974
  */
 module demo.contract.rest {
     requires java.net.http;
