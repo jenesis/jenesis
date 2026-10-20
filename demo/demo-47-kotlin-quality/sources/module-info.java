@@ -121,14 +121,14 @@
  * @jenesis.pin org.jetbrains.kotlin/kotlin-stdlib 1.9.10 SHA-256/55e989c512b80907799f854309f3bc7782c5b3d13932442d0379d5c472711504
  * @jenesis.pin org.jetbrains.kotlin/kotlin-stdlib-common 1.9.10 SHA-256/cde3341ba18a2ba262b0b7cf6c55b20c90e8d434e42c9a13e6a3f770db965a88
  * @jenesis.pin org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
- * @jenesis.pin detekt/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
- * @jenesis.pin detekt/module/build.jenesis.plugin.detekt 0.1.0 SHA-256/442dc4232f196d9d15644ef4d12ef53e319b93628dbb76564ed52eb7d91a8286
- * @jenesis.pin kotlin/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
- * @jenesis.pin kotlin/module/build.jenesis.plugin.kotlin 0.1.0 SHA-256/ceb06085b2d45c16c94ca8205ba90902441b5423e7427027f21a543022de2447
- * @jenesis.pin ktfmt/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
- * @jenesis.pin ktfmt/module/build.jenesis.plugin.ktfmt 0.1.0 SHA-256/2ce2cfa22966fb01fe283993049ff9ba5181db6cad16ec0b34cf83245a18e399
- * @jenesis.pin ktlint/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
- * @jenesis.pin ktlint/module/build.jenesis.plugin.ktlint 0.1.0 SHA-256/bccd834604561f7ea1ee8e927aceaff368c925a246eefef385cf3b82fea1c7bc
+ * @jenesis.pin detekt/module/build.jenesis 0.17.0 SHA-256/0dfd1715ecb35e8dd398b5fc9ceb49c120aa59e3d6063606882717f41d84b284
+ * @jenesis.pin detekt/module/build.jenesis.plugin.detekt 0.1.0 SHA-256/1c4a8baae8ecbc3d0c1a8df38d95116f3e404a7211c363f59c1f105d7ee10e90
+ * @jenesis.pin kotlin/module/build.jenesis 0.17.0 SHA-256/0dfd1715ecb35e8dd398b5fc9ceb49c120aa59e3d6063606882717f41d84b284
+ * @jenesis.pin kotlin/module/build.jenesis.plugin.kotlin 0.1.0 SHA-256/fb58617b50f3874df76ae9df9f5a609ecfd342d04fd350bbd7512f6d10f1d807
+ * @jenesis.pin ktfmt/module/build.jenesis 0.17.0 SHA-256/0dfd1715ecb35e8dd398b5fc9ceb49c120aa59e3d6063606882717f41d84b284
+ * @jenesis.pin ktfmt/module/build.jenesis.plugin.ktfmt 0.1.0 SHA-256/b5f920c1f7c0c80a4590f1ad389f4619d9bd92dc4169f0c358d2983b1e8976c1
+ * @jenesis.pin ktlint/module/build.jenesis 0.17.0 SHA-256/0dfd1715ecb35e8dd398b5fc9ceb49c120aa59e3d6063606882717f41d84b284
+ * @jenesis.pin ktlint/module/build.jenesis.plugin.ktlint 0.1.0 SHA-256/508277aafbe7e82a2d2293ee8b14fb5ce697a3b1a7fecec99472a5f72d95791b
  */
 module sample.kotlin {
     requires kotlin.stdlib;

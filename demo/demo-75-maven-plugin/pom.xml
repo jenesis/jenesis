@@ -77,8 +77,8 @@
         </dependency>
     </dependencies>
     <!--jenesis.pin
-    mavenplugin/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
-    mavenplugin/module/build.jenesis.plugin.mavenplugin 0.1.0 SHA-256/e056cc85931c5466ee0e31b7c534e63d643b80587ef4efa29805c1e7af7b67c9
+    mavenplugin/module/build.jenesis 0.17.0 SHA-256/0dfd1715ecb35e8dd398b5fc9ceb49c120aa59e3d6063606882717f41d84b284
+    mavenplugin/module/build.jenesis.plugin.mavenplugin 0.1.0 SHA-256/56e451ccefa7524abc2500ba0dd1c2f15c410622c51f46dfcdebcb40dc6ba77b
     mavenplugin:tool/maven/aopalliance/aopalliance 1.0 SHA-256/0addec670fedcd3f113c5c8091d783280d23f75e3acb841b61a9cdb079376a08
     mavenplugin:tool/maven/com.github.luben/zstd-jni 1.5.6-3 SHA-256/f72ede1b39258faf81277dc58de30c71cbae4253732558d2ce10b53d8b5763d5
     mavenplugin:tool/maven/com.google.guava/failureaccess 1.0.3 SHA-256/cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb

@@ -130,7 +130,7 @@
     protoc:grpc-java/maven/io.grpc/protoc-gen-grpc-java/exe/osx-x86_64 1.83.1 SHA-256/372e13b25cb058ea6e3ab6cb54ba1458d5d2bbe1cfdcd37bc57e82b872656e21 (macos,x86_64)
     protoc:grpc-java/maven/io.grpc/protoc-gen-grpc-java/exe/osx-aarch_64 1.83.1 SHA-256/372e13b25cb058ea6e3ab6cb54ba1458d5d2bbe1cfdcd37bc57e82b872656e21 (macos,aarch64)
     protoc:grpc-java/maven/io.grpc/protoc-gen-grpc-java/exe/windows-x86_64 1.83.1 SHA-256/f4654b0b8e1faedf897f4abcd754c5250cb48afe07d595e56efc9fb478736c73 (windows,x86_64)
-    protoc/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
-    protoc/module/build.jenesis.plugin.protoc 0.1.0 SHA-256/e5c7e984fbc9dc018a8d95dd1d3a468d78562adf7bac3a307f7a50c7a672538b
+    protoc/module/build.jenesis 0.17.0 SHA-256/0dfd1715ecb35e8dd398b5fc9ceb49c120aa59e3d6063606882717f41d84b284
+    protoc/module/build.jenesis.plugin.protoc 0.1.0 SHA-256/81522cda8011b532d9a9dfa3fac000e6ccbee07e00fbd1127a38203a9dd1fb18
     -->
 </project>
