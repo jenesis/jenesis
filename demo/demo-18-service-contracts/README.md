@@ -15,12 +15,9 @@ Run it
 | `soap` | `soap/META-INF/build.jenesis/wsimport.properties` | `soap/wsdl/greeter.wsdl`                 | yes | `wsimport` | `demo.greeter` |
 | `rest` | `rest/META-INF/build.jenesis/openapi.properties`  | `rest/META-INF/build.jenesis/greeting.yaml` | no | OpenAPI Generator | `demo.greeting` |
 
-`jenesis.plugins.properties` names both generators as plugins at the hook point
-`binary/generated`, and each runs in the module where its `<name>.properties`
-is found:
-
-    openapi+binary/generated=build.jenesis.plugin.openapi
-    wsimport+binary/generated=build.jenesis.plugin.wsimport
+Each generator is a plugin the build resolves itself, and runs in the module
+where its `<name>.properties` is found, whose sources it compiles with the
+module's own.
 
 Each module is a folder with a `module-info.java` at its root, which declares the
 module, what it requires and what it exports, as in the `java-modular-multi` demo.
@@ -133,7 +130,6 @@ Layout
 
     demo-18-service-contracts
     |-- build/jenesis            symlink to ../../../sources/build/jenesis
-    |-- jenesis.plugins.properties  names the wsimport and OpenAPI plugins
     |-- soap
     |   |-- module-info.java     requires jakarta.xml.ws
     |   |-- META-INF/build.jenesis/wsimport.properties

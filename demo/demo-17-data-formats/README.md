@@ -1,10 +1,10 @@
 Generated sources demo (data formats)
 =====================================
 
-Three modules, three wire formats, no build script: `jenesis.plugins.properties`
-names one generator plugin per format, each module binds its schema in the
-plugin's configuration file, and the classes the generator writes are compiled
-into that module like any hand-written package.
+Three modules, three wire formats, no build script: each module switches on the
+generator of its format with that generator's configuration file, binds its schema
+there, and the classes the generator writes are compiled into the module like any
+hand-written package.
 
 Run it
 ------
@@ -151,7 +151,6 @@ Layout
     demo-17-data-formats
     |-- build/jenesis            symlink to ../../../sources/build/jenesis
     |-- pom.xml                  parent, three modules
-    |-- jenesis.plugins.properties  names the three generator plugins
     |-- xml
     |   |-- build.jenesis/xjc.properties
     |   |-- pom.xml

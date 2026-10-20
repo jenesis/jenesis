@@ -17,8 +17,7 @@ From this directory:
     java build/jenesis/Make.java
 
 Jenesis auto-detects the MODULAR_TO_MAVEN layout, resolves the Kotlin compiler
-of the Kotlin plugin that `jenesis.plugins.properties` names, as in
-`../demo-46-kotlin`, resolves the compiler plugin, and compiles the module -
+of the Kotlin plugin it resolves by itself, as in `../demo-46-kotlin`, resolves the compiler plugin, and compiles the module -
 emitting the generated `Point$$serializer` class alongside `Point`.
 
 How the plugin is wired

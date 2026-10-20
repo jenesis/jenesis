@@ -18,10 +18,10 @@ Jenesis auto-detects the MODULAR_TO_MAVEN layout (a `module-info.java`, no
 `module-info.java` and `Greeter.java` with `javac`, then compiles `Sample.groovy`
 with `groovyc`, and packages a modular jar plus a generated POM.
 
-Groovy is a plugin of the hook point `language`, named in
-`jenesis.plugins.properties` as Kotlin and Scala are in the demos before it:
-
-    groovy+language=build.jenesis.plugin.groovy
+Groovy is an official plugin of the hook point `language`, as Kotlin and Scala
+are in the demos before it. The build resolves it by itself, as
+`module/build.jenesis.plugin.groovy`, in every module that holds a `.groovy`
+source, and `-Djenesis.language.groovy=false` leaves it out.
 
 Layout
 ------
@@ -31,7 +31,6 @@ Groovy types in one package:
 
     demo/demo-52-groovy
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
-    |-- jenesis.plugins.properties names the Groovy plugin
     `-- sources
         |-- module-info.java       requires org.apache.groovy; exports sample
         `-- sample

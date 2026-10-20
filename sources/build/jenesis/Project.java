@@ -2675,7 +2675,7 @@ public record Project(
                     from a jenesis.plugins.arguments-<profile>.properties per active profile, and pin
                     writes its pins to jenesis.plugins.pin.properties. A releaser reads
                     jenesis.release.publish and publishes nothing without it, and pin runs last, after
-                    a dry release, so it pins a releaser's tool as plugin.<name>/maven/<groupId>/<artifactId>
+                    a dry release, so it pins a releaser's tool as plugin.<name>:tool/maven/<groupId>/<artifactId>
                     with the rest. A transform adds files to a
                     module by naming them in an inventory.properties of its own under any
                     <module>.<key>, such as <module>.attachment.<classifier> or <module>.report.<name>,
@@ -2714,7 +2714,7 @@ public record Project(
 
                     The provider implements BuildModuleFactory, whose create is handed the values of
                     plugin-<name>.properties, the build's Environment, the build's process permits, the
-                    plugin's name as the group of its own closure, and its repositories and resolvers, and
+                    group plugin.<name> its own closure is pinned in, and its repositories and resolvers, and
                     returns a BuildExecutorModule. A value is resolved already, @<key> or
                     @<key>/<default> to jenesis.variable.<key>; a file the plugin reads is an input it
                     is handed, never a path among its values.

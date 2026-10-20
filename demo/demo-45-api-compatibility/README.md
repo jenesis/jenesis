@@ -2,10 +2,8 @@ API-compatibility demo
 ======================
 
 Compare the jar you just built against the one you released last, with
-[japicmp](https://siom79.github.io/japicmp/), a plugin that `jenesis.plugins.properties` names at the hook
-point `artifact`:
-
-    japicmp+artifact=build.jenesis.plugin.japicmp
+[japicmp](https://siom79.github.io/japicmp/), a plugin the build resolves by itself where a
+configuration folder holds its `japicmp.properties`, as it does revapi where it finds a `revapi.properties`.
 
 japicmp reads byte code, not sources, so it sees exactly what a caller compiled against the old jar would
 see: a removed method, a narrowed return type, a field that changed its modifiers. No build script and no
@@ -49,7 +47,6 @@ Layout
     |   |-- jenesis            symlink to ../../../sources/build/jenesis
     |   `-- Demo.java          publishes 1.0.0, then builds 1.1.0 against it
     |-- pom.xml                this module: build.jenesis.demo:api-compatibility:1.1.0
-    |-- jenesis.plugins.properties  names the japicmp and revapi plugins
     |-- build.jenesis
     |   |-- japicmp.properties  runs japicmp; names no baseline
     |   `-- revapi.properties   runs revapi; reports non-breaking differences too
@@ -137,17 +134,17 @@ own JSON, one entry per difference with its code and classification:
     "new" : "method java.lang.String library.Library::greet(java.lang.String, java.lang.String)",
 
 revapi's own configuration, as a `revapi.differences` list of the differences a release accepts, stays in
-revapi's JSON: `@analysis/revapi.json=<path>` binds such a file, an array of
+revapi's JSON: a `configuration=<path>` line of `revapi.properties`, resolved against its folder, names such a file, an array of
 `{"extension": ..., "configuration": ...}` objects as revapi documents it. Any other key fails the build.
 
 Like a linter, revapi reports and keeps the build green; `-Djenesis.strict.revapi=true` fails it on
-any difference reported, and `-Djenesis.artifact.revapi=false` skips it. revapi resolves in its own `revapi` group: `revapi-java`,
+any difference reported, and `-Djenesis.artifact.revapi=false` skips it. revapi resolves in its tool group, `revapi:tool`: `revapi-java`,
 `revapi-basic-features` and `revapi-reporter-json` with what they depend on, beside the baseline.
 
 Pinning
 -------
 
-japicmp resolves in its own `japicmp` group, kept apart from the module's own dependencies, and floats
+japicmp resolves in its tool group, `japicmp:tool`, kept apart from the module's own dependencies, and floats
 a `RELEASE` version until pinned. The baseline resolves in that same group, without its transitive
 dependencies, because only its own byte code is compared. `java build/Demo.java pin` records that
 closure with `SHA-256` checksums into the `<!--jenesis.pin-->` block of `pom.xml`.

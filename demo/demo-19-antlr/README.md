@@ -24,20 +24,17 @@ Pass your own expression as arguments:
 How the grammar is wired
 ------------------------
 
-Three things turn ANTLR on, and none of them is a build script.
-
-`jenesis.plugins.properties` names the ANTLR plugin at the hook point
-`binary/generated`, whose sources the module compiles with its own:
-
-    antlr+binary/generated=build.jenesis.plugin.antlr
+Two things turn ANTLR on, and neither is a build script.
 
 The grammar lives in the module's `META-INF/build.jenesis` folder, which keeps it
 out of the jar:
 
     sources/META-INF/build.jenesis/Calc.g4
 
-A `antlr.properties` in the configuration folder binds that folder as the
-plugin's grammars and names the package the parser lands in:
+An `antlr.properties` in the configuration folder switches on the ANTLR plugin,
+which the build resolves itself and whose sources the module compiles with its
+own. It binds that folder as the plugin's grammars and names the package the
+parser lands in:
 
     package=demo.antlr.calc
     arguments=-visitor -no-listener
