@@ -8,12 +8,12 @@
  *
  * @jenesis.release 25
  * @jenesis.pin org.scala-lang/scala-library 2.13.18 SHA-256/4e85d96ff7bc7dc627985523c3541b9917aaa08e956391380c42db21a2c4e5a0
- * @jenesis.pin scala/module/build.jenesis 0.17.0 SHA-256/c73dbb0a30f1bae340e0c6adfa433c76980528cf45a7a8836119b038e710886f
- * @jenesis.pin scala/module/build.jenesis.plugin.scala 0.1.0 SHA-256/fdbbdc290690c9f4392ee93ea1f7bd668d41f36f6a3f99a8bac7752e46511037
- * @jenesis.pin scalafmt/module/build.jenesis 0.17.0 SHA-256/c73dbb0a30f1bae340e0c6adfa433c76980528cf45a7a8836119b038e710886f
- * @jenesis.pin scalafmt/module/build.jenesis.plugin.scalafmt 0.1.0 SHA-256/fcf1289d08b9577120bfea1400366e46b0aadfb72d7517b9d92b41bbde2ac9fa
- * @jenesis.pin scalastyle/module/build.jenesis 0.17.0 SHA-256/c73dbb0a30f1bae340e0c6adfa433c76980528cf45a7a8836119b038e710886f
- * @jenesis.pin scalastyle/module/build.jenesis.plugin.scalastyle 0.1.0 SHA-256/53f969da3530c46e97135d300a980810d7ebab3f18cd404d4d5b0d0f75aaf8ec
+ * @jenesis.pin scala/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
+ * @jenesis.pin scala/module/build.jenesis.plugin.scala 0.1.0 SHA-256/cda6e0e975998d6ee6c06a658fd88398e12da9ffdd6aea7b137c21e7ba9a2e57
+ * @jenesis.pin scalafmt/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
+ * @jenesis.pin scalafmt/module/build.jenesis.plugin.scalafmt 0.1.0 SHA-256/c47d41cf34739786f3120792d65b79fb40ba9698d3972d6b60d4f94eeada710c
+ * @jenesis.pin scalastyle/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
+ * @jenesis.pin scalastyle/module/build.jenesis.plugin.scalastyle 0.1.0 SHA-256/03f94377bc741e3f47b737b11c8dd0f02ac2a78227f9a2b42b4fd7739339d394
  * @jenesis.pin scala.library 2.13.18 SHA-256/4e85d96ff7bc7dc627985523c3541b9917aaa08e956391380c42db21a2c4e5a0
  * @jenesis.pin scala:tool/maven/org.scala-lang.modules/scala-asm 9.9.0-scala-1 SHA-256/75ac366e8ecb691e06a7e85041eed0f67919a646e5262fa0901225698c104375
  * @jenesis.pin scala:tool/maven/org.scala-lang/scala-library 3.8.4-RC3 SHA-256/f2052e9a932973699c9ef575da2ff780245a3f464dbfa28871a44fd27028fc35
