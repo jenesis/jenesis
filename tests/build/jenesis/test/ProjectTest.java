@@ -179,6 +179,162 @@ public class ProjectTest {
                 .doesNotContain("jreleaser:tool/maven/org.jreleaser/jreleaser-gone");
     }
 
+    @Test
+    public void pin_pins_the_tool_a_transform_of_the_whole_project_resolved() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        Path pins = root.resolve("jenesis.plugins.pin.properties");
+        Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .plugins(new ProjectPlugins().pins(pins)
+                        .resolutions(new LinkedHashMap<>(Map.of(
+                                "docs", new Resolved("docs/runtime/module/build.jenesis/0.16.0").asModule("docs"))))
+                        .transform("docs", (transform, _) -> transform.addModule("dependencies", (dependencies, _) ->
+                                dependencies.addStep("resolve", new Resolved("docs:tool/runtime/maven/org.example/tool/2.0")))))
+                .build(Project.PIN);
+
+        assertThat(SequencedProperties.ofFiles(pins).getProperty("docs:tool/maven/org.example/tool"))
+                .as("pin runs after the build, so it pins the tool a transform of the whole project resolved")
+                .isEqualTo("2.0 SHA-256/xyz");
+    }
+
+    @Test
+    public void pin_pins_the_tool_a_preprocessor_resolved_without_handing_it_to_the_modules() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        Path pins = root.resolve("jenesis.plugins.pin.properties");
+        Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .plugins(new ProjectPlugins().pins(pins)
+                        .resolutions(new LinkedHashMap<>(Map.of(
+                                "check", new Resolved("check/runtime/module/build.jenesis/0.16.0").asModule("check"))))
+                        .preprocess("check", (preprocess, _) -> preprocess.addModule("dependencies", (dependencies, _) ->
+                                dependencies.addStep("resolve", new Resolved("check:tool/runtime/maven/org.example/tool/3.0")))))
+                .build(Project.PIN);
+
+        assertThat(SequencedProperties.ofFiles(pins).getProperty("check:tool/maven/org.example/tool"))
+                .as("pin pins the tool a preprocessor resolved")
+                .isEqualTo("3.0 SHA-256/xyz");
+        List<String> arguments;
+        try (Stream<Path> walk = Files.walk(root.resolve("target/build/modules"))) {
+            arguments = walk.filter(path -> path.getFileName().toString().equals("arguments.properties"))
+                    .map(path -> {
+                        try {
+                            return Files.readString(path);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    })
+                    .toList();
+        }
+        assertThat(arguments)
+                .as("the modules are built after the preprocessor, but are not handed what it resolved")
+                .isNotEmpty()
+                .noneMatch(argument -> argument.contains("preprocess"));
+    }
+
+    @Test
+    public void refuses_asciidoctor_properties_that_name_no_documents_naming_the_key() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("asciidoctor.properties"), "");
+
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names no documents")
+                .hasMessageContaining("documents=../docs");
+    }
+
+    @Test
+    public void switches_asciidoctor_on_by_its_properties_alone_never_by_the_documents() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("docs")).resolve("index.adoc"), "= Index\n");
+
+        assertThat(Project.ofEnvironment(new Environment(settings), root).plugins().transforms())
+                .as("documents alone switch nothing on")
+                .doesNotContainKey("asciidoctor");
+
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("asciidoctor.properties"),
+                "documents=../docs\n");
+        assertThat(Project.ofEnvironment(new Environment(settings), root).plugins().transforms())
+                .as("the properties switch Asciidoctor on")
+                .containsKey("asciidoctor");
+    }
+
+    @Test
+    public void switches_jreleaser_on_by_a_configuration_folder_never_by_the_project_root() throws IOException {
+        Files.writeString(root.resolve("jreleaser.yml"), "project:\n  name: example\n");
+
+        assertThat(Project.ofEnvironment(new Environment(settings), root).plugins().releasers())
+                .as("a jreleaser.yml at the root is JReleaser's own, so it switches nothing on")
+                .doesNotContainKey("jreleaser");
+
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("jreleaser.yml"),
+                "project:\n  name: example\n");
+        assertThat(Project.ofEnvironment(new Environment(settings), root).plugins().releasers())
+                .as("one in a configuration folder switches JReleaser on")
+                .containsKey("jreleaser");
+    }
+
+    @Test
+    public void switches_an_official_plugin_off_by_the_setting_named_after_its_part_of_the_build() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("jreleaser.yml"),
+                "project:\n  name: example\n");
+        Map<String, String> switchedOff = new HashMap<>(settings);
+        switchedOff.put("release.jreleaser", "false");
+
+        assertThat(Project.ofEnvironment(new Environment(switchedOff), root).plugins().releasers())
+                .as("an official plugin is switched off by jenesis.<part>.<name>")
+                .doesNotContainKey("jreleaser");
+    }
+
+    @Test
+    public void switches_a_declared_plugin_by_its_declared_setting_never_by_the_official_one_of_its_name() throws IOException {
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "pmd+postprocess/transform=./linter\n");
+        Files.createDirectories(root.resolve("linter"));
+        Map<String, String> official = new HashMap<>(settings), declared = new HashMap<>(settings);
+        official.put("check.pmd", "false");
+        declared.put("plugin.pmd", "false");
+
+        assertThat(Project.ofEnvironment(new Environment(official), root).plugins().transforms())
+                .as("the official plugin's switch leaves a declared plugin of its name in")
+                .containsKey("plugin.pmd");
+        assertThat(Project.ofEnvironment(new Environment(declared), root).plugins().transforms())
+                .as("a declared plugin is switched by jenesis.plugin.<name>")
+                .doesNotContainKey("plugin.pmd");
+    }
+
+    @Test
+    public void runs_an_official_and_a_declared_plugin_of_one_name_side_by_side() throws IOException {
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "jreleaser+release=./releaser\n");
+        Files.createDirectories(root.resolve("releaser"));
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("jreleaser.yml"),
+                "project:\n  name: example\n");
+
+        Project project = Project.ofEnvironment(new Environment(settings), root);
+        assertThat(project.plugins().releasers())
+                .as("the declared plugin is plugin.jreleaser, so it takes nothing from the official one")
+                .containsOnlyKeys("jreleaser", "plugin.jreleaser");
+        assertThat(project.plugins().resolutions())
+                .as("each resolves and pins in a group of its own")
+                .containsOnlyKeys("jreleaser", "plugin.jreleaser");
+    }
+
+    @Test
+    public void refuses_jreleaser_properties_that_name_no_configuration_naming_the_key() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("jreleaser.properties"),
+                "JRELEASER_GITHUB_TOKEN=unused\n");
+
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names no configuration")
+                .hasMessageContaining("configuration=../jreleaser.yml");
+    }
+
+    @Test
+    public void reads_no_asciidoctor_properties_once_asciidoctor_is_switched_off() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("asciidoctor.properties"), "");
+        Map<String, String> switched = new HashMap<>(settings);
+        switched.put("documentation.asciidoctor", "false");
+
+        assertThat(Project.ofEnvironment(new Environment(switched), root)).isNotNull();
+    }
+
     private record Resolved(String dependency) implements BuildStep {
 
         @Override
@@ -582,7 +738,7 @@ public class ProjectTest {
         assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).out(printed::add), root, new LinkedHashSet<>(), Project.SKILL + "/registry")).isEmpty();
         assertThat(String.join("\n", printed))
                 .as("a migrating build is read plugin by plugin, so each line starts from the plugin it replaces")
-                .contains("maven-checkstyle-plugin / checkstyle -> checkstyle.xml (37)", "skill/extend");
+                .contains("maven-checkstyle-plugin / checkstyle -> checkstyle.properties (37)", "skill/extend");
     }
 
     @Test
@@ -1159,15 +1315,15 @@ public class ProjectTest {
         Project project = Project.ofEnvironment(new Environment(settings), root);
         assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
                 assembler -> assertThat(assembler.plugins()).containsOnlyKeys("greeting+binary/generated"));
-        assertThat(project.plugins().preprocessors()).containsOnlyKeys("headers");
-        assertThat(project.plugins().transforms()).containsOnlyKeys("licenses");
-        assertThat(project.plugins().inspections()).containsOnlyKeys("audit");
-        assertThat(project.plugins().releasers()).containsOnlyKeys("announce");
-        assertThat(project.plugins().goals()).containsOnlyKeys("bench");
-        assertThat(project.plugins().supplements()).containsOnlyKeys("sums");
-        assertThat(project.plugins().audits()).containsOnlyKeys("signed");
+        assertThat(project.plugins().preprocessors()).containsOnlyKeys("plugin.headers");
+        assertThat(project.plugins().transforms()).containsOnlyKeys("plugin.licenses");
+        assertThat(project.plugins().inspections()).containsOnlyKeys("plugin.audit");
+        assertThat(project.plugins().releasers()).containsOnlyKeys("plugin.announce");
+        assertThat(project.plugins().goals()).containsOnlyKeys("plugin.bench");
+        assertThat(project.plugins().supplements()).containsOnlyKeys("plugin.sums");
+        assertThat(project.plugins().audits()).containsOnlyKeys("plugin.signed");
         assertThat(project.plugins().resolutions())
-                .containsOnlyKeys("headers", "licenses", "audit", "announce", "bench", "sums", "signed");
+                .containsOnlyKeys("plugin.headers", "plugin.licenses", "plugin.audit", "plugin.announce", "plugin.bench", "plugin.sums", "plugin.signed");
         assertThat(project.plugins().pins()).isEqualTo(root.resolve("jenesis.plugins.pin.properties"));
     }
 
@@ -1186,11 +1342,11 @@ public class ProjectTest {
                 audit+postprocess/inspect=demo.audit
                 """);
         Project project = Project.ofEnvironment(new Environment(Map.of("plugin.audit", "false")), root);
-        assertThat(project.plugins().transforms()).containsOnlyKeys("licenses");
+        assertThat(project.plugins().transforms()).containsOnlyKeys("plugin.licenses");
         assertThat(project.plugins().inspections()).isEmpty();
         assertThat(project.plugins().resolutions())
                 .as("pin must capture a plugin that only a profile switches on")
-                .containsOnlyKeys("licenses", "audit");
+                .containsOnlyKeys("plugin.licenses", "plugin.audit");
     }
 
     @Test
@@ -1207,7 +1363,7 @@ public class ProjectTest {
         assertThat(project.plugins().inspections()).isEmpty();
         assertThat(project.plugins().resolutions())
                 .as("pin still pins the plugins it leaves out")
-                .containsOnlyKeys("licenses", "audit");
+                .containsOnlyKeys("plugin.licenses", "plugin.audit");
     }
 
     @Test
@@ -1259,7 +1415,7 @@ public class ProjectTest {
     public void refuses_an_input_that_leaves_the_project() throws IOException {
         assertThatThrownBy(() -> plugin("@schemas", root.relativize(elsewhere).toString()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("The input @schemas of the plugin gen")
+                .hasMessageContaining("The input @schemas of the plugin plugin.gen")
                 .hasMessageContaining("lies outside the project");
     }
 
@@ -1360,14 +1516,47 @@ public class ProjectTest {
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The plugin gen+check")
-                .hasMessageContaining("neither a module name nor a folder of the project");
+                .hasMessageContaining("neither a module name, nor a coordinate of a repository of [maven, module]");
+    }
+
+    @Test
+    public void refuses_a_plugin_coordinate_of_a_repository_the_build_does_not_hold() throws IOException {
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "gen+check=nexus/org.example/gen\n");
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The plugin gen+check")
+                .hasMessageContaining("maven/<groupId>/<artifactId>");
+    }
+
+    @Test
+    public void refuses_a_plugin_named_by_a_maven_coordinate_under_the_modular_layout() throws IOException {
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "gen+postprocess/transform=maven/org.example/gen\n");
+        Map<String, String> modular = new HashMap<>(settings);
+        modular.put("project.layout", "modular");
+
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(modular), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("a Maven coordinate, which loads on a class path")
+                .hasMessageContaining("name the plugin by its module instead");
+    }
+
+    @Test
+    public void resolves_a_plugin_by_the_coordinate_of_a_repository_its_line_names() throws IOException {
+        Files.writeString(root.resolve("jenesis.plugins.properties"), """
+                gen+postprocess/transform=maven/org.example/gen
+                lint+postprocess/inspect=module/org.example.lint
+                """);
+
+        assertThat(Project.ofEnvironment(new Environment(settings), root).plugins().resolutions())
+                .as("a coordinate of the maven or the module repository names a plugin as a module name does")
+                .containsKeys("plugin.gen", "plugin.lint");
     }
 
     @Test
     public void refuses_a_plugin_value_naming_a_variable_that_is_not_set() {
         assertThatThrownBy(() -> plugin("level", "@level"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("The plugin gen sets level to @level, but jenesis.variable.level is not set");
+                .hasMessageContaining("The plugin plugin.gen sets level to @level, but jenesis.variable.level is not set");
     }
 
     @Test

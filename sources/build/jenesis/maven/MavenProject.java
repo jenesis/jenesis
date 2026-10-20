@@ -21,6 +21,7 @@ import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.MultiProjectDependencies;
 import build.jenesis.project.MultiProjectModule;
 import build.jenesis.project.ProjectModule;
+import build.jenesis.project.ProjectPlugins;
 import build.jenesis.step.Assign;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
@@ -754,7 +755,7 @@ public class MavenProject implements BuildExecutorModule {
         }
         try (Stream<Path> configured = Files.list(configuration)) {
             return configured.map(path -> path.getFileName().toString())
-                    .anyMatch(entry -> entry.startsWith("plugin-") && entry.endsWith(".properties"));
+                    .anyMatch(entry -> entry.startsWith(ProjectPlugins.PLUGIN + "-") && entry.endsWith(".properties"));
         }
     }
 

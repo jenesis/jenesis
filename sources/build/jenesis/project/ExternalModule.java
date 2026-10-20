@@ -17,7 +17,7 @@ import build.jenesis.step.Dependencies;
 public class ExternalModule extends PluginModule<ExternalModule> {
 
     public static final String COORDINATE = "coordinate";
-    static final String RULES = "rules";
+    private static final String MAVEN = "maven";
 
     private final String coordinate;
     private final Dependencies dependencyModule;
@@ -31,6 +31,9 @@ public class ExternalModule extends PluginModule<ExternalModule> {
         return new ExternalModule(coordinate,
                 Dependencies.ofEnvironment(environment, repositories, resolvers),
                 Collections.emptyNavigableSet(),
+                Resolver.base(coordinate.substring(0, coordinate.indexOf('/'))).equals(MAVEN)
+                        ? PathPlacement.CLASS_PATH
+                        : PathPlacement.INFERRED,
                 null,
                 group,
                 Collections.emptyNavigableMap(),
@@ -58,6 +61,7 @@ public class ExternalModule extends PluginModule<ExternalModule> {
     private ExternalModule(String coordinate,
                            Dependencies dependencyModule,
                            SequencedSet<String> additionalDependencies,
+                           PathPlacement pathPlacement,
                            String buildModuleName,
                            String group,
                            SequencedMap<String, String> properties,
@@ -65,7 +69,7 @@ public class ExternalModule extends PluginModule<ExternalModule> {
                            Map<String, Repository> repositories,
                            Map<String, Resolver> resolvers,
                            Environment environment) {
-        super(buildModuleName, group, properties, inputs, repositories, resolvers, environment);
+        super(buildModuleName, group, pathPlacement, properties, inputs, repositories, resolvers, environment);
         this.coordinate = coordinate;
         this.dependencyModule = dependencyModule;
         this.additionalDependencies = additionalDependencies;
@@ -79,6 +83,21 @@ public class ExternalModule extends PluginModule<ExternalModule> {
         return new ExternalModule(coordinate,
                 dependencyModule,
                 dependencies,
+                pathPlacement,
+                buildModuleName,
+                group,
+                properties,
+                inputs,
+                repositories,
+                resolvers,
+                environment);
+    }
+
+    public ExternalModule pathPlacement(PathPlacement pathPlacement) {
+        return new ExternalModule(coordinate,
+                dependencyModule,
+                additionalDependencies,
+                pathPlacement,
                 buildModuleName,
                 group,
                 properties,
@@ -92,6 +111,7 @@ public class ExternalModule extends PluginModule<ExternalModule> {
         return new ExternalModule(coordinate,
                 dependencyModule,
                 additionalDependencies,
+                pathPlacement,
                 name,
                 group,
                 properties,
@@ -105,6 +125,7 @@ public class ExternalModule extends PluginModule<ExternalModule> {
         return new ExternalModule(coordinate,
                 dependencyModule.pinning(pinning),
                 additionalDependencies,
+                pathPlacement,
                 buildModuleName,
                 group,
                 properties,
@@ -118,6 +139,7 @@ public class ExternalModule extends PluginModule<ExternalModule> {
         return new ExternalModule(coordinate,
                 dependencyModule,
                 additionalDependencies,
+                pathPlacement,
                 buildModuleName,
                 group,
                 properties,
@@ -131,6 +153,7 @@ public class ExternalModule extends PluginModule<ExternalModule> {
         return new ExternalModule(coordinate,
                 dependencyModule,
                 additionalDependencies,
+                pathPlacement,
                 buildModuleName,
                 group,
                 properties,
@@ -144,6 +167,7 @@ public class ExternalModule extends PluginModule<ExternalModule> {
         return new ExternalModule(coordinate,
                 dependencyModule,
                 additionalDependencies,
+                pathPlacement,
                 buildModuleName,
                 group,
                 properties,
@@ -157,6 +181,7 @@ public class ExternalModule extends PluginModule<ExternalModule> {
         return new ExternalModule(coordinate,
                 dependencyModule,
                 additionalDependencies,
+                pathPlacement,
                 buildModuleName,
                 group,
                 properties,
@@ -175,7 +200,7 @@ public class ExternalModule extends PluginModule<ExternalModule> {
                     new WriteCoordinates(group, coordinates),
                     inherited.sequencedKeySet().stream());
             buildExecutor.addModule(DEPENDENCIES,
-                    dependencyModule.pathPlacement(PathPlacement.MODULE_PATH),
+                    dependencyModule.pathPlacement(pathPlacement),
                     COORDINATE);
         };
     }

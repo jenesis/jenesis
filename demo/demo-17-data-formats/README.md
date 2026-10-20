@@ -13,9 +13,9 @@ Run it
 
 | Module     | Config file                          | Input                    | Generator | Generated |
 | ---------- | ------------------------------------ | ------------------------ | --------- | --------- |
-| `xml`      | `xml/build.jenesis/plugin-xjc.properties`       | `META-INF/build.jenesis/order.xsd`     | JAXB `xjc` | `demo.order` |
-| `protobuf` | `protobuf/build.jenesis/plugin-protoc.properties` | `META-INF/build.jenesis/greeting.proto` | `protoc` + the gRPC plugin | `demo.greeting` |
-| `avro`     | `avro/build.jenesis/plugin-avro.properties`     | `META-INF/build.jenesis/user.avsc`     | `avro-tools` | `demo.user` |
+| `xml`      | `xml/build.jenesis/xjc.properties`       | `META-INF/build.jenesis/order.xsd`     | JAXB `xjc` | `demo.order` |
+| `protobuf` | `protobuf/build.jenesis/protoc.properties` | `META-INF/build.jenesis/greeting.proto` | `protoc` + the gRPC plugin | `demo.greeting` |
+| `avro`     | `avro/build.jenesis/avro.properties`     | `META-INF/build.jenesis/user.avsc`     | `avro-tools` | `demo.user` |
 
 Each module also has one hand-written class that uses the generated types -
 `Orders`, `Greetings`, `Users` - so a build that compiles at all proves the
@@ -28,10 +28,10 @@ module compiles with its own:
     protoc+binary/generated=build.jenesis.plugin.protoc
     avro+binary/generated=build.jenesis.plugin.avro
 
-A plugin runs in a module where its `plugin-<name>.properties` is found, so each
-module turns on its own generator and no other. `plugin-avro.properties` here only
+A plugin runs in a module where its `<name>.properties` is found, so each
+module turns on its own generator and no other. `avro.properties` here only
 binds the schemas: that is enough to compile every `.avsc` and `.avpr` they hold.
-`plugin-xjc.properties` also names a target package, and `plugin-protoc.properties`
+`xjc.properties` also names a target package, and `protoc.properties`
 a protoc plugin.
 
 Where the inputs live
@@ -153,19 +153,19 @@ Layout
     |-- pom.xml                  parent, three modules
     |-- jenesis.plugins.properties  names the three generator plugins
     |-- xml
-    |   |-- build.jenesis/plugin-xjc.properties
+    |   |-- build.jenesis/xjc.properties
     |   |-- pom.xml
     |   `-- sources
     |       |-- META-INF/build.jenesis/order.xsd     the input, which does not ship
     |       `-- demo/format/xml/Orders.java
     |-- protobuf
-    |   |-- build.jenesis/plugin-protoc.properties
+    |   |-- build.jenesis/protoc.properties
     |   |-- pom.xml              plus a protoc and gRPC plugin pin per platform
     |   `-- sources
     |       |-- META-INF/build.jenesis/greeting.proto
     |       `-- demo/format/protobuf/Greetings.java
     `-- avro
-        |-- build.jenesis/plugin-avro.properties  binds the schemas alone
+        |-- build.jenesis/avro.properties  binds the schemas alone
         |-- pom.xml
         `-- sources
             |-- META-INF/build.jenesis/user.avsc

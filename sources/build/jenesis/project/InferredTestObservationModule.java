@@ -81,9 +81,9 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableSet(),
                 ExternalModule.official(environment, JACOCO, null, repositories, resolvers),
-                true,
+                environment.flag("observe.jacoco", true),
                 ExternalModule.official(environment, PITEST, null, repositories, resolvers),
-                true);
+                environment.flag("observe.pitest", true));
         Boolean nativeImage = environment.flagOrNull("observe.native");
         if (nativeImage != null) {
             module = module.nativeImage(nativeImage ? value -> value : null);
@@ -91,12 +91,6 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         Boolean jfr = environment.flagOrNull("observe.jfr");
         if (jfr != null) {
             module = module.jfr(jfr ? value -> value : null);
-        }
-        if (!environment.flag("observe.jacoco", true)) {
-            module = module.jacoco(false);
-        }
-        if (!environment.flag("mutate.pitest", true)) {
-            module = module.pitest(false);
         }
         return module;
     }
@@ -135,8 +129,9 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         }
         String framework = properties.value(FRAMEWORK), engines = properties.value(ENGINES);
         List<String> scan = properties.entries(SCAN);
+        String named = framework == null ? null : ProjectPlugins.declared(framework);
         TestModule declared = framework == null ? module
-                : frameworks.containsKey(framework) ? frameworks.get(framework) == null ? module : module.framework(frameworks.get(framework))
+                : frameworks.containsKey(named) ? frameworks.get(named) == null ? module : module.framework(frameworks.get(named))
                 : module.framework(TestFrameworks.named(framework));
         declared = scan == null ? declared : declared.scan(scan);
         return engines == null ? declared : declared.engines(engines);
@@ -448,8 +443,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         if (jacoco && coverage != null) {
             if (this.observers.containsKey(JACOCO)) {
                 throw new IllegalArgumentException("The observer " + JACOCO + " takes the name of the plugin the"
-                        + " build runs by itself where jacoco.properties is found - remove its line from"
-                        + " jenesis.plugins.properties");
+                        + " build runs by itself where jacoco.properties is found - give it another name");
             }
             SequencedMap<String, String> values = new LinkedHashMap<>();
             SequencedProperties.ofFiles(coverage).forEachProperty(values::put);

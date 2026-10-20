@@ -21,7 +21,9 @@ modular jar alongside a generated POM.
 Kotlin is an official plugin of the hook point `language`. The build resolves it
 by itself, as `module/build.jenesis.plugin.kotlin`, in every module that holds a
 `.kt` source, with no line in `jenesis.plugins.properties` and no other
-configuration.
+configuration. `-Djenesis.language.kotlin=false` leaves it out, as every
+plugin's setting switches it off, and a build of this demo then fails, naming
+the `.kt` sources nothing compiles.
 
 Layout
 ------

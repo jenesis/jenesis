@@ -320,7 +320,7 @@ public class LanguageTest {
                 .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("kotlin")
-                .hasMessageContaining("jenesis.plugins.properties");
+                .hasMessageContaining("give it another name");
     }
 
     @Test

@@ -3,22 +3,31 @@ package build.jenesis.project;
 import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
+import build.jenesis.BuildStep;
 import build.jenesis.Environment;
 import build.jenesis.Language;
 import build.jenesis.Observation;
+import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
+import build.jenesis.SequencedProperties;
 import build.jenesis.TestFramework;
 import build.jenesis.step.Bind;
 import build.jenesis.step.ProcessBuildStep;
 
 abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorModule {
 
-    static final String DELEGATE = "delegate", INPUTS = "inputs", DEPENDENCIES = "dependencies", CLOSURE = "+closure";
+    static final String DELEGATE = "delegate",
+            INPUTS = "inputs",
+            DEPENDENCIES = "dependencies",
+            CLOSURE = "+closure",
+            RULES = "rules";
+    public static final String CONFIGURATION = "configuration";
     private static final Pattern INPUT_NAME = Pattern.compile("[A-Za-z0-9._-]+");
 
     final String buildModuleName;
     final String group;
+    final PathPlacement pathPlacement;
     final SequencedMap<String, String> properties;
     final SequencedMap<String, SequencedMap<Path, Path>> inputs;
     final Map<String, Repository> repositories;
@@ -27,6 +36,7 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
 
     PluginModule(String buildModuleName,
                  String group,
+                 PathPlacement pathPlacement,
                  SequencedMap<String, String> properties,
                  SequencedMap<String, SequencedMap<Path, Path>> inputs,
                  Map<String, Repository> repositories,
@@ -34,6 +44,7 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
                  Environment environment) {
         this.buildModuleName = buildModuleName;
         this.group = group;
+        this.pathPlacement = pathPlacement;
         this.properties = properties;
         this.inputs = inputs;
         this.repositories = repositories;
@@ -47,7 +58,8 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
         SequencedMap<String, PluginModule<?>> plugins = new LinkedHashMap<>();
         modules.forEach((name, module) -> {
             if (!(module instanceof PluginModule<?> plugin)) {
-                throw new IllegalArgumentException("The plugin " + name + "+" + hook + " is no plugin module - name a"
+                throw new IllegalArgumentException("The plugin " + name.substring(name.indexOf('.') + 1) + "+" + hook
+                        + " is no plugin module - name a"
                         + " module that provides an " + factory + " in jenesis.plugins.properties, or build it with"
                         + " ExternalModule.ofEnvironment or InternalModule.ofEnvironment");
             }
@@ -158,6 +170,35 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
         return properties(values).inputs(bound);
     }
 
+    public static Path named(Path properties, String key, String value) {
+        Path named = properties.resolveSibling(value.trim()).normalize();
+        if (!Files.isRegularFile(named)) {
+            throw new IllegalArgumentException(properties + " names " + key + "=" + value.trim() + ", but " + named
+                    + " is no file - name it relative to " + properties.getFileName());
+        }
+        return named;
+    }
+
+    M configuredBy(Path properties, Path target) throws IOException {
+        SequencedMap<String, String> values = new LinkedHashMap<>();
+        SequencedProperties.ofFiles(properties).forEachProperty(values::put);
+        String configuration = values.remove(CONFIGURATION);
+        if (configuration == null || configuration.isBlank()) {
+            throw new IllegalArgumentException(properties + " names no " + CONFIGURATION + " - add " + CONFIGURATION
+                    + "=" + target + ", the file relative to " + properties.getFileName());
+        }
+        return properties(values).bound(RULES, target, named(properties, CONFIGURATION, configuration));
+    }
+
+    M discovered(SequencedSet<Path> configuration, Path conventional) throws IOException {
+        Path properties = BuildStep.locate(configuration, group + ".properties");
+        if (properties != null) {
+            return configuredBy(properties, conventional);
+        }
+        Path file = BuildStep.locate(configuration, conventional.toString());
+        return file == null ? null : bound(RULES, conventional, file);
+    }
+
     M bound(String input, Path target, Path source) {
         SequencedMap<String, SequencedMap<Path, Path>> merged = new LinkedHashMap<>(inputs);
         SequencedMap<Path, Path> placed = new LinkedHashMap<>(merged.getOrDefault(input, Collections.emptyNavigableMap()));
@@ -216,7 +257,7 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
                     + ", but a plugin that observes or runs the tests is handed no input - remove its @<input> lines");
         }
         try {
-            return JenesisClassLoaderBridge.of(identity(), artifacts(prepared));
+            return JenesisClassLoaderBridge.of(group, artifacts(prepared), pathPlacement);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Failed to load the plugin " + identity(), e);
         }
@@ -237,7 +278,7 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
                 JenesisClassLoaderBridge bridge;
                 Object foreignModule;
                 try {
-                    bridge = JenesisClassLoaderBridge.of(identity(), artifacts(delegated));
+                    bridge = JenesisClassLoaderBridge.of(group, artifacts(delegated), pathPlacement);
                     foreignModule = bridge.create(buildModuleName,
                             environment,
                             properties,

@@ -36,19 +36,12 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
                                                               SequencedSet<Path> configuration,
                                                               Map<String, Repository> repositories,
                                                               Map<String, Resolver> resolvers) {
-        InferredArtifactQualityModule module = new InferredArtifactQualityModule(configuration,
+        return new InferredArtifactQualityModule(configuration,
                 ExternalModule.official(environment, "japicmp", null, repositories, resolvers),
-                true,
+                environment.flag("artifact.japicmp", true),
                 ExternalModule.official(environment, "revapi", null, repositories, resolvers),
-                true,
+                environment.flag("artifact.revapi", true),
                 Collections.emptyNavigableMap());
-        if (!environment.flag("artifact.japicmp", true)) {
-            module = module.japicmp(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "artifact.revapi") == Enforcement.IGNORE) {
-            module = module.revapi(false);
-        }
-        return module;
     }
 
     private InferredArtifactQualityModule(SequencedSet<Path> configuration,
@@ -123,17 +116,7 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
             String analysis = values.remove(CONFIGURATION);
             ExternalModule module = revapiModule.properties(values);
             if (analysis != null) {
-                Path sibling = Path.of(analysis.trim()).normalize();
-                if (sibling.isAbsolute() || sibling.startsWith("..")) {
-                    throw new IllegalArgumentException(revapiFile + " names the configuration " + analysis
-                            + ", which is not beside or below it - place the file in the folder of "
-                            + revapiFile.getFileName());
-                }
-                if (!Files.isRegularFile(revapiFile.resolveSibling(sibling))) {
-                    throw new IllegalArgumentException(revapiFile + " names the configuration " + analysis
-                            + ", which does not exist beside it");
-                }
-                module = module.bound(ANALYSIS, Path.of("revapi.json"), revapiFile.resolveSibling(sibling));
+                module = module.bound(ANALYSIS, Path.of("revapi.json"), ExternalModule.named(revapiFile, CONFIGURATION, analysis));
             }
             buildExecutor.addModule(REVAPI, module, inherited.sequencedKeySet());
         }

@@ -1,0 +1,8 @@
+type: specs.openrewrite.org/v1beta/recipe
+name: demo.Modernize
+displayName: Strip by Unicode whitespace
+description: Calls String.strip(), which knows every Unicode space, where the sources call String.trim().
+recipeList:
+  - org.openrewrite.java.ChangeMethodName:
+      methodPattern: java.lang.String trim()
+      newMethodName: strip

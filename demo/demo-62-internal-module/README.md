@@ -23,7 +23,7 @@ greeting the plugin generated:
 Built without the plugin, `sample.Greeting` would not exist and the project would
 not compile. A second plugin observes the tests: it records which classes their JVM
 loads and reports those of the package `sample`, in
-`target/.../observed/observations/loaded/loaded/output/reports/loaded/loaded.txt`:
+`target/.../observed/observations/plugin.loaded/loaded/output/reports/loaded/loaded.txt`:
 
     sample.Sample
 
@@ -135,8 +135,8 @@ default Jenesis repository, with the local export (`~/.jenesis`) searched first,
 and are pinned in `sources/module-info.java` under the dependency group named
 after the plugin:
 
-    @jenesis.pin greeting/module/build.jenesis 0.13.1 SHA-256/...
-    @jenesis.pin greeting/module/org.json 20260522 SHA-256/...
+    @jenesis.pin plugin.greeting/module/build.jenesis 0.13.1 SHA-256/...
+    @jenesis.pin plugin.greeting/module/org.json 20260522 SHA-256/...
 
 Observing the tests
 -------------------

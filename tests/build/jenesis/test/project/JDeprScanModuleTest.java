@@ -51,7 +51,7 @@ public class JDeprScanModuleTest {
                 .rootCause()
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jdeprscan found 1 finding")
-                .hasMessageContaining("jenesis.validator.jdeprscan=strict");
+                .hasMessageContaining("jenesis.strict.jdeprscan is true");
     }
 
     @Test

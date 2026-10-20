@@ -12,23 +12,36 @@ import build.jenesis.step.Bind;
 
 public class InferredSourceFormattingModule implements BuildExecutorModule {
 
-    public static final String JAVA = "java", KTFMT = "ktfmt", KTLINT = "ktlint", SCALAFMT = "scalafmt";
-    private static final String LICENSE = "license", TEXT = "text", FORMATTER = "formatter", PROFILE = "profile";
+    public static final String OPENREWRITE = "openrewrite",
+            GOOGLEJAVAFORMAT = "googlejavaformat",
+            PALANTIR = "palantir",
+            ECLIPSE = "eclipse",
+            KTFMT = "ktfmt",
+            KTLINT = "ktlint",
+            SCALAFMT = "scalafmt";
+    private static final String LICENSE = "license",
+            TEXT = "text",
+            RECIPES = "recipes";
 
     private final SequencedSet<Path> configuration;
     private final boolean verify;
     private final LicenseHeaderModule licenseModule;
     private final Function<LicenseHeaderModule, BuildExecutorModule> license;
+    private final ExternalModule openRewriteModule;
+    private final boolean openrewrite;
     private final ExternalModule googleJavaFormatModule;
+    private final boolean googlejavaformat;
     private final ExternalModule palantirJavaFormatModule;
+    private final boolean palantir;
     private final ExternalModule eclipseJavaFormatModule;
-    private final boolean java;
+    private final boolean eclipse;
     private final ExternalModule ktfmtModule;
     private final boolean ktfmt;
     private final ExternalModule ktlintModule;
     private final boolean ktlint;
     private final ExternalModule scalafmtModule;
     private final boolean scalafmt;
+    private final SequencedSet<String> dependencies;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredSourceFormattingModule(SequencedSet<Path> configuration,
@@ -38,8 +51,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 true,
                 new LicenseHeaderModule(),
                 value -> value,
+                ExternalModule.official(Environment.NONE, "openrewrite", null, repositories, resolvers),
+                true,
                 ExternalModule.official(Environment.NONE, "googlejavaformat", null, repositories, resolvers),
+                true,
                 ExternalModule.official(Environment.NONE, "palantir", null, repositories, resolvers),
+                true,
                 ExternalModule.official(Environment.NONE, "eclipse", null, repositories, resolvers),
                 true,
                 ExternalModule.official(Environment.NONE, "ktfmt", null, repositories, resolvers),
@@ -48,6 +65,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 true,
                 ExternalModule.official(Environment.NONE, "scalafmt", "format", repositories, resolvers),
                 true,
+                Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap());
     }
 
@@ -59,16 +77,21 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 true,
                 new LicenseHeaderModule(),
                 value -> value,
+                ExternalModule.official(environment, "openrewrite", null, repositories, resolvers),
+                environment.flag("format.openrewrite", true),
                 ExternalModule.official(environment, "googlejavaformat", null, repositories, resolvers),
+                environment.flag("format.googlejavaformat", true),
                 ExternalModule.official(environment, "palantir", null, repositories, resolvers),
+                environment.flag("format.palantir", true),
                 ExternalModule.official(environment, "eclipse", null, repositories, resolvers),
-                true,
+                environment.flag("format.eclipse", true),
                 ExternalModule.official(environment, "ktfmt", null, repositories, resolvers),
-                true,
+                environment.flag("format.ktfmt", true),
                 ExternalModule.official(environment, "ktlint", "format", repositories, resolvers),
-                true,
+                environment.flag("format.ktlint", true),
                 ExternalModule.official(environment, "scalafmt", "format", repositories, resolvers),
-                true,
+                environment.flag("format.scalafmt", true),
+                Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap());
         Boolean rewrite = environment.flagOrNull("format.rewrite");
         if (rewrite != null) {
@@ -78,18 +101,6 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         if (license != null) {
             module = module.license(license ? value -> value : null);
         }
-        if (!environment.flag("format.java", true)) {
-            module = module.java(false);
-        }
-        if (!environment.flag("format.ktfmt", true)) {
-            module = module.ktfmt(false);
-        }
-        if (!environment.flag("format.ktlint", true)) {
-            module = module.ktlint(false);
-        }
-        if (!environment.flag("format.scalafmt", true)) {
-            module = module.scalafmt(false);
-        }
         return module;
     }
 
@@ -97,31 +108,41 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                                            boolean verify,
                                            LicenseHeaderModule licenseModule,
                                            Function<LicenseHeaderModule, BuildExecutorModule> license,
+                                           ExternalModule openRewriteModule,
+                                           boolean openrewrite,
                                            ExternalModule googleJavaFormatModule,
+                                           boolean googlejavaformat,
                                            ExternalModule palantirJavaFormatModule,
+                                           boolean palantir,
                                            ExternalModule eclipseJavaFormatModule,
-                                           boolean java,
+                                           boolean eclipse,
                                            ExternalModule ktfmtModule,
                                            boolean ktfmt,
                                            ExternalModule ktlintModule,
                                            boolean ktlint,
                                            ExternalModule scalafmtModule,
                                            boolean scalafmt,
+                                           SequencedSet<String> dependencies,
                                            SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
         this.verify = verify;
         this.licenseModule = licenseModule;
         this.license = license;
+        this.openRewriteModule = openRewriteModule;
+        this.openrewrite = openrewrite;
         this.googleJavaFormatModule = googleJavaFormatModule;
+        this.googlejavaformat = googlejavaformat;
         this.palantirJavaFormatModule = palantirJavaFormatModule;
+        this.palantir = palantir;
         this.eclipseJavaFormatModule = eclipseJavaFormatModule;
-        this.java = java;
+        this.eclipse = eclipse;
         this.ktfmtModule = ktfmtModule;
         this.ktfmt = ktfmt;
         this.ktlintModule = ktlintModule;
         this.ktlint = ktlint;
         this.scalafmtModule = scalafmtModule;
         this.scalafmt = scalafmt;
+        this.dependencies = dependencies;
         this.custom = custom;
     }
 
@@ -130,16 +151,21 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 licenseModule,
                 license,
+                openRewriteModule,
+                openrewrite,
                 googleJavaFormatModule,
+                googlejavaformat,
                 palantirJavaFormatModule,
+                palantir,
                 eclipseJavaFormatModule,
-                java,
+                eclipse,
                 ktfmtModule,
                 ktfmt,
                 ktlintModule,
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                dependencies,
                 custom);
     }
 
@@ -148,34 +174,113 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 licenseModule,
                 license,
+                openRewriteModule,
+                openrewrite,
                 googleJavaFormatModule,
+                googlejavaformat,
                 palantirJavaFormatModule,
+                palantir,
                 eclipseJavaFormatModule,
-                java,
+                eclipse,
                 ktfmtModule,
                 ktfmt,
                 ktlintModule,
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                dependencies,
                 custom);
     }
 
-    public InferredSourceFormattingModule java(boolean java) {
+    public InferredSourceFormattingModule openrewrite(boolean openrewrite) {
         return new InferredSourceFormattingModule(configuration,
                 verify,
                 licenseModule,
                 license,
+                openRewriteModule,
+                openrewrite,
                 googleJavaFormatModule,
+                googlejavaformat,
                 palantirJavaFormatModule,
+                palantir,
                 eclipseJavaFormatModule,
-                java,
+                eclipse,
                 ktfmtModule,
                 ktfmt,
                 ktlintModule,
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                dependencies,
+                custom);
+    }
+
+    public InferredSourceFormattingModule googlejavaformat(boolean googlejavaformat) {
+        return new InferredSourceFormattingModule(configuration,
+                verify,
+                licenseModule,
+                license,
+                openRewriteModule,
+                openrewrite,
+                googleJavaFormatModule,
+                googlejavaformat,
+                palantirJavaFormatModule,
+                palantir,
+                eclipseJavaFormatModule,
+                eclipse,
+                ktfmtModule,
+                ktfmt,
+                ktlintModule,
+                ktlint,
+                scalafmtModule,
+                scalafmt,
+                dependencies,
+                custom);
+    }
+
+    public InferredSourceFormattingModule palantir(boolean palantir) {
+        return new InferredSourceFormattingModule(configuration,
+                verify,
+                licenseModule,
+                license,
+                openRewriteModule,
+                openrewrite,
+                googleJavaFormatModule,
+                googlejavaformat,
+                palantirJavaFormatModule,
+                palantir,
+                eclipseJavaFormatModule,
+                eclipse,
+                ktfmtModule,
+                ktfmt,
+                ktlintModule,
+                ktlint,
+                scalafmtModule,
+                scalafmt,
+                dependencies,
+                custom);
+    }
+
+    public InferredSourceFormattingModule eclipse(boolean eclipse) {
+        return new InferredSourceFormattingModule(configuration,
+                verify,
+                licenseModule,
+                license,
+                openRewriteModule,
+                openrewrite,
+                googleJavaFormatModule,
+                googlejavaformat,
+                palantirJavaFormatModule,
+                palantir,
+                eclipseJavaFormatModule,
+                eclipse,
+                ktfmtModule,
+                ktfmt,
+                ktlintModule,
+                ktlint,
+                scalafmtModule,
+                scalafmt,
+                dependencies,
                 custom);
     }
 
@@ -184,16 +289,21 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 licenseModule,
                 license,
+                openRewriteModule,
+                openrewrite,
                 googleJavaFormatModule,
+                googlejavaformat,
                 palantirJavaFormatModule,
+                palantir,
                 eclipseJavaFormatModule,
-                java,
+                eclipse,
                 ktfmtModule,
                 ktfmt,
                 ktlintModule,
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                dependencies,
                 custom);
     }
 
@@ -202,16 +312,21 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 licenseModule,
                 license,
+                openRewriteModule,
+                openrewrite,
                 googleJavaFormatModule,
+                googlejavaformat,
                 palantirJavaFormatModule,
+                palantir,
                 eclipseJavaFormatModule,
-                java,
+                eclipse,
                 ktfmtModule,
                 ktfmt,
                 ktlintModule,
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                dependencies,
                 custom);
     }
 
@@ -220,16 +335,44 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 licenseModule,
                 license,
+                openRewriteModule,
+                openrewrite,
                 googleJavaFormatModule,
+                googlejavaformat,
                 palantirJavaFormatModule,
+                palantir,
                 eclipseJavaFormatModule,
-                java,
+                eclipse,
                 ktfmtModule,
                 ktfmt,
                 ktlintModule,
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                dependencies,
+                custom);
+    }
+
+    public InferredSourceFormattingModule dependencies(SequencedSet<String> dependencies) {
+        return new InferredSourceFormattingModule(configuration,
+                verify,
+                licenseModule,
+                license,
+                openRewriteModule,
+                openrewrite,
+                googleJavaFormatModule,
+                googlejavaformat,
+                palantirJavaFormatModule,
+                palantir,
+                eclipseJavaFormatModule,
+                eclipse,
+                ktfmtModule,
+                ktfmt,
+                ktlintModule,
+                ktlint,
+                scalafmtModule,
+                scalafmt,
+                dependencies,
                 custom);
     }
 
@@ -238,16 +381,21 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 verify,
                 licenseModule,
                 license,
+                openRewriteModule,
+                openrewrite,
                 googleJavaFormatModule,
+                googlejavaformat,
                 palantirJavaFormatModule,
+                palantir,
                 eclipseJavaFormatModule,
-                java,
+                eclipse,
                 ktfmtModule,
                 ktfmt,
                 ktlintModule,
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                dependencies,
                 custom);
     }
 
@@ -267,9 +415,13 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        SequencedSet<String> inputs = new LinkedHashSet<>(inherited.sequencedKeySet());
+        SequencedSet<String> inputs = inherited.sequencedKeySet().stream()
+                .filter(key -> dependencies.stream()
+                        .map(name -> PREVIOUS + name)
+                        .noneMatch(name -> key.equals(name) || key.startsWith(name + "/")))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
         if (Bind.configuredByProperties(buildExecutor,
-                inherited.sequencedKeySet(),
+                new LinkedHashSet<>(inputs),
                 LICENSE,
                 license,
                 LicenseHeaderModule.configurationFile(configuration),
@@ -284,69 +436,89 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 })) {
             inputs.add(LICENSE);
         }
-        Path javaFormat = BuildStep.locate(configuration, "javaformat.properties");
-        if (javaFormat != null && java) {
-            SequencedMap<String, String> values = new LinkedHashMap<>();
-            SequencedProperties.ofFiles(javaFormat).forEachProperty(values::put);
-            String formatter = values.remove(FORMATTER);
-            ExternalModule module = switch (formatter == null ? null : formatter.trim()) {
-                case "google" -> googleJavaFormatModule;
-                case "palantir" -> palantirJavaFormatModule;
-                case "eclipse" -> {
-                    String profile = values.remove(PROFILE);
-                    if (profile == null) {
-                        yield eclipseJavaFormatModule;
-                    }
-                    Path relative = Path.of(profile.trim()).normalize();
-                    if (relative.isAbsolute() || relative.startsWith("..")) {
-                        throw new IllegalArgumentException("javaformat.properties names " + PROFILE + "=" + profile
-                                + ", which is not beside or below it - place the profile in the folder of"
-                                + " javaformat.properties");
-                    }
-                    Path resolved = javaFormat.resolveSibling(relative);
-                    if (!Files.isRegularFile(resolved)) {
-                        throw new IllegalArgumentException("javaformat.properties names " + PROFILE + "=" + profile
-                                + ", but " + resolved + " is no file - export the formatter profile from Eclipse"
-                                + " there");
-                    }
-                    yield eclipseJavaFormatModule.bound(PROFILE, Path.of("eclipse-formatter.xml"), resolved);
+        Path openRewriteFile = BuildStep.locate(configuration, "openrewrite.properties"),
+                recipesFile = BuildStep.locate(configuration, "rewrite.yml");
+        if ((openRewriteFile != null || recipesFile != null) && openrewrite) {
+            ExternalModule module = openRewriteModule;
+            if (openRewriteFile == null) {
+                module = module.bound(ExternalModule.RULES, Path.of("rewrite.yml"), recipesFile);
+            } else {
+                SequencedMap<String, String> values = new LinkedHashMap<>();
+                SequencedProperties.ofFiles(openRewriteFile).forEachProperty(values::put);
+                String recipes = values.remove(ExternalModule.CONFIGURATION);
+                if ((recipes == null || recipes.isBlank()) && (values.get(RECIPES) == null || values.get(RECIPES).isBlank())) {
+                    throw new IllegalArgumentException(openRewriteFile + " names neither " + ExternalModule.CONFIGURATION
+                            + " nor " + RECIPES + " - add " + ExternalModule.CONFIGURATION + "=rewrite.yml, the file"
+                            + " declaring the recipes relative to it, or " + RECIPES + "=<recipe>[,<recipe>...]");
                 }
-                case null -> {
-                    if (!values.isEmpty()) {
-                        throw new IllegalArgumentException("javaformat.properties names " + values.sequencedKeySet()
-                                + " but no formatter - add formatter=google, palantir or eclipse");
-                    }
-                    yield null;
+                module = module.properties(values);
+                if (recipes != null && !recipes.isBlank()) {
+                    module = module.bound(ExternalModule.RULES,
+                            Path.of("rewrite.yml"),
+                            ExternalModule.named(openRewriteFile, ExternalModule.CONFIGURATION, recipes));
                 }
-                default -> throw new IllegalArgumentException("javaformat.properties names formatter=" + formatter
-                        + ", which is no Java formatter - google, palantir or eclipse");
-            };
-            if (module != null) {
-                buildExecutor.addModule(JAVA, module.properties(values), inputs);
             }
+            SequencedSet<String> rewritten = new LinkedHashSet<>(inputs);
+            inherited.sequencedKeySet().stream().filter(key -> !inputs.contains(key)).forEach(rewritten::add);
+            buildExecutor.addModule(OPENREWRITE, module, rewritten);
+            inputs.add(OPENREWRITE);
         }
+        SequencedMap<String, ExternalModule> formatters = new LinkedHashMap<>();
+        Path googleJavaFormatFile = BuildStep.locate(configuration, GOOGLEJAVAFORMAT + ".properties");
+        if (googleJavaFormatFile != null && googlejavaformat) {
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(googleJavaFormatFile).forEachProperty(values::put);
+            formatters.put(GOOGLEJAVAFORMAT, googleJavaFormatModule.properties(values));
+        }
+        Path palantirFile = BuildStep.locate(configuration, PALANTIR + ".properties");
+        if (palantirFile != null && palantir) {
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(palantirFile).forEachProperty(values::put);
+            formatters.put(PALANTIR, palantirJavaFormatModule.properties(values));
+        }
+        Path eclipseFile = BuildStep.locate(configuration, ECLIPSE + ".properties"),
+                profileFile = BuildStep.locate(configuration, "eclipse-formatter.xml");
+        if ((eclipseFile != null || profileFile != null) && eclipse) {
+            ExternalModule module = eclipseJavaFormatModule;
+            if (eclipseFile == null) {
+                module = module.bound(ExternalModule.RULES, Path.of("eclipse-formatter.xml"), profileFile);
+            } else {
+                SequencedMap<String, String> values = new LinkedHashMap<>();
+                SequencedProperties.ofFiles(eclipseFile).forEachProperty(values::put);
+                String profile = values.remove(ExternalModule.CONFIGURATION);
+                module = module.properties(values);
+                if (profile != null && !profile.isBlank()) {
+                    module = module.bound(ExternalModule.RULES,
+                            Path.of("eclipse-formatter.xml"),
+                            ExternalModule.named(eclipseFile, ExternalModule.CONFIGURATION, profile));
+                }
+            }
+            formatters.put(ECLIPSE, module);
+        }
+        if (formatters.size() > 1) {
+            throw new IllegalArgumentException("A configuration folder switches on " + formatters.sequencedKeySet()
+                    + ", which would each format the same Java sources - keep the <name>.properties of one, or"
+                    + " switch the others off with jenesis.format.<name>=false");
+        }
+        formatters.forEach((name, module) -> buildExecutor.addModule(name, module, inputs));
         Path ktfmtFile = ktfmt ? BuildStep.locate(configuration, "ktfmt.properties") : null;
-        Path editorConfig = BuildStep.locate(configuration, ".editorconfig");
-        if (ktfmtFile != null && ktlint && editorConfig != null) {
-            throw new IllegalArgumentException(ktfmtFile + " selects ktfmt while " + editorConfig + " selects ktlint"
-                    + " to format the same Kotlin sources - set jenesis.format.ktlint=false to format with ktfmt"
-                    + " alone, or remove ktfmt.properties");
+        ExternalModule ktlintDiscovered = ktlint ? ktlintModule.discovered(configuration, Path.of(".editorconfig")) : null;
+        if (ktfmtFile != null && ktlintDiscovered != null) {
+            throw new IllegalArgumentException(ktfmtFile + " selects ktfmt while ktlint formats the same Kotlin sources,"
+                    + " as a configuration folder holds a ktlint.properties or an .editorconfig - set"
+                    + " jenesis.format.ktlint=false to format with ktfmt alone, or remove ktfmt.properties");
         }
-        if (ktfmtFile != null && ktfmt) {
+        if (ktfmtFile != null) {
             SequencedMap<String, String> values = new LinkedHashMap<>();
             SequencedProperties.ofFiles(ktfmtFile).forEachProperty(values::put);
             buildExecutor.addModule(KTFMT, ktfmtModule.properties(values), inputs);
         }
-        if (editorConfig != null && ktlint) {
-            buildExecutor.addModule(KTLINT,
-                    ktlintModule.bound(ExternalModule.RULES, editorConfig.getFileName(), editorConfig),
-                    inputs);
+        if (ktlintDiscovered != null) {
+            buildExecutor.addModule(KTLINT, ktlintDiscovered, inputs);
         }
-        Path scalafmtFile = BuildStep.locate(configuration, ".scalafmt.conf");
-        if (scalafmtFile != null && scalafmt) {
-            buildExecutor.addModule(SCALAFMT,
-                    scalafmtModule.bound(ExternalModule.RULES, scalafmtFile.getFileName(), scalafmtFile),
-                    inputs);
+        ExternalModule scalafmtDiscovered = scalafmt ? scalafmtModule.discovered(configuration, Path.of(".scalafmt.conf")) : null;
+        if (scalafmtDiscovered != null) {
+            buildExecutor.addModule(SCALAFMT, scalafmtDiscovered, inputs);
         }
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->

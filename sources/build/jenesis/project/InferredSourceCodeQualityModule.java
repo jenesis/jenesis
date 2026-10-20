@@ -62,44 +62,22 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
                                                                 SequencedSet<Path> configuration,
                                                                 Map<String, Repository> repositories,
                                                                 Map<String, Resolver> resolvers) {
-        InferredSourceCodeQualityModule module = new InferredSourceCodeQualityModule(configuration,
+        return new InferredSourceCodeQualityModule(configuration,
                 ExternalModule.official(environment, "checkstyle", null, repositories, resolvers),
-                true,
+                environment.flag("check.checkstyle", true),
                 ExternalModule.official(environment, "pmd", null, repositories, resolvers),
-                true,
+                environment.flag("check.pmd", true),
                 ExternalModule.official(environment, "detekt", null, repositories, resolvers),
-                true,
+                environment.flag("check.detekt", true),
                 ExternalModule.official(environment, "ktlint", "check", repositories, resolvers),
-                true,
+                environment.flag("check.ktlint", true),
                 ExternalModule.official(environment, "scalastyle", null, repositories, resolvers),
-                true,
+                environment.flag("check.scalastyle", true),
                 ExternalModule.official(environment, "scalafmt", "check", repositories, resolvers),
-                true,
+                environment.flag("check.scalafmt", true),
                 ExternalModule.official(environment, "codenarc", null, repositories, resolvers),
-                true,
+                environment.flag("check.codenarc", true),
                 Collections.emptyNavigableMap());
-        if (Enforcement.ofEnvironment(environment, "source.checkstyle") == Enforcement.IGNORE) {
-            module = module.checkstyle(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "source.pmd") == Enforcement.IGNORE) {
-            module = module.pmd(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "source.detekt") == Enforcement.IGNORE) {
-            module = module.detekt(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "source.ktlint") == Enforcement.IGNORE) {
-            module = module.ktlint(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "source.scalastyle") == Enforcement.IGNORE) {
-            module = module.scalastyle(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "source.scalafmt") == Enforcement.IGNORE) {
-            module = module.scalafmt(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "source.codenarc") == Enforcement.IGNORE) {
-            module = module.codenarc(false);
-        }
-        return module;
     }
 
     private InferredSourceCodeQualityModule(SequencedSet<Path> configuration,
@@ -304,65 +282,58 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        Path checkstyleFile = BuildStep.locate(configuration, "checkstyle.xml");
-        if (checkstyleFile != null && checkstyle) {
-            ExternalModule module = checkstyleModule.bound(ExternalModule.RULES, checkstyleFile.getFileName(), checkstyleFile);
-            Matcher matcher = CONFIG_LOC.matcher(Files.readString(checkstyleFile));
+        ExternalModule checkstyleDiscovered = checkstyle
+                ? checkstyleModule.discovered(configuration, Path.of("checkstyle.xml"))
+                : null;
+        if (checkstyleDiscovered != null) {
+            ExternalModule module = checkstyleDiscovered;
+            Path checkstyleFile = BuildStep.locate(configuration, "checkstyle.properties");
+            Path rules = checkstyleFile == null
+                    ? BuildStep.locate(configuration, "checkstyle.xml")
+                    : ExternalModule.named(checkstyleFile,
+                            ExternalModule.CONFIGURATION,
+                            SequencedProperties.ofFiles(checkstyleFile).value(ExternalModule.CONFIGURATION));
+            Matcher matcher = CONFIG_LOC.matcher(Files.readString(rules));
             while (matcher.find()) {
                 Path sibling = Path.of(matcher.group(1)).normalize();
                 if (sibling.isAbsolute() || sibling.startsWith("..")) {
-                    throw new IllegalArgumentException(checkstyleFile + " references ${config_loc}/" + matcher.group(1)
+                    throw new IllegalArgumentException(rules + " references ${config_loc}/" + matcher.group(1)
                             + ", which is not beside or below it - place the file in the folder of "
-                            + checkstyleFile.getFileName());
+                            + rules.getFileName());
                 }
-                if (!sibling.equals(checkstyleFile.getFileName())
-                        && Files.isRegularFile(checkstyleFile.resolveSibling(sibling))) {
-                    module = module.bound(ExternalModule.RULES, sibling, checkstyleFile.resolveSibling(sibling));
+                if (!sibling.equals(rules.getFileName())
+                        && !sibling.equals(Path.of("checkstyle.xml"))
+                        && Files.isRegularFile(rules.resolveSibling(sibling))) {
+                    module = module.bound(ExternalModule.RULES, sibling, rules.resolveSibling(sibling));
                 }
-            }
-            Path expansions = checkstyleFile.resolveSibling("checkstyle.properties");
-            if (Files.isRegularFile(expansions)) {
-                SequencedMap<String, String> values = new LinkedHashMap<>();
-                SequencedProperties.ofFiles(expansions).forEachProperty(values::put);
-                module = module.properties(values);
             }
             buildExecutor.addModule(CHECKSTYLE, module, inherited.sequencedKeySet());
         }
-        Path pmdFile = BuildStep.locate(configuration, "pmd.xml");
-        if (pmdFile != null && pmd) {
-            buildExecutor.addModule(PMD,
-                    pmdModule.bound(ExternalModule.RULES, pmdFile.getFileName(), pmdFile),
-                    inherited.sequencedKeySet());
+        ExternalModule pmdDiscovered = pmd ? pmdModule.discovered(configuration, Path.of("pmd.xml")) : null;
+        if (pmdDiscovered != null) {
+            buildExecutor.addModule(PMD, pmdDiscovered, inherited.sequencedKeySet());
         }
-        Path detektFile = BuildStep.locate(configuration, "detekt.yml");
-        if (detektFile != null && detekt) {
-            buildExecutor.addModule(DETEKT,
-                    detektModule.bound(ExternalModule.RULES, detektFile.getFileName(), detektFile),
-                    inherited.sequencedKeySet());
+        ExternalModule detektDiscovered = detekt ? detektModule.discovered(configuration, Path.of("detekt.yml")) : null;
+        if (detektDiscovered != null) {
+            buildExecutor.addModule(DETEKT, detektDiscovered, inherited.sequencedKeySet());
         }
-        Path ktlintFile = BuildStep.locate(configuration, ".editorconfig");
-        if (ktlintFile != null && ktlint) {
-            buildExecutor.addModule(KTLINT,
-                    ktlintModule.bound(ExternalModule.RULES, ktlintFile.getFileName(), ktlintFile),
-                    inherited.sequencedKeySet());
+        ExternalModule ktlintDiscovered = ktlint ? ktlintModule.discovered(configuration, Path.of(".editorconfig")) : null;
+        if (ktlintDiscovered != null) {
+            buildExecutor.addModule(KTLINT, ktlintDiscovered, inherited.sequencedKeySet());
         }
-        Path scalastyleFile = BuildStep.locate(configuration, "scalastyle-config.xml");
-        if (scalastyleFile != null && scalastyle) {
-            buildExecutor.addModule(SCALASTYLE,
-                    scalastyleModule.bound(ExternalModule.RULES, scalastyleFile.getFileName(), scalastyleFile),
-                    inherited.sequencedKeySet());
+        ExternalModule scalastyleDiscovered = scalastyle
+                ? scalastyleModule.discovered(configuration, Path.of("scalastyle-config.xml"))
+                : null;
+        if (scalastyleDiscovered != null) {
+            buildExecutor.addModule(SCALASTYLE, scalastyleDiscovered, inherited.sequencedKeySet());
         }
-        Path scalafmtFile = BuildStep.locate(configuration, ".scalafmt.conf");
-        if (scalafmtFile != null && scalafmt) {
-            buildExecutor.addModule(SCALAFMT,
-                    scalafmtModule.bound(ExternalModule.RULES, scalafmtFile.getFileName(), scalafmtFile),
-                    inherited.sequencedKeySet());
+        ExternalModule scalafmtDiscovered = scalafmt ? scalafmtModule.discovered(configuration, Path.of(".scalafmt.conf")) : null;
+        if (scalafmtDiscovered != null) {
+            buildExecutor.addModule(SCALAFMT, scalafmtDiscovered, inherited.sequencedKeySet());
         }
-        Path codenarcFile = BuildStep.locate(configuration, "codenarc.xml");
-        if (codenarcFile != null && codenarc) {
-            buildExecutor.addModule(CODENARC,
-                    codenarcModule.bound(ExternalModule.RULES, codenarcFile.getFileName(), codenarcFile),
-                    inherited.sequencedKeySet());
+        ExternalModule codenarcDiscovered = codenarc ? codenarcModule.discovered(configuration, Path.of("codenarc.xml")) : null;
+        if (codenarcDiscovered != null) {
+            buildExecutor.addModule(CODENARC, codenarcDiscovered, inherited.sequencedKeySet());
         }
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
