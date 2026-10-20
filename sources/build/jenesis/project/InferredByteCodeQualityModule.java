@@ -51,21 +51,15 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 JDeprScanModule.ofEnvironment(environment),
                 value -> value,
                 ExternalModule.official(environment, "spotbugs", null, repositories, resolvers),
-                true,
+                environment.flag("validate.spotbugs", true),
                 ExternalModule.official(environment, "forbiddenapis", null, repositories, resolvers),
-                true,
+                environment.flag("validate.forbiddenapis", true),
                 Collections.emptyNavigableMap());
-        if (Enforcement.ofEnvironment(environment, "validator.jdeps") == Enforcement.IGNORE) {
+        if (!environment.flag("validate.jdeps", true)) {
             module = module.jdeps(null);
         }
-        if (Enforcement.ofEnvironment(environment, "validator.jdeprscan") == Enforcement.IGNORE) {
+        if (!environment.flag("validate.jdeprscan", true)) {
             module = module.jdeprscan(null);
-        }
-        if (Enforcement.ofEnvironment(environment, "validator.spotbugs") == Enforcement.IGNORE) {
-            module = module.spotbugs(false);
-        }
-        if (Enforcement.ofEnvironment(environment, "validator.forbiddenapis") == Enforcement.IGNORE) {
-            module = module.forbiddenapis(false);
         }
         return module;
     }
@@ -173,11 +167,24 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        Path spotbugsFile = BuildStep.locate(configuration, "spotbugs-exclude.xml");
-        if (spotbugsFile != null && spotbugs) {
-            buildExecutor.addModule(SPOTBUGS,
-                    spotbugsModule.bound(ExternalModule.RULES, spotbugsFile.getFileName(), spotbugsFile),
-                    inherited.sequencedKeySet());
+        Path spotbugsFile = BuildStep.locate(configuration, "spotbugs.properties"),
+                exclusionFile = BuildStep.locate(configuration, "spotbugs-exclude.xml");
+        if ((spotbugsFile != null || exclusionFile != null) && spotbugs) {
+            ExternalModule module = spotbugsModule;
+            if (spotbugsFile == null) {
+                module = module.bound(ExternalModule.RULES, Path.of("spotbugs-exclude.xml"), exclusionFile);
+            } else {
+                SequencedMap<String, String> values = new LinkedHashMap<>();
+                SequencedProperties.ofFiles(spotbugsFile).forEachProperty(values::put);
+                String exclusion = values.remove(ExternalModule.CONFIGURATION);
+                module = module.properties(values);
+                if (exclusion != null && !exclusion.isBlank()) {
+                    module = module.bound(ExternalModule.RULES,
+                            Path.of("spotbugs-exclude.xml"),
+                            ExternalModule.named(spotbugsFile, ExternalModule.CONFIGURATION, exclusion));
+                }
+            }
+            buildExecutor.addModule(SPOTBUGS, module, inherited.sequencedKeySet());
         }
         Path forbiddenapisFile = BuildStep.locate(configuration, "forbiddenapis.properties");
         if (forbiddenapisFile != null && forbiddenapis) {
@@ -186,17 +193,8 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
             properties.forEachProperty(values::put);
             ExternalModule module = forbiddenapisModule.properties(values);
             for (String name : Objects.requireNonNullElse(properties.entries(SIGNATURES), List.<String>of())) {
-                Path signature = Path.of(name).normalize();
-                if (signature.isAbsolute() || signature.startsWith("..")) {
-                    throw new IllegalArgumentException(forbiddenapisFile + " names the signatures " + name
-                            + ", which is not beside or below it - place the file in the folder of "
-                            + forbiddenapisFile.getFileName());
-                }
-                if (!Files.isRegularFile(forbiddenapisFile.resolveSibling(signature))) {
-                    throw new IllegalArgumentException(forbiddenapisFile + " names the signatures " + name
-                            + ", which does not exist beside it");
-                }
-                module = module.bound(SIGNATURES, signature, forbiddenapisFile.resolveSibling(signature));
+                Path signature = ExternalModule.named(forbiddenapisFile, SIGNATURES, name);
+                module = module.bound(SIGNATURES, signature.getFileName(), signature);
             }
             buildExecutor.addModule(FORBIDDENAPIS, module, inherited.sequencedKeySet());
         }

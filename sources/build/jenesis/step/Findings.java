@@ -36,7 +36,7 @@ public record Findings(String tool, Path report, int count) {
         if (strict && count > 0 && (code != 0 || !judged)) {
             throw new IllegalStateException(found + ", reported in " + report
                     + ", and fails the build on them as jenesis." + setting
-                    + "=strict: fix them, or set it to report to print them without failing");
+                    + " is true: fix them, or set it to false to print them without failing");
         }
         if (strict && code != 0) {
             return false;

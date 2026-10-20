@@ -2,11 +2,11 @@ Scala code-quality demo
 =======================
 
 The Scala counterpart to `../demo-37-java-quality`, following the Scala demo that
-precedes it. A small Scala module is linted by the Scalastyle and scalafmt
-plugins, and scalafmt doubles as a formatter that verifies the source layout. As
-elsewhere, there is no build script: `jenesis.plugins.properties` names the
-plugins, and each runs where its `plugin-<name>.properties` is found in the
-`build.jenesis/` configuration directory.
+precedes it. A small Scala module is linted by Scalastyle and scalafmt, and
+scalafmt doubles as a formatter that verifies the source layout. As elsewhere,
+there is no build script: each tool is an official plugin the build resolves by
+itself where the tool's own file - `scalastyle-config.xml`, `.scalafmt.conf` - is
+found in the `build.jenesis/` configuration folder.
 
 Build it
 --------
@@ -24,13 +24,9 @@ Layout
 
     demo/demo-51-scala-quality
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
-    |-- jenesis.plugins.properties names the Scala, Scalastyle and scalafmt plugins
     |-- build.jenesis/
-    |   |-- plugin-scalastyle.properties  binds scalastyle-config.xml
-    |   |-- scalastyle-config.xml  Scalastyle's configuration
-    |   |-- plugin-scalafmt.properties    binds .scalafmt.conf for scalafmt's checks
-    |   |-- plugin-scalafmtformat.properties  binds it for scalafmt's formatting
-    |   |-- .scalafmt.conf         scalafmt's configuration
+    |   |-- scalastyle-config.xml  switches Scalastyle on: its configuration
+    |   `-- .scalafmt.conf         switches scalafmt on: its configuration
     `-- sources
         |-- module-info.java
         `-- sample
@@ -39,44 +35,36 @@ Layout
 How the linters are wired
 -------------------------
 
-`jenesis.plugins.properties` names both linters at the hook point `check`:
+As in the Java and Kotlin code-quality demos, each tool's own file switches it
+on by itself where it lies in a configuration folder. A file kept elsewhere is
+named from a `scalastyle.properties` or `scalafmt.properties` as
+`configuration=<path>`, relative to the properties; where those are found, the
+conventional file is not read, and properties without `configuration` fail the
+build, naming the key to add.
 
-    scalastyle+check=build.jenesis.plugin.scalastyle
-    scalafmt+check=build.jenesis.plugin.scalafmt@check
-
-The scalafmt plugin provides a checker and a formatter, and `@check` selects the
-checker. Each `plugin-<name>.properties` binds the file its tool reads into the
-input `rules`:
-
-    @rules=../build.jenesis/scalastyle-config.xml
-    @rules=../build.jenesis/.scalafmt.conf
-
-Scalastyle runs with `-c scalastyle-config.xml`; scalafmt runs against
-`.scalafmt.conf`. Both inspect the `.scala` sources in parallel with
-compilation and write a report under their step's output folder. The
+Scalastyle runs with `--config scalastyle-config.xml`; scalafmt runs against
+`.scalafmt.conf`. Both inspect the `.scala` sources in the module's `verify`
+phase and write a report under their step's output folder. The
 `.scalafmt.conf` pins the formatter's own `version`, so the formatting is
 reproducible no matter which scalafmt release resolves. Both linters are
-report-only by default; `-Djenesis.source.scalastyle=strict` and
-`-Djenesis.source.scalafmt=strict` fail the build on their findings instead,
-as in the Java code-quality demo.
+report-only by default; `-Djenesis.strict.scalastyle=true` and
+`-Djenesis.strict.scalafmt=true` fail the build on their findings instead,
+and `-Djenesis.check.scalastyle=false` and `-Djenesis.check.scalafmt=false`
+skip them, as in the Java code-quality demo.
 
 Formatting: verify, and how to reformat
 ---------------------------------------
 
-scalafmt formats as well, as the plugin `scalafmtformat` at the hook point
-`format`, whose `@format` selects the formatter of the scalafmt plugin:
-
-    scalafmtformat+format=build.jenesis.plugin.scalafmt@format
-
-Its `plugin-scalafmtformat.properties` binds the same `.scalafmt.conf`. It runs in
-verify mode: a normal build fails if a `.scala` file is not already formatted,
-but never rewrites it. To apply scalafmt and rewrite the sources in place, run
-the build with the rewrite switch:
+The same `.scalafmt.conf` switches scalafmt on as a formatter as well. It runs in verify mode: a normal build fails if a
+`.scala` file is not already formatted, but never rewrites it. To apply scalafmt
+and rewrite the sources in place, run the build with the rewrite switch:
 
     java -Djenesis.format.rewrite=true build/jenesis/Make.java
 
-This mirrors the `google-java-format` and `ktlint` rewrites in
+This mirrors the google-java-format and ktlint rewrites in
 `../demo-37-java-quality` and `../demo-47-kotlin-quality`.
+`-Djenesis.format.scalafmt=false` switches scalafmt's formatting off, while
+scalafmt still checks.
 
 Pinning
 -------

@@ -1,0 +1,8 @@
+= {product-name}
+include::_version.adoc[]
+
+image::images/logo.svg[Logo,64]
+
+{product-name} greets whoever it is handed: `{greeting}`
+
+See xref:guide/getting-started.adoc[Getting started] for the first steps.

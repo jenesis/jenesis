@@ -34,6 +34,7 @@ public record ProjectPlugins(Path pins,
     public static final String PREPROCESS = "preprocess",
             POSTPROCESS = "postprocess",
             CUSTOM = "custom",
+            PLUGIN = "plugin",
             TRANSFORM = "transform",
             INSPECT = "inspect",
             PINS = "jenesis.plugins.pin.properties",
@@ -44,6 +45,9 @@ public record ProjectPlugins(Path pins,
             UNCHANGED = "unchanged",
             RESOLVED = "resolved",
             JRELEASER = "jreleaser",
+            ASCIIDOCTOR = "asciidoctor",
+            DOCS = "docs",
+            DOCUMENTS = "documents",
             ROOT = "root.properties",
             ROOT_KEY = "root";
 
@@ -76,10 +80,14 @@ public record ProjectPlugins(Path pins,
         return Collections.unmodifiableMap(merged);
     }
 
-    public static Path jreleaser(Path root) {
+    public static String declared(String name) {
+        return PLUGIN + "." + name;
+    }
+
+    public static Path jreleaser(SequencedSet<Path> configurations) {
         return Stream.of("jreleaser.yml", "jreleaser.yaml", "jreleaser.toml", "jreleaser.json")
-                .map(root::resolve)
-                .filter(Files::isRegularFile)
+                .map(name -> BuildStep.locate(configurations, name))
+                .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
     }
@@ -347,7 +355,10 @@ public record ProjectPlugins(Path pins,
         return new BuildExecutorModule() {
             @Override
             public Optional<String> resolve(String path) {
-                return Optional.empty();
+                String[] segments = path.split("/");
+                return segments.length > 2
+                        && segments[0].equals(CUSTOM)
+                        && segments[2].equals(PluginModule.DEPENDENCIES) ? Optional.of(path) : Optional.empty();
             }
 
             @Override
@@ -365,6 +376,22 @@ public record ProjectPlugins(Path pins,
                                 given.sequencedKeySet());
                     }
                 }, inputs);
+            }
+        };
+    }
+
+    public BuildExecutorModule preprocessed(BuildExecutorModule build) {
+        return new BuildExecutorModule() {
+            @Override
+            public Optional<String> resolve(String path) {
+                return build.resolve(path);
+            }
+
+            @Override
+            public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+                SequencedMap<String, Path> built = new LinkedHashMap<>(inherited);
+                built.keySet().removeIf(key -> key.startsWith(BuildExecutorModule.PREVIOUS + PREPROCESS + "/"));
+                build.accept(buildExecutor, built);
             }
         };
     }
@@ -431,8 +458,12 @@ public record ProjectPlugins(Path pins,
                     plugins.put(releaser.getKey(), releaser.getValue().apply(Collections.emptyNavigableMap()));
                     continue;
                 }
-                boolean official = releaser.getKey().equals(JRELEASER) && jreleaser(root) != null;
-                Path file = BuildStep.locate(configurations, (official ? "" : "plugin-") + releaser.getKey() + ".properties");
+                boolean official = releaser.getKey().equals(JRELEASER)
+                        && (BuildStep.locate(configurations, JRELEASER + ".properties") != null
+                        || jreleaser(configurations) != null);
+                Path file = BuildStep.locate(configurations, official
+                        ? JRELEASER + ".properties"
+                        : PLUGIN + "-" + releaser.getKey().substring(releaser.getKey().indexOf('.') + 1) + ".properties");
                 if (file != null || official) {
                     SequencedMap<String, String> values = new LinkedHashMap<>();
                     if (file != null) {
@@ -467,7 +498,7 @@ public record ProjectPlugins(Path pins,
             SequencedSet<String> inputs = pinned(buildExecutor);
             inputs.addAll(inherited.sequencedKeySet());
             for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : goals.entrySet()) {
-                buildExecutor.addModule(entry.getKey(),
+                buildExecutor.addModule(entry.getKey().substring(entry.getKey().indexOf('.') + 1),
                         entry.getValue().apply(values.getOrDefault(entry.getKey(), Collections.emptyNavigableMap())),
                         inputs);
             }
@@ -478,7 +509,12 @@ public record ProjectPlugins(Path pins,
         return new BuildExecutorModule() {
             @Override
             public Optional<String> resolve(String path) {
-                return path.startsWith(ADDITIONS + "/") || path.equals(PROJECT) ? Optional.of(path) : Optional.empty();
+                String[] segments = path.split("/");
+                return path.startsWith(ADDITIONS + "/")
+                        || path.equals(PROJECT)
+                        || segments.length > 2
+                        && (segments[0].equals(TRANSFORM) || segments[0].equals(INSPECT))
+                        && segments[2].equals(PluginModule.DEPENDENCIES) ? Optional.of(path) : Optional.empty();
             }
 
             @Override
@@ -558,7 +594,9 @@ public record ProjectPlugins(Path pins,
             SequencedProperties declared = SequencedProperties.ofFiles(file);
             for (String key : declared.stringPropertyNames()) {
                 int dot = key.indexOf('.');
-                String plugin = dot == -1 ? key : key.substring(0, dot);
+                String name = dot == -1 ? key : key.substring(0, dot);
+                String plugin = Stream.of(resolutions, preprocessors, transforms, inspections, supplements, audits, releasers, goals)
+                        .anyMatch(plugins -> plugins.containsKey(declared(name))) ? declared(name) : name;
                 if (dot <= 0 || dot == key.length() - 1 || Stream.of(resolutions, preprocessors, transforms, inspections, supplements, audits, releasers, goals)
                         .noneMatch(plugins -> plugins.containsKey(plugin))) {
                     throw new IllegalArgumentException("The argument " + key + " in " + file + " names no plugin of "
@@ -567,11 +605,12 @@ public record ProjectPlugins(Path pins,
                                             inspections.keySet(), supplements.keySet(), audits.keySet(),
                                             releasers.keySet(), goals.keySet())
                                     .flatMap(Set::stream)
+                                    .map(plugged -> plugged.startsWith(PLUGIN + ".") ? plugged.substring(PLUGIN.length() + 1) : plugged)
                                     .collect(Collectors.toCollection(TreeSet::new)));
                 }
                 if (releasers.containsKey(plugin) && resolutions.containsKey(plugin)) {
                     throw new IllegalArgumentException("The argument " + key + " in " + file + " configures the plugin "
-                            + plugin + " of release, which takes its values from the plugin-" + plugin + ".properties"
+                            + name + " of release, which takes its values from the plugin-" + name + ".properties"
                             + " of a configuration folder, and runs only where one is found - write "
                             + key.substring(dot + 1) + "=<value> there");
                 }

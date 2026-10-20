@@ -478,7 +478,7 @@ public class ProcessBuildStepTest {
                 .rootCause()
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("linter found 2 findings, reported in " + root.resolve("check~").resolve("output").resolve("report.xml"))
-                .hasMessageContaining("jenesis.source.linter=strict");
+                .hasMessageContaining("jenesis.strict.linter is true");
     }
 
     @Test
@@ -602,7 +602,7 @@ public class ProcessBuildStepTest {
                                           SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Path report = context.next().resolve("report.xml");
             return Findings.ofXml("linter", report, "error")
-                    .acceptable(code, context, judged, strict, "source.linter", terms.reporting());
+                    .acceptable(code, context, judged, strict, "strict.linter", terms.reporting());
         }
     }
 

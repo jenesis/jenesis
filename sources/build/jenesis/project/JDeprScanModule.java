@@ -15,7 +15,7 @@ import build.jenesis.step.ProcessHandler;
 public class JDeprScanModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
-    private static final String SETTING = "validator.jdeprscan", REPORT = BuildStep.REPORTS + "jdeprscan/jdeprscan.txt";
+    private static final String STRICT = "strict.jdeprscan", REPORT = BuildStep.REPORTS + "jdeprscan/jdeprscan.txt";
 
     private final String group;
     private final boolean strict;
@@ -29,7 +29,7 @@ public class JDeprScanModule implements BuildExecutorModule {
 
     public static JDeprScanModule ofEnvironment(Environment environment) {
         return new JDeprScanModule("main",
-                Enforcement.ofEnvironment(environment, SETTING) == Enforcement.STRICT,
+                environment.flag(STRICT, false),
                 true,
                 null,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "jdeprscan"));
@@ -122,7 +122,7 @@ public class JDeprScanModule implements BuildExecutorModule {
             Files.createDirectories(report.getParent());
             Files.write(report, findings);
             return new Findings("jdeprscan", report, findings.size())
-                    .acceptable(code, context, false, strict, SETTING, terms.reporting());
+                    .acceptable(code, context, false, strict, STRICT, terms.reporting());
         }
 
         @Override

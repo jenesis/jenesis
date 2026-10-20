@@ -10,6 +10,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.BuildStepHashFunction;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.project.InferredSourceFormattingModule;
 
@@ -19,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 public class InferredSourceFormattingModuleTest {
 
     @TempDir
-    private Path root, project;
+    private Path root, project, dependencies;
 
     @Test
     public void checks_the_license_header_when_license_header_txt_is_present() throws IOException {
@@ -113,6 +114,173 @@ public class InferredSourceFormattingModuleTest {
                 .as("a formatter that rewrites the sources runs after the header is written, rather than beside it")
                 .content()
                 .contains("Copyright 2026 the authors.");
+    }
+
+    @Test
+    public void hands_the_dependencies_of_a_module_to_no_formatter_but_openrewrite() throws IOException {
+        Files.writeString(project.resolve("licenseheader.properties"), "text=Copyright 2026 the authors.\n");
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "/*\n * Copyright 2026 the authors.\n */\n\npackage sample;\n");
+        Files.writeString(Files.createDirectories(dependencies.resolve(BuildStep.SOURCES + "other")).resolve("Other.java"),
+                "package other;\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addSource("dependencies", dependencies);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of())
+                        .dependencies(new LinkedHashSet<>(List.of("dependencies"))),
+                "project",
+                "dependencies");
+        SequencedMap<String, Path> steps = executor.execute();
+
+        assertThat(steps.keySet())
+                .as("the header check reads the module's own sources, never those of what it depends on")
+                .anyMatch(step -> step.startsWith("format/license/"));
+    }
+
+    @Test
+    public void binds_the_rewrite_yml_that_openrewrite_properties_names() throws IOException {
+        Files.writeString(project.resolve("cleanup.yml"), "type: specs.openrewrite.org/v1beta/recipe\nname: demo.Cleanup\n");
+        Files.writeString(project.resolve("openrewrite.properties"), "configuration=cleanup.yml\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()),
+                "project");
+        executor.execute("format/" + InferredSourceFormattingModule.OPENREWRITE + "/inputs");
+
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.OPENREWRITE + "/inputs/rules/bound/output/rewrite.yml"))
+                .as("the file the properties name is handed to OpenRewrite under the name it reads")
+                .content()
+                .contains("demo.Cleanup");
+    }
+
+    @Test
+    public void switches_openrewrite_on_by_a_rewrite_yml_where_no_properties_are_found() throws IOException {
+        Files.writeString(project.resolve("rewrite.yml"), "type: specs.openrewrite.org/v1beta/recipe\nname: demo.Cleanup\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()),
+                "project");
+        executor.execute("format/" + InferredSourceFormattingModule.OPENREWRITE + "/inputs");
+
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.OPENREWRITE + "/inputs/rules/bound/output/rewrite.yml"))
+                .as("the conventional file of a configuration folder switches OpenRewrite on and is handed to it")
+                .content()
+                .contains("demo.Cleanup");
+    }
+
+    @Test
+    public void refuses_openrewrite_properties_that_name_neither_recipes_nor_their_file() throws IOException {
+        Files.writeString(project.resolve("openrewrite.properties"), "");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()),
+                "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names neither configuration nor recipes")
+                .hasMessageContaining("configuration=rewrite.yml");
+    }
+
+    @Test
+    public void refuses_ktlint_properties_that_name_no_configuration_naming_the_key() throws IOException {
+        Files.writeString(project.resolve("ktlint.properties"), "");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()),
+                "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names no configuration - add configuration=.editorconfig");
+    }
+
+    @Test
+    public void runs_no_openrewrite_once_switched_off() throws IOException {
+        Files.writeString(project.resolve("openrewrite.properties"), "recipes=org.openrewrite.java.RemoveUnusedImports\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()).openrewrite(false),
+                "project");
+        SequencedMap<String, Path> steps = executor.execute();
+
+        assertThat(steps.keySet()).noneMatch(step -> step.startsWith("format/" + InferredSourceFormattingModule.OPENREWRITE));
+    }
+
+    @Test
+    public void switches_the_eclipse_formatter_on_by_its_profile_where_no_properties_are_found() throws IOException {
+        Files.writeString(project.resolve("eclipse-formatter.xml"), "<profiles/>");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+        executor.execute("format/" + InferredSourceFormattingModule.ECLIPSE + "/inputs");
+
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.ECLIPSE + "/inputs/rules/bound/output/eclipse-formatter.xml"))
+                .as("the profile Eclipse exports switches the Eclipse formatter on and is handed to it")
+                .hasContent("<profiles/>");
+    }
+
+    @Test
+    public void binds_the_profile_eclipse_properties_names() throws IOException {
+        Files.writeString(project.resolve("eclipse.properties"), "configuration=team.xml\n");
+        Files.writeString(project.resolve("team.xml"), "<profiles/>");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+        executor.execute("format/" + InferredSourceFormattingModule.ECLIPSE + "/inputs");
+
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.ECLIPSE + "/inputs/rules/bound/output/eclipse-formatter.xml"))
+                .as("the profile is handed over under the name the Eclipse formatter reads")
+                .hasContent("<profiles/>");
+    }
+
+    @Test
+    public void refuses_two_java_formatters_naming_both() throws IOException {
+        Files.writeString(project.resolve("googlejavaformat.properties"), "");
+        Files.writeString(project.resolve("palantir.properties"), "");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("[googlejavaformat, palantir]")
+                .hasMessageContaining("jenesis.format.<name>=false");
+    }
+
+    @Test
+    public void switches_a_java_formatter_off_by_its_boolean_setting() throws IOException {
+        Files.writeString(project.resolve("googlejavaformat.properties"), "");
+        Files.writeString(project.resolve("eclipse-formatter.xml"), "<profiles/>");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                InferredSourceFormattingModule.ofEnvironment(new Environment(Map.of("format.googlejavaformat", "false")),
+                        new LinkedHashSet<>(List.of(project)),
+                        Map.of(),
+                        Map.of()),
+                "project");
+        executor.execute("format/" + InferredSourceFormattingModule.ECLIPSE + "/inputs");
+
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.ECLIPSE + "/inputs/rules/bound/output/eclipse-formatter.xml"))
+                .as("the formatter switched off is no second Java formatter beside the one that is on")
+                .hasContent("<profiles/>");
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.GOOGLEJAVAFORMAT)).doesNotExist();
     }
 
     private record Formatter(String file) implements BuildStep {

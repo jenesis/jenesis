@@ -180,6 +180,23 @@ public class InferredCompilerChainModuleTest {
     }
 
     @Test
+    public void switches_a_language_off_by_its_boolean_setting_naming_it_where_its_sources_are_found() throws IOException {
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.kt"),
+                "package sample\nclass Sample\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("chain", InferredCompilerChainModule.ofEnvironment(new Environment(Map.of("language.kotlin", "false")),
+                Map.of(),
+                Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .rootCause()
+                .hasMessageContaining(".kt")
+                .hasMessageContaining("jenesis.language.kotlin=false");
+    }
+
+    @Test
     public void resolves_no_language_plugin_for_a_module_without_its_sources() throws IOException {
         Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
                 "package sample; public class Sample {}");

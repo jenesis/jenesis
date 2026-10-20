@@ -12,6 +12,8 @@ import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
+import build.jenesis.maven.MavenDefaultRepository;
+import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.module.ModularJarResolver;
 import build.jenesis.project.ExternalModule;
 import javax.tools.ToolProvider;
@@ -116,6 +118,124 @@ public class ExternalModuleTest {
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps).containsKey("external/marker");
         assertThat(steps.get("external/marker").resolve("out.txt")).content().isEqualTo("hello");
+    }
+
+    @Test
+    public void loads_a_plugin_named_by_a_maven_coordinate_with_its_closure_on_a_class_path() throws IOException {
+        Path pluginJar = compileModule(work.resolve("plugin"),
+                work.resolve("plugin.jar"),
+                null,
+                Map.of("test/plugin/Plugin.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutor;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStepResult;
+                        import java.nio.file.Files;
+                        import java.nio.file.Path;
+                        import java.util.SequencedMap;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
+                            public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
+                                executor.addStep("marker", (_, context, _) -> {
+                                    Files.writeString(context.next().resolve("out.txt"),
+                                            String.valueOf(Plugin.class.getModule().isNamed()));
+                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                });
+                            }
+                        }
+                        """,
+                        "META-INF/services/build.jenesis.BuildModuleFactory", "test.plugin.Plugin\n"));
+        Path maven = work.resolve("maven");
+        Files.copy(jenesisJar, Files.createDirectories(maven.resolve("build/jenesis/build.jenesis/1.0"))
+                .resolve("build.jenesis-1.0.jar"));
+        Files.writeString(maven.resolve("build/jenesis/build.jenesis/1.0/build.jenesis-1.0.pom"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>build.jenesis</groupId>
+                    <artifactId>build.jenesis</artifactId>
+                    <version>1.0</version>
+                </project>""");
+        Files.copy(pluginJar, Files.createDirectories(maven.resolve("test/plugin/1.0")).resolve("plugin-1.0.jar"));
+        Files.writeString(maven.resolve("test/plugin/1.0/plugin-1.0.pom"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>test</groupId>
+                    <artifactId>plugin</artifactId>
+                    <version>1.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>build.jenesis</groupId>
+                            <artifactId>build.jenesis</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>""");
+
+        buildExecutor.addModule("external", ExternalModule.ofEnvironment(Environment.NONE,
+                "maven/test/plugin/1.0",
+                "main",
+                Map.of("maven", new MavenDefaultRepository(maven.toUri(), null, Map.of(), null)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))));
+
+        assertThat(buildExecutor.execute().get("external/marker").resolve("out.txt"))
+                .as("a plugin named by a Maven coordinate runs from a class path")
+                .hasContent("false");
+    }
+
+    @Test
+    public void loads_a_modular_plugin_into_its_named_module_with_its_own_resources() throws IOException {
+        Path pluginJar = compileModule(work.resolve("plugin"),
+                work.resolve("plugin.jar"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.plugin.Plugin; }",
+                Map.of("test/plugin/Plugin.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutor;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStepResult;
+                        import java.io.InputStream;
+                        import java.nio.file.Files;
+                        import java.nio.file.Path;
+                        import java.util.SequencedMap;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
+                            public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
+                                executor.addStep("marker", (_, context, _) -> {
+                                    try (InputStream greeting = Plugin.class.getResourceAsStream("greeting.txt")) {
+                                        Files.writeString(context.next().resolve("out.txt"),
+                                                Plugin.class.getModule().getName() + " " + new String(greeting.readAllBytes()));
+                                    }
+                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                });
+                            }
+                        }
+                        """,
+                        "test/plugin/greeting.txt", "hello"));
+
+        buildExecutor.addModule("external", ExternalModule.ofEnvironment(Environment.NONE,
+                "module/test.plugin",
+                "main",
+                Map.of("module", versionInsensitive(Map.of(
+                        "test.plugin", pluginJar,
+                        "build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+
+        assertThat(buildExecutor.execute().get("external/marker").resolve("out.txt"))
+                .as("a plugin declaring a module is loaded as that module and finds its resources there")
+                .hasContent("test.plugin hello");
     }
 
     @Test
@@ -942,21 +1062,28 @@ public class ExternalModuleTest {
                                       Map<String, String> sources,
                                       Path jenesis) throws IOException {
         Files.createDirectories(sourceDir);
-        Files.writeString(sourceDir.resolve("module-info.java"), moduleInfo);
         List<Path> files = new ArrayList<>();
-        files.add(sourceDir.resolve("module-info.java"));
-        for (Map.Entry<String, String> entry : sources.entrySet()) {
-            Path file = sourceDir.resolve(entry.getKey());
-            Files.createDirectories(file.getParent());
-            Files.writeString(file, entry.getValue());
-            files.add(file);
+        if (moduleInfo != null) {
+            Files.writeString(sourceDir.resolve("module-info.java"), moduleInfo);
+            files.add(sourceDir.resolve("module-info.java"));
         }
         Path classes = Files.createDirectories(sourceDir.resolveSibling(sourceDir.getFileName() + "-classes"));
+        for (Map.Entry<String, String> entry : sources.entrySet()) {
+            boolean source = entry.getKey().endsWith(".java");
+            Path file = (source ? sourceDir : classes).resolve(entry.getKey());
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, entry.getValue());
+            if (source) {
+                files.add(file);
+            }
+        }
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
         try (StandardJavaFileManager fileManager = compiler.getStandardFileManager(diagnostics, null, null)) {
             fileManager.setLocationFromPaths(StandardLocation.CLASS_OUTPUT, List.of(classes));
-            fileManager.setLocationFromPaths(StandardLocation.MODULE_PATH, List.of(jenesis));
+            fileManager.setLocationFromPaths(moduleInfo == null
+                    ? StandardLocation.CLASS_PATH
+                    : StandardLocation.MODULE_PATH, List.of(jenesis));
             boolean success = compiler.getTask(null,
                     fileManager,
                     diagnostics,
