@@ -35,7 +35,7 @@ and `gradle hello` prints `Hello from a Gradle plugin that Jenesis built!`.
 Layout
 ------
 
-    demo/demo-81-gradle-plugin
+    demo/demo-76-gradle-plugin
     |-- build/jenesis                       symlink to ../../../sources/build/jenesis
     |-- build.jenesis/
     |   `-- gradleplugin.properties         switches the markers on, and stays empty

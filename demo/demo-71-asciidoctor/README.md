@@ -29,7 +29,7 @@ changed.
 Layout
 ------
 
-    demo/demo-79-asciidoctor
+    demo/demo-71-asciidoctor
     |-- build/jenesis                symlink to ../../../sources/build/jenesis
     |-- build.jenesis/
     |   `-- asciidoctor.properties   switches Asciidoctor on: its documents and values

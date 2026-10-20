@@ -120,17 +120,17 @@ Quick index
 | 68 | [`custom-maven`](demo-68-custom-maven/README.md)                  | Drive a multi-module Maven build without `Project`                           | `java build/Demo.java`            |
 | 69 | [`custom-modular`](demo-69-custom-modular/README.md)              | The same for `module-info.java` modules                                      | `java build/Demo.java`            |
 | 70 | [`custom-build`](demo-70-custom-build/README.md)                  | No template at all: wire the build by hand                                   | `java build/Demo.java`            |
-| 71 | [`code-signing`](demo-71-code-signing/README.md)                  | Sign the produced jar with `jarsigner`, keyed by the environment             | `java build/Demo.java`            |
-| 72 | [`export`](demo-72-export/README.md)                              | Install a build into the local repositories, for other projects to require   | `java build/jenesis/Make.java export`|
-| 73 | [`publishing`](demo-73-publishing/README.md)                      | Assemble a Maven Central ready bundle and resolve it back                    | `java build/Demo.java`            |
-| 74 | [`module-convention`](demo-74-module-convention/README.md)        | Resolve your own modules from your own Maven repository                      | `java build/Demo.java`            |
-| 75 | [`discovery-module`](demo-75-discovery-module/README.md)          | Resolve a module by what its domain says it is published as                  | `java build/jenesis/Execute.java` |
-| 76 | [`discovery-maven`](demo-76-discovery-maven/README.md)            | The same for a Maven dependency, from a release or a Maven repository        | `java build/jenesis/Execute.java` |
-| 77 | [`jpx`](demo-77-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
-| 78 | [`tools-api`](demo-78-tools-api/README.md)                        | Run a build, or a published program, inside another program's JVM            | `java build/Demo.java`            |
-| 79 | [`asciidoctor`](demo-79-asciidoctor/README.md)                    | Convert the project's AsciiDoc documents and stage them beside its modules   | `java build/jenesis/Make.java stage` |
-| 80 | [`maven-plugin`](demo-80-maven-plugin/README.md)                  | Build a Maven plugin, its descriptor written by Maven's own plugin tools      | `java build/jenesis/Make.java`    |
-| 81 | [`gradle-plugin`](demo-81-gradle-plugin/README.md)                | Build a Gradle plugin and stage the marker its ID is resolved by             | `java build/jenesis/Make.java stage` |
+| 71 | [`asciidoctor`](demo-71-asciidoctor/README.md)                    | Convert the project's AsciiDoc documents and stage them beside its modules   | `java build/jenesis/Make.java stage` |
+| 72 | [`code-signing`](demo-72-code-signing/README.md)                  | Sign the produced jar with `jarsigner`, keyed by the environment             | `java build/Demo.java`            |
+| 73 | [`export`](demo-73-export/README.md)                              | Install a build into the local repositories, for other projects to require   | `java build/jenesis/Make.java export`|
+| 74 | [`publishing`](demo-74-publishing/README.md)                      | Assemble a Maven Central ready bundle and resolve it back                    | `java build/Demo.java`            |
+| 75 | [`maven-plugin`](demo-75-maven-plugin/README.md)                  | Build a Maven plugin, its descriptor written by Maven's own plugin tools      | `java build/jenesis/Make.java`    |
+| 76 | [`gradle-plugin`](demo-76-gradle-plugin/README.md)                | Build a Gradle plugin and stage the marker its ID is resolved by             | `java build/jenesis/Make.java stage` |
+| 77 | [`module-convention`](demo-77-module-convention/README.md)        | Resolve your own modules from your own Maven repository                      | `java build/Demo.java`            |
+| 78 | [`discovery-module`](demo-78-discovery-module/README.md)          | Resolve a module by what its domain says it is published as                  | `java build/jenesis/Execute.java` |
+| 79 | [`discovery-maven`](demo-79-discovery-maven/README.md)            | The same for a Maven dependency, from a release or a Maven repository        | `java build/jenesis/Execute.java` |
+| 80 | [`jpx`](demo-80-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
+| 81 | [`tools-api`](demo-81-tools-api/README.md)                        | Run a build, or a published program, inside another program's JVM            | `java build/Demo.java`            |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1106,7 +1106,22 @@ model:
     java build/Demo.java
     java -cp target/jar/output/artifacts/classes.jar sample.Sample
 
-## 53. Signing the jar you publish - [`code-signing`](demo-71-code-signing/README.md)
+## 53. The project's own documents - [`asciidoctor`](demo-71-asciidoctor/README.md)
+
+A project's manual is written beside its code and published with it. An
+`asciidoctor.properties` in the configuration folder names the folder of AsciiDoc
+documents as `documents=../docs`, and the build converts them once for the whole
+project, after every module is built, and `stage` places them beside the modules:
+
+    java build/jenesis/Make.java stage
+    # target/stage/project/output/docs/index.html
+
+Every `.adoc` file keeps its folder, a file whose name starts with `_` is only
+included, and every other file is copied as it stands. The other lines of the file
+set AsciiDoc attributes (`attribute.<name>=<value>`), the backend and the output
+folder.
+
+## 54. Signing the jar you publish - [`code-signing`](demo-72-code-signing/README.md)
 
 Where `openpgp` and `sigstore` ask who produced the dependencies coming in,
 `code-signing` answers the same question about what goes out, and answers it
@@ -1129,7 +1144,7 @@ The password is never a value: `storepass` takes `env <variable>` or
 `file <path>`, and anything else is refused. The signed jar replaces the unsigned
 one before the inventory, the staged repositories or a publication ever see it.
 
-## 54. Requiring a build from another local project - [`export`](demo-72-export/README.md)
+## 55. Requiring a build from another local project - [`export`](demo-73-export/README.md)
 
 Before anything is published, `export` installs what `stage` laid out into this
 machine's local repositories: the modular tree into `~/.jenesis`, the Maven tree
@@ -1146,7 +1161,7 @@ and pinning that version fixes the dependency. A consumer resolves again when wh
 it declares changes, not when a new export appears, so `jenesis.executor.rebuild`
 is how it takes one.
 
-## 55. Publishing to Maven Central - [`publishing`](demo-73-publishing/README.md)
+## 56. Publishing to Maven Central - [`publishing`](demo-74-publishing/README.md)
 
 Publishing is two jobs - produce a correct bundle and upload it - and Jenesis
 does the first. A `module-info.java` plus a `project.properties` supply the
@@ -1167,7 +1182,32 @@ is reached by `release` itself once `jenesis.deploy.uri` names it, as
 `maven-metadata.xml` merged with the repository's, a SNAPSHOT under a unique
 timestamped name. The demo releases into a small repository on this machine.
 
-## 56. Your own modules from your own Maven repository - [`module-convention`](demo-74-module-convention/README.md)
+## 57. A Maven plugin - [`maven-plugin`](demo-75-maven-plugin/README.md)
+
+A Maven plugin is a jar whose `META-INF/maven/plugin.xml` describes its mojos.
+The module declares `maven-plugin-api` and `maven-plugin-annotations` in scope
+`provided` and keeps the packaging `jar`, and a `mavenplugin.properties` in its
+configuration folder has Maven's own plugin tools describe the compiled mojos,
+taking the descriptions from their javadoc:
+
+    java build/jenesis/Make.java
+    # META-INF/maven/plugin.xml in the module's jar
+
+The jar, staged, installs into a Maven repository as it stands, and Maven runs its
+goals.
+
+## 58. A Gradle plugin - [`gradle-plugin`](demo-76-gradle-plugin/README.md)
+
+A Gradle plugin is a jar that names each plugin it implements in a
+`META-INF/gradle-plugins/<id>.properties` among its resources, compiled against
+the Gradle API in scope `provided`. A `gradleplugin.properties` in the
+configuration folder stages, beside the jar, the marker that Gradle's `plugins`
+block resolves the ID by:
+
+    java build/jenesis/Make.java stage
+    # target/stage/maven/output/demo/greet/demo.greet.gradle.plugin/1.0/demo.greet.gradle.plugin-1.0.pom
+
+## 59. Your own modules from your own Maven repository - [`module-convention`](demo-77-module-convention/README.md)
 
 `publishing` showed the coordinate a module is published under: the groupId from
 the first two dotted segments of its name, the artifactId from the whole name.
@@ -1184,7 +1224,7 @@ group reaches into the name is configuration too:
 
     jenesis.maven.segments=3
 
-## 57. Asking a module's domain how it is published - [`discovery-module`](demo-75-discovery-module/README.md)
+## 60. Asking a module's domain how it is published - [`discovery-module`](demo-78-discovery-module/README.md)
 
 A module name is a reversed domain, and `discovery-module` lets that domain say how
 the module is published. With discovery switched on, a `requires build.jenesis` is
@@ -1202,15 +1242,15 @@ and which Maven artifact it is published as:
 The demo builds with `jenesis.project.layout=modular`, which asks `module` first and
 downloads the jar from the Jenesis release on GitHub, without a POM and without
 Maven. A build that resolves modules through Maven asks `moduletomaven` first and
-resolves the artifact as any Maven dependency, from where the same file names for
-the group, as the next demo shows - so a domain that publishes the file needs no
+resolves the artifact as any Maven dependency, from where a `maven` key of the
+same file names for the group - so a domain that publishes the file needs no
 module repository. The demo empties `jenesis.maven.uri` and `jenesis.module.uri`,
 which name no remote at all, so nothing but the domain answers and nothing falls
 back. With the remotes in place, `<key>.since` and `<key>.suffixes` leave other
 versions to them and a module whose domain publishes nothing resolves as before; the
 pin still decides what is accepted.
 
-## 58. The same for a Maven dependency - [`discovery-maven`](demo-76-discovery-maven/README.md)
+## 61. The same for a Maven dependency - [`discovery-maven`](demo-79-discovery-maven/README.md)
 
 A groupId is a reversed domain too, and `discovery-maven` resolves a `pom.xml`
 dependency on Jenesis from the `maven` key beside the module's:
@@ -1223,7 +1263,7 @@ Maven repository, whose metadata is merged with that of the Maven remotes. A fil
 the location does not hold is asked of the Maven remotes - here none, as the demo
 names no remote either.
 
-## 59. Running a released program - [`jpx`](demo-77-jpx/README.md)
+## 62. Running a released program - [`jpx`](demo-80-jpx/README.md)
 
 Every demo so far built something. `jpx` builds nothing: it resolves a published
 module or Maven artifact, installs its runtime closure once under
@@ -1251,7 +1291,7 @@ be pointed at a mirror with `JENESIS_REPOSITORY_URI` and `MAVEN_REPOSITORY_URI`.
 The demo runs those same commands from `java build/Demo.java`, with the
 installation directed at its own `target/` so your home directory is left alone.
 
-## 60. Running a build from another program - [`tools-api`](demo-78-tools-api/README.md)
+## 63. Running a build from another program - [`tools-api`](demo-81-tools-api/README.md)
 
 A build does not have to be a process of its own. `build.jenesis` publishes three
 `java.util.spi.ToolProvider` tools, named after the commands they answer to, so a
@@ -1273,43 +1313,3 @@ Three settings cannot be honoured in-process, because they replace the process a
 build runs in - naming another JDK with `jenesis.toolchain.version`, or a container
 with `jenesis.project.docker` or `jenesis.execute.docker` - and each is refused by
 name rather than ignored. Reach for the `jenesis` command there.
-
-## 61. The project's own documents - [`asciidoctor`](demo-79-asciidoctor/README.md)
-
-A project's manual is written beside its code and published with it. An
-`asciidoctor.properties` in the configuration folder names the folder of AsciiDoc
-documents as `documents=../docs`, and the build converts them once for the whole
-project, after every module is built, and `stage` places them beside the modules:
-
-    java build/jenesis/Make.java stage
-    # target/stage/project/output/docs/index.html
-
-Every `.adoc` file keeps its folder, a file whose name starts with `_` is only
-included, and every other file is copied as it stands. The other lines of the file
-set AsciiDoc attributes (`attribute.<name>=<value>`), the backend and the output
-folder.
-
-## 62. A Maven plugin - [`maven-plugin`](demo-80-maven-plugin/README.md)
-
-A Maven plugin is a jar whose `META-INF/maven/plugin.xml` describes its mojos.
-The module declares `maven-plugin-api` and `maven-plugin-annotations` in scope
-`provided` and keeps the packaging `jar`, and a `mavenplugin.properties` in its
-configuration folder has Maven's own plugin tools describe the compiled mojos,
-taking the descriptions from their javadoc:
-
-    java build/jenesis/Make.java
-    # META-INF/maven/plugin.xml in the module's jar
-
-The jar, staged, installs into a Maven repository as it stands, and Maven runs its
-goals.
-
-## 63. A Gradle plugin - [`gradle-plugin`](demo-81-gradle-plugin/README.md)
-
-A Gradle plugin is a jar that names each plugin it implements in a
-`META-INF/gradle-plugins/<id>.properties` among its resources, compiled against
-the Gradle API in scope `provided`. A `gradleplugin.properties` in the
-configuration folder stages, beside the jar, the marker that Gradle's `plugins`
-block resolves the ID by:
-
-    java build/jenesis/Make.java stage
-    # target/stage/maven/output/demo/greet/demo.greet.gradle.plugin/1.0/demo.greet.gradle.plugin-1.0.pom

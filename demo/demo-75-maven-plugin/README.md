@@ -33,7 +33,7 @@ which prints `Hello, Jenesis!`.
 Layout
 ------
 
-    demo/demo-80-maven-plugin
+    demo/demo-75-maven-plugin
     |-- build/jenesis                    symlink to ../../../sources/build/jenesis
     |-- pom.xml                          the module, packaged as a jar
     `-- src/main
