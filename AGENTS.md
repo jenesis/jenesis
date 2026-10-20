@@ -149,11 +149,13 @@ a plugin on a class path then links against the engine's `build.jenesis` rather 
 the group `plugin.<name>` (handed on as `+closure`, which `pin` writes into every module that runs the plugin), and
 `@<provider>` selects the provider annotated `@BuildModuleName`.
 `Project.ofEnvironment` reads the file, and the assembler wires a plugin into the `custom` namespace of its hook point,
-in a module only where `plugin-<name>.properties` is found in its configuration locations. Wherever it meets the
-build's own plugins - its group, the languages, observers and frameworks of a module, every hook point of the project -
-it is `plugin.<name>` (`ProjectPlugins.declared`), so an official plugin of the same name, present or added later, runs
-beside it untouched; the line naming it, `plugin-<name>.properties`, the `<name>.<key>` arguments and the
-`plugin/<name>` selector spell the name as written.
+in a module only where `plugin-<name>.properties` is found in its configuration locations. The languages, observers and
+frameworks of a module hold every plugin they are handed, from that file or from code, under `plugin/<name>` beside
+the official ones (`PluginModule.plugins`), so no name of an official plugin can be taken. Its group, which its pins and
+everything it resolves are keyed by, and its name at every hook point of the project, is `plugin.<name>`
+(`ProjectPlugins.declared`), so an official plugin of the same name, present or added later, runs beside it untouched;
+the line naming it, `plugin-<name>.properties`, the `<name>.<key>` arguments and the `plugin/<name>` selector spell the
+name as written.
 
 **A plugin provides a factory**, created by `ServiceLoader`, whose `create` validates its values - the engine checks
 none - and is handed the loading build's environment, its process `Permits`, its group - its name for an official

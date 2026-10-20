@@ -1008,6 +1008,7 @@ public class InferredMultiProjectAssemblerTest {
         SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
         plugins.put("probe+observe", (_, _) -> new MarkerStep().asModule("probe"));
         assertThatThrownBy(() -> fixture.execute(new InferredMultiProjectAssembler().plugins(plugins), "build/observed"))
+                .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The plugin probe+observe is no plugin module");
     }
@@ -1019,6 +1020,7 @@ public class InferredMultiProjectAssemblerTest {
         SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
         plugins.put("runner+test", (_, _) -> new MarkerStep().asModule("runner"));
         assertThatThrownBy(() -> fixture.execute(new InferredMultiProjectAssembler().plugins(plugins), "build/observed"))
+                .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The plugin runner+test is no plugin module")
                 .hasMessageContaining("TestFrameworkFactory");

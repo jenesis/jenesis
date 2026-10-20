@@ -21,6 +21,6 @@ class GreetingTest {
 
     @Test
     void runs_on_the_framework_the_project_declares() {
-        assertEquals("platform", System.getProperty("demo.framework"));
+        assertEquals("plugin.platform", System.getProperty("demo.framework"));
     }
 }

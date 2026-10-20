@@ -250,10 +250,6 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
             configured.put(GROOVY, groovyModule);
         }
         configured.forEach((name, module) -> {
-            if (languages.containsKey(name)) {
-                throw new IllegalArgumentException("The language plugin " + name + " takes the name of the language"
-                        + " the build compiles by itself - give it another name");
-            }
             prepared.put(name, module);
             official.put(name, EXTENSIONS_OF.get(name));
         });
@@ -270,11 +266,13 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 List<String> found = Objects.requireNonNullElse(
                         SequencedProperties.ofFiles(scanFolder.resolve(SCAN_FILE)).entries(EXTENSIONS),
                         List.of());
+                SequencedMap<String, BuildExecutorModule> preparations = new LinkedHashMap<>();
                 prepared.forEach((name, plugin) -> {
                     if (!official.containsKey(name) || found.contains(official.get(name))) {
-                        nested.addModule(name, plugin.preparation(), nestedInherited.sequencedKeySet());
+                        preparations.put(name, plugin.preparation());
                     }
                 });
+                PluginModule.addModules(nested, preparations, nestedInherited.sequencedKeySet());
             }, languageInputs);
             compileInputs.add(LANGUAGES);
         }
@@ -363,7 +361,8 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 Language language = plugin.getValue().language(PluginModule.prepared(LANGUAGES, plugin.getKey(), inherited));
                 compiled.addAll(language.extensions());
                 if (language.extensions().stream().anyMatch(found::contains)) {
-                    (language.order() == Language.Order.BEFORE_JAVAC ? before : after).put(plugin.getKey(), language);
+                    (language.order() == Language.Order.BEFORE_JAVAC ? before : after)
+                            .put(BuildExecutorModule.encodePath(plugin.getKey()), language);
                 }
             }
             for (Map.Entry<String, String> language : EXTENSIONS_OF.entrySet()) {

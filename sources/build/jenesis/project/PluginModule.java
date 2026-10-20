@@ -58,14 +58,31 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
         SequencedMap<String, PluginModule<?>> plugins = new LinkedHashMap<>();
         modules.forEach((name, module) -> {
             if (!(module instanceof PluginModule<?> plugin)) {
-                throw new IllegalArgumentException("The plugin " + name.substring(name.indexOf('.') + 1) + "+" + hook
+                throw new IllegalArgumentException("The plugin " + name + "+" + hook
                         + " is no plugin module - name a"
                         + " module that provides an " + factory + " in jenesis.plugins.properties, or build it with"
                         + " ExternalModule.ofEnvironment or InternalModule.ofEnvironment");
             }
-            plugins.put(name, plugin);
+            plugins.put(ProjectPlugins.PLUGIN + "/" + name, plugin);
         });
         return Collections.unmodifiableSequencedMap(plugins);
+    }
+
+    static void addModules(BuildExecutor buildExecutor,
+                           SequencedMap<String, ? extends BuildExecutorModule> modules,
+                           SequencedSet<String> inputs) {
+        SequencedMap<String, BuildExecutorModule> plugins = new LinkedHashMap<>();
+        modules.forEach((name, module) -> {
+            if (name.startsWith(ProjectPlugins.PLUGIN + "/")) {
+                plugins.put(name.substring(ProjectPlugins.PLUGIN.length() + 1), module);
+            } else {
+                buildExecutor.addModule(name, module, inputs);
+            }
+        });
+        if (!plugins.isEmpty()) {
+            buildExecutor.addModule(ProjectPlugins.PLUGIN, (nested, given) -> plugins.forEach((name, module) ->
+                    nested.addModule(name, module, given.sequencedKeySet())), inputs);
+        }
     }
 
     static SequencedMap<String, Path> prepared(String namespace, String name, SequencedMap<String, Path> inherited) {
@@ -94,9 +111,11 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
     static Optional<String> exposed(Set<String> namespaces, String path) {
         for (String namespace : namespaces) {
             if (path.equals(namespace) || path.startsWith(namespace + "/")) {
-                String[] segments = path.split("/", 4);
-                return segments.length > 2 && segments[2].equals(DEPENDENCIES)
-                        ? Optional.of(segments[0] + "/" + segments[1] + "/" + CLOSURE + (segments.length > 3 ? "/" + segments[3] : ""))
+                List<String> segments = List.of(path.split("/"));
+                int named = segments.size() > 2 && segments.get(1).equals(ProjectPlugins.PLUGIN) ? 3 : 2;
+                return segments.size() > named && segments.get(named).equals(DEPENDENCIES)
+                        ? Optional.of(String.join("/", segments.subList(0, named)) + "/" + CLOSURE
+                        + (segments.size() > named + 1 ? "/" + String.join("/", segments.subList(named + 1, segments.size())) : ""))
                         : Optional.empty();
             }
         }

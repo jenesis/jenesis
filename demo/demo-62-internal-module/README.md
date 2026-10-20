@@ -23,13 +23,14 @@ greeting the plugin generated:
 Built without the plugin, `sample.Greeting` would not exist and the project would
 not compile. A second plugin observes the tests: it records which classes their JVM
 loads and reports those of the package `sample`, in
-`target/.../observed/observations/plugin.loaded/loaded/output/reports/loaded/loaded.txt`:
+`target/.../observed/observations/plugin/loaded/loaded/output/reports/loaded/loaded.txt`:
 
     sample.Sample
 
 A third plugin is the framework the tests run on: it runs them on the JUnit
 Platform, as the built-in framework would, and hands them the system property
-`demo.framework`, which one of the tests asserts.
+`demo.framework`, holding the group the build handed the plugin, `plugin.platform`,
+which one of the tests asserts.
 
 Layout
 ------
@@ -111,7 +112,7 @@ module does not see it:
 The plugin provides a `BuildModuleFactory`, and the build hands the file's values
 to its `create` method as a `SequencedMap<String, String>`, in the file's order,
 beside the build's settings, the build's process permits, the dependency group
-named after the plugin - `greeting` here - in which to resolve a tool, and the build's
+named after the plugin - `plugin.greeting` here - in which to resolve a tool, and the build's
 repositories and resolvers. A value `@<key>`, or `@<key>/<default>`, is the setting
 `jenesis.variable.<key>`, read before the plugin sees it, and `@@` writes a literal `@`. The factory returns the module that is wired:
 

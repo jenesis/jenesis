@@ -60,7 +60,6 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             "package",
             "documentation",
             "documentation/generate");
-    private static final Set<String> SHARED = Set.of("language", "observe", "test");
 
     public InferredMultiProjectAssembler() {
         this(Environment.NONE);
@@ -307,15 +306,15 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 module = tooled.repositories(ProjectPlugins.repositories(repositories, environment))
                         .resolvers(ProjectPlugins.resolvers(resolvers, environment));
             }
-            if (hooked.putIfAbsent(SHARED.contains(hook) ? ProjectPlugins.declared(name) : name, module) != null) {
+            if (hooked.putIfAbsent(name, module) != null) {
                 throw new IllegalArgumentException("The plugin " + plugin.getKey() + " takes the name of a custom module"
                         + " that is added already - give the plugin another name");
             }
         }
         SequencedMap<String, BuildExecutorModule> none = Collections.emptyNavigableMap();
-        SequencedMap<String, PluginModule<?>> observers = PluginModule.plugins("observe", "ObservabilityFactory", hooks.getOrDefault("observe", none)),
-                frameworks = PluginModule.plugins("test", "TestFrameworkFactory", hooks.getOrDefault("test", none)),
-                languages = PluginModule.plugins("language", "LanguageFactory", hooks.getOrDefault("language", none));
+        SequencedMap<String, BuildExecutorModule> observers = hooks.getOrDefault("observe", none),
+                frameworks = hooks.getOrDefault("test", none),
+                languages = hooks.getOrDefault("language", none);
         Classifiers classifiers = Classifiers.configured(descriptor.configuration(), descriptor.location(), descriptor.root());
         Sbom sbom = environment.flag("sbom.cyclonedx", true)
                 ? Sbom.configured(BuildStep.locate(descriptor.configuration(), "sbom.properties"))
