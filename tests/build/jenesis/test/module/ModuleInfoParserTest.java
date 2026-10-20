@@ -1096,6 +1096,23 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void tests_tag_rejects_a_second_tag_naming_another_module() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.test bar
+                 * @jenesis.test qux
+                 */
+                module foo {
+                  requires bar;
+                  requires qux;
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("A second @jenesis.test 'qux' after @jenesis.test 'bar'");
+    }
+
+    @Test
     public void tests_tag_with_argument_marks_main_module() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**

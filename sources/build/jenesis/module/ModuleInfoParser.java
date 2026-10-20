@@ -434,6 +434,14 @@ public class ModuleInfoParser {
                                 }
                             }
                             case "jenesis.test" -> {
+                                if (testOf != null) {
+                                    throw new IllegalArgumentException("A second @jenesis.test '"
+                                            + content
+                                            + "' after @jenesis.test '"
+                                            + (abstractTest ? "abstract" : testOf)
+                                            + "': a test module tests one module - declare one tag, and"
+                                            + " require any further module the tests need");
+                                }
                                 if (content.equals("abstract")) {
                                     abstractTest = true;
                                     testOf = "";
