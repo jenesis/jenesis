@@ -129,6 +129,8 @@ Quick index
 | 77 | [`jpx`](demo-77-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
 | 78 | [`tools-api`](demo-78-tools-api/README.md)                        | Run a build, or a published program, inside another program's JVM            | `java build/Demo.java`            |
 | 79 | [`asciidoctor`](demo-79-asciidoctor/README.md)                    | Convert the project's AsciiDoc documents and stage them beside its modules   | `java build/jenesis/Make.java stage` |
+| 80 | [`maven-plugin`](demo-80-maven-plugin/README.md)                  | Build a Maven plugin, its descriptor written by Maven's own plugin tools      | `java build/jenesis/Make.java`    |
+| 81 | [`gradle-plugin`](demo-81-gradle-plugin/README.md)                | Build a Gradle plugin and stage the marker its ID is resolved by             | `java build/jenesis/Make.java stage` |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1286,3 +1288,28 @@ Every `.adoc` file keeps its folder, a file whose name starts with `_` is only
 included, and every other file is copied as it stands. The other lines of the file
 set AsciiDoc attributes (`attribute.<name>=<value>`), the backend and the output
 folder.
+
+## 62. A Maven plugin - [`maven-plugin`](demo-80-maven-plugin/README.md)
+
+A Maven plugin is a jar whose `META-INF/maven/plugin.xml` describes its mojos.
+The module declares `maven-plugin-api` and `maven-plugin-annotations` in scope
+`provided` and keeps the packaging `jar`, and a `mavenplugin.properties` in its
+configuration folder has Maven's own plugin tools describe the compiled mojos,
+taking the descriptions from their javadoc:
+
+    java build/jenesis/Make.java
+    # META-INF/maven/plugin.xml in the module's jar
+
+The jar, staged, installs into a Maven repository as it stands, and Maven runs its
+goals.
+
+## 63. A Gradle plugin - [`gradle-plugin`](demo-81-gradle-plugin/README.md)
+
+A Gradle plugin is a jar that names each plugin it implements in a
+`META-INF/gradle-plugins/<id>.properties` among its resources, compiled against
+the Gradle API in scope `provided`. A `gradleplugin.properties` in the
+configuration folder stages, beside the jar, the marker that Gradle's `plugins`
+block resolves the ID by:
+
+    java build/jenesis/Make.java stage
+    # target/stage/maven/output/demo/greet/demo.greet.gradle.plugin/1.0/demo.greet.gradle.plugin-1.0.pom

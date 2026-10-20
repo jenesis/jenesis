@@ -1756,6 +1756,18 @@ public record Project(
                           A platform's variant goes into the classifiers.properties of a profile
                           folder, and a consumer selects one with @jenesis.pin <module>
                           :<classifier> or a pom.xml <classifier> (66)
+                      maven-plugin-plugin / packaging maven-plugin -> <packaging>jar</packaging>,
+                          as Maven reads a plugin from its descriptor alone, and a
+                          mavenplugin.properties in the module's configuration folder (80), whose
+                          descriptor Maven's own plugin tools write into the jar from the mojos and
+                          their javadoc; goalPrefix -> goalprefix=<prefix>, maven-plugin-api and
+                          maven-plugin-annotations in scope provided or by requires static
+                      java-gradle-plugin gradlePlugin.plugins -> a META-INF/gradle-plugins/<id>.properties
+                          naming implementation-class among the resources, the Gradle API in scope
+                          provided or by requires static, and a gradleplugin.properties in the
+                          project's configuration folder (81), which stages the marker the plugins
+                          block resolves an ID by; com.gradle.plugin-publish, the Gradle Plugin
+                          Portal's own publisher, has no counterpart
                       exec-maven-plugin or maven-antrun-plugin running make, cmake or cargo,
                           nar-maven-plugin, Gradle's cpp-library or an Exec task calling cargo
                           -> a plugin at binary/compiled that forks the native tool as an
@@ -2853,7 +2865,7 @@ public record Project(
                 case "demos" -> """
                     # Jenesis - Copy a demo
 
-                    79 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    81 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -2920,7 +2932,9 @@ public record Project(
                                          75, 76 discovery (a dependency resolved from its
                                          publisher's own domain, as a module or by coordinate),
                                          77 jpx (run a released program without building),
-                                         78 tools-api (a build inside another program's JVM)
+                                         78 tools-api (a build inside another program's JVM),
+                                         80 maven-plugin (a Maven plugin and its descriptor),
+                                         81 gradle-plugin (a Gradle plugin and its marker)
                       Documenting it     79 asciidoctor (AsciiDoc documents converted for the whole
                                          project and staged beside its modules)
 
@@ -3655,6 +3669,34 @@ public record Project(
             project = project.plugins(project.plugins.pins(project.root().resolve("jenesis.plugins.pin.properties"))
                     .arguments(project.root().resolve("jenesis.plugins.arguments.properties"))
                     .transforms(transforms)
+                    .resolutions(resolutions));
+        }
+        ExternalModule marking = ExternalModule.official(environment, ProjectPlugins.GRADLE_PLUGIN, null, Map.of(), Map.of());
+        Path gradlePlugin = environment.flag("artifact." + ProjectPlugins.GRADLE_PLUGIN, true)
+                ? BuildStep.locate(project.configuration(), ProjectPlugins.GRADLE_PLUGIN + ".properties")
+                : null;
+        if (gradlePlugin != null) {
+            SequencedMap<String, String> given = new LinkedHashMap<>();
+            try {
+                SequencedProperties.ofFiles(gradlePlugin).forEachProperty(given::put);
+            } catch (IOException e) {
+                throw new UncheckedIOException("Cannot read " + gradlePlugin, e);
+            }
+            Path marked = project.root();
+            SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> supplements = new LinkedHashMap<>(project.plugins.supplements());
+            supplements.put(ProjectPlugins.GRADLE_PLUGIN, values -> {
+                if (!values.isEmpty()) {
+                    throw new IllegalArgumentException("The plugin " + ProjectPlugins.GRADLE_PLUGIN + " takes its values"
+                            + " from " + gradlePlugin + ", not from jenesis.plugins.arguments.properties - write "
+                            + String.join(", ", values.sequencedKeySet()) + " there");
+                }
+                return marking.configured(marked, marked, given);
+            });
+            SequencedMap<String, BuildExecutorModule> resolutions = new LinkedHashMap<>(project.plugins.resolutions());
+            resolutions.put(ProjectPlugins.GRADLE_PLUGIN, marking.resolution());
+            project = project.plugins(project.plugins.pins(project.root().resolve("jenesis.plugins.pin.properties"))
+                    .arguments(project.root().resolve("jenesis.plugins.arguments.properties"))
+                    .supplements(supplements)
                     .resolutions(resolutions));
         }
         String boms = environment.getProperty("project.boms");
@@ -4853,6 +4895,8 @@ public record Project(
                 observe.pitest|true|PIT mutation testing, activated by a pitest.properties
                 artifact.japicmp|true|japicmp API comparison, activated by a japicmp.properties
                 artifact.revapi|true|revapi API comparison, activated by a revapi.properties
+                artifact.mavenplugin|true|Maven plugin descriptor, activated by a mavenplugin.properties, written into the module's classes from the mojos they declare by Maven's own plugin tools
+                artifact.gradleplugin|true|Gradle plugin markers, activated by a gradleplugin.properties of the project's configuration folder, staged for every plugin a staged jar declares in META-INF/gradle-plugins
                 strict.revapi|false|revapi fails the build on any difference that reaches its severity, where it otherwise records them
                 pmd.priority|5|The lowest rule priority PMD runs, from 1, the highest, to 5, the lowest, as maven-pmd-plugin's minimumPriority
                 language.kotlin|true|Kotlin, the official plugin build.jenesis.plugin.kotlin, resolved where a module holds a .kt source; false leaves it out, and such a source then fails the build
