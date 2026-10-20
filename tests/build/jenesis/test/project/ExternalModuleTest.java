@@ -193,6 +193,81 @@ public class ExternalModuleTest {
     }
 
     @Test
+    public void keeps_running_a_warm_plugin_after_the_folder_the_build_that_warmed_it_resolved_it_into_is_gone()
+            throws IOException {
+        Path pluginJar = compileModule(work.resolve("plugin"),
+                work.resolve("plugin.jar"),
+                null,
+                Map.of("test/plugin/Plugin.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutor;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStepResult;
+                        import java.nio.file.Files;
+                        import java.nio.file.Path;
+                        import java.util.SequencedMap;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
+                            public BuildExecutorModule create(build.jenesis.Environment environment,
+                                                              java.util.SequencedMap<String, String> properties,
+                                                              build.jenesis.Permits permits,
+                                                              String group,
+                                                              java.util.Map<String, build.jenesis.Repository> repositories,
+                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
+                                return this;
+                            }
+                            public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
+                                executor.addStep("marker", (_, context, _) -> {
+                                    Files.writeString(context.next().resolve("out.txt"),
+                                            Plugin.class.getProtectionDomain().getCodeSource().getLocation().toString());
+                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                });
+                            }
+                        }
+                        """,
+                        "META-INF/services/build.jenesis.BuildModuleFactory", "test.plugin.Plugin\n"));
+        Path maven = work.resolve("maven");
+        Files.copy(pluginJar, Files.createDirectories(maven.resolve("test/warmed/1.0")).resolve("warmed-1.0.jar"));
+        Files.writeString(maven.resolve("test/warmed/1.0/warmed-1.0.pom"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>test</groupId>
+                    <artifactId>warmed</artifactId>
+                    <version>1.0</version>
+                </project>""");
+
+        List<String> loaded = new ArrayList<>();
+        for (String build : List.of("first", "second")) {
+            if (build.equals("second")) {
+                try (Stream<Path> walk = Files.walk(work.resolve("first"))) {
+                    for (Path file : walk.sorted(Comparator.reverseOrder()).toList()) {
+                        Files.delete(file);
+                    }
+                }
+            }
+            BuildExecutor executor = BuildExecutor.of(Files.createDirectories(work.resolve(build)),
+                    Duration.ZERO,
+                    new HashDigestFunction("MD5"),
+                    BuildStepHashFunction.ofSerializationDigest("MD5"),
+                    BuildExecutorCallback.nop(),
+                    BuildExecutorCache.nop(),
+                    false,
+                    false,
+                    0);
+            executor.addModule("external", ExternalModule.ofEnvironment(Environment.NONE,
+                    "maven/test/warmed/1.0",
+                    "warmed",
+                    Map.of("maven", new MavenDefaultRepository(maven.toUri(), null, Map.of(), null)),
+                    Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))));
+            loaded.add(Files.readString(executor.execute().get("external/marker").resolve("out.txt")));
+        }
+
+        assertThat(loaded)
+                .as("a warm plugin reads its jars from a copy of its own, not from the folder of the build that warmed it")
+                .hasSize(2)
+                .allSatisfy(location -> assertThat(location).doesNotContain("/first/").doesNotContain("/second/"));
+    }
+
+    @Test
     public void loads_a_modular_plugin_into_its_named_module_with_its_own_resources() throws IOException {
         Path pluginJar = compileModule(work.resolve("plugin"),
                 work.resolve("plugin.jar"),

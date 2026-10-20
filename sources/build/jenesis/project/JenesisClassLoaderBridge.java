@@ -75,6 +75,7 @@ class JenesisClassLoaderBridge {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
+        digest.update(pathPlacement.name().getBytes(StandardCharsets.UTF_8));
         for (Path artifact : artifacts) {
             List<Path> files;
             try (Stream<Path> walk = Files.walk(artifact)) {
@@ -104,8 +105,21 @@ class JenesisClassLoaderBridge {
     private JenesisClassLoaderBridge(String group, List<Path> artifacts, PathPlacement pathPlacement, byte[] origin)
             throws ReflectiveOperationException, IOException {
         List<Path> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
+        Path copies = Files.createTempDirectory("jenesis-plugin");
         for (Path artifact : artifacts) {
-            (pathPlacement.test(artifact) ? modulePath : classPath).add(artifact);
+            Path copy = Files.createDirectory(copies.resolve(Integer.toString(modulePath.size() + classPath.size())))
+                    .resolve(artifact.getFileName().toString());
+            try (Stream<Path> walk = Files.walk(artifact)) {
+                for (Path file : walk.toList()) {
+                    Path target = copy.resolve(artifact.relativize(file).toString());
+                    if (Files.isDirectory(file)) {
+                        Files.createDirectories(target);
+                    } else {
+                        Files.copy(file, target);
+                    }
+                }
+            }
+            (pathPlacement.test(copy) ? modulePath : classPath).add(copy);
         }
         Module hostModule = JenesisClassLoaderBridge.class.getModule();
         ClassLoader parent = ClassLoader.getPlatformClassLoader();
