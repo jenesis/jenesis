@@ -257,6 +257,29 @@ public class ProjectTest {
     }
 
     @Test
+    public void switches_the_gradle_plugin_markers_on_by_their_properties_in_a_configuration_folder() throws IOException {
+        Files.createDirectories(root.resolve("src/main/resources/META-INF/gradle-plugins"))
+                .resolve("com.example.greet.properties")
+                .toFile()
+                .createNewFile();
+
+        assertThat(Project.ofEnvironment(new Environment(settings), root).plugins().supplements())
+                .as("a plugin descriptor among the resources switches nothing on")
+                .doesNotContainKey("gradleplugin");
+
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("gradleplugin.properties"), "");
+        assertThat(Project.ofEnvironment(new Environment(settings), root).plugins().supplements())
+                .as("the properties stage the markers after the stock staging")
+                .containsKey("gradleplugin");
+
+        Map<String, String> switchedOff = new HashMap<>(settings);
+        switchedOff.put("artifact.gradleplugin", "false");
+        assertThat(Project.ofEnvironment(new Environment(switchedOff), root).plugins().supplements())
+                .as("jenesis.artifact.gradleplugin switches the markers off")
+                .doesNotContainKey("gradleplugin");
+    }
+
+    @Test
     public void switches_jreleaser_on_by_a_configuration_folder_never_by_the_project_root() throws IOException {
         Files.writeString(root.resolve("jreleaser.yml"), "project:\n  name: example\n");
 

@@ -9,6 +9,7 @@ import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
+import build.jenesis.SequencedProperties;
 import build.jenesis.step.Abi;
 import build.jenesis.step.ClassPathCompatibility;
 import build.jenesis.step.Jar;
@@ -16,6 +17,8 @@ import build.jenesis.step.JarSigner;
 import build.jenesis.step.ProcessHandler;
 
 public class InferredJavaToolchainModule implements BuildExecutorModule {
+
+    public static final String MAVEN_PLUGIN = "mavenplugin";
 
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
@@ -35,6 +38,10 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
     private final Function<ClassPathCompatibility, BuildStep> classpath;
     private final Function<Abi, BuildStep> abi;
     private final SequencedMap<String, BuildExecutorModule> custom;
+    private final Path location;
+    private final Path root;
+    private final ExternalModule mavenPluginModule;
+    private final boolean mavenPlugin;
 
     public InferredJavaToolchainModule(SequencedSet<Path> configuration,
                                        Path location,
@@ -58,7 +65,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 step -> step.configured() ? step : null,
                 value -> value,
                 null,
-                Collections.emptyNavigableMap());
+                Collections.emptyNavigableMap(),
+                location,
+                root,
+                ExternalModule.official(Environment.NONE, MAVEN_PLUGIN, null, repositories, resolvers),
+                true);
     }
 
     public static InferredJavaToolchainModule ofEnvironment(Environment environment,
@@ -85,7 +96,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 step -> step.configured() ? step : null,
                 value -> value,
                 mode == null ? null : value -> value,
-                Collections.emptyNavigableMap());
+                Collections.emptyNavigableMap(),
+                location,
+                root,
+                ExternalModule.official(environment, MAVEN_PLUGIN, null, repositories, resolvers),
+                environment.flag("artifact." + MAVEN_PLUGIN, true));
         return environment.flag("generate.classpath", true) ? module : module.classpath(null);
     }
 
@@ -106,7 +121,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                                         Function<JarSigner, BuildStep> signer,
                                         Function<ClassPathCompatibility, BuildStep> classpath,
                                         Function<Abi, BuildStep> abi,
-                                        SequencedMap<String, BuildExecutorModule> custom) {
+                                        SequencedMap<String, BuildExecutorModule> custom,
+                                        Path location,
+                                        Path root,
+                                        ExternalModule mavenPluginModule,
+                                        boolean mavenPlugin) {
         this.configuration = configuration;
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
@@ -125,6 +144,10 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
         this.classpath = classpath;
         this.abi = abi;
         this.custom = custom;
+        this.location = location;
+        this.root = root;
+        this.mavenPluginModule = mavenPluginModule;
+        this.mavenPlugin = mavenPlugin;
     }
 
     public InferredJavaToolchainModule pinning(Pinning pinning) {
@@ -145,7 +168,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer,
                 classpath,
                 abi,
-                custom);
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
     }
 
     public InferredJavaToolchainModule pathPlacement(PathPlacement pathPlacement) {
@@ -166,7 +193,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer,
                 classpath,
                 abi,
-                custom);
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
     }
 
     public InferredJavaToolchainModule generator(Function<InferredSourceGenerationModule, BuildExecutorModule> generator) {
@@ -187,7 +218,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer,
                 classpath,
                 abi,
-                custom);
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
     }
 
     public InferredJavaToolchainModule compiler(Function<InferredCompilerChainModule, BuildExecutorModule> compiler) {
@@ -208,7 +243,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer,
                 classpath,
                 abi,
-                custom);
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
     }
 
     public InferredJavaToolchainModule validator(Function<InferredByteCodeQualityModule, BuildExecutorModule> validator) {
@@ -229,7 +268,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer,
                 classpath,
                 abi,
-                custom);
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
     }
 
     public InferredJavaToolchainModule transformer(BuildExecutorModule transformer) {
@@ -250,7 +293,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer,
                 classpath,
                 abi,
-                custom);
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
     }
 
     public InferredJavaToolchainModule archiver(BuildExecutorModule archiver) {
@@ -271,7 +318,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer,
                 classpath,
                 abi,
-                custom);
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
     }
 
     public InferredJavaToolchainModule signer(Function<JarSigner, BuildStep> signer) {
@@ -292,7 +343,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer,
                 classpath,
                 abi,
-                custom);
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
     }
 
     public InferredJavaToolchainModule classpath(Function<ClassPathCompatibility, BuildStep> classpath) {
@@ -313,7 +368,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer,
                 classpath,
                 abi,
-                custom);
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
     }
 
     public InferredJavaToolchainModule abi(Function<Abi, BuildStep> abi) {
@@ -334,7 +393,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer,
                 classpath,
                 abi,
-                custom);
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
     }
 
     public InferredJavaToolchainModule generatorModule(InferredSourceGenerationModule generatorModule) {
@@ -355,7 +418,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer,
                 classpath,
                 abi,
-                custom);
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
     }
 
     public InferredJavaToolchainModule compilerModule(InferredCompilerChainModule compilerModule) {
@@ -376,7 +443,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer,
                 classpath,
                 abi,
-                custom);
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
     }
 
     public InferredJavaToolchainModule validatorModule(InferredByteCodeQualityModule validatorModule) {
@@ -397,7 +468,11 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer,
                 classpath,
                 abi,
-                custom);
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
     }
 
     public InferredJavaToolchainModule custom(SequencedMap<String, BuildExecutorModule> custom) {
@@ -418,7 +493,36 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer,
                 classpath,
                 abi,
-                custom);
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
+    }
+
+    public InferredJavaToolchainModule mavenPlugin(boolean mavenPlugin) {
+        return new InferredJavaToolchainModule(configuration,
+                pinning,
+                pathPlacement,
+                generatorModule,
+                compilerModule,
+                validatorModule,
+                signerStep,
+                classpathStep,
+                abiStep,
+                generator,
+                compiler,
+                validator,
+                transformer,
+                archiver,
+                signer,
+                classpath,
+                abi,
+                custom,
+                location,
+                root,
+                mavenPluginModule,
+                mavenPlugin);
     }
 
     public InferredJavaToolchainModule custom(String name, BuildExecutorModule module) {
@@ -460,10 +564,31 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 ? null
                 : classpath.apply(classpathStep);
         BuildStep extraction = abi == null ? null : abi.apply(abiStep);
+        Path described = mavenPlugin ? BuildStep.locate(configuration, MAVEN_PLUGIN + ".properties") : null;
+        BuildExecutorModule transforming = transformer;
+        if (described != null) {
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            try {
+                SequencedProperties.ofFiles(described).forEachProperty(values::put);
+            } catch (IOException e) {
+                throw new UncheckedIOException("Cannot read " + described, e);
+            }
+            SequencedMap<String, BuildExecutorModule> transforms = new LinkedHashMap<>();
+            if (transformer instanceof ClassTransformModule(SequencedMap<String, BuildExecutorModule> declared)) {
+                transforms.putAll(declared);
+            } else if (transformer != null) {
+                throw new IllegalStateException(described + " has the Maven plugin descriptor written into the"
+                        + " compiled classes, which a transformer of its own replaces - hand the transforms as a"
+                        + " ClassTransformModule, or switch the descriptor off with -Djenesis.artifact."
+                        + MAVEN_PLUGIN + "=false");
+            }
+            transforms.put(MAVEN_PLUGIN, mavenPluginModule.configured(location, root, values));
+            transforming = new ClassTransformModule(transforms);
+        }
         return new JavaToolchainModule(
                 generator == null ? null : generator.apply(generatorModule),
                 compiled,
-                transformer,
+                transforming,
                 validator == null ? null : validator.apply(validatorModule),
                 signing == null || archiver == null ? archiver : new SignedArchive(archiver, signing),
                 compatibility == null ? null : compatibility.asModule("services"),
