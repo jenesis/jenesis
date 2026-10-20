@@ -119,7 +119,7 @@ jobs:
           - { name: test-framework-engines, dir: demo-38-test-framework, entry: build/jenesis/Make.java, flags: -Djenesis.make.profiles=jupiter, verify: 'grep -rqs "exclude-engine=junit-vintage" target' }
           - { name: test-framework-category, dir: demo-38-test-framework, entry: build/jenesis/Make.java, flags: '-Djenesis.make.profiles=legacy -Djenesis.test.tag=greetertest.Legacy', verify: 'grep -rqs "IncludeCategories=greetertest.Legacy" target && grep -rqs JUnitCore target' }
           # The plugins of these demos are not published yet: enable them once jenesis/jenesis-plugins releases them
-          # - { name: code-coverage-recording, dir: demo-41-code-coverage, entry: build/jenesis/Make.java stage, flags: -Djenesis.make.profiles=profiling, verify: 'test -s target/stage/reports/output/jfr/module/tests.jfr' }
+          # - { name: code-coverage-recording, dir: demo-41-code-coverage, entry: build/jenesis/Make.java stage, flags: -Djenesis.make.profiles=profiling, verify: 'test -s target/stage/reports/output/jfr/module/tests.jfr && test -s target/stage/reports/output/asyncprofiler/module/tests.html' }
           # - { name: code-coverage, dir: demo-41-code-coverage, entry: build/jenesis/Make.java, verify: 'find target -path "*reports/jacoco/coverage/Calculator.html" | grep -q .' }
           # - { name: code-coverage-limit, dir: demo-41-code-coverage, entry: build/jenesis/Make.java, verify: 'printf "minimum.method=0.9\n" > build.jenesis/jacoco.properties && ! java build/jenesis/Make.java > target/limit.txt 2>&1 && grep -q "a covered ratio of 0.9 of methods is not met: 2 of 3 covered" target/limit.txt' }
           - { name: test-selection, dir: demo-39-test-selection, entry: build/Demo.java }

@@ -137,6 +137,31 @@ public class InferredTestObservationModuleTest {
     }
 
     @Test
+    public void an_asyncprofiler_properties_file_wires_the_official_async_profiler_plugin() throws IOException {
+        Files.writeString(project.resolve("asyncprofiler.properties"), "event=cpu\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+
+        assertThatThrownBy(executor::execute)
+                .as("the plugin is resolved by its module name from repositories this build does not have")
+                .hasStackTraceContaining("build.jenesis.plugin.asyncprofiler");
+    }
+
+    @Test
+    public void the_observe_override_switches_off_the_async_profiler_plugin() throws IOException {
+        Files.writeString(project.resolve("asyncprofiler.properties"), "event=cpu\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", observation().test(_ -> (_, _) -> {}).asyncProfiler(false), "project");
+        executor.execute();
+
+        assertThat(root.resolve("observed").resolve(InferredTestObservationModule.OBSERVERS))
+                .as("no plugin is resolved where its switch is off")
+                .doesNotExist();
+    }
+
+    @Test
     public void the_test_configurator_decorates_the_inferred_test_module() throws IOException {
         Files.writeString(project.resolve("graal.properties"), "");
         List<TestModule> decorated = new ArrayList<>();

@@ -21,6 +21,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
             OBSERVATIONS = "observations",
             FRAMEWORKS = "frameworks",
             JACOCO = "jacoco",
+            ASYNCPROFILER = "asyncprofiler",
             PITEST = "pitest",
             MUTATE = "mutate";
     private static final String FRAMEWORK = "framework", ENGINES = "engines", SCAN = "scan";
@@ -40,6 +41,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
     private final SequencedSet<String> untested;
     private final ExternalModule jacocoModule;
     private final boolean jacoco;
+    private final ExternalModule asyncProfilerModule;
+    private final boolean asyncProfiler;
     private final ExternalModule pitestModule;
     private final boolean pitest;
 
@@ -59,6 +62,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableSet(),
                 ExternalModule.official(Environment.NONE, JACOCO, null, repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, ASYNCPROFILER, null, repositories, resolvers),
                 true,
                 ExternalModule.official(Environment.NONE, PITEST, null, repositories, resolvers),
                 true);
@@ -82,6 +87,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 Collections.emptyNavigableSet(),
                 ExternalModule.official(environment, JACOCO, null, repositories, resolvers),
                 environment.flag("observe.jacoco", true),
+                ExternalModule.official(environment, ASYNCPROFILER, null, repositories, resolvers),
+                environment.flag("observe.asyncprofiler", true),
                 ExternalModule.official(environment, PITEST, null, repositories, resolvers),
                 environment.flag("observe.pitest", true));
         Boolean nativeImage = environment.flagOrNull("observe.native");
@@ -162,6 +169,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                                           SequencedSet<String> untested,
                                           ExternalModule jacocoModule,
                                           boolean jacoco,
+                                          ExternalModule asyncProfilerModule,
+                                          boolean asyncProfiler,
                                           ExternalModule pitestModule,
                                           boolean pitest) {
         this.configuration = configuration;
@@ -178,6 +187,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         this.untested = untested;
         this.jacocoModule = jacocoModule;
         this.jacoco = jacoco;
+        this.asyncProfilerModule = asyncProfilerModule;
+        this.asyncProfiler = asyncProfiler;
         this.pitestModule = pitestModule;
         this.pitest = pitest;
     }
@@ -197,6 +208,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 untested,
                 jacocoModule,
                 jacoco,
+                asyncProfilerModule,
+                asyncProfiler,
                 pitestModule,
                 pitest);
     }
@@ -216,6 +229,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 untested,
                 jacocoModule,
                 jacoco,
+                asyncProfilerModule,
+                asyncProfiler,
                 pitestModule,
                 pitest);
     }
@@ -235,6 +250,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 untested,
                 jacocoModule,
                 jacoco,
+                asyncProfilerModule,
+                asyncProfiler,
                 pitestModule,
                 pitest);
     }
@@ -254,6 +271,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 untested,
                 jacocoModule,
                 jacoco,
+                asyncProfilerModule,
+                asyncProfiler,
                 pitestModule,
                 pitest);
     }
@@ -273,6 +292,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 untested,
                 jacocoModule,
                 jacoco,
+                asyncProfilerModule,
+                asyncProfiler,
                 pitestModule,
                 pitest);
     }
@@ -292,6 +313,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 untested,
                 jacocoModule,
                 jacoco,
+                asyncProfilerModule,
+                asyncProfiler,
                 pitestModule,
                 pitest);
     }
@@ -311,6 +334,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 untested,
                 jacocoModule,
                 jacoco,
+                asyncProfilerModule,
+                asyncProfiler,
                 pitestModule,
                 pitest);
     }
@@ -330,6 +355,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 untested,
                 jacocoModule,
                 jacoco,
+                asyncProfilerModule,
+                asyncProfiler,
                 pitestModule,
                 pitest);
     }
@@ -349,6 +376,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 untested,
                 jacocoModule,
                 jacoco,
+                asyncProfilerModule,
+                asyncProfiler,
                 pitestModule,
                 pitest);
     }
@@ -368,6 +397,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 untested,
                 jacocoModule,
                 jacoco,
+                asyncProfilerModule,
+                asyncProfiler,
                 pitestModule,
                 pitest);
     }
@@ -387,6 +418,29 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 untested,
                 jacocoModule,
                 jacoco,
+                asyncProfilerModule,
+                asyncProfiler,
+                pitestModule,
+                pitest);
+    }
+
+    public InferredTestObservationModule asyncProfiler(boolean asyncProfiler) {
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                test,
+                nativeImage,
+                jfr,
+                custom,
+                observers,
+                frameworks,
+                untested,
+                jacocoModule,
+                jacoco,
+                asyncProfilerModule,
+                asyncProfiler,
                 pitestModule,
                 pitest);
     }
@@ -406,6 +460,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 untested,
                 jacocoModule,
                 jacoco,
+                asyncProfilerModule,
+                asyncProfiler,
                 pitestModule,
                 pitest);
     }
@@ -439,16 +495,25 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         SequencedMap<String, BuildExecutorModule> reports = new LinkedHashMap<>();
         List<ObservabilityEngine> engines = new ArrayList<>();
         SequencedMap<String, PluginModule<?>> observers = new LinkedHashMap<>();
-        Path coverage = BuildStep.locate(configuration, "jacoco.properties");
-        if (jacoco && coverage != null) {
-            if (this.observers.containsKey(JACOCO)) {
-                throw new IllegalArgumentException("The observer " + JACOCO + " takes the name of the plugin the"
-                        + " build runs by itself where jacoco.properties is found - give it another name");
+        SequencedMap<String, ExternalModule> official = new LinkedHashMap<>();
+        if (jacoco) {
+            official.put(JACOCO, jacocoModule);
+        }
+        if (asyncProfiler) {
+            official.put(ASYNCPROFILER, asyncProfilerModule);
+        }
+        for (Map.Entry<String, ExternalModule> observer : official.entrySet()) {
+            Path file = BuildStep.locate(configuration, observer.getKey() + ".properties");
+            if (file != null) {
+                if (this.observers.containsKey(observer.getKey())) {
+                    throw new IllegalArgumentException("The observer " + observer.getKey() + " takes the name of the"
+                            + " plugin the build runs by itself where " + observer.getKey() + ".properties is found"
+                            + " - give it another name");
+                }
+                SequencedMap<String, String> values = new LinkedHashMap<>();
+                SequencedProperties.ofFiles(file).forEachProperty(values::put);
+                observers.put(observer.getKey(), observer.getValue().properties(values));
             }
-            SequencedMap<String, String> values = new LinkedHashMap<>();
-            SequencedProperties.ofFiles(coverage).forEachProperty(values::put);
-            ExternalModule module = jacocoModule.properties(values);
-            observers.put(JACOCO, module);
         }
         observers.putAll(this.observers);
         if (nativeImage != null && BuildStep.locate(configuration, "graal.properties") != null) {
