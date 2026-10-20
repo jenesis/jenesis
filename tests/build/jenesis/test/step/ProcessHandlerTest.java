@@ -271,6 +271,34 @@ public class ProcessHandlerTest {
     }
 
     @Test
+    public void a_temporary_folder_is_deleted_with_what_it_holds_when_its_jvm_exits() throws Exception {
+        Path source = root.resolve("Temporary.java");
+        Files.writeString(source, """
+                import build.jenesis.step.ProcessHandler;
+                import java.nio.file.Files;
+                import java.nio.file.Path;
+
+                public class Temporary {
+                    public static void main(String[] args) throws Exception {
+                        Path folder = ProcessHandler.OfProcess.temporary("jenesis-test");
+                        Files.writeString(Files.createDirectory(folder.resolve("nested")).resolve("file"), "content");
+                        System.out.println(folder);
+                    }
+                }
+                """);
+        Path engine = Path.of(ProcessHandler.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        Path output = root.resolve("output"), error = root.resolve("error");
+        ProcessHandler handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(List.of(
+                "-cp",
+                engine.toString(),
+                source.toString()));
+        assertThat(handler.execute(output, error, null)).as(Files.readString(error)).isZero();
+        Path folder = Path.of(Files.readString(output).strip());
+        assertThat(folder.isAbsolute()).as("the folder the JVM printed is named in full").isTrue();
+        assertThat(folder).as("nothing of the folder outlives the JVM that made it").doesNotExist();
+    }
+
+    @Test
     public void a_tool_runs_within_the_build() {
         assertThat(ProcessHandler.OfTool.of("jar").apply(List.of("--version")).external()).isFalse();
     }

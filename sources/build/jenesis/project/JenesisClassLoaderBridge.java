@@ -105,7 +105,7 @@ class JenesisClassLoaderBridge {
     private JenesisClassLoaderBridge(String group, List<Path> artifacts, PathPlacement pathPlacement, byte[] origin)
             throws ReflectiveOperationException, IOException {
         List<Path> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
-        Path copies = Files.createTempDirectory("jenesis-plugin");
+        Path copies = ProcessHandler.OfProcess.temporary("jenesis-plugin");
         for (Path artifact : artifacts) {
             Path copy = Files.createDirectory(copies.resolve(Integer.toString(modulePath.size() + classPath.size())))
                     .resolve(artifact.getFileName().toString());

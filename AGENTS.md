@@ -201,8 +201,9 @@ no project file may set or widen it.
 
 **A plugin is kept warm.** Its module layer is kept per plugin, jar digest and placement, softly reachable, and
 handed to the next build in the JVM loading the same jars, wherever that build resolved them; the layer reads a
-private copy of the jars, so no build cleaning its folders pulls them from under it. A static field of a plugin must
-stay right for that next build.
+private copy of the jars, so no build cleaning its folders pulls them from under it, and the JVM deletes it when it
+exits, as it does every folder it keeps for itself (`OfProcess.temporary`). A static field of a plugin must stay right
+for that next build.
 
 **Official plugins are discovered.** A module under `project/` (`JDepsModule`, `LicenseHeaderModule`, …) runs what
 the JDK ships and activates when its file is in a configuration folder. Every tool the build discovers, shipped or
