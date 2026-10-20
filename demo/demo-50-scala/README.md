@@ -20,10 +20,10 @@ modular jar alongside a generated POM. The `requires scala.library` directive
 resolves to `org.scala-lang:scala-library`, the jar that carries the Scala
 standard library.
 
-Scala is a plugin of the hook point `language`, named in
-`jenesis.plugins.properties` as Kotlin is in `../demo-46-kotlin`:
-
-    scala+language=build.jenesis.plugin.scala
+Scala is an official plugin of the hook point `language`, as Kotlin is in
+`../demo-46-kotlin`. The build resolves it by itself, as
+`module/build.jenesis.plugin.scala`, in every module that holds a `.scala`
+source, and `-Djenesis.language.scala=false` leaves it out.
 
 Layout
 ------
@@ -33,7 +33,6 @@ sources out under one package:
 
     demo/demo-50-scala
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
-    |-- jenesis.plugins.properties names the Scala plugin
     `-- sources
         |-- module-info.java       requires scala.library; exports sample; exports sample.pure
         `-- sample

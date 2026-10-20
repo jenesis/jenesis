@@ -98,8 +98,8 @@ Where it runs
 Asciidoctor runs at the hook point `postprocess/transform` once every module is
 built, as `build/postprocess/transform/asciidoctor`, and writes what belongs to no
 module into the `project/` folder that `stage` copies into
-`target/stage/project/output/`. A plugin of `jenesis.plugins.properties` may not
-take the name `asciidoctor`, which the build gives the plugin it resolves itself.
+`target/stage/project/output/`. A plugin of `jenesis.plugins.properties` named
+`asciidoctor` runs beside it as `plugin.asciidoctor`.
 
 AsciidoctorJ resolves in the tool group of the plugin, `asciidoctor:tool`, and the
 plugin's own module in the group `asciidoctor`. `java build/jenesis/Make.java pin`
