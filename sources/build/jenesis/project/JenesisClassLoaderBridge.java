@@ -67,7 +67,7 @@ class JenesisClassLoaderBridge {
 
     private final byte[] origin;
 
-    static JenesisClassLoaderBridge of(String plugin, List<Path> artifacts, PathPlacement pathPlacement)
+    static JenesisClassLoaderBridge of(String group, List<Path> artifacts, PathPlacement pathPlacement)
             throws ReflectiveOperationException, IOException {
         MessageDigest digest;
         try {
@@ -88,20 +88,20 @@ class JenesisClassLoaderBridge {
             }
         }
         byte[] origin = digest.digest();
-        Warmed warmed = WARMED.get(plugin);
+        Warmed warmed = WARMED.get(group);
         JenesisClassLoaderBridge kept = warmed == null || !Arrays.equals(warmed.origin(), origin) ? null : warmed.bridge().get();
         if (kept != null) {
             return kept;
         }
-        JenesisClassLoaderBridge bridge = new JenesisClassLoaderBridge(artifacts, pathPlacement, origin);
-        WARMED.put(plugin, new Warmed(origin, new SoftReference<>(bridge)));
+        JenesisClassLoaderBridge bridge = new JenesisClassLoaderBridge(group, artifacts, pathPlacement, origin);
+        WARMED.put(group, new Warmed(origin, new SoftReference<>(bridge)));
         return bridge;
     }
 
     private record Warmed(byte[] origin, SoftReference<JenesisClassLoaderBridge> bridge) {
     }
 
-    private JenesisClassLoaderBridge(List<Path> artifacts, PathPlacement pathPlacement, byte[] origin)
+    private JenesisClassLoaderBridge(String group, List<Path> artifacts, PathPlacement pathPlacement, byte[] origin)
             throws ReflectiveOperationException, IOException {
         List<Path> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
         for (Path artifact : artifacts) {
@@ -114,7 +114,7 @@ class JenesisClassLoaderBridge {
             for (Path artifact : classPath) {
                 urls.add(artifact.toUri().toURL());
             }
-            parent = new URLClassLoader("plugin", urls.toArray(URL[]::new), parent);
+            parent = new URLClassLoader("jenesis-plugin." + group, urls.toArray(URL[]::new), parent);
             hostModule.addReads(parent.getUnnamedModule());
         }
         if (modulePath.isEmpty()) {
