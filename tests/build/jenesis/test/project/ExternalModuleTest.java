@@ -227,12 +227,27 @@ public class ExternalModuleTest {
                         """,
                         "META-INF/services/build.jenesis.BuildModuleFactory", "test.plugin.Plugin\n"));
         Path maven = work.resolve("maven");
+        Files.copy(jenesisJar, Files.createDirectories(maven.resolve("build/jenesis/build.jenesis/1.0"))
+                .resolve("build.jenesis-1.0.jar"));
+        Files.writeString(maven.resolve("build/jenesis/build.jenesis/1.0/build.jenesis-1.0.pom"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>build.jenesis</groupId>
+                    <artifactId>build.jenesis</artifactId>
+                    <version>1.0</version>
+                </project>""");
         Files.copy(pluginJar, Files.createDirectories(maven.resolve("test/warmed/1.0")).resolve("warmed-1.0.jar"));
         Files.writeString(maven.resolve("test/warmed/1.0/warmed-1.0.pom"), """
                 <project xmlns="http://maven.apache.org/POM/4.0.0">
                     <groupId>test</groupId>
                     <artifactId>warmed</artifactId>
                     <version>1.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>build.jenesis</groupId>
+                            <artifactId>build.jenesis</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                    </dependencies>
                 </project>""");
 
         List<String> loaded = new ArrayList<>();
