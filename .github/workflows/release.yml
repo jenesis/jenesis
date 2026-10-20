@@ -92,6 +92,15 @@ jobs:
             rm "${BASE}"
           done
 
+      - name: Tag the released commit
+        env:
+          TAG: v${{ steps.version.outputs.version }}
+        run: |
+          if [ "$(git rev-parse -q --verify "refs/tags/$TAG^{commit}")" != "$(git rev-parse HEAD)" ]; then
+            git tag "$TAG"
+            git push origin "refs/tags/$TAG"
+          fi
+
       - name: JReleaser deploy
         env:
           JRELEASER_PROJECT_VERSION: ${{ steps.version.outputs.version }}
