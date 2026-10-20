@@ -262,6 +262,7 @@ public final class Worker {
                 out.writeByte(EXIT);
                 out.writeInt(0);
                 out.writeInt(0);
+                out.writeLong(ProcessHandle.current().pid());
                 out.flush();
                 server.close();
                 return;
