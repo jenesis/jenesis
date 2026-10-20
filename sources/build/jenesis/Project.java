@@ -1202,7 +1202,7 @@ public record Project(
                       the version          version=<version> in project.properties at the root,
                                            which -Djenesis.project.version overrides
 
-                    demo-02 is one module, demo-04 several with a test module, demo-72 the
+                    demo-02 is one module, demo-04 several with a test module, demo-73 the
                     published coordinate; skill/tags lists every tag.
 
                     ## 4. Replace each plugin
@@ -1423,9 +1423,9 @@ public record Project(
                     was given, never a POM's, and fails on a blank one unless jreleaser.yml names
                     it. Without that setting, `release` and every `pin` run
                     the release dry and publish nothing. The job's credentials become the JRELEASER_*
-                    variables JReleaser reads (73). A job that deployed to a repository of its own rather than to
+                    variables JReleaser reads (74). A job that deployed to a repository of its own rather than to
                     Maven Central names it in MAVEN_RELEASE_URI and its key in MAVEN_RELEASE_TOKEN
-                    instead (73). Then let `ide` write the IntelliJ, VS Code or Eclipse
+                    instead (74). Then let `ide` write the IntelliJ, VS Code or Eclipse
                     project so no IDE depends on the old build: one IDE module per module, its
                     tests in its test sources. The IDE files it writes into a source folder never
                     reach a jar. A Maven layout keeps its pom.xml files, which are now its build
@@ -1732,14 +1732,14 @@ public record Project(
                           (13); addDefaultImplementationEntries -> on by default: Implementation-Title
                           and -Vendor, and -Version where the POM, project.properties or
                           jenesis.project.version names one
-                      maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (8, 73),
+                      maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (8, 74),
                           whose jar holds the sources and, as Maven's and Gradle's do, the resources,
                           including those of -Djenesis.project.resources; set it, and the next one,
                           in the profile a release activates, such as jenesis-release.properties,
                           never in jenesis.properties, so that a regular build neither archives the
                           sources nor renders the documentation and nothing waits for either
                       maven-javadoc-plugin / withJavadocJar(), Dokka
-                          -> -Djenesis.project.documentation=true (8, 73), which documents
+                          -> -Djenesis.project.documentation=true (8, 74), which documents
                           the main modules, a test module only under jenesis.stage.tests, one with a
                           module-info.java as that module (module-summary.html, its pages below the
                           module's name), as maven-javadoc-plugin and Gradle do; javadoc runs with
@@ -1758,14 +1758,14 @@ public record Project(
                           :<classifier> or a pom.xml <classifier> (66)
                       maven-plugin-plugin / packaging maven-plugin -> <packaging>jar</packaging>,
                           as Maven reads a plugin from its descriptor alone, and a
-                          mavenplugin.properties in the module's configuration folder (80), whose
+                          mavenplugin.properties in the module's configuration folder (75), whose
                           descriptor Maven's own plugin tools write into the jar from the mojos and
                           their javadoc; goalPrefix -> goalprefix=<prefix>, maven-plugin-api and
                           maven-plugin-annotations in scope provided or by requires static
                       java-gradle-plugin gradlePlugin.plugins -> a META-INF/gradle-plugins/<id>.properties
                           naming implementation-class among the resources, the Gradle API in scope
                           provided or by requires static, and a gradleplugin.properties in the
-                          project's configuration folder (81), which stages the marker the plugins
+                          project's configuration folder (76), which stages the marker the plugins
                           block resolves an ID by; com.gradle.plugin-publish, the Gradle Plugin
                           Portal's own publisher, has no counterpart
                       exec-maven-plugin or maven-antrun-plugin running make, cmake or cargo,
@@ -1795,7 +1795,7 @@ public record Project(
                           no counterpart, an unknown key fails the build, and a Gradle source set or
                           a multi-module aggregate has none either: each module is documented alone
                       asciidoctor-maven-plugin process-asciidoc / org.asciidoctor.jvm.convert
-                          -> asciidoctor.properties in the configuration folder (79), whose
+                          -> asciidoctor.properties in the configuration folder (71), whose
                           documents=<folder, relative to it> - ../src/docs/asciidoc for their
                           default - is converted once for the whole project, staged as
                           target/stage/project/output/docs/; a file whose name starts with _ is a
@@ -1813,13 +1813,13 @@ public record Project(
                           -> docker=<image>, a build context; the build never runs Docker (9, 10)
                       native-maven-plugin / org.graalvm.buildtools.native
                           -> native=true, graal.properties (57)
-                      maven-jarsigner-plugin / jar signing -> jenesis.jarsigner.* (71)
-                      maven-install-plugin / publishToMavenLocal -> `export` (72)
+                      maven-jarsigner-plugin / jar signing -> jenesis.jarsigner.* (72)
+                      maven-install-plugin / publishToMavenLocal -> `export` (73)
                       maven-deploy-plugin, distributionManagement to a repository of your own /
                           maven-publish to one -> `release` with jenesis.deploy.uri and
                           jenesis.deploy.token, which puts the staged Maven tree there
                           with its checksums and maven-metadata.xml, unsigned, a SNAPSHOT under
-                          a unique timestamped name (73); altDeploymentRepository -> the same
+                          a unique timestamped name (74); altDeploymentRepository -> the same
                           setting on the command line
                       deploy to Maven Central, central-publishing, maven-gpg-plugin / maven-publish
                           to Central, signing
@@ -1830,7 +1830,7 @@ public record Project(
                           version the build was given as -Djenesis.project.version, which a
                           pom.xml build passes to `release` and `pin` alike, as no POM's version
                           reaches it, unless jreleaser.yml names one, and
-                          the staged trees as template properties (73), the other values of
+                          the staged trees as template properties (74), the other values of
                           jreleaser.properties, and with --dry-run,
                           publishing nothing, unless the command line passes
                           -Djenesis.release.publish=true; JReleaser releases versions without
@@ -2560,7 +2560,7 @@ public record Project(
                     than the JVM, so two runs in one program never clash; everything after them is
                     what the command line would take. A setting that replaces the process a build
                     runs in - toolchain.version, project.docker, execute.docker - is refused by name
-                    there, and so is a -J option, as the JDK's own tools refuse one; demo-78-tools-api
+                    there, and so is a -J option, as the JDK's own tools refuse one; demo-81-tools-api
                     shows the whole contract.
 
                     Every command line here, the commands and the tools alike, reads @<file> as the
@@ -2829,7 +2829,7 @@ public record Project(
                     META-INF/services entry; a modular layout refuses it. Configure the tool in that
                     code, too: where a Maven or Gradle plugin discovers the tool's own extensions and takes their settings as XML,
                     as Byte Buddy's build plugin does, the provider constructs them in Java and reads
-                    only plain values from plugin-<name>.properties, as demo-63 does with Byte Buddy. A JDK tool is forked by extending ProcessBuildStep,
+                    only plain values from plugin-<name>.properties, as demo-64 does with Byte Buddy. A JDK tool is forked by extending ProcessBuildStep,
                     which also reads process-<tool>.properties; one that runs a program extends
                     EnvironmentalProcessBuildStep for environment-<tool>.properties. A tool's main
                     method, as java -cp <jars> <class or Launcher.java> <arguments>, runs through
@@ -2926,17 +2926,17 @@ public record Project(
                                          67 jni (a C library a plugin compiles against the headers),
                                          68 custom-maven, 69 custom-modular,
                                          70 custom-build (no Project at all)
-                      Shipping it        71 code-signing (jarsigner), 72 export (into the local repositories),
-                                         73 publishing (Maven Central),
-                                         74 module-convention (resolving what you published),
-                                         75, 76 discovery (a dependency resolved from its
-                                         publisher's own domain, as a module or by coordinate),
-                                         77 jpx (run a released program without building),
-                                         78 tools-api (a build inside another program's JVM),
-                                         80 maven-plugin (a Maven plugin and its descriptor),
-                                         81 gradle-plugin (a Gradle plugin and its marker)
-                      Documenting it     79 asciidoctor (AsciiDoc documents converted for the whole
-                                         project and staged beside its modules)
+                      Shipping it        71 asciidoctor (AsciiDoc documents converted for the whole
+                                         project and staged beside its modules),
+                                         72 code-signing (jarsigner), 73 export (into the local repositories),
+                                         74 publishing (Maven Central),
+                                         75 maven-plugin (a Maven plugin and its descriptor),
+                                         76 gradle-plugin (a Gradle plugin and its marker)
+                      Resolving it       77 module-convention (resolving what you published),
+                                         78, 79 discovery (a dependency resolved from its
+                                         publisher's own domain, as a module or by coordinate)
+                      Running it         80 jpx (run a released program without building),
+                                         81 tools-api (a build inside another program's JVM)
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;

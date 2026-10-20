@@ -7,7 +7,7 @@ discovery switched on Jenesis reads a small file that the domain publishes befor
 it asks any module repository. This demo requires Jenesis itself and builds on the
 module path alone: `jenesis.build` says where the module's jar is - the Jenesis
 release on GitHub - so the module resolves without the module repository
-`../demo-74-module-convention` resolved from, and without Maven. The demo names no
+`../demo-77-module-convention` resolved from, and without Maven. The demo names no
 repository at all, so nothing but the domain can answer.
 
 Build and run it
@@ -36,7 +36,7 @@ that folder and `target/` to watch the download again.
 Layout
 ------
 
-    demo/demo-75-discovery-module
+    demo/demo-78-discovery-module
     |-- build/jenesis          symlink to ../../../sources/build/jenesis
     |-- jenesis.properties     discovery on, the modular layout, and no repository
     `-- sources
