@@ -199,8 +199,10 @@ output into `stage/packages/`. Changing what stock steps do takes an entry point
 plugin runs the project's code, so the project names it; `jenesis.project.docker` isolates an untrusted project, and
 no project file may set or widen it.
 
-**A plugin is kept warm.** Its module layer is kept per plugin and jar digest, softly reachable, and handed to the
-next build in the JVM loading the same jars; a static field of a plugin must stay right for that next build.
+**A plugin is kept warm.** Its module layer is kept per plugin, jar digest and placement, softly reachable, and
+handed to the next build in the JVM loading the same jars, wherever that build resolved them; the layer reads a
+private copy of the jars, so no build cleaning its folders pulls them from under it. A static field of a plugin must
+stay right for that next build.
 
 **Official plugins are discovered.** A module under `project/` (`JDepsModule`, `LicenseHeaderModule`, …) runs what
 the JDK ships and activates when its file is in a configuration folder. Every tool the build discovers, shipped or
