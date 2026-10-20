@@ -142,10 +142,13 @@ public class InferredTestObservationModuleTest {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+        executor.execute("observed/" + InferredTestObservationModule.OBSERVERS + "/asyncprofiler/coordinate");
 
-        assertThatThrownBy(executor::execute)
-                .as("the plugin is resolved by its module name from repositories this build does not have")
-                .hasStackTraceContaining("build.jenesis.plugin.asyncprofiler");
+        Path requires = root.resolve("observed/" + InferredTestObservationModule.OBSERVERS
+                + "/asyncprofiler/coordinate/output/" + BuildStep.REQUIRES);
+        assertThat(SequencedProperties.ofFiles(requires).stringPropertyNames())
+                .as("the plugin is resolved by its module name from the module repository")
+                .anyMatch(coordinate -> coordinate.contains("module/build.jenesis.plugin.asyncprofiler"));
     }
 
     @Test
