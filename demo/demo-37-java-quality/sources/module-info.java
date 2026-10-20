@@ -13,6 +13,8 @@
  * independently of the module's own dependencies.
  *
  * @jenesis.release 25
+ * @jenesis.pin checkstyle/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin checkstyle/module/build.jenesis.plugin.checkstyle 0.1.0 SHA-256/b7006102fdba775a73c5acc65c89ce072c5c6ffcefe904603c4e161e729df960
  * @jenesis.pin checkstyle:tool/maven/com.google.code.findbugs/jsr305 3.0.2 SHA-256/766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7
  * @jenesis.pin checkstyle:tool/maven/com.google.errorprone/error_prone_annotations 2.47.0 SHA-256/5364bc6f22e72e98195e406a58d3ba1c09ffa11dea0729592cb870dc2de4056d
  * @jenesis.pin checkstyle:tool/maven/com.google.guava/failureaccess 1.0.3 SHA-256/cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb
@@ -46,6 +48,8 @@
  * @jenesis.pin checkstyle:tool/maven/org.slf4j/slf4j-simple 2.0.18 SHA-256/8268bd018a5709b07209e0d8ca6221a37584ba1bc12ba985b8335a82c648bdd0
  * @jenesis.pin checkstyle:tool/maven/org.xmlresolver/xmlresolver 5.3.3 SHA-256/1fe4d5b92f708dcdb82dbce12919e0171e6b5ca62c6dca6220483625098feb5f
  * @jenesis.pin checkstyle:tool/maven/org.xmlresolver/xmlresolver/jar/data 5.3.3 SHA-256/b0c487ad2f3e558be8d829c916d2458d10aca6a5bafa7a4d0524b70845e48a5c
+ * @jenesis.pin eclipse/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin eclipse/module/build.jenesis.plugin.eclipse 0.1.0 SHA-256/8835b24fb676616961e6d72625b7cc8a9dd4e7c8ebc00555d9b0b21f5a8b67ae
  * @jenesis.pin eclipse:tool/maven/net.java.dev.jna/jna 5.19.1 SHA-256/4fb141dd8ef6b0585ffceea4bc49602fbc6312fa977e2c488794ea3e6aafecae
  * @jenesis.pin eclipse:tool/maven/net.java.dev.jna/jna-platform 5.19.1 SHA-256/3b3864f5b449e9c3c24b16861524b622b086563f44e0cd8384c8efc5a6052f82
  * @jenesis.pin eclipse:tool/maven/org.eclipse.jdt/ecj 3.46.100 SHA-256/74c93172475fee0cd4e6eefb44233516dd40525642da35d009146d97ea598229
@@ -65,7 +69,11 @@
  * @jenesis.pin eclipse:tool/maven/org.eclipse.platform/org.eclipse.text 3.14.800 SHA-256/14814c1f1a737fde0a2d56c47a2f02cf4c8c5dee748756c4763e674cae214250
  * @jenesis.pin eclipse:tool/maven/org.osgi/org.osgi.service.prefs 1.1.2 SHA-256/43c7c870710e363405d422da653cce0d798a4537f76e4930f79bceadd3a55345
  * @jenesis.pin eclipse:tool/maven/org.osgi/osgi.annotation 8.0.1 SHA-256/a0e8a4c362bd3600812f37b0ea45fba966c7bc049d01fed56a09ecc74082759e
+ * @jenesis.pin forbiddenapis/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin forbiddenapis/module/build.jenesis.plugin.forbiddenapis 0.1.0 SHA-256/baa58b5a4d91a3a264e4921ea90a4b28368f159aa6efdc6bf17fcce246376b64
  * @jenesis.pin forbiddenapis:tool/maven/de.thetaphi/forbiddenapis 3.11 SHA-256/2d9243b165c566a5ca140be8dfd11ce7bf4ce00e07ccdc31d2c0719cd061c9c6
+ * @jenesis.pin googlejavaformat/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin googlejavaformat/module/build.jenesis.plugin.googlejavaformat 0.1.0 SHA-256/61916b8adc2527c03fd3574595c0896c80a3983ccf160b7b8258f77c32138f38
  * @jenesis.pin googlejavaformat:tool/maven/com.google.code.findbugs/jsr305 3.0.2 SHA-256/766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7
  * @jenesis.pin googlejavaformat:tool/maven/com.google.errorprone/error_prone_annotations 2.21.1 SHA-256/d1f3c66aa91ac52549e00ae3b208ba4b9af7d72d68f230643553beb38e6118ac
  * @jenesis.pin googlejavaformat:tool/maven/com.google.googlejavaformat/google-java-format 1.35.0 SHA-256/b2a52e363d51dd86b3b38d1a8dd51538541b42ff1048769684681c676550f043
@@ -74,18 +82,53 @@
  * @jenesis.pin googlejavaformat:tool/maven/com.google.guava/listenablefuture 9999.0-empty-to-avoid-conflict-with-guava SHA-256/b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99
  * @jenesis.pin googlejavaformat:tool/maven/com.google.j2objc/j2objc-annotations 2.8 SHA-256/f02a95fa1a5e95edb3ed859fd0fb7df709d121a35290eff8b74dce2ab7f4d6ed
  * @jenesis.pin googlejavaformat:tool/maven/org.checkerframework/checker-qual 3.37.0 SHA-256/e4ce1376cc2735e1dde220b62ad0913f51297704daad155a33f386bc5db0d9f7
- * @jenesis.pin checkstyle/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
- * @jenesis.pin checkstyle/module/build.jenesis.plugin.checkstyle 0.1.0 SHA-256/b7006102fdba775a73c5acc65c89ce072c5c6ffcefe904603c4e161e729df960
- * @jenesis.pin eclipse/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
- * @jenesis.pin eclipse/module/build.jenesis.plugin.eclipse 0.1.0 SHA-256/8835b24fb676616961e6d72625b7cc8a9dd4e7c8ebc00555d9b0b21f5a8b67ae
- * @jenesis.pin forbiddenapis/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
- * @jenesis.pin forbiddenapis/module/build.jenesis.plugin.forbiddenapis 0.1.0 SHA-256/baa58b5a4d91a3a264e4921ea90a4b28368f159aa6efdc6bf17fcce246376b64
- * @jenesis.pin googlejavaformat/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
- * @jenesis.pin googlejavaformat/module/build.jenesis.plugin.googlejavaformat 0.1.0 SHA-256/61916b8adc2527c03fd3574595c0896c80a3983ccf160b7b8258f77c32138f38
+ * @jenesis.pin openrewrite/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin openrewrite/module/build.jenesis.plugin.openrewrite 0.1.0 SHA-256/77a42078d4130527b47b64c3bcb446e6feda2cd08c53e14524d9e72d2a724644
+ * @jenesis.pin openrewrite:tool/maven/com.fasterxml.jackson.core/jackson-annotations 2.21 SHA-256/53ca085f4a150f703f49e1aabd935bd03b43e1ea3d55d135438292af22cef56b
+ * @jenesis.pin openrewrite:tool/maven/com.fasterxml.jackson.core/jackson-core 2.21.6 SHA-256/36111c3a4372cd5c2be6f4ec44a050382487920f3fc38ca3015c9c1678bd7c56
+ * @jenesis.pin openrewrite:tool/maven/com.fasterxml.jackson.core/jackson-databind 2.21.6 SHA-256/62134a98de12d0a421cd2f5b9854c8e63f10f524b0341e66cfd31a4326f6a329
+ * @jenesis.pin openrewrite:tool/maven/com.fasterxml.jackson.dataformat/jackson-dataformat-smile 2.21.6 SHA-256/735ea360294ced091cb623cb9370604bfba89187d24b0934267475d2921f2309
+ * @jenesis.pin openrewrite:tool/maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310 2.21.6 SHA-256/1d82027afe574c63e24df72eb109f98de02dff3bb5adf81f0174b27088490067
+ * @jenesis.pin openrewrite:tool/maven/com.fasterxml.jackson.module/jackson-module-parameter-names 2.21.6 SHA-256/24f5c6f75fad85d7e2e3f600ef4832a839def8a2bf1e6f2fc5a0577cef54e01d
+ * @jenesis.pin openrewrite:tool/maven/com.github.ben-manes.caffeine/caffeine 2.9.3 SHA-256/1e0a7bbef1dd791653143f3f05d0e489934bf5481e58a87c9e619cd46b68729b
+ * @jenesis.pin openrewrite:tool/maven/com.google.errorprone/error_prone_annotations 2.10.0 SHA-256/a249d4d25dfb86d41e6c82fc335df580189f0c9feeabdc53233fc1e5060724a1
+ * @jenesis.pin openrewrite:tool/maven/com.googlecode.javaewah/JavaEWAH 1.1.13 SHA-256/4c0fda2b1d317750d7ea324e36c70b2bc48310c0aaae67b98df0915d696d7111
+ * @jenesis.pin openrewrite:tool/maven/com.univocity/univocity-parsers 2.9.1 SHA-256/31685122d5e392e98672ed6009a95a4c1623ca1185567bd44ee94527d454e5c3
+ * @jenesis.pin openrewrite:tool/maven/io.github.classgraph/classgraph 4.8.193 SHA-256/e95ab7083d025b7f6a4fb7c0e608a9ff1ddc0ea91b4cd757c9c3a0650e61b34b
+ * @jenesis.pin openrewrite:tool/maven/io.micrometer/micrometer-core 1.9.17 SHA-256/c350cfdc76c08356f12a60e840f2dbeaeea7540712d58b54becd6c302a86147a
+ * @jenesis.pin openrewrite:tool/maven/io.moderne/jsonrpc 1.0.12 SHA-256/20225ec918f60137496b0596993b04d21ae35db464d67e02f8b93aa4543c4b66
+ * @jenesis.pin openrewrite:tool/maven/io.quarkus.gizmo/gizmo 1.0.11.Final SHA-256/a54bfbb6dcce9298134595b3cd1df961bc732468825f26ee5296f2b5f88c0b99
+ * @jenesis.pin openrewrite:tool/maven/net.java.dev.jna/jna 5.19.1 SHA-256/4fb141dd8ef6b0585ffceea4bc49602fbc6312fa977e2c488794ea3e6aafecae
+ * @jenesis.pin openrewrite:tool/maven/net.java.dev.jna/jna-platform 5.19.1 SHA-256/3b3864f5b449e9c3c24b16861524b622b086563f44e0cd8384c8efc5a6052f82
+ * @jenesis.pin openrewrite:tool/maven/org.antlr/antlr4-runtime 4.13.2 SHA-256/dd3e8a13a2d669bf84fb8d834de35ce4875f27157698d206241ec8488aadcaf7
+ * @jenesis.pin openrewrite:tool/maven/org.apache.commons/commons-lang3 3.20.0 SHA-256/69e5c9fa35da7a51a5fd2099dfe56a2d8d32cf233e2f6d770e796146440263f4
+ * @jenesis.pin openrewrite:tool/maven/org.apache.commons/commons-text 1.15.0 SHA-256/58d2da30f058512a1e7f914e39241deca4dff5c27a085b4ed2faa9e7208067f6
+ * @jenesis.pin openrewrite:tool/maven/org.checkerframework/checker-qual 3.19.0 SHA-256/a827c49183f3a632277d27a0a4673686cb341507447b9d570261094bd748aa68
+ * @jenesis.pin openrewrite:tool/maven/org.hdrhistogram/HdrHistogram 2.1.12 SHA-256/9b47fbae444feaac4b7e04f0ea294569e4bc282bc69d8c2ce2ac3f23577281e2
+ * @jenesis.pin openrewrite:tool/maven/org.jboss/jandex 2.4.2.Final SHA-256/3f2ce55c7d71e744581488dc5105806aa8084c08e6e916a019bab8f8698994f0
+ * @jenesis.pin openrewrite:tool/maven/org.jetbrains/annotations 26.1.0 SHA-256/ebc7aec252ed0c7d2d04c039d7f00e69f7b86b1f493c741d67b3ef31b986b054
+ * @jenesis.pin openrewrite:tool/maven/org.jspecify/jspecify 1.0.1 SHA-256/070d75f261fe4c5b8202508366715f7f2d4660f88c8ef7e6d3575e48c9683b66
+ * @jenesis.pin openrewrite:tool/maven/org.latencyutils/LatencyUtils 2.0.3 SHA-256/a32a9ffa06b2f4e01c5360f8f9df7bc5d9454a5d373cd8f361347fa5a57165ec
+ * @jenesis.pin openrewrite:tool/maven/org.objenesis/objenesis 3.6 SHA-256/6ecc0fc776af04e2bfd2bf42d618ab5161440dcb8a0e7dff9e84c065c7cec3dd
+ * @jenesis.pin openrewrite:tool/maven/org.openrewrite.tools/java-object-diff 1.0.2 SHA-256/86c5e72942bb12143f2c283bb2d44c9f022e52d44361751ead8c11f3ebde2596
+ * @jenesis.pin openrewrite:tool/maven/org.openrewrite.tools/jgit 1.5.0 SHA-256/50c68d603cb8d7f2585d3d98824dc509fdfd95812adb4ac93d6cec4db095b29c
+ * @jenesis.pin openrewrite:tool/maven/org.openrewrite/rewrite-core 8.90.4 SHA-256/12168e8045fb62c1b3f3ad3f3ef8895db84e2791d8c811aefda410e262266503
+ * @jenesis.pin openrewrite:tool/maven/org.openrewrite/rewrite-java 8.90.4 SHA-256/c18f5b86a2401f64d82d036460e15937dfd87d41e3b9772757cadee89b89c5bb
+ * @jenesis.pin openrewrite:tool/maven/org.openrewrite/rewrite-java-25 8.90.4 SHA-256/32b05a74bb19e72e4e0241c16ad49c79283e61746ce717066a7563b4947a9cf6
+ * @jenesis.pin openrewrite:tool/maven/org.openrewrite/rewrite-java-lombok 8.90.4 SHA-256/db47834696d127a836b4ac51225bbe1a5b2dbab155c9f44f1b0c5cd582a6f741
+ * @jenesis.pin openrewrite:tool/maven/org.openrewrite/rewrite-properties 8.90.4 SHA-256/fd6d276c91cfd69fd34aa52dd67e5896cd86bbbd3c1a38d8206a36d1bdeb2b83
+ * @jenesis.pin openrewrite:tool/maven/org.openrewrite/rewrite-xml 8.90.4 SHA-256/6652d97b0ecc8801bbd17158c83f445f60904d41466e3807363f2a87f77d2d2e
+ * @jenesis.pin openrewrite:tool/maven/org.openrewrite/rewrite-yaml 8.90.4 SHA-256/4a13a672601e40180c2ddc234edbfcf4dab139ffb0b8ce7ec25f4e7fccf9552d
+ * @jenesis.pin openrewrite:tool/maven/org.ow2.asm/asm 9.10.1 SHA-256/ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb
+ * @jenesis.pin openrewrite:tool/maven/org.ow2.asm/asm-analysis 9.10.1 SHA-256/dede75a21306b65974ecd8f87114ff6970f09fb794157a4ca09ab25c888c2bfc
+ * @jenesis.pin openrewrite:tool/maven/org.ow2.asm/asm-tree 9.10.1 SHA-256/3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b
+ * @jenesis.pin openrewrite:tool/maven/org.ow2.asm/asm-util 9.10.1 SHA-256/1bb99d091fba2597dc6d51193e9bbcf0d8447e7ed96bd8f0198b18152f09655c
+ * @jenesis.pin openrewrite:tool/maven/org.projectlombok/lombok 1.18.46 SHA-256/01f7b1a015e33e2b62d5f5f37053306357ab1415fd181fcba7794f5d198c1126
+ * @jenesis.pin openrewrite:tool/maven/org.slf4j/slf4j-api 2.0.20 SHA-256/7e1446499b359675d8aabe6af2de86b85e72ae8a2a932c0b40d0e5ba57097439
+ * @jenesis.pin openrewrite:tool/maven/org.slf4j/slf4j-nop 2.0.20 SHA-256/6522080396fb339e99bae40d329a06d18d3190dc864020ac4ca943519d0fd85b
+ * @jenesis.pin openrewrite:tool/maven/org.yaml/snakeyaml 2.6 SHA-256/c8f7a98e7394adda02f6317249710e4d1b4c7a25aa8c7eace0c2eea52eb8bf85
  * @jenesis.pin pmd/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
  * @jenesis.pin pmd/module/build.jenesis.plugin.pmd 0.1.0 SHA-256/2ce8138f6b7887e12e50305a31d298be815b4d198a61a9ab6b7b2ebedde45451
- * @jenesis.pin spotbugs/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
- * @jenesis.pin spotbugs/module/build.jenesis.plugin.spotbugs 0.1.0 SHA-256/3c55346b2cad4367203ec44383448f09397c73f0536a4325672ea87200774e75
  * @jenesis.pin pmd:tool/maven/com.github.nawforce/scala-json-rpc-upickle-json-serializer_2.13 1.1.0 SHA-256/4ce9d100d26080a7b8813b6c3c6bc568c7c33b500b2b42120862c3f9fda926ff
  * @jenesis.pin pmd:tool/maven/com.github.nawforce/scala-json-rpc_2.13 1.1.0 SHA-256/0fcac451d102a687a1be2d8cb3ad4854a0beb9a26398f01db03d95f9851fa3e1
  * @jenesis.pin pmd:tool/maven/com.github.oowekyala.ooxml/nice-xml-messages 3.1 SHA-256/0b4ceb5b8362d43c9c6c49b1bd57f1c5da54d3c5c7c305fa39c0a04462bb4799
@@ -143,7 +186,6 @@
  * @jenesis.pin pmd:tool/maven/net.sourceforge.pmd/pmd-jsp 7.25.0 SHA-256/eeeb0e0e33c045154fc309d20237029989aa6b73beca9803df496e65c5a29f9a
  * @jenesis.pin pmd:tool/maven/net.sourceforge.pmd/pmd-julia 7.25.0 SHA-256/7b0ee31745d0f440a546f83de57fa11a5893c876fa38a3eaa84b8bfe359415ee
  * @jenesis.pin pmd:tool/maven/net.sourceforge.pmd/pmd-kotlin 7.25.0 SHA-256/1ea74d48850f78091fced85fa04efec7a86cc6445d499ae277832d0c1b81e08b
- * @jenesis.pin pmd:tool/maven/net.sourceforge.pmd/pmd-languages-deps/pom 7.25.0 SHA-256/b809649c8457bd269276678827fa210fd804f216c6afa60b34bd7fc5f32d231c
  * @jenesis.pin pmd:tool/maven/net.sourceforge.pmd/pmd-lua 7.25.0 SHA-256/8b420935dfbaeac9354ca853ab165cc7c54d14ca6436fcb76ff216d91eb4e0f9
  * @jenesis.pin pmd:tool/maven/net.sourceforge.pmd/pmd-matlab 7.25.0 SHA-256/5885e369096a084509787388574ab6118b3c7adae773148c72a806a06cd21817
  * @jenesis.pin pmd:tool/maven/net.sourceforge.pmd/pmd-modelica 7.25.0 SHA-256/222ae4c8a3e6a8e390e6a42280d01afc3d91e05a228d6f6124077a3b58ee9fb1
@@ -193,6 +235,8 @@
  * @jenesis.pin pmd:tool/maven/org.slf4j/slf4j-simple 1.7.36 SHA-256/2f39bed943d624dfa8f4102d0571283a10870b6aa36f197a8a506f147010c10f
  * @jenesis.pin pmd:tool/maven/org.xmlresolver/xmlresolver 5.3.3 SHA-256/1fe4d5b92f708dcdb82dbce12919e0171e6b5ca62c6dca6220483625098feb5f
  * @jenesis.pin pmd:tool/maven/org.xmlresolver/xmlresolver/jar/data 5.3.3 SHA-256/b0c487ad2f3e558be8d829c916d2458d10aca6a5bafa7a4d0524b70845e48a5c
+ * @jenesis.pin spotbugs/module/build.jenesis 0.17.0 SHA-256/a875ab473238e7191332698fab64db7b4a4d7a484da6beb313a4a4beb10c60fc
+ * @jenesis.pin spotbugs/module/build.jenesis.plugin.spotbugs 0.1.0 SHA-256/3c55346b2cad4367203ec44383448f09397c73f0536a4325672ea87200774e75
  * @jenesis.pin spotbugs:tool/maven/com.github.spotbugs/spotbugs 4.10.2 SHA-256/46f5c9524c08d027cf96cda2704e5d8ded633626b94a19dc9ced3ae67595d80b
  * @jenesis.pin spotbugs:tool/maven/com.github.spotbugs/spotbugs-annotations 4.10.2 SHA-256/5335e5107c74cdd62ef96a7908066c51abb3de63b1ebf99dc953c2c7d0747678
  * @jenesis.pin spotbugs:tool/maven/com.github.stephenc.jcip/jcip-annotations 1.0-1 SHA-256/4fccff8382aafc589962c4edb262f6aa595e34f1e11e61057d1c6a96e8fc7323
