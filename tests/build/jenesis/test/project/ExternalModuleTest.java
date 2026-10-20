@@ -10,7 +10,6 @@ import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
-import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.maven.MavenDefaultRepository;
@@ -187,14 +186,6 @@ public class ExternalModuleTest {
         assertThat(buildExecutor.execute().get("external/marker").resolve("out.txt"))
                 .as("a plugin named by a Maven coordinate runs from a class path")
                 .hasContent("false");
-    }
-
-    @Test
-    public void places_a_maven_coordinate_on_the_class_path_and_infers_the_placement_of_a_module() {
-        assertThat(ExternalModule.ofEnvironment(Environment.NONE, "maven/test/plugin/1.0", "main", Map.of(), Map.of())
-                .pathPlacement()).isEqualTo(PathPlacement.CLASS_PATH);
-        assertThat(ExternalModule.ofEnvironment(Environment.NONE, "module/test.plugin", "main", Map.of(), Map.of())
-                .pathPlacement()).isEqualTo(PathPlacement.INFERRED);
     }
 
     @Test

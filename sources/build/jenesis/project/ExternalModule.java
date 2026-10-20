@@ -22,7 +22,6 @@ public class ExternalModule extends PluginModule<ExternalModule> {
     private final String coordinate;
     private final Dependencies dependencyModule;
     private final SequencedSet<String> additionalDependencies;
-    private final PathPlacement pathPlacement;
 
     public static ExternalModule ofEnvironment(Environment environment,
                                                String coordinate,
@@ -70,11 +69,10 @@ public class ExternalModule extends PluginModule<ExternalModule> {
                            Map<String, Repository> repositories,
                            Map<String, Resolver> resolvers,
                            Environment environment) {
-        super(buildModuleName, group, properties, inputs, repositories, resolvers, environment);
+        super(buildModuleName, group, pathPlacement, properties, inputs, repositories, resolvers, environment);
         this.coordinate = coordinate;
         this.dependencyModule = dependencyModule;
         this.additionalDependencies = additionalDependencies;
-        this.pathPlacement = pathPlacement;
     }
 
     public ExternalModule dependencies(String... dependencies) {
@@ -227,11 +225,6 @@ public class ExternalModule extends PluginModule<ExternalModule> {
         List<Path> artifacts = new ArrayList<>(Dependencies.select(prepared.get(PREVIOUS + DEPENDENCIES), group, "runtime"));
         artifacts.sort(null);
         return artifacts;
-    }
-
-    @Override
-    public PathPlacement pathPlacement() {
-        return pathPlacement;
     }
 
     private record WriteCoordinates(String group, List<String> coordinates) implements BuildStep {

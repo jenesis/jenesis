@@ -3497,6 +3497,13 @@ public record Project(
                             + " module that provides it, a coordinate as module/<name> or"
                             + " maven/<groupId>/<artifactId>, or its folder as ./<folder>");
                 }
+                if (layout == Layout.MODULAR
+                        && slash != -1
+                        && Resolver.base(location.substring(0, slash)).equals("maven")) {
+                    throw new IllegalArgumentException("The plugin " + key + " in " + file + " names " + location
+                            + ", a Maven coordinate, which loads on a class path, but the modular layout loads"
+                            + " every plugin as modules - name the plugin by its module instead");
+                }
                 InternalModule internal = folder
                         ? InternalModule.ofEnvironment(environment,
                                         "module",
@@ -3516,11 +3523,6 @@ public record Project(
                                     pluginRepositories,
                                     pluginResolvers)
                             .buildModuleName(provider);
-                    if (layout == Layout.MODULAR && resolved.pathPlacement() == PathPlacement.CLASS_PATH) {
-                        throw new IllegalArgumentException("The plugin " + key + " in " + file + " names " + location
-                                + ", a Maven coordinate, which loads on a class path, but the modular layout loads"
-                                + " every plugin as modules - name the plugin by its module instead");
-                    }
                     external = layout == Layout.MODULAR ? resolved.pathPlacement(PathPlacement.MODULE_PATH) : resolved;
                 }
                 BuildExecutorModule resolution = folder ? internal.resolution() : external.resolution();
