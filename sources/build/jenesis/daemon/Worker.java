@@ -336,30 +336,46 @@ public final class Worker {
             if (type == null) {
                 Path folder = Files.createTempDirectory("jenesis-java-worker-launcher");
                 JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-                if (compiler.run(null,
-                        null,
-                        null,
-                        "-d",
-                        folder.toString(),
-                        "-cp",
-                        System.getProperty("java.class.path"),
-                        source.toString()) != 0) {
-                    throw new IllegalStateException("Cannot compile " + source);
-                }
-                String name = source.getFileName().toString().replace(".java", "");
-                URLClassLoader loader = new URLClassLoader(new URL[] { folder.toUri().toURL() },
-                        ClassLoader.getSystemClassLoader());
-                if (!Files.exists(folder.resolve(name + ".class"))) {
-                    try (DirectoryStream<Path> classes = Files.newDirectoryStream(folder, "*.class")) {
-                        for (Path file : classes) {
-                            String candidate = file.getFileName().toString().replace(".class", "");
-                            if (!candidate.contains("$")) {
-                                name = candidate;
-                                break;
-                            }
+                Map<String, byte[]> classes = new HashMap<>();
+                try {
+                    if (compiler.run(null,
+                            null,
+                            null,
+                            "-d",
+                            folder.toString(),
+                            "-cp",
+                            System.getProperty("java.class.path"),
+                            source.toString()) != 0) {
+                        throw new IllegalStateException("Cannot compile " + source);
+                    }
+                    try (Stream<Path> files = Files.walk(folder)) {
+                        for (Path file : files.filter(file -> file.toString().endsWith(".class")).toList()) {
+                            String binary = folder.relativize(file).toString().replace(File.separatorChar, '.');
+                            classes.put(binary.substring(0, binary.length() - ".class".length()),
+                                    Files.readAllBytes(file));
                         }
                     }
+                } finally {
+                    try (Stream<Path> files = Files.walk(folder)) {
+                        files.sorted(Comparator.reverseOrder()).forEach(file -> file.toFile().delete());
+                    }
                 }
+                String declared = source.getFileName().toString().replace(".java", "");
+                String name = classes.containsKey(declared) ? declared : classes.keySet().stream()
+                        .filter(candidate -> !candidate.contains("$"))
+                        .sorted()
+                        .findFirst()
+                        .orElse(declared);
+                ClassLoader loader = new ClassLoader(ClassLoader.getSystemClassLoader()) {
+                    @Override
+                    protected Class<?> findClass(String binary) throws ClassNotFoundException {
+                        byte[] bytes = classes.get(binary);
+                        if (bytes == null) {
+                            throw new ClassNotFoundException(binary);
+                        }
+                        return defineClass(binary, bytes, 0, bytes.length);
+                    }
+                };
                 type = loader.loadClass(name);
                 compiled.put(key, type);
             }

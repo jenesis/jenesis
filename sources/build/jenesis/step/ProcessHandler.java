@@ -198,6 +198,16 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                 "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP", "USERPROFILE",
                 "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432", "PROGRAMDATA", "APPDATA", "LOCALAPPDATA");
         private static final Map<String, Path> DRIVERS = new ConcurrentHashMap<>();
+        private static final Set<Path> TEMPORARY = ConcurrentHashMap.newKeySet();
+
+        static {
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> TEMPORARY.forEach(folder -> {
+                try (Stream<Path> files = Files.walk(folder)) {
+                    files.sorted(Comparator.reverseOrder()).forEach(file -> file.toFile().delete());
+                } catch (IOException | UncheckedIOException _) {
+                }
+            })));
+        }
 
         private final List<String> commands;
         private final SortedMap<String, String> environment;
@@ -279,6 +289,12 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             };
         }
 
+        public static Path temporary(String prefix) throws IOException {
+            Path folder = Files.createTempDirectory(prefix);
+            TEMPORARY.add(folder);
+            return folder;
+        }
+
         public static Path driver(Class<?> type) throws IOException {
             SequencedMap<String, byte[]> classes = new TreeMap<>();
             for (Class<?> member : type.getNestMembers()) {
@@ -304,7 +320,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             try {
                 return DRIVERS.computeIfAbsent(HexFormat.of().formatHex(digest.digest()), _ -> {
                     try {
-                        Path folder = Files.createTempDirectory("jenesis-driver");
+                        Path folder = temporary("jenesis-driver");
                         for (Map.Entry<String, byte[]> entry : classes.entrySet()) {
                             Path file = folder.resolve(entry.getKey());
                             Files.createDirectories(file.getParent());

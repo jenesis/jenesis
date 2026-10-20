@@ -279,7 +279,7 @@ final class JavaWorker {
 
     private static synchronized Path classes() throws IOException {
         if (compiled == null) {
-            Path copied = Files.createTempDirectory("jenesis-java-worker");
+            Path copied = ProcessHandler.OfProcess.temporary("jenesis-java-worker");
             for (Class<?> member : Worker.class.getNestMembers()) {
                 String name = member.getName().replace('.', '/') + ".class";
                 try (InputStream input = Worker.class.getResourceAsStream("/" + name)) {
@@ -348,11 +348,6 @@ final class JavaWorker {
                         .join()));
                 synchronized (SHARED) {
                     SHARED.values().forEach(shared -> shared.running.process().destroyForcibly().onExit().join());
-                }
-                try (Stream<Path> files = Files.walk(folder)) {
-                    files.sorted(Comparator.reverseOrder()).forEach(file -> file.toFile().delete());
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
                 }
             }));
         }
