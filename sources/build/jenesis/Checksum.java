@@ -30,7 +30,7 @@ public final class Checksum {
         return value.get();
     }
 
-    public static Map<Path, Checksum> diff(Map<Path, byte[]> expected, Map<Path, byte[]> actual, HashDigestFunction hash) {
+    public static Map<Path, Checksum> diff(Map<Path, byte[]> expected, Map<Path, byte[]> actual, String algorithm) {
         Map<Path, Checksum> diff = new LinkedHashMap<>();
         Map<Path, byte[]> removed = new LinkedHashMap<>(expected);
         for (Map.Entry<Path, byte[]> entry : actual.entrySet()) {
@@ -44,7 +44,7 @@ public final class Checksum {
                 status = ChecksumStatus.ALTERED;
             }
             byte[] bytes = entry.getValue();
-            diff.put(entry.getKey(), new Checksum(status, () -> hash.encoded(bytes)));
+            diff.put(entry.getKey(), new Checksum(status, () -> new HashDigestFunction(algorithm).encoded(bytes)));
         }
         for (Path path : removed.keySet()) {
             diff.put(path, of(ChecksumStatus.REMOVED));
@@ -58,9 +58,9 @@ public final class Checksum {
         return removed;
     }
 
-    public static Map<Path, Checksum> added(Map<Path, byte[]> actual, HashDigestFunction hash) {
+    public static Map<Path, Checksum> added(Map<Path, byte[]> actual, String algorithm) {
         Map<Path, Checksum> added = new LinkedHashMap<>();
-        actual.forEach((path, bytes) -> added.put(path, new Checksum(ChecksumStatus.ADDED, () -> hash.encoded(bytes))));
+        actual.forEach((path, bytes) -> added.put(path, new Checksum(ChecksumStatus.ADDED, () -> new HashDigestFunction(algorithm).encoded(bytes))));
         return added;
     }
 }

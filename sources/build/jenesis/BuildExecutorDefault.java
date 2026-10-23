@@ -13,8 +13,8 @@ class BuildExecutorDefault implements BuildExecutor {
 
     private final Path target;
     private final Duration timeout;
-    private final HashDigestFunction hash;
-    private final HashFunction files;
+    private final String algorithm;
+    private final HashFunction hash;
     private final BuildStepHashFunction stepHash;
     private final BuildExecutorCallback callback;
     private final BuildExecutorCache cache;
@@ -28,8 +28,8 @@ class BuildExecutorDefault implements BuildExecutor {
 
     BuildExecutorDefault(Path target,
                          Duration timeout,
-                         HashDigestFunction hash,
-                         HashFunction files,
+                         String algorithm,
+                         HashFunction hash,
                          BuildStepHashFunction stepHash,
                          BuildExecutorCallback callback,
                          BuildExecutorCache cache,
@@ -40,8 +40,8 @@ class BuildExecutorDefault implements BuildExecutor {
                          Map<String, StepSummary> inherited) throws IOException {
         this.target = Files.isDirectory(target) ? target : Files.createDirectory(target);
         this.timeout = timeout;
+        this.algorithm = algorithm;
         this.hash = hash;
-        this.files = files;
         this.stepHash = stepHash;
         this.callback = callback;
         this.cache = cache;
@@ -59,7 +59,7 @@ class BuildExecutorDefault implements BuildExecutor {
 
     @Override
     public void addSource(String identity, BuildStep step, SequencedSet<Path> paths) {
-        add(identity, bindStep(step).summaries(files, paths), Map.of());
+        add(identity, bindStep(step).summaries(hash, paths), Map.of());
     }
 
     @Override
@@ -69,7 +69,7 @@ class BuildExecutorDefault implements BuildExecutor {
 
     @Override
     public void replaceSource(String identity, BuildStep step, SequencedSet<Path> paths) {
-        replace(identity, bindStep(step).summaries(files, paths));
+        replace(identity, bindStep(step).summaries(hash, paths));
     }
 
     private Bound bindSource(Path path) {
@@ -86,7 +86,7 @@ class BuildExecutorDefault implements BuildExecutor {
                 try {
                     future.complete(Map.of(identity, Map.of(
                             identity,
-                            new StepSummary(path, HashFunction.read(path, files, executor)))));
+                            new StepSummary(path, HashFunction.read(path, hash, executor)))));
                 } catch (Throwable t) {
                     future.completeExceptionally(t);
                 }
@@ -143,8 +143,8 @@ class BuildExecutorDefault implements BuildExecutor {
                     arguments.put(entry.getKey(), new BuildStepArgument(
                             entry.getValue().folder(),
                             consistent && checksums != null && Files.exists(checksums)
-                                    ? Checksum.diff(HashFunction.read(checksums), argumentChecksums, hash)
-                                    : Checksum.added(argumentChecksums, hash)));
+                                    ? Checksum.diff(HashFunction.read(checksums), argumentChecksums, algorithm)
+                                    : Checksum.added(argumentChecksums, algorithm)));
                 }
                 SequencedMap<String, Set<Path>> vanished = consistent
                         ? previous.vanished(recorded, summaries.keySet())
@@ -242,7 +242,7 @@ class BuildExecutorDefault implements BuildExecutor {
                                 throw new IllegalStateException("Cannot reuse initial run for " + location + identity);
                             }
                             previous.record(summaries);
-                            Map<Path, byte[]> checksums = HashFunction.read(previous.output(), files, executor);
+                            Map<Path, byte[]> checksums = HashFunction.read(previous.output(), hash, executor);
                             HashFunction.write(previous.checksums(), checksums);
                             SequencedProperties stepProperties = new SequencedProperties();
                             stepProperties.setProperty("serialization", HexFormat.of().formatHex(currentStepHash));
@@ -259,7 +259,7 @@ class BuildExecutorDefault implements BuildExecutor {
                                                     inputs,
                                                     cacheRemotely,
                                                     previous.output(),
-                                                    hash.algorithm(),
+                                                    algorithm,
                                                     checksums);
                                         } catch (IOException _) {
                                         }
@@ -364,8 +364,8 @@ class BuildExecutorDefault implements BuildExecutor {
                     }
                     BuildExecutorDefault buildExecutor = new BuildExecutorDefault(target.resolve(prefix),
                             timeout,
+                            algorithm,
                             hash,
-                            files,
                             stepHash,
                             callback,
                             cache,
@@ -855,7 +855,7 @@ class BuildExecutorDefault implements BuildExecutor {
                 return StepRecord.INCOMPLETE;
             }
             Map<Path, byte[]> checksums = HashFunction.read(folder.checksums());
-            return new StepRecord(checksums, HashFunction.areConsistent(folder.output(), checksums, files, executor));
+            return new StepRecord(checksums, HashFunction.areConsistent(folder.output(), checksums, hash, executor));
         } catch (IOException | IllegalArgumentException _) {
             return StepRecord.INCOMPLETE;
         }

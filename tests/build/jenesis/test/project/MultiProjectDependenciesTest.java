@@ -53,7 +53,7 @@ public class MultiProjectDependenciesTest {
                                         Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED))),
                                 "bar", new BuildStepArgument(
                                         dependency,
-                                        Checksum.added(Map.of(Path.of("file"), artifact), hash)))))
+                                        Checksum.added(Map.of(Path.of("file"), artifact), hash.algorithm())))))
                 .toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         SequencedProperties properties = SequencedProperties.ofFiles(next.resolve(BuildStep.REQUIRES));
@@ -151,7 +151,7 @@ public class MultiProjectDependenciesTest {
         identity.store(dependency.resolve(BuildStep.IDENTITY));
         HashDigestFunction hash = new HashDigestFunction("MD5");
 
-        prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}, Path.of("linux.jar"), new byte[]{2}), hash));
+        prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}, Path.of("linux.jar"), new byte[]{2}), hash.algorithm()));
 
         assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.REQUIRES)).getProperty("main/compile/module/natives"))
                 .as("a consumer of a variant resolves again when the variant changes")
@@ -167,7 +167,7 @@ public class MultiProjectDependenciesTest {
         inactive.setProperty("module/natives-linux", "platform-a");
         inactive.store(dependency.resolve(Assign.INACTIVE));
 
-        assertThatThrownBy(() -> prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}), new HashDigestFunction("MD5"))))
+        assertThatThrownBy(() -> prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}), "MD5")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("app asks for the classifier linux of module/natives")
                 .hasMessageContaining("-Djenesis.make.profiles=platform-a");
@@ -180,7 +180,7 @@ public class MultiProjectDependenciesTest {
         identity.setProperty("maven/org.example/natives/1.0", "main.jar");
         identity.store(dependency.resolve(BuildStep.IDENTITY));
 
-        assertThatThrownBy(() -> prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}), new HashDigestFunction("MD5"))))
+        assertThatThrownBy(() -> prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}), "MD5")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not declare")
                 .hasMessageContaining("linux=<folder>[,<folder>...] in a classifiers.properties");
@@ -193,7 +193,7 @@ public class MultiProjectDependenciesTest {
         identity.setProperty("module/natives", "main.jar");
         identity.store(dependency.resolve(BuildStep.IDENTITY));
 
-        assertThatThrownBy(() -> prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}), new HashDigestFunction("MD5"))))
+        assertThatThrownBy(() -> prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}), "MD5")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("@jenesis.pin natives :<classifier>");
     }
@@ -208,7 +208,7 @@ public class MultiProjectDependenciesTest {
         variants.setProperty("maven/org.example/natives/jar/linux/1.0", "maven/org.example/natives/1.0");
         variants.store(dependency.resolve(Assign.VARIANTS));
 
-        prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}, Path.of("linux.jar"), new byte[]{2}), new HashDigestFunction("MD5")));
+        prepare(Checksum.added(Map.of(Path.of("main.jar"), new byte[]{1}, Path.of("linux.jar"), new byte[]{2}), "MD5"));
 
         assertThat(SequencedProperties.ofFiles(next.resolve(Assign.VARIANTS)))
                 .containsEntry("maven/org.example/natives/jar/linux/1.0", "maven/org.example/natives/1.0");
@@ -267,7 +267,7 @@ public class MultiProjectDependenciesTest {
         Files.writeString(dependency.resolve(Abi.ABI), "baz/Baz.class=0");
         byte[] jar = {1, 2, 3};
         Files.write(dependency.resolve("baz.jar"), jar);
-        return Checksum.added(Map.of(Path.of("baz.jar"), jar), new HashDigestFunction("MD5"));
+        return Checksum.added(Map.of(Path.of("baz.jar"), jar), "MD5");
     }
 
     private void requiring(String required, String pin, String value) throws IOException {

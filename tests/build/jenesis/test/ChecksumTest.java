@@ -25,7 +25,7 @@ public class ChecksumTest {
         Map<Path, Checksum> status = Checksum.diff(
                 Map.of(),
                 Map.of(Path.of("foo"), new byte[]{1, 2, 3}),
-                HASH);
+                HASH.algorithm());
         assertThat(status.get(Path.of("foo")).status()).isEqualTo(ChecksumStatus.ADDED);
     }
 
@@ -34,7 +34,7 @@ public class ChecksumTest {
         Map<Path, Checksum> status = Checksum.diff(
                 Map.of(Path.of("foo"), new byte[]{1, 2, 3}),
                 Map.of(),
-                HASH);
+                HASH.algorithm());
         assertThat(status.get(Path.of("foo")).status()).isEqualTo(ChecksumStatus.REMOVED);
     }
 
@@ -43,7 +43,7 @@ public class ChecksumTest {
         Map<Path, Checksum> status = Checksum.diff(
                 Map.of(Path.of("foo"), new byte[]{1, 2, 3}),
                 Map.of(Path.of("foo"), new byte[]{1, 2, 3}),
-                HASH);
+                HASH.algorithm());
         assertThat(status.get(Path.of("foo")).status()).isEqualTo(ChecksumStatus.RETAINED);
     }
 
@@ -52,7 +52,7 @@ public class ChecksumTest {
         Map<Path, Checksum> status = Checksum.diff(
                 Map.of(Path.of("foo"), new byte[]{1, 2, 3}),
                 Map.of(Path.of("foo"), new byte[]{4, 5, 6}),
-                HASH);
+                HASH.algorithm());
         assertThat(status.get(Path.of("foo")).status()).isEqualTo(ChecksumStatus.ALTERED);
     }
 
@@ -60,7 +60,7 @@ public class ChecksumTest {
     public void lazily_encodes_the_checksum() {
         Map<Path, Checksum> status = Checksum.added(
                 Map.of(Path.of("foo"), new byte[]{1, 2, 3}),
-                HASH);
+                HASH.algorithm());
         assertThat(status.get(Path.of("foo")).encoded()).isEqualTo(HASH.encoded(new byte[]{1, 2, 3}));
     }
 }
