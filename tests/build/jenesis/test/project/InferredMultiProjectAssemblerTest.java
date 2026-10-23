@@ -349,6 +349,22 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void a_jvm_option_in_a_process_file_is_one_argument_per_line_of_its_value() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("process-javac.properties"),
+                "-J-Dstdout.encoding=UTF-8\n-J--add-exports=jdk.compiler/a=ALL-UNNAMED\\njdk.compiler/b=ALL-UNNAMED\n-J-Xmx1g=\n");
+        Path prepareOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(Environment.NONE), "build/prepare")
+                .get("build/prepare");
+        SequencedProperties arguments = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "javac"));
+        assertThat(arguments.stringPropertyNames())
+                .as("a -J option reaches the JVM as one argument, so its value joins it rather than following it")
+                .contains("-J-Dstdout.encoding=UTF-8",
+                        "-J--add-exports=jdk.compiler/a=ALL-UNNAMED",
+                        "-J--add-exports=jdk.compiler/b=ALL-UNNAMED",
+                        "-J-Xmx1g");
+    }
+
+    @Test
     public void a_variable_that_is_not_set_and_has_no_default_names_the_setting() throws IOException {
         Fixture fixture = setUp("main=\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("environment-test.properties"), "GREETING=@greeting\n");
