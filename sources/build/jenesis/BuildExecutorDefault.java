@@ -14,6 +14,7 @@ class BuildExecutorDefault implements BuildExecutor {
     private final Path target;
     private final Duration timeout;
     private final HashDigestFunction hash;
+    private final HashFunction files;
     private final BuildStepHashFunction stepHash;
     private final BuildExecutorCallback callback;
     private final BuildExecutorCache cache;
@@ -28,6 +29,7 @@ class BuildExecutorDefault implements BuildExecutor {
     BuildExecutorDefault(Path target,
                          Duration timeout,
                          HashDigestFunction hash,
+                         HashFunction files,
                          BuildStepHashFunction stepHash,
                          BuildExecutorCallback callback,
                          BuildExecutorCache cache,
@@ -39,6 +41,7 @@ class BuildExecutorDefault implements BuildExecutor {
         this.target = Files.isDirectory(target) ? target : Files.createDirectory(target);
         this.timeout = timeout;
         this.hash = hash;
+        this.files = files;
         this.stepHash = stepHash;
         this.callback = callback;
         this.cache = cache;
@@ -56,7 +59,7 @@ class BuildExecutorDefault implements BuildExecutor {
 
     @Override
     public void addSource(String identity, BuildStep step, SequencedSet<Path> paths) {
-        add(identity, bindStep(step).summaries(hash, paths), Map.of());
+        add(identity, bindStep(step).summaries(files, paths), Map.of());
     }
 
     @Override
@@ -66,7 +69,7 @@ class BuildExecutorDefault implements BuildExecutor {
 
     @Override
     public void replaceSource(String identity, BuildStep step, SequencedSet<Path> paths) {
-        replace(identity, bindStep(step).summaries(hash, paths));
+        replace(identity, bindStep(step).summaries(files, paths));
     }
 
     private Bound bindSource(Path path) {
@@ -83,7 +86,7 @@ class BuildExecutorDefault implements BuildExecutor {
                 try {
                     future.complete(Map.of(identity, Map.of(
                             identity,
-                            new StepSummary(path, HashFunction.read(path, hash, executor)))));
+                            new StepSummary(path, HashFunction.read(path, files, executor)))));
                 } catch (Throwable t) {
                     future.completeExceptionally(t);
                 }
@@ -239,7 +242,7 @@ class BuildExecutorDefault implements BuildExecutor {
                                 throw new IllegalStateException("Cannot reuse initial run for " + location + identity);
                             }
                             previous.record(summaries);
-                            Map<Path, byte[]> checksums = HashFunction.read(previous.output(), hash, executor);
+                            Map<Path, byte[]> checksums = HashFunction.read(previous.output(), files, executor);
                             HashFunction.write(previous.checksums(), checksums);
                             SequencedProperties stepProperties = new SequencedProperties();
                             stepProperties.setProperty("serialization", HexFormat.of().formatHex(currentStepHash));
@@ -362,6 +365,7 @@ class BuildExecutorDefault implements BuildExecutor {
                     BuildExecutorDefault buildExecutor = new BuildExecutorDefault(target.resolve(prefix),
                             timeout,
                             hash,
+                            files,
                             stepHash,
                             callback,
                             cache,
@@ -851,7 +855,7 @@ class BuildExecutorDefault implements BuildExecutor {
                 return StepRecord.INCOMPLETE;
             }
             Map<Path, byte[]> checksums = HashFunction.read(folder.checksums());
-            return new StepRecord(checksums, HashFunction.areConsistent(folder.output(), checksums, hash, executor));
+            return new StepRecord(checksums, HashFunction.areConsistent(folder.output(), checksums, files, executor));
         } catch (IOException | IllegalArgumentException _) {
             return StepRecord.INCOMPLETE;
         }
