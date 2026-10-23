@@ -1277,10 +1277,11 @@ public record Project(
                     one exception and is written as on a command line, `-Dkey=value`, its value a
                     variable where it differs per run, `-DshardIndex=@shard/0`. The release is not such a
                     flag: a `--release` there is refused, since maven.compiler.release, its testRelease
-                    or @jenesis.release declares it for every tool. javac runs without -g, where
-                    Maven and Gradle pass it, so a test reading parameter or local names needs `-g=`
-                    or `-parameters=`. A plugin may pass flags its configuration never shows, as
-                    a convention plugin adds -parameters or a compiler plugin its own, so compare the
+                    or @jenesis.release declares it for every tool. javac runs with -g, as Maven and
+                    Gradle do, unless a line names a -g of its own, `-g\\:none=` or `-g\\:lines,source=`,
+                    and a test reading parameter names needs `-parameters=`. A plugin may pass flags its
+                    configuration never shows, as a convention plugin adds -parameters or a compiler
+                    plugin its own, so compare the
                     old build's effective javac arguments: `mvn -X compile` prints them after
                     "Command line options:", `gradle compileJava --debug` on its "Compiler
                     arguments:" line. Checkstyle reads a copy of the sources below target/build/,

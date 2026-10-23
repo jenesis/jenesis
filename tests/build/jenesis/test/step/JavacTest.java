@@ -623,6 +623,31 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void compiles_the_names_of_local_variables_as_maven_and_gradle_do(boolean process) throws IOException {
+        String source = "package sample; public class Sample { int sum(int a) { int b = a + 1; return b; } }\n";
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"), source);
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/21/sample"))
+                .resolve("Sample.java"), source);
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
+                new BuildStepContext(previous, next, supplement, persistent),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("sources/META-INF/versions/21/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        for (String file : List.of("sample/Sample.class", "META-INF/versions/21/sample/Sample.class")) {
+            assertThat(ClassFile.of().parse(next.resolve(Javac.CLASSES + file)).methods().stream()
+                    .filter(method -> method.methodName().equalsString("sum"))
+                    .flatMap(method -> method.findAttribute(Attributes.code()).stream())
+                    .flatMap(code -> code.findAttribute(Attributes.localVariableTable()).stream())
+                    .toList())
+                    .as("javac runs with -g unless a process file names a -g of its own, so %s names its locals", file)
+                    .hasSize(1);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void versioned_compilation_honours_process_javac_properties(boolean process) throws IOException {
         Path main = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(main.resolve("Sample.java"), "package sample; public class Sample { }\n");
