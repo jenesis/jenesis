@@ -31,6 +31,7 @@ public class MultiProjectDependencies implements BuildStep {
                 Path.of(OVERRIDES),
                 Path.of(IDENTITY),
                 Path.of(Abi.ABI),
+                Path.of(Abi.TESTED),
                 Path.of(Abi.ABIS),
                 Path.of(Assign.VARIANTS),
                 Path.of(Assign.INACTIVE),
@@ -108,7 +109,6 @@ public class MultiProjectDependencies implements BuildStep {
             }
         }
         SequencedProperties properties = new SequencedProperties();
-        Set<Path> required = new HashSet<>();
         SequencedMap<String, String> versions = inherited.get(VERSIONS);
         for (Map.Entry<String, String> entry : dependencies.entrySet()) {
             String key = entry.getKey();
@@ -147,9 +147,6 @@ public class MultiProjectDependencies implements BuildStep {
                     candidate != null
                             ? fingerprint(arguments.values(), candidate)
                             : entry.getValue());
-            if (candidate != null) {
-                required.add(candidate);
-            }
         }
         Set<Path> tests = new HashSet<>();
         if (tested != null) {
@@ -162,13 +159,14 @@ public class MultiProjectDependencies implements BuildStep {
             }
         }
         for (Map.Entry<String, Path> abi : abis.entrySet()) {
-            Path jar = coordinates.get(abi.getKey());
-            if (jar != null && required.contains(jar) && !tests.contains(jar)) {
+            Path jar = coordinates.get(abi.getKey()),
+                    source = tests.contains(jar) ? abi.getValue().resolveSibling(Abi.TESTED) : abi.getValue();
+            if (jar != null && Files.isRegularFile(source)) {
                 Path target = context.next()
                         .resolve(Abi.FOLDER)
                         .resolve(BuildExecutorModule.encode(abi.getKey()) + ".properties");
                 Files.createDirectories(target.getParent());
-                Files.copy(abi.getValue(), target);
+                Files.copy(source, target);
             }
         }
         if (!variants.isEmpty()) {

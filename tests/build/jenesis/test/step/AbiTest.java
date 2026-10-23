@@ -156,6 +156,20 @@ public class AbiTest {
     }
 
     @Test
+    public void writes_for_the_tests_every_package_with_its_package_private_members_whatever_the_mode() throws IOException {
+        source("module-info", "module sample { exports sample.api; }");
+        source("sample.api.Api", "package sample.api; public class Api { void internal() { } }");
+        source("sample.internal.Internal", "package sample.internal; class Internal { }");
+        abi(Abi.Mode.MODULAR, ChecksumStatus.ADDED, null);
+        SequencedProperties tested = SequencedProperties.ofFiles(root.resolve("next-" + (run - 1)).resolve(Abi.TESTED));
+        Map<String, String> hashes = new TreeMap<>();
+        tested.forEachProperty(hashes::put);
+        assertThat(hashes)
+                .as("a test reaches the package-private members of every package of the module it tests")
+                .isEqualTo(abi(Abi.Mode.CLASSPATH, ChecksumStatus.ADDED, null));
+    }
+
+    @Test
     public void changes_the_hash_of_the_module_descriptor_when_an_export_changes() throws IOException {
         source("module-info", "module sample { exports sample.api; }");
         source("sample.api.Api", "package sample.api; public class Api { }");

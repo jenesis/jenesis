@@ -224,7 +224,21 @@ public class MultiProjectDependenciesTest {
     }
 
     @Test
-    public void withholds_the_abi_of_the_module_its_tests_are_compiled_against() throws IOException {
+    public void hands_on_the_tested_abi_of_the_module_its_tests_are_compiled_against() throws IOException {
+        requiring("main/compile/module/baz", null, null);
+        SequencedProperties module = SequencedProperties.ofFiles(this.module.resolve(BuildStep.MODULE));
+        module.setProperty("test", "baz");
+        module.store(this.module.resolve(BuildStep.MODULE));
+        Map<Path, Checksum> artifacts = sibling();
+        Files.writeString(dependency.resolve(Abi.TESTED), "baz/Baz.class=1");
+        prepare(artifacts);
+        assertThat(next.resolve(Abi.FOLDER + "module%2Fbaz.properties"))
+                .as("the tests reach the package-private members of the module they test, which its tested abi covers")
+                .hasContent("baz/Baz.class=1");
+    }
+
+    @Test
+    public void withholds_the_abi_of_the_module_its_tests_are_compiled_against_without_a_tested_abi() throws IOException {
         requiring("main/compile/module/baz", null, null);
         SequencedProperties module = SequencedProperties.ofFiles(this.module.resolve(BuildStep.MODULE));
         module.setProperty("test", "baz");
@@ -234,10 +248,12 @@ public class MultiProjectDependenciesTest {
     }
 
     @Test
-    public void hands_on_no_abi_of_a_sibling_module_it_does_not_require() throws IOException {
+    public void hands_on_the_abi_of_a_sibling_module_it_reaches_only_through_another() throws IOException {
         requiring("main/compile/module/other", null, null);
         prepare(sibling());
-        assertThat(next.resolve(Abi.FOLDER)).doesNotExist();
+        assertThat(next.resolve(Abi.FOLDER + "module%2Fbaz.properties"))
+                .as("a sibling required by a required module is on the compile path as well")
+                .hasContent("baz/Baz.class=0");
     }
 
     private Map<Path, Checksum> sibling() throws IOException {
