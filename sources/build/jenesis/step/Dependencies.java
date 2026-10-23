@@ -192,15 +192,29 @@ public class Dependencies implements BuildExecutorModule {
 
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Map<String, Boolean> snapshots = new HashMap<>();
+            Set<String> internals = new HashSet<>();
             for (BuildStepArgument argument : arguments.values()) {
-                Path requires = argument.removed() ? null : argument.folder().resolve(REQUIRES);
-                if (requires != null && Files.isRegularFile(requires)) {
-                    SequencedProperties required = SequencedProperties.ofFiles(requires);
-                    for (String key : required.stringPropertyNames()) {
-                        if (key.endsWith("-SNAPSHOT") && required.getProperty(key).isEmpty()) {
-                            return true;
+                if (argument.removed()) {
+                    continue;
+                }
+                Path requires = argument.folder().resolve(REQUIRES), internal = argument.folder().resolve(INTERNAL);
+                if (Files.isRegularFile(requires)) {
+                    SequencedProperties.ofFiles(requires).forEachProperty((key, value) -> {
+                        if (key.endsWith("-SNAPSHOT") && (group == null || key.startsWith(group + "/"))) {
+                            snapshots.merge(key, value.isEmpty(), Boolean::logicalAnd);
                         }
-                    }
+                    });
+                }
+                if (Files.isRegularFile(internal)) {
+                    internals.addAll(SequencedProperties.ofFiles(internal).stringPropertyNames());
+                }
+            }
+            for (Map.Entry<String, Boolean> snapshot : snapshots.entrySet()) {
+                String key = snapshot.getKey();
+                int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+                if (snapshot.getValue() && !internals.contains(key.substring(second + 1))) {
+                    return true;
                 }
             }
             return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
