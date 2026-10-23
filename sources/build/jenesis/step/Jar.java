@@ -147,6 +147,7 @@ public class Jar extends ProcessBuildStep {
         }
         commands.add("--manifest");
         commands.add(output.toString());
+        Map<Path, Path> added = new HashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -154,6 +155,34 @@ public class Jar extends ProcessBuildStep {
             for (String name : sort.folders) {
                 Path folder = argument.folder().resolve(name);
                 if (!Files.exists(folder)) {
+                    continue;
+                }
+                List<Path> contained;
+                try (Stream<Path> walk = Files.walk(folder, FileVisitOption.FOLLOW_LINKS)) {
+                    contained = walk.filter(Files::isRegularFile)
+                            .map(folder::relativize)
+                            .filter(file -> !BuildStep.underBuildJenesis(file)
+                                    && !file.equals(Path.of(JarFile.MANIFEST_NAME)))
+                            .sorted()
+                            .toList();
+                }
+                List<Path> kept = new ArrayList<>();
+                for (Path file : contained) {
+                    Path previous = added.putIfAbsent(file, folder.resolve(file));
+                    if (previous == null) {
+                        kept.add(file);
+                    } else if (Files.mismatch(previous, folder.resolve(file)) != -1) {
+                        throw new IllegalArgumentException(file + " is both " + previous + " and "
+                                + folder.resolve(file) + ", which differ, but a jar holds one entry by that name"
+                                + " - rename one of them or remove it from the sources or resources of the module");
+                    }
+                }
+                if (kept.size() < contained.size()) {
+                    for (Path file : kept) {
+                        commands.add("-C");
+                        commands.add(folder.toString());
+                        commands.add(file.toString());
+                    }
                     continue;
                 }
                 Path metaInf = folder.resolve("META-INF");
