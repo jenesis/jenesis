@@ -28,6 +28,47 @@ public class CompileAvoidanceTest {
     }
 
     @Test
+    public void compiles_no_dependent_again_that_reaches_the_changed_module_through_another() throws IOException {
+        library("public static String greeting() { return \"Hello\"; }");
+        Path middle = Files.createDirectories(root.resolve("middle/demo/middle"));
+        Files.writeString(root.resolve("middle/module-info.java"), """
+                module demo.middle {
+                    requires transitive demo.library;
+                    exports demo.middle;
+                }
+                """);
+        Files.writeString(middle.resolve("Middle.java"), """
+                package demo.middle;
+
+                public class Middle {
+                }
+                """);
+        Path application = Files.createDirectories(root.resolve("application/demo/application"));
+        Files.writeString(root.resolve("application/module-info.java"), """
+                module demo.application {
+                    requires demo.middle;
+                }
+                """);
+        Files.writeString(application.resolve("Application.java"), """
+                package demo.application;
+
+                public class Application {
+
+                    public static String greeting() {
+                        return demo.library.Library.greeting();
+                    }
+                }
+                """);
+        build(Map.of("abi.mode", "modular"));
+        library("public static String greeting() { return \"Hello\" + \"!\"; }");
+        build(Map.of("abi.mode", "modular"));
+        assertThat(compiled("library")).isTrue();
+        assertThat(compiled("application"))
+                .as("the abi of a module reached through another is compared as that of a module required directly")
+                .isFalse();
+    }
+
+    @Test
     public void compiles_a_dependent_again_when_the_abi_of_its_dependency_changed() throws IOException {
         library("public static String greeting() { return \"Hello\"; }");
         application();

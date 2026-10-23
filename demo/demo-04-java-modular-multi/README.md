@@ -443,6 +443,7 @@ body of `Greeter.prefix()` changed, `greeter` is compiled again, while `app` and
     [SKIPPED]   build/modules/compose/module/build-module-app/produce/assemble/binary/compiled/compile/javac
 
 A change to what `greeter` exports - a method added to `Greeter` - compiles them
-again. A test module is compiled again whenever the module it tests changed, so
-`greeter-test` always is. Without `jenesis.abi.mode`, every module requiring a
+again. A test module reaches every package of the module it tests, its
+package-private members as well, and is compiled again only when one of those
+changed, so `greeter-test` is skipped too. Without `jenesis.abi.mode`, every module requiring a
 changed module is compiled again.

@@ -194,8 +194,15 @@ public class MavenProject implements BuildExecutorModule {
                     for (int index = 0; index < spdx.size(); index++) {
                         spdxInherited.add(BuildExecutorModule.PREVIOUS + MultiProjectModule.SPDX + "-" + index);
                     }
+                    SequencedSet<String> resourceFolders = new LinkedHashSet<>();
+                    for (String key : arguments.sequencedKeySet()) {
+                        String folder = key.substring(key.lastIndexOf('/') + 1);
+                        if (folder.startsWith("resources-")) {
+                            resourceFolders.add(BuildExecutorModule.PREVIOUS + folder);
+                        }
+                    }
                     AssemblyDescriptor packaging = assembler.apply(
-                            new MavenModuleDescriptor(name, dependencies.sequencedKeySet(), Collections.emptyNavigableSet(), spdxInherited, location, test),
+                            new MavenModuleDescriptor(name, dependencies.sequencedKeySet(), resourceFolders, spdxInherited, location, test),
                             repositories,
                             resolvers);
                     return packaging.nest(packaging.build(), PRODUCE, _ -> (buildExecutor, inherited) -> {
