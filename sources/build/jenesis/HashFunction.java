@@ -8,7 +8,9 @@ public interface HashFunction {
     byte[] hash(Path file) throws IOException;
 
     static HashFunction ofFileKeys(HashFunction hash) {
-        return new FileKeyHashFunction(hash);
+        return FileSystems.getDefault().supportedFileAttributeViews().contains("unix")
+                ? new FileKeyHashFunction(hash)
+                : hash;
     }
 
     static Map<Path, byte[]> read(Path file) throws IOException {
