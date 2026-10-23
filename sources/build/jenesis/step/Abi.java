@@ -13,9 +13,9 @@ import java.lang.classfile.Attributes;
 
 public record Abi(Mode mode) implements BuildStep {
 
-    public static final String ABI = "abi.properties", ABIS = "abis.properties", FOLDER = "abi/";
+    public static final String ABI = "abi.properties", TESTED = "abi-tested.properties", ABIS = "abis.properties", FOLDER = "abi/";
     private static final String STATE = "abi-state.properties",
-            FORMAT = "1",
+            FORMAT = "2",
             MODULE_INFO = "module-info",
             PACKAGE_INFO = "package-info",
             NONE = "-";
@@ -82,7 +82,7 @@ public record Abi(Mode mode) implements BuildStep {
         SequencedProperties recorded = context.previous() != null && Files.isRegularFile(state)
                 ? SequencedProperties.ofFiles(state)
                 : new SequencedProperties();
-        if (!FORMAT.equals(recorded.getProperty("format")) || !mode.name().equals(recorded.getProperty("mode"))) {
+        if (!FORMAT.equals(recorded.getProperty("format"))) {
             recorded = new SequencedProperties();
         }
         Path classes = Path.of(CLASSES);
@@ -109,11 +109,16 @@ public record Abi(Mode mode) implements BuildStep {
         }
         SequencedProperties written = new SequencedProperties();
         written.setProperty("format", FORMAT);
-        written.setProperty("mode", mode.name());
         entries.forEach((key, entry) -> written.setProperty(key, entry.toString()));
         written.store(state);
         Map<String, List<Entry>> named = new HashMap<>();
         entries.values().forEach(entry -> named.computeIfAbsent(entry.name(), _ -> new ArrayList<>()).add(entry));
+        view(mode, entries, named).store(context.next().resolve(ABI));
+        view(Mode.CLASSPATH, entries, named).store(context.next().resolve(TESTED));
+        return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    private static SequencedProperties view(Mode mode, SortedMap<String, Entry> entries, Map<String, List<Entry>> named) {
         Set<String> exports = entries.values().stream()
                 .filter(entry -> entry.name().equals(MODULE_INFO))
                 .flatMap(entry -> entry.exports().stream())
@@ -146,14 +151,13 @@ public record Abi(Mode mode) implements BuildStep {
         SequencedProperties abi = new SequencedProperties();
         entries.forEach((key, entry) -> {
             if (included.contains(entry.name())) {
-                abi.setProperty(key, entry.hash());
+                abi.setProperty(key, mode == Mode.MODULAR ? entry.api() : entry.internal());
             }
         });
-        abi.store(context.next().resolve(ABI));
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return abi;
     }
 
-    private Entry entry(Path file) throws IOException {
+    private static Entry entry(Path file) throws IOException {
         ClassModel model = ClassFile.of().parse(file);
         String name = model.thisClass().asInternalName();
         Optional<InnerClassInfo> nested = model.findAttribute(Attributes.innerClasses()).stream()
@@ -238,9 +242,9 @@ public record Abi(Mode mode) implements BuildStep {
                 write(out, require);
             }
         }
-        SortedMap<String, byte[]> members = new TreeMap<>();
+        SortedMap<String, byte[]> members = new TreeMap<>(), exposed = new TreeMap<>();
         for (FieldModel field : model.fields()) {
-            if (!included(field.flags().flagsMask())) {
+            if ((field.flags().flagsMask() & (ClassFile.ACC_SYNTHETIC | ClassFile.ACC_PRIVATE)) != 0) {
                 continue;
             }
             ByteArrayOutputStream member = new ByteArrayOutputStream();
@@ -254,11 +258,15 @@ public record Abi(Mode mode) implements BuildStep {
                 write(fieldOut, String.valueOf(value));
             }
             element(fieldOut, field);
-            members.put("field " + field.fieldName().stringValue() + " " + field.fieldType().stringValue(),
-                    member.toByteArray());
+            String key = "field " + field.fieldName().stringValue() + " " + field.fieldType().stringValue();
+            members.put(key, member.toByteArray());
+            if ((field.flags().flagsMask() & (ClassFile.ACC_PUBLIC | ClassFile.ACC_PROTECTED)) != 0) {
+                exposed.put(key, member.toByteArray());
+            }
         }
         for (MethodModel method : model.methods()) {
-            if (method.methodName().equalsString("<clinit>") || !included(method.flags().flagsMask())) {
+            if (method.methodName().equalsString("<clinit>")
+                    || (method.flags().flagsMask() & (ClassFile.ACC_SYNTHETIC | ClassFile.ACC_PRIVATE)) != 0) {
                 continue;
             }
             ByteArrayOutputStream member = new ByteArrayOutputStream();
@@ -291,23 +299,16 @@ public record Abi(Mode mode) implements BuildStep {
                 }
             }
             element(methodOut, method);
-            members.put("method " + method.methodName().stringValue() + method.methodType().stringValue(),
-                    member.toByteArray());
-        }
-        out.writeInt(members.size());
-        for (Map.Entry<String, byte[]> member : members.entrySet()) {
-            write(out, member.getKey());
-            out.writeInt(member.getValue().length);
-            out.write(member.getValue());
+            String key = "method " + method.methodName().stringValue() + method.methodType().stringValue();
+            members.put(key, member.toByteArray());
+            if ((method.flags().flagsMask() & (ClassFile.ACC_PUBLIC | ClassFile.ACC_PROTECTED)) != 0) {
+                exposed.put(key, member.toByteArray());
+            }
         }
         out.flush();
-        MessageDigest digest;
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
-        return new Entry(HexFormat.of().formatHex(digest.digest(bytes.toByteArray())),
+        byte[] header = bytes.toByteArray();
+        return new Entry(digest(header, exposed),
+                digest(header, members),
                 access,
                 name,
                 outer,
@@ -316,11 +317,22 @@ public record Abi(Mode mode) implements BuildStep {
                 exports);
     }
 
-    private boolean included(int flags) {
-        if ((flags & (ClassFile.ACC_SYNTHETIC | ClassFile.ACC_PRIVATE)) != 0) {
-            return false;
+    private static String digest(byte[] header, SortedMap<String, byte[]> members) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytes);
+        out.write(header);
+        out.writeInt(members.size());
+        for (Map.Entry<String, byte[]> member : members.entrySet()) {
+            write(out, member.getKey());
+            out.writeInt(member.getValue().length);
+            out.write(member.getValue());
         }
-        return mode == Mode.CLASSPATH || (flags & (ClassFile.ACC_PUBLIC | ClassFile.ACC_PROTECTED)) != 0;
+        out.flush();
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static Access access(int flags) {
@@ -417,7 +429,8 @@ public record Abi(Mode mode) implements BuildStep {
         out.write(bytes);
     }
 
-    private record Entry(String hash,
+    private record Entry(String api,
+                         String internal,
                          Access access,
                          String name,
                          String outer,
@@ -428,12 +441,13 @@ public record Abi(Mode mode) implements BuildStep {
         private static Entry parse(String line) {
             String[] tokens = line.split(" ");
             return new Entry(tokens[0],
-                    Access.valueOf(tokens[1]),
-                    tokens[2],
+                    tokens[1],
+                    Access.valueOf(tokens[2]),
                     tokens[3],
                     tokens[4],
-                    tokens[5].equals(NONE) ? List.of() : List.of(tokens[5].split(",")),
-                    tokens[6].equals(NONE) ? List.of() : List.of(tokens[6].split(",")));
+                    tokens[5],
+                    tokens[6].equals(NONE) ? List.of() : List.of(tokens[6].split(",")),
+                    tokens[7].equals(NONE) ? List.of() : List.of(tokens[7].split(",")));
         }
 
         private Access access(Map<String, List<Entry>> named, Map<String, Access> effective) {
@@ -452,7 +466,8 @@ public record Abi(Mode mode) implements BuildStep {
         @Override
         public String toString() {
             return String.join(" ",
-                    hash,
+                    api,
+                    internal,
                     access.name(),
                     name,
                     outer,
