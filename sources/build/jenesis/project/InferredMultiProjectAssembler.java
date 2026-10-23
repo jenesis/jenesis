@@ -892,8 +892,13 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             SequencedMap<String, String> values = new LinkedHashMap<>();
             SequencedProperties.ofFiles(files.get(tool)).forEachProperty((key, value) -> {
                 String resolved = environment.variable(files.get(tool) + " sets " + key, value);
-                if (prefix.equals("process-") && key.startsWith("-D") && key.indexOf('=') < 0 && !resolved.isEmpty()) {
-                    values.put(key + "=" + resolved, "");
+                if (prefix.equals("process-")
+                        && (key.startsWith("-D") || key.startsWith("-J"))
+                        && key.indexOf('=') < 0
+                        && !resolved.isEmpty()) {
+                    for (String line : resolved.split("\n")) {
+                        values.put(key + "=" + line, "");
+                    }
                 } else {
                     values.put(key, resolved);
                 }

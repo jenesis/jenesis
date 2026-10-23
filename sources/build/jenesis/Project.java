@@ -1273,9 +1273,10 @@ public record Project(
                     and a flag that takes two arguments has them parted by a tab,
                     `-linkoffline=https\\://example.com/api/\\toffline/api` for javadoc's.
                     A flag that holds a `:` or `=` escapes
-                    it, since a properties file splits there: `-Xlint\\:all=`. A system property is the
-                    one exception and is written as on a command line, `-Dkey=value`, its value a
-                    variable where it differs per run, `-DshardIndex=@shard/0`. The release is not such a
+                    it, since a properties file splits there: `-Xlint\\:all=`. A system property and a
+                    -J option are the exception and are written as on a command line, `-Dkey=value` or
+                    `-J-Dstdout.encoding=UTF-8`, the value a variable where it differs per run,
+                    `-DshardIndex=@shard/0`. The release is not such a
                     flag: a `--release` there is refused, since maven.compiler.release, its testRelease
                     or @jenesis.release declares it for every tool. javac runs with -g, as Maven and
                     Gradle do, unless a line names a -g of its own, `-g\\:none=` or `-g\\:lines,source=`,

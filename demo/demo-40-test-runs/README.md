@@ -33,8 +33,8 @@ Layout
     |   |-- module-info.java     @jenesis.test; requires demo.suite
     |   `-- META-INF/build.jenesis/
     |       |-- test.properties          scan=demo.suite
-    |       `-- process-test.properties  -Ddemo.mode\=fast=
-    |-- slow/                    the same, with -Ddemo.mode\=slow=
+    |       `-- process-test.properties  -Ddemo.mode=fast
+    |-- slow/                    the same, with -Ddemo.mode=slow
     `-- maven/                   the same project as a pom.xml build
 
 There is no `pom.xml` at the root, so every `module-info.java` is a module of
@@ -74,8 +74,8 @@ The same tests, run twice
 `fast` and `slow` differ only in their `process-test.properties`, which `javac-arguments`
 introduced for the compiler:
 
-    fast/META-INF/build.jenesis/process-test.properties   -Ddemo.mode\=fast=
-    slow/META-INF/build.jenesis/process-test.properties   -Ddemo.mode\=slow=
+    fast/META-INF/build.jenesis/process-test.properties   -Ddemo.mode=fast
+    slow/META-INF/build.jenesis/process-test.properties   -Ddemo.mode=slow
 
 Each module runs the test JVM with its own flags, its own `environment-test.properties`
 and its own reports, and is selected, cached and skipped on its own. A run on
