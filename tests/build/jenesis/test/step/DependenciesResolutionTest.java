@@ -148,6 +148,56 @@ public class DependenciesResolutionTest {
     }
 
     @Test
+    public void resolves_no_snapshot_of_another_group_again() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("tool/runtime/foo/tool/1", "");
+        properties.setProperty("main/compile/foo/lib/1-SNAPSHOT", "");
+        properties.store(dependencies.resolve(BuildStep.REQUIRES));
+        Dependencies module = counting(new AtomicInteger()).group("tool");
+        execute(module);
+        String run = Files.readString(build.resolve("resolved/resolve").resolve(BuildExecutor.LOCAL));
+        execute(module);
+        assertThat(build.resolve("resolved/resolve").resolve(BuildExecutor.LOCAL))
+                .as("the step resolves the group tool alone, so a snapshot of another group does not concern it")
+                .hasContent(run);
+    }
+
+    @Test
+    public void resolves_no_snapshot_the_build_produces_again() throws IOException {
+        SequencedProperties properties = new SequencedProperties(), internal = new SequencedProperties();
+        properties.setProperty("main/compile/foo/lib/1-SNAPSHOT", "");
+        properties.store(dependencies.resolve(BuildStep.REQUIRES));
+        internal.setProperty("foo/lib/1-SNAPSHOT", "");
+        internal.store(dependencies.resolve(Dependencies.INTERNAL));
+        AtomicInteger requested = new AtomicInteger();
+        Dependencies module = counting(requested);
+        execute(module);
+        requested.set(0);
+        execute(module);
+        assertThat(requested)
+                .as("a snapshot built by this build changes only with its files, which the step is handed")
+                .hasValue(0);
+    }
+
+    private Dependencies counting(AtomicInteger requested) {
+        Repository repository = (_, coordinate, _) -> {
+            requested.incrementAndGet();
+            try {
+                return Optional.of(RepositoryItem.ofFile(Files.writeString(
+                        artifacts.resolve(coordinate.replace('/', '-') + ".jar"),
+                        coordinate)));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        };
+        return new Dependencies(Map.of("foo", repository), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+            SequencedMap<String, String> resolved = new LinkedHashMap<>();
+            descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+        }));
+    }
+
+    @Test
     public void lists_only_what_the_resolutions_it_is_handed_do_not_hold_already() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/qux", "");
