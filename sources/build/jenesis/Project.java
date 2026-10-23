@@ -1406,7 +1406,8 @@ public record Project(
                     whose dependencies changed only below their ABI; set it before timing an edit
                     against the old build.
                     A pom.xml resolves a conflict as Maven does, the version nearest the root
-                    winning, where Gradle takes the highest version requested. No setting of
+                    winning and, at one depth, the one declared first, a module's own dependencies
+                    ahead of those it inherits, where Gradle takes the highest version requested. No setting of
                     jenesis.resolver.maven does the latter: latest takes the newest version the
                     repository lists for every dependency, whatever was requested, and a
                     module-info.java build resolves as a pom.xml does. Compare the dependency trees
