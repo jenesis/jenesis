@@ -1077,7 +1077,10 @@ public class MavenPomResolver implements MavenResolver {
                             });
                             declaredDependencies.putAll(listed);
                         });
-                declaredDependencies.forEach(dependencies::putLast);
+                SequencedMap<DependencyKey, DependencyValue> inheritedDependencies = new LinkedHashMap<>(dependencies);
+                dependencies.clear();
+                dependencies.putAll(declaredDependencies);
+                inheritedDependencies.forEach(dependencies::putIfAbsent);
                 Node build = extended || trusted && path != null
                         ? toElements(document.getDocumentElement(), "build").findFirst().orElse(null)
                         : null;
