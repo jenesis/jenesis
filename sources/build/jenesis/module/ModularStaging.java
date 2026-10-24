@@ -5,7 +5,6 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Environment;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
@@ -13,20 +12,6 @@ import build.jenesis.step.Inventory;
 public class ModularStaging implements BuildStep {
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
-
-    private final boolean includeTests;
-
-    public ModularStaging() {
-        this(false);
-    }
-
-    public static ModularStaging ofEnvironment(Environment environment) {
-        return new ModularStaging(environment.flag("stage.tests"));
-    }
-
-    public ModularStaging(boolean includeTests) {
-        this.includeTests = includeTests;
-    }
 
     @Override
     public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -45,8 +30,7 @@ public class ModularStaging implements BuildStep {
             }
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
             for (String prefix : Inventory.prefixes(inventory)) {
-                String testsOf = inventory.getProperty(prefix + ".test");
-                if (!includeTests && testsOf != null || !inventory.flag(prefix + ".stage", true)) {
+                if (!inventory.flag(prefix + ".stage", true)) {
                     continue;
                 }
                 String moduleName = inventory.getProperty(prefix + ".module");

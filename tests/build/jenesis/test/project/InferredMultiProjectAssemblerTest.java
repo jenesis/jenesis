@@ -746,6 +746,22 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void archives_and_documents_no_module_its_packaging_does_not_stage() throws IOException {
+        Fixture fixture = setUp("path=\n", false, true, true);
+        Files.writeString(fixture.configuration.resolve("packaging.properties"), "stage=false\n");
+        Files.createDirectory(fixture.sources.resolve(BuildStep.SOURCES));
+        Files.writeString(fixture.sources.resolve(BuildStep.SOURCES).resolve("Foo.java"), "public class Foo {}");
+        assertThatThrownBy(() -> fixture.execute("source/sources/archive"))
+                .as("a module that is never staged has no sources jar to archive")
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: sources/archive - ");
+        assertThatThrownBy(() -> fixture.execute("document/documentation/archive"))
+                .as("nor a javadoc jar")
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: documentation/archive - ");
+    }
+
+    @Test
     public void packages_no_test_module_unless_the_tests_are_staged() throws IOException {
         Fixture fixture = setUp("path=\ntest=main_artifact\n", false, false, false, null, false, false, true);
         assertThatThrownBy(() -> fixture.execute("package/inventory"))
