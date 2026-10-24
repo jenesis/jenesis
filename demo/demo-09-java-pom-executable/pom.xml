@@ -14,16 +14,6 @@
         <mainClass>sample.Sample</mainClass>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-lang3</artifactId>
-                <version>3.14.0</version>
-                <!--Checksum/SHA-256/7b96bf3ee68949abb5bc465559ac270e0551596fa34523fddf890ec418dde13c-->
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
     <dependencies>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -33,5 +23,11 @@
     </dependencies>
     <!--jenesis.pin
     launcher/maven/build.jenesis/build.jenesis.launcher 0.6.0 SHA-256/38a0381e95f6980b965b11bc05958482d0550f3050f901a574bf30b26536539b
+    launcher/maven/build.jenesis/build.jenesis.launcher/pom 0.6.0 SHA-256/62237345fd053bdd3b0c4681f6b65d79d856eb07bb761b9cd9520626f6ba12ce
+    org.apache.commons/commons-lang3 3.14.0 SHA-256/7b96bf3ee68949abb5bc465559ac270e0551596fa34523fddf890ec418dde13c
+    maven/org.apache.commons/commons-lang3/pom 3.14.0 SHA-256/110438863bad37c28f906bf87016e38c7a8c758ba321e09d11dc5a2363a8e79e
+    maven/org.apache.commons/commons-parent/pom 64 SHA-256/6f19638994e8357b4ed734696f992057efaafa1235673998133299798e2ccddb
+    maven/org.apache/apache/pom 30 SHA-256/63dd4a393a9c0dfcb314efe83871a41d243bc8d200cbc7f2d197f30da78239d8
+    maven/org.junit/junit-bom/pom 5.10.0 SHA-256/e006dd8894f9fc7b75fc32bb12fe5ed8be65667d5b454f99e2e0b8c5bb8d30b3
     -->
 </project>
