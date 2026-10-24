@@ -479,12 +479,19 @@ class JenesisClassLoaderBridge {
                     }
                     if (type.isRecord() && bridged(type, source, target)) {
                         Class<?> counterpart = Class.forName(type.getName(), false, target);
-                        RecordComponent[] components = type.getRecordComponents();
-                        Object[] values = new Object[components.length];
-                        Class<?>[] types = new Class<?>[components.length];
-                        for (int index = 0; index < components.length; index++) {
-                            values[index] = convert(components[index].getAccessor().invoke(value), source, target);
-                            types[index] = counterpart(components[index].getType(), target);
+                        Map<String, RecordComponent> components = new HashMap<>();
+                        for (RecordComponent component : type.getRecordComponents()) {
+                            components.put(component.getName(), component);
+                        }
+                        RecordComponent[] fields = counterpart.getRecordComponents();
+                        Object[] values = new Object[fields.length];
+                        Class<?>[] types = new Class<?>[fields.length];
+                        for (int index = 0; index < fields.length; index++) {
+                            RecordComponent component = components.get(fields[index].getName());
+                            types[index] = fields[index].getType();
+                            values[index] = component == null
+                                    ? empty(types[index])
+                                    : convert(component.getAccessor().invoke(value), source, target);
                         }
                         yield counterpart.getDeclaredConstructor(types).newInstance(values);
                     }
@@ -533,6 +540,18 @@ class JenesisClassLoaderBridge {
                 collect(parent, interfaces);
             }
         }
+    }
+
+    private static Object empty(Class<?> type) {
+        if (type.isPrimitive()) {
+            return Array.get(Array.newInstance(type, 1), 0);
+        }
+        for (Object candidate : List.of(new LinkedHashMap<>(), new ArrayList<>(), new LinkedHashSet<>())) {
+            if (type.isInstance(candidate)) {
+                return candidate;
+            }
+        }
+        return type == Optional.class ? Optional.empty() : null;
     }
 
     private static Class<?> counterpart(Class<?> type, ClassLoader target) throws ClassNotFoundException {
