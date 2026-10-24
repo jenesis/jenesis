@@ -12,6 +12,7 @@ import build.jenesis.Palette;
 import build.jenesis.Permits;
 import build.jenesis.Pinning;
 import build.jenesis.Platform;
+import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
 import javax.tools.JavaFileObject;
@@ -173,6 +174,13 @@ public class PinModuleInfo implements BuildStep {
         SequencedMap<String, Inventory.Dependency> closure = Inventory.closure(arguments.values(), path);
         Set<String> internal = collectInternal(Inventory.identities(arguments.values()));
         SequencedMap<String, String> entries = collectEntries(closure, internal, checksum ? hashFunction : null);
+        if (checksum) {
+            for (Map.Entry<String, Inventory.Dependency> pom : Inventory.poms(arguments.values(), path).entrySet()) {
+                String group = pom.getValue().group(), coordinate = pom.getKey().substring(group.length() + 1);
+                entries.putIfAbsent(group.equals("main") ? coordinate : pom.getKey(),
+                        coordinate.substring(coordinate.lastIndexOf('/') + 1) + " " + pom.getValue().checksum(hashFunction));
+            }
+        }
         Set<String> covered = new HashSet<>();
         SequencedMap<String, String> references = new LinkedHashMap<>();
         if (!flatten) {
@@ -515,11 +523,11 @@ public class PinModuleInfo implements BuildStep {
                 if (insertAt < 0) {
                     insertAt = kept.size();
                 }
-                String coordinate = expand(tag.token());
+                String coordinate = Resolver.pinKey(expand(tag.token()), tag.rest());
                 if (internal.contains(coordinate.substring(coordinate.indexOf('/') + 1))) {
-                    merged.putIfAbsent(tag.token(), tag.rest());
+                    merged.putIfAbsent(Resolver.pinKey(tag.token(), tag.rest()), tag.rest());
                 } else if (!regenerated.contains(coordinate) && retained.test(coordinate)) {
-                    merged.putIfAbsent(tag.token(), tag.rest());
+                    merged.putIfAbsent(Resolver.pinKey(tag.token(), tag.rest()), tag.rest());
                     carried.add(tag.token() + " " + tag.rest());
                 }
                 continue;
@@ -540,7 +548,7 @@ public class PinModuleInfo implements BuildStep {
         }
         List<String> tags = new ArrayList<>();
         for (Map.Entry<String, String> entry : merged.entrySet()) {
-            tags.add(continuation + "@jenesis.pin " + entry.getKey() + " " + entry.getValue());
+            tags.add(continuation + "@jenesis.pin " + Resolver.pinToken(entry.getKey()) + " " + entry.getValue());
         }
         lines.addAll(insertAt, tags);
         return String.join("\n", lines);
@@ -632,7 +640,7 @@ public class PinModuleInfo implements BuildStep {
     private static String renderJavadoc(SequencedMap<String, String> entries) {
         StringBuilder sb = new StringBuilder("/**\n");
         for (Map.Entry<String, String> entry : entries.entrySet()) {
-            sb.append(" * @jenesis.pin ").append(entry.getKey()).append(" ").append(entry.getValue()).append("\n");
+            sb.append(" * @jenesis.pin ").append(Resolver.pinToken(entry.getKey())).append(" ").append(entry.getValue()).append("\n");
         }
         sb.append(" */");
         return sb.toString();

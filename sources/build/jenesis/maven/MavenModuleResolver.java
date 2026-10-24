@@ -112,89 +112,78 @@ public class MavenModuleResolver implements Resolver {
         List<MavenResolver.RootPom> rootPoms = new ArrayList<>();
         SequencedMap<MavenDependencyKey, MavenDependencyValue> mavenPins = new LinkedHashMap<>();
         SequencedMap<String, Map.Entry<String, String>> classified = new LinkedHashMap<>();
-        try {
-            for (Map.Entry<String, SequencedSet<String>> entry : coordinates.entrySet()) {
-                String coordinate = entry.getKey();
-                String pinned = versions.get(coordinate);
-                if (pinned != null && pinned.startsWith(":")) {
-                    int space = pinned.indexOf(' ');
-                    String qualifier = space < 0 ? pinned : pinned.substring(0, space);
-                    int divider = qualifier.indexOf(':', 1);
-                    String classifier = divider < 0 ? qualifier.substring(1) : qualifier.substring(1, divider);
-                    String version = divider < 0 ? null : qualifier.substring(divider + 1);
-                    if (classifier.isEmpty() || version != null && version.isEmpty()) {
-                        throw new IllegalArgumentException("Malformed classifier '" + qualifier + "' for " + coordinate
-                                + ": expected :<classifier> or :<classifier>:<version>");
+        for (Map.Entry<String, SequencedSet<String>> entry : coordinates.entrySet()) {
+            String coordinate = entry.getKey();
+            String pinned = versions.get(coordinate);
+            if (pinned != null && pinned.startsWith(":")) {
+                int space = pinned.indexOf(' ');
+                String qualifier = space < 0 ? pinned : pinned.substring(0, space);
+                int divider = qualifier.indexOf(':', 1);
+                String classifier = divider < 0 ? qualifier.substring(1) : qualifier.substring(1, divider);
+                String version = divider < 0 ? null : qualifier.substring(divider + 1);
+                if (classifier.isEmpty() || version != null && version.isEmpty()) {
+                    throw new IllegalArgumentException("Malformed classifier '" + qualifier + "' for " + coordinate
+                            + ": expected :<classifier> or :<classifier>:<version>");
+                }
+                classified.put(coordinate, Map.entry(classifier, space < 0 ? "" : pinned.substring(space + 1).trim()));
+                pinned = version;
+            }
+            MavenDependencyValue managed = toManagedValue(coordinate, pinned);
+            String fetchCoord = managed == null
+                    ? coordinate + ":pom"
+                    : coordinate + "/" + managed.version() + ":pom";
+            RepositoryItem item = repository.fetch(executor, fetchCoord)
+                    .orElseThrow(() -> new IllegalArgumentException("The module name " + coordinate
+                            + " has no artifact behind it"
+                            + (managed == null ? "" : " in version " + managed.version())
+                            + ": no POM is found for it, as the module repositories name no Maven artifact"
+                            + " that declares it - which is so for a jar that declares no module name and is"
+                            + " required by the name its file name derives - or the artifact they name"
+                            + " publishes no POM; map the name to its artifact with @jenesis.alias "
+                            + coordinate + " <groupId>/<artifactId> in module-info.java, or with"
+                            + " <!--jenesis.alias " + coordinate + " <groupId>/<artifactId>--> in pom.xml"
+                            + (managed == null ? "" : ", or pin a version the artifact is published in")));
+            List<MavenDependencyName> exclusions = null;
+            if (!entry.getValue().isEmpty()) {
+                exclusions = new ArrayList<>();
+                for (String exclude : entry.getValue()) {
+                    int separator = exclude.indexOf('/');
+                    if (separator < 1 || separator == exclude.length() - 1) {
+                        throw new IllegalArgumentException("Malformed exclusion '"
+                                + exclude
+                                + "' for "
+                                + coordinate
+                                + ": expected <groupId>/<artifactId>");
                     }
-                    classified.put(coordinate, Map.entry(classifier, space < 0 ? "" : pinned.substring(space + 1).trim()));
-                    pinned = version;
-                }
-                MavenDependencyValue managed = toManagedValue(coordinate, pinned);
-                String fetchCoord = managed == null
-                        ? coordinate + ":pom"
-                        : coordinate + "/" + managed.version() + ":pom";
-                RepositoryItem item = repository.fetch(executor, fetchCoord)
-                        .orElseThrow(() -> new IllegalArgumentException("The module name " + coordinate
-                                + " has no artifact behind it"
-                                + (managed == null ? "" : " in version " + managed.version())
-                                + ": no POM is found for it, as the module repositories name no Maven artifact"
-                                + " that declares it - which is so for a jar that declares no module name and is"
-                                + " required by the name its file name derives - or the artifact they name"
-                                + " publishes no POM; map the name to its artifact with @jenesis.alias "
-                                + coordinate + " <groupId>/<artifactId> in module-info.java, or with"
-                                + " <!--jenesis.alias " + coordinate + " <groupId>/<artifactId>--> in pom.xml"
-                                + (managed == null ? "" : ", or pin a version the artifact is published in")));
-                List<MavenDependencyName> exclusions = null;
-                if (!entry.getValue().isEmpty()) {
-                    exclusions = new ArrayList<>();
-                    for (String exclude : entry.getValue()) {
-                        int separator = exclude.indexOf('/');
-                        if (separator < 1 || separator == exclude.length() - 1) {
-                            throw new IllegalArgumentException("Malformed exclusion '"
-                                    + exclude
-                                    + "' for "
-                                    + coordinate
-                                    + ": expected <groupId>/<artifactId>");
-                        }
-                        exclusions.add(new MavenDependencyName(
-                                exclude.substring(0, separator), exclude.substring(separator + 1)));
-                    }
-                }
-                rootPoms.add(new MavenResolver.RootPom(item.toInputStream(),
-                        managed == null ? null : managed.checksum(),
-                        coordinate,
-                        managed != null,
-                        exclusions));
-            }
-            for (Map.Entry<String, String> pin : versions.entrySet()) {
-                if (pin.getKey().indexOf('/') < 0) {
-                    continue;
-                }
-                MavenDependencyValue managed = toManagedValue(pin.getKey(), pin.getValue());
-                if (managed != null) {
-                    mavenPins.put(MavenDependencyKey.parseKey(pin.getKey()), managed);
+                    exclusions.add(new MavenDependencyName(
+                            exclude.substring(0, separator), exclude.substring(separator + 1)));
                 }
             }
-            managedExclusions.forEach((coordinate, excludes) -> mavenPins.merge(MavenDependencyKey.parseKey(coordinate),
-                    new MavenDependencyValue(null, null, null, excludes.stream().map(exclude -> {
-                        int separator = exclude.indexOf('/');
-                        if (separator < 1 || separator == exclude.length() - 1) {
-                            throw new IllegalArgumentException("Malformed managed exclusion '" + exclude + "' for "
-                                    + coordinate + ": expected <groupId>/<artifactId>");
-                        }
-                        return new MavenDependencyName(exclude.substring(0, separator), exclude.substring(separator + 1));
-                    }).toList(), null, null),
-                    (pinned, excluded) -> pinned.exclusions(excluded.exclusions())));
-        } catch (RuntimeException | IOException e) {
-            for (MavenResolver.RootPom opened : rootPoms) {
-                try {
-                    opened.pom().close();
-                } catch (IOException suppressed) {
-                    e.addSuppressed(suppressed);
-                }
-            }
-            throw e;
+            rootPoms.add(new MavenResolver.RootPom(item,
+                    managed == null ? null : managed.checksum(),
+                    coordinate,
+                    managed != null,
+                    exclusions));
         }
+        for (Map.Entry<String, String> pin : versions.entrySet()) {
+            if (pin.getKey().indexOf('/') < 0 || Resolver.pom(pin.getKey())) {
+                continue;
+            }
+            MavenDependencyValue managed = toManagedValue(pin.getKey(), pin.getValue());
+            if (managed != null) {
+                mavenPins.put(MavenDependencyKey.parseKey(pin.getKey()), managed);
+            }
+        }
+        managedExclusions.forEach((coordinate, excludes) -> mavenPins.merge(MavenDependencyKey.parseKey(coordinate),
+                new MavenDependencyValue(null, null, null, excludes.stream().map(exclude -> {
+                    int separator = exclude.indexOf('/');
+                    if (separator < 1 || separator == exclude.length() - 1) {
+                        throw new IllegalArgumentException("Malformed managed exclusion '" + exclude + "' for "
+                                + coordinate + ": expected <groupId>/<artifactId>");
+                    }
+                    return new MavenDependencyName(exclude.substring(0, separator), exclude.substring(separator + 1));
+                }).toList(), null, null),
+                (pinned, excluded) -> pinned.exclusions(excluded.exclusions())));
         MavenRepository mavenRepo = MavenRepository.of(repositories.getOrDefault(mavenPrefix, Repository.empty()));
         MavenResolver.Closure resolution = delegate.dependencies(
                 executor, mavenRepo, rootPoms, mavenPins, MavenDependencyScope.COMPILE, mavenPrefix);
@@ -281,7 +270,7 @@ public class MavenModuleResolver implements Resolver {
                     artifact != null && artifact.internal(),
                     resolution.licenses().getOrDefault(withVersion, List.of())));
         });
-        return new Resolver.Resolution(materialized, resolution.edges(), nodes);
+        return new Resolver.Resolution(materialized, resolution.edges(), nodes, resolution.poms());
     }
 
     private static MavenDependencyValue toManagedValue(String coordinate, String pinned) {

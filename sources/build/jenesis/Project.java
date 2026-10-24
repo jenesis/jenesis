@@ -206,7 +206,7 @@ public record Project(
             executor.addModule(PIN, PinModule.ofEnvironment(project.environment(),
                     project.root(),
                     "pom.xml",
-                    (path, file) -> PinPom.ofEnvironment(project.environment(), "maven", path, List.of(file), project.hashFunction()),
+                    (path, file) -> PinPom.ofEnvironment(project.environment(), path, List.of(file), project.hashFunction()),
                     project.hashFunction()).plugins(project.toolPlugins()), BUILD, RELEASE);
             executor.addModule(PLUGIN, project.toolPlugins().goal(project.profiles()));
             return name -> {
@@ -1386,16 +1386,12 @@ public record Project(
                     again; -Djenesis.test.skip=true leaves the tests to the next build. It runs
                     last, after `stage` and a dry `release`, so the tool of a release plugin such
                     as JReleaser is resolved and pinned with the rest.
-                    Commit before the first `pin`. It writes the versions and checksums it resolved
-                    into each pom.xml's <dependencyManagement>, updating an entry where it stands and
-                    adding the others at its end; every other entry, an imported BOM, a sibling
-                    module's and a comment, stays as written, a SNAPSHOT is given no checksum, and an
-                    entry `pin` wrote that nothing resolves any longer is dropped. Review that diff. An entry keeps the ${...} its coordinate was written with, and
-                    its version property where that still names the version resolved, so a
-                    classifier an OS profile selects stays selectable. A pinned entry outranks a BOM, as any managed version does,
-                    so it repeats the exclusions and the <scope> the BOM managed for it: to
-                    move to a new BOM version, change it, delete the entries `pin` wrote and pin
-                    again. `pin` resolves what the active profiles build, so run it with every profile
+                    Commit before the first `pin`. It writes the versions and checksums it resolved,
+                    those of every POM read among them, into a <!--jenesis.pin--> comment of each
+                    pom.xml, which changes nothing Maven resolves; <dependencyManagement> stays as
+                    written but for the entries carrying a <!--Checksum/...--> comment, which an earlier
+                    `pin` wrote and which it removes, and a SNAPSHOT is given no checksum. Review that
+                    diff. `pin` resolves what the active profiles build, so run it with every profile
                     CI builds with, as -Djenesis.make.profiles=release,docker, or a tool only one of
                     them switches on stays unpinned. Then build with -Djenesis.dependency.pin=strict, as CI should. Before retiring the old build, compare what both produce: the jar
                     contents, the dependency tree (`dependencies` against mvn dependency:tree or
@@ -2104,7 +2100,9 @@ public record Project(
                           place of its jar on every path, in both modular layouts and for an aliased
                           name as well; a module of this build is selected as :<classifier> alone,
                           resolving to the variant its classifiers.properties declares, and fails
-                          naming the profile or the file to set where it declares none.
+                          naming the profile or the file to set where it declares none. A token
+                          maven/<groupId>/<artifactId>/pom with a checksum pins the POM read at that
+                          version, a line per version read, and selects no version.
                       @jenesis.signature <algo>/<hex> | Sigstore/<host>/<path> <token>... | [<group>/]signature-<name>.properties
                           Declare the OpenPGP key that signs these coordinates' artifacts - the
                           fingerprint first, because one key normally signs many. A Maven token may
@@ -2583,16 +2581,17 @@ public record Project(
 
                     Pin external dependencies so every machine resolves the same artifacts, and offer
                     to pin whenever you add or change one. `pin` records resolved versions and
-                    checksums back into pom.xml (<dependencyManagement> with <!--Checksum/<algo>/<hex>-->
-                    and a <!--jenesis.pin ... --> comment) or module-info.java (@jenesis.pin tags),
-                    idempotently, refreshing only the lines matching the local platform. An entry whose
-                    version is a property keeps it, and its checksum names the version it was taken of
-                    (<!--Checksum/SHA-256/<hex> 2.2.20-->), so it applies to no other: pin again after
-                    the property changes. It covers the
+                    checksums back into pom.xml (a <!--jenesis.pin ... --> comment, which changes
+                    nothing Maven resolves) or module-info.java (@jenesis.pin tags), idempotently,
+                    refreshing only the lines matching the local platform. Beside a line per jar it
+                    writes one per POM the resolution read - a dependency's own, every parent, every
+                    imported BOM - as maven/<groupId>/<artifactId>/pom <version> <algo>/<hex>, once per
+                    version read; such a line pins the bytes of that file and selects no version,
+                    which the POM naming it decides. It covers the
                     whole project; to pin one module, name its step (pin/module-foo+bar) rather than
-                    adding +<module>. A pom.xml's main and test halves share one <dependencyManagement>,
-                    so where they resolve a coordinate at different versions its entry takes the
-                    version the pom declares itself, which the other half then resolves as well.
+                    adding +<module>. A pom.xml's main and test halves share one comment, so where
+                    they resolve a coordinate at different versions its line takes the version the
+                    pom declares itself, which the other half then resolves as well.
                     -Djenesis.pin.file=<path> writes the closure of every module's main group to that
                     properties file instead of the declarations, in the grammar @jenesis.bom reads,
                     which is how a local bill of materials is refreshed rather than hand-edited. Only
@@ -2605,7 +2604,8 @@ public record Project(
                     module resolves alone, so nothing makes them agree: pin/divergence reports every
                     coordinate the tree pins at more than one version, which is the signal that a
                     shared version table is overdue. Enforce
-                    coverage with -Djenesis.dependency.pin=strict; refresh with
+                    coverage with -Djenesis.dependency.pin=strict, which fails a resolution reading a
+                    jar or a POM without a pinned checksum; refresh with
                     -Djenesis.dependency.pin=ignore and the `pin` selector. A checksum says the bytes
                     did not change since they were vetted, not who produced them; @jenesis.signature
                     declares the OpenPGP key that signs a coordinate, and -Djenesis.dependency.signature
@@ -3121,6 +3121,21 @@ public record Project(
                     pins.putIfAbsent(segments[0] + "/" + segments[2].substring(0, version),
                             segments[2].substring(version + 1) + (checksum == null ? "" : " " + checksum));
                 }
+                Path poms = argument.folder().resolve(Dependencies.POMS);
+                if (!Files.isRegularFile(poms)) {
+                    continue;
+                }
+                SequencedProperties read = SequencedProperties.ofFiles(poms);
+                for (String key : read.stringPropertyNames()) {
+                    String group = key.substring(0, key.indexOf('/'));
+                    int colon = group.indexOf(':');
+                    if (plugins.contains(colon < 0 ? group : group.substring(0, colon))) {
+                        String value = read.getProperty(key).trim();
+                        int space = value.indexOf(' ');
+                        pins.putIfAbsent(key, key.substring(key.lastIndexOf('/') + 1) + " " + hashFunction.encodedHash(
+                                argument.folder().resolve(space < 0 ? value : value.substring(0, space))));
+                    }
+                }
             }
             if (Files.isRegularFile(file)) {
                 SequencedProperties existing = SequencedProperties.ofFiles(file);
@@ -3206,6 +3221,13 @@ public record Project(
                                 : coordinate;
                     }
                     entries.putIfAbsent(entry, value);
+                }
+                for (Map.Entry<String, Inventory.Dependency> pom : Inventory.poms(arguments.values(), path).entrySet()) {
+                    if (pom.getValue().group().equals("main")) {
+                        String coordinate = pom.getKey().substring("main/".length());
+                        entries.putIfAbsent(coordinate, coordinate.substring(coordinate.lastIndexOf('/') + 1)
+                                + " " + pom.getValue().checksum(hashFunction));
+                    }
                 }
             }
             for (Path other : provided) {
