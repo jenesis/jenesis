@@ -185,7 +185,7 @@ public record Project(
                 sub.addModule(ProjectPlugins.POSTPROCESS, project.toolPlugins().postprocess(project.profiles()), "maven");
             }, METADATA);
             SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
-            trees.put("maven", MavenRepositoryStaging.ofEnvironment(project.environment()));
+            trees.put("maven", new MavenRepositoryStaging());
             trees.put("packages", new ImageStaging("package").noFolder(true));
             trees.put("native", new ImageStaging("native").noFolder(true));
             trees.put("docker", new ImageStaging("docker"));
@@ -282,7 +282,7 @@ public record Project(
                 sub.addModule(ProjectPlugins.POSTPROCESS, project.toolPlugins().postprocess(project.profiles()), "modules");
             }, METADATA);
             SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
-            trees.put("modular", ModularStaging.ofEnvironment(project.environment()));
+            trees.put("modular", new ModularStaging());
             trees.put("packages", new ImageStaging("package").noFolder(true));
             trees.put("runtime", new ImageStaging("image"));
             trees.put("layers", new ImageStaging("layers"));
@@ -387,8 +387,8 @@ public record Project(
                 sub.addModule(ProjectPlugins.POSTPROCESS, project.toolPlugins().postprocess(project.profiles()), "modules");
             }, METADATA);
             SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
-            trees.put("maven", MavenRepositoryStaging.ofEnvironment(project.environment()));
-            trees.put("modular", ModularStaging.ofEnvironment(project.environment()));
+            trees.put("maven", new MavenRepositoryStaging());
+            trees.put("modular", new ModularStaging());
             trees.put("packages", new ImageStaging("package").noFolder(true));
             trees.put("runtime", new ImageStaging("image"));
             trees.put("layers", new ImageStaging("layers"));
@@ -1263,6 +1263,7 @@ public record Project(
                       maven.deploy.skip, maven.install.skip
                       as for a module of tests alone       stage=false in packaging.properties: built
                                                            and tested, never staged, so neither
+                                                           archived, documented, packaged,
                                                            exported nor released; the pom.xml
                                                            property itself is not read
 
@@ -1273,14 +1274,16 @@ public record Project(
                     and a flag that takes two arguments has them parted by a tab,
                     `-linkoffline=https\\://example.com/api/\\toffline/api` for javadoc's.
                     A flag that holds a `:` or `=` escapes
-                    it, since a properties file splits there: `-Xlint\\:all=`. A system property is the
-                    one exception and is written as on a command line, `-Dkey=value`, its value a
-                    variable where it differs per run, `-DshardIndex=@shard/0`. The release is not such a
+                    it, since a properties file splits there: `-Xlint\\:all=`. A system property and a
+                    -J option are the exception and are written as on a command line, `-Dkey=value` or
+                    `-J-Dstdout.encoding=UTF-8`, the value a variable where it differs per run,
+                    `-DshardIndex=@shard/0`. The release is not such a
                     flag: a `--release` there is refused, since maven.compiler.release, its testRelease
-                    or @jenesis.release declares it for every tool. javac runs without -g, where
-                    Maven and Gradle pass it, so a test reading parameter or local names needs `-g=`
-                    or `-parameters=`. A plugin may pass flags its configuration never shows, as
-                    a convention plugin adds -parameters or a compiler plugin its own, so compare the
+                    or @jenesis.release declares it for every tool. javac runs with -g, as Maven and
+                    Gradle do, unless a line names a -g of its own, `-g\\:none=` or `-g\\:lines,source=`,
+                    and a test reading parameter names needs `-parameters=`. A plugin may pass flags its
+                    configuration never shows, as a convention plugin adds -parameters or a compiler
+                    plugin its own, so compare the
                     old build's effective javac arguments: `mvn -X compile` prints them after
                     "Command line options:", `gradle compileJava --debug` on its "Compiler
                     arguments:" line. Checkstyle reads a copy of the sources below target/build/,
@@ -1404,7 +1407,8 @@ public record Project(
                     whose dependencies changed only below their ABI; set it before timing an edit
                     against the old build.
                     A pom.xml resolves a conflict as Maven does, the version nearest the root
-                    winning, where Gradle takes the highest version requested. No setting of
+                    winning and, at one depth, the one declared first, a module's own dependencies
+                    ahead of those it inherits, where Gradle takes the highest version requested. No setting of
                     jenesis.resolver.maven does the latter: latest takes the newest version the
                     repository lists for every dependency, whatever was requested, and a
                     module-info.java build resolves as a pom.xml does. Compare the dependency trees
@@ -1734,13 +1738,14 @@ public record Project(
                           jenesis.project.version names one
                       maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (8, 74),
                           whose jar holds the sources and, as Maven's and Gradle's do, the resources,
-                          including those of -Djenesis.project.resources; set it, and the next one,
+                          including those of -Djenesis.project.resources, for a staged module only;
+                          set it, and the next one,
                           in the profile a release activates, such as jenesis-release.properties,
                           never in jenesis.properties, so that a regular build neither archives the
                           sources nor renders the documentation and nothing waits for either
                       maven-javadoc-plugin / withJavadocJar(), Dokka
                           -> -Djenesis.project.documentation=true (8, 74), which documents
-                          the main modules, a test module only under jenesis.stage.tests, one with a
+                          every staged module, a test module only under jenesis.stage.tests, one with a
                           module-info.java as that module (module-summary.html, its pages below the
                           module's name), as maven-javadoc-plugin and Gradle do; javadoc runs with
                           -Xdoclint:none unless process-javadoc.properties names an -Xdoclint flag,
@@ -2306,9 +2311,10 @@ public record Project(
                                                 package into the image instead of the jars, built
                                                 and staged only if jpackage lists it too,
                                                 stage=false to build and test the module but keep
-                                                its jar, POM, sources and documentation out of the
-                                                staged repositories, so neither export nor release
-                                                ships them
+                                                its jar and POM out of the staged repositories and
+                                                assemble no sources, documentation or packages for
+                                                it, so neither export nor release ships them; a test
+                                                module is unstaged unless jenesis.stage.tests is set
                       classifiers.properties    <classifier>=<folder>[,<folder>...] per line, each a
                                                 variant of the module's jar holding its files and
                                                 the files of the folders, named from the module's
@@ -4712,8 +4718,8 @@ public record Project(
                 project.await||Phases of the modules a module depends on that its build waits for, comma-separated, such as verify for their checks, so that a module builds only once the modules it depends on passed them; by default a build waits for their builds alone, and every phase runs as soon as what it reads is built
                 project.artifacts||Folder resolved dependencies and repository metadata are cached in; a file a project provides names only a folder inside the project
                 project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project, and modular also loads every jar of a plugin jenesis.plugins.properties names by its module as a module, where the others load a jar without a module name on the plugin's class path, and refuses one named by a Maven coordinate
-                project.sources|false|Assemble a sources jar for every module
-                project.documentation|false|Assemble a javadoc jar for every module, a test module only where jenesis.stage.tests stages it
+                project.sources|false|Assemble a sources jar for every staged module
+                project.documentation|false|Assemble a javadoc jar for every staged module
                 documentation.empty|false|Archive that javadoc jar holding nothing but an INTENTIONALLY_EMPTY file instead of rendering the documentation, for a repository such as Maven Central that requires the jar but not its content
                 project.version||Version stamped onto every produced artifact, a module version that starts with a digit; unset leaves modules unversioned and POMs at 0-SNAPSHOT, and an empty value is refused
                 project.tag||SCM tag recorded in the generated POM and SBOM; empty for none
@@ -4832,7 +4838,7 @@ public record Project(
                 test.incremental||Run only the tests a change can reach: true, or the setting named with no value, detects changes with MD5, the name of another message digest with that one, and false runs every test
                 test.parallel|false|Let the engine execute the matched tests concurrently
                 test.reporting|false|Write a test run's reports into the module's reports/tests folder - the legacy JUnit XML and the open-test-reporting XML - and name that folder when the run fails; without it the JUnit Platform writes none
-                stage.tests|false|Stage test-variant artifacts alongside the main ones
+                stage.tests|false|Stage test modules alongside the main ones; a test module is otherwise unstaged, as stage=false leaves a module
                 tree.format|full|full|compact: what the dependencies selector prints
                 tree.merge|true|One tree per module whose every node names the scopes it applies to; false prints one tree per module and scope
                 tree.internal|false|List the project's own modules among the resolved dependencies and count them in the license summary

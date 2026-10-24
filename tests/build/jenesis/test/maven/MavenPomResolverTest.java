@@ -1038,11 +1038,80 @@ public class MavenPomResolverTest {
                 null);
         assertThat(dependencies).containsExactly(
                 Map.entry(
-                        new MavenDependencyKey("other", "artifact", "jar", null),
+                        new MavenDependencyKey("transitive", "artifact", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)),
                 Map.entry(
-                        new MavenDependencyKey("transitive", "artifact", "jar", null),
+                        new MavenDependencyKey("other", "artifact", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
+    }
+
+    @Test
+    public void breaks_a_tie_at_one_depth_by_the_own_dependencies_before_the_inherited_ones_as_maven_does() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>parent</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>own</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("parent", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>inherited</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        for (String[] declaration : List.of(new String[]{"own", "1"}, new String[]{"inherited", "2"})) {
+            addToRepository(declaration[0], "artifact", "1", """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                        <modelVersion>4.0.0</modelVersion>
+                        <dependencies>
+                            <dependency>
+                                <groupId>shared</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>%s</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                    """.formatted(declaration[1]));
+        }
+        for (String version : List.of("1", "2")) {
+            addToRepository("shared", "artifact", version, """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                        <modelVersion>4.0.0</modelVersion>
+                    </project>
+                    """);
+        }
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+                Runnable::run,
+                mavenRepository,
+                "group",
+                "artifact",
+                "1",
+                null);
+        assertThat(dependencies.get(new MavenDependencyKey("shared", "artifact", "jar", null)).version())
+                .as("Maven's effective POM lists a module's own dependencies before those of its parent, so at one"
+                        + " depth the version an own dependency names wins")
+                .isEqualTo("1");
     }
 
     @Test
@@ -6593,10 +6662,10 @@ public class MavenPomResolverTest {
         assertThat(pom.version()).isEqualTo("1");
         assertThat(pom.dependencies()).containsExactly(
                 Map.entry(
-                        new MavenDependencyKey("group", "parent", "jar", null),
+                        new MavenDependencyKey("group", "artifact", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)),
                 Map.entry(
-                        new MavenDependencyKey("group", "artifact", "jar", null),
+                        new MavenDependencyKey("group", "parent", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
         assertThat(pom.managedDependencies()).containsExactly(
                 Map.entry(
@@ -6672,10 +6741,10 @@ public class MavenPomResolverTest {
         assertThat(pom.version()).isEqualTo("1");
         assertThat(pom.dependencies()).containsExactly(
                 Map.entry(
-                        new MavenDependencyKey("group", "parent", "jar", null),
+                        new MavenDependencyKey("group", "artifact", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)),
                 Map.entry(
-                        new MavenDependencyKey("group", "artifact", "jar", null),
+                        new MavenDependencyKey("group", "parent", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
         assertThat(pom.managedDependencies()).containsExactly(
                 Map.entry(

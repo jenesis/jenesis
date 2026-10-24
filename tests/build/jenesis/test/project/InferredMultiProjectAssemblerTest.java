@@ -349,6 +349,22 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void a_jvm_option_in_a_process_file_is_one_argument_per_line_of_its_value() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("process-javac.properties"),
+                "-J-Dstdout.encoding=UTF-8\n-J--add-exports=jdk.compiler/a=ALL-UNNAMED\\njdk.compiler/b=ALL-UNNAMED\n-J-Xmx1g=\n");
+        Path prepareOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(Environment.NONE), "build/prepare")
+                .get("build/prepare");
+        SequencedProperties arguments = readProperties(ProcessBuildStep.locate(prepareOutput, ProcessBuildStep.PROCESS, "javac"));
+        assertThat(arguments.stringPropertyNames())
+                .as("a -J option reaches the JVM as one argument, so its value joins it rather than following it")
+                .contains("-J-Dstdout.encoding=UTF-8",
+                        "-J--add-exports=jdk.compiler/a=ALL-UNNAMED",
+                        "-J--add-exports=jdk.compiler/b=ALL-UNNAMED",
+                        "-J-Xmx1g");
+    }
+
+    @Test
     public void a_variable_that_is_not_set_and_has_no_default_names_the_setting() throws IOException {
         Fixture fixture = setUp("main=\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("environment-test.properties"), "GREETING=@greeting\n");
@@ -707,12 +723,54 @@ public class InferredMultiProjectAssemblerTest {
         assertThatThrownBy(() -> fixture.execute("document/documentation/archive"))
                 .as("the documentation of a test module is never published unless its artifacts are staged")
                 .rootCause()
-                .hasMessageStartingWith("Unknown selector: archive - ");
+                .hasMessageStartingWith("Unknown selector: documentation/archive - ");
         Files.createDirectory(fixture.sources.resolve(BuildStep.SOURCES));
         Files.writeString(fixture.sources.resolve(BuildStep.SOURCES).resolve("FooTest.java"), "public class FooTest {}");
         Path javadocOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
                 new Environment(Map.of("stage.tests", "true"))), "document/documentation/archive").get("document/documentation/archive");
         assertThat(javadocOutput.resolve("documentation").resolve("javadoc.jar")).exists();
+    }
+
+    @Test
+    public void archives_the_sources_of_no_test_module_unless_the_tests_are_staged() throws IOException {
+        Fixture fixture = setUp("path=\ntest=main_artifact\n", false, true, false);
+        Files.createDirectory(fixture.sources.resolve(BuildStep.SOURCES));
+        Files.writeString(fixture.sources.resolve(BuildStep.SOURCES).resolve("FooTest.java"), "public class FooTest {}");
+        assertThatThrownBy(() -> fixture.execute("source/sources/archive"))
+                .as("the sources of a test module are archived only where its artifacts are staged")
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: sources/archive - ");
+        assertThat(fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
+                new Environment(Map.of("stage.tests", "true"))), "source/sources/archive"))
+                .containsKey("source/sources/archive");
+    }
+
+    @Test
+    public void archives_and_documents_no_module_its_packaging_does_not_stage() throws IOException {
+        Fixture fixture = setUp("path=\n", false, true, true);
+        Files.writeString(fixture.configuration.resolve("packaging.properties"), "stage=false\n");
+        Files.createDirectory(fixture.sources.resolve(BuildStep.SOURCES));
+        Files.writeString(fixture.sources.resolve(BuildStep.SOURCES).resolve("Foo.java"), "public class Foo {}");
+        assertThatThrownBy(() -> fixture.execute("source/sources/archive"))
+                .as("a module that is never staged has no sources jar to archive")
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: sources/archive - ");
+        assertThatThrownBy(() -> fixture.execute("document/documentation/archive"))
+                .as("nor a javadoc jar")
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: documentation/archive - ");
+    }
+
+    @Test
+    public void packages_no_test_module_unless_the_tests_are_staged() throws IOException {
+        Fixture fixture = setUp("path=\ntest=main_artifact\n", false, false, false, null, false, false, true);
+        assertThatThrownBy(() -> fixture.execute("package/inventory"))
+                .as("a test module is packaged only where its artifacts are staged")
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: inventory - ");
+        assertThat(fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
+                new Environment(Map.of("stage.tests", "true"))), "package/inventory"))
+                .containsKey("package/inventory");
     }
 
     @Test

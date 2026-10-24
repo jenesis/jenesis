@@ -130,6 +130,49 @@ public class JarTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void holds_a_file_its_sources_and_resources_both_hold_once(boolean process) throws IOException {
+        Path sources = Files.createDirectories(classes.resolve(BuildStep.SOURCES + "sample"));
+        Path resources = Files.createDirectories(root.resolve("resources").resolve(BuildStep.RESOURCES + "sample"));
+        for (Path folder : List.of(sources, resources)) {
+            Files.writeString(folder.resolve("Sample.java"), "package sample; public class Sample { }");
+        }
+        Files.writeString(resources.resolve("sample.txt"), "sample");
+        LinkedHashMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(classes, Map.of()));
+        arguments.put("resources", new BuildStepArgument(root.resolve("resources"), Map.of()));
+        BuildStepResult result = Jar.ofEnvironment(Environment.NONE,
+                process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL,
+                Jar.Sort.SOURCES).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement, persistent),
+                arguments).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        try (JarFile file = new JarFile(next.resolve(BuildStep.SOURCES + "sources.jar").toFile())) {
+            assertThat(file.stream().map(JarEntry::getName).filter(name -> !name.endsWith("/")).toList())
+                    .as("a resource folder that is the source folder, as Guava's test folder, adds its sources once")
+                    .containsExactlyInAnyOrder("META-INF/MANIFEST.MF", "sample/Sample.java", "sample/sample.txt");
+        }
+    }
+
+    @Test
+    public void refuses_a_file_two_folders_hold_with_different_content() throws IOException {
+        Path sources = Files.createDirectories(classes.resolve(BuildStep.SOURCES + "sample"));
+        Path resources = Files.createDirectories(root.resolve("resources").resolve(BuildStep.RESOURCES + "sample"));
+        Files.writeString(sources.resolve("sample.txt"), "one");
+        Files.writeString(resources.resolve("sample.txt"), "other");
+        LinkedHashMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(classes, Map.of()));
+        arguments.put("resources", new BuildStepArgument(root.resolve("resources"), Map.of()));
+        assertThatThrownBy(() -> Jar.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL, Jar.Sort.SOURCES).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement, persistent),
+                arguments).toCompletableFuture().join())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageStartingWith(Path.of("sample/sample.txt") + " is both " + sources.resolve("sample.txt"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void can_execute_javadoc_jar(boolean process) throws IOException {
         Path folder = Files.createDirectory(classes.resolve(Javadoc.JAVADOC));
         Files.writeString(Files

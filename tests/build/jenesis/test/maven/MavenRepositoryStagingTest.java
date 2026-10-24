@@ -37,7 +37,7 @@ public class MavenRepositoryStagingTest {
         writeArtifact(inv, "sources.jar", "sources-bytes");
         writeArtifact(inv, "javadoc.jar", "javadoc-bytes");
 
-        BuildStepResult result = run(true, inv);
+        BuildStepResult result = run(inv);
 
         assertThat(result.next()).isTrue();
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).hasContent("classes-bytes");
@@ -61,7 +61,7 @@ public class MavenRepositoryStagingTest {
         sources.setProperty("module-foo.sources.0", "sources/sources.jar");
         sources.store(sourced.resolve(Inventory.INVENTORY));
 
-        run(true, inv, documented, sourced);
+        run(inv, documented, sourced);
 
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).hasContent("classes-bytes");
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-javadoc.jar"))
@@ -80,7 +80,7 @@ public class MavenRepositoryStagingTest {
         inventory.setProperty("module-bom.packaging", "pom");
         inventory.store(inventoryDir.resolve(Inventory.INVENTORY));
 
-        BuildStepResult result = run(true, inventoryDir);
+        BuildStepResult result = run(inventoryDir);
 
         assertThat(result.next()).isTrue();
         assertThat(next.resolve("com/example/foo-bom/1.2.3/foo-bom-1.2.3.pom")).exists();
@@ -99,7 +99,7 @@ public class MavenRepositoryStagingTest {
         inventory.setProperty("module-bar.stage", "false");
         inventory.store(skipped.resolve(Inventory.INVENTORY));
 
-        run(true, published, skipped);
+        run(published, skipped);
 
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).exists();
         assertThat(next.resolve("com/example/bar"))
@@ -117,7 +117,7 @@ public class MavenRepositoryStagingTest {
         Path test = testInventory("foo-test", "com.example", "foo.test", "1.2.3", "foo", List.of(), "classes.jar");
         writeArtifact(test, "classes.jar", "test-bytes");
 
-        run(true, main, test);
+        run(main, test);
 
         assertThat(next.resolve("com/example/foo"))
                 .as("the tests of a module that is not staged have no artifact to be staged beside")
@@ -143,7 +143,7 @@ public class MavenRepositoryStagingTest {
         inventory.setProperty("module-foo.report.sbom", "../../produce/assemble/sbom/output/reports/sbom");
         inventory.store(inventoryDir.resolve(Inventory.INVENTORY));
 
-        BuildStepResult result = run(true, inventoryDir);
+        BuildStepResult result = run(inventoryDir);
 
         assertThat(result.next()).isTrue();
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).hasContent("classes-bytes");
@@ -161,7 +161,7 @@ public class MavenRepositoryStagingTest {
         attached.store(additions.resolve(Inventory.INVENTORY));
         Files.writeString(Files.createDirectories(additions.resolve("attachment/licenses")).resolve("LICENSES.zip"), "zip");
 
-        run(true, inv, additions);
+        run(inv, additions);
 
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).hasContent("c");
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-licenses.zip")).hasContent("zip");
@@ -177,7 +177,7 @@ public class MavenRepositoryStagingTest {
         attached.store(additions.resolve(Inventory.INVENTORY));
         Files.writeString(additions.resolve("LICENSES.zip"), "zip");
 
-        run(true, inv, additions);
+        run(inv, additions);
 
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).hasContent("c");
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-licenses.zip")).hasContent("zip");
@@ -194,7 +194,7 @@ public class MavenRepositoryStagingTest {
         attached.store(additions.resolve(Inventory.INVENTORY));
         Files.writeString(additions.resolve("other-sources.jar"), "other");
 
-        assertThatThrownBy(() -> run(true, inv, additions))
+        assertThatThrownBy(() -> run(inv, additions))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("foo-1.2.3-sources.jar is staged already");
     }
@@ -209,7 +209,7 @@ public class MavenRepositoryStagingTest {
         attached.store(additions.resolve(Inventory.INVENTORY));
         Files.writeString(additions.resolve("sbom.json"), "{}");
 
-        run(true, inv, additions);
+        run(inv, additions);
 
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-cyclonedx.json"))
                 .as("without the stock SBOM, a transform may stage its own")
@@ -221,7 +221,7 @@ public class MavenRepositoryStagingTest {
         Path inv = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(inv, "classes.jar", "c");
 
-        run(true, inv);
+        run(inv);
 
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).hasContent("c");
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-sources.jar")).doesNotExist();
@@ -233,7 +233,7 @@ public class MavenRepositoryStagingTest {
         Path inv = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(inv, "classes.jar", "c");
 
-        run(true, inv);
+        run(inv);
 
         String staged = Files.readString(next.resolve("com/example/foo/1.2.3/foo-1.2.3.pom"));
         assertThat(staged).doesNotContain("<dependency>");
@@ -251,7 +251,7 @@ public class MavenRepositoryStagingTest {
                 "classes.jar");
         writeArtifact(test, "classes.jar", "test");
 
-        run(true, main, test);
+        run(main, test);
 
         String pom = Files.readString(next.resolve("com/example/foo/1.2.3/foo-1.2.3.pom"));
         assertThat(pom).contains("<artifactId>junit-jupiter</artifactId>");
@@ -271,7 +271,7 @@ public class MavenRepositoryStagingTest {
                 "classes.jar");
         writeArtifact(test, "classes.jar", "test");
 
-        run(true, main, test);
+        run(main, test);
 
         String pom = Files.readString(next.resolve("com/example/foo/1.2.3/foo-1.2.3.pom"));
         long fooDeps = pom.lines().filter(line -> line.trim().equals("<artifactId>foo</artifactId>")).count();
@@ -280,14 +280,15 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
-    public void abstract_test_module_is_not_staged_without_tests() throws IOException {
+    public void omits_an_abstract_test_module_its_inventory_marks_unstaged() throws IOException {
         Path main = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(main, "classes.jar", "main");
         Path fixtures = abstractInventory("foo-testing", "com.example", "foo-testing", "1.2.3",
                 List.of(), "classes.jar");
         writeArtifact(fixtures, "classes.jar", "testing");
+        unstaged(fixtures);
 
-        run(false, main, fixtures);
+        run(main, fixtures);
 
         assertThat(next.resolve("com/example/foo-testing")).doesNotExist();
     }
@@ -300,7 +301,7 @@ public class MavenRepositoryStagingTest {
                 List.of(), "classes.jar");
         writeArtifact(fixtures, "classes.jar", "testing");
 
-        run(true, main, fixtures);
+        run(main, fixtures);
 
         assertThat(next.resolve("com/example/foo-testing/1.2.3/foo-testing-1.2.3.jar")).hasContent("testing");
         assertThat(next.resolve("com/example/foo-testing/1.2.3/foo-testing-1.2.3.pom")).exists();
@@ -321,7 +322,7 @@ public class MavenRepositoryStagingTest {
                 "classes.jar");
         writeArtifact(test, "classes.jar", "test");
 
-        run(true, main, fixtures, test);
+        run(main, fixtures, test);
 
         assertThat(Files.readString(next.resolve("com/example/foo/1.2.3/foo-1.2.3.pom")))
                 .as("the tests jar requires the abstract module, which is staged beside it")
@@ -342,7 +343,7 @@ public class MavenRepositoryStagingTest {
                 "classes.jar");
         writeArtifact(test, "classes.jar", "test");
 
-        run(true, main, fixtures, test);
+        run(main, fixtures, test);
 
         assertThat(next.resolve("com/example/foo-testing/1.2.3/foo-testing-1.2.3-tests.jar")).hasContent("test");
         String pom = Files.readString(next.resolve("com/example/foo-testing/1.2.3/foo-testing-1.2.3.pom"));
@@ -363,7 +364,7 @@ public class MavenRepositoryStagingTest {
         writeArtifact(test, "sources.jar", "test-sources");
         writeArtifact(test, "javadoc.jar", "test-javadoc");
 
-        run(true, main, test);
+        run(main, test);
 
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-tests.jar")).hasContent("test-classes");
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-tests-sources.jar")).hasContent("test-sources");
@@ -378,7 +379,7 @@ public class MavenRepositoryStagingTest {
                 List.of(), "classes.jar");
         writeArtifact(test, "classes.jar", "test");
 
-        run(true, main, test);
+        run(main, test);
 
         try (Stream<Path> stream = Files.walk(next)) {
             List<String> poms = stream
@@ -403,7 +404,7 @@ public class MavenRepositoryStagingTest {
                 List.of(new Dep("org.assertj", "assertj-core", "3.27.0")), "classes.jar");
         writeArtifact(testB, "classes.jar", "bar-test");
 
-        run(true, mainA, mainB, testA, testB);
+        run(mainA, mainB, testA, testB);
 
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-tests.jar")).hasContent("foo-test");
         assertThat(next.resolve("com/example/bar/1.2.3/bar-1.2.3-tests.jar")).hasContent("bar-test");
@@ -426,7 +427,7 @@ public class MavenRepositoryStagingTest {
                 List.of(), "classes.jar");
         writeArtifact(test, "classes.jar", "test-classes");
 
-        run(true, main, test);
+        run(main, test);
 
         assertThat(next.resolve("com/lmax/disruptor/4.0.0/disruptor-4.0.0-tests.jar"))
                 .as("a modular build's test names the module it tests, which publishes under an artifactId of its own")
@@ -444,7 +445,7 @@ public class MavenRepositoryStagingTest {
                 List.of(), "classes.jar");
         writeArtifact(testB, "classes.jar", "test-b");
 
-        assertThatThrownBy(() -> run(true, main, testA, testB))
+        assertThatThrownBy(() -> run(main, testA, testB))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Multiple test modules name 'foo'")
                 .hasMessageContaining("'-tests' classifier")
@@ -460,7 +461,7 @@ public class MavenRepositoryStagingTest {
                 List.of(), "classes.jar");
         writeArtifact(test, "classes.jar", "test");
 
-        assertThatThrownBy(() -> run(true, main, test))
+        assertThatThrownBy(() -> run(main, test))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Test module 'module-foo-test'")
                 .hasMessageContaining("references unknown module 'typo'")
@@ -473,7 +474,7 @@ public class MavenRepositoryStagingTest {
                 List.of(), "classes.jar");
         writeArtifact(test, "classes.jar", "test");
 
-        assertThatThrownBy(() -> run(true, test))
+        assertThatThrownBy(() -> run(test))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Test module 'module-foo-test'")
                 .hasMessageContaining("does not name the main module it tests")
@@ -490,7 +491,7 @@ public class MavenRepositoryStagingTest {
                 List.of(), "classes.jar");
         writeArtifact(test, "classes.jar", "test");
 
-        assertThatThrownBy(() -> run(true, mainA, mainB, test))
+        assertThatThrownBy(() -> run(mainA, mainB, test))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Test module 'module-foo-test'")
                 .hasMessageContaining("does not name the main module it tests")
@@ -506,7 +507,7 @@ public class MavenRepositoryStagingTest {
         Path mainB = mainInventory("foo-b", "com.example.b", "foo", "1.2.3", "classes.jar");
         writeArtifact(mainB, "classes.jar", "foo-b");
 
-        assertThatThrownBy(() -> run(true, mainA, mainB))
+        assertThatThrownBy(() -> run(mainA, mainB))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Duplicate staged artifactId 'foo'")
                 .hasMessageContaining("module-foo-a")
@@ -527,7 +528,7 @@ public class MavenRepositoryStagingTest {
                 "classes.jar");
         writeArtifact(test, "classes.jar", "test");
 
-        run(true, main, test);
+        run(main, test);
 
         String pom = Files.readString(next.resolve("com/example/foo/1.2.3/foo-1.2.3.pom"));
         long slf4jOccurrences = pom.lines().filter(line -> line.trim().equals("<artifactId>slf4j-api</artifactId>")).count();
@@ -538,7 +539,7 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
-    public void default_does_not_stage_test_artifacts() throws IOException {
+    public void stages_no_test_artifacts_of_a_test_module_its_inventory_marks_unstaged() throws IOException {
         Path main = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(main, "classes.jar", "main");
         Path test = testInventory("foo-test", "com.example", "foo.test", "1.2.3", "foo",
@@ -546,8 +547,9 @@ public class MavenRepositoryStagingTest {
         writeArtifact(test, "classes.jar", "test-classes");
         writeArtifact(test, "sources.jar", "test-sources");
         writeArtifact(test, "javadoc.jar", "test-javadoc");
+        unstaged(test);
 
-        run(false, main, test);
+        run(main, test);
 
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).exists();
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-tests.jar")).doesNotExist();
@@ -556,14 +558,15 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
-    public void default_does_not_merge_test_dependencies_into_main_pom() throws IOException {
+    public void merges_no_test_dependency_of_an_unstaged_test_module_into_the_main_pom() throws IOException {
         Path main = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(main, "classes.jar", "main");
         Path test = testInventory("foo-test", "com.example", "foo.test", "1.2.3", "foo",
                 List.of(new Dep("org.junit.jupiter", "junit-jupiter", "5.11.3")), "classes.jar");
         writeArtifact(test, "classes.jar", "test");
+        unstaged(test);
 
-        run(false, main, test);
+        run(main, test);
 
         String pom = Files.readString(next.resolve("com/example/foo/1.2.3/foo-1.2.3.pom"));
         assertThat(pom).doesNotContain("junit-jupiter");
@@ -575,7 +578,7 @@ public class MavenRepositoryStagingTest {
         Path main = mainInventory("foo", "com.example", "foo", "../../../../../../tmp/evil", "classes.jar");
         writeArtifact(main, "classes.jar", "main");
 
-        assertThatThrownBy(() -> run(true, main))
+        assertThatThrownBy(() -> run(main))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -584,7 +587,7 @@ public class MavenRepositoryStagingTest {
         Path stray = Files.createDirectory(source.resolve("stray"));
         writeArtifact(stray, "classes.jar", "stray");
 
-        BuildStepResult result = run(true, stray);
+        BuildStepResult result = run(stray);
 
         assertThat(result.next()).isTrue();
         try (Stream<Path> stream = Files.walk(next)) {
@@ -674,7 +677,16 @@ public class MavenRepositoryStagingTest {
         return Files.writeString(dir.resolve(filename), content);
     }
 
-    private BuildStepResult run(boolean includeTests, Path... inventoryFolders) throws IOException {
+    private static Path unstaged(Path folder) throws IOException {
+        SequencedProperties inventory = SequencedProperties.ofFiles(folder.resolve(Inventory.INVENTORY));
+        for (String prefix : Inventory.prefixes(inventory)) {
+            inventory.setProperty(prefix + ".stage", "false");
+        }
+        inventory.store(folder.resolve(Inventory.INVENTORY));
+        return folder;
+    }
+
+    private BuildStepResult run(Path... inventoryFolders) throws IOException {
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
         for (Path folder : inventoryFolders) {
             Map<Path, Checksum> checksums = new LinkedHashMap<>();
@@ -685,7 +697,7 @@ public class MavenRepositoryStagingTest {
             }
             arguments.put(folder.getFileName().toString(), new BuildStepArgument(folder, checksums));
         }
-        return new MavenRepositoryStaging(includeTests).apply(Runnable::run,
+        return new MavenRepositoryStaging().apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement, persistent),
                         arguments)
                 .toCompletableFuture()
