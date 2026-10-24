@@ -328,6 +328,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             sub.addStep("prepare",
                     new Prepare(descriptor.pathPlacement(),
                             packaging.stage(),
+                            environment.flag("stage.tests"),
                             List.copyOf(packaging.formats()),
                             List.copyOf(descriptor.manifests()),
                             overrides,
@@ -480,7 +481,6 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     Stream.concat(Stream.of("check", "format", "compliance", "validate", "artifact"),
                             renamed(inherited, descriptor.manifests().stream()).sequencedKeySet().stream()));
         }, AssemblyRequirement.of().after(AssemblyDescriptor.BUILD));
-        boolean stagesTests = environment.flag("stage.tests");
         if (descriptor.documentation()) {
             InferredDocumentationModule documentationModule = InferredDocumentationModule.ofEnvironment(environment,
                             descriptor.configuration(),
@@ -495,7 +495,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             .languages(languages));
             BuildExecutorModule documented = documentation.apply(documentationModule);
             assembly = assembly.andThen("document", (sub, inherited) -> {
-                if (!stagesTests && tests(descriptor, inherited)) {
+                if (unstaged(inherited)) {
                     return;
                 }
                 sub.addModule("documentation",
@@ -509,7 +509,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         }
         if (descriptor.source()) {
             assembly = assembly.andThen("source", (sub, inherited) -> {
-                if (!stagesTests && tests(descriptor, inherited)) {
+                if (unstaged(inherited)) {
                     return;
                 }
                 sub.addModule("sources",
@@ -532,7 +532,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         if (packaging.jlink() || packaging.jpackaged() || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null
                 || !packagers.isEmpty()) {
             assembly = assembly.andThen("package", (sub, inherited) -> {
-                if (!stagesTests && tests(descriptor, inherited)) {
+                if (unstaged(inherited)) {
                     return;
                 }
                 SequencedSet<String> images = new LinkedHashSet<>();
@@ -849,12 +849,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         };
     }
 
-    private static boolean tests(ProjectModuleDescriptor descriptor, SequencedMap<String, Path> inherited)
-            throws IOException {
-        Path described = BuildStep.locate(renamed(inherited, descriptor.manifests().stream()).sequencedKeySet().stream()
-                .map(inherited::get)
-                .collect(Collectors.toCollection(LinkedHashSet::new)), BuildStep.MODULE);
-        return described != null && SequencedProperties.ofFiles(described).getProperty("test") != null;
+    private static boolean unstaged(SequencedMap<String, Path> inherited) {
+        return renamed(inherited, Stream.of("prepare")).sequencedKeySet().stream()
+                .anyMatch(key -> Files.exists(inherited.get(key).resolve(Inventory.UNSTAGED)));
     }
 
     private static SequencedMap<String, String> renamed(SequencedMap<String, Path> inherited, Stream<String> names) {
@@ -928,6 +925,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
 
     private record Prepare(PathPlacement pathPlacement,
                            boolean staged,
+                           boolean stagesTests,
                            List<String> packageTypes,
                            List<String> manifests,
                            SequencedMap<String, SequencedMap<String, String>> overrides,
@@ -943,6 +941,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             String artifact = null;
             String moduleName = null;
             SequencedProperties described = null;
+            boolean tests = false;
             for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
                 BuildStepArgument argument = entry.getValue();
                 if (argument.removed()) {
@@ -951,6 +950,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 Path moduleFile = argument.folder().resolve(BuildStep.MODULE);
                 if (Files.isRegularFile(moduleFile)) {
                     SequencedProperties module = SequencedProperties.ofFiles(moduleFile);
+                    if (manifests.contains(entry.getKey())) {
+                        tests |= module.getProperty("test") != null || module.flag("abstract");
+                    }
                     if (main == null) {
                         String value = module.getProperty("main");
                         if (value != null && !value.isEmpty()) {
@@ -1115,7 +1117,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 tool.getValue().forEach(variables::setProperty);
                 ProcessBuildStep.store(context.next(), ProcessBuildStep.ENVIRONMENT, tool.getKey(), variables);
             }
-            if (!staged) {
+            if (!staged || tests && !stagesTests) {
                 Files.createFile(context.next().resolve(Inventory.UNSTAGED));
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
