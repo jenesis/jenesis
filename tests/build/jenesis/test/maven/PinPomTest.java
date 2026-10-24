@@ -677,4 +677,29 @@ public class PinPomTest {
                 .contains("com.example/external 1.2.3 SHA-256/cafebabe")
                 .doesNotContain("com.example/internal");
     }
+
+    @Test
+    public void keeps_the_pins_of_a_group_the_run_resolved_nothing_in() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.pin
+                    launcher/maven/build.jenesis/build.jenesis.launcher 0.6.0 SHA-256/kept
+                    org.example/stale 1.0 SHA-256/stale
+                    -->
+                </project>
+                """);
+        writeResolved(Map.of("maven/org.example/fresh", "2.0 SHA-256/fresh"));
+        assertThat(run(pom))
+                .as("a run without the profile that resolves the launcher leaves its pin for the run that does")
+                .contains("launcher/maven/build.jenesis/build.jenesis.launcher 0.6.0 SHA-256/kept",
+                        "org.example/fresh 2.0 SHA-256/fresh")
+                .as("a pin of a group the run resolved, which it no longer reaches, is dropped")
+                .doesNotContain("SHA-256/stale");
+    }
 }

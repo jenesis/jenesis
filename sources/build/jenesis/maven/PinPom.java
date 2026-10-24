@@ -12,6 +12,7 @@ import build.jenesis.Pinning;
 import build.jenesis.Platform;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.module.PinModuleInfo;
 import build.jenesis.step.Inventory;
 
 public class PinPom implements BuildStep {
@@ -32,9 +33,10 @@ public class PinPom implements BuildStep {
     private final List<Path> pomFiles;
     private final transient HashDigestFunction hashFunction;
     private final Platform platform;
+    private final PinModuleInfo.Retain retain;
 
     public PinPom(String path, List<Path> pomFiles, HashDigestFunction hashFunction) {
-        this(path, pomFiles, hashFunction, new Platform(), Pinning.permits());
+        this(path, pomFiles, hashFunction, new Platform(), PinModuleInfo.Retain.GROUPS, Pinning.permits());
     }
 
     public static PinPom ofEnvironment(Environment environment,
@@ -43,27 +45,34 @@ public class PinPom implements BuildStep {
                                        HashDigestFunction hashFunction) {
         return new PinPom(path, pomFiles, hashFunction)
                 .permits(Pinning.permits(environment))
-                .platform(Platform.ofEnvironment(environment));
+                .platform(Platform.ofEnvironment(environment))
+                .retain(PinModuleInfo.Retain.ofEnvironment(environment));
     }
 
     private PinPom(String path,
                    List<Path> pomFiles,
                    HashDigestFunction hashFunction,
                    Platform platform,
+                   PinModuleInfo.Retain retain,
                    Permits permits) {
         this.permits = permits;
         this.path = path;
         this.pomFiles = List.copyOf(pomFiles);
         this.hashFunction = hashFunction;
         this.platform = platform;
+        this.retain = retain;
     }
 
     public PinPom permits(Permits permits) {
-        return new PinPom(path, pomFiles, hashFunction, platform, permits);
+        return new PinPom(path, pomFiles, hashFunction, platform, retain, permits);
     }
 
     public PinPom platform(Platform platform) {
-        return new PinPom(path, pomFiles, hashFunction, platform, permits);
+        return new PinPom(path, pomFiles, hashFunction, platform, retain, permits);
+    }
+
+    public PinPom retain(PinModuleInfo.Retain retain) {
+        return new PinPom(path, pomFiles, hashFunction, platform, retain, permits);
     }
 
     @Override
@@ -116,7 +125,11 @@ public class PinPom implements BuildStep {
             }
         }
         SequencedMap<String, String> entries = collectEntries(closure, internal, declared, hashFunction);
-        for (Map.Entry<String, Inventory.Dependency> pom : Inventory.poms(arguments.values(), path).entrySet()) {
+        SequencedMap<String, Inventory.Dependency> poms = Inventory.poms(arguments.values(), path);
+        Set<String> groups = new HashSet<>();
+        Stream.concat(closure.values().stream(), poms.values().stream()).forEach(dependency -> groups.add(dependency.group()));
+        Predicate<String> retained = retain.retains(groups);
+        for (Map.Entry<String, Inventory.Dependency> pom : poms.entrySet()) {
             String version = pom.getKey().substring(pom.getKey().lastIndexOf('/') + 1);
             if (!version.endsWith("-SNAPSHOT")) {
                 entries.putIfAbsent(pom.getKey(), version + " " + pom.getValue().checksum(hashFunction));
@@ -131,14 +144,24 @@ public class PinPom implements BuildStep {
                 pinned.append(pinMatcher.group(2)).append('\n');
             }
             List<String> preserved = pinned.isEmpty() ? List.of() : preserveGuarded(pinned.toString(), qualified);
+            for (String line : pinned.toString().replace("&#45;", "-").split("\n")) {
+                String trimmed = line.trim().replaceAll("\\s+", " ");
+                int space = trimmed.indexOf(' ');
+                if (space > 0 && !trimmed.endsWith(")")) {
+                    String value = trimmed.substring(space + 1), key = Resolver.pinKey(expand(trimmed.substring(0, space)), value);
+                    if (!entries.containsKey(key) && retained.test(key)) {
+                        qualified.putIfAbsent(key, value);
+                    }
+                }
+            }
             String updated = existing, indent;
             Matcher dependencyManagementMatcher = DEPENDENCY_MANAGEMENT.matcher(existing);
             if (dependencyManagementMatcher.find()) {
                 indent = dependencyManagementMatcher.group(1);
-                String retained = MANAGED_DEPENDENCY.matcher(dependencyManagementMatcher.group()).replaceAll(dependency ->
+                String management = MANAGED_DEPENDENCY.matcher(dependencyManagementMatcher.group()).replaceAll(dependency ->
                         CHECKSUM_COMMENT.matcher(dependency.group()).find() ? "" : Matcher.quoteReplacement(dependency.group()));
                 updated = existing.substring(0, dependencyManagementMatcher.start())
-                        + (EMPTY_MANAGEMENT.matcher(retained).matches() ? "" : retained)
+                        + (EMPTY_MANAGEMENT.matcher(management).matches() ? "" : management)
                         + existing.substring(dependencyManagementMatcher.end());
             } else {
                 Matcher indentMatcher = INDENT.matcher(existing);

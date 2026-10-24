@@ -55,7 +55,7 @@ public class PinModuleInfo implements BuildStep {
         PinModuleInfo pin = new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction)
                 .checksum(checksumFrom(environment))
                 .flatten(flattenFrom(environment))
-                .retain(retainFrom(environment))
+                .retain(Retain.ofEnvironment(environment))
                 .permits(Pinning.permits(environment))
                 .platform(Platform.ofEnvironment(environment));
         Boolean pins = environment.flagOrNull("print.pins");
@@ -132,16 +132,6 @@ public class PinModuleInfo implements BuildStep {
         throw new IllegalArgumentException("Unknown pin BOM mode: " + value + " (expected keep or flatten)");
     }
 
-    private static Retain retainFrom(Environment environment) {
-        String value = environment.value("pin.retain", "groups");
-        return switch (value) {
-            case "groups" -> Retain.GROUPS;
-            case "all" -> Retain.ALL;
-            case "none" -> Retain.NONE;
-            default -> throw new IllegalArgumentException("Unknown pin retention: " + value + " (expected groups, all or none)");
-        };
-    }
-
     @Override
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
         return true;
@@ -210,11 +200,7 @@ public class PinModuleInfo implements BuildStep {
         for (Inventory.Dependency dependency : closure.values()) {
             groups.add(dependency.group());
         }
-        Predicate<String> retained = switch (retain) {
-            case GROUPS -> key -> !groups.contains(key.substring(0, key.indexOf('/')));
-            case ALL -> _ -> true;
-            case NONE -> _ -> false;
-        };
+        Predicate<String> retained = retain.retains(groups);
         for (Path file : moduleInfoFiles) {
             SequencedSet<String> carried = new TreeSet<>();
             updateModuleInfo(file, entries, covered, internal, retained, references, flatten, platform, carried);
@@ -647,6 +633,25 @@ public class PinModuleInfo implements BuildStep {
     }
 
     public enum Retain {
-        GROUPS, ALL, NONE
+
+        GROUPS, ALL, NONE;
+
+        public static Retain ofEnvironment(Environment environment) {
+            String value = environment.value("pin.retain", "groups");
+            return switch (value) {
+                case "groups" -> GROUPS;
+                case "all" -> ALL;
+                case "none" -> NONE;
+                default -> throw new IllegalArgumentException("Unknown pin retention: " + value + " (expected groups, all or none)");
+            };
+        }
+
+        public Predicate<String> retains(Set<String> groups) {
+            return switch (this) {
+                case GROUPS -> key -> !groups.contains(key.substring(0, key.indexOf('/')));
+                case ALL -> _ -> true;
+                case NONE -> _ -> false;
+            };
+        }
     }
 }
