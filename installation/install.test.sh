@@ -88,7 +88,11 @@ mkdir -p "$TMP/corrupt" "$TMP/repository/build/jenesis/build.jenesis/9.9.9"
 printf 'not the published jar' > "$TMP/repository/build/jenesis/build.jenesis/9.9.9/build.jenesis-9.9.9-sources.jar"
 printf '0000000000000000000000000000000000000000000000000000000000000000' \
     > "$TMP/repository/build/jenesis/build.jenesis/9.9.9/build.jenesis-9.9.9-sources.jar.sha256"
-if env JENESIS_TARGET="$TMP/corrupt" JENESIS_VERSION=9.9.9 JENESIS_MAVEN_URI="file://$TMP/repository/" \
+REPOSITORY="$TMP/repository"
+if command -v cygpath >/dev/null 2>&1; then
+    REPOSITORY="/$(cygpath -m "$REPOSITORY")"
+fi
+if env JENESIS_TARGET="$TMP/corrupt" JENESIS_VERSION=9.9.9 JENESIS_MAVEN_URI="file://$REPOSITORY/" \
     bash "$SCRIPT" >"$TMP/corrupt.log" 2>&1; then
     fail "installed a sources jar that does not match its checksum"
 fi
