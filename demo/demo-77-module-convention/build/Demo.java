@@ -56,7 +56,9 @@ public class Demo {
         String checksum = sha256(jar);
         Path boms = Files.createDirectories(Path.of("target", "boms"));
         Files.writeString(boms.resolve("pin-greeter.properties"), module + "=1.0.0 SHA-256/" + checksum + "\n"
-                + group + "/" + module + "=1.0.0 SHA-256/" + checksum + "\n");
+                + group + "/" + module + "=1.0.0 SHA-256/" + checksum + "\n"
+                + "maven/" + group + "/" + module + "/pom/1.0.0=1.0.0 SHA-256/"
+                + sha256(jar.resolveSibling(module + "-1.0.0.pom")) + "\n");
 
         MavenRepository maven = new MavenDefaultRepository(published.toUri(), null, Map.of(), null);
         Map<String, Repository> repositories = Map.of("module", new MavenModuleRepository(maven), "maven", maven);
