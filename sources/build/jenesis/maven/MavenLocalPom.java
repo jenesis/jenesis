@@ -25,7 +25,6 @@ public record MavenLocalPom(String groupId,
                             SequencedMap<String, String> signatures,
                             String mainClass,
                             MavenPomEmitter.Metadata metadata,
-                            SequencedMap<MavenDependencyKey, MavenDependencyKey.Versioned> expressions,
                             MavenPomEmitter.Relocation relocation,
                             SequencedMap<MavenDependencyKey, MavenDependencyValue> reactor) {
 
@@ -53,7 +52,6 @@ public record MavenLocalPom(String groupId,
                 signatures,
                 mainClass,
                 metadata,
-                expressions,
                 relocation,
                 reactor);
     }
@@ -82,7 +80,6 @@ public record MavenLocalPom(String groupId,
                 signatures,
                 mainClass,
                 metadata,
-                expressions,
                 relocation,
                 reactor);
     }
@@ -111,7 +108,6 @@ public record MavenLocalPom(String groupId,
                 signatures,
                 mainClass,
                 metadata,
-                expressions,
                 relocation,
                 reactor);
     }
@@ -140,7 +136,6 @@ public record MavenLocalPom(String groupId,
                 signatures,
                 mainClass,
                 metadata,
-                expressions,
                 relocation,
                 reactor);
     }
@@ -169,7 +164,6 @@ public record MavenLocalPom(String groupId,
                 signatures,
                 mainClass,
                 metadata,
-                expressions,
                 relocation,
                 reactor);
     }
@@ -198,7 +192,6 @@ public record MavenLocalPom(String groupId,
                 signatures,
                 mainClass,
                 metadata,
-                expressions,
                 relocation,
                 reactor);
     }
@@ -227,7 +220,6 @@ public record MavenLocalPom(String groupId,
                 signatures,
                 mainClass,
                 metadata,
-                expressions,
                 relocation,
                 reactor);
     }
@@ -256,7 +248,6 @@ public record MavenLocalPom(String groupId,
                 signatures,
                 mainClass,
                 metadata,
-                expressions,
                 relocation,
                 reactor);
     }

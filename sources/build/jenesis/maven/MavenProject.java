@@ -46,7 +46,6 @@ import static java.util.Objects.requireNonNull;
 public class MavenProject implements BuildExecutorModule {
 
     public static final String POM = "pom/", MAVEN = "maven/", BOM = "bom/";
-    public static final String EXPRESSIONS = "expressions.properties", SCOPES = "scopes.properties";
     private static final String SCAN = "scan", POM_METADATA = "metadata.", RELOCATION = "relocation.", BOMS = "boms",
             POMS = "poms", SKIPPED = "skipped.properties", INDEX = "index.properties";
     private static final Set<String> JARS = Set.of("jar", "bundle"), AGGREGATES = Set.of("pom", "bom");
@@ -616,26 +615,6 @@ public class MavenProject implements BuildExecutorModule {
                             }
                             if (!managedExclusions.isEmpty()) {
                                 managedExclusions.store(context.next().resolve(BuildStep.MANAGED));
-                            }
-                            SequencedProperties managedScopes = new SequencedProperties();
-                            for (String key : properties.stringPropertyNames()) {
-                                if (key.startsWith("managed.scope.")) {
-                                    managedScopes.setProperty(group + "/" + key.substring("managed.scope.".length()),
-                                            properties.getProperty(key));
-                                }
-                            }
-                            if (!managedScopes.isEmpty()) {
-                                managedScopes.store(context.next().resolve(SCOPES));
-                            }
-                            SequencedProperties expressions = new SequencedProperties();
-                            for (String key : properties.stringPropertyNames()) {
-                                if (key.startsWith("expression.")) {
-                                    expressions.setProperty(key.substring("expression.".length()),
-                                            properties.getProperty(key));
-                                }
-                            }
-                            if (!expressions.isEmpty()) {
-                                expressions.store(context.next().resolve(EXPRESSIONS));
                             }
                             String optionalDependencies = properties.getProperty("optional");
                             if (optionalDependencies != null) {
@@ -1210,22 +1189,6 @@ public class MavenProject implements BuildExecutorModule {
                     }
                 });
             }
-            value.expressions().forEach((depKey, expression) -> {
-                MavenDependencyValue resolved = value.managedDependencies() == null
-                        ? null
-                        : value.managedDependencies().get(depKey);
-                if (resolved == null && value.dependencies() != null) {
-                    resolved = value.dependencies().get(depKey);
-                }
-                MavenDependencyKey raw = expression.key();
-                properties.setProperty("expression." + depKey.coordinate(null, null),
-                        raw.groupId() + "/" + raw.artifactId()
-                                + "/" + (raw.type() == null ? "" : raw.type())
-                                + "/" + (raw.classifier() == null ? "" : raw.classifier())
-                                + (expression.version() == null || resolved == null || resolved.version() == null
-                                        ? ""
-                                        : " " + expression.version() + " " + resolved.version()));
-            });
             if (value.managedDependencies() != null) {
                 value.managedDependencies().forEach((depKey, depValue) -> {
                     if (depValue.exclusions() != null && !depValue.exclusions().isEmpty()) {
@@ -1234,10 +1197,6 @@ public class MavenProject implements BuildExecutorModule {
                                 depValue.exclusions().stream()
                                         .map(name -> name.groupId() + "/" + name.artifactId())
                                         .collect(Collectors.joining(",")));
-                    }
-                    if (depValue.scope() != null && depValue.scope() != MavenDependencyScope.IMPORT) {
-                        properties.setProperty("managed.scope." + depKey.coordinate(prefix, null),
-                                depValue.scope().name().toLowerCase(Locale.ROOT));
                     }
                 });
             }
