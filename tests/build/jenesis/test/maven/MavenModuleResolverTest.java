@@ -688,19 +688,21 @@ public class MavenModuleResolverTest {
     public void coordinate_pin_follows_the_pinning_mode(Pinning pinning,
                                                         String version,
                                                         boolean checksummed) throws IOException {
+        Map<String, String> libPoms = new LinkedHashMap<>();
         for (String pinned : List.of("1.0", "2.0")) {
-            addToMavenRepository("org.transitive", "lib", pinned, """
+            libPoms.put(pinned, """
                     <project xmlns="http://maven.apache.org/POM/4.0.0">
                         <groupId>org.transitive</groupId>
                         <artifactId>lib</artifactId>
                         <version>%s</version>
                     </project>""".formatted(pinned));
+            addToMavenRepository("org.transitive", "lib", pinned, libPoms.get(pinned));
         }
         String core = "SHA-256/" + addJarToMavenRepository("org.example", "example-core", "1.0");
         Map<String, String> libs = new LinkedHashMap<>();
         libs.put("1.0", "SHA-256/" + addJarToMavenRepository("org.transitive", "lib", "1.0"));
         libs.put("2.0", "SHA-256/" + addJarToMavenRepository("org.transitive", "lib", "2.0"));
-        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", """
+        String corePom = """
                 <project xmlns="http://maven.apache.org/POM/4.0.0">
                     <groupId>org.example</groupId>
                     <artifactId>example-core</artifactId>
@@ -712,7 +714,8 @@ public class MavenModuleResolverTest {
                             <version>1.0</version>
                         </dependency>
                     </dependencies>
-                </project>"""));
+                </project>""";
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", corePom));
         Path folder = Files.createDirectory(workspace.resolve("dependencies"));
         Path build = Files.createDirectory(workspace.resolve("build"));
         SequencedProperties requires = new SequencedProperties();
@@ -721,6 +724,9 @@ public class MavenModuleResolverTest {
         SequencedProperties versions = new SequencedProperties();
         versions.setProperty("main/maven/org.example/example-core", "1.0 " + core);
         versions.setProperty("main/maven/org.transitive/lib", "2.0 " + libs.get("2.0"));
+        versions.setProperty("main/maven/org.example/example-core/pom/1.0", "1.0 SHA-256/" + sha256(corePom));
+        libPoms.forEach((pinned, pom) -> versions.setProperty("main/maven/org.transitive/lib/pom/" + pinned,
+                pinned + " SHA-256/" + sha256(pom)));
         versions.store(folder.resolve(BuildStep.VERSIONS));
 
         BuildExecutor executor = BuildExecutor.of(build,
@@ -908,12 +914,16 @@ public class MavenModuleResolverTest {
     }
 
     private String addJarToMavenRepository(String groupId, String artifactId, String version) throws IOException {
-        byte[] content = (groupId + ":" + artifactId + ":" + version).getBytes(StandardCharsets.UTF_8);
-        Files.write(Files
+        String content = groupId + ":" + artifactId + ":" + version;
+        Files.writeString(Files
                 .createDirectories(mavenRepoFolder.resolve(groupId.replace('.', '/') + "/" + artifactId + "/" + version))
                 .resolve(artifactId + "-" + version + ".jar"), content);
+        return sha256(content);
+    }
+
+    private static String sha256(String content) {
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }

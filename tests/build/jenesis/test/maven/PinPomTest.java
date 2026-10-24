@@ -10,12 +10,10 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
-import build.jenesis.maven.MavenProject;
 import build.jenesis.maven.PinPom;
 import build.jenesis.step.Inventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class PinPomTest {
 
@@ -77,12 +75,35 @@ public class PinPomTest {
         properties.store(input.resolve(Inventory.INVENTORY));
     }
 
+    private void writePoms(Map<String, String> poms) throws IOException {
+        SequencedProperties properties = loadInventory();
+        int index = count(properties, "module.pom.");
+        Path resolved = Files.createDirectories(input.resolve("resolved"));
+        for (Map.Entry<String, String> pom : poms.entrySet()) {
+            String file = "resolved/" + pom.getKey().replace('/', '-') + ".pom";
+            Files.writeString(resolved.resolve(file.substring("resolved/".length())), pom.getValue());
+            properties.setProperty("module.pom." + index, pom.getKey() + " " + file);
+            properties.setProperty("module.pom." + index + ".group", "main");
+            index++;
+        }
+        properties.store(input.resolve(Inventory.INVENTORY));
+    }
+
+    private static String sha256(String content) {
+        try {
+            return "SHA-256/" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(content.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new AssertionError(e);
+        }
+    }
+
     private String run(Path pomFile) throws IOException {
         return run(pomFile, Platform.of("linux,x86_64"));
     }
 
     private String run(Path pomFile, Platform platform) throws IOException {
-        new PinPom("maven", "", List.of(pomFile), new HashDigestFunction("SHA-256"))
+        new PinPom("", List.of(pomFile), new HashDigestFunction("SHA-256"))
                 .platform(platform)
                 .apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement, persistent),
@@ -115,14 +136,14 @@ public class PinPomTest {
                 input,
                 Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))));
         arguments.put("vanished", new BuildStepArgument(null, Checksum.removed(Set.of(Path.of(Inventory.INVENTORY)))));
-        new PinPom("maven", "", List.of(pom), new HashDigestFunction("SHA-256"))
+        new PinPom("", List.of(pom), new HashDigestFunction("SHA-256"))
                 .platform(Platform.of("linux,x86_64"))
                 .apply(Runnable::run, new BuildStepContext(previous, next, supplement, persistent), arguments)
                 .toCompletableFuture()
                 .join();
         assertThat(Files.readString(pom))
                 .as("a predecessor that no longer exists is skipped rather than read")
-                .contains("<version>3.0.0</version>", "Checksum/SHA-256/fresh")
+                .contains("org.foo/bar 3.0.0 SHA-256/fresh")
                 .doesNotContain("SHA-256/stale");
     }
 
@@ -370,385 +391,6 @@ public class PinPomTest {
     }
 
     @Test
-    public void inserts_dependency_management_when_absent() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.example</groupId>
-                            <artifactId>direct</artifactId>
-                            <version>1.0</version>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """);
-        writeResolved(Map.of(
-                "maven/org.example/transitive", "2.0 SHA-256/cafebabe"));
-        String result = run(pom);
-        assertThat(result).contains("<dependencyManagement>");
-        assertThat(result).contains("<artifactId>transitive</artifactId>");
-        assertThat(result).contains("<version>2.0</version>");
-        assertThat(result).contains("<!--Checksum/SHA-256/cafebabe-->");
-        assertThat(result).contains("<dependencies>\n        <dependency>\n            <groupId>org.example</groupId>\n            <artifactId>direct</artifactId>");
-        int dmIndex = result.indexOf("<dependencyManagement>");
-        int depsIndex = result.indexOf("<dependencies>", dmIndex + "<dependencyManagement>".length());
-        int directDepsIndex = result.indexOf("<dependencies>", depsIndex + 1);
-        assertThat(directDepsIndex).isGreaterThan(depsIndex);
-    }
-
-    @Test
-    public void replaces_an_entry_pin_wrote_that_nothing_resolves_any_longer() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>stale</groupId>
-                                <artifactId>old</artifactId>
-                                <version>0.1</version>
-                                <!--Checksum/SHA-256/cafebabe-->
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                </project>
-                """);
-        writeResolved(Map.of(
-                "maven/org.example/fresh", "3.0 SHA-256/deadbeef"));
-        String result = run(pom);
-        assertThat(result).doesNotContain("stale");
-        assertThat(result).doesNotContain("<artifactId>old</artifactId>");
-        assertThat(result).contains("<artifactId>fresh</artifactId>");
-        assertThat(result).contains("<version>3.0</version>");
-        assertThat(result).contains("<!--Checksum/SHA-256/deadbeef-->");
-    }
-
-    @Test
-    public void keeps_every_entry_and_comment_it_does_not_pin_where_it_stands() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <!-- the module of this build, which the tests use -->
-                            <dependency>
-                                <groupId>group</groupId>
-                                <artifactId>sibling</artifactId>
-                                <version>${project.version}</version>
-                            </dependency>
-                            <dependency>
-                                <groupId>org.example</groupId>
-                                <artifactId>pinned</artifactId>
-                                <version>1.0</version>
-                                <scope>test</scope>
-                            </dependency>
-                            <!-- read by another tool of the old build, never resolved here -->
-                            <dependency>
-                                <groupId>org.eclipse.platform</groupId>
-                                <artifactId>org.eclipse.osgi</artifactId>
-                                <version>3.23.0</version>
-                                <scope>test</scope>
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                </project>
-                """);
-        writeResolved(Map.of(
-                "maven/org.example/pinned", "1.0 SHA-256/deadbeef",
-                "maven/org.example/fresh", "3.0 SHA-256/cafebabe",
-                "maven/org.example/snapshot", "2.0-SNAPSHOT SHA-256/feedface"));
-        String result = run(pom);
-        assertThat(result)
-                .as("a sibling, an entry no closure reaches and every comment stay as written")
-                .contains("<!-- the module of this build, which the tests use -->",
-                        "<artifactId>sibling</artifactId>",
-                        "<version>${project.version}</version>",
-                        "<!-- read by another tool of the old build, never resolved here -->",
-                        "<artifactId>org.eclipse.osgi</artifactId>")
-                .as("an entry pin resolves keeps its place and its scope and gains its checksum")
-                .containsSubsequence("<artifactId>pinned</artifactId>",
-                        "<scope>test</scope>",
-                        "<!--Checksum/SHA-256/deadbeef-->",
-                        "<artifactId>org.eclipse.osgi</artifactId>",
-                        "<artifactId>fresh</artifactId>")
-                .as("a snapshot is published again under its version, so no checksum can hold for it")
-                .contains("<version>2.0-SNAPSHOT</version>")
-                .doesNotContain("feedface");
-    }
-
-    @Test
-    public void keeps_an_imported_bom_when_replacing_dependency_management() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>stale</groupId>
-                                <artifactId>old</artifactId>
-                                <version>0.1</version>
-                                <!--Checksum/SHA-256/cafebabe-->
-                            </dependency>
-                            <dependency>
-                                <groupId>org.example</groupId>
-                                <artifactId>bom</artifactId>
-                                <version>${bom.version}</version>
-                                <type>pom</type>
-                                <scope>import</scope>
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                </project>
-                """);
-        writeResolved(Map.of("maven/org.example/fresh", "3.0 SHA-256/deadbeef"));
-        String result = run(pom);
-        assertThat(result)
-                .as("an imported BOM is where versions come from rather than a pin, so it outlives the pins it produced")
-                .contains("""
-                                <dependency>
-                                    <groupId>org.example</groupId>
-                                    <artifactId>bom</artifactId>
-                                    <version>${bom.version}</version>
-                                    <type>pom</type>
-                                    <scope>import</scope>
-                                </dependency>
-                    """)
-                .contains("<artifactId>fresh</artifactId>")
-                .doesNotContain("<artifactId>old</artifactId>");
-        assertThat(result.indexOf("<artifactId>bom</artifactId>")).isLessThan(result.indexOf("<artifactId>fresh</artifactId>"));
-        assertThat(run(pom)).isEqualTo(result);
-    }
-
-    @Test
-    public void keeps_the_exclusions_and_scope_of_a_managed_entry_it_rewrites() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.mysql</groupId>
-                                <artifactId>mysql-connector-j</artifactId>
-                                <version>9.6.0</version>
-                                <scope>runtime</scope>
-                                <exclusions>
-                                    <exclusion>
-                                        <groupId>com.google.protobuf</groupId>
-                                        <artifactId>protobuf-java</artifactId>
-                                    </exclusion>
-                                </exclusions>
-                                <!--Checksum/SHA-256/stale-->
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                </project>
-                """);
-        writeResolved(Map.of("maven/com.mysql/mysql-connector-j", "9.7.0 SHA-256/deadbeef"));
-        String result = run(pom);
-        assertThat(result)
-                .as("a pin replaces the version and the checksum of an entry, and what else it says still holds")
-                .contains("""
-                                <dependency>
-                                    <groupId>com.mysql</groupId>
-                                    <artifactId>mysql-connector-j</artifactId>
-                                    <version>9.7.0</version>
-                                    <scope>runtime</scope>
-                                    <exclusions>
-                                        <exclusion>
-                                            <groupId>com.google.protobuf</groupId>
-                                            <artifactId>protobuf-java</artifactId>
-                                        </exclusion>
-                                    </exclusions>
-                                    <!--Checksum/SHA-256/deadbeef-->
-                                </dependency>
-                    """)
-                .doesNotContain("9.6.0", "stale");
-        assertThat(run(pom)).isEqualTo(result);
-    }
-
-    @Test
-    public void keeps_the_property_expressions_of_an_entry_and_writes_only_the_version_it_owns() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.openjfx</groupId>
-                                <artifactId>javafx-base</artifactId>
-                                <version>${javafx.version}</version>
-                                <classifier>${javafx.platform}</classifier>
-                                <exclusions>
-                                    <exclusion>
-                                        <groupId>org.openjfx</groupId>
-                                        <artifactId>javafx-base</artifactId>
-                                    </exclusion>
-                                </exclusions>
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                </project>
-                """);
-        writeResolved(Map.of(
-                "maven/org.openjfx/javafx-base/jar/linux", "17.0.20 SHA-256/cafebabe",
-                "maven/org.openjfx/javafx-graphics/jar/linux", "17.0.21 SHA-256/deadbeef"));
-        SequencedProperties module = new SequencedProperties();
-        module.setProperty("path", "");
-        module.store(input.resolve(BuildStep.MODULE));
-        SequencedProperties expressions = new SequencedProperties();
-        expressions.setProperty("org.openjfx/javafx-base/jar/linux",
-                "org.openjfx/javafx-base//${javafx.platform} ${javafx.version} 17.0.20");
-        expressions.setProperty("org.openjfx/javafx-graphics/jar/linux",
-                "org.openjfx/javafx-graphics//${javafx.platform} ${javafx.version} 17.0.20");
-        expressions.store(input.resolve(MavenProject.EXPRESSIONS));
-        String result = run(pom);
-        assertThat(result)
-                .as("the classifier a property selects stays that property, so another platform's build still finds"
-                        + " its managed entry, and so does a version the property still names, its checksum"
-                        + " naming the version it was taken of")
-                .contains("""
-                                <dependency>
-                                    <groupId>org.openjfx</groupId>
-                                    <artifactId>javafx-base</artifactId>
-                                    <version>${javafx.version}</version>
-                                    <classifier>${javafx.platform}</classifier>
-                                    <exclusions>
-                                        <exclusion>
-                                            <groupId>org.openjfx</groupId>
-                                            <artifactId>javafx-base</artifactId>
-                                        </exclusion>
-                                    </exclusions>
-                                    <!--Checksum/SHA-256/cafebabe 17.0.20-->
-                                </dependency>
-                    """)
-                .as("a version resolved to another than the property names is written as the version pinned")
-                .contains("""
-                                <dependency>
-                                    <groupId>org.openjfx</groupId>
-                                    <artifactId>javafx-graphics</artifactId>
-                                    <version>17.0.21</version>
-                                    <classifier>${javafx.platform}</classifier>
-                                    <!--Checksum/SHA-256/deadbeef-->
-                                </dependency>
-                    """);
-        assertThat(run(pom)).isEqualTo(result);
-    }
-
-    @Test
-    public void carries_the_exclusions_of_an_imported_bom_into_the_entry_that_pins_its_coordinate() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                </project>
-                """);
-        writeResolved(Map.of("maven/com.mysql/mysql-connector-j", "9.7.0 SHA-256/deadbeef"));
-        SequencedProperties module = new SequencedProperties();
-        module.setProperty("path", "");
-        module.store(input.resolve(BuildStep.MODULE));
-        SequencedProperties managed = new SequencedProperties();
-        managed.setProperty("main/maven/com.mysql/mysql-connector-j", "com.google.protobuf/protobuf-java");
-        managed.store(input.resolve(BuildStep.MANAGED));
-        String result = run(pom);
-        assertThat(result)
-                .as("the project's own entry shadows the bill of materials' one, so it has to exclude what that one excluded")
-                .contains("""
-                                <dependency>
-                                    <groupId>com.mysql</groupId>
-                                    <artifactId>mysql-connector-j</artifactId>
-                                    <version>9.7.0</version>
-                                    <exclusions>
-                                        <exclusion>
-                                            <groupId>com.google.protobuf</groupId>
-                                            <artifactId>protobuf-java</artifactId>
-                                        </exclusion>
-                                    </exclusions>
-                                    <!--Checksum/SHA-256/deadbeef-->
-                                </dependency>
-                    """);
-        assertThat(run(pom)).isEqualTo(result);
-    }
-
-    @Test
-    public void carries_the_scope_an_imported_bom_manages_into_the_entry_that_pins_its_coordinate() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                </project>
-                """);
-        writeResolved(Map.of("maven/io.netty/netty-tcnative-boringssl-static/jar/linux-x86_64", "2.0.70.Final SHA-256/deadbeef",
-                "maven/io.netty/netty-common", "4.1.115.Final SHA-256/cafebabe"));
-        SequencedProperties module = new SequencedProperties();
-        module.setProperty("path", "");
-        module.store(input.resolve(BuildStep.MODULE));
-        SequencedProperties scopes = new SequencedProperties();
-        scopes.setProperty("main/maven/io.netty/netty-tcnative-boringssl-static/jar/linux-x86_64", "runtime");
-        scopes.store(input.resolve(MavenProject.SCOPES));
-        String result = run(pom);
-        assertThat(result)
-                .as("the project's own entry shadows the bill of materials' one, so it has to state the scope that one managed")
-                .contains("""
-                                <dependency>
-                                    <groupId>io.netty</groupId>
-                                    <artifactId>netty-tcnative-boringssl-static</artifactId>
-                                    <version>2.0.70.Final</version>
-                                    <classifier>linux-x86_64</classifier>
-                                    <scope>runtime</scope>
-                                    <!--Checksum/SHA-256/deadbeef-->
-                                </dependency>
-                    """)
-                .contains("""
-                                <dependency>
-                                    <groupId>io.netty</groupId>
-                                    <artifactId>netty-common</artifactId>
-                                    <version>4.1.115.Final</version>
-                                    <!--Checksum/SHA-256/cafebabe-->
-                                </dependency>
-                    """);
-        assertThat(run(pom)).isEqualTo(result);
-    }
-
-    @Test
     public void keeps_an_imported_bom_when_nothing_is_left_to_pin() throws IOException {
         Path pom = root.resolve("pom.xml");
         String content = """
@@ -777,123 +419,6 @@ public class PinPomTest {
     }
 
     @Test
-    public void omits_checksum_comment_when_version_has_no_hash() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                </project>
-                """);
-        writeResolved(Map.of("maven/org.example/no-hash", "1.5"));
-        String result = run(pom);
-        assertThat(result).contains("<artifactId>no-hash</artifactId>");
-        assertThat(result).contains("<version>1.5</version>");
-        assertThat(result).doesNotContain("<!--Checksum");
-    }
-
-    @Test
-    public void emits_type_and_classifier_when_present() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                </project>
-                """);
-        writeResolved(Map.of(
-                "maven/org.example/sources/jar/sources", "4.0 SHA-256/cafebabe",
-                "maven/org.example/zipped/zip", "5.0"));
-        String result = run(pom);
-        assertThat(result).contains("<type>zip</type>");
-        assertThat(result).contains("<classifier>sources</classifier>");
-        assertThat(result).doesNotContain("<type>jar</type>");
-    }
-
-    @Test
-    public void ignores_entries_with_other_prefix() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                </project>
-                """);
-        writeResolved(Map.of(
-                "module/org.example.module", "1.0",
-                "maven/org.example/picked", "2.0"));
-        String result = run(pom);
-        assertThat(result).contains("<artifactId>picked</artifactId>");
-        assertThat(result).doesNotContain("<artifactId>org.example.module</artifactId>");
-        assertThat(result).contains("main/module/org.example.module 1.0");
-    }
-
-    @Test
-    public void strips_checksum_comments_from_direct_dependencies() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.example</groupId>
-                            <artifactId>direct</artifactId>
-                            <version>1.0</version>
-                            <!--Checksum/SHA-256/stale-->
-                        </dependency>
-                        <dependency>
-                            <groupId>org.example</groupId>
-                            <artifactId>another</artifactId>
-                            <version>2.0</version>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """);
-        writeResolved(Map.of("maven/org.example/direct", "1.0 SHA-256/cafebabe"));
-        String result = run(pom);
-        assertThat(result).contains("<artifactId>direct</artifactId>");
-        assertThat(result).doesNotContain("Checksum/SHA-256/stale");
-        long directDepChecksums = result.lines()
-                .filter(line -> line.contains("Checksum/"))
-                .filter(line -> !line.contains("cafebabe"))
-                .count();
-        assertThat(directDepChecksums).isZero();
-        assertThat(result).contains("<!--Checksum/SHA-256/cafebabe-->");
-    }
-
-    @Test
-    public void preserves_checksum_comments_inside_dependency_management() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                </project>
-                """);
-        writeResolved(Map.of(
-                "maven/org.example/with-hash", "1.0 SHA-256/cafebabe",
-                "maven/org.example/without-hash", "2.0"));
-        String result = run(pom);
-        assertThat(result).contains("<!--Checksum/SHA-256/cafebabe-->");
-    }
-
-    @Test
     public void second_run_with_same_input_is_a_noop() throws IOException {
         Path pom = root.resolve("pom.xml");
         Files.writeString(pom, """
@@ -909,35 +434,6 @@ public class PinPomTest {
         String afterFirst = run(pom);
         String afterSecond = run(pom);
         assertThat(afterSecond).isEqualTo(afterFirst);
-    }
-
-    @Test
-    public void recomputes_checksum_when_jar_is_present() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                </project>
-                """);
-        Path resolved = Files.createDirectory(input.resolve("resolved"));
-        Path jar = resolved.resolve("maven-org.example-dep-1.0.jar");
-        byte[] payload = "jar-bytes".getBytes(StandardCharsets.UTF_8);
-        Files.write(jar, payload);
-        writeResolved(Map.of("maven/org.example/dep", "1.0 SHA-256/stale"));
-        String result = run(pom);
-        MessageDigest digest;
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new AssertionError(e);
-        }
-        String expected = HexFormat.of().formatHex(digest.digest(payload));
-        assertThat(result).contains("<!--Checksum/SHA-256/" + expected + "-->");
-        assertThat(result).doesNotContain("SHA-256/stale");
     }
 
     @Test
@@ -969,7 +465,165 @@ public class PinPomTest {
     }
 
     @Test
-    public void manages_a_coordinate_at_the_version_the_pom_declares_inline_rather_than_at_another_halfs() throws IOException {
+    public void writes_every_pin_into_the_pin_comment_and_none_into_dependency_management() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        writeResolved(Map.of(
+                "maven/org.example/plain", "1.0 SHA-256/aa",
+                "maven/org.example/sources/jar/sources", "4.0 SHA-256/cafebabe",
+                "maven/org.example/zipped/zip", "5.0",
+                "maven/org.example/snapshot", "2.0-SNAPSHOT SHA-256/feedface",
+                "module/org.example.module", "1.0"));
+        assertThat(run(pom))
+                .as("a pin changes nothing Maven resolves, so it lives in the comment alone")
+                .contains("<!--jenesis.pin",
+                        "org.example/plain 1.0 SHA-256/aa",
+                        "maven/org.example/sources/jar/sources 4.0 SHA-256/cafebabe",
+                        "maven/org.example/zipped/zip 5.0",
+                        "main/module/org.example.module 1.0")
+                .as("a snapshot is published again under its version, so no checksum can hold for it")
+                .contains("org.example/snapshot 2.0-SNAPSHOT\n")
+                .doesNotContain("feedface", "<dependencyManagement>", "Checksum/");
+    }
+
+    @Test
+    public void writes_a_line_for_every_pom_the_resolution_read_at_each_of_its_versions() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        writeResolved(Map.of("maven/org.example/library", "1.0 SHA-256/aa"));
+        writePoms(Map.of(
+                "maven/org.example/library/pom/1.0", "<project>library</project>",
+                "maven/org.example/parent/pom/64", "<project>64</project>",
+                "maven/org.example/parent/pom/69", "<project>69</project>"));
+        String result = run(pom);
+        assertThat(result)
+                .as("a parent read at two versions is two files, each pinned by a line of its own")
+                .contains("maven/org.example/library/pom 1.0 " + sha256("<project>library</project>"),
+                        "maven/org.example/parent/pom 64 " + sha256("<project>64</project>"),
+                        "maven/org.example/parent/pom 69 " + sha256("<project>69</project>"));
+        assertThat(run(pom)).as("the lines read back as what pin writes").isEqualTo(result);
+    }
+
+    @Test
+    public void removes_the_management_entries_an_earlier_pin_wrote_and_keeps_every_other() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <!-- the module of this build, which the tests use -->
+                            <dependency>
+                                <groupId>group</groupId>
+                                <artifactId>sibling</artifactId>
+                                <version>${project.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.example</groupId>
+                                <artifactId>pinned</artifactId>
+                                <version>1.0</version>
+                                <!--Checksum/SHA-256/cafebabe-->
+                            </dependency>
+                            <dependency>
+                                <groupId>org.example</groupId>
+                                <artifactId>bom</artifactId>
+                                <version>1.0</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        writeResolved(Map.of("maven/org.example/pinned", "1.0 SHA-256/deadbeef"));
+        assertThat(run(pom))
+                .as("an entry carrying a checksum is one pin wrote, which the comment now holds")
+                .doesNotContain("<artifactId>pinned</artifactId>", "Checksum/")
+                .contains("org.example/pinned 1.0 SHA-256/deadbeef")
+                .as("a sibling, an imported BOM and every comment stay as written")
+                .contains("<!-- the module of this build, which the tests use -->",
+                        "<artifactId>sibling</artifactId>",
+                        "<version>${project.version}</version>",
+                        "<scope>import</scope>");
+    }
+
+    @Test
+    public void drops_a_dependency_management_that_held_only_entries_pin_wrote() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>stale</groupId>
+                                <artifactId>old</artifactId>
+                                <version>0.1</version>
+                                <!--Checksum/SHA-256/cafebabe-->
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>direct</artifactId>
+                            <version>1.0</version>
+                            <!--Checksum/SHA-256/stale-->
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        writeResolved(Map.of("maven/org.example/direct", "1.0 SHA-256/fresh"));
+        assertThat(run(pom))
+                .doesNotContain("<dependencyManagement>", "stale", "Checksum/")
+                .contains("<artifactId>direct</artifactId>", "org.example/direct 1.0 SHA-256/fresh");
+    }
+
+    @Test
+    public void computes_the_checksum_of_a_jar_that_is_present() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(input.resolve("resolved")).resolve("maven-org.example-dep-1.0.jar"), "jar-bytes");
+        writeResolved(Map.of("maven/org.example/dep", "1.0 SHA-256/stale"));
+        assertThat(run(pom))
+                .contains("org.example/dep 1.0 " + sha256("jar-bytes"))
+                .doesNotContain("SHA-256/stale");
+    }
+
+    @Test
+    public void pins_a_coordinate_at_the_version_the_pom_declares_inline_rather_than_at_another_halfs() throws IOException {
         Path pom = root.resolve("pom.xml");
         Files.writeString(pom, """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -997,10 +651,9 @@ public class PinPomTest {
         requires.setProperty("main/compile/maven/org.slf4j/slf4j-api/2.0.19", "");
         requires.setProperty("main/runtime/maven/org.slf4j/slf4j-api/2.0.19", "");
         requires.store(input.resolve(BuildStep.REQUIRES));
-        String result = run(pom);
-        assertThat(result)
-                .as("the version the pom declares itself is the one its resolution keeps, so a managed entry may not override it")
-                .contains("<version>2.0.19</version>\n                <!--Checksum/SHA-256/test-->")
+        assertThat(run(pom))
+                .as("the version the pom declares itself is the one its resolution keeps")
+                .contains("org.slf4j/slf4j-api 2.0.19 SHA-256/test")
                 .doesNotContain("1.7.36");
     }
 
@@ -1018,12 +671,10 @@ public class PinPomTest {
                 """);
         writeResolved(new LinkedHashMap<>(Map.of(
                 "maven/com.example/internal", "0-SNAPSHOT",
-                "maven/com.example/external", "1.2.3 SHA-256/cafebabe",
-                "maven/com.example/managed", "9.9")));
+                "maven/com.example/external", "1.2.3 SHA-256/cafebabe")));
         writeIdentity(Map.of("maven/com.example/internal/0-SNAPSHOT", ""));
-        String result = run(pom);
-        assertThat(result).doesNotContain("<artifactId>internal</artifactId>");
-        assertThat(result).contains("<artifactId>external</artifactId>");
-        assertThat(result).contains("<artifactId>managed</artifactId>");
+        assertThat(run(pom))
+                .contains("com.example/external 1.2.3 SHA-256/cafebabe")
+                .doesNotContain("com.example/internal");
     }
 }

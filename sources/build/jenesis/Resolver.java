@@ -12,12 +12,24 @@ public interface Resolver extends Serializable {
                boolean internal,
                boolean verifiable,
                String version,
-               SequencedMap<String, String> entries) implements Serializable {
+               SequencedMap<String, String> entries,
+               SequencedMap<String, Resolved> poms) implements Serializable {
+
+        public Bom(Path file, boolean internal, boolean verifiable, String version, SequencedMap<String, String> entries) {
+            this(file, internal, verifiable, version, entries, new LinkedHashMap<>());
+        }
     }
 
     record Resolution(SequencedMap<String, Resolved> artifacts,
                       List<Edge> edges,
-                      SequencedMap<String, Vertex> vertices) {
+                      SequencedMap<String, Vertex> vertices,
+                      SequencedMap<String, Resolved> poms) {
+
+        public Resolution(SequencedMap<String, Resolved> artifacts,
+                          List<Edge> edges,
+                          SequencedMap<String, Vertex> vertices) {
+            this(artifacts, edges, vertices, new LinkedHashMap<>());
+        }
     }
 
     record Edge(String parent, String coordinate, String version, String scope, boolean followed) {
@@ -98,9 +110,34 @@ public interface Resolver extends Serializable {
                 }
                 expanded = key;
             }
-            entries.put(expanded, value);
+            entries.put(pinKey(expanded, value), value);
         }
         return entries;
+    }
+
+    static boolean pom(String coordinate) {
+        String[] segments = coordinate.split("/");
+        return segments.length == 4 && segments[2].equals("pom");
+    }
+
+    static String pinKey(String key, String value) {
+        int space = value.indexOf(' ');
+        String[] segments = key.split("/");
+        return space > 0
+                && segments.length > 3
+                && segments[segments.length - 1].equals("pom")
+                && segments[segments.length - 4].equals("maven")
+                ? key + "/" + value.substring(0, space)
+                : key;
+    }
+
+    static String pinToken(String key) {
+        String[] segments = key.split("/");
+        return segments.length > 4
+                && segments[segments.length - 2].equals("pom")
+                && segments[segments.length - 5].equals("maven")
+                ? key.substring(0, key.lastIndexOf('/'))
+                : key;
     }
 
     static String base(String prefix) {

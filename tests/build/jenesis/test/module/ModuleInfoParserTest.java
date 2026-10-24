@@ -111,6 +111,27 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_pin_keys_a_pom_by_its_version_so_several_versions_stand_side_by_side() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin maven/org.apache.commons/commons-parent/pom 64 SHA-256/aa
+                 * @jenesis.pin maven/org.apache.commons/commons-parent/pom 69 SHA-256/bb
+                 * @jenesis.pin maven/org.acme/bundle/pom 1.0
+                 */
+                module foo {
+                    requires bar;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.versions())
+                .as("a POM's checksum pins the one file read at that version")
+                .containsEntry("main/maven/org.apache.commons/commons-parent/pom/64", "64 SHA-256/aa")
+                .containsEntry("main/maven/org.apache.commons/commons-parent/pom/69", "69 SHA-256/bb")
+                .as("without a checksum, the line still manages a dependency of type pom")
+                .containsEntry("main/maven/org.acme/bundle/pom", "1.0");
+    }
+
+    @Test
     public void jenesis_pin_refuses_a_classified_coordinate_that_reads_as_a_group() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**

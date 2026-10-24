@@ -6179,6 +6179,31 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_reads_every_pin_of_its_pin_comment_a_pom_once_per_version() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>project</artifactId>
+                    <version>1</version>
+                    <!--jenesis.pin
+                    org.example/library 1.0 SHA-256/aa
+                    maven/org.example/library/jar/sources 1.0 SHA-256/bb
+                    maven/org.example/parent/pom 64 SHA-256/cc
+                    maven/org.example/parent/pom 69 SHA-256/dd
+                    -->
+                </project>
+                """);
+        assertThat(mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of("")).qualifiedDependencies())
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        "main/maven/org.example/library", "1.0 SHA-256/aa",
+                        "main/maven/org.example/library/jar/sources", "1.0 SHA-256/bb",
+                        "main/maven/org.example/parent/pom/64", "64 SHA-256/cc",
+                        "main/maven/org.example/parent/pom/69", "69 SHA-256/dd"));
+    }
+
+    @Test
     public void local_pom_reads_plugin_comment_block() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -7541,7 +7566,7 @@ public class MavenPomResolverTest {
         SequencedMap<MavenDependencyKey, MavenDependencyValue> deps = mavenPomResolver.dependencies(
                 Runnable::run,
                 mavenRepository,
-                List.of(new MavenResolver.RootPom(new ByteArrayInputStream(rootPom.getBytes(StandardCharsets.UTF_8)))),
+                List.of(new MavenResolver.RootPom(() -> new ByteArrayInputStream(rootPom.getBytes(StandardCharsets.UTF_8)))),
                 Map.of(),
                 MavenDependencyScope.COMPILE,
                 "main").dependencies();
@@ -7884,7 +7909,7 @@ public class MavenPomResolverTest {
         assertThatThrownBy(() -> mavenPomResolver.dependencies(
                 Runnable::run,
                 mavenRepository,
-                List.of(new MavenResolver.RootPom(new ByteArrayInputStream(rootPom.getBytes(StandardCharsets.UTF_8)))),
+                List.of(new MavenResolver.RootPom(() -> new ByteArrayInputStream(rootPom.getBytes(StandardCharsets.UTF_8)))),
                 Map.of(),
                 MavenDependencyScope.COMPILE,
                 "main"))

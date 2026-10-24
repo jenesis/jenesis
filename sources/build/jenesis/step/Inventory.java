@@ -121,6 +121,7 @@ public class Inventory implements BuildStep {
                 Path.of(BOMS),
                 Path.of(Dependencies.GRAPH),
                 Path.of(Dependencies.LICENSES),
+                Path.of(Dependencies.POMS),
                 Path.of(JPackage.PACKAGES),
                 Path.of(JMod.JMODS),
                 Path.of(JLink.RUNTIME),
@@ -166,6 +167,8 @@ public class Inventory implements BuildStep {
         SequencedMap<String, Path> closureJars = new LinkedHashMap<>();
         SequencedMap<String, String> closureScopes = new LinkedHashMap<>();
         SequencedMap<String, String> closureChecksums = new LinkedHashMap<>();
+        SequencedMap<String, Path> pomFiles = new LinkedHashMap<>();
+        SequencedMap<String, String> pomChecksums = new LinkedHashMap<>();
         SequencedMap<String, Path> bomFiles = new LinkedHashMap<>();
         SequencedMap<String, String> bomValues = new LinkedHashMap<>();
         SequencedMap<String, String> attachments = new LinkedHashMap<>();
@@ -299,6 +302,18 @@ public class Inventory implements BuildStep {
                 natives.addAll(SequencedProperties.ofFiles(nativesFile).stringPropertyNames());
             }
             collectClosure(folder, closureJars, closureScopes, closureChecksums);
+            Path pomsFile = folder.resolve(Dependencies.POMS);
+            if (Files.isRegularFile(pomsFile)) {
+                SequencedProperties index = SequencedProperties.ofFiles(pomsFile);
+                for (String key : index.stringPropertyNames()) {
+                    String value = index.getProperty(key);
+                    int space = value.indexOf(' ');
+                    Path file = folder.resolve(space < 0 ? value : value.substring(0, space)).normalize();
+                    if (Files.isRegularFile(file) && pomFiles.putIfAbsent(key, file) == null && space >= 0) {
+                        pomChecksums.put(key, value.substring(space + 1));
+                    }
+                }
+            }
             Path bomsFile = folder.resolve(BOMS);
             if (Files.isRegularFile(folder.resolve(DEPENDENCIES)) && Files.isRegularFile(bomsFile)) {
                 SequencedProperties resolvedBoms = SequencedProperties.ofFiles(bomsFile);
@@ -319,6 +334,7 @@ public class Inventory implements BuildStep {
                     .toList());
             writePaths(inventory, context, prefix + "documentation", documentation);
             writeClosure(inventory, context, prefix + "tool.", closureJars, closureScopes, closureChecksums);
+            writeClosure(inventory, context, prefix + "pom.", pomFiles, new LinkedHashMap<>(), pomChecksums);
             if (!inventory.isEmpty()) {
                 inventory.store(context.next().resolve(INVENTORY));
             }
@@ -337,6 +353,7 @@ public class Inventory implements BuildStep {
             inventory.setProperty(prefix + "identity." + identityIndex++, coordinate);
         }
         writeClosure(inventory, context, prefix + "dependency.", closureJars, closureScopes, closureChecksums);
+        writeClosure(inventory, context, prefix + "pom.", pomFiles, new LinkedHashMap<>(), pomChecksums);
         int agentIndex = 0;
         for (Map.Entry<String, String> attachment : attachments.entrySet()) {
             String key = attachment.getKey();
@@ -677,6 +694,15 @@ public class Inventory implements BuildStep {
     }
 
     public static SequencedMap<String, Dependency> closure(Iterable<BuildStepArgument> arguments, String path) throws IOException {
+        return entries(arguments, List.of(prefixOf(path) + "dependency.", prefixOf(path) + "tool."));
+    }
+
+    public static SequencedMap<String, Dependency> poms(Iterable<BuildStepArgument> arguments, String path) throws IOException {
+        return entries(arguments, List.of(prefixOf(path) + "pom."));
+    }
+
+    private static SequencedMap<String, Dependency> entries(Iterable<BuildStepArgument> arguments, List<String> keys)
+            throws IOException {
         SequencedMap<String, Dependency> closure = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments) {
             if (argument.removed()) {
@@ -687,7 +713,7 @@ public class Inventory implements BuildStep {
                 continue;
             }
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
-            for (String key : List.of(prefixOf(path) + "dependency.", prefixOf(path) + "tool.")) {
+            for (String key : keys) {
                 for (int index = 0; ; index++) {
                     String value = inventory.getProperty(key + index);
                     if (value == null) {

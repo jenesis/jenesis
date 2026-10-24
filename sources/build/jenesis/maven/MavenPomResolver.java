@@ -127,6 +127,9 @@ public class MavenPomResolver implements MavenResolver {
                                             DependencyScope scope) throws IOException {
         Map<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>();
         versions.forEach((coordinate, value) -> {
+            if (Resolver.pom(coordinate)) {
+                return;
+            }
             MavenDependencyKey key = MavenDependencyKey.parseKey(coordinate);
             int split = value.indexOf(' ');
             String version = split < 0 ? value : value.substring(0, split);
@@ -202,10 +205,11 @@ public class MavenPomResolver implements MavenResolver {
                         "No version pinned for " + coordinate + " (add to dependencyManagement)");
             }
         });
+        Map<DependencyCoordinate, UnresolvedPom> unresolved = new ConcurrentHashMap<>();
         Traversal traversal = dependencies(executor,
                 MavenRepository.of(repositories.getOrDefault(Resolver.base(prefix), Repository.empty())),
                 new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of(), null), true, null, Set.of(), null, null),
-                new ConcurrentHashMap<>(),
+                unresolved,
                 new ConcurrentHashMap<>(),
                 prefix);
         SequencedMap<String, String> resolved = new LinkedHashMap<>();
@@ -242,7 +246,7 @@ public class MavenPomResolver implements MavenResolver {
                     artifact != null && artifact.internal(),
                     traversal.licenses().getOrDefault(withVersion, List.of())));
         });
-        return new Resolver.Resolution(artifacts, traversal.edges(), nodes);
+        return new Resolver.Resolution(artifacts, traversal.edges(), nodes, poms(prefix, unresolved));
     }
 
     public SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies(
@@ -293,7 +297,7 @@ public class MavenPomResolver implements MavenResolver {
         Map<DependencyCoordinate, UnresolvedPom> unresolved = new HashMap<>();
         UnresolvedPom assembled;
         try (InputStream stream = item.toInputStream()) {
-            assembled = assemble(executor, repository, stream, false, false, null, null, new HashSet<>(), unresolved);
+            assembled = assemble(executor, repository, item, stream, false, false, null, null, new HashSet<>(), unresolved);
         } catch (SAXException | ParserConfigurationException e) {
             throw new IllegalStateException("Failed to parse BOM " + coordinate + "/" + resolved, e);
         }
@@ -303,7 +307,8 @@ public class MavenPomResolver implements MavenResolver {
                 entries.put(prefix + "/" + key.coordinate(null, null), value.version());
             }
         });
-        return new Resolver.Bom(item.file().orElse(null), item.internal(), false, resolved, entries);
+        unresolved.putIfAbsent(new DependencyCoordinate(groupId, artifactId, resolved), assembled);
+        return new Resolver.Bom(item.file().orElse(null), item.internal(), false, resolved, entries, poms(prefix, unresolved));
     }
 
     @Override
@@ -321,8 +326,8 @@ public class MavenPomResolver implements MavenResolver {
         SequencedMap<String, MavenDependencyKey> roots = new LinkedHashMap<>();
         for (RootPom rootPom : rootPoms) {
             UnresolvedPom assembled;
-            try (InputStream stream = rootPom.pom()) {
-                assembled = assemble(executor, repository, stream, false, true, null, null, new HashSet<>(), unresolved);
+            try (InputStream stream = rootPom.pom().toInputStream()) {
+                assembled = assemble(executor, repository, rootPom.pom(), stream, false, true, null, null, new HashSet<>(), unresolved);
             } catch (SAXException | ParserConfigurationException e) {
                 throw new IllegalStateException("Failed to parse provided root POM", e);
             }
@@ -351,7 +356,25 @@ public class MavenPomResolver implements MavenResolver {
                 unresolved,
                 resolved,
                 prefix);
-        return new MavenResolver.Closure(traversal.dependencies(), roots, traversal.edges(), traversal.licenses());
+        return new MavenResolver.Closure(traversal.dependencies(),
+                roots,
+                traversal.edges(),
+                traversal.licenses(),
+                poms(prefix, unresolved));
+    }
+
+    private static SequencedMap<String, Resolver.Resolved> poms(String prefix,
+                                                               Map<DependencyCoordinate, UnresolvedPom> unresolved) {
+        SequencedMap<String, Resolver.Resolved> poms = new TreeMap<>();
+        unresolved.forEach((coordinate, pom) -> {
+            Path file = pom.source() == null ? null : pom.source().file().orElse(null);
+            if (file != null) {
+                poms.put(new MavenDependencyKey(coordinate.groupId(), coordinate.artifactId(), "pom", null)
+                                .coordinate(prefix, coordinate.version()),
+                        new Resolver.Resolved(file, "", pom.source().internal()));
+            }
+        });
+        return poms;
     }
 
     public SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies(Executor executor,
@@ -683,6 +706,7 @@ public class MavenPomResolver implements MavenResolver {
                 try {
                     pom = assemble(executor,
                             MavenRepository.of(repository),
+                            null,
                             Files.newInputStream(current.resolve("pom.xml")),
                             true,
                             true,
@@ -870,6 +894,7 @@ public class MavenPomResolver implements MavenResolver {
 
     private UnresolvedPom assemble(Executor executor,
                                    MavenRepository repository,
+                                   RepositoryItem item,
                                    InputStream inputStream,
                                    boolean extended,
                                    boolean trusted,
@@ -922,6 +947,7 @@ public class MavenPomResolver implements MavenResolver {
                             }
                             local = assemble(executor,
                                     repository,
+                                    null,
                                     Files.newInputStream(pom),
                                     false,
                                     trusted,
@@ -965,6 +991,7 @@ public class MavenPomResolver implements MavenResolver {
                             if (Files.exists(pom)) {
                                 resolution = assemble(executor,
                                         repository,
+                                        null,
                                         Files.newInputStream(pom),
                                         false,
                                         trusted,
@@ -1226,7 +1253,8 @@ public class MavenPomResolver implements MavenResolver {
                                         toElementText(relocation, "version").orElse(null),
                                         toElementText(relocation, "message").orElse(null)))
                                 .orElse(null),
-                        declaredManagedDependencies.keySet());
+                        declaredManagedDependencies.keySet(),
+                        item);
             }
             default -> throw new IllegalArgumentException("Unknown namespace: " + namespace);
         };
@@ -1276,7 +1304,8 @@ public class MavenPomResolver implements MavenResolver {
                             null,
                             true,
                             null,
-                            Set.of());
+                            Set.of(),
+                            null);
                 } else {
                     Path localPath = candidate.file().map(Path::getParent).orElse(null);
                     Map<Path, UnresolvedPom> localPaths = localPath == null ? null : new HashMap<>();
@@ -1296,14 +1325,14 @@ public class MavenPomResolver implements MavenResolver {
                             throw new IllegalStateException(e);
                         }
                         DigestInputStream digestStream = new DigestInputStream(candidate.toInputStream(), digest);
-                        pom = assemble(executor, repository, drainAndValidate(digestStream,
+                        pom = assemble(executor, repository, candidate, drainAndValidate(digestStream,
                                 digest,
                                 expected,
                                 groupId,
                                 artifactId,
                                 version), false, false, localPath, localPaths, children, poms);
                     } else {
-                        pom = assemble(executor, repository, candidate.toInputStream(), false, false, localPath, localPaths, children, poms);
+                        pom = assemble(executor, repository, candidate, candidate.toInputStream(), false, false, localPath, localPaths, children, poms);
                     }
                 }
             } catch (RuntimeException | SAXException | ParserConfigurationException e) {
@@ -1699,8 +1728,9 @@ public class MavenPomResolver implements MavenResolver {
                                         + "': expected <module>, <groupId>/<artifactId>,"
                                         + " or <group>/<repository>/<coordinate>");
                             }
-                            key = token;
+                            key = token.startsWith("maven/") ? "main/" + token : token;
                         }
+                        key = Resolver.pinKey(key, value);
                         entries.put(guard == null ? key : key + "[" + guard + "]", value);
                     }
                 });
@@ -2183,7 +2213,8 @@ public class MavenPomResolver implements MavenResolver {
                                  Map<DependencyKey, DependencyValue> bom,
                                  boolean missing,
                                  MavenPomEmitter.Relocation relocation,
-                                 Set<DependencyKey> declaredManagement) {
+                                 Set<DependencyKey> declaredManagement,
+                                 RepositoryItem source) {
     }
 
     private record ResolvedPom(Map<MavenDependencyKey, MavenDependencyValue> managedDependencies,

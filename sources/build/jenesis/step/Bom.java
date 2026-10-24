@@ -23,7 +23,8 @@ public class Bom implements BuildStep {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(DEPENDENCIES),
                 Path.of(MODULE),
-                Path.of(Dependencies.RESOLVED)));
+                Path.of(Dependencies.RESOLVED),
+                Path.of(Dependencies.POMS)));
     }
 
     @Override
@@ -43,6 +44,18 @@ public class Bom implements BuildStep {
                 String value = SequencedProperties.ofFiles(moduleFile).getProperty("module");
                 if (value != null && !value.isEmpty()) {
                     module = value;
+                }
+            }
+            Path pomsFile = folder.resolve(Dependencies.POMS);
+            if (Files.isRegularFile(pomsFile)) {
+                SequencedProperties poms = SequencedProperties.ofFiles(pomsFile);
+                for (String key : poms.stringPropertyNames()) {
+                    if (key.startsWith("main/")) {
+                        String value = poms.getProperty(key);
+                        int space = value.indexOf(' ');
+                        entries.putIfAbsent(key.substring("main/".length()), key.substring(key.lastIndexOf('/') + 1)
+                                + " " + hashFunction.encodedHash(folder.resolve(space < 0 ? value : value.substring(0, space))));
+                    }
                 }
             }
             Path dependenciesFile = folder.resolve(DEPENDENCIES);
