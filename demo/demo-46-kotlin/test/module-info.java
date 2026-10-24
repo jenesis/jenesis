@@ -10,11 +10,16 @@
  * @jenesis.pin kotlin/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
  * @jenesis.pin kotlin/module/build.jenesis.plugin.kotlin 0.1.0 SHA-256/8ae119271454d849d712d61b0166b5879f6c6493897beaa4d76b1aa5319545c6
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-build-tools-api 2.4.21 SHA-256/c5cd6a49bd072b529ae10809111c16a7aa0f92147e95d288354017fd65799461
+ * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-build-tools-cri-impl 2.4.21 SHA-256/d1849f9b98033f5333905409074ca90e6a0e17258cd0eb8befa47d795e695841
+ * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-build-tools-impl 2.4.21 SHA-256/3152b3e1fbaa4d48f3681734a2c0efc438359a48c8a3c5cac00d874670de1377
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable 2.4.21 SHA-256/ef19419c765e7ac8404465fa026ca8fc4dbb8a822de0fc79aa53c8dce29f1d02
+ * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-compiler-runner 2.4.21 SHA-256/75cd5956405697559e6925ebc5808449a2e12002d4f017275281ad3d4c0c7985
+ * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-daemon-client 2.4.21 SHA-256/095903c4c4713bf91a562d226d7ba0464cf5424e76342d487deec494451ab29b
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-daemon-embeddable 2.4.21 SHA-256/7b3ef24674e5bcffcadfc4e43202ea314194939ecbcdd90a4770b2f1b04e0d07
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-reflect 1.6.10 SHA-256/3277ac102ae17aad10a55abec75ff5696c8d109790396434b496e75087854203
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-script-runtime 2.4.21 SHA-256/a658cf5902a1525a06c264a5e42b437e97a6679ddeef8ca641246f270cf6a013
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-stdlib 2.4.21 SHA-256/bd8250210584cb659847dce9cda660f8e9906e5def7fbebcea93dc6dcb6a88a3
+ * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-tooling-core 2.4.21 SHA-256/5fc5db083803232857408ed5c25bcc307c703b04bdef6cb2c34ebf4db611a622
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm 1.8.0 SHA-256/9860906a1937490bf5f3b06d2f0e10ef451e65b95b269f22daf68a3d1f5065c5
  * @jenesis.pin kotlin:tool/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
  * @jenesis.pin maven/org.apiguardian/apiguardian-api/pom 1.1.2 SHA-256/32355081d109095c3d5d374d5a43b4f4c1b75d549e983ef50723e2772e5302a0
