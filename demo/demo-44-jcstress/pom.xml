@@ -14,34 +14,6 @@
         <mainClass>org.openjdk.jcstress.Main</mainClass>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>net.java.dev.jna</groupId>
-                <artifactId>jna</artifactId>
-                <version>5.8.0</version>
-                <!--Checksum/SHA-256/930273cc1c492f25661ea62413a6da3fd7f6e01bf1c4dcc0817fc8696a7b07ac-->
-            </dependency>
-            <dependency>
-                <groupId>net.java.dev.jna</groupId>
-                <artifactId>jna-platform</artifactId>
-                <version>5.8.0</version>
-                <!--Checksum/SHA-256/ffd93fe1bc07de6f33eabf3d051c3636e01a01c17cb0da8448c53a2ac5e3bf7a-->
-            </dependency>
-            <dependency>
-                <groupId>net.sf.jopt-simple</groupId>
-                <artifactId>jopt-simple</artifactId>
-                <version>4.6</version>
-                <!--Checksum/SHA-256/3fcfbe3203c2ea521bf7640484fd35d6303186ea2e08e72f032d640ca067ffda-->
-            </dependency>
-            <dependency>
-                <groupId>org.openjdk.jcstress</groupId>
-                <artifactId>jcstress-core</artifactId>
-                <version>0.16</version>
-                <!--Checksum/SHA-256/58ee119c227bd02a86ad47f32b6165537e42502ef6cc8140d6454b0cac29f6ac-->
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
     <dependencies>
         <dependency>
             <groupId>org.openjdk.jcstress</groupId>
@@ -57,9 +29,25 @@
     </dependencies>
     <!--jenesis.native net.java.dev.jna/jna-->
     <!--jenesis.pin
+    net.java.dev.jna/jna 5.8.0 SHA-256/930273cc1c492f25661ea62413a6da3fd7f6e01bf1c4dcc0817fc8696a7b07ac
+    net.java.dev.jna/jna-platform 5.8.0 SHA-256/ffd93fe1bc07de6f33eabf3d051c3636e01a01c17cb0da8448c53a2ac5e3bf7a
+    maven/net.java.dev.jna/jna-platform/pom 5.8.0 SHA-256/6c00fa34f1d7c19e73821b7423a5e974b63b64ce30323d15a92a6b5e734613dd
+    maven/net.java.dev.jna/jna/pom 5.8.0 SHA-256/5e53d8e637f93b83014e2302fb7e63fd7b83ab000a7f794aa340020ffb880d4a
+    net.sf.jopt-simple/jopt-simple 4.6 SHA-256/3fcfbe3203c2ea521bf7640484fd35d6303186ea2e08e72f032d640ca067ffda
+    maven/net.sf.jopt-simple/jopt-simple/pom 4.6 SHA-256/692744a19473011539ebc1370a264b8af1c056e0ae21f5372aa9dd7d4b4e5a2b
+    org.openjdk.jcstress/jcstress-core 0.16 SHA-256/58ee119c227bd02a86ad47f32b6165537e42502ef6cc8140d6454b0cac29f6ac
+    maven/org.openjdk.jcstress/jcstress-core/pom 0.16 SHA-256/9bf5fe907d35c8fd6f5c85d5fbc570a69712c1c550fc696c26b50d34eb10e266
+    maven/org.openjdk.jcstress/jcstress-parent/pom 0.16 SHA-256/4882d0a9cd3b94929f07b99ece78a73ca5af2be0d8b85d689ec8143d168731c6
+    maven/org.sonatype.oss/oss-parent/pom 7 SHA-256/b51f8867c92b6a722499557fc3a1fdea77bdf9ef574722fe90ce436a29559454
     plugin/maven/net.java.dev.jna/jna 5.8.0 SHA-256/930273cc1c492f25661ea62413a6da3fd7f6e01bf1c4dcc0817fc8696a7b07ac
     plugin/maven/net.java.dev.jna/jna-platform 5.8.0 SHA-256/ffd93fe1bc07de6f33eabf3d051c3636e01a01c17cb0da8448c53a2ac5e3bf7a
+    plugin/maven/net.java.dev.jna/jna-platform/pom 5.8.0 SHA-256/6c00fa34f1d7c19e73821b7423a5e974b63b64ce30323d15a92a6b5e734613dd
+    plugin/maven/net.java.dev.jna/jna/pom 5.8.0 SHA-256/5e53d8e637f93b83014e2302fb7e63fd7b83ab000a7f794aa340020ffb880d4a
     plugin/maven/net.sf.jopt-simple/jopt-simple 4.6 SHA-256/3fcfbe3203c2ea521bf7640484fd35d6303186ea2e08e72f032d640ca067ffda
+    plugin/maven/net.sf.jopt-simple/jopt-simple/pom 4.6 SHA-256/692744a19473011539ebc1370a264b8af1c056e0ae21f5372aa9dd7d4b4e5a2b
     plugin/maven/org.openjdk.jcstress/jcstress-core 0.16 SHA-256/58ee119c227bd02a86ad47f32b6165537e42502ef6cc8140d6454b0cac29f6ac
+    plugin/maven/org.openjdk.jcstress/jcstress-core/pom 0.16 SHA-256/9bf5fe907d35c8fd6f5c85d5fbc570a69712c1c550fc696c26b50d34eb10e266
+    plugin/maven/org.openjdk.jcstress/jcstress-parent/pom 0.16 SHA-256/4882d0a9cd3b94929f07b99ece78a73ca5af2be0d8b85d689ec8143d168731c6
+    plugin/maven/org.sonatype.oss/oss-parent/pom 7 SHA-256/b51f8867c92b6a722499557fc3a1fdea77bdf9ef574722fe90ce436a29559454
     -->
 </project>
