@@ -81,8 +81,8 @@ verification asks whether it was valid at the moment the log recorded the signat
 is valid today. A ten-minute certificate plus a countersigned timestamp is what replaces a key kept
 for years - there is nothing left to steal once the signature is made.
 
-Under `strict` a coordinate's **POM must carry a bundle from the same identity**, which closes the
-same gap the key form closes: POMs are read during resolution but never pinned.
+Under `strict` a coordinate's **POM must carry a bundle from the same identity**, as in the key form.
+The parents and BOMs that POM reads carry no such check; their checksum pins cover them.
 
 Where the trust root comes from
 -------------------------------

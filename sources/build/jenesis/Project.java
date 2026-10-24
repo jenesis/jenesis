@@ -2117,7 +2117,7 @@ public record Project(
                           rejects one that no line covers or that publishes no signature, and the
                           default none verifies nothing, so a consumer who trusts the pins needs no
                           gpg at all. A coordinate's POM is verified with its artifact and must carry
-                          the same signer, which closes the gap that POMs are read but never pinned.
+                          the same signer; the parents and BOMs it reads are covered by their pins.
                           The algorithm unsigned names no key, because there is none to name, and
                           its value says what to do when one turns up: unsigned/missing accepts a
                           coordinate that publishes no signature and fails once one appears, so an
