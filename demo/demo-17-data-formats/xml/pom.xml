@@ -14,22 +14,6 @@
         <sourceDirectory>sources</sourceDirectory>
     </build>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>jakarta.activation</groupId>
-                <artifactId>jakarta.activation-api</artifactId>
-                <version>2.1.3</version>
-                <!--Checksum/SHA-256/01b176d718a169263e78290691fc479977186bcc6b333487325084d6586f4627-->
-            </dependency>
-            <dependency>
-                <groupId>jakarta.xml.bind</groupId>
-                <artifactId>jakarta.xml.bind-api</artifactId>
-                <version>4.0.2</version>
-                <!--Checksum/SHA-256/0d6bcfe47763e85047acf7c398336dc84ff85ebcad0a7cb6f3b9d3e981245406-->
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
     <dependencies>
         <dependency>
             <groupId>jakarta.xml.bind</groupId>
@@ -38,6 +22,12 @@
         </dependency>
     </dependencies>
     <!--jenesis.pin
+    jakarta.activation/jakarta.activation-api 2.1.3 SHA-256/01b176d718a169263e78290691fc479977186bcc6b333487325084d6586f4627
+    maven/jakarta.activation/jakarta.activation-api/pom 2.1.3 SHA-256/b2549940c17b6865a34f6135b7722ed8cbfef6d0b6c0db372c30f0346bc8cd58
+    jakarta.xml.bind/jakarta.xml.bind-api 4.0.2 SHA-256/0d6bcfe47763e85047acf7c398336dc84ff85ebcad0a7cb6f3b9d3e981245406
+    maven/jakarta.xml.bind/jakarta.xml.bind-api-parent/pom 4.0.2 SHA-256/482cdb46d4dd2f5af7dc884c8a6de73ddffe6daf549ef36a6c077fd6e41eed08
+    maven/jakarta.xml.bind/jakarta.xml.bind-api/pom 4.0.2 SHA-256/ab7273e26a54824b3b7333d4956e6ecd26de13a5eb3d90ee63023193a92d72be
+    maven/org.eclipse.ee4j/project/pom 1.0.9 SHA-256/825379934a1cf29249f349f2d18adaf79a7b2cb2dbe231518974e1ee70941c17
     xjc/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
     xjc/module/build.jenesis.plugin.xjc 0.1.0 SHA-256/32407679fe3ddbce389eb3ca58a2583c2ab39e21ff0c8e5c0f102326c47f50d1
     xjc:tool/maven/com.sun.istack/istack-commons-runtime 4.1.2 SHA-256/7fd6792361f4dd00f8c56af4a20cecc0066deea4a8f3dec38348af23fc2296ee

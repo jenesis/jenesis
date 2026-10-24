@@ -14,64 +14,6 @@
         <sourceDirectory>sources</sourceDirectory>
     </build>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-annotations</artifactId>
-                <version>2.22</version>
-                <!--Checksum/SHA-256/21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0-->
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-core</artifactId>
-                <version>2.22.1</version>
-                <!--Checksum/SHA-256/941ff029bcdb93e83d209ce516c1a7fb8bbac07d0a2fa122f5bf194b2cd7b4f4-->
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-databind</artifactId>
-                <version>2.22.1</version>
-                <!--Checksum/SHA-256/7dcd7e53bec1f56c7ad278bd1ca0840bebcc595d61ce44d6a8439abb75b965b2-->
-            </dependency>
-            <dependency>
-                <groupId>commons-codec</groupId>
-                <artifactId>commons-codec</artifactId>
-                <version>1.19.0</version>
-                <!--Checksum/SHA-256/5c3881e4f556855e9c532927ee0c9dfde94cc66760d5805c031a59887070af5f-->
-            </dependency>
-            <dependency>
-                <groupId>commons-io</groupId>
-                <artifactId>commons-io</artifactId>
-                <version>2.20.0</version>
-                <!--Checksum/SHA-256/df90bba0fe3cb586b7f164e78fe8f8f4da3f2dd5c27fa645f888100ccc25dd72-->
-            </dependency>
-            <dependency>
-                <groupId>org.apache.avro</groupId>
-                <artifactId>avro</artifactId>
-                <version>1.12.2</version>
-                <!--Checksum/SHA-256/6522e2a146b859ad158bb024dcc3b0bc826680794a2523b0881dafcbd59ce2df-->
-            </dependency>
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-compress</artifactId>
-                <version>1.28.0</version>
-                <!--Checksum/SHA-256/e1522945218456f3649a39bc4afd70ce4bd466221519dba7d378f2141a4642ca-->
-            </dependency>
-            <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-lang3</artifactId>
-                <version>3.18.0</version>
-                <!--Checksum/SHA-256/4eeeae8d20c078abb64b015ec158add383ac581571cddc45c68f0c9ae0230720-->
-            </dependency>
-            <dependency>
-                <groupId>org.slf4j</groupId>
-                <artifactId>slf4j-api</artifactId>
-                <version>2.0.18</version>
-                <!--Checksum/SHA-256/44508fd1576500688c790b190acdd16fec4f8c79a3e0b900afd70503cf055f55-->
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
     <dependencies>
         <dependency>
             <groupId>org.apache.avro</groupId>
@@ -80,8 +22,39 @@
         </dependency>
     </dependencies>
     <!--jenesis.pin
-    avro:tool/maven/org.apache.avro/avro-tools 1.12.2 SHA-256/6220e8bc089aaf917cdad4cd358bd651fc0394c0e5ddb8b36da402012c294a68
     avro/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
     avro/module/build.jenesis.plugin.avro 0.1.0 SHA-256/728932e797c8bf270d03b6f011fca3f342dce3a7ba53de97e947864c7e5048ab
+    avro:tool/maven/org.apache.avro/avro-tools 1.12.2 SHA-256/6220e8bc089aaf917cdad4cd358bd651fc0394c0e5ddb8b36da402012c294a68
+    com.fasterxml.jackson.core/jackson-annotations 2.22 SHA-256/21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0
+    maven/com.fasterxml.jackson.core/jackson-annotations/pom 2.22 SHA-256/38c3ba52a0eade3e3eacc5b13499d56e1038ccbad8ec4bb79426dc21432b46d0
+    com.fasterxml.jackson.core/jackson-core 2.22.1 SHA-256/941ff029bcdb93e83d209ce516c1a7fb8bbac07d0a2fa122f5bf194b2cd7b4f4
+    maven/com.fasterxml.jackson.core/jackson-core/pom 2.22.1 SHA-256/34551c6c8d72a4a2215fd05fdcf2f4e693eff99e6e54632bd57cf2674478e293
+    com.fasterxml.jackson.core/jackson-databind 2.22.1 SHA-256/7dcd7e53bec1f56c7ad278bd1ca0840bebcc595d61ce44d6a8439abb75b965b2
+    maven/com.fasterxml.jackson.core/jackson-databind/pom 2.22.1 SHA-256/0bc8f98c7bd7232bc90324fc63c2f56f7ae92dee2bf0dc303669f4e2de8c1f69
+    maven/com.fasterxml.jackson/jackson-base/pom 2.22.1 SHA-256/3f5f597c7474d90fe27060477f243b804bec705dc60feca4de27ca326386448a
+    maven/com.fasterxml.jackson/jackson-bom/pom 2.22.1 SHA-256/b366aa5fd26958e2308a4807e5d42b14706b001b3ccbf138e31b8698dc0ac0ec
+    maven/com.fasterxml.jackson/jackson-parent/pom 2.22 SHA-256/7d45a7efb69df207bed7cc54b87a0bb012f10952c095570a273b49485da0d129
+    maven/com.fasterxml/oss-parent/pom 79 SHA-256/9206b7dd67fb138036576c3dfca947a2a8f3e2c4d2d9c1f2d1dea519b3a4dae1
+    commons-codec/commons-codec 1.19.0 SHA-256/5c3881e4f556855e9c532927ee0c9dfde94cc66760d5805c031a59887070af5f
+    maven/commons-codec/commons-codec/pom 1.19.0 SHA-256/e0f3269fa23de0c83130c5659f5f9514cc5422c0bcdf45f2eae004a78b9fca34
+    commons-io/commons-io 2.20.0 SHA-256/df90bba0fe3cb586b7f164e78fe8f8f4da3f2dd5c27fa645f888100ccc25dd72
+    maven/commons-io/commons-io/pom 2.20.0 SHA-256/bdbdf81072c190ee9a8b181a5c58f5bd917a750fb13a256debbf53f5dbd33a2a
+    org.apache.avro/avro 1.12.2 SHA-256/6522e2a146b859ad158bb024dcc3b0bc826680794a2523b0881dafcbd59ce2df
+    maven/org.apache.avro/avro-parent/pom 1.12.2 SHA-256/ae436924d7acd1561984ee8b2a371aa92d47692a2f8f778e053eefd072225141
+    maven/org.apache.avro/avro-toplevel/pom 1.12.2 SHA-256/f2256409c5cd5f937c67a5389b1b803bdf09ee30412ae49ded3de322cbf378f2
+    maven/org.apache.avro/avro/pom 1.12.2 SHA-256/58729d54b51d36ac5f41c2d7fdf9e8521e4cff330f7c5677aaa110d7915695b8
+    org.apache.commons/commons-compress 1.28.0 SHA-256/e1522945218456f3649a39bc4afd70ce4bd466221519dba7d378f2141a4642ca
+    maven/org.apache.commons/commons-compress/pom 1.28.0 SHA-256/033f4c78d632da88d0eb8ead974fc14a264392cebf12ab6c68d6cea7adf0c64a
+    org.apache.commons/commons-lang3 3.18.0 SHA-256/4eeeae8d20c078abb64b015ec158add383ac581571cddc45c68f0c9ae0230720
+    maven/org.apache.commons/commons-lang3/pom 3.18.0 SHA-256/aa254b373b6f6d46bc9dca86331b072a8ab86eb25ea9921fd439618392e98a16
+    maven/org.apache.commons/commons-parent/pom 85 SHA-256/d189ff2c0027e96bb65d31e6f227ed2af966169b36af1e973dd5ba08926dc7b5
+    maven/org.apache/apache/pom 35 SHA-256/ea297dcd114136e8b8e8b630230d52a76c2fc69f6c5db25d672b1857000728b8
+    maven/org.apache/apache/pom 39 SHA-256/71752ed4c2435a1d8385fe0a4d330f39d04efec89f0d1ba5d1598d39f7397a44
+    maven/org.junit/junit-bom/pom 5.13.1 SHA-256/fa68451ea830572ed43ffe51d75b6a05f7a5e665a602a51f49d6be02063a65f3
+    maven/org.junit/junit-bom/pom 5.14.3 SHA-256/08a02856e487c9357f9b29e38745f8ae805848111e72d15aad0352338f1632e1
+    org.slf4j/slf4j-api 2.0.18 SHA-256/44508fd1576500688c790b190acdd16fec4f8c79a3e0b900afd70503cf055f55
+    maven/org.slf4j/slf4j-api/pom 2.0.18 SHA-256/6c2c7f2c02774cc2b7b619fbd2df7873cdad29718926e44754b87f70d1eb43cb
+    maven/org.slf4j/slf4j-bom/pom 2.0.18 SHA-256/9219aab601575126c4e66e1331eb2b0c6c17a330ac4d5a07e3cd11d580a0c12d
+    maven/org.slf4j/slf4j-parent/pom 2.0.18 SHA-256/0b3896bedad2c9ed9697edcbea1da0c54cd238a723583a81358a83bfb782e9fa
     -->
 </project>
