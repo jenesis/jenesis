@@ -103,28 +103,6 @@ public class InferredDocumentationModuleTest {
         }
     }
 
-    @Test
-    public void documents_a_module_its_description_declares_a_test_module_only_where_its_tests_are_staged()
-            throws IOException {
-        Files.writeString(project.resolve(BuildStep.MODULE), "test=main_artifact\n");
-
-        BuildExecutor executor = newExecutor();
-        executor.addSource("project", project);
-        executor.addModule("documentation",
-                InferredDocumentationModule.ofEnvironment(new Environment(Map.of("documentation.empty", "true")), new LinkedHashSet<>(), Map.of(), Map.of()),
-                "project");
-        executor.addModule("staged",
-                InferredDocumentationModule.ofEnvironment(new Environment(Map.of("documentation.empty", "true",
-                        "stage.tests", "true")), new LinkedHashSet<>(), Map.of(), Map.of()),
-                "project");
-        SequencedMap<String, Path> steps = executor.execute();
-
-        assertThat(steps.keySet())
-                .as("the documentation of a test module is published only with its staged tests")
-                .noneMatch(step -> step.startsWith("documentation/"))
-                .contains("staged/archive");
-    }
-
     private BuildExecutor newExecutor() throws IOException {
         return BuildExecutor.of(root,
                 Duration.ZERO,

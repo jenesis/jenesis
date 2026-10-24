@@ -480,6 +480,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     Stream.concat(Stream.of("check", "format", "compliance", "validate", "artifact"),
                             renamed(inherited, descriptor.manifests().stream()).sequencedKeySet().stream()));
         }, AssemblyRequirement.of().after(AssemblyDescriptor.BUILD));
+        boolean stagesTests = environment.flag("stage.tests");
         if (descriptor.documentation()) {
             InferredDocumentationModule documentationModule = InferredDocumentationModule.ofEnvironment(environment,
                             descriptor.configuration(),
@@ -494,6 +495,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             .languages(languages));
             BuildExecutorModule documented = documentation.apply(documentationModule);
             assembly = assembly.andThen("document", (sub, inherited) -> {
+                if (!stagesTests && tests(descriptor, inherited)) {
+                    return;
+                }
                 sub.addModule("documentation",
                         documented,
                         renamed(inherited, Stream.concat(Stream.of("prepare", "binary"), inputs(descriptor, closed))));
@@ -505,6 +509,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         }
         if (descriptor.source()) {
             assembly = assembly.andThen("source", (sub, inherited) -> {
+                if (!stagesTests && tests(descriptor, inherited)) {
+                    return;
+                }
                 sub.addModule("sources",
                         (module, sourcesInherited) -> module.addStep("archive",
                                 Jar.ofEnvironment(environment, factory, Jar.Sort.SOURCES),
@@ -525,6 +532,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         if (packaging.jlink() || packaging.jpackaged() || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null
                 || !packagers.isEmpty()) {
             assembly = assembly.andThen("package", (sub, inherited) -> {
+                if (!stagesTests && tests(descriptor, inherited)) {
+                    return;
+                }
                 SequencedSet<String> images = new LinkedHashSet<>();
                 SequencedSet<String> inputs = new LinkedHashSet<>(inherited.sequencedKeySet());
                 SequencedSet<String> identified = Stream.of(descriptor.manifests(),
@@ -837,6 +847,14 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     + " fail on a jar that declares no module name, synthetic to derive one, or none to leave the"
                     + " closure as it is");
         };
+    }
+
+    private static boolean tests(ProjectModuleDescriptor descriptor, SequencedMap<String, Path> inherited)
+            throws IOException {
+        Path described = BuildStep.locate(renamed(inherited, descriptor.manifests().stream()).sequencedKeySet().stream()
+                .map(inherited::get)
+                .collect(Collectors.toCollection(LinkedHashSet::new)), BuildStep.MODULE);
+        return described != null && SequencedProperties.ofFiles(described).getProperty("test") != null;
     }
 
     private static SequencedMap<String, String> renamed(SequencedMap<String, Path> inherited, Stream<String> names) {
