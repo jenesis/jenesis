@@ -24,14 +24,18 @@
     <!--jenesis.pin
     main/maven/org.apache.commons/commons-lang3 3.14.0 SHA-256/7b96bf3ee68949abb5bc465559ac270e0551596fa34523fddf890ec418dde13c
     main/maven/org.apache.commons/commons-lang3 3.12.0 SHA-256/d919d904486c037f8d193412da0c92e22a9fa24230b9d67a57855c5c31c7e94e (legacy)
+    maven/org.apache.commons/commons-lang3/pom 3.12.0 SHA-256/82d31f1dcc4583effd744e979165b16da64bf86bca623fc5d1b03ed94f45c85a
     maven/org.apache.commons/commons-lang3/pom 3.14.0 SHA-256/110438863bad37c28f906bf87016e38c7a8c758ba321e09d11dc5a2363a8e79e
+    maven/org.apache.commons/commons-parent/pom 52 SHA-256/75dbe8f34e98e4c3ff42daae4a2f9eb4cbcd3b5f1047d54460ace906dbb4502e
     maven/org.apache.commons/commons-parent/pom 64 SHA-256/6f19638994e8357b4ed734696f992057efaafa1235673998133299798e2ccddb
     maven/org.apache.commons/commons-parent/pom 69 SHA-256/d50da9c39bdca823d618d1b4a03b73f196497fcb8616fd0da727c8623592a9bb
     org.apache.commons/commons-text 1.12.0 SHA-256/de023257ff166044a56bd1aa9124e843cd05dac5806cc705a9311f3556d5a15f
     maven/org.apache.commons/commons-text/pom 1.12.0 SHA-256/b2d4341c921981cb35d5570f4fc9732a08a34b1528dee84c0507c7f2719a334f
+    maven/org.apache/apache/pom 23 SHA-256/bc10624e0623f36577fac5639ca2936d3240ed152fb6d8d533ab4d270543491c
     maven/org.apache/apache/pom 30 SHA-256/63dd4a393a9c0dfcb314efe83871a41d243bc8d200cbc7f2d197f30da78239d8
     maven/org.apache/apache/pom 31 SHA-256/555d0c9eaa69c042aff924927b9381e8f8174136d355eead445224452e6291cc
     maven/org.junit/junit-bom/pom 5.10.0 SHA-256/e006dd8894f9fc7b75fc32bb12fe5ed8be65667d5b454f99e2e0b8c5bb8d30b3
     maven/org.junit/junit-bom/pom 5.10.2 SHA-256/169dd904a4b0f6520cffe658cc62292bfe9f3c14a989fa92120724cde43a9968
+    maven/org.junit/junit-bom/pom 5.7.1 SHA-256/0b9b14a3d62106fafe8c68a717b87b87ad18685899451b753c04fa41b6857784
     -->
 </project>

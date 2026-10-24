@@ -17,6 +17,7 @@
  * @jenesis.pin maven/org.junit.platform/junit-platform-reporting/pom 1.11.3 SHA-256/78560c03c04f4810a152f291894b90d290219ec5b492dbb605c25ada77a4ee77
  * @jenesis.pin maven/org.junit/junit-bom/pom 5.11.3 SHA-256/f13df2e4caf1febce567667e7c378101a0331d53d1324d6e2dfe3aecfb1f7774
  * @jenesis.pin maven/org.mockito/mockito-core/pom 5.23.0 SHA-256/c02e2900b9277adbfe12756d7d0b9472e6b9e5972ae1f28d19a41aa6513777e3
+ * @jenesis.pin maven/org.mockito/mockito-core/pom 5.24.0 SHA-256/718074bfcba3592e3283a1cbcff2eb0163dddd742e2ed22d54a78eafedadc062
  * @jenesis.pin maven/org.objenesis/objenesis-parent/pom 3.3 SHA-256/305c384aa2f1e1c7fe53a96da41c3ec35243b97d428d24a8f779818cc10be4ff
  * @jenesis.pin maven/org.objenesis/objenesis/pom 3.3 SHA-256/ba0c40da2669a048b6e24ef7066a471f0fbcbfcc509e6a3e856ca4ddfa614ad3
  * @jenesis.pin maven/org.opentest4j/opentest4j/pom 1.3.0 SHA-256/9bf7cffc410f3e8372c2522578df9ca56d9d43bd937e30948706c232a943b355
