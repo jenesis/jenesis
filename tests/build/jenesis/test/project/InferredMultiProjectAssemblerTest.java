@@ -723,12 +723,38 @@ public class InferredMultiProjectAssemblerTest {
         assertThatThrownBy(() -> fixture.execute("document/documentation/archive"))
                 .as("the documentation of a test module is never published unless its artifacts are staged")
                 .rootCause()
-                .hasMessageStartingWith("Unknown selector: archive - ");
+                .hasMessageStartingWith("Unknown selector: documentation/archive - ");
         Files.createDirectory(fixture.sources.resolve(BuildStep.SOURCES));
         Files.writeString(fixture.sources.resolve(BuildStep.SOURCES).resolve("FooTest.java"), "public class FooTest {}");
         Path javadocOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
                 new Environment(Map.of("stage.tests", "true"))), "document/documentation/archive").get("document/documentation/archive");
         assertThat(javadocOutput.resolve("documentation").resolve("javadoc.jar")).exists();
+    }
+
+    @Test
+    public void archives_the_sources_of_no_test_module_unless_the_tests_are_staged() throws IOException {
+        Fixture fixture = setUp("path=\ntest=main_artifact\n", false, true, false);
+        Files.createDirectory(fixture.sources.resolve(BuildStep.SOURCES));
+        Files.writeString(fixture.sources.resolve(BuildStep.SOURCES).resolve("FooTest.java"), "public class FooTest {}");
+        assertThatThrownBy(() -> fixture.execute("source/sources/archive"))
+                .as("the sources of a test module are archived only where its artifacts are staged")
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: sources/archive - ");
+        assertThat(fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
+                new Environment(Map.of("stage.tests", "true"))), "source/sources/archive"))
+                .containsKey("source/sources/archive");
+    }
+
+    @Test
+    public void packages_no_test_module_unless_the_tests_are_staged() throws IOException {
+        Fixture fixture = setUp("path=\ntest=main_artifact\n", false, false, false, null, false, false, true);
+        assertThatThrownBy(() -> fixture.execute("package/inventory"))
+                .as("a test module is packaged only where its artifacts are staged")
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: inventory - ");
+        assertThat(fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
+                new Environment(Map.of("stage.tests", "true"))), "package/inventory"))
+                .containsKey("package/inventory");
     }
 
     @Test

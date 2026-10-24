@@ -1737,7 +1737,8 @@ public record Project(
                           jenesis.project.version names one
                       maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (8, 74),
                           whose jar holds the sources and, as Maven's and Gradle's do, the resources,
-                          including those of -Djenesis.project.resources; set it, and the next one,
+                          including those of -Djenesis.project.resources, of a test module only under
+                          jenesis.stage.tests, which packages a test module as well; set it, and the next one,
                           in the profile a release activates, such as jenesis-release.properties,
                           never in jenesis.properties, so that a regular build neither archives the
                           sources nor renders the documentation and nothing waits for either
@@ -4715,7 +4716,7 @@ public record Project(
                 project.await||Phases of the modules a module depends on that its build waits for, comma-separated, such as verify for their checks, so that a module builds only once the modules it depends on passed them; by default a build waits for their builds alone, and every phase runs as soon as what it reads is built
                 project.artifacts||Folder resolved dependencies and repository metadata are cached in; a file a project provides names only a folder inside the project
                 project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project, and modular also loads every jar of a plugin jenesis.plugins.properties names by its module as a module, where the others load a jar without a module name on the plugin's class path, and refuses one named by a Maven coordinate
-                project.sources|false|Assemble a sources jar for every module
+                project.sources|false|Assemble a sources jar for every module, a test module only where jenesis.stage.tests stages it
                 project.documentation|false|Assemble a javadoc jar for every module, a test module only where jenesis.stage.tests stages it
                 documentation.empty|false|Archive that javadoc jar holding nothing but an INTENTIONALLY_EMPTY file instead of rendering the documentation, for a repository such as Maven Central that requires the jar but not its content
                 project.version||Version stamped onto every produced artifact, a module version that starts with a digit; unset leaves modules unversioned and POMs at 0-SNAPSHOT, and an empty value is refused
@@ -4835,7 +4836,7 @@ public record Project(
                 test.incremental||Run only the tests a change can reach: true, or the setting named with no value, detects changes with MD5, the name of another message digest with that one, and false runs every test
                 test.parallel|false|Let the engine execute the matched tests concurrently
                 test.reporting|false|Write a test run's reports into the module's reports/tests folder - the legacy JUnit XML and the open-test-reporting XML - and name that folder when the run fails; without it the JUnit Platform writes none
-                stage.tests|false|Stage test-variant artifacts alongside the main ones
+                stage.tests|false|Stage test-variant artifacts alongside the main ones, and assemble the sources, documentation and packages of a test module
                 tree.format|full|full|compact: what the dependencies selector prints
                 tree.merge|true|One tree per module whose every node names the scopes it applies to; false prints one tree per module and scope
                 tree.internal|false|List the project's own modules among the resolved dependencies and count them in the license summary
