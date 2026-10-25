@@ -2484,6 +2484,9 @@ public record Project(
                                                        JVMs at once rather than one per processor -
                                                        with many test modules on little memory,
                                                        beside an -Xmx in process-test.properties
+                      -Djenesis.test.concurrency=1     run one module's tests at a time while the
+                                                       rest of the build goes on - for tests that
+                                                       share a database, a port or a file
                       -Djenesis.executor.aggregate     name every failed step at the end rather
                                                        than the first, as Maven's -fae summary
                                                        does; a step that depends on none of them
@@ -4859,6 +4862,7 @@ public record Project(
                 test.jars|true|Run the tests against the packaged test jar; false runs them against the module's classes and resources folders instead, as Maven and Gradle do, so a test can read its own resources as files, while the modules it depends on stay jars; a module tested on the module path refuses false
                 test.incremental||Run only the tests a change can reach: true, or the setting named with no value, detects changes with MD5, the name of another message digest with that one, and false runs every test
                 test.parallel|false|Let the engine execute the matched tests concurrently
+                test.concurrency|0|Run at most this many test runs at once across the build, each a forked JVM, while every other step keeps running; 1 runs one module's tests at a time, as Maven does, and 0 leaves them bounded by process.concurrency alone
                 test.reporting|false|Write a test run's reports into the module's reports/tests folder - the legacy JUnit XML and the open-test-reporting XML - and name that folder when the run fails; without it the JUnit Platform writes none
                 stage.tests|false|Stage test modules alongside the main ones; a test module is otherwise unstaged, as stage=false leaves a module
                 tree.format|full|full|compact: what the dependencies selector prints

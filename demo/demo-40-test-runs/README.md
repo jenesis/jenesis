@@ -85,6 +85,26 @@ main code are a module of their own already, `@jenesis.test <module>`, which a
 sibling requires and scans in the same way; when that test module is not
 abstract, its tests also run once as they are.
 
+One test run at a time
+----------------------
+
+`fast` and `slow` test in parallel, each in a JVM of its own. Tests that share
+something outside their JVM - a database, a port, a file - cannot run that way.
+`jenesis.test.concurrency` caps how many test runs execute at once across the
+build:
+
+    java -Djenesis.test.concurrency=1 -Djenesis.print.tests=true build/jenesis/Make.java
+
+With `1`, one module starts its tests only once the other is done, as Maven runs
+one module after another. Compiling, packaging and every other step keep running
+in parallel; only the test runs wait for one another. A project whose tests
+always share such a resource sets the key in its `jenesis.properties`:
+
+    jenesis.test.concurrency=1
+
+The default, `0`, leaves test runs bounded by `jenesis.process.concurrency`
+alone, which caps every tool the build runs.
+
 The pom.xml build
 -----------------
 

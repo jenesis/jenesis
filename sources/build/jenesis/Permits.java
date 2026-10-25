@@ -24,4 +24,27 @@ public interface Permits {
             semaphore.release();
         }
     }
+
+    record Sequenced(Permits first, Permits second) implements Permits {
+
+        @Override
+        public void acquire() throws InterruptedException {
+            first.acquire();
+            try {
+                second.acquire();
+            } catch (InterruptedException | RuntimeException e) {
+                first.release();
+                throw e;
+            }
+        }
+
+        @Override
+        public void release() {
+            try {
+                second.release();
+            } finally {
+                first.release();
+            }
+        }
+    }
 }
