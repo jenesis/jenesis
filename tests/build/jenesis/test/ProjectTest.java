@@ -982,7 +982,7 @@ public class ProjectTest {
     public void maven_layout_resolver_maps_named_and_unnamed_modules() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
         Project project = Project.ofEnvironment(new Environment(settings), root).target(target);
-        Function<String, String> resolver = Project.Layout.MAVEN.apply(
+        Function<String, Project.Layout.Selection> resolver = Project.Layout.MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
                         new HashDigestFunction("MD5"),
@@ -994,15 +994,23 @@ public class ProjectTest {
                         0),
                 project,
                 new InferredMultiProjectAssembler());
-        assertThat(resolver.apply("sources")).isEqualTo("build/maven/compose/module/build-module-sources");
-        assertThat(resolver.apply("")).isEqualTo("build/maven/compose/module/build-module-");
+        assertThat(resolver.apply("sources"))
+                .as("a pom.xml module's tests are a module of their own, which its selector reaches where it exists,"
+                        + " as mvn test -pl does")
+                .isEqualTo(new Project.Layout.Selection(List.of("build/maven/compose/module/build-module-sources"),
+                        List.of("build/maven/compose/module/build-testmodule-sources")));
+        assertThat(resolver.apply("")).isEqualTo(new Project.Layout.Selection(List.of("build/maven/compose/module/build-module-"),
+                List.of("build/maven/compose/module/build-testmodule-")));
+        assertThat(resolver.apply("parent+child")).isEqualTo(new Project.Layout.Selection(
+                List.of("build/maven/compose/module/build-module-parent+child"),
+                List.of("build/maven/compose/module/build-testmodule-parent+child")));
     }
 
     @Test
     public void modular_layout_resolver_maps_named_and_unnamed_modules() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
         Project project = Project.ofEnvironment(new Environment(settings), root).target(target);
-        Function<String, String> resolver = Project.Layout.MODULAR.apply(
+        Function<String, Project.Layout.Selection> resolver = Project.Layout.MODULAR.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
                         new HashDigestFunction("MD5"),
@@ -1014,16 +1022,16 @@ public class ProjectTest {
                         0),
                 project,
                 new InferredMultiProjectAssembler());
-        assertThat(resolver.apply("sources")).isEqualTo("build/modules/compose/module/build-module-sources");
-        assertThat(resolver.apply("")).isEqualTo("build/modules/compose/module/build-module-");
-        assertThat(resolver.apply("api+client/compile")).isEqualTo("build/modules/compose/module/build-module-api+client/compile");
+        assertThat(resolver.apply("sources")).isEqualTo(Project.Layout.Selection.of("build/modules/compose/module/build-module-sources"));
+        assertThat(resolver.apply("")).isEqualTo(Project.Layout.Selection.of("build/modules/compose/module/build-module-"));
+        assertThat(resolver.apply("api+client/compile")).isEqualTo(Project.Layout.Selection.of("build/modules/compose/module/build-module-api+client/compile"));
     }
 
     @Test
     public void maven_layout_resolver_preserves_step_path_after_slash() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
         Project project = Project.ofEnvironment(new Environment(settings), root).target(target);
-        Function<String, String> resolver = Project.Layout.MAVEN.apply(
+        Function<String, Project.Layout.Selection> resolver = Project.Layout.MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
                         new HashDigestFunction("MD5"),
@@ -1036,16 +1044,16 @@ public class ProjectTest {
                 project,
                 new InferredMultiProjectAssembler());
         assertThat(resolver.apply("sources/compile/dependencies/artifacts"))
-                .isEqualTo("build/maven/compose/module/build-module-sources/compile/dependencies/artifacts");
+                .isEqualTo(Project.Layout.Selection.of("build/maven/compose/module/build-module-sources/compile/dependencies/artifacts"));
         assertThat(resolver.apply("/compile"))
-                .isEqualTo("build/maven/compose/module/build-module-/compile");
+                .isEqualTo(Project.Layout.Selection.of("build/maven/compose/module/build-module-/compile"));
     }
 
     @Test
     public void modular_layout_resolver_preserves_step_path_after_slash() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
         Project project = Project.ofEnvironment(new Environment(settings), root).target(target);
-        Function<String, String> resolver = Project.Layout.MODULAR.apply(
+        Function<String, Project.Layout.Selection> resolver = Project.Layout.MODULAR.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
                         new HashDigestFunction("MD5"),
@@ -1058,16 +1066,16 @@ public class ProjectTest {
                 project,
                 new InferredMultiProjectAssembler());
         assertThat(resolver.apply("sources/compile/dependencies/artifacts"))
-                .isEqualTo("build/modules/compose/module/build-module-sources/compile/dependencies/artifacts");
+                .isEqualTo(Project.Layout.Selection.of("build/modules/compose/module/build-module-sources/compile/dependencies/artifacts"));
         assertThat(resolver.apply("/compile"))
-                .isEqualTo("build/modules/compose/module/build-module-/compile");
+                .isEqualTo(Project.Layout.Selection.of("build/modules/compose/module/build-module-/compile"));
     }
 
     @Test
     public void modular_to_maven_layout_resolver_preserves_step_path_after_slash() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
         Project project = Project.ofEnvironment(new Environment(settings), root).target(target);
-        Function<String, String> resolver = Project.Layout.MODULAR_TO_MAVEN.apply(
+        Function<String, Project.Layout.Selection> resolver = Project.Layout.MODULAR_TO_MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
                         new HashDigestFunction("MD5"),
@@ -1080,9 +1088,9 @@ public class ProjectTest {
                 project,
                 new InferredMultiProjectAssembler());
         assertThat(resolver.apply("sources/compile/dependencies/artifacts"))
-                .isEqualTo("build/modules/compose/module/build-module-sources/compile/dependencies/artifacts");
+                .isEqualTo(Project.Layout.Selection.of("build/modules/compose/module/build-module-sources/compile/dependencies/artifacts"));
         assertThat(resolver.apply("/compile"))
-                .isEqualTo("build/modules/compose/module/build-module-/compile");
+                .isEqualTo(Project.Layout.Selection.of("build/modules/compose/module/build-module-/compile"));
     }
 
     @Test
@@ -1218,7 +1226,7 @@ public class ProjectTest {
     public void modular_to_maven_layout_resolver_maps_named_and_unnamed_modules() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
         Project project = Project.ofEnvironment(new Environment(settings), root).target(target);
-        Function<String, String> resolver = Project.Layout.MODULAR_TO_MAVEN.apply(
+        Function<String, Project.Layout.Selection> resolver = Project.Layout.MODULAR_TO_MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
                         new HashDigestFunction("MD5"),
@@ -1230,8 +1238,8 @@ public class ProjectTest {
                         0),
                 project,
                 new InferredMultiProjectAssembler());
-        assertThat(resolver.apply("sources")).isEqualTo("build/modules/compose/module/build-module-sources");
-        assertThat(resolver.apply("")).isEqualTo("build/modules/compose/module/build-module-");
+        assertThat(resolver.apply("sources")).isEqualTo(Project.Layout.Selection.of("build/modules/compose/module/build-module-sources"));
+        assertThat(resolver.apply("")).isEqualTo(Project.Layout.Selection.of("build/modules/compose/module/build-module-"));
     }
 
     @Test
@@ -1240,7 +1248,7 @@ public class ProjectTest {
         Path source = Files.createDirectory(root.resolve("source"));
         Project.Layout layout = (executor, _, _) -> {
             executor.addSource(Project.BUILD, source);
-            return name -> name;
+            return Project.Layout.Selection::of;
         };
         SequencedMap<String, Path> result = Project.ofEnvironment(new Environment(settings), Path.of("."))
                 .root(root)
@@ -1258,7 +1266,7 @@ public class ProjectTest {
         Project.Layout layout = (executor, _, _) -> {
             executor.addSource("alpha", alpha);
             executor.addSource("beta", beta);
-            return name -> name;
+            return Project.Layout.Selection::of;
         };
         SequencedMap<String, Path> result = Project.ofEnvironment(new Environment(settings), Path.of("."))
                 .root(root)
@@ -1274,7 +1282,7 @@ public class ProjectTest {
         Path source = Files.createDirectory(root.resolve("source"));
         Project.Layout layout = (executor, _, _) -> {
             executor.addSource("resolved", source);
-            return name -> "resolved";
+            return _ -> Project.Layout.Selection.of("resolved");
         };
         SequencedMap<String, Path> result = Project.ofEnvironment(new Environment(settings), Path.of("."))
                 .root(root)
@@ -1282,6 +1290,28 @@ public class ProjectTest {
                 .layout(layout)
                 .build("+anything");
         assertThat(result).containsExactly(Map.entry("resolved", source));
+    }
+
+    @Test
+    public void build_runs_what_a_plus_prefixed_selector_resolves_to_and_its_optional_selectors_where_they_exist() throws IOException {
+        Path target = Files.createDirectory(root.resolve("target"));
+        Path main = Files.createDirectory(root.resolve("main")),
+                tests = Files.createDirectory(root.resolve("tests")),
+                other = Files.createDirectory(root.resolve("other"));
+        Project.Layout layout = (executor, _, _) -> {
+            executor.addSource("module-main", main);
+            executor.addSource("testmodule-main", tests);
+            executor.addSource("module-other", other);
+            return name -> new Project.Layout.Selection(List.of("module-" + name), List.of("testmodule-" + name));
+        };
+        Project project = Project.ofEnvironment(new Environment(settings), Path.of("."))
+                .root(root)
+                .target(target)
+                .layout(layout);
+        assertThat(project.build("+main")).containsOnly(Map.entry("module-main", main), Map.entry("testmodule-main", tests));
+        assertThat(project.build("+other"))
+                .as("an optional selector that names nothing selects nothing, as a module without tests has no test module")
+                .containsOnlyKeys("module-other");
     }
 
     @Test

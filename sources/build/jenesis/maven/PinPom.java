@@ -51,7 +51,7 @@ public class PinPom implements BuildStep {
                    Permits permits) {
         this.permits = permits;
         this.path = path;
-        this.pomFiles = List.copyOf(pomFiles);
+        this.pomFiles = pomFiles;
         this.hashFunction = hashFunction;
         this.platform = platform;
         this.retain = retain;

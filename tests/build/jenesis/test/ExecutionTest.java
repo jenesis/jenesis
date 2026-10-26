@@ -538,7 +538,7 @@ public class ExecutionTest {
                     sub.addModule(entry.getKey(), (inner, _) -> inner.addSource("manifests", entry.getValue()));
                 }
             });
-            return name -> Project.BUILD + "/module-" + name;
+            return name -> Project.Layout.Selection.of(Project.BUILD + "/module-" + name);
         };
     }
 }

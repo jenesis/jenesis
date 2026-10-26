@@ -1764,6 +1764,29 @@ public class BuildExecutorTest implements Serializable {
     }
 
     @Test
+    public void an_optional_selector_runs_what_it_names_where_it_exists_and_nothing_where_it_does_not() throws IOException {
+        Files.writeString(source.resolve("file"), "foo");
+        buildExecutor.addModule("module", (module, _) -> {
+            module.addSource("source", source);
+            module.addStep("tests", (_, context, _) -> {
+                Files.writeString(context.next().resolve("file"), "tested");
+                return CompletableFuture.completedStage(new BuildStepResult(true));
+            }, "source");
+        });
+        buildExecutor.addStep("other", (_, _, _) -> {
+            throw new AssertionError("other should not run");
+        });
+        assertThat(buildExecutor.execute(Runnable::run, List.of("module/source"), List.of("module/tests"))
+                .toCompletableFuture()
+                .join()).containsOnlyKeys("module/source", "module/tests");
+        assertThat(buildExecutor.execute(Runnable::run, List.of("module/source"), List.of("module/absent", "absent/tests"))
+                .toCompletableFuture()
+                .join())
+                .as("a module the build registers only where it has something to do is selected only where it is")
+                .containsOnlyKeys("module/source");
+    }
+
+    @Test
     public void an_unknown_selector_names_what_it_could_have_matched() {
         buildExecutor.addStep("step1", (_, _, _) -> {
             throw new AssertionError();

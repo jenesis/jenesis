@@ -19,7 +19,6 @@ public record ClassTransformModule(SequencedMap<String, BuildExecutorModule> tra
             throw new IllegalArgumentException("A class transformation needs at least one transform - name one, or"
                     + " leave the transformer of the toolchain unset");
         }
-        transforms = Collections.unmodifiableSequencedMap(new LinkedHashMap<>(transforms));
     }
 
     @Override

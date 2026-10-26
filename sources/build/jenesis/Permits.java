@@ -36,10 +36,6 @@ public interface Permits {
 
     record Compound(List<Permits> permits) implements Permits {
 
-        public Compound {
-            permits = List.copyOf(permits);
-        }
-
         @Override
         public void acquire() throws InterruptedException {
             for (int index = 0; index < permits.size(); index++) {

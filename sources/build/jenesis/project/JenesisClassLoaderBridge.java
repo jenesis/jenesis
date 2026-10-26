@@ -284,7 +284,7 @@ class JenesisClassLoaderBridge {
             Field field = foreignChecksumStatus.getField(status.name());
             values.put(status.name(), foreignChecksumOf.invoke(null, field.get(null)));
         }
-        foreignChecksums = Map.copyOf(values);
+        foreignChecksums = values;
         this.origin = origin;
     }
 
