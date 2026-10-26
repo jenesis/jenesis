@@ -161,6 +161,20 @@ public class InventoryTest {
     }
 
     @Test
+    public void a_module_resolved_by_name_takes_the_version_of_the_artifact_behind_it() throws IOException {
+        Path folder = Files.createDirectory(root.resolve("inventory"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-foo.dependency.0", "maven/org.foo/foo/1.0 foo.jar SHA-256/foo");
+        inventory.setProperty("module-foo.dependency.1", "module/org.foo foo.jar");
+        inventory.setProperty("module-foo.dependency.2", "module/org.bar bar.jar");
+        inventory.store(folder.resolve(Inventory.INVENTORY));
+
+        assertThat(Inventory.closure(List.of(new BuildStepArgument(folder, Map.of())), "foo"))
+                .as("a descriptor without a version is pinned at the version of its artifact, so its lookup stays put")
+                .containsOnlyKeys("main/maven/org.foo/foo/1.0", "main/module/org.foo/1.0", "main/module/org.bar");
+    }
+
+    @Test
     public void attaches_each_classifier_jar_under_its_classifier() throws IOException {
         Path manifests = Files.createDirectory(root.resolve("manifests"));
         SequencedProperties module = new SequencedProperties();
