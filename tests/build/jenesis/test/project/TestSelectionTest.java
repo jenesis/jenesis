@@ -56,7 +56,12 @@ public class TestSelectionTest {
         Map<String, Set<String>> classes = new LinkedHashMap<>();
         classes.put("a.HStoreType", reference("a.HStoreType"));
         classes.put("a.Type", reference("a.Type"));
-        classes.put("a.Entity", annotated("a.Entity", "a.Type", "a.HStoreType"));
+        classes.put("a.Entity", TestSelection.references(ClassFile.of().build(ClassDesc.of("a.Entity"),
+                builder -> builder.withField("field",
+                        ClassDesc.of("java.util.Map"),
+                        field -> field.withFlags(ClassFile.ACC_PRIVATE).with(RuntimeVisibleAnnotationsAttribute.of(
+                                Annotation.of(ClassDesc.of("a.Type"),
+                                        AnnotationElement.of("value", AnnotationValue.ofClass(ClassDesc.of("a.HStoreType"))))))))));
 
         assertThat(TestSelection.of(classes).impacted(List.of("a.HStoreType")))
                 .as("@Type(HStoreType.class) stores the class as a descriptor, not as a class of the constant pool")
@@ -70,7 +75,11 @@ public class TestSelectionTest {
     public void selects_a_class_that_names_a_change_only_as_a_type_argument() {
         Map<String, Set<String>> classes = new LinkedHashMap<>();
         classes.put("a.Item", reference("a.Item"));
-        classes.put("a.Holder", parameterized("a.Holder", "Ljava/util/List<La/Item;>;"));
+        classes.put("a.Holder", TestSelection.references(ClassFile.of().build(ClassDesc.of("a.Holder"),
+                builder -> builder.withField("field",
+                        ClassDesc.of("java.util.List"),
+                        field -> field.withFlags(ClassFile.ACC_PRIVATE)
+                                .with(SignatureAttribute.of(Signature.parseFrom("Ljava/util/List<La/Item;>;")))))));
 
         assertThat(TestSelection.of(classes).impacted(List.of("a.Item")))
                 .containsExactlyInAnyOrder("a.Item", "a.Holder");
@@ -83,20 +92,6 @@ public class TestSelectionTest {
                 builder.withField("field" + index++, ClassDesc.of(fieldType), ClassFile.ACC_PRIVATE);
             }
         }));
-    }
-
-    private static Set<String> annotated(String name, String annotation, String value) {
-        return TestSelection.references(ClassFile.of().build(ClassDesc.of(name), builder -> builder.withField("field",
-                ClassDesc.of("java.util.Map"),
-                field -> field.withFlags(ClassFile.ACC_PRIVATE).with(RuntimeVisibleAnnotationsAttribute.of(Annotation.of(
-                        ClassDesc.of(annotation),
-                        AnnotationElement.of("value", AnnotationValue.ofClass(ClassDesc.of(value)))))))));
-    }
-
-    private static Set<String> parameterized(String name, String signature) {
-        return TestSelection.references(ClassFile.of().build(ClassDesc.of(name), builder -> builder.withField("field",
-                ClassDesc.of("java.util.List"),
-                field -> field.withFlags(ClassFile.ACC_PRIVATE).with(SignatureAttribute.of(Signature.parseFrom(signature))))));
     }
 
     private static Set<String> extending(String name, String superName) {

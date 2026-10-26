@@ -85,21 +85,6 @@ public class DependenciesPomPinTest {
         requires.store(dependencies.resolve(BuildStep.REQUIRES));
     }
 
-    private MavenRepository maven(Map<String, String> poms) {
-        return (_, groupId, artifactId, version, type, _, _) -> {
-            String coordinate = groupId + "/" + artifactId + "/" + type + "/" + version;
-            String content = "pom".equals(type) ? poms.get(coordinate) : coordinate;
-            if (content == null) {
-                return Optional.empty();
-            }
-            try {
-                return Optional.of(RepositoryItem.ofFile(Files.writeString(artifacts.resolve(coordinate.replace('/', '-')), content)));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        };
-    }
-
     private static String sha256(String content) {
         try {
             return "SHA-256/" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
@@ -118,6 +103,18 @@ public class DependenciesPomPinTest {
     }
 
     private Path apply(Map<String, String> poms, Pinning pinning) throws IOException {
+        MavenRepository maven = (_, groupId, artifactId, version, type, _, _) -> {
+            String coordinate = groupId + "/" + artifactId + "/" + type + "/" + version;
+            String content = "pom".equals(type) ? poms.get(coordinate) : coordinate;
+            if (content == null) {
+                return Optional.empty();
+            }
+            try {
+                return Optional.of(RepositoryItem.ofFile(Files.writeString(artifacts.resolve(coordinate.replace('/', '-')), content)));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        };
         BuildExecutor executor = BuildExecutor.of(build,
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
@@ -129,7 +126,7 @@ public class DependenciesPomPinTest {
                 0);
         executor.addSource("dependencies", dependencies);
         executor.addModule("resolved", new Dependencies(
-                Map.of("maven", maven(poms)),
+                Map.of("maven", maven),
                 Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(pinning), "dependencies");
         return executor.execute().get("resolved");
     }

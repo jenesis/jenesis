@@ -489,9 +489,18 @@ class JenesisClassLoaderBridge {
                         for (int index = 0; index < fields.length; index++) {
                             RecordComponent component = components.get(fields[index].getName());
                             types[index] = fields[index].getType();
-                            values[index] = component == null
-                                    ? empty(types[index])
-                                    : convert(component.getAccessor().invoke(value), source, target);
+                            if (component != null) {
+                                values[index] = convert(component.getAccessor().invoke(value), source, target);
+                            } else if (types[index].isPrimitive()) {
+                                values[index] = Array.get(Array.newInstance(types[index], 1), 0);
+                            } else if (types[index] == Optional.class) {
+                                values[index] = Optional.empty();
+                            } else {
+                                values[index] = Stream.of(new LinkedHashMap<>(), new ArrayList<>(), new LinkedHashSet<>())
+                                        .filter(types[index]::isInstance)
+                                        .findFirst()
+                                        .orElse(null);
+                            }
                         }
                         yield counterpart.getDeclaredConstructor(types).newInstance(values);
                     }
@@ -542,24 +551,6 @@ class JenesisClassLoaderBridge {
         }
     }
 
-    private static Object empty(Class<?> type) {
-        if (type.isPrimitive()) {
-            return Array.get(Array.newInstance(type, 1), 0);
-        }
-        for (Object candidate : List.of(new LinkedHashMap<>(), new ArrayList<>(), new LinkedHashSet<>())) {
-            if (type.isInstance(candidate)) {
-                return candidate;
-            }
-        }
-        return type == Optional.class ? Optional.empty() : null;
-    }
-
-    private static Class<?> counterpart(Class<?> type, ClassLoader target) throws ClassNotFoundException {
-        return type.isPrimitive() || !type.getName().startsWith("build.jenesis.")
-                ? type
-                : Class.forName(type.getName(), false, target);
-    }
-
     private static final class Adapter implements InvocationHandler, Serializable {
 
         private final Object delegate;
@@ -583,7 +574,10 @@ class JenesisClassLoaderBridge {
             Class<?>[] types = new Class<?>[method.getParameterCount()];
             Object[] converted = new Object[types.length];
             for (int index = 0; index < types.length; index++) {
-                types[index] = counterpart(method.getParameterTypes()[index], origin);
+                Class<?> type = method.getParameterTypes()[index];
+                types[index] = type.isPrimitive() || !type.getName().startsWith("build.jenesis.")
+                        ? type
+                        : Class.forName(type.getName(), false, origin);
                 converted[index] = convert(args[index], loader, origin);
             }
             Method target = Class.forName(method.getDeclaringClass().getName(), false, origin)
