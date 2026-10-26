@@ -216,6 +216,7 @@ public class ModuleInfoParser {
                                     value = checksum.isEmpty() ? version : version + " " + checksum;
                                 }
                                 if (guard == null) {
+                                    boms.remove(key);
                                     boms.put(key, value);
                                 } else {
                                     bomVariants.computeIfAbsent(key, _ -> new LinkedHashMap<>()).put(guard, value);
