@@ -91,8 +91,7 @@ public class TestModule implements BuildExecutorModule {
                     + ", but names how many test runs execute at once: 0 or more, 0 bounding them by"
                     + " jenesis.process.concurrency alone");
         } else if (concurrency > 0) {
-            Permits permits = PERMITS.computeIfAbsent(concurrency, Permits::of);
-            terms = terms.permits(terms.permits() == null ? permits : new Permits.Sequenced(permits, terms.permits()));
+            terms = terms.permits(Permits.compound(PERMITS.computeIfAbsent(concurrency, Permits::of), terms.permits()));
         }
         return new TestModule(null,
                 List.of(),
