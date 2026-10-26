@@ -50,7 +50,7 @@ public record PinFile(SequencedSet<String> paths,
                     : Inventory.closure(arguments.values(), path).entrySet()) {
                 String group = dependency.getValue().group();
                 String key = dependency.getKey().substring(group.length() + 1);
-                if (!groups.contains(group) || internal.contains(key)) {
+                if (!groups.contains("*") && !groups.contains(group) || internal.contains(key)) {
                     continue;
                 }
                 int lastSlash = key.lastIndexOf('/'), firstSlash = key.indexOf('/');
@@ -98,7 +98,7 @@ public record PinFile(SequencedSet<String> paths,
             }
             for (Map.Entry<String, Inventory.Dependency> pom : Inventory.poms(arguments.values(), path).entrySet()) {
                 String group = pom.getValue().group();
-                if (!groups.contains(group)) {
+                if (!groups.contains("*") && !groups.contains(group)) {
                     continue;
                 }
                 String coordinate = pom.getKey().substring(group.length() + 1);

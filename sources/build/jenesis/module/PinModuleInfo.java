@@ -183,7 +183,8 @@ public class PinModuleInfo implements BuildStep {
             for (String imported : Inventory.bomImports(arguments.values(), path)) {
                 int slash = imported.indexOf('/');
                 String group = imported.substring(0, slash);
-                if (imported.substring(slash + 1).equals(exported) && exportedGroups.contains(group)) {
+                if (imported.substring(slash + 1).equals(exported)
+                        && (exportedGroups.contains("*") || exportedGroups.contains(group))) {
                     skipped.add(group);
                 }
             }
