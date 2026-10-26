@@ -10,6 +10,7 @@ import build.jenesis.maven.MavenRepository;
 import build.jenesis.module.JenesisRepository;
 import build.jenesis.module.ModularJarResolver;
 import build.jenesis.step.ProcessBuildStep;
+import build.jenesis.step.ProcessHandler;
 
 public record Jpx(Path storage,
                   Map<String, Repository> repositories,
@@ -126,7 +127,7 @@ public record Jpx(Path storage,
                 List<String> command = new ArrayList<>();
                 command.add(home.resolve("bin").resolve(File.separatorChar == '\\' ? "java.exe" : "java").toString());
                 command.addAll(javaArguments(mainClass, arguments, argumentFile));
-                return new ProcessBuilder(command).inheritIO().start().waitFor();
+                return ProcessHandler.OfProcess.inheriting(command);
             } finally {
                 Files.deleteIfExists(argumentFile);
             }

@@ -5,6 +5,7 @@ import build.jenesis.docker.DockerizedJava;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Layers;
 import build.jenesis.step.ProcessBuildStep;
+import build.jenesis.step.ProcessHandler;
 
 public record Execution(Project project, String mainClass, String module, Container container) {
 
@@ -286,7 +287,7 @@ public record Execution(Project project, String mainClass, String module, Contai
         List<String> command = new ArrayList<>();
         command.add(javaExecutable.toString());
         command.addAll(javaArgs);
-        return new ProcessBuilder(command).inheritIO().start().waitFor();
+        return ProcessHandler.OfProcess.inheriting(command);
     }
 
     public static int run(Environment environment,

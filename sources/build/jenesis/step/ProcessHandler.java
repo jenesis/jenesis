@@ -199,14 +199,32 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                 "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432", "PROGRAMDATA", "APPDATA", "LOCALAPPDATA");
         private static final Map<String, Path> DRIVERS = new ConcurrentHashMap<>();
         private static final Set<Path> TEMPORARY = ConcurrentHashMap.newKeySet();
+        private static final Set<Process> RUNNING = ConcurrentHashMap.newKeySet();
+        private static final Duration ENDING = Duration.ofSeconds(10);
 
         static {
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> TEMPORARY.forEach(folder -> {
-                try (Stream<Path> files = Files.walk(folder)) {
-                    files.sorted(Comparator.reverseOrder()).forEach(file -> file.toFile().delete());
-                } catch (IOException | UncheckedIOException _) {
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                List<ProcessHandle> ending = new ArrayList<>();
+                RUNNING.forEach(process -> {
+                    ending.add(process.toHandle());
+                    process.descendants().forEach(ending::add);
+                });
+                ending.forEach(ProcessHandle::destroy);
+                long deadline = System.nanoTime() + ENDING.toNanos();
+                for (ProcessHandle process : ending) {
+                    try {
+                        process.onExit().get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+                    } catch (ExecutionException | InterruptedException | TimeoutException _) {
+                        process.destroyForcibly();
+                    }
                 }
-            })));
+                TEMPORARY.forEach(folder -> {
+                    try (Stream<Path> files = Files.walk(folder)) {
+                        files.sorted(Comparator.reverseOrder()).forEach(file -> file.toFile().delete());
+                    } catch (IOException | UncheckedIOException _) {
+                    }
+                });
+            }));
         }
 
         private final List<String> commands;
@@ -492,7 +510,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             builder.environment().putIfAbsent("COLUMNS", "80");
             builder.environment().putIfAbsent("LINES", "24");
             builder.environment().putIfAbsent("TERM", "dumb");
-            Process process = builder.start();
+            Process process = start(builder);
             process.getOutputStream().close();
             CompletableFuture<Void> errored, printed;
             if (tee == null) {
@@ -524,6 +542,23 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                 Thread.currentThread().interrupt();
                 throw new RuntimeException(e);
             }
+        }
+
+        public static int inheriting(List<String> command) throws IOException, InterruptedException {
+            Process process = start(new ProcessBuilder(command).inheritIO());
+            try {
+                return process.waitFor();
+            } catch (InterruptedException e) {
+                process.destroy();
+                throw e;
+            }
+        }
+
+        static Process start(ProcessBuilder builder) throws IOException {
+            Process process = builder.start();
+            RUNNING.add(process);
+            process.onExit().thenRun(() -> RUNNING.remove(process));
+            return process;
         }
 
         private static CompletableFuture<Void> drain(Executor executor,
