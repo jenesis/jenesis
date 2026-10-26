@@ -84,6 +84,15 @@ public class PinFileTest {
     }
 
     @Test
+    public void writes_every_group_for_a_wildcard() throws IOException {
+        resolved("cli", "main", "maven/org.foo/foo", "1.0");
+        resolved("cli", "checkstyle:tool", "maven/org.bar/bar", "2.0");
+        assertThat(run(List.of("*"), "cli")).containsOnly(
+                Map.entry("org.foo/foo", "1.0 SHA-256/1.0"),
+                Map.entry("org.bar/bar", "2.0 SHA-256/2.0"));
+    }
+
+    @Test
     public void leaves_out_what_a_provided_file_records_before_comparing_versions() throws IOException {
         Path core = Files.writeString(root.resolve("pin-core.properties"), "org.foo/foo=1.0 SHA-256/1.0\n");
         provided.add(core);
