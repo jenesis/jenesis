@@ -88,9 +88,21 @@ public record Project(
     @FunctionalInterface
     public interface Layout {
 
-        Function<String, String> apply(BuildExecutor executor,
-                                       Project project,
-                                       MultiProjectAssembler<? super ProjectModuleDescriptor> assembler) throws IOException;
+        Function<String, Selection> apply(BuildExecutor executor,
+                                          Project project,
+                                          MultiProjectAssembler<? super ProjectModuleDescriptor> assembler) throws IOException;
+
+        record Selection(List<String> selectors, List<String> optional) {
+
+            public Selection {
+                selectors = List.copyOf(selectors);
+                optional = List.copyOf(optional);
+            }
+
+            public static Selection of(String selector) {
+                return new Selection(List.of(selector), List.of());
+            }
+        }
 
         private static Path modularConfigurationFolder(Path location) {
             return location == null ? null : location.resolve("META-INF").resolve("build.jenesis");
@@ -211,9 +223,11 @@ public record Project(
             executor.addModule(PLUGIN, project.toolPlugins().goal(project.profiles()));
             return name -> {
                 int slash = name.indexOf('/');
-                String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
-                return prefix + "/" + AssemblyDescriptor.BUILD + "-module-" + BuildExecutorModule.encodePath(module)
-                        + (slash == -1 ? "" : "/" + name.substring(slash + 1));
+                String module = BuildExecutorModule.encodePath((slash == -1 ? name : name.substring(0, slash)).replace('+', '/'));
+                return slash == -1
+                        ? new Selection(List.of(prefix + "/" + AssemblyDescriptor.BUILD + "-module-" + module),
+                                List.of(prefix + "/" + AssemblyDescriptor.BUILD + "-testmodule-" + module))
+                        : Selection.of(prefix + "/" + AssemblyDescriptor.BUILD + "-module-" + module + "/" + name.substring(slash + 1));
             };
         };
 
@@ -311,8 +325,8 @@ public record Project(
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
-                return prefix + "/" + AssemblyDescriptor.BUILD + "-module-" + BuildExecutorModule.encodePath(module)
-                        + (slash == -1 ? "" : "/" + name.substring(slash + 1));
+                return Selection.of(prefix + "/" + AssemblyDescriptor.BUILD + "-module-" + BuildExecutorModule.encodePath(module)
+                        + (slash == -1 ? "" : "/" + name.substring(slash + 1)));
             };
         };
 
@@ -422,8 +436,8 @@ public record Project(
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
-                return prefix + "/" + AssemblyDescriptor.BUILD + "-module-" + BuildExecutorModule.encodePath(module)
-                        + (slash == -1 ? "" : "/" + name.substring(slash + 1));
+                return Selection.of(prefix + "/" + AssemblyDescriptor.BUILD + "-module-" + BuildExecutorModule.encodePath(module)
+                        + (slash == -1 ? "" : "/" + name.substring(slash + 1)));
             };
         };
 
@@ -2032,10 +2046,9 @@ public record Project(
                                         <module> is the source folder holding its pom.xml or
                                         module-info.java; nested, foo/bar is written +foo+bar.
                                         In a pom.xml build a module's tests are a module of
-                                        their own, which +<module> does not reach: name
-                                        build/maven/compose/module/build-testmodule-<module>,
-                                        or run the whole build with
-                                        -Djenesis.test.filter=<module>/<regex>.
+                                        their own, build-testmodule-<module>, which +<module>
+                                        selects beside it, as mvn test -pl <module> does;
+                                        +<module>/<step> names a step of the main module.
                       +<module>/<step>  one step in it, e.g. +foo+bar/compile/dependencies/resolved
                       pin/module-<path> one module's pins. `pin` is an entry point of its own and
                                         always rewrites every module, so `pin +foo` runs both and
@@ -4702,11 +4715,19 @@ public record Project(
                     : new BuildExecutorLayeredCache(cache, configured));
         }
         BuildExecutor executor = configuration.of(target, callback);
-        Function<String, String> resolver = layout.apply(executor, this, assembler);
+        Function<String, Layout.Selection> resolver = layout.apply(executor, this, assembler);
+        List<String> required = new ArrayList<>(), optional = new ArrayList<>();
+        for (String selector : selectors.length == 0 ? defaultTarget : List.of(selectors)) {
+            if (selector.startsWith("+")) {
+                Layout.Selection selection = resolver.apply(selector.substring(1));
+                required.addAll(selection.selectors());
+                optional.addAll(selection.optional());
+            } else {
+                required.add(selector);
+            }
+        }
         try (Closeable _ = ProcessHandler.scope()) {
-            return executor.execute(Arrays.stream(selectors.length == 0 ? defaultTarget.toArray(String[]::new) : selectors)
-                    .map(selector -> selector.startsWith("+") ? resolver.apply(selector.substring(1)) : selector)
-                    .toArray(String[]::new));
+            return executor.execute(required, optional);
         }
     }
 
