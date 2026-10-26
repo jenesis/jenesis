@@ -277,6 +277,9 @@ with `shared(true)`, which a compiler does. Under `jenesis.process.shared` (defa
 mode: `fork` and `aot` end it when the last build running in the JVM ends, through the scope `Project.build` holds
 from `ProcessHandler.scope()`, while `daemon` keeps it for the next build; `false` forks such calls as well. A command
 line of another shape forks as `ofJavaHome("bin/java")` does.
+Every process the engine waits on is started through `OfProcess.start`, which ends it with the JVM: a shutdown hook
+asks it and its descendants to stop and kills them ten seconds later, so a terminated build leaves no test JVM
+behind. `Make` and `Toolchain`, which compile alone, end the JVM they relaunch with a hook of their own.
 
 ## Tests
 

@@ -298,6 +298,79 @@ public class ProcessHandlerTest {
         assertThat(folder).as("nothing of the folder outlives the JVM that made it").doesNotExist();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"execute", "inheriting"})
+    public void a_forked_process_ends_with_the_jvm_that_forked_it_when_that_jvm_is_terminated(String mode)
+            throws Exception {
+        Assumptions.assumeFalse(File.separatorChar == '\\', "a terminated process on Windows runs no shutdown hook");
+        Path sleeper = root.resolve("Sleeper.java"), holder = root.resolve("Holder.java"), pid = root.resolve("pid");
+        Files.writeString(sleeper, """
+                import java.nio.file.Files;
+                import java.nio.file.Path;
+                import java.nio.file.StandardCopyOption;
+
+                public class Sleeper {
+                    public static void main(String[] args) throws Exception {
+                        Path written = Files.writeString(Path.of(args[0] + ".written"),
+                                Long.toString(ProcessHandle.current().pid()));
+                        Files.move(written, Path.of(args[0]), StandardCopyOption.ATOMIC_MOVE);
+                        Thread.sleep(600_000);
+                    }
+                }
+                """);
+        Files.writeString(holder, """
+                import build.jenesis.step.ProcessHandler;
+                import java.nio.file.Path;
+                import java.util.List;
+
+                public class Holder {
+                    public static void main(String[] args) throws Exception {
+                        if (args[0].equals("inheriting")) {
+                            ProcessHandler.OfProcess.inheriting(List.of(
+                                    Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                                    args[1],
+                                    args[2]));
+                        } else {
+                            ProcessHandler.OfProcess.ofJavaHome("bin/java")
+                                    .apply(List.of(args[1], args[2]))
+                                    .execute(Path.of(args[2] + ".out"), Path.of(args[2] + ".err"), null);
+                        }
+                    }
+                }
+                """);
+        Path engine = Path.of(ProcessHandler.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        Process jvm = new ProcessBuilder(
+                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                "-cp",
+                engine.toString(),
+                holder.toString(),
+                mode,
+                sleeper.toString(),
+                pid.toString())
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start();
+        ProcessHandle forked = null;
+        try {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+            while (!Files.exists(pid) && jvm.isAlive() && System.nanoTime() < deadline) {
+                Thread.sleep(100);
+            }
+            assertThat(pid).as("the forked process started").exists();
+            forked = ProcessHandle.of(Long.parseLong(Files.readString(pid))).orElseThrow();
+            jvm.destroy();
+            assertThat(jvm.waitFor(30, TimeUnit.SECONDS)).as("the terminated JVM exits").isTrue();
+            assertThat(forked.onExit())
+                    .as("the process the terminated JVM forked does not outlive it")
+                    .succeedsWithin(Duration.ofSeconds(30));
+        } finally {
+            jvm.destroyForcibly();
+            if (forked != null) {
+                forked.destroyForcibly();
+            }
+        }
+    }
+
     @Test
     public void a_tool_runs_within_the_build() {
         assertThat(ProcessHandler.OfTool.of("jar").apply(List.of("--version")).external()).isFalse();
