@@ -75,20 +75,6 @@ public class PinPomTest {
         properties.store(input.resolve(Inventory.INVENTORY));
     }
 
-    private void writePoms(Map<String, String> poms) throws IOException {
-        SequencedProperties properties = loadInventory();
-        int index = count(properties, "module.pom.");
-        Path resolved = Files.createDirectories(input.resolve("resolved"));
-        for (Map.Entry<String, String> pom : poms.entrySet()) {
-            String file = "resolved/" + pom.getKey().replace('/', '-') + ".pom";
-            Files.writeString(resolved.resolve(file.substring("resolved/".length())), pom.getValue());
-            properties.setProperty("module.pom." + index, pom.getKey() + " " + file);
-            properties.setProperty("module.pom." + index + ".group", "main");
-            index++;
-        }
-        properties.store(input.resolve(Inventory.INVENTORY));
-    }
-
     private static String sha256(String content) {
         try {
             return "SHA-256/" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
@@ -507,10 +493,20 @@ public class PinPomTest {
                 </project>
                 """);
         writeResolved(Map.of("maven/org.example/library", "1.0 SHA-256/aa"));
-        writePoms(Map.of(
+        SequencedProperties properties = loadInventory();
+        int index = count(properties, "module.pom.");
+        Path resolved = Files.createDirectories(input.resolve("resolved"));
+        for (Map.Entry<String, String> read : Map.of(
                 "maven/org.example/library/pom/1.0", "<project>library</project>",
                 "maven/org.example/parent/pom/64", "<project>64</project>",
-                "maven/org.example/parent/pom/69", "<project>69</project>"));
+                "maven/org.example/parent/pom/69", "<project>69</project>").entrySet()) {
+            String file = read.getKey().replace('/', '-') + ".pom";
+            Files.writeString(resolved.resolve(file), read.getValue());
+            properties.setProperty("module.pom." + index, read.getKey() + " resolved/" + file);
+            properties.setProperty("module.pom." + index + ".group", "main");
+            index++;
+        }
+        properties.store(input.resolve(Inventory.INVENTORY));
         String result = run(pom);
         assertThat(result)
                 .as("a parent read at two versions is two files, each pinned by a line of its own")
@@ -518,89 +514,6 @@ public class PinPomTest {
                         "maven/org.example/parent/pom 64 " + sha256("<project>64</project>"),
                         "maven/org.example/parent/pom 69 " + sha256("<project>69</project>"));
         assertThat(run(pom)).as("the lines read back as what pin writes").isEqualTo(result);
-    }
-
-    @Test
-    public void removes_the_management_entries_an_earlier_pin_wrote_and_keeps_every_other() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <!-- the module of this build, which the tests use -->
-                            <dependency>
-                                <groupId>group</groupId>
-                                <artifactId>sibling</artifactId>
-                                <version>${project.version}</version>
-                            </dependency>
-                            <dependency>
-                                <groupId>org.example</groupId>
-                                <artifactId>pinned</artifactId>
-                                <version>1.0</version>
-                                <!--Checksum/SHA-256/cafebabe-->
-                            </dependency>
-                            <dependency>
-                                <groupId>org.example</groupId>
-                                <artifactId>bom</artifactId>
-                                <version>1.0</version>
-                                <type>pom</type>
-                                <scope>import</scope>
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                </project>
-                """);
-        writeResolved(Map.of("maven/org.example/pinned", "1.0 SHA-256/deadbeef"));
-        assertThat(run(pom))
-                .as("an entry carrying a checksum is one pin wrote, which the comment now holds")
-                .doesNotContain("<artifactId>pinned</artifactId>", "Checksum/")
-                .contains("org.example/pinned 1.0 SHA-256/deadbeef")
-                .as("a sibling, an imported BOM and every comment stay as written")
-                .contains("<!-- the module of this build, which the tests use -->",
-                        "<artifactId>sibling</artifactId>",
-                        "<version>${project.version}</version>",
-                        "<scope>import</scope>");
-    }
-
-    @Test
-    public void drops_a_dependency_management_that_held_only_entries_pin_wrote() throws IOException {
-        Path pom = root.resolve("pom.xml");
-        Files.writeString(pom, """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>stale</groupId>
-                                <artifactId>old</artifactId>
-                                <version>0.1</version>
-                                <!--Checksum/SHA-256/cafebabe-->
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.example</groupId>
-                            <artifactId>direct</artifactId>
-                            <version>1.0</version>
-                            <!--Checksum/SHA-256/stale-->
-                        </dependency>
-                    </dependencies>
-                </project>
-                """);
-        writeResolved(Map.of("maven/org.example/direct", "1.0 SHA-256/fresh"));
-        assertThat(run(pom))
-                .doesNotContain("<dependencyManagement>", "stale", "Checksum/")
-                .contains("<artifactId>direct</artifactId>", "org.example/direct 1.0 SHA-256/fresh");
     }
 
     @Test

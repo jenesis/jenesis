@@ -284,7 +284,7 @@ public class ModularJarResolver implements Resolver {
             edges.addAll(fallbackResolution.edges());
             fallbackResolution.vertices().forEach(nodes::putIfAbsent);
         }
-        return new Resolver.Resolution(dependencies, edges, nodes);
+        return new Resolver.Resolution(dependencies, edges, nodes, new LinkedHashMap<>());
     }
 
     private static String aliased(String module,

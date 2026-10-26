@@ -26,7 +26,7 @@ public class DependencyTreeReportTest {
 
     private static Resolver.Resolution resolution(List<Resolver.Edge> edges,
                                                   SequencedMap<String, Resolver.Vertex> vertices) {
-        return new Resolver.Resolution(new LinkedHashMap<>(), edges, vertices);
+        return new Resolver.Resolution(new LinkedHashMap<>(), edges, vertices, new LinkedHashMap<>());
     }
 
     @Test

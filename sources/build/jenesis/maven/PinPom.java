@@ -17,15 +17,9 @@ import build.jenesis.step.Inventory;
 
 public class PinPom implements BuildStep {
 
-    private static final Pattern DEPENDENCY_MANAGEMENT = Pattern.compile(
-            "(?s)([ \\t]*)<dependencyManagement>.*?</dependencyManagement>\\s*\\n");
     private static final Pattern PROJECT_CLOSE = Pattern.compile("\\n([ \\t]*)</project>");
-    private static final Pattern CHECKSUM_COMMENT = Pattern.compile("[ \\t]*<!--\\s*Checksum/[^>]*-->\\s*\\n");
     private static final Pattern INDENT = Pattern.compile("\\n([ \\t]+)<");
     private static final Pattern PIN_COMMENT = Pattern.compile("(?s)([ \\t]*)<!--\\s*jenesis\\.pin\\b(.*?)-->\\s*\\n");
-    private static final Pattern MANAGED_DEPENDENCY = Pattern.compile("(?s)[ \\t]*<dependency>.*?</dependency>[ \\t]*\\n");
-    private static final Pattern EMPTY_MANAGEMENT = Pattern.compile(
-            "\\s*<dependencyManagement>\\s*<dependencies>\\s*</dependencies>\\s*</dependencyManagement>\\s*");
 
     private final transient Permits permits;
 
@@ -154,28 +148,25 @@ public class PinPom implements BuildStep {
                     }
                 }
             }
-            String updated = existing, indent;
-            Matcher dependencyManagementMatcher = DEPENDENCY_MANAGEMENT.matcher(existing);
-            if (dependencyManagementMatcher.find()) {
-                indent = dependencyManagementMatcher.group(1);
-                String management = MANAGED_DEPENDENCY.matcher(dependencyManagementMatcher.group()).replaceAll(dependency ->
-                        CHECKSUM_COMMENT.matcher(dependency.group()).find() ? "" : Matcher.quoteReplacement(dependency.group()));
-                updated = existing.substring(0, dependencyManagementMatcher.start())
-                        + (EMPTY_MANAGEMENT.matcher(management).matches() ? "" : management)
-                        + existing.substring(dependencyManagementMatcher.end());
-            } else {
-                Matcher indentMatcher = INDENT.matcher(existing);
-                indent = indentMatcher.find() ? indentMatcher.group(1) : "    ";
-            }
+            String updated = existing;
+            Matcher indentMatcher = INDENT.matcher(existing);
+            String indent = indentMatcher.find() ? indentMatcher.group(1) : "    ";
             StringBuilder requires = new StringBuilder();
             if (!qualified.isEmpty() || !preserved.isEmpty()) {
                 requires.append(indent).append("<!--jenesis.pin\n");
                 for (String line : preserved) {
                     requires.append(indent).append(line.replace("--", "&#45;&#45;")).append("\n");
                 }
-                qualified.forEach((key, value) -> requires.append(indent)
-                        .append((token(key) + " " + value).replace("--", "&#45;&#45;"))
-                        .append("\n"));
+                qualified.forEach((key, value) -> {
+                    String token = Resolver.pinToken(key);
+                    if (token.startsWith("main/maven/")) {
+                        String coordinate = token.substring("main/maven/".length());
+                        token = coordinate.indexOf('/') == coordinate.lastIndexOf('/')
+                                ? coordinate
+                                : token.substring("main/".length());
+                    }
+                    requires.append(indent).append((token + " " + value).replace("--", "&#45;&#45;")).append("\n");
+                });
                 requires.append(indent).append("-->\n");
             }
             Matcher requiresMatcher = PIN_COMMENT.matcher(updated);
@@ -195,21 +186,11 @@ public class PinPom implements BuildStep {
                         + requires
                         + updated.substring(projectCloseMatcher.start() + 1);
             }
-            updated = CHECKSUM_COMMENT.matcher(updated).replaceAll("");
             if (!updated.equals(existing)) {
                 Files.writeString(pomFile, updated);
             }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
-    }
-
-    private static String token(String key) {
-        String token = Resolver.pinToken(key);
-        if (!token.startsWith("main/maven/")) {
-            return token;
-        }
-        String coordinate = token.substring("main/maven/".length());
-        return coordinate.indexOf('/') == coordinate.lastIndexOf('/') ? coordinate : token.substring("main/".length());
     }
 
     private static String expand(String token) {

@@ -14,22 +14,12 @@ public interface Resolver extends Serializable {
                String version,
                SequencedMap<String, String> entries,
                SequencedMap<String, Resolved> poms) implements Serializable {
-
-        public Bom(Path file, boolean internal, boolean verifiable, String version, SequencedMap<String, String> entries) {
-            this(file, internal, verifiable, version, entries, new LinkedHashMap<>());
-        }
     }
 
     record Resolution(SequencedMap<String, Resolved> artifacts,
                       List<Edge> edges,
                       SequencedMap<String, Vertex> vertices,
                       SequencedMap<String, Resolved> poms) {
-
-        public Resolution(SequencedMap<String, Resolved> artifacts,
-                          List<Edge> edges,
-                          SequencedMap<String, Vertex> vertices) {
-            this(artifacts, edges, vertices, new LinkedHashMap<>());
-        }
     }
 
     record Edge(String parent, String coordinate, String version, String scope, boolean followed) {
@@ -75,7 +65,8 @@ public interface Resolver extends Serializable {
                 resolved.internal(),
                 true,
                 version,
-                bomEntries(SequencedProperties.ofFiles(resolved.file())));
+                bomEntries(SequencedProperties.ofFiles(resolved.file())),
+                new LinkedHashMap<>());
     }
 
     static SequencedMap<String, String> bomEntries(SequencedProperties properties) {
@@ -232,7 +223,7 @@ public interface Resolver extends Serializable {
                 edges.add(new Edge(null, coordinate, null, null, true));
                 vertices.put(coordinate, new Vertex(null, null, false, artifacts.get(coordinate).internal(), List.of()));
             });
-            return new Resolution(artifacts, edges, vertices);
+            return new Resolution(artifacts, edges, vertices, new LinkedHashMap<>());
         };
     }
 }
