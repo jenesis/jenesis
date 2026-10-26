@@ -364,6 +364,10 @@ public class Dependencies implements BuildExecutorModule {
                         if (resolution && !key.startsWith("entry/")) {
                             continue;
                         }
+                        if (key.startsWith("file/")) {
+                            bomTokens.putIfAbsent(key, "");
+                            continue;
+                        }
                         String reference = key.startsWith("bom/")
                                 ? key.substring(4)
                                 : key.startsWith("entry/") ? key.substring(6) : null;
@@ -565,6 +569,10 @@ public class Dependencies implements BuildExecutorModule {
                 SequencedMap<String, String> covering = new LinkedHashMap<>();
                 SequencedProperties resolvedBoms = new SequencedProperties();
                 for (Map.Entry<String, String> token : bomTokens.entrySet()) {
+                    if (token.getKey().startsWith("file/")) {
+                        resolvedBoms.setProperty(token.getKey(), "");
+                        continue;
+                    }
                     if (token.getKey().startsWith("entry/")) {
                         String key = token.getKey().substring(6);
                         int groupSlash = key.indexOf('/');

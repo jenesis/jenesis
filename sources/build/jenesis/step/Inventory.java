@@ -320,7 +320,7 @@ public class Inventory implements BuildStep {
                 for (String key : resolvedBoms.stringPropertyNames()) {
                     if (key.startsWith("bom/")) {
                         bomFiles.putIfAbsent(key, folder.resolve(resolvedBoms.getProperty(key)).normalize());
-                    } else if (key.startsWith("entry/") || key.startsWith("version/")) {
+                    } else if (key.startsWith("entry/") || key.startsWith("version/") || key.startsWith("file/")) {
                         bomValues.putIfAbsent(key, resolvedBoms.getProperty(key));
                     }
                 }
@@ -694,7 +694,23 @@ public class Inventory implements BuildStep {
     }
 
     public static SequencedMap<String, Dependency> closure(Iterable<BuildStepArgument> arguments, String path) throws IOException {
-        return entries(arguments, List.of(prefixOf(path) + "dependency.", prefixOf(path) + "tool."));
+        SequencedMap<String, Dependency> entries = entries(arguments, List.of(prefixOf(path) + "dependency.", prefixOf(path) + "tool."));
+        Map<String, String> versions = new HashMap<>();
+        entries.forEach((key, dependency) -> {
+            int first = key.indexOf('/'), last = key.lastIndexOf('/');
+            if (dependency.jar() != null && key.indexOf('/', first + 1) < last) {
+                versions.putIfAbsent(dependency.group() + "/" + dependency.jar(), key.substring(last + 1));
+            }
+        });
+        SequencedMap<String, Dependency> closure = new LinkedHashMap<>();
+        entries.forEach((key, dependency) -> {
+            int first = key.indexOf('/');
+            String version = key.startsWith("module/", first + 1) && key.indexOf('/', first + 8) < 0
+                    ? versions.get(dependency.group() + "/" + dependency.jar())
+                    : null;
+            closure.putIfAbsent(version == null ? key : key + "/" + version, dependency);
+        });
+        return closure;
     }
 
     public static SequencedMap<String, Dependency> poms(Iterable<BuildStepArgument> arguments, String path) throws IOException {
@@ -820,6 +836,17 @@ public class Inventory implements BuildStep {
             }
         });
         return versions;
+    }
+
+    public static SequencedSet<String> bomImports(Iterable<BuildStepArgument> arguments, String path)
+            throws IOException {
+        SequencedSet<String> imports = new LinkedHashSet<>();
+        forEachBom(arguments, path, (key, _, _) -> {
+            if (key.startsWith("file/")) {
+                imports.add(key.substring(5));
+            }
+        });
+        return imports;
     }
 
     private interface BomConsumer {

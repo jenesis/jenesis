@@ -669,11 +669,11 @@ public class ModularProject implements BuildExecutorModule {
                     if (file == null) {
                         throw new IllegalArgumentException("Local BOM not found: " + entry.getKey());
                     }
+                    boms.setProperty("file/" + entry.getKey(), "");
                     Dependencies.bomEntries(SequencedProperties.ofFiles(file),
                             entry.getKey().substring(0, slash)).forEach((key, value) -> {
-                        if (!boms.containsKey("entry/" + key)) {
-                            boms.setProperty("entry/" + key, value);
-                        }
+                        boms.remove("entry/" + key);
+                        boms.setProperty("entry/" + key, value);
                     });
                 }
                 boms.store(context.next().resolve(BuildStep.BOMS));

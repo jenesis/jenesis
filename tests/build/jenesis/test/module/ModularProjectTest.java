@@ -800,6 +800,7 @@ public class ModularProjectTest {
         SequencedProperties boms = SequencedProperties.ofFiles(
                 results.get("module/module-/manifests").resolve(BuildStep.BOMS));
         assertThat(boms.stringPropertyNames()).containsExactly(
+                "file/main/pin-team.properties",
                 "entry/main/module/bar",
                 "entry/main/maven/org.slf4j/slf4j-api",
                 "bom/main/module/acme.platform");
@@ -835,7 +836,53 @@ public class ModularProjectTest {
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         SequencedProperties boms = SequencedProperties.ofFiles(
                 results.get("module/module-/manifests").resolve(BuildStep.BOMS));
-        assertThat(boms).containsOnly(Map.entry("entry/kotlinc/module/bar", "1.2.3"));
+        assertThat(boms).containsOnly(
+                Map.entry("file/kotlinc/pin-team.properties", ""),
+                Map.entry("entry/kotlinc/module/bar", "1.2.3"));
+    }
+
+    @Test
+    public void last_declared_local_bom_wins_a_conflicting_entry() throws IOException {
+        Files.writeString(project.resolve("pin-broad.properties"), """
+                bar = 1.0
+                qux = 1.0
+                """);
+        Files.writeString(project.resolve("pin-narrow.properties"), """
+                bar = 2.0
+                """);
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.bom pin-broad.properties
+                 * @jenesis.bom acme.platform 1.0
+                 * @jenesis.bom pin-narrow.properties
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("module", new ModularProject("module", project)
+                .boms(new LinkedHashSet<>(List.of(project))));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        SequencedProperties boms = SequencedProperties.ofFiles(
+                results.get("module/module-/manifests").resolve(BuildStep.BOMS));
+        assertThat(boms.stringPropertyNames())
+                .as("the later file's entry replaces the earlier one in its own place, after the Maven BOM")
+                .containsExactly("file/main/pin-broad.properties",
+                        "entry/main/module/qux",
+                        "bom/main/module/acme.platform",
+                        "file/main/pin-narrow.properties",
+                        "entry/main/module/bar");
+        assertThat(boms.getProperty("entry/main/module/bar")).isEqualTo("2.0");
+        assertThat(boms.getProperty("entry/main/module/qux")).isEqualTo("1.0");
     }
 
     @Test
@@ -870,7 +917,9 @@ public class ModularProjectTest {
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         SequencedProperties boms = SequencedProperties.ofFiles(
                 results.get("module/module-/manifests").resolve(BuildStep.BOMS));
-        assertThat(boms).containsOnly(Map.entry("entry/main/module/bar", "1.0"));
+        assertThat(boms).containsOnly(
+                Map.entry("file/main/pin-team.properties", ""),
+                Map.entry("entry/main/module/bar", "1.0"));
     }
 
     @Test

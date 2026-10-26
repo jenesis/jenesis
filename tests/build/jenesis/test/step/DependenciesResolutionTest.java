@@ -937,6 +937,38 @@ public class DependenciesResolutionTest {
     }
 
     @Test
+    public void local_bom_entry_declared_after_a_bom_wins() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/module/qux", "");
+        requires.store(dependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties boms = new SequencedProperties();
+        boms.setProperty("bom/main/module/first", "1.0");
+        boms.setProperty("entry/main/module/qux", "3.0");
+        boms.store(dependencies.resolve(BuildStep.BOMS));
+        execute(new Dependencies(
+                Map.of("module", files(Map.of("first/1.0:properties", "qux = 1.0\n"))),
+                Map.of("module", versioning())));
+        SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
+        assertThat(index.stringPropertyNames()).containsExactly("main/compile/module/qux/3.0");
+    }
+
+    @Test
+    public void bom_declared_after_a_local_bom_entry_wins() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/module/qux", "");
+        requires.store(dependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties boms = new SequencedProperties();
+        boms.setProperty("entry/main/module/qux", "3.0");
+        boms.setProperty("bom/main/module/second", "1.0");
+        boms.store(dependencies.resolve(BuildStep.BOMS));
+        execute(new Dependencies(
+                Map.of("module", files(Map.of("second/1.0:properties", "qux = 2.0\n"))),
+                Map.of("module", versioning())));
+        SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
+        assertThat(index.stringPropertyNames()).containsExactly("main/compile/module/qux/2.0");
+    }
+
+    @Test
     public void expanded_local_bom_entries_apply_without_fetching() throws IOException {
         SequencedProperties requires = new SequencedProperties();
         requires.setProperty("main/compile/module/qux", "");

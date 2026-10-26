@@ -17,6 +17,7 @@ import build.jenesis.module.JenesisRepository;
 import build.jenesis.module.ModularJarResolver;
 import build.jenesis.module.ModularProject;
 import build.jenesis.module.ModularStaging;
+import build.jenesis.module.PinFile;
 import build.jenesis.module.PinModuleInfo;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.AssemblyRequirement;
@@ -2601,15 +2602,22 @@ public record Project(
                     adding +<module>. A pom.xml's main and test halves share one comment, so where
                     they resolve a coordinate at different versions its line takes the version the
                     pom declares itself, which the other half then resolves as well.
-                    -Djenesis.pin.file=<path> writes the closure of every module's main group to that
-                    properties file instead of the declarations, in the grammar @jenesis.bom reads,
-                    which is how a local bill of materials is refreshed rather than hand-edited. Only
-                    a module-info.java reads it back, by @jenesis.bom
-                    pin-<name>.properties: a tool's closure, as Checkstyle's with the jars
-                    @jenesis.plugin checkstyle:tool adds, stays a @jenesis.pin <name>:tool/... line that `pin`
-                    without the file writes, and a pom.xml build keeps every pin in its POMs, a
-                    -SNAPSHOT from the local repository among them, whose checksum strict pinning
-                    then holds until that snapshot is installed anew. Each
+                    -Djenesis.pin.file=<path> writes the closure of the groups -Djenesis.pin.groups
+                    names (main by default, comma-separated, * for every group) of every module to that
+                    properties file, in the grammar @jenesis.bom reads, which is how a local bill of
+                    materials is refreshed rather than hand-edited. The file names no group: a module
+                    chooses one per import, as @jenesis.bom launcher/pin-<name>.properties reads it
+                    into the launcher group. It holds one version of a coordinate, so `pin` refuses to
+                    write a file in which those groups resolve one at two versions and names both,
+                    which is why a tool's group, resolved apart so as not to agree with the main one,
+                    is rarely named. Every other group is pinned in the declarations as without the
+                    file - a tool's closure, as Checkstyle's with the jars @jenesis.plugin
+                    checkstyle:tool adds, as @jenesis.pin <name>:tool/... lines - and a module
+                    importing the file into a group the file holds loses that group's own pin lines,
+                    which would override the file. Only a module-info.java reads the file back: a
+                    pom.xml build keeps every pin in its POMs, a -SNAPSHOT from the local repository
+                    among them, whose checksum strict pinning then holds until that snapshot is
+                    installed anew. Each
                     module resolves alone, so nothing makes them agree: pin/divergence reports every
                     coordinate the tree pins at more than one version, which is the signal that a
                     shared version table is overdue. Enforce
@@ -2985,6 +2993,7 @@ public record Project(
                              String fileName,
                              BiFunction<String, Path, BuildStep> stepFactory,
                              Path file,
+                             SequencedSet<String> groups,
                              SequencedSet<Path> provided,
                              HashDigestFunction hashFunction,
                              Consumer<String> printing,
@@ -3005,10 +3014,12 @@ public record Project(
                     provided.add(root.resolve(entry).normalize());
                 }
             }
+            List<String> groups = environment.entries("pin.groups");
             return new PinModule(root,
                                  fileName,
                                  stepFactory,
                                  file == null ? null : root.resolve(file).normalize(),
+                                 new LinkedHashSet<>(groups == null ? List.of("main") : groups),
                                  provided,
                                  hashFunction,
                                  environment.flag("print.divergence") ? environment.out() : null,
@@ -3017,15 +3028,19 @@ public record Project(
         }
 
         PinModule file(Path file) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, palette, plugins);
+            return new PinModule(root, fileName, stepFactory, file, groups, provided, hashFunction, printing, palette, plugins);
+        }
+
+        PinModule groups(SequencedSet<String> groups) {
+            return new PinModule(root, fileName, stepFactory, file, groups, provided, hashFunction, printing, palette, plugins);
         }
 
         PinModule provided(SequencedSet<Path> provided) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, palette, plugins);
+            return new PinModule(root, fileName, stepFactory, file, groups, provided, hashFunction, printing, palette, plugins);
         }
 
         PinModule plugins(ProjectPlugins plugins) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, palette, plugins);
+            return new PinModule(root, fileName, stepFactory, file, groups, provided, hashFunction, printing, palette, plugins);
         }
 
         @Override
@@ -3049,19 +3064,21 @@ public record Project(
                     }
                 }
             }
-            if (file == null) {
-                for (String path : paths) {
-                    Path file = root.resolve(path).resolve(fileName);
-                    if (!Files.isRegularFile(file)) {
-                        continue;
-                    }
-                    buildExecutor.addStep("module-" + BuildExecutorModule.encodePath(path),
-                            stepFactory.apply(path, file),
-                            built);
+            for (String path : paths) {
+                Path declaration = root.resolve(path).resolve(fileName);
+                if (!Files.isRegularFile(declaration)) {
+                    continue;
                 }
-            } else {
+                BuildStep step = stepFactory.apply(path, declaration);
+                buildExecutor.addStep("module-" + BuildExecutorModule.encodePath(path),
+                        file != null && step instanceof PinModuleInfo pin
+                                ? pin.exported(file.getFileName().toString()).exportedGroups(groups)
+                                : step,
+                        built);
+            }
+            if (file != null) {
                 buildExecutor.addStep("file",
-                        new Pins(paths, file, provided, hashFunction),
+                        new PinFile(paths, file, groups, provided, hashFunction),
                         built);
             }
             buildExecutor.addStep("divergence",
@@ -3160,108 +3177,6 @@ public record Project(
             SequencedProperties written = new SequencedProperties();
             pins.forEach(written::setProperty);
             written.store(file);
-            return CompletableFuture.completedStage(new BuildStepResult(true));
-        }
-    }
-
-    private record Pins(SequencedSet<String> paths,
-                        Path file,
-                        SequencedSet<Path> provided,
-                        HashDigestFunction hashFunction)
-            implements BuildStep {
-
-        @Override
-        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
-            return true;
-        }
-
-        @Override
-        public CompletionStage<BuildStepResult> apply(Executor executor,
-                                                      BuildStepContext context,
-                                                      SequencedMap<String, BuildStepArgument> arguments)
-                throws IOException {
-            SequencedMap<String, String> entries = new TreeMap<>();
-            for (String path : paths) {
-                Set<String> internal = new LinkedHashSet<>();
-                for (String identity : Inventory.identities(arguments.values())) {
-                    internal.add(identity);
-                    int first = identity.indexOf('/'), last = identity.lastIndexOf('/');
-                    if (first > 0 && last > first) {
-                        internal.add(identity.substring(0, last));
-                    }
-                }
-                for (Map.Entry<String, Inventory.Dependency> dependency
-                        : Inventory.closure(arguments.values(), path).entrySet()) {
-                    String group = dependency.getValue().group();
-                    String key = dependency.getKey().substring(group.length() + 1);
-                    if (!group.equals("main") || internal.contains(key)) {
-                        continue;
-                    }
-                    int lastSlash = key.lastIndexOf('/'), firstSlash = key.indexOf('/');
-                    if (lastSlash <= 0 || lastSlash == firstSlash) {
-                        continue;
-                    }
-                    String coordinate = key.substring(0, lastSlash);
-                    String value = key.substring(lastSlash + 1);
-                    Inventory.Dependency resolved = dependency.getValue();
-                    String checksum = resolved.jar() != null && Files.isRegularFile(resolved.jar())
-                            ? hashFunction.encodedHash(resolved.jar())
-                            : resolved.checksum();
-                    if (checksum != null && !checksum.isEmpty()) {
-                        value += " " + checksum;
-                    }
-                    String entry;
-                    if (coordinate.startsWith("module/")) {
-                        String module = coordinate.substring("module/".length());
-                        int dash = module.indexOf('-');
-                        if (dash >= 0) {
-                            value = ":" + module.substring(dash + 1) + ":" + value;
-                            module = module.substring(0, dash);
-                        }
-                        entry = module;
-                    } else {
-                        String maven = coordinate.startsWith("maven/")
-                                ? coordinate.substring("maven/".length())
-                                : null;
-                        entry = maven != null
-                                && maven.indexOf('/') > 0
-                                && maven.indexOf('/') == maven.lastIndexOf('/')
-                                ? maven
-                                : coordinate;
-                    }
-                    entries.putIfAbsent(entry, value);
-                }
-                for (Map.Entry<String, Inventory.Dependency> pom : Inventory.poms(arguments.values(), path).entrySet()) {
-                    if (pom.getValue().group().equals("main")) {
-                        String coordinate = pom.getKey().substring("main/".length());
-                        entries.putIfAbsent(coordinate, coordinate.substring(coordinate.lastIndexOf('/') + 1)
-                                + " " + pom.getValue().checksum(hashFunction));
-                    }
-                }
-            }
-            for (Path other : provided) {
-                if (!Files.isRegularFile(other)) {
-                    throw new IllegalStateException("No such file in jenesis.pin.provided: " + other);
-                }
-                SequencedProperties covered = SequencedProperties.ofFiles(other);
-                for (String key : covered.stringPropertyNames()) {
-                    String value = covered.getProperty(key).trim();
-                    int space = value.indexOf(' ');
-                    if (space < 0) {
-                        continue;
-                    }
-                    if (value.equals(entries.get(key))) {
-                        entries.remove(key);
-                    }
-                }
-            }
-            SequencedProperties pins = new SequencedProperties();
-            entries.forEach(pins::setProperty);
-            Path parent = file.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-            pins.store(file);
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }
@@ -4829,7 +4744,8 @@ public record Project(
                 dependency.native|ignore|ignore|warn|strict: what to do when a module runs a jar whose Jenesis-Native-Access names a module it does not grant with @jenesis.native; warn reports it, strict fails the build
                 resolver.maven|maven|maven|closest|latest|release|stable|fail|managed: which version a Maven coordinate resolves to; stable skips pre-release qualifiers, fail rejects a coordinate two dependencies require at different versions, managed rejects that and any version only a dependency's POM names
                 resolver.module|first|first|ignore|fail|managed: what to do with the versions a module-info records; fail rejects two requires that record different versions, managed rejects that and any module only another module's requires names
-                pin.file||Write the whole project's pins of the main group to this properties file instead of the module declarations, which a module-info.java imports with @jenesis.bom and a pom.xml never reads; a file a project provides names only a folder inside the project
+                pin.file||Write the pins of the jenesis.pin.groups of every module to this properties file, and every other group's to the module declarations; a pom.xml never reads it, and a file a project provides names only a folder inside the project
+                pin.groups|main|Comma-separated groups whose pins jenesis.pin.file writes to the file, or * for every group; a module importing the file into one of them loses that group's pin lines from its declaration
                 pin.provided||Comma-separated pin files whose entries this one leaves out, where the version and hash are the same
                 pin.concurrency|(processor count)|Rewrite at most this many modules' pins at once; 0 is unbounded
                 pin.checksum|true|Record content checksums in the pins that the pin selector writes
