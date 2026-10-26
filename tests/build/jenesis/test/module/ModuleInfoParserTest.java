@@ -1209,6 +1209,27 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void repeated_tags_keep_the_last_declaration_as_pins_do() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.bom acme.platform 1.0.0
+                 * @jenesis.bom other.platform 2.0.0
+                 * @jenesis.bom acme.platform 3.0.0
+                 * @jenesis.pin bar 1.0.0
+                 * @jenesis.pin bar 2.0.0
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.boms()).containsExactly(
+                Map.entry("main/module/other.platform", "2.0.0"),
+                Map.entry("main/module/acme.platform", "3.0.0"));
+        assertThat(info.versions()).containsEntry("main/module/bar", "2.0.0");
+    }
+
+    @Test
     public void bom_tag_keeps_qualified_token_verbatim() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
