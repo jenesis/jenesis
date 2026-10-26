@@ -82,7 +82,7 @@ public class Dependencies implements BuildExecutorModule {
                          Consumer<String> printing,
                          Palette palette) {
         this.repositories = repositories;
-        this.resolvers = new LinkedHashMap<>(resolvers);
+        this.resolvers = resolvers;
         this.signatures = signatures;
         this.pinning = pinning;
         this.group = group;
@@ -182,7 +182,7 @@ public class Dependencies implements BuildExecutorModule {
                         Palette palette,
                         OffsetDateTime timestamp) {
             this.repositories = repositories;
-            this.resolvers = new LinkedHashMap<>(resolvers);
+            this.resolvers = resolvers;
             this.pinning = pinning;
             this.group = group;
             this.pathPlacement = pathPlacement;

@@ -22,11 +22,6 @@ public record Classifiers(SequencedMap<String, SequencedMap<String, Path>> folde
     private static final String FOLDERS = "folders/", CLASSIFY = "classify";
     public static final Pattern NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_.-]*");
 
-    public Classifiers {
-        folders = Collections.unmodifiableSequencedMap(new LinkedHashMap<>(folders));
-        dormant = Collections.unmodifiableSequencedMap(new LinkedHashMap<>(dormant));
-    }
-
     public static Classifiers configured(SequencedSet<Path> configuration, Path location, Path root) throws IOException {
         Path file = BuildStep.locate(configuration, FILE);
         SequencedMap<String, SequencedMap<String, Path>> folders = new LinkedHashMap<>();

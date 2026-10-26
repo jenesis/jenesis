@@ -8,7 +8,7 @@ public record TestTags(SequencedSet<String> alternatives) {
     public static final TestTags ALL = new TestTags(Collections.emptyNavigableSet());
 
     public TestTags {
-        alternatives = Collections.unmodifiableSequencedSet(new TreeSet<>(alternatives));
+        alternatives = new TreeSet<>(alternatives);
     }
 
     public static TestTags parse(String expression) {

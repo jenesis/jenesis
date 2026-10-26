@@ -972,7 +972,6 @@ public class TestModule implements BuildExecutorModule {
         public Scope {
             filter = filter == null || filter.isBlank() ? null : filter;
             exclude = exclude == null || exclude.isBlank() ? null : exclude;
-            covered = List.copyOf(covered);
         }
 
         public Scope(String filter, List<TestTags> covered) {
