@@ -839,6 +839,46 @@ public class ModularProjectTest {
     }
 
     @Test
+    public void last_declared_local_bom_wins_a_conflicting_entry() throws IOException {
+        Files.writeString(project.resolve("pin-broad.properties"), """
+                bar = 1.0
+                qux = 1.0
+                """);
+        Files.writeString(project.resolve("pin-narrow.properties"), """
+                bar = 2.0
+                """);
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.bom pin-broad.properties
+                 * @jenesis.bom acme.platform 1.0
+                 * @jenesis.bom pin-narrow.properties
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("module", new ModularProject("module", project)
+                .boms(new LinkedHashSet<>(List.of(project))));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        SequencedProperties boms = SequencedProperties.ofFiles(
+                results.get("module/module-/manifests").resolve(BuildStep.BOMS));
+        assertThat(boms.stringPropertyNames())
+                .as("the later file's entry replaces the earlier one in its own place, after the Maven BOM")
+                .containsExactly("entry/main/module/qux", "bom/main/module/acme.platform", "entry/main/module/bar");
+        assertThat(boms.getProperty("entry/main/module/bar")).isEqualTo("2.0");
+        assertThat(boms.getProperty("entry/main/module/qux")).isEqualTo("1.0");
+    }
+
+    @Test
     public void first_boms_location_shadows_later_ones() throws IOException {
         Path first = Files.createDirectory(project.resolve("first"));
         Path second = Files.createDirectory(project.resolve("second"));
