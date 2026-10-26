@@ -1,6 +1,7 @@
 package build.jenesis.docker;
 
 import module java.base;
+import build.jenesis.step.ProcessHandler;
 
 public class DockerizedJava {
 
@@ -148,7 +149,7 @@ public class DockerizedJava {
     }
 
     public int execute(List<String> javaArgs) throws IOException, InterruptedException {
-        return new ProcessBuilder(command(javaArgs)).inheritIO().start().waitFor();
+        return ProcessHandler.OfProcess.inheriting(command(javaArgs));
     }
 
     public List<String> command(List<String> javaArgs) throws IOException, InterruptedException {

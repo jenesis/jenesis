@@ -25,7 +25,6 @@ final class JavaWorker {
     private static final Map<Key, Deque<Running>> IDLE = new ConcurrentHashMap<>();
     private static final Map<Key, Shared> SHARED = new HashMap<>();
     private static final List<Closeable> NESTED = new ArrayList<>();
-    private static final AtomicBoolean HOOKED = new AtomicBoolean();
     private static Path compiled;
     private static int scopes;
 
@@ -339,18 +338,7 @@ final class JavaWorker {
         builder.environment().putIfAbsent("COLUMNS", "80");
         builder.environment().putIfAbsent("LINES", "24");
         builder.environment().putIfAbsent("TERM", "dumb");
-        Process process = builder.start();
-        if (HOOKED.compareAndSet(false, true)) {
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                IDLE.values().forEach(workers -> workers.forEach(worker -> worker.process()
-                        .destroyForcibly()
-                        .onExit()
-                        .join()));
-                synchronized (SHARED) {
-                    SHARED.values().forEach(shared -> shared.running.process().destroyForcibly().onExit().join());
-                }
-            }));
-        }
+        Process process = ProcessHandler.OfProcess.start(builder);
         return new Running(process,
                 new DataOutputStream(new BufferedOutputStream(process.getOutputStream())),
                 new DataInputStream(new BufferedInputStream(process.getInputStream())));
