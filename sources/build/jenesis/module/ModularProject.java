@@ -671,9 +671,8 @@ public class ModularProject implements BuildExecutorModule {
                     }
                     Dependencies.bomEntries(SequencedProperties.ofFiles(file),
                             entry.getKey().substring(0, slash)).forEach((key, value) -> {
-                        if (!boms.containsKey("entry/" + key)) {
-                            boms.setProperty("entry/" + key, value);
-                        }
+                        boms.remove("entry/" + key);
+                        boms.setProperty("entry/" + key, value);
                     });
                 }
                 boms.store(context.next().resolve(BuildStep.BOMS));
