@@ -466,9 +466,9 @@ class BuildExecutorDefault implements BuildExecutor {
     }
 
     @Override
-    public CompletionStage<SequencedMap<String, Path>> execute(Executor executor, String... selectors) {
-        Set<Selector> initial = Arrays.stream(selectors)
-                .map(s -> new Selector(s, false))
+    public CompletionStage<SequencedMap<String, Path>> execute(Executor executor, List<String> selectors, List<String> optional) {
+        Set<Selector> initial = Stream.concat(selectors.stream().map(selector -> new Selector(selector, false)),
+                        optional.stream().map(selector -> new Selector(selector, true)))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Path canonical = target.toAbsolutePath().normalize();
         FileChannel lock = lock(canonical);

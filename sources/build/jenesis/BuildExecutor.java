@@ -288,12 +288,20 @@ public interface BuildExecutor {
                       Function<String, Optional<String>> resolver);
 
     default SequencedMap<String, Path> execute(String... selectors) {
+        return execute(List.of(selectors), List.of());
+    }
+
+    default SequencedMap<String, Path> execute(List<String> selectors, List<String> optional) {
         try (ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor()) {
-            return execute(executorService, selectors).toCompletableFuture().join();
+            return execute(executorService, selectors, optional).toCompletableFuture().join();
         }
     }
 
-    CompletionStage<SequencedMap<String, Path>> execute(Executor executor, String... selectors);
+    default CompletionStage<SequencedMap<String, Path>> execute(Executor executor, String... selectors) {
+        return execute(executor, List.of(selectors), List.of());
+    }
+
+    CompletionStage<SequencedMap<String, Path>> execute(Executor executor, List<String> selectors, List<String> optional);
 
     @SafeVarargs
     private static <T> SequencedSet<T> sequencedSetOf(T... values) {
