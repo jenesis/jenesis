@@ -165,6 +165,34 @@ public class PinModuleInfoTest {
     }
 
     @Test
+    public void leaves_the_groups_importing_the_exported_file_to_that_file() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.bom pin-shared.properties
+                 * @jenesis.pin org.example/stale 0.9 SHA-256/old
+                 */
+                module foo {
+                }
+                """);
+        SequencedProperties inventory = loadInventory();
+        inventory.setProperty("module.bom.0", "file/main/pin-shared.properties ");
+        inventory.store(input.resolve(Inventory.INVENTORY));
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        writeResolved("tool", "runtime", Map.of("maven/org.example/checker", "2.0 SHA-256/beefcafe"));
+        String result = run(file, pin -> pin.exported("pin-shared.properties"));
+        assertThat(result)
+                .as("a group the module does not import the file into is pinned in the declaration")
+                .contains("@jenesis.pin tool/maven/org.example/checker 2.0 SHA-256/beefcafe")
+                .as("the imported group is the file's, and a line of its own would override the file")
+                .doesNotContain("org.example/lib")
+                .doesNotContain("org.example/stale");
+        assertThat(run(file, pin -> pin.exported("pin-other.properties")))
+                .as("a module that imports another file keeps every group in its declaration")
+                .contains("@jenesis.pin org.example/lib 1.0 SHA-256/cafebabe");
+    }
+
+    @Test
     public void renders_dependencies_under_their_resolved_group() throws IOException {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """

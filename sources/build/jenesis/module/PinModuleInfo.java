@@ -30,6 +30,7 @@ public class PinModuleInfo implements BuildStep {
     private final boolean checksum;
     private final boolean flatten;
     private final Retain retain;
+    private final String exported;
     private final transient Consumer<String> printing;
     private final transient Palette palette;
 
@@ -42,6 +43,7 @@ public class PinModuleInfo implements BuildStep {
                 true,
                 false,
                 Retain.GROUPS,
+                null,
                 Pinning.permits(),
                 null,
                 Palette.NONE);
@@ -70,6 +72,7 @@ public class PinModuleInfo implements BuildStep {
                           boolean checksum,
                           boolean flatten,
                           Retain retain,
+                          String exported,
                           Permits permits,
                           Consumer<String> printing,
                           Palette palette) {
@@ -82,32 +85,37 @@ public class PinModuleInfo implements BuildStep {
         this.checksum = checksum;
         this.flatten = flatten;
         this.retain = retain;
+        this.exported = exported;
         this.printing = printing;
         this.palette = palette;
     }
 
     public PinModuleInfo permits(Permits permits) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, exported, permits, printing, palette);
     }
 
     public PinModuleInfo platform(Platform platform) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, exported, permits, printing, palette);
     }
 
     public PinModuleInfo checksum(boolean checksum) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, exported, permits, printing, palette);
     }
 
     public PinModuleInfo flatten(boolean flatten) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, exported, permits, printing, palette);
     }
 
     public PinModuleInfo retain(Retain retain) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, exported, permits, printing, palette);
+    }
+
+    public PinModuleInfo exported(String exported) {
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, exported, permits, printing, palette);
     }
 
     public PinModuleInfo printing(Consumer<String> printing, Palette palette) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, exported, permits, printing, palette);
     }
 
     private static boolean checksumFrom(Environment environment) {
@@ -162,10 +170,24 @@ public class PinModuleInfo implements BuildStep {
     private CompletionStage<BuildStepResult> pin(SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         SequencedMap<String, Inventory.Dependency> closure = Inventory.closure(arguments.values(), path);
+        Set<String> skipped = new HashSet<>();
+        if (exported != null) {
+            for (String imported : Inventory.bomImports(arguments.values(), path)) {
+                int slash = imported.indexOf('/');
+                if (imported.substring(slash + 1).equals(exported)) {
+                    skipped.add(imported.substring(0, slash));
+                }
+            }
+        }
+        SequencedMap<String, Inventory.Dependency> pinned = new LinkedHashMap<>(closure);
+        pinned.values().removeIf(dependency -> skipped.contains(dependency.group()));
         Set<String> internal = collectInternal(Inventory.identities(arguments.values()));
-        SequencedMap<String, String> entries = collectEntries(closure, internal, checksum ? hashFunction : null);
+        SequencedMap<String, String> entries = collectEntries(pinned, internal, checksum ? hashFunction : null);
         if (checksum) {
             for (Map.Entry<String, Inventory.Dependency> pom : Inventory.poms(arguments.values(), path).entrySet()) {
+                if (skipped.contains(pom.getValue().group())) {
+                    continue;
+                }
                 String group = pom.getValue().group(), coordinate = pom.getKey().substring(group.length() + 1);
                 entries.putIfAbsent(group.equals("main") ? coordinate : pom.getKey(),
                         coordinate.substring(coordinate.lastIndexOf('/') + 1) + " " + pom.getValue().checksum(hashFunction));
