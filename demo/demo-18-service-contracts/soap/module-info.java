@@ -4,6 +4,12 @@
  * @jenesis.pin jakarta.xml.soap/jakarta.xml.soap-api 3.0.2 SHA-256/62ecd5c3b5c107779e5ffe84922594c381f7a8e397320a05c3ee3957b5b7863f
  * @jenesis.pin jakarta.xml.ws 4.0.3 SHA-256/e2244d1046363f21a1dbb9485d592f6697b219b8086de70de759c7c5d725517f
  * @jenesis.pin jakarta.xml.ws/jakarta.xml.ws-api 4.0.3 SHA-256/e2244d1046363f21a1dbb9485d592f6697b219b8086de70de759c7c5d725517f
+ * @jenesis.pin maven/jakarta.activation/jakarta.activation-api/pom 2.1.4 SHA-256/7577970dc09f1131a4a42769e1771ed062f08d22f40da3041ff3e16d5b2fdea8
+ * @jenesis.pin maven/jakarta.xml.bind/jakarta.xml.bind-api-parent/pom 4.0.5 SHA-256/68e78c21a934cd37ab48c07a95aa7f8cbb98cafcfa2bb9ef92d54399accdbf15
+ * @jenesis.pin maven/jakarta.xml.bind/jakarta.xml.bind-api/pom 4.0.5 SHA-256/596f65494651b79eb589b2f579a5686fabcd5cbb68f2c928c1cf360341d68c16
+ * @jenesis.pin maven/jakarta.xml.soap/jakarta.xml.soap-api/pom 3.0.2 SHA-256/28a46919604b9d0e84a057463579f3e81779c866da2e6feedff51f76c9785f09
+ * @jenesis.pin maven/jakarta.xml.ws/jakarta.xml.ws-api/pom 4.0.3 SHA-256/40578a6b6317792e5665c3b135686279511b4bdb1e7759a4f5e9ccc90a2077bd
+ * @jenesis.pin maven/org.eclipse.ee4j/project/pom 1.0.9 SHA-256/825379934a1cf29249f349f2d18adaf79a7b2cb2dbe231518974e1ee70941c17
  * @jenesis.pin wsimport/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
  * @jenesis.pin wsimport/module/build.jenesis.plugin.wsimport 0.1.0 SHA-256/498b5efed2145065d982d2a32e8d2f4b0b451bfee0e90edb392e128f87888eff
  * @jenesis.pin wsimport:tool/maven/com.fasterxml.woodstox/woodstox-core 7.2.0 SHA-256/689f5be95f9bb369d6c0e8db99a99f930b0c48d6a69b46151782b5816c7ea820

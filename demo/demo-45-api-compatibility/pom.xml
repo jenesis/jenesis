@@ -10,6 +10,9 @@
         <sourceDirectory>sources</sourceDirectory>
     </build>
     <!--jenesis.pin
+    japicmp/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
+    japicmp/module/build.jenesis.plugin.japicmp 0.1.0 SHA-256/d2118292b0dc76b88ff0d90f34022210e1481d7b962de83df329c41cce30fd8c
+    japicmp:tool/maven/build.jenesis.demo/api-compatibility 1.0.0 SHA-256/b069b5880803e7f780ce7750727bba2b5b8a117dd8dc019234f23016cfb71b93
     japicmp:tool/maven/com.github.siom79.japicmp/japicmp 0.26.2 SHA-256/317c4d11ef25469203d6de9c5b804c62392f52e3edc9e42e42161a192335bc3a
     japicmp:tool/maven/com.google.errorprone/error_prone_annotations 2.36.0 SHA-256/77440e270b0bc9a249903c5a076c36a722c4886ca4f42675f2903a1c53ed61a5
     japicmp:tool/maven/com.google.guava/failureaccess 1.0.3 SHA-256/cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb
@@ -25,5 +28,28 @@
     japicmp:tool/maven/org.javassist/javassist 3.30.2-GA SHA-256/eba37290994b5e4868f3af98ff113f6244a6b099385d9ad46881307d3cb01aaf
     japicmp:tool/maven/org.jspecify/jspecify 1.0.0 SHA-256/1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab
     japicmp:tool/maven/org.jvnet.staxex/stax-ex 1.8.1 SHA-256/20522549056e9e50aa35ef0b445a2e47a53d06be0b0a9467d704e2483ffb049a
+    revapi/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
+    revapi/module/build.jenesis.plugin.revapi 0.1.0 SHA-256/8f0abdf3cf0b31271e4cd1d31c5bc0bbdf0194718b6303d38e8612098d051c59
+    revapi:tool/maven/build.jenesis.demo/api-compatibility 1.0.0 SHA-256/b069b5880803e7f780ce7750727bba2b5b8a117dd8dc019234f23016cfb71b93
+    revapi:tool/maven/com.fasterxml.jackson.core/jackson-annotations 2.10.4 SHA-256/9d07ea7ce579a678e7aea61249fa82c46469af9d02c5b5f13e84beb7b0827dbc
+    revapi:tool/maven/com.fasterxml.jackson.core/jackson-core 2.13.3 SHA-256/ab119a8ea3cc69472ebc0e870b849bfbbe536ad57d613dc38453ccd592ca6a3d
+    revapi:tool/maven/com.fasterxml.jackson.core/jackson-databind 2.10.4 SHA-256/55312662a420c71508e6159c86aa41c1694c52e89a1b90dc94bcf4358134005e
+    revapi:tool/maven/com.networknt/json-schema-validator 1.0.43 SHA-256/7c10b089a973fe15d13fbe3205c30eb751d6770354ffe77643c9d6133073a7bf
+    revapi:tool/maven/org.antlr/antlr4-runtime 4.7.2 SHA-256/4c518b87d4bdff8b44cd8cbc1af816e944b62a3fe5b80b781501cf1f4759bbc4
+    revapi:tool/maven/org.apache.commons/commons-lang3 3.5 SHA-256/8ac96fc686512d777fca85e144f196cd7cfe0c0aec23127229497d1a38ff651c
+    revapi:tool/maven/org.apache.logging.log4j/log4j-api 2.17.1 SHA-256/b0d8a4c8ab4fb8b1888d0095822703b0e6d4793c419550203da9e69196161de4
+    revapi:tool/maven/org.apache.logging.log4j/log4j-core 2.17.1 SHA-256/c967f223487980b9364e94a7c7f9a8a01fd3ee7c19bdbf0b0f9f8cb8511f3d41
+    revapi:tool/maven/org.jboss/jboss-dmr 1.5.0.Final SHA-256/cbbe302464ff99bc0656be2343958f3eb7a4ffc575e03bb7399fccbb327be6c5
+    revapi:tool/maven/org.jruby.jcodings/jcodings 1.0.46 SHA-256/13e7fa99093b729fe736f1bf6886e6230065b36bd3dc9117ee14942883e3e515
+    revapi:tool/maven/org.jruby.joni/joni 2.1.31 SHA-256/96c8d65e99d16a2ee48046fa352a972feadbc15420ed576a3c13d8339cdbe1f0
+    revapi:tool/maven/org.revapi.classif/classif 0.1.1 SHA-256/56b3a356500b2a0acfa964b960d593361acd6c6324bcd13ffd26802b38b44412
+    revapi:tool/maven/org.revapi.classif/classif-dsl 0.1.1 SHA-256/eb62873779b25e8b997172b0e88900ac0835489611d7b24d0521861e6ffee081
+    revapi:tool/maven/org.revapi/revapi 0.15.1 SHA-256/c41a393d7216e56f98d66a57ca964ffceb658849b42ef488b71f89a600beae72
+    revapi:tool/maven/org.revapi/revapi-basic-features 0.13.1 SHA-256/9eade0d8c45f2d99b5b39b42b2f63cb15904db6f3583c89c370b78e8825f76e2
+    revapi:tool/maven/org.revapi/revapi-java 0.28.4 SHA-256/95f9edd7082703037fa229a415bc7aaf14b60a85319c893d1a9cd0e665e3a825
+    revapi:tool/maven/org.revapi/revapi-java-spi 0.25.1 SHA-256/8fd32703b52df0e206ff55c4e3b97525cc4cd790693972e1746cdd4230d3a42a
+    revapi:tool/maven/org.revapi/revapi-reporter-file-base 0.5.1 SHA-256/eb8e10d0d8c9e3c9945cdb2315fbc351ee0bb884cb86e1498c10179ae4f00495
+    revapi:tool/maven/org.revapi/revapi-reporter-json 0.5.1 SHA-256/2b385bb37d92dd48ea0ecb85269194485dfb4fb5757afe278d8a43e6ce169b62
+    revapi:tool/maven/org.slf4j/slf4j-api 1.7.5 SHA-256/fe30825245d2336c859dc38d60c0fc5f3668dbf29cd586828d2b5667ec355b91
     -->
 </project>

@@ -172,7 +172,7 @@ public class TestFrameworkAdapterTest {
         executor.addModule("test",
                 new TestModule(Map.of(),
                         Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(
-                                new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                                new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .jarsOnly(false),
                 "dependencies");

@@ -10,6 +10,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.ObservabilityEngine;
 import build.jenesis.PathPlacement;
+import build.jenesis.Permits;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
@@ -26,6 +27,7 @@ public class TestModule implements BuildExecutorModule {
 
     public static final String REQUIRED = "required", ARTIFACTS = "artifacts", EXECUTED = "executed";
     private static final String RESOLVED = "resolved", DEPENDENCIES = "dependencies";
+    private static final ConcurrentMap<Integer, Permits> PERMITS = new ConcurrentHashMap<>();
 
     private final TestFramework framework;
     private final List<TestFramework> frameworks;
@@ -82,6 +84,15 @@ public class TestModule implements BuildExecutorModule {
     public static TestModule ofEnvironment(Environment environment,
                                     Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) {
+        ProcessBuildStep.Terms terms = ProcessBuildStep.Terms.ofEnvironment(environment, "tests");
+        int concurrency = environment.number("test.concurrency", 0);
+        if (concurrency < 0) {
+            throw new IllegalArgumentException("jenesis.test.concurrency is " + concurrency
+                    + ", but names how many test runs execute at once: 0 or more, 0 bounding them by"
+                    + " jenesis.process.concurrency alone");
+        } else if (concurrency > 0) {
+            terms = terms.permits(Permits.compound(PERMITS.computeIfAbsent(concurrency, Permits::of), terms.permits()));
+        }
         return new TestModule(null,
                 List.of(),
                 defaultIsTest(),
@@ -104,7 +115,7 @@ public class TestModule implements BuildExecutorModule {
                 "main",
                 List.of(),
                 incrementalDigest(environment.getProperty("test.incremental")),
-                ProcessBuildStep.Terms.ofEnvironment(environment, "tests"),
+                terms,
                 environment.flag("test.skip"));
     }
 
@@ -646,6 +657,33 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 incrementalDigest,
                 terms,
+                skip);
+    }
+
+    public TestModule permits(Permits permits) {
+        return new TestModule(framework,
+                frameworks,
+                isTest,
+                factory,
+                resolvers,
+                dependencies,
+                jarsOnly,
+                requireFramework,
+                pinning,
+                pathPlacement,
+                moduleName,
+                filter,
+                exclude,
+                tag,
+                engines,
+                scan,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                incrementalDigest,
+                terms.permits(permits),
                 skip);
     }
 

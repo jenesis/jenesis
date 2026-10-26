@@ -33,8 +33,8 @@ Layout
     |   |-- module-info.java     @jenesis.test; requires demo.suite
     |   `-- META-INF/build.jenesis/
     |       |-- test.properties          scan=demo.suite
-    |       `-- process-test.properties  -Ddemo.mode\=fast=
-    |-- slow/                    the same, with -Ddemo.mode\=slow=
+    |       `-- process-test.properties  -Ddemo.mode=fast
+    |-- slow/                    the same, with -Ddemo.mode=slow
     `-- maven/                   the same project as a pom.xml build
 
 There is no `pom.xml` at the root, so every `module-info.java` is a module of
@@ -74,8 +74,8 @@ The same tests, run twice
 `fast` and `slow` differ only in their `process-test.properties`, which `javac-arguments`
 introduced for the compiler:
 
-    fast/META-INF/build.jenesis/process-test.properties   -Ddemo.mode\=fast=
-    slow/META-INF/build.jenesis/process-test.properties   -Ddemo.mode\=slow=
+    fast/META-INF/build.jenesis/process-test.properties   -Ddemo.mode=fast
+    slow/META-INF/build.jenesis/process-test.properties   -Ddemo.mode=slow
 
 Each module runs the test JVM with its own flags, its own `environment-test.properties`
 and its own reports, and is selected, cached and skipped on its own. A run on
@@ -84,6 +84,26 @@ module that scans the module whose tests it repeats. The tests of a module with
 main code are a module of their own already, `@jenesis.test <module>`, which a
 sibling requires and scans in the same way; when that test module is not
 abstract, its tests also run once as they are.
+
+One test run at a time
+----------------------
+
+`fast` and `slow` test in parallel, each in a JVM of its own. Tests that share
+something outside their JVM - a database, a port, a file - cannot run that way.
+`jenesis.test.concurrency` caps how many test runs execute at once across the
+build:
+
+    java -Djenesis.test.concurrency=1 -Djenesis.print.tests=true build/jenesis/Make.java
+
+With `1`, one module starts its tests only once the other is done, as Maven runs
+one module after another. Compiling, packaging and every other step keep running
+in parallel; only the test runs wait for one another. A project whose tests
+always share such a resource sets the key in its `jenesis.properties`:
+
+    jenesis.test.concurrency=1
+
+The default, `0`, leaves test runs bounded by `jenesis.process.concurrency`
+alone, which caps every tool the build runs.
 
 The pom.xml build
 -----------------

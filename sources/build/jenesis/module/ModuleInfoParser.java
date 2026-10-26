@@ -4,6 +4,7 @@ import module java.base;
 import module jdk.compiler;
 import build.jenesis.ModuleGraph;
 import build.jenesis.Platform;
+import build.jenesis.Resolver;
 import com.sun.source.doctree.LiteralTree;
 import javax.lang.model.SourceVersion;
 import javax.tools.ToolProvider;
@@ -143,7 +144,7 @@ public class ModuleInfoParser {
                                             + " A tag owns every line below it until the next tag, so prose written"
                                             + " under a pin becomes part of that pin; move it above the tag block");
                                 }
-                                String key = expand("jenesis.pin", token);
+                                String key = Resolver.pinKey(expand("jenesis.pin", token), version);
                                 if (guard == null) {
                                     versions.put(key, version);
                                 } else {

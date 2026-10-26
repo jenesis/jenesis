@@ -84,6 +84,11 @@ public interface MavenRepository extends Repository {
                     Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
                 } catch (AtomicMoveNotSupportedException _) {
                     Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+                } catch (AccessDeniedException e) {
+                    Files.deleteIfExists(temporary);
+                    if (!Files.exists(target)) {
+                        throw e;
+                    }
                 }
                 return Optional.of(RepositoryItem.ofFile(target));
             }

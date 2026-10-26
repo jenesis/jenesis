@@ -12,12 +12,14 @@ public interface Resolver extends Serializable {
                boolean internal,
                boolean verifiable,
                String version,
-               SequencedMap<String, String> entries) implements Serializable {
+               SequencedMap<String, String> entries,
+               SequencedMap<String, Resolved> poms) implements Serializable {
     }
 
     record Resolution(SequencedMap<String, Resolved> artifacts,
                       List<Edge> edges,
-                      SequencedMap<String, Vertex> vertices) {
+                      SequencedMap<String, Vertex> vertices,
+                      SequencedMap<String, Resolved> poms) {
     }
 
     record Edge(String parent, String coordinate, String version, String scope, boolean followed) {
@@ -63,7 +65,8 @@ public interface Resolver extends Serializable {
                 resolved.internal(),
                 true,
                 version,
-                bomEntries(SequencedProperties.ofFiles(resolved.file())));
+                bomEntries(SequencedProperties.ofFiles(resolved.file())),
+                new LinkedHashMap<>());
     }
 
     static SequencedMap<String, String> bomEntries(SequencedProperties properties) {
@@ -98,9 +101,34 @@ public interface Resolver extends Serializable {
                 }
                 expanded = key;
             }
-            entries.put(expanded, value);
+            entries.put(pinKey(expanded, value), value);
         }
         return entries;
+    }
+
+    static boolean pom(String coordinate) {
+        String[] segments = coordinate.split("/");
+        return segments.length == 4 && segments[2].equals("pom");
+    }
+
+    static String pinKey(String key, String value) {
+        int space = value.indexOf(' ');
+        String[] segments = key.split("/");
+        return space > 0
+                && segments.length > 3
+                && segments[segments.length - 1].equals("pom")
+                && segments[segments.length - 4].equals("maven")
+                ? key + "/" + value.substring(0, space)
+                : key;
+    }
+
+    static String pinToken(String key) {
+        String[] segments = key.split("/");
+        return segments.length > 4
+                && segments[segments.length - 2].equals("pom")
+                && segments[segments.length - 5].equals("maven")
+                ? key.substring(0, key.lastIndexOf('/'))
+                : key;
     }
 
     static String base(String prefix) {
@@ -195,7 +223,7 @@ public interface Resolver extends Serializable {
                 edges.add(new Edge(null, coordinate, null, null, true));
                 vertices.put(coordinate, new Vertex(null, null, false, artifacts.get(coordinate).internal(), List.of()));
             });
-            return new Resolution(artifacts, edges, vertices);
+            return new Resolution(artifacts, edges, vertices, new LinkedHashMap<>());
         };
     }
 }

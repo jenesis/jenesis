@@ -1038,11 +1038,80 @@ public class MavenPomResolverTest {
                 null);
         assertThat(dependencies).containsExactly(
                 Map.entry(
-                        new MavenDependencyKey("other", "artifact", "jar", null),
+                        new MavenDependencyKey("transitive", "artifact", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)),
                 Map.entry(
-                        new MavenDependencyKey("transitive", "artifact", "jar", null),
+                        new MavenDependencyKey("other", "artifact", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
+    }
+
+    @Test
+    public void breaks_a_tie_at_one_depth_by_the_own_dependencies_before_the_inherited_ones_as_maven_does() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>parent</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>own</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("parent", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>inherited</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        for (String[] declaration : List.of(new String[]{"own", "1"}, new String[]{"inherited", "2"})) {
+            addToRepository(declaration[0], "artifact", "1", """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                        <modelVersion>4.0.0</modelVersion>
+                        <dependencies>
+                            <dependency>
+                                <groupId>shared</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>%s</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                    """.formatted(declaration[1]));
+        }
+        for (String version : List.of("1", "2")) {
+            addToRepository("shared", "artifact", version, """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                        <modelVersion>4.0.0</modelVersion>
+                    </project>
+                    """);
+        }
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+                Runnable::run,
+                mavenRepository,
+                "group",
+                "artifact",
+                "1",
+                null);
+        assertThat(dependencies.get(new MavenDependencyKey("shared", "artifact", "jar", null)).version())
+                .as("Maven's effective POM lists a module's own dependencies before those of its parent, so at one"
+                        + " depth the version an own dependency names wins")
+                .isEqualTo("1");
     }
 
     @Test
@@ -4379,34 +4448,6 @@ public class MavenPomResolverTest {
     }
 
     @Test
-    public void multiple_checksum_comments_on_one_dependency_fail() throws IOException {
-        Files.writeString(project.resolve("pom.xml"), """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>project</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>group</groupId>
-                                <artifactId>artifact</artifactId>
-                                <version>1</version>
-                                <!--Checksum/SHA256/cafebabe-->
-                                <!--Checksum/SHA256/deadbeef-->
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                </project>
-                """);
-        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Multiple Checksum/* comments")
-                .hasMessageContaining("group:artifact:1");
-    }
-
-    @Test
     public void names_a_dependency_a_local_pom_declares_twice_and_keeps_the_second_as_maven_does() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -4842,77 +4883,6 @@ public class MavenPomResolverTest {
     }
 
     @Test
-    public void local_pom_dependency_management_checksum_is_honored() throws IOException {
-        Files.writeString(project.resolve("pom.xml"), """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>project</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>group</groupId>
-                                <artifactId>artifact</artifactId>
-                                <version>1</version>
-                                <!--Checksum/SHA256/cafebabe-->
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>group</groupId>
-                            <artifactId>artifact</artifactId>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """);
-        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
-        MavenLocalPom pom = poms.get(Path.of(""));
-        assertThat(pom.dependencies().get(new MavenDependencyKey("group", "artifact", "jar", null)).checksum())
-                .isEqualTo("SHA256/cafebabe");
-    }
-
-    @Test
-    public void local_pom_dependency_management_checksum_of_a_property_version_applies_only_to_the_version_it_names() throws IOException {
-        for (String version : List.of("1", "2")) {
-            Files.writeString(project.resolve("pom.xml"), """
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <project xmlns="http://maven.apache.org/POM/4.0.0">
-                        <modelVersion>4.0.0</modelVersion>
-                        <groupId>project</groupId>
-                        <artifactId>artifact</artifactId>
-                        <version>1</version>
-                        <properties>
-                            <managed.version>%s</managed.version>
-                        </properties>
-                        <dependencyManagement>
-                            <dependencies>
-                                <dependency>
-                                    <groupId>group</groupId>
-                                    <artifactId>artifact</artifactId>
-                                    <version>${managed.version}</version>
-                                    <!--Checksum/SHA256/cafebabe 1-->
-                                </dependency>
-                            </dependencies>
-                        </dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>group</groupId>
-                                <artifactId>artifact</artifactId>
-                            </dependency>
-                        </dependencies>
-                    </project>
-                    """.formatted(version));
-            SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
-            assertThat(poms.get(Path.of("")).dependencies().get(new MavenDependencyKey("group", "artifact", "jar", null)).checksum())
-                    .as("a checksum pinned for version 1 applies while the property names 1, and to no other version")
-                    .isEqualTo(version.equals("1") ? "SHA256/cafebabe" : null);
-        }
-    }
-
-    @Test
     public void local_pom_dependency_management_wins_over_a_parent_entry_naming_the_artifact_by_a_property() throws IOException {
         Path subproject = Files.createDirectory(project.resolve("subproject"));
         Files.writeString(project.resolve("pom.xml"), """
@@ -4956,8 +4926,7 @@ public class MavenPomResolverTest {
                             <dependency>
                                 <groupId>group</groupId>
                                 <artifactId>artifact</artifactId>
-                                <version>1</version>
-                                <!--Checksum/SHA256/cafebabe-->
+                                <version>2</version>
                             </dependency>
                         </dependencies>
                     </dependencyManagement>
@@ -4972,11 +4941,11 @@ public class MavenPomResolverTest {
                 """);
         SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
         MavenLocalPom pom = poms.get(Path.of("subproject"));
-        assertThat(pom.managedDependencies().get(new MavenDependencyKey("group", "artifact", "jar", null)).checksum())
+        assertThat(pom.managedDependencies().get(new MavenDependencyKey("group", "artifact", "jar", null)).version())
                 .as("the subproject's own entry is the one that manages the artifact the parent names by a property")
-                .isEqualTo("SHA256/cafebabe");
-        assertThat(pom.dependencies().get(new MavenDependencyKey("group", "artifact", "jar", null)).checksum())
-                .isEqualTo("SHA256/cafebabe");
+                .isEqualTo("2");
+        assertThat(pom.dependencies().get(new MavenDependencyKey("group", "artifact", "jar", null)).version())
+                .isEqualTo("2");
     }
 
     @Test
@@ -6110,6 +6079,31 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_reads_every_pin_of_its_pin_comment_a_pom_once_per_version() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>project</artifactId>
+                    <version>1</version>
+                    <!--jenesis.pin
+                    org.example/library 1.0 SHA-256/aa
+                    maven/org.example/library/jar/sources 1.0 SHA-256/bb
+                    maven/org.example/parent/pom 64 SHA-256/cc
+                    maven/org.example/parent/pom 69 SHA-256/dd
+                    -->
+                </project>
+                """);
+        assertThat(mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of("")).qualifiedDependencies())
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        "main/maven/org.example/library", "1.0 SHA-256/aa",
+                        "main/maven/org.example/library/jar/sources", "1.0 SHA-256/bb",
+                        "main/maven/org.example/parent/pom/64", "64 SHA-256/cc",
+                        "main/maven/org.example/parent/pom/69", "69 SHA-256/dd"));
+    }
+
+    @Test
     public void local_pom_reads_plugin_comment_block() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -6593,10 +6587,10 @@ public class MavenPomResolverTest {
         assertThat(pom.version()).isEqualTo("1");
         assertThat(pom.dependencies()).containsExactly(
                 Map.entry(
-                        new MavenDependencyKey("group", "parent", "jar", null),
+                        new MavenDependencyKey("group", "artifact", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)),
                 Map.entry(
-                        new MavenDependencyKey("group", "artifact", "jar", null),
+                        new MavenDependencyKey("group", "parent", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
         assertThat(pom.managedDependencies()).containsExactly(
                 Map.entry(
@@ -6672,10 +6666,10 @@ public class MavenPomResolverTest {
         assertThat(pom.version()).isEqualTo("1");
         assertThat(pom.dependencies()).containsExactly(
                 Map.entry(
-                        new MavenDependencyKey("group", "parent", "jar", null),
+                        new MavenDependencyKey("group", "artifact", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)),
                 Map.entry(
-                        new MavenDependencyKey("group", "artifact", "jar", null),
+                        new MavenDependencyKey("group", "parent", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
         assertThat(pom.managedDependencies()).containsExactly(
                 Map.entry(
@@ -7437,50 +7431,6 @@ public class MavenPomResolverTest {
     }
 
     @Test
-    public void first_party_managed_dep_checksum_propagates_to_resolved_value() throws IOException {
-        addToRepository("other", "artifact", "1", """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                </project>
-                """);
-        String rootPom = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>other</groupId>
-                                <artifactId>artifact</artifactId>
-                                <version>1</version>
-                                <!--Checksum/SHA256/cafebabe-->
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>other</groupId>
-                            <artifactId>artifact</artifactId>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """;
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> deps = mavenPomResolver.dependencies(
-                Runnable::run,
-                mavenRepository,
-                List.of(new MavenResolver.RootPom(new ByteArrayInputStream(rootPom.getBytes(StandardCharsets.UTF_8)))),
-                Map.of(),
-                MavenDependencyScope.COMPILE,
-                "main").dependencies();
-        assertThat(deps.get(new MavenDependencyKey("other", "artifact", "jar", null)).checksum())
-                .isEqualTo("SHA256/cafebabe");
-    }
-
-    @Test
     public void inline_version_still_enforces_a_managed_checksum() throws IOException {
         addToRepository("other", "artifact", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -7777,50 +7727,6 @@ public class MavenPomResolverTest {
                 """);
         assertThatCode(() -> mavenPomResolver.dependencies(
                 Runnable::run, mavenRepository, "group", "artifact", "1", null)).doesNotThrowAnyException();
-    }
-
-    @Test
-    public void first_party_bom_import_checksum_mismatch_fails_resolution() throws IOException {
-        addToRepository("bom", "artifact", "1", """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>bom</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                    <packaging>pom</packaging>
-                </project>
-                """);
-        String rootPom = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>group</groupId>
-                    <artifactId>artifact</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>bom</groupId>
-                                <artifactId>artifact</artifactId>
-                                <version>1</version>
-                                <type>pom</type>
-                                <scope>import</scope>
-                                <!--Checksum/SHA-256/cafebabe-->
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                </project>
-                """;
-        assertThatThrownBy(() -> mavenPomResolver.dependencies(
-                Runnable::run,
-                mavenRepository,
-                List.of(new MavenResolver.RootPom(new ByteArrayInputStream(rootPom.getBytes(StandardCharsets.UTF_8)))),
-                Map.of(),
-                MavenDependencyScope.COMPILE,
-                "main"))
-                .hasStackTraceContaining("Mismatched POM checksum")
-                .hasStackTraceContaining("bom:artifact:1");
     }
 
     @Test

@@ -2,6 +2,7 @@ package build.jenesis.test;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.HashDigestFunction;
 import build.jenesis.HashFunction;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -11,6 +12,43 @@ public class HashFunctionTest {
 
     @TempDir
     private Path folder;
+
+    @Test
+    public void hashes_a_file_reached_through_several_links_once() throws IOException {
+        Assumptions.assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        Path file = Files.writeString(folder.resolve("foo"), "bar"), link = Files.createLink(folder.resolve("qux"), file);
+        AtomicInteger hashed = new AtomicInteger();
+        HashFunction hash = HashFunction.ofFileKeys(counted(hashed));
+        assertThat(hash.hash(link)).isEqualTo(hash.hash(file)).isEqualTo(new HashDigestFunction("MD5").hash(file));
+        assertThat(hashed)
+                .as("links share their contents, so a build reads the file behind them once")
+                .hasValue(1);
+    }
+
+    @Test
+    public void hashes_a_file_without_a_second_link_every_time() throws IOException {
+        Path file = Files.writeString(folder.resolve("foo"), "bar");
+        AtomicInteger hashed = new AtomicInteger();
+        HashFunction hash = HashFunction.ofFileKeys(counted(hashed));
+        hash.hash(file);
+        hash.hash(file);
+        assertThat(hashed)
+                .as("a file with one link can be replaced by another reusing its inode, so it is read again")
+                .hasValue(2);
+    }
+
+    @Test
+    public void hashes_a_linked_file_again_once_it_changed() throws IOException {
+        Assumptions.assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        Path file = Files.writeString(folder.resolve("foo"), "bar");
+        Files.createLink(folder.resolve("qux"), file);
+        AtomicInteger hashed = new AtomicInteger();
+        HashFunction hash = HashFunction.ofFileKeys(counted(hashed));
+        hash.hash(file);
+        Files.writeString(file, "barbaz");
+        assertThat(hash.hash(file)).isEqualTo(new HashDigestFunction("MD5").hash(file));
+        assertThat(hashed).hasValue(2);
+    }
 
     @Test
     public void can_write_file_and_read_file() throws IOException {
@@ -53,5 +91,13 @@ public class HashFunctionTest {
                 .hasMessageContaining("foo")
                 .hasMessageContaining(Path.of("..", "missing").toString())
                 .hasMessageContaining("symbolic link");
+    }
+
+    private static HashFunction counted(AtomicInteger hashed) {
+        HashFunction digest = new HashDigestFunction("MD5");
+        return file -> {
+            hashed.incrementAndGet();
+            return digest.hash(file);
+        };
     }
 }

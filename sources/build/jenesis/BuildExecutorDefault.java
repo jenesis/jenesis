@@ -13,7 +13,8 @@ class BuildExecutorDefault implements BuildExecutor {
 
     private final Path target;
     private final Duration timeout;
-    private final HashDigestFunction hash;
+    private final String algorithm;
+    private final HashFunction hash;
     private final BuildStepHashFunction stepHash;
     private final BuildExecutorCallback callback;
     private final BuildExecutorCache cache;
@@ -27,7 +28,8 @@ class BuildExecutorDefault implements BuildExecutor {
 
     BuildExecutorDefault(Path target,
                          Duration timeout,
-                         HashDigestFunction hash,
+                         String algorithm,
+                         HashFunction hash,
                          BuildStepHashFunction stepHash,
                          BuildExecutorCallback callback,
                          BuildExecutorCache cache,
@@ -38,6 +40,7 @@ class BuildExecutorDefault implements BuildExecutor {
                          Map<String, StepSummary> inherited) throws IOException {
         this.target = Files.isDirectory(target) ? target : Files.createDirectory(target);
         this.timeout = timeout;
+        this.algorithm = algorithm;
         this.hash = hash;
         this.stepHash = stepHash;
         this.callback = callback;
@@ -140,8 +143,8 @@ class BuildExecutorDefault implements BuildExecutor {
                     arguments.put(entry.getKey(), new BuildStepArgument(
                             entry.getValue().folder(),
                             consistent && checksums != null && Files.exists(checksums)
-                                    ? Checksum.diff(HashFunction.read(checksums), argumentChecksums, hash)
-                                    : Checksum.added(argumentChecksums, hash)));
+                                    ? Checksum.diff(HashFunction.read(checksums), argumentChecksums, algorithm)
+                                    : Checksum.added(argumentChecksums, algorithm)));
                 }
                 SequencedMap<String, Set<Path>> vanished = consistent
                         ? previous.vanished(recorded, summaries.keySet())
@@ -256,7 +259,7 @@ class BuildExecutorDefault implements BuildExecutor {
                                                     inputs,
                                                     cacheRemotely,
                                                     previous.output(),
-                                                    hash.algorithm(),
+                                                    algorithm,
                                                     checksums);
                                         } catch (IOException _) {
                                         }
@@ -361,6 +364,7 @@ class BuildExecutorDefault implements BuildExecutor {
                     }
                     BuildExecutorDefault buildExecutor = new BuildExecutorDefault(target.resolve(prefix),
                             timeout,
+                            algorithm,
                             hash,
                             stepHash,
                             callback,

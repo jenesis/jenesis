@@ -328,17 +328,37 @@ public class DependenciesMavenBomTest {
     }
 
     @Test
-    public void strict_pinning_accepts_hashless_maven_bom_reference() throws IOException {
+    public void strict_pinning_accepts_a_hashless_maven_bom_reference_whose_pom_is_pinned() throws IOException {
+        String pom = """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                </project>
+                """;
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("main/maven/org.acme/platform-bom/pom/1.0", "1.0 " + new HashDigestFunction("SHA-256")
+                .encodedHash(Files.writeString(root.resolve("platform-bom.pom"), pom)));
+        versions.store(dependencies.resolve(BuildStep.VERSIONS));
         apply(new Dependencies(
+                Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", pom))),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT));
+    }
+
+    @Test
+    public void strict_pinning_names_the_pom_of_a_maven_bom_reference_without_a_pin() throws IOException {
+        SequencedProperties boms = new SequencedProperties();
+        boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
+        boms.store(dependencies.resolve(BuildStep.BOMS));
+        assertThatThrownBy(() -> apply(new Dependencies(
                 Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
                         <project xmlns="http://maven.apache.org/POM/4.0.0">
                             <modelVersion>4.0.0</modelVersion>
                         </project>
                         """))),
-                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT));
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT)))
+                .hasStackTraceContaining("No checksum pinned for maven/org.acme/platform-bom/pom/1.0");
     }
 
     @Test

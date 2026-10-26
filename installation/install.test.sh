@@ -82,6 +82,24 @@ release released || fail "installing release ${VERSION}: $(cat "$TMP/released.lo
 builds released || fail "a project on release ${VERSION} does not build: $(cat "$TMP/released.build.log")"
 pass "installs release ${VERSION} from its sources jar, and the project builds"
 
+# --- a release whose sources jar does not match its checksum ----------------
+
+mkdir -p "$TMP/corrupt" "$TMP/repository/build/jenesis/build.jenesis/9.9.9"
+printf 'not the published jar' > "$TMP/repository/build/jenesis/build.jenesis/9.9.9/build.jenesis-9.9.9-sources.jar"
+printf '0000000000000000000000000000000000000000000000000000000000000000' \
+    > "$TMP/repository/build/jenesis/build.jenesis/9.9.9/build.jenesis-9.9.9-sources.jar.sha256"
+REPOSITORY="$TMP/repository"
+if command -v cygpath >/dev/null 2>&1; then
+    REPOSITORY="/$(cygpath -m "$REPOSITORY")"
+fi
+if env JENESIS_TARGET="$TMP/corrupt" JENESIS_VERSION=9.9.9 JENESIS_MAVEN_URI="file://$REPOSITORY/" \
+    bash "$SCRIPT" >"$TMP/corrupt.log" 2>&1; then
+    fail "installed a sources jar that does not match its checksum"
+fi
+grep -q "SHA-256 checksum" "$TMP/corrupt.log" || fail "refusing the jar did not say why: $(cat "$TMP/corrupt.log")"
+[ ! -e "$TMP/corrupt/build/jenesis" ] || fail "a sources jar that does not match its checksum was installed"
+pass "refuses a sources jar that does not match its checksum"
+
 # --- auto does not reach for a submodule ------------------------------------
 
 scaffold auto

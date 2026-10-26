@@ -9,280 +9,6 @@
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
     </properties>
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>com.beust</groupId>
-                <artifactId>jcommander</artifactId>
-                <version>1.78</version>
-                <!--Checksum/SHA-256/7891debb84b5f83e9bd57593ebece3399abbe0fd938cf306b3534c57913b9615-->
-            </dependency>
-            <dependency>
-                <groupId>com.github.javaparser</groupId>
-                <artifactId>javaparser-core</artifactId>
-                <version>3.25.6</version>
-                <!--Checksum/SHA-256/5880547a277f3f875b3a9ec09d8777f7cf1545ca815bd8b2ad83ffab58f3c57b-->
-            </dependency>
-            <dependency>
-                <groupId>com.thoughtworks.qdox</groupId>
-                <artifactId>qdox</artifactId>
-                <version>1.12.1</version>
-                <!--Checksum/SHA-256/21fba22f830e9268f07cf4ab2d99e8181abbdcb0cb91ee0228eb3cb918dcdd1d-->
-            </dependency>
-            <dependency>
-                <groupId>dev.gradleplugins</groupId>
-                <artifactId>gradle-api</artifactId>
-                <version>8.11.1</version>
-                <!--Checksum/SHA-256/6f4658c280ce4d63a7fe269d94332604449c95a6d2181949e4f6809ac010f871-->
-            </dependency>
-            <dependency>
-                <groupId>info.picocli</groupId>
-                <artifactId>picocli</artifactId>
-                <version>4.6.3</version>
-                <!--Checksum/SHA-256/b0a5159e926de8084ff066025142270443533656bc599b8bb31d14d11fd138a4-->
-            </dependency>
-            <dependency>
-                <groupId>jline</groupId>
-                <artifactId>jline</artifactId>
-                <version>2.14.6</version>
-                <!--Checksum/SHA-256/97d1acaac82409be42e622d7a54d3ae9d08517e8aefdea3d2ba9791150c2f02d-->
-            </dependency>
-            <dependency>
-                <groupId>junit</groupId>
-                <artifactId>junit</artifactId>
-                <version>4.13.2</version>
-                <!--Checksum/SHA-256/8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3-->
-            </dependency>
-            <dependency>
-                <groupId>org.apache.ant</groupId>
-                <artifactId>ant</artifactId>
-                <version>1.10.14</version>
-                <!--Checksum/SHA-256/4cbbd9243de4c1042d61d9a15db4c43c90ff93b16d78b39481da1c956c8e9671-->
-            </dependency>
-            <dependency>
-                <groupId>org.apache.ant</groupId>
-                <artifactId>ant-antlr</artifactId>
-                <version>1.10.14</version>
-                <!--Checksum/SHA-256/d737deb5b0992f691bffe94076695a77523e1e3b5d524b465f90d93e2d8ed7a2-->
-            </dependency>
-            <dependency>
-                <groupId>org.apache.ant</groupId>
-                <artifactId>ant-junit</artifactId>
-                <version>1.10.14</version>
-                <!--Checksum/SHA-256/a3b535d3d549f1850a8917a7c2bfdf364fffb79d527267db30a129475ca2faf8-->
-            </dependency>
-            <dependency>
-                <groupId>org.apache.ant</groupId>
-                <artifactId>ant-launcher</artifactId>
-                <version>1.10.14</version>
-                <!--Checksum/SHA-256/f0909725a7a24e393888f3fbb558347abf506ce2f7ebc581ff26331b94d951a5-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/c92c92c4b9b183f9981ba7399f36592e5e3ad6f4cdac7101b5a22cc17998d13f-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-ant</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/243086aba6ad859a107f20c2f5db40861c478cc676cd31e9f1fb3eb60a0a4208-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-astbuilder</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/abc32356f26938dba6a6a2fb63db0f3ffc3afe5774c63deeb55dcbd6d8308744-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-cli-picocli</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/49d5c158ec4ffffcaf9b8af2d7600a7d8a10050e66ec77f409f4c1bdf9bd5d1c-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-console</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/16160addea093246b836f47b366a68008f4d1d5d297fbf8eee2ea06776931bd1-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-datetime</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/a9b221c1abb073ca6c51685bac6038ea1b5242076f2ee895b5e7a0fe3b9574dc-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-docgenerator</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/3c780ae661ceab3065e7cd0f157e97c03868ddaa97461c97ee0500075bc050f8-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-groovydoc</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/2f2eab5938fb089f669a4a79f4233db3b19bc538fefbbcd894f0a9ce22bd75d1-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-groovysh</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/ec6a42a51f787dad8058d829da281f1d0dd00b1d04b186d1e8bcaa322e612011-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-jmx</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/18f8e45da1fa81e5bb9d503199fb3c080e254d5bac7f3cba026b1cb29fbe07ce-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-json</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/5dceb17bd9085c76563b56eb7bdec414e83f388dcb79965e942580abf2780329-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-jsr223</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/571b43ab268119f4cf9b005755486c3c3a560e301e9fa311bce95099cdd23229-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-macro</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/5012ac70ec41e364979db96bcaea2db4a050e20dbc397d280eaa57d2fc894ba2-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-nio</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/5f47a9a64f7ccdceae0cb4c95ad382fea56b6130a67399d811cea9dbd8ce68a3-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-servlet</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/6ae56ffc06ab02c207ae0d3ac34eec1cfc4ad8bd9dd8d2f29e0fd4c57afce218-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-sql</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/ab74306c2ed9cf0ea20953a70d394b2ad622145ef710dbdb71a010ab52a6776c-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-swing</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/33d3bc07bf380b4f3220f6255aa589bca9c405b9457f07e23b2be0ee13121d88-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-templates</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/1f71909b4bfd7bd3741c4e54d125103d4509e71ad0974692913879f45ea01873-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-test</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/7d156e091159613f477a68481de5324988bb35a08e1b93449d177e08727ed4c9-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-test-junit5</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/c93331d8c5e36e927464f5e5aa00974f2035a51c48273f65efd7326b73a84f08-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-testng</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/8706a372b272a0821a48db314bcd6844005dc1dd884ecbadf27cb8bdf1d304c3-->
-            </dependency>
-            <dependency>
-                <groupId>org.codehaus.groovy</groupId>
-                <artifactId>groovy-xml</artifactId>
-                <version>3.0.22</version>
-                <!--Checksum/SHA-256/b7f6d5c6dd552b24d8e66ce8cdd0403e1a3a9bbb7c4229a1afc00d8e54624862-->
-            </dependency>
-            <dependency>
-                <groupId>org.hamcrest</groupId>
-                <artifactId>hamcrest-core</artifactId>
-                <version>1.3</version>
-                <!--Checksum/SHA-256/66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9-->
-            </dependency>
-            <dependency>
-                <groupId>org.jetbrains.kotlin</groupId>
-                <artifactId>kotlin-stdlib</artifactId>
-                <version>2.0.20</version>
-                <!--Checksum/SHA-256/fb169596659a518357c4b2c16f43dc75ab1c4980565ed4b4a317a050e5e39006-->
-            </dependency>
-            <dependency>
-                <groupId>org.jetbrains</groupId>
-                <artifactId>annotations</artifactId>
-                <version>13.0</version>
-                <!--Checksum/SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478-->
-            </dependency>
-            <dependency>
-                <groupId>org.junit.jupiter</groupId>
-                <artifactId>junit-jupiter-api</artifactId>
-                <version>5.9.2</version>
-                <!--Checksum/SHA-256/f767a170f97127b0ad3582bf3358eabbbbe981d9f96411853e629d9276926fd5-->
-            </dependency>
-            <dependency>
-                <groupId>org.junit.jupiter</groupId>
-                <artifactId>junit-jupiter-engine</artifactId>
-                <version>5.9.2</version>
-                <!--Checksum/SHA-256/74cfc49388f760413ff348ca2c9ab39527484b57deecd157f2275a5f8a5fe971-->
-            </dependency>
-            <dependency>
-                <groupId>org.junit.platform</groupId>
-                <artifactId>junit-platform-commons</artifactId>
-                <version>1.9.2</version>
-                <!--Checksum/SHA-256/624a3d745ef1d28e955a6a67af8edba0fdfc5c9bad680a73f67a70bb950a683d-->
-            </dependency>
-            <dependency>
-                <groupId>org.junit.platform</groupId>
-                <artifactId>junit-platform-engine</artifactId>
-                <version>1.9.2</version>
-                <!--Checksum/SHA-256/25f23dc535a091e9dc80c008faf29dcb92be902e6911f77a736fbaf019908367-->
-            </dependency>
-            <dependency>
-                <groupId>org.junit.platform</groupId>
-                <artifactId>junit-platform-launcher</artifactId>
-                <version>1.9.2</version>
-                <!--Checksum/SHA-256/eef139eb09c98e9cdd358b6ce4c6cdd59b30c6a88096e369c33ba96e67edf0e4-->
-            </dependency>
-            <dependency>
-                <groupId>org.opentest4j</groupId>
-                <artifactId>opentest4j</artifactId>
-                <version>1.2.0</version>
-                <!--Checksum/SHA-256/58812de60898d976fb81ef3b62da05c6604c18fd4a249f5044282479fc286af2-->
-            </dependency>
-            <dependency>
-                <groupId>org.slf4j</groupId>
-                <artifactId>slf4j-api</artifactId>
-                <version>1.7.32</version>
-                <!--Checksum/SHA-256/3624f8474c1af46d75f98bc097d7864a323c81b3808aa43689a6e1c601c027be-->
-            </dependency>
-            <dependency>
-                <groupId>org.testng</groupId>
-                <artifactId>testng</artifactId>
-                <version>7.5</version>
-                <!--Checksum/SHA-256/e549db50dcc421f9501d6af933af15e4fba96617577409d939724cd7e1a25033-->
-            </dependency>
-            <dependency>
-                <groupId>org.webjars</groupId>
-                <artifactId>jquery</artifactId>
-                <version>3.5.1</version>
-                <!--Checksum/SHA-256/83168112220ac912a3dba0eebae90a4da5bf1e24b1bafd401e3d4f9f598bb2cb-->
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
     <dependencies>
         <dependency>
             <groupId>dev.gradleplugins</groupId>
@@ -291,4 +17,105 @@
             <scope>provided</scope>
         </dependency>
     </dependencies>
+    <!--jenesis.pin
+    com.beust/jcommander 1.78 SHA-256/7891debb84b5f83e9bd57593ebece3399abbe0fd938cf306b3534c57913b9615
+    maven/com.beust/jcommander/pom 1.78 SHA-256/6fee231c0aeee6de1256b6b5590ce9e6f6cf6c39797ed668573520bc3412e2a7
+    com.github.javaparser/javaparser-core 3.25.6 SHA-256/5880547a277f3f875b3a9ec09d8777f7cf1545ca815bd8b2ad83ffab58f3c57b
+    maven/com.github.javaparser/javaparser-core/pom 3.25.6 SHA-256/0395a7aaf1bfa3c396df190cc20f2f06bf1b5f4138e65db5ee87a14986b5254c
+    maven/com.github.javaparser/javaparser-parent/pom 3.25.6 SHA-256/f74315e9600a7788525ee5c58f3c9b7a8967d337dff8c27ba1ab50cae5b00a05
+    com.thoughtworks.qdox/qdox 1.12.1 SHA-256/21fba22f830e9268f07cf4ab2d99e8181abbdcb0cb91ee0228eb3cb918dcdd1d
+    maven/com.thoughtworks.qdox/qdox/pom 1.12.1 SHA-256/c52a6616d04efb30c9edeab9ee82b0591e4d04d38e030bf81e250776552d215d
+    dev.gradleplugins/gradle-api 8.11.1 SHA-256/6f4658c280ce4d63a7fe269d94332604449c95a6d2181949e4f6809ac010f871
+    maven/dev.gradleplugins/gradle-api/pom 8.11.1 SHA-256/1cdc51b63acbeb574cd46e232f382326caf009ce6b845d753481d5679964e255
+    info.picocli/picocli 4.6.3 SHA-256/b0a5159e926de8084ff066025142270443533656bc599b8bb31d14d11fd138a4
+    maven/info.picocli/picocli/pom 4.6.3 SHA-256/24150c7dbdc8a5bb987cbeb4898ee1515d2893d3f6224acfc563da1a7fd5c283
+    jline/jline 2.14.6 SHA-256/97d1acaac82409be42e622d7a54d3ae9d08517e8aefdea3d2ba9791150c2f02d
+    maven/jline/jline/pom 2.14.6 SHA-256/1df7b6f08dfb81a268d6b93b659a6a9e389c5d8c32bdf0754238ba6483a4e982
+    junit/junit 4.13.2 SHA-256/8e495b634469d64fb8acfa3495a065cbacc8a0fff55ce1e31007be4c16dc57d3
+    maven/junit/junit/pom 4.13.2 SHA-256/569b6977ee4603c965c1c46c3058fa6e969291b0160eb6964dd092cd89eadd94
+    org.apache.ant/ant 1.10.14 SHA-256/4cbbd9243de4c1042d61d9a15db4c43c90ff93b16d78b39481da1c956c8e9671
+    org.apache.ant/ant-antlr 1.10.14 SHA-256/d737deb5b0992f691bffe94076695a77523e1e3b5d524b465f90d93e2d8ed7a2
+    maven/org.apache.ant/ant-antlr/pom 1.10.14 SHA-256/5bd13036710fedbd37705052fb9ec6ed1348de57219baba5c9535758446b8103
+    org.apache.ant/ant-junit 1.10.14 SHA-256/a3b535d3d549f1850a8917a7c2bfdf364fffb79d527267db30a129475ca2faf8
+    maven/org.apache.ant/ant-junit/pom 1.10.14 SHA-256/64588e5bd5c4f3d8c8879345a6c350a31cc8a79aa8bc126318dcad04be3f3e7a
+    org.apache.ant/ant-launcher 1.10.14 SHA-256/f0909725a7a24e393888f3fbb558347abf506ce2f7ebc581ff26331b94d951a5
+    maven/org.apache.ant/ant-launcher/pom 1.10.14 SHA-256/9c9daa4123e9eb707356793652c388a35510aaa5a6d145b44f855d08dd4b2bbc
+    maven/org.apache.ant/ant-parent/pom 1.10.14 SHA-256/0816106a606788c270efaef21562cfcbd8f4baf7da7c11bce5149eb5661b331f
+    maven/org.apache.ant/ant/pom 1.10.14 SHA-256/2fa4269e6b1c45723a8a88e69d984a766dbb204cd0fe981494ccdf3fee3af65c
+    org.codehaus.groovy/groovy 3.0.22 SHA-256/c92c92c4b9b183f9981ba7399f36592e5e3ad6f4cdac7101b5a22cc17998d13f
+    maven/org.codehaus.groovy/groovy-all/pom 3.0.22 SHA-256/48ac2fd1aa83b63cd5b78c12f292ef188e2ad1eaa87412d64edc20a80221ced4
+    org.codehaus.groovy/groovy-ant 3.0.22 SHA-256/243086aba6ad859a107f20c2f5db40861c478cc676cd31e9f1fb3eb60a0a4208
+    maven/org.codehaus.groovy/groovy-ant/pom 3.0.22 SHA-256/b87cc7b1f65fe5521e2b2a360b65347d8d8b1f43a38c1d90f409ace3387027d3
+    org.codehaus.groovy/groovy-astbuilder 3.0.22 SHA-256/abc32356f26938dba6a6a2fb63db0f3ffc3afe5774c63deeb55dcbd6d8308744
+    maven/org.codehaus.groovy/groovy-astbuilder/pom 3.0.22 SHA-256/b62a813aab04d8c64be73dcdf8c36f0f8610afabb6a7f5871471561e7f2ea9eb
+    org.codehaus.groovy/groovy-cli-picocli 3.0.22 SHA-256/49d5c158ec4ffffcaf9b8af2d7600a7d8a10050e66ec77f409f4c1bdf9bd5d1c
+    maven/org.codehaus.groovy/groovy-cli-picocli/pom 3.0.22 SHA-256/71dfaed714b26d4dc518911345e13f9149190f723b2336d049a76e5a6e992a10
+    org.codehaus.groovy/groovy-console 3.0.22 SHA-256/16160addea093246b836f47b366a68008f4d1d5d297fbf8eee2ea06776931bd1
+    maven/org.codehaus.groovy/groovy-console/pom 3.0.22 SHA-256/6b2807bae91597a653ffb45d3957b59b8b54bcebf790843f00be103344de05f5
+    org.codehaus.groovy/groovy-datetime 3.0.22 SHA-256/a9b221c1abb073ca6c51685bac6038ea1b5242076f2ee895b5e7a0fe3b9574dc
+    maven/org.codehaus.groovy/groovy-datetime/pom 3.0.22 SHA-256/9a458b0eccaa6c8322169d98b6d3dceb981e2ff26b6f2b4bef851a261186da4b
+    org.codehaus.groovy/groovy-docgenerator 3.0.22 SHA-256/3c780ae661ceab3065e7cd0f157e97c03868ddaa97461c97ee0500075bc050f8
+    maven/org.codehaus.groovy/groovy-docgenerator/pom 3.0.22 SHA-256/577225153a5f2d2d1b8241c7207e605e25b52e6591732fdedf1552843c45259f
+    org.codehaus.groovy/groovy-groovydoc 3.0.22 SHA-256/2f2eab5938fb089f669a4a79f4233db3b19bc538fefbbcd894f0a9ce22bd75d1
+    maven/org.codehaus.groovy/groovy-groovydoc/pom 3.0.22 SHA-256/0ce658b2969b714ea4d4e26b9790934fb7b62f6e00cf5adf010ddb9898293684
+    org.codehaus.groovy/groovy-groovysh 3.0.22 SHA-256/ec6a42a51f787dad8058d829da281f1d0dd00b1d04b186d1e8bcaa322e612011
+    maven/org.codehaus.groovy/groovy-groovysh/pom 3.0.22 SHA-256/781b5ca048f4463cf8358546817af72fae33929e066dc9fe12e633c36972bcb8
+    org.codehaus.groovy/groovy-jmx 3.0.22 SHA-256/18f8e45da1fa81e5bb9d503199fb3c080e254d5bac7f3cba026b1cb29fbe07ce
+    maven/org.codehaus.groovy/groovy-jmx/pom 3.0.22 SHA-256/9d52c7ec1d6005058fe5f615184c614c01772913fc39ff95d7cf77d7c564f94b
+    org.codehaus.groovy/groovy-json 3.0.22 SHA-256/5dceb17bd9085c76563b56eb7bdec414e83f388dcb79965e942580abf2780329
+    maven/org.codehaus.groovy/groovy-json/pom 3.0.22 SHA-256/a85625850d352cc3e4f3ce82917de85069032323949c4f510dd39459258ea9c0
+    org.codehaus.groovy/groovy-jsr223 3.0.22 SHA-256/571b43ab268119f4cf9b005755486c3c3a560e301e9fa311bce95099cdd23229
+    maven/org.codehaus.groovy/groovy-jsr223/pom 3.0.22 SHA-256/676f99c84688c3636fb609db579e459d39961adfe1da9366abd7734d0bf38a01
+    org.codehaus.groovy/groovy-macro 3.0.22 SHA-256/5012ac70ec41e364979db96bcaea2db4a050e20dbc397d280eaa57d2fc894ba2
+    maven/org.codehaus.groovy/groovy-macro/pom 3.0.22 SHA-256/267c30bbca73598bf5be9d8a56f0780675d8fcd9812bee5bdcb1e7de9b459dda
+    org.codehaus.groovy/groovy-nio 3.0.22 SHA-256/5f47a9a64f7ccdceae0cb4c95ad382fea56b6130a67399d811cea9dbd8ce68a3
+    maven/org.codehaus.groovy/groovy-nio/pom 3.0.22 SHA-256/4a86edbc4131c60b3109a4919aeb1ab51741ca9bbbb2924d4441c4bf86f8a7e6
+    org.codehaus.groovy/groovy-servlet 3.0.22 SHA-256/6ae56ffc06ab02c207ae0d3ac34eec1cfc4ad8bd9dd8d2f29e0fd4c57afce218
+    maven/org.codehaus.groovy/groovy-servlet/pom 3.0.22 SHA-256/2c4fbd2f77966fdee623ddc7d8be38ab0fc0bd5db990a3a0e52aa58f374733f7
+    org.codehaus.groovy/groovy-sql 3.0.22 SHA-256/ab74306c2ed9cf0ea20953a70d394b2ad622145ef710dbdb71a010ab52a6776c
+    maven/org.codehaus.groovy/groovy-sql/pom 3.0.22 SHA-256/746aae5fe04a2c26c9de26fbaafd448d3f9756e6593691d55bd852eea8c0bc08
+    org.codehaus.groovy/groovy-swing 3.0.22 SHA-256/33d3bc07bf380b4f3220f6255aa589bca9c405b9457f07e23b2be0ee13121d88
+    maven/org.codehaus.groovy/groovy-swing/pom 3.0.22 SHA-256/76bd8e067787424546d74b8581fcd60343bb3b002eaa4886855a6f6ff148eef1
+    org.codehaus.groovy/groovy-templates 3.0.22 SHA-256/1f71909b4bfd7bd3741c4e54d125103d4509e71ad0974692913879f45ea01873
+    maven/org.codehaus.groovy/groovy-templates/pom 3.0.22 SHA-256/3fa54b88fdff37652bdc1e1de7036b1b9e685707f5e2b788954f1f4976510be4
+    org.codehaus.groovy/groovy-test 3.0.22 SHA-256/7d156e091159613f477a68481de5324988bb35a08e1b93449d177e08727ed4c9
+    org.codehaus.groovy/groovy-test-junit5 3.0.22 SHA-256/c93331d8c5e36e927464f5e5aa00974f2035a51c48273f65efd7326b73a84f08
+    maven/org.codehaus.groovy/groovy-test-junit5/pom 3.0.22 SHA-256/d00ff7f262a3acb5c86ac47c303cbd403411b95a7e44a0644d6d37639e16b664
+    maven/org.codehaus.groovy/groovy-test/pom 3.0.22 SHA-256/6860785155a3a171d8f90cf41dea0c6177dd5e22087bd9544e6e6d482c863c1b
+    org.codehaus.groovy/groovy-testng 3.0.22 SHA-256/8706a372b272a0821a48db314bcd6844005dc1dd884ecbadf27cb8bdf1d304c3
+    maven/org.codehaus.groovy/groovy-testng/pom 3.0.22 SHA-256/596d4de9a190e7321239a1a73209bd92e668a3c080cb6acc15e5e565cc8cbdf4
+    org.codehaus.groovy/groovy-xml 3.0.22 SHA-256/b7f6d5c6dd552b24d8e66ce8cdd0403e1a3a9bbb7c4229a1afc00d8e54624862
+    maven/org.codehaus.groovy/groovy-xml/pom 3.0.22 SHA-256/e879ad0e2489ebd0e0806b108ec4bfc966ce34dc5b8bd964c355146887316f1f
+    maven/org.codehaus.groovy/groovy/pom 3.0.22 SHA-256/51b731e5cff121efd6d320f4a801cd616869c5bed4e9c0e353b29060b1d2355f
+    maven/org.codehaus/codehaus-parent/pom 4 SHA-256/6b87237de8c2e1740cf80627c7f3ce3e15de1930bb250c55a1eca94fa3e014df
+    org.hamcrest/hamcrest-core 1.3 SHA-256/66fdef91e9739348df7a096aa384a5685f4e875584cce89386a7a47251c4d8e9
+    maven/org.hamcrest/hamcrest-core/pom 1.3 SHA-256/fde386a7905173a1b103de6ab820727584b50d0e32282e2797787c20a64ffa93
+    maven/org.hamcrest/hamcrest-parent/pom 1.3 SHA-256/6d535f94efb663bdb682c9f27a50335394688009642ba7a9677504bc1be4129b
+    org.jetbrains.kotlin/kotlin-stdlib 2.0.20 SHA-256/fb169596659a518357c4b2c16f43dc75ab1c4980565ed4b4a317a050e5e39006
+    maven/org.jetbrains.kotlin/kotlin-stdlib/pom 2.0.20 SHA-256/0aee962091e7dd0288cc3ca4cf4a928c562071460211bf8f4179009306e619fe
+    org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
+    maven/org.jetbrains/annotations/pom 13.0 SHA-256/965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397
+    org.junit.jupiter/junit-jupiter-api 5.9.2 SHA-256/f767a170f97127b0ad3582bf3358eabbbbe981d9f96411853e629d9276926fd5
+    maven/org.junit.jupiter/junit-jupiter-api/pom 5.9.2 SHA-256/10af60fa690accdcebf394ec58409dcecff1dec370268a670360a115f731c55c
+    org.junit.jupiter/junit-jupiter-engine 5.9.2 SHA-256/74cfc49388f760413ff348ca2c9ab39527484b57deecd157f2275a5f8a5fe971
+    maven/org.junit.jupiter/junit-jupiter-engine/pom 5.9.2 SHA-256/9df38e823e1add9a656acfb959ce73b07004df6c9f7c0367c26b743e656b59af
+    org.junit.platform/junit-platform-commons 1.9.2 SHA-256/624a3d745ef1d28e955a6a67af8edba0fdfc5c9bad680a73f67a70bb950a683d
+    maven/org.junit.platform/junit-platform-commons/pom 1.9.2 SHA-256/24023f20c235a69609fb2f95a60738557fcf9413f3ae92a92e1329547d6145c9
+    org.junit.platform/junit-platform-engine 1.9.2 SHA-256/25f23dc535a091e9dc80c008faf29dcb92be902e6911f77a736fbaf019908367
+    maven/org.junit.platform/junit-platform-engine/pom 1.9.2 SHA-256/2df9420a6b24e5f4f314235e01cd9c3b8f646285db2f6e82d86ee06ef7af4e24
+    org.junit.platform/junit-platform-launcher 1.9.2 SHA-256/eef139eb09c98e9cdd358b6ce4c6cdd59b30c6a88096e369c33ba96e67edf0e4
+    maven/org.junit.platform/junit-platform-launcher/pom 1.9.2 SHA-256/ce9148998a8ef1de67e5a8f44079c03e1752eab52a23a1f76e07a8147f2c198e
+    maven/org.junit/junit-bom/pom 5.9.2 SHA-256/2ed07d65845131f5336a86476c9a4056b59d0b58b9815ab3679bb0f36f35f705
+    org.opentest4j/opentest4j 1.2.0 SHA-256/58812de60898d976fb81ef3b62da05c6604c18fd4a249f5044282479fc286af2
+    maven/org.opentest4j/opentest4j/pom 1.2.0 SHA-256/a96e671816c1ff8803bdec74c9241f025bdfb277da5d2b4ee02266405936f994
+    org.slf4j/slf4j-api 1.7.32 SHA-256/3624f8474c1af46d75f98bc097d7864a323c81b3808aa43689a6e1c601c027be
+    maven/org.slf4j/slf4j-api/pom 1.7.32 SHA-256/001cde5b3c6ba91070425cfe9f2e695e4aeb8bc290a2d4cd96531127ab244fe5
+    maven/org.slf4j/slf4j-parent/pom 1.7.32 SHA-256/5ab349d0f4c7bc08ed0ef1f4d9386cb1940a2f4d6f152150e16dbbecc0b83c70
+    maven/org.sonatype.oss/oss-parent/pom 7 SHA-256/b51f8867c92b6a722499557fc3a1fdea77bdf9ef574722fe90ce436a29559454
+    maven/org.sonatype.oss/oss-parent/pom 9 SHA-256/fb40265f982548212ff82e362e59732b2187ec6f0d80182885c14ef1f982827a
+    org.testng/testng 7.5 SHA-256/e549db50dcc421f9501d6af933af15e4fba96617577409d939724cd7e1a25033
+    maven/org.testng/testng/pom 7.5 SHA-256/a78b246abf12f7bd3fa50736a1b2d7686337222e4bfe4124cd35b3584b1a5821
+    org.webjars/jquery 3.5.1 SHA-256/83168112220ac912a3dba0eebae90a4da5bf1e24b1bafd401e3d4f9f598bb2cb
+    maven/org.webjars/jquery/pom 3.5.1 SHA-256/4fbae081d74852ff2943cd069696a799628ae6df22828b53fa456334104c9878
+    -->
 </project>

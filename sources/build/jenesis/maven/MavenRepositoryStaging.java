@@ -6,7 +6,6 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Environment;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
@@ -14,20 +13,6 @@ import build.jenesis.step.Inventory;
 public class MavenRepositoryStaging implements BuildStep {
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
-
-    private final boolean includeTests;
-
-    public MavenRepositoryStaging() {
-        this(false);
-    }
-
-    public static MavenRepositoryStaging ofEnvironment(Environment environment) {
-        return new MavenRepositoryStaging(environment.flag("stage.tests"));
-    }
-
-    public MavenRepositoryStaging(boolean includeTests) {
-        this.includeTests = includeTests;
-    }
 
     @Override
     public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -72,9 +57,6 @@ public class MavenRepositoryStaging implements BuildStep {
                     continue;
                 }
                 boolean abstractTest = inventory.flag(prefix + ".abstract");
-                if (abstractTest && !includeTests) {
-                    continue;
-                }
                 boolean packaged = !"pom".equals(inventory.value(prefix + ".packaging"));
                 Path artifact = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".artifacts"),
                         prefix,
@@ -117,7 +99,7 @@ public class MavenRepositoryStaging implements BuildStep {
                                 + coordinates.version()
                                 + ")");
                     }
-                } else if (includeTests) {
+                } else {
                     testModules.add(module);
                 }
             }

@@ -185,7 +185,7 @@ public record Project(
                 sub.addModule(ProjectPlugins.POSTPROCESS, project.toolPlugins().postprocess(project.profiles()), "maven");
             }, METADATA);
             SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
-            trees.put("maven", MavenRepositoryStaging.ofEnvironment(project.environment()));
+            trees.put("maven", new MavenRepositoryStaging());
             trees.put("packages", new ImageStaging("package").noFolder(true));
             trees.put("native", new ImageStaging("native").noFolder(true));
             trees.put("docker", new ImageStaging("docker"));
@@ -206,7 +206,7 @@ public record Project(
             executor.addModule(PIN, PinModule.ofEnvironment(project.environment(),
                     project.root(),
                     "pom.xml",
-                    (path, file) -> PinPom.ofEnvironment(project.environment(), "maven", path, List.of(file), project.hashFunction()),
+                    (path, file) -> PinPom.ofEnvironment(project.environment(), path, List.of(file), project.hashFunction()),
                     project.hashFunction()).plugins(project.toolPlugins()), BUILD, RELEASE);
             executor.addModule(PLUGIN, project.toolPlugins().goal(project.profiles()));
             return name -> {
@@ -282,7 +282,7 @@ public record Project(
                 sub.addModule(ProjectPlugins.POSTPROCESS, project.toolPlugins().postprocess(project.profiles()), "modules");
             }, METADATA);
             SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
-            trees.put("modular", ModularStaging.ofEnvironment(project.environment()));
+            trees.put("modular", new ModularStaging());
             trees.put("packages", new ImageStaging("package").noFolder(true));
             trees.put("runtime", new ImageStaging("image"));
             trees.put("layers", new ImageStaging("layers"));
@@ -387,8 +387,8 @@ public record Project(
                 sub.addModule(ProjectPlugins.POSTPROCESS, project.toolPlugins().postprocess(project.profiles()), "modules");
             }, METADATA);
             SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
-            trees.put("maven", MavenRepositoryStaging.ofEnvironment(project.environment()));
-            trees.put("modular", ModularStaging.ofEnvironment(project.environment()));
+            trees.put("maven", new MavenRepositoryStaging());
+            trees.put("modular", new ModularStaging());
             trees.put("packages", new ImageStaging("package").noFolder(true));
             trees.put("runtime", new ImageStaging("image"));
             trees.put("layers", new ImageStaging("layers"));
@@ -1263,6 +1263,7 @@ public record Project(
                       maven.deploy.skip, maven.install.skip
                       as for a module of tests alone       stage=false in packaging.properties: built
                                                            and tested, never staged, so neither
+                                                           archived, documented, packaged,
                                                            exported nor released; the pom.xml
                                                            property itself is not read
 
@@ -1273,14 +1274,16 @@ public record Project(
                     and a flag that takes two arguments has them parted by a tab,
                     `-linkoffline=https\\://example.com/api/\\toffline/api` for javadoc's.
                     A flag that holds a `:` or `=` escapes
-                    it, since a properties file splits there: `-Xlint\\:all=`. A system property is the
-                    one exception and is written as on a command line, `-Dkey=value`, its value a
-                    variable where it differs per run, `-DshardIndex=@shard/0`. The release is not such a
+                    it, since a properties file splits there: `-Xlint\\:all=`. A system property and a
+                    -J option are the exception and are written as on a command line, `-Dkey=value` or
+                    `-J-Dstdout.encoding=UTF-8`, the value a variable where it differs per run,
+                    `-DshardIndex=@shard/0`. The release is not such a
                     flag: a `--release` there is refused, since maven.compiler.release, its testRelease
-                    or @jenesis.release declares it for every tool. javac runs without -g, where
-                    Maven and Gradle pass it, so a test reading parameter or local names needs `-g=`
-                    or `-parameters=`. A plugin may pass flags its configuration never shows, as
-                    a convention plugin adds -parameters or a compiler plugin its own, so compare the
+                    or @jenesis.release declares it for every tool. javac runs with -g, as Maven and
+                    Gradle do, unless a line names a -g of its own, `-g\\:none=` or `-g\\:lines,source=`,
+                    and a test reading parameter names needs `-parameters=`. A plugin may pass flags its
+                    configuration never shows, as a convention plugin adds -parameters or a compiler
+                    plugin its own, so compare the
                     old build's effective javac arguments: `mvn -X compile` prints them after
                     "Command line options:", `gradle compileJava --debug` on its "Compiler
                     arguments:" line. Checkstyle reads a copy of the sources below target/build/,
@@ -1383,16 +1386,10 @@ public record Project(
                     again; -Djenesis.test.skip=true leaves the tests to the next build. It runs
                     last, after `stage` and a dry `release`, so the tool of a release plugin such
                     as JReleaser is resolved and pinned with the rest.
-                    Commit before the first `pin`. It writes the versions and checksums it resolved
-                    into each pom.xml's <dependencyManagement>, updating an entry where it stands and
-                    adding the others at its end; every other entry, an imported BOM, a sibling
-                    module's and a comment, stays as written, a SNAPSHOT is given no checksum, and an
-                    entry `pin` wrote that nothing resolves any longer is dropped. Review that diff. An entry keeps the ${...} its coordinate was written with, and
-                    its version property where that still names the version resolved, so a
-                    classifier an OS profile selects stays selectable. A pinned entry outranks a BOM, as any managed version does,
-                    so it repeats the exclusions and the <scope> the BOM managed for it: to
-                    move to a new BOM version, change it, delete the entries `pin` wrote and pin
-                    again. `pin` resolves what the active profiles build, so run it with every profile
+                    Commit before the first `pin`. It writes the versions and checksums it resolved,
+                    those of every POM read among them, into a <!--jenesis.pin--> comment of each
+                    pom.xml, which changes nothing Maven resolves, and a SNAPSHOT is given no
+                    checksum. Review that diff. `pin` resolves what the active profiles build, so run it with every profile
                     CI builds with, as -Djenesis.make.profiles=release,docker, or a tool only one of
                     them switches on stays unpinned. Then build with -Djenesis.dependency.pin=strict, as CI should. Before retiring the old build, compare what both produce: the jar
                     contents, the dependency tree (`dependencies` against mvn dependency:tree or
@@ -1404,7 +1401,8 @@ public record Project(
                     whose dependencies changed only below their ABI; set it before timing an edit
                     against the old build.
                     A pom.xml resolves a conflict as Maven does, the version nearest the root
-                    winning, where Gradle takes the highest version requested. No setting of
+                    winning and, at one depth, the one declared first, a module's own dependencies
+                    ahead of those it inherits, where Gradle takes the highest version requested. No setting of
                     jenesis.resolver.maven does the latter: latest takes the newest version the
                     repository lists for every dependency, whatever was requested, and a
                     module-info.java build resolves as a pom.xml does. Compare the dependency trees
@@ -1734,13 +1732,14 @@ public record Project(
                           jenesis.project.version names one
                       maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (8, 74),
                           whose jar holds the sources and, as Maven's and Gradle's do, the resources,
-                          including those of -Djenesis.project.resources; set it, and the next one,
+                          including those of -Djenesis.project.resources, for a staged module only;
+                          set it, and the next one,
                           in the profile a release activates, such as jenesis-release.properties,
                           never in jenesis.properties, so that a regular build neither archives the
                           sources nor renders the documentation and nothing waits for either
                       maven-javadoc-plugin / withJavadocJar(), Dokka
                           -> -Djenesis.project.documentation=true (8, 74), which documents
-                          the main modules, a test module only under jenesis.stage.tests, one with a
+                          every staged module, a test module only under jenesis.stage.tests, one with a
                           module-info.java as that module (module-summary.html, its pages below the
                           module's name), as maven-javadoc-plugin and Gradle do; javadoc runs with
                           -Xdoclint:none unless process-javadoc.properties names an -Xdoclint flag,
@@ -2099,7 +2098,9 @@ public record Project(
                           place of its jar on every path, in both modular layouts and for an aliased
                           name as well; a module of this build is selected as :<classifier> alone,
                           resolving to the variant its classifiers.properties declares, and fails
-                          naming the profile or the file to set where it declares none.
+                          naming the profile or the file to set where it declares none. A token
+                          maven/<groupId>/<artifactId>/pom with a checksum pins the POM read at that
+                          version, a line per version read, and selects no version.
                       @jenesis.signature <algo>/<hex> | Sigstore/<host>/<path> <token>... | [<group>/]signature-<name>.properties
                           Declare the OpenPGP key that signs these coordinates' artifacts - the
                           fingerprint first, because one key normally signs many. A Maven token may
@@ -2114,7 +2115,7 @@ public record Project(
                           rejects one that no line covers or that publishes no signature, and the
                           default none verifies nothing, so a consumer who trusts the pins needs no
                           gpg at all. A coordinate's POM is verified with its artifact and must carry
-                          the same signer, which closes the gap that POMs are read but never pinned.
+                          the same signer; the parents and BOMs it reads are covered by their pins.
                           The algorithm unsigned names no key, because there is none to name, and
                           its value says what to do when one turns up: unsigned/missing accepts a
                           coordinate that publishes no signature and fails once one appears, so an
@@ -2306,9 +2307,10 @@ public record Project(
                                                 package into the image instead of the jars, built
                                                 and staged only if jpackage lists it too,
                                                 stage=false to build and test the module but keep
-                                                its jar, POM, sources and documentation out of the
-                                                staged repositories, so neither export nor release
-                                                ships them
+                                                its jar and POM out of the staged repositories and
+                                                assemble no sources, documentation or packages for
+                                                it, so neither export nor release ships them; a test
+                                                module is unstaged unless jenesis.stage.tests is set
                       classifiers.properties    <classifier>=<folder>[,<folder>...] per line, each a
                                                 variant of the module's jar holding its files and
                                                 the files of the folders, named from the module's
@@ -2480,6 +2482,9 @@ public record Project(
                                                        JVMs at once rather than one per processor -
                                                        with many test modules on little memory,
                                                        beside an -Xmx in process-test.properties
+                      -Djenesis.test.concurrency=1     run one module's tests at a time while the
+                                                       rest of the build goes on - for tests that
+                                                       share a database, a port or a file
                       -Djenesis.executor.aggregate     name every failed step at the end rather
                                                        than the first, as Maven's -fae summary
                                                        does; a step that depends on none of them
@@ -2577,16 +2582,17 @@ public record Project(
 
                     Pin external dependencies so every machine resolves the same artifacts, and offer
                     to pin whenever you add or change one. `pin` records resolved versions and
-                    checksums back into pom.xml (<dependencyManagement> with <!--Checksum/<algo>/<hex>-->
-                    and a <!--jenesis.pin ... --> comment) or module-info.java (@jenesis.pin tags),
-                    idempotently, refreshing only the lines matching the local platform. An entry whose
-                    version is a property keeps it, and its checksum names the version it was taken of
-                    (<!--Checksum/SHA-256/<hex> 2.2.20-->), so it applies to no other: pin again after
-                    the property changes. It covers the
+                    checksums back into pom.xml (a <!--jenesis.pin ... --> comment, which changes
+                    nothing Maven resolves) or module-info.java (@jenesis.pin tags), idempotently,
+                    refreshing only the lines matching the local platform. Beside a line per jar it
+                    writes one per POM the resolution read - a dependency's own, every parent, every
+                    imported BOM - as maven/<groupId>/<artifactId>/pom <version> <algo>/<hex>, once per
+                    version read; such a line pins the bytes of that file and selects no version,
+                    which the POM naming it decides. It covers the
                     whole project; to pin one module, name its step (pin/module-foo+bar) rather than
-                    adding +<module>. A pom.xml's main and test halves share one <dependencyManagement>,
-                    so where they resolve a coordinate at different versions its entry takes the
-                    version the pom declares itself, which the other half then resolves as well.
+                    adding +<module>. A pom.xml's main and test halves share one comment, so where
+                    they resolve a coordinate at different versions its line takes the version the
+                    pom declares itself, which the other half then resolves as well.
                     -Djenesis.pin.file=<path> writes the closure of every module's main group to that
                     properties file instead of the declarations, in the grammar @jenesis.bom reads,
                     which is how a local bill of materials is refreshed rather than hand-edited. Only
@@ -2599,7 +2605,8 @@ public record Project(
                     module resolves alone, so nothing makes them agree: pin/divergence reports every
                     coordinate the tree pins at more than one version, which is the signal that a
                     shared version table is overdue. Enforce
-                    coverage with -Djenesis.dependency.pin=strict; refresh with
+                    coverage with -Djenesis.dependency.pin=strict, which fails a resolution reading a
+                    jar or a POM without a pinned checksum; refresh with
                     -Djenesis.dependency.pin=ignore and the `pin` selector. A checksum says the bytes
                     did not change since they were vetted, not who produced them; @jenesis.signature
                     declares the OpenPGP key that signs a coordinate, and -Djenesis.dependency.signature
@@ -3115,6 +3122,21 @@ public record Project(
                     pins.putIfAbsent(segments[0] + "/" + segments[2].substring(0, version),
                             segments[2].substring(version + 1) + (checksum == null ? "" : " " + checksum));
                 }
+                Path poms = argument.folder().resolve(Dependencies.POMS);
+                if (!Files.isRegularFile(poms)) {
+                    continue;
+                }
+                SequencedProperties read = SequencedProperties.ofFiles(poms);
+                for (String key : read.stringPropertyNames()) {
+                    String group = key.substring(0, key.indexOf('/'));
+                    int colon = group.indexOf(':');
+                    if (plugins.contains(colon < 0 ? group : group.substring(0, colon))) {
+                        String value = read.getProperty(key).trim();
+                        int space = value.indexOf(' ');
+                        pins.putIfAbsent(key, key.substring(key.lastIndexOf('/') + 1) + " " + hashFunction.encodedHash(
+                                argument.folder().resolve(space < 0 ? value : value.substring(0, space))));
+                    }
+                }
             }
             if (Files.isRegularFile(file)) {
                 SequencedProperties existing = SequencedProperties.ofFiles(file);
@@ -3200,6 +3222,13 @@ public record Project(
                                 : coordinate;
                     }
                     entries.putIfAbsent(entry, value);
+                }
+                for (Map.Entry<String, Inventory.Dependency> pom : Inventory.poms(arguments.values(), path).entrySet()) {
+                    if (pom.getValue().group().equals("main")) {
+                        String coordinate = pom.getKey().substring("main/".length());
+                        entries.putIfAbsent(coordinate, coordinate.substring(coordinate.lastIndexOf('/') + 1)
+                                + " " + pom.getValue().checksum(hashFunction));
+                    }
                 }
             }
             for (Path other : provided) {
@@ -4712,8 +4741,8 @@ public record Project(
                 project.await||Phases of the modules a module depends on that its build waits for, comma-separated, such as verify for their checks, so that a module builds only once the modules it depends on passed them; by default a build waits for their builds alone, and every phase runs as soon as what it reads is built
                 project.artifacts||Folder resolved dependencies and repository metadata are cached in; a file a project provides names only a folder inside the project
                 project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project, and modular also loads every jar of a plugin jenesis.plugins.properties names by its module as a module, where the others load a jar without a module name on the plugin's class path, and refuses one named by a Maven coordinate
-                project.sources|false|Assemble a sources jar for every module
-                project.documentation|false|Assemble a javadoc jar for every module, a test module only where jenesis.stage.tests stages it
+                project.sources|false|Assemble a sources jar for every staged module
+                project.documentation|false|Assemble a javadoc jar for every staged module
                 documentation.empty|false|Archive that javadoc jar holding nothing but an INTENTIONALLY_EMPTY file instead of rendering the documentation, for a repository such as Maven Central that requires the jar but not its content
                 project.version||Version stamped onto every produced artifact, a module version that starts with a digit; unset leaves modules unversioned and POMs at 0-SNAPSHOT, and an empty value is refused
                 project.tag||SCM tag recorded in the generated POM and SBOM; empty for none
@@ -4831,8 +4860,9 @@ public record Project(
                 test.jars|true|Run the tests against the packaged test jar; false runs them against the module's classes and resources folders instead, as Maven and Gradle do, so a test can read its own resources as files, while the modules it depends on stay jars; a module tested on the module path refuses false
                 test.incremental||Run only the tests a change can reach: true, or the setting named with no value, detects changes with MD5, the name of another message digest with that one, and false runs every test
                 test.parallel|false|Let the engine execute the matched tests concurrently
+                test.concurrency|0|Run at most this many test runs at once across the build, each a forked JVM, while every other step keeps running; 1 runs one module's tests at a time, as Maven does, and 0 leaves them bounded by process.concurrency alone
                 test.reporting|false|Write a test run's reports into the module's reports/tests folder - the legacy JUnit XML and the open-test-reporting XML - and name that folder when the run fails; without it the JUnit Platform writes none
-                stage.tests|false|Stage test-variant artifacts alongside the main ones
+                stage.tests|false|Stage test modules alongside the main ones; a test module is otherwise unstaged, as stage=false leaves a module
                 tree.format|full|full|compact: what the dependencies selector prints
                 tree.merge|true|One tree per module whose every node names the scopes it applies to; false prints one tree per module and scope
                 tree.internal|false|List the project's own modules among the resolved dependencies and count them in the license summary

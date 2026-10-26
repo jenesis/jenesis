@@ -7,14 +7,11 @@
  * tools float their own {@code RELEASE}.
  *
  * @jenesis.release 25
+ * @jenesis.pin maven/org.scala-lang/scala-library/pom 2.13.18 SHA-256/c3fb118214e12399857f4aeaa3033ab8b06f6edbeec9bfe4cb5f0101c034c21d
  * @jenesis.pin org.scala-lang/scala-library 2.13.18 SHA-256/4e85d96ff7bc7dc627985523c3541b9917aaa08e956391380c42db21a2c4e5a0
+ * @jenesis.pin scala.library 2.13.18 SHA-256/4e85d96ff7bc7dc627985523c3541b9917aaa08e956391380c42db21a2c4e5a0
  * @jenesis.pin scala/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
  * @jenesis.pin scala/module/build.jenesis.plugin.scala 0.1.0 SHA-256/cda6e0e975998d6ee6c06a658fd88398e12da9ffdd6aea7b137c21e7ba9a2e57
- * @jenesis.pin scalafmt/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
- * @jenesis.pin scalafmt/module/build.jenesis.plugin.scalafmt 0.1.0 SHA-256/c47d41cf34739786f3120792d65b79fb40ba9698d3972d6b60d4f94eeada710c
- * @jenesis.pin scalastyle/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
- * @jenesis.pin scalastyle/module/build.jenesis.plugin.scalastyle 0.1.0 SHA-256/03f94377bc741e3f47b737b11c8dd0f02ac2a78227f9a2b42b4fd7739339d394
- * @jenesis.pin scala.library 2.13.18 SHA-256/4e85d96ff7bc7dc627985523c3541b9917aaa08e956391380c42db21a2c4e5a0
  * @jenesis.pin scala:tool/maven/org.scala-lang.modules/scala-asm 9.9.0-scala-1 SHA-256/75ac366e8ecb691e06a7e85041eed0f67919a646e5262fa0901225698c104375
  * @jenesis.pin scala:tool/maven/org.scala-lang/scala-library 3.8.4-RC3 SHA-256/f2052e9a932973699c9ef575da2ff780245a3f464dbfa28871a44fd27028fc35
  * @jenesis.pin scala:tool/maven/org.scala-lang/scala3-compiler_3 3.8.4-RC3 SHA-256/8c1f104682d0bda19eecca2ab0e6e90aca0c49d934fb69990fbc8a6f3799cbd9
@@ -23,6 +20,8 @@
  * @jenesis.pin scala:tool/maven/org.scala-lang/tasty-core_3 3.8.4-RC3 SHA-256/5fca75da0a575775dd468923fed00d8efb4f0c86ed05f7c86dc44cdf3aec6fc1
  * @jenesis.pin scala:tool/maven/org.scala-sbt/compiler-interface 1.10.7 SHA-256/2bacc5761e03920a228e5c9d20b33d9c51d43aaf2f52e8f839ece630966eb880
  * @jenesis.pin scala:tool/maven/org.scala-sbt/util-interface 1.10.7 SHA-256/1d6b91efa42b70fc064caed6d62962374e13b27737f885a87c84c667b30be625
+ * @jenesis.pin scalafmt/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
+ * @jenesis.pin scalafmt/module/build.jenesis.plugin.scalafmt 0.1.0 SHA-256/c47d41cf34739786f3120792d65b79fb40ba9698d3972d6b60d4f94eeada710c
  * @jenesis.pin scalafmt:tool/maven/com.facebook/nailgun-server 1.0.1 SHA-256/c852b33463ce343d22f45686dad8e2a29f61a105bdfd95c87f22b0520a482f21
  * @jenesis.pin scalafmt:tool/maven/com.github.luben/zstd-jni 1.5.6-3 SHA-256/f72ede1b39258faf81277dc58de30c71cbae4253732558d2ce10b53d8b5763d5
  * @jenesis.pin scalafmt:tool/maven/com.github.plokhotnyuk.jsoniter-scala/jsoniter-scala-core_2.13 2.13.5 SHA-256/e258e292706ced7ba036882a439a1ecc841750a7fc4fa4a5f42f074e7491406d
@@ -89,6 +88,8 @@
  * @jenesis.pin scalafmt:tool/maven/org.typelevel/paiges-core_2.13 0.4.4 SHA-256/ffbd59d3648e71c5b8f4474a54121fb3512707e7901245831669aa9e85f3bbf0
  * @jenesis.pin scalafmt:tool/maven/org.virtuslab.scala-cli/config_2.13 1.1.3 SHA-256/482ed69e838834aa90741e68871ca2687279b7315cc0436fbd18d9ad342e7b22
  * @jenesis.pin scalafmt:tool/maven/org.virtuslab.scala-cli/specification-level_2.13 1.1.3 SHA-256/2532f59b1e1fdbc00eb2a1ee0cdc5ce16d829e2fc48aef082384f4916ced2cbd
+ * @jenesis.pin scalastyle/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
+ * @jenesis.pin scalastyle/module/build.jenesis.plugin.scalastyle 0.1.0 SHA-256/03f94377bc741e3f47b737b11c8dd0f02ac2a78227f9a2b42b4fd7739339d394
  * @jenesis.pin scalastyle:tool/maven/com.beautiful-scala/scalastyle_2.13 1.5.1 SHA-256/469254118554648963ebeb2e8c0be0f4c093b8099ed05794b70de3c37e3ba7a1
  * @jenesis.pin scalastyle:tool/maven/com.typesafe/config 1.4.1 SHA-256/4c0aa7e223c75c8840c41fc183d4cd3118140a1ee503e3e08ce66ed2794c948f
  * @jenesis.pin scalastyle:tool/maven/org.scala-lang.modules/scala-collection-compat_2.13 2.5.0 SHA-256/93f8bf202ac28c4ca13562e31f6881a7770768e12b056b568139f37c025a3841
