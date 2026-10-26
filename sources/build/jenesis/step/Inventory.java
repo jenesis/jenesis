@@ -320,7 +320,7 @@ public class Inventory implements BuildStep {
                 for (String key : resolvedBoms.stringPropertyNames()) {
                     if (key.startsWith("bom/")) {
                         bomFiles.putIfAbsent(key, folder.resolve(resolvedBoms.getProperty(key)).normalize());
-                    } else if (key.startsWith("entry/") || key.startsWith("version/")) {
+                    } else if (key.startsWith("entry/") || key.startsWith("version/") || key.startsWith("file/")) {
                         bomValues.putIfAbsent(key, resolvedBoms.getProperty(key));
                     }
                 }
@@ -820,6 +820,17 @@ public class Inventory implements BuildStep {
             }
         });
         return versions;
+    }
+
+    public static SequencedSet<String> bomImports(Iterable<BuildStepArgument> arguments, String path)
+            throws IOException {
+        SequencedSet<String> imports = new LinkedHashSet<>();
+        forEachBom(arguments, path, (key, _, _) -> {
+            if (key.startsWith("file/")) {
+                imports.add(key.substring(5));
+            }
+        });
+        return imports;
     }
 
     private interface BomConsumer {

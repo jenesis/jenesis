@@ -800,6 +800,7 @@ public class ModularProjectTest {
         SequencedProperties boms = SequencedProperties.ofFiles(
                 results.get("module/module-/manifests").resolve(BuildStep.BOMS));
         assertThat(boms.stringPropertyNames()).containsExactly(
+                "file/main/pin-team.properties",
                 "entry/main/module/bar",
                 "entry/main/maven/org.slf4j/slf4j-api",
                 "bom/main/module/acme.platform");
@@ -835,7 +836,9 @@ public class ModularProjectTest {
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         SequencedProperties boms = SequencedProperties.ofFiles(
                 results.get("module/module-/manifests").resolve(BuildStep.BOMS));
-        assertThat(boms).containsOnly(Map.entry("entry/kotlinc/module/bar", "1.2.3"));
+        assertThat(boms).containsOnly(
+                Map.entry("file/kotlinc/pin-team.properties", ""),
+                Map.entry("entry/kotlinc/module/bar", "1.2.3"));
     }
 
     @Test
@@ -873,7 +876,11 @@ public class ModularProjectTest {
                 results.get("module/module-/manifests").resolve(BuildStep.BOMS));
         assertThat(boms.stringPropertyNames())
                 .as("the later file's entry replaces the earlier one in its own place, after the Maven BOM")
-                .containsExactly("entry/main/module/qux", "bom/main/module/acme.platform", "entry/main/module/bar");
+                .containsExactly("file/main/pin-broad.properties",
+                        "entry/main/module/qux",
+                        "bom/main/module/acme.platform",
+                        "file/main/pin-narrow.properties",
+                        "entry/main/module/bar");
         assertThat(boms.getProperty("entry/main/module/bar")).isEqualTo("2.0");
         assertThat(boms.getProperty("entry/main/module/qux")).isEqualTo("1.0");
     }
@@ -910,7 +917,9 @@ public class ModularProjectTest {
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         SequencedProperties boms = SequencedProperties.ofFiles(
                 results.get("module/module-/manifests").resolve(BuildStep.BOMS));
-        assertThat(boms).containsOnly(Map.entry("entry/main/module/bar", "1.0"));
+        assertThat(boms).containsOnly(
+                Map.entry("file/main/pin-team.properties", ""),
+                Map.entry("entry/main/module/bar", "1.0"));
     }
 
     @Test
