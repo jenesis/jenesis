@@ -470,7 +470,18 @@ public final class Make {
         for (String selector : selectors) {
             command.add(selector.startsWith("@") ? "@" + selector : selector);
         }
-        return new ProcessBuilder(command).inheritIO().start().waitFor();
+        Process process = new ProcessBuilder(command).inheritIO().start();
+        Thread hook = new Thread(process::destroy);
+        Runtime.getRuntime().addShutdownHook(hook);
+        try {
+            return process.waitFor();
+        } finally {
+            try {
+                Runtime.getRuntime().removeShutdownHook(hook);
+            } catch (IllegalStateException _) {
+                process.destroy();
+            }
+        }
     }
 
     private static String fingerprint(Path folder, List<Path> files, String salt) throws IOException {
