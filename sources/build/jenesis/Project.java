@@ -94,11 +94,6 @@ public record Project(
 
         record Selection(List<String> selectors, List<String> optional) {
 
-            public Selection {
-                selectors = List.copyOf(selectors);
-                optional = List.copyOf(optional);
-            }
-
             public static Selection of(String selector) {
                 return new Selection(List.of(selector), List.of());
             }

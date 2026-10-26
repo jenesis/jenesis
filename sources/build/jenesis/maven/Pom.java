@@ -24,8 +24,8 @@ public class Pom implements BuildStep {
     }
 
     private Pom(Set<String> prefixes, Map<String, String> shared, String group, boolean embedded) {
-        this.prefixes = Set.copyOf(prefixes);
-        this.shared = Map.copyOf(shared);
+        this.prefixes = prefixes;
+        this.shared = shared;
         this.group = group;
         this.embedded = embedded;
     }

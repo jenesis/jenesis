@@ -44,7 +44,8 @@ onboarding briefing from the same material, `skill/<page>` one page and `skill` 
   are the normal idiom.
 - **Immutable objects with withers.** Configuration is a record or a final class; each value has a method named
   exactly like it that returns a copy with that value replaced (`new Project(root).version("1.0.0")`). No setters,
-  no builders, no `with` prefix.
+  no builders, no `with` prefix. A record takes what it is handed: no compact constructor copies a collection or
+  checks a value unless a rule of the type depends on it.
 - **Fail loudly, name the fix.** Bad input is an `IllegalArgumentException` naming what was given and what would be
   valid; a missing prerequisite is an `IllegalStateException` naming it. Nothing silently falls back; a lenient
   wildcard selector is the one documented exception.
