@@ -12,7 +12,7 @@ public record Platform(SequencedSet<String> tokens) implements Serializable {
                 normalized.add(value);
             }
         }
-        this.tokens = Collections.unmodifiableSequencedSet(normalized);
+        this.tokens = normalized;
     }
 
     public Platform() {

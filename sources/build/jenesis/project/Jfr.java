@@ -17,7 +17,6 @@ public record Jfr(SequencedMap<String, String> options) implements Observability
                         + "'");
             }
         });
-        options = Collections.unmodifiableSequencedMap(new LinkedHashMap<>(options));
     }
 
     public Jfr() {

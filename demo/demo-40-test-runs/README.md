@@ -126,3 +126,12 @@ An entry scans every jar of that dependency on the test path, its `tests` jar
 included. So the tests of a module repeat with other flags in a sibling that
 declares a `<type>test-jar</type>` dependency on it and scans it, where Maven
 would add a second Surefire execution.
+
+A module's tests are a module of their own in a pom.xml build, and `+<module>`
+selects them beside the module, as `mvn test -pl fast` does:
+
+    java -Djenesis.print.tests=true build/jenesis/Make.java +fast
+
+`fast` is built with what it depends on and its tests run, while `slow` and its
+tests are left alone. A module without tests, as `suite`, is selected all the
+same, as `+suite`.

@@ -76,7 +76,7 @@ public class PinModuleInfo implements BuildStep {
         this.permits = permits;
         this.prefix = prefix;
         this.path = path;
-        this.moduleInfoFiles = List.copyOf(moduleInfoFiles);
+        this.moduleInfoFiles = moduleInfoFiles;
         this.hashFunction = hashFunction;
         this.platform = platform;
         this.checksum = checksum;

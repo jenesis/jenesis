@@ -239,7 +239,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                           boolean shared,
                           Path aot) {
             this.commands = commands;
-            this.environment = Collections.unmodifiableSortedMap(environment);
+            this.environment = environment;
             this.output = output;
             this.error = error;
             this.main = main;

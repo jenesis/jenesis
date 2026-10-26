@@ -62,7 +62,7 @@ public final class Make {
 
     public Make(String mainClass, Map<String, String> ambient) {
         this.mainClass = mainClass;
-        this.ambient = Map.copyOf(ambient);
+        this.ambient = ambient;
         String location = ambient.get("make.root");
         root = Path.of(location == null ? "" : location).toAbsolutePath().normalize();
         try {

@@ -52,8 +52,8 @@ public final class Toolchain {
                 words.add(parts[index].toLowerCase(Locale.ROOT));
             }
         }
-        this.numbers = List.copyOf(numbers);
-        this.words = Collections.unmodifiableSequencedSet(words);
+        this.numbers = numbers;
+        this.words = words;
         List<Entry> entries = new ArrayList<>();
         for (String part : searchpath.split(",")) {
             String entry = part.trim();
@@ -65,7 +65,7 @@ public final class Toolchain {
                 entries.add(entry(entry));
             }
         }
-        this.entries = List.copyOf(entries);
+        this.entries = entries;
         if (this.installer == null) {
             invocation = null;
         } else {
@@ -99,7 +99,7 @@ public final class Toolchain {
                 }
             }
             invocation.set(0, program);
-            this.invocation = List.copyOf(invocation);
+            this.invocation = invocation;
         }
     }
 
