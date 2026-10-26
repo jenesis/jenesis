@@ -1,5 +1,6 @@
 /**
  * @jenesis.release 21
+ * @jenesis.pin kotlin.stdlib 1.9.10 SHA-256/55e989c512b80907799f854309f3bc7782c5b3d13932442d0379d5c472711504
  * @jenesis.pin kotlin/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
  * @jenesis.pin kotlin/module/build.jenesis.plugin.kotlin 0.1.0 SHA-256/8ae119271454d849d712d61b0166b5879f6c6493897beaa4d76b1aa5319545c6
  * @jenesis.pin kotlin:dokka/maven/com.fasterxml.jackson.core/jackson-annotations 2.15.3 SHA-256/aae865c3d88256d61b11523cb1e88bd48d5b9ad5855fa1fc859504fd2204708a
@@ -36,7 +37,6 @@
  * @jenesis.pin kotlin:tool/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
  * @jenesis.pin maven/org.jetbrains.kotlin/kotlin-stdlib-common/pom 1.9.10 SHA-256/7d4b70547910676b3bdfc8925a88f3b6bfb24582c9784542805544ceef490a92
  * @jenesis.pin maven/org.jetbrains.kotlin/kotlin-stdlib/pom 1.9.10 SHA-256/7e29fbf73fdf71e0679d3dee7e680fd573464fa01644a4f58ab819d2c088d3d2
- * @jenesis.pin maven/org.jetbrains.kotlin/kotlin-stdlib/pom 2.4.21 SHA-256/b92b23ec9c444b2578b9852447565efc72c24b3ea77b4c3bf4e644f685eeef07
  * @jenesis.pin maven/org.jetbrains/annotations/pom 13.0 SHA-256/965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397
  * @jenesis.pin org.jetbrains.kotlin/kotlin-stdlib 1.9.10 SHA-256/55e989c512b80907799f854309f3bc7782c5b3d13932442d0379d5c472711504
  * @jenesis.pin org.jetbrains.kotlin/kotlin-stdlib-common 1.9.10 SHA-256/cde3341ba18a2ba262b0b7cf6c55b20c90e8d434e42c9a13e6a3f770db965a88
