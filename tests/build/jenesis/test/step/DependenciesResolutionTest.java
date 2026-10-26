@@ -106,7 +106,7 @@ public class DependenciesResolutionTest {
                         resolved.put(prefix + "/" +descriptor, "");
                         resolved.put(prefix + "/transitive/" + descriptor, "");
                     });
-                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
                 })));
         SequencedProperties dependencies = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(dependencies.stringPropertyNames()).containsExactlyInAnyOrder("main/compile/foo/qux",
@@ -136,7 +136,7 @@ public class DependenciesResolutionTest {
         Dependencies module = new Dependencies(Map.of("foo", repository), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         }));
         execute(module);
         published.set("second");
@@ -193,7 +193,7 @@ public class DependenciesResolutionTest {
         return new Dependencies(Map.of("foo", repository), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         }));
     }
 
@@ -225,7 +225,7 @@ public class DependenciesResolutionTest {
                         transitive.put(prefix + "/" + descriptor, "");
                         transitive.put(prefix + "/transitive/" + descriptor, "");
                     });
-                    return new Resolver.Resolution(Resolver.materializeAll(resolving, repositories, prefix, transitive), List.of(), new LinkedHashMap<>());
+                    return new Resolver.Resolution(Resolver.materializeAll(resolving, repositories, prefix, transitive), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
                 })), new LinkedHashSet<>(List.of("dependencies", "handed")));
         next = executor.execute().get("resolved");
         assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
@@ -247,7 +247,7 @@ public class DependenciesResolutionTest {
         execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
                 })).group("tool"));
         assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
                 .as("a tool reads the module's requirements for its pins, but resolves only what it declares")
@@ -266,7 +266,7 @@ public class DependenciesResolutionTest {
         execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
                 })).group("tool"));
         assertThat(next.resolve(Dependencies.ALIASED))
                 .as("the module renames its own jars; a tool step is not the place that fails over it")
@@ -287,7 +287,7 @@ public class DependenciesResolutionTest {
                     received.putAll(descriptors);
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
                 })));
 
         assertThat(received)
@@ -337,7 +337,7 @@ public class DependenciesResolutionTest {
             received.putAll(managedExclusions);
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             coordinates.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-            return new Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         }
     }
 
@@ -351,7 +351,7 @@ public class DependenciesResolutionTest {
         execute(new Dependencies(Map.of("foo", streaming), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
                 })));
         assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
                 .containsExactly("main/compile/foo/qux");
@@ -375,7 +375,7 @@ public class DependenciesResolutionTest {
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
-                            vertices);
+                            vertices, new LinkedHashMap<>());
                 })));
         SequencedProperties licenses = SequencedProperties.ofFiles(next.resolve("licenses.properties"));
         assertThat(licenses.getProperty("foo/qux#0#name"))
@@ -408,7 +408,7 @@ public class DependenciesResolutionTest {
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
-                            vertices);
+                            vertices, new LinkedHashMap<>());
                 })));
         SequencedProperties licenses = SequencedProperties.ofFiles(next.resolve("licenses.properties"));
         assertThat(licenses.getProperty("foo/qux#0#id")).isEqualTo("MIT");
@@ -436,7 +436,7 @@ public class DependenciesResolutionTest {
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
-                            vertices);
+                            vertices, new LinkedHashMap<>());
                 })), licenses);
         SequencedProperties sidecar = SequencedProperties.ofFiles(next.resolve("licenses.properties"));
         assertThat(sidecar.getProperty("foo/qux#0#id"))
@@ -467,7 +467,7 @@ public class DependenciesResolutionTest {
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
-                            vertices);
+                            vertices, new LinkedHashMap<>());
                 })), licenses);
         SequencedProperties sidecar = SequencedProperties.ofFiles(next.resolve("licenses.properties"));
         assertThat(sidecar.getProperty("foo/qux#0#id")).isEqualTo("Apache-2.0");
@@ -490,7 +490,7 @@ public class DependenciesResolutionTest {
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
-                            new LinkedHashMap<>());
+                            new LinkedHashMap<>(), new LinkedHashMap<>());
                 }));
         assertThatThrownBy(() -> execute(step, licenses))
                 .hasStackTraceContaining(IllegalArgumentException.class.getName())
@@ -512,7 +512,7 @@ public class DependenciesResolutionTest {
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(new Resolver.Edge(null, "foo/qux/1", "1", "compile", true)),
-                            vertices);
+                            vertices, new LinkedHashMap<>());
                 })));
         SequencedProperties graph = SequencedProperties.ofFiles(next.resolve("graph.properties"));
         assertThat(graph.getProperty("edge/0")).isEqualTo("main\tcompile\tfoo\ttrue\tcompile\t1\t\tfoo/qux/1");
@@ -527,7 +527,7 @@ public class DependenciesResolutionTest {
         execute(new Dependencies(Map.of("maven", files(Map.of())), Map.of("maven", (executor, prefix, repositories, descriptors, _, _) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
                 })));
         SequencedProperties resolved = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(resolved.stringPropertyNames()).containsExactly("kotlinc/plugin/maven/org.jetbrains/something");
@@ -545,7 +545,7 @@ public class DependenciesResolutionTest {
                 resolved.put(prefix + "/" + descriptor, "");
                 resolved.put(prefix + "/transitive/" + descriptor, "");
             });
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         })));
         SequencedProperties dependencies = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(dependencies.stringPropertyNames()).containsExactlyInAnyOrder("main/compile/foo/qux",
@@ -570,7 +570,7 @@ public class DependenciesResolutionTest {
                 resolved.put(prefix + "/" + descriptor, checksum(descriptor));
                 resolved.put(prefix + "/" + "transitive/" + descriptor, checksum("transitive/" + descriptor));
             });
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         })));
         SequencedProperties dependencies = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(dependencies.stringPropertyNames()).containsExactlyInAnyOrder("main/compile/foo/qux",
@@ -598,7 +598,7 @@ public class DependenciesResolutionTest {
                 String version = bom.getOrDefault(descriptor, "FLOAT");
                 resolved.put(prefix + "/" + descriptor + "/" + version, "");
             });
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         })));
         SequencedProperties dependencies = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(dependencies.stringPropertyNames())
@@ -620,7 +620,7 @@ public class DependenciesResolutionTest {
                 String version = bom.getOrDefault(descriptor, "FLOAT");
                 resolved.put(prefix + "/" + descriptor + "/" + version, "");
             });
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         })));
         SequencedProperties dependencies = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(dependencies.stringPropertyNames())
@@ -643,7 +643,7 @@ public class DependenciesResolutionTest {
                 String version = bom.getOrDefault(descriptor, "FLOAT");
                 resolved.put(prefix + "/" + descriptor + "/" + version, "");
             });
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         })));
         SequencedProperties dependencies = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(dependencies.stringPropertyNames())
@@ -656,7 +656,7 @@ public class DependenciesResolutionTest {
         versions.setProperty("bar", "1.0");
         versions.store(dependencies.resolve(BuildStep.VERSIONS));
         Dependencies resolve = new Dependencies(Map.of("foo", Repository.empty()),
-                Map.of("foo", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())));
+                Map.of("foo", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())));
         assertThatThrownBy(() -> execute(resolve))
                 .hasStackTraceContaining(IllegalArgumentException.class.getName())
                 .hasStackTraceContaining("bar")
@@ -671,7 +671,7 @@ public class DependenciesResolutionTest {
         Dependencies resolve = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, checksum("other")));
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         }));
         assertThatThrownBy(() -> execute(resolve))
                 .hasStackTraceContaining("Mismatched digest for bar");
@@ -691,7 +691,7 @@ public class DependenciesResolutionTest {
         Dependencies resolve = new Dependencies(Map.of("foo", internal), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         })).pinning(Pinning.STRICT);
         execute(resolve);
 
@@ -717,7 +717,7 @@ public class DependenciesResolutionTest {
         Dependencies resolve = new Dependencies(Map.of("foo", local), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         })).pinning(Pinning.STRICT);
         assertThatThrownBy(() -> execute(resolve))
                 .as("an export into a local folder is pinned as a remote artifact is, unlike what this build builds")
@@ -732,7 +732,7 @@ public class DependenciesResolutionTest {
         Dependencies resolve = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         })).pinning(Pinning.STRICT);
         assertThatThrownBy(() -> execute(resolve))
                 .hasStackTraceContaining(IllegalStateException.class.getName())
@@ -748,7 +748,7 @@ public class DependenciesResolutionTest {
         Dependencies resolve = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         }));
         execute(resolve);
 
@@ -781,7 +781,7 @@ public class DependenciesResolutionTest {
         execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         })).pinning(Pinning.IGNORE));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.getProperty("main/compile/foo/bar")).isEqualTo("resolved/bar.jar");
@@ -803,7 +803,7 @@ public class DependenciesResolutionTest {
             received.putAll(pins);
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         })).pinning(Pinning.IGNORE));
         assertThat(received).containsOnly(Map.entry("bar", ":win:1.0"), Map.entry("transitive", ":mac"));
     }
@@ -823,7 +823,7 @@ public class DependenciesResolutionTest {
             received.putAll(pins);
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         })).pinning(Pinning.IGNORE));
         assertThat(received).containsOnly(Map.entry("bar", "1.0"));
     }
@@ -837,7 +837,7 @@ public class DependenciesResolutionTest {
         Dependencies resolve = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         }));
         assertThatThrownBy(() -> execute(resolve))
                 .hasStackTraceContaining("Conflicting checksums pinned for foo/bar");
@@ -855,7 +855,7 @@ public class DependenciesResolutionTest {
             return new Resolver.Resolution(
                     Resolver.materializeAll(executor, repositories, prefix, resolved),
                     List.of(),
-                    new LinkedHashMap<>());
+                    new LinkedHashMap<>(), new LinkedHashMap<>());
         };
     }
 
@@ -1027,7 +1027,7 @@ public class DependenciesResolutionTest {
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
-                            new LinkedHashMap<>());
+                            new LinkedHashMap<>(), new LinkedHashMap<>());
                 })).pinning(Pinning.IGNORE));
         assertThat(received).containsOnly(Map.entry("bar", "1.0"));
     }
@@ -1136,7 +1136,7 @@ public class DependenciesResolutionTest {
             return new Resolver.Resolution(
                     Resolver.materializeAll(executor, repositories, prefix, resolved),
                     List.of(),
-                    new LinkedHashMap<>());
+                    new LinkedHashMap<>(), new LinkedHashMap<>());
         }
 
         @Override

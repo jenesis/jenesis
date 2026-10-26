@@ -1388,10 +1388,8 @@ public record Project(
                     as JReleaser is resolved and pinned with the rest.
                     Commit before the first `pin`. It writes the versions and checksums it resolved,
                     those of every POM read among them, into a <!--jenesis.pin--> comment of each
-                    pom.xml, which changes nothing Maven resolves; <dependencyManagement> stays as
-                    written but for the entries carrying a <!--Checksum/...--> comment, which an earlier
-                    `pin` wrote and which it removes, and a SNAPSHOT is given no checksum. Review that
-                    diff. `pin` resolves what the active profiles build, so run it with every profile
+                    pom.xml, which changes nothing Maven resolves, and a SNAPSHOT is given no
+                    checksum. Review that diff. `pin` resolves what the active profiles build, so run it with every profile
                     CI builds with, as -Djenesis.make.profiles=release,docker, or a tool only one of
                     them switches on stays unpinned. Then build with -Djenesis.dependency.pin=strict, as CI should. Before retiring the old build, compare what both produce: the jar
                     contents, the dependency tree (`dependencies` against mvn dependency:tree or

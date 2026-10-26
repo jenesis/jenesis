@@ -104,7 +104,7 @@ public final class DependencyTreeReport {
             SequencedMap<String, Resolver.Vertex> nodes = new LinkedHashMap<>();
             nodes.put(key, root);
             nodes.putAll(resolution.vertices());
-            rooted.put(scope, new Resolver.Resolution(resolution.artifacts(), edges, nodes));
+            rooted.put(scope, new Resolver.Resolution(resolution.artifacts(), edges, nodes, resolution.poms()));
         });
         if (merged) {
             render(null, key, rooted, true, grafts);

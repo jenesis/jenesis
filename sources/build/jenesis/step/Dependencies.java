@@ -2001,7 +2001,8 @@ public class Dependencies implements BuildExecutorModule {
             result.put(groupScope, new Resolver.Resolution(
                     Collections.emptyNavigableMap(),
                     new ArrayList<>(edges.getOrDefault(groupScope, Collections.emptyNavigableSet())),
-                    vertices.getOrDefault(groupScope, Collections.emptyNavigableMap())));
+                    vertices.getOrDefault(groupScope, Collections.emptyNavigableMap()),
+                    Collections.emptyNavigableMap()));
         }
         return result;
     }

@@ -1548,7 +1548,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
@@ -1599,7 +1599,7 @@ public class TestModuleTest {
                                                 SequencedMap<String, String> versions,
                                                 DependencyScope scope) {
             ORDER.addAll(coordinates.sequencedKeySet());
-            return new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         }
     }
 
@@ -1610,7 +1610,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .observe(new Agent())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
@@ -1636,7 +1636,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .observe(new Agent())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
@@ -1657,7 +1657,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
@@ -1762,7 +1762,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .jarsOnly(false),
                 "dependencies", "classes");
@@ -1787,7 +1787,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .jarsOnly(false),
                 "dependencies", "classes");
@@ -1805,7 +1805,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new MultiRunnerEngine())
                         .jarsOnly(false),
                 "dependencies", "classes");
