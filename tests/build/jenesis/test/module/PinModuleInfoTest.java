@@ -181,6 +181,9 @@ public class PinModuleInfoTest {
         writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
         writeResolved("tool", "runtime", Map.of("maven/org.example/checker", "2.0 SHA-256/beefcafe"));
         String result = run(file, pin -> pin.exported("pin-shared.properties"));
+        assertThat(run(file, pin -> pin.exported("pin-shared.properties").exportedGroups(new LinkedHashSet<>(List.of("tool")))))
+                .as("a group the file does not hold stays in the declaration, imported or not")
+                .contains("@jenesis.pin org.example/lib 1.0 SHA-256/cafebabe");
         assertThat(result)
                 .as("a group the module does not import the file into is pinned in the declaration")
                 .contains("@jenesis.pin tool/maven/org.example/checker 2.0 SHA-256/beefcafe")

@@ -11,6 +11,7 @@ import build.jenesis.step.Inventory;
 
 public record PinFile(SequencedSet<String> paths,
                       Path file,
+                      SequencedSet<String> groups,
                       SequencedSet<Path> provided,
                       HashDigestFunction hashFunction)
         implements BuildStep {
@@ -25,32 +26,26 @@ public record PinFile(SequencedSet<String> paths,
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
+        Map<String, String> covered = new HashMap<>();
+        for (Path other : provided) {
+            if (!Files.isRegularFile(other)) {
+                throw new IllegalStateException("No such file in jenesis.pin.provided: " + other);
+            }
+            SequencedProperties.ofFiles(other).forEachProperty((key, value) -> covered.putIfAbsent(key, value.trim()));
+        }
+        Set<String> internal = new LinkedHashSet<>();
+        for (String identity : Inventory.identities(arguments.values())) {
+            internal.add(identity);
+            int first = identity.indexOf('/'), last = identity.lastIndexOf('/');
+            if (first > 0 && last > first) {
+                internal.add(identity.substring(0, last));
+            }
+        }
         SequencedMap<String, String> entries = new TreeMap<>();
         Map<String, String> owners = new HashMap<>();
         SequencedSet<String> conflicts = new TreeSet<>();
-        String name = file.getFileName().toString();
-        SequencedMap<String, Set<String>> importers = new LinkedHashMap<>();
         for (String path : paths) {
-            for (String imported : Inventory.bomImports(arguments.values(), path)) {
-                int slash = imported.indexOf('/');
-                if (imported.substring(slash + 1).equals(name)) {
-                    importers.computeIfAbsent(path, _ -> new HashSet<>()).add(imported.substring(0, slash));
-                }
-            }
-        }
-        for (String path : paths) {
-            Set<String> groups = importers.isEmpty() ? Set.of("main") : importers.getOrDefault(path, Set.of());
-            if (groups.isEmpty()) {
-                continue;
-            }
-            Set<String> internal = new LinkedHashSet<>();
-            for (String identity : Inventory.identities(arguments.values())) {
-                internal.add(identity);
-                int first = identity.indexOf('/'), last = identity.lastIndexOf('/');
-                if (first > 0 && last > first) {
-                    internal.add(identity.substring(0, last));
-                }
-            }
+            String module = path.isEmpty() ? "." : path;
             for (Map.Entry<String, Inventory.Dependency> dependency
                     : Inventory.closure(arguments.values(), path).entrySet()) {
                 String group = dependency.getValue().group();
@@ -73,13 +68,13 @@ public record PinFile(SequencedSet<String> paths,
                 }
                 String entry;
                 if (coordinate.startsWith("module/")) {
-                    String module = coordinate.substring("module/".length());
-                    int dash = module.indexOf('-');
+                    String name = coordinate.substring("module/".length());
+                    int dash = name.indexOf('-');
                     if (dash >= 0) {
-                        value = ":" + module.substring(dash + 1) + ":" + value;
-                        module = module.substring(0, dash);
+                        value = ":" + name.substring(dash + 1) + ":" + value;
+                        name = name.substring(0, dash);
                     }
-                    entry = module;
+                    entry = name;
                 } else {
                     String maven = coordinate.startsWith("maven/")
                             ? coordinate.substring("maven/".length())
@@ -90,7 +85,10 @@ public record PinFile(SequencedSet<String> paths,
                             ? maven
                             : coordinate;
                 }
-                String owner = (path.isEmpty() ? "." : path) + " (" + group + ")";
+                if (value.equals(covered.get(entry))) {
+                    continue;
+                }
+                String owner = module + " (" + group + ")";
                 String previous = entries.putIfAbsent(entry, value);
                 if (previous == null) {
                     owners.put(entry, owner);
@@ -99,36 +97,27 @@ public record PinFile(SequencedSet<String> paths,
                 }
             }
             for (Map.Entry<String, Inventory.Dependency> pom : Inventory.poms(arguments.values(), path).entrySet()) {
-                if (groups.contains(pom.getValue().group())) {
-                    String coordinate = pom.getKey().substring("main/".length());
-                    entries.putIfAbsent(coordinate, coordinate.substring(coordinate.lastIndexOf('/') + 1)
-                            + " " + pom.getValue().checksum(hashFunction));
+                String group = pom.getValue().group();
+                if (!groups.contains(group)) {
+                    continue;
+                }
+                String coordinate = pom.getKey().substring(group.length() + 1);
+                String value = coordinate.substring(coordinate.lastIndexOf('/') + 1)
+                        + " " + pom.getValue().checksum(hashFunction);
+                if (!value.equals(covered.get(coordinate))) {
+                    entries.putIfAbsent(coordinate, value);
                 }
             }
         }
         if (!conflicts.isEmpty()) {
             throw new IllegalStateException("Cannot write "
                     + file
-                    + ": the modules importing it resolve "
+                    + ": the groups "
+                    + String.join(", ", groups)
+                    + " resolve "
                     + String.join("; ", conflicts)
-                    + " - a file holds one version of a coordinate, so pin the version every importer is to"
-                    + " resolve in the file, or import a file of its own where a module needs another");
-        }
-        for (Path other : provided) {
-            if (!Files.isRegularFile(other)) {
-                throw new IllegalStateException("No such file in jenesis.pin.provided: " + other);
-            }
-            SequencedProperties covered = SequencedProperties.ofFiles(other);
-            for (String key : covered.stringPropertyNames()) {
-                String value = covered.getProperty(key).trim();
-                int space = value.indexOf(' ');
-                if (space < 0) {
-                    continue;
-                }
-                if (value.equals(entries.get(key))) {
-                    entries.remove(key);
-                }
-            }
+                    + " - a file holds one version of a coordinate, so pin the version every module is to resolve"
+                    + " in the file, or name fewer groups in jenesis.pin.groups");
         }
         SequencedProperties pins = new SequencedProperties();
         entries.forEach(pins::setProperty);
