@@ -2602,18 +2602,17 @@ public record Project(
                     adding +<module>. A pom.xml's main and test halves share one comment, so where
                     they resolve a coordinate at different versions its line takes the version the
                     pom declares itself, which the other half then resolves as well.
-                    -Djenesis.pin.file=<path> writes the closure of every group that imports a file of
-                    that name - each @jenesis.bom [<group>/]pin-<name>.properties, in every module - to
-                    that properties file, in the grammar @jenesis.bom reads, which is how a local bill
-                    of materials is refreshed rather than hand-edited. The file names no group, so a
-                    module chooses one per import; while no module imports it yet, every module's main
-                    group is written, which is how one is started. It holds one version of a
-                    coordinate, so `pin` refuses to write a file whose importers resolve one at two
-                    versions and names both. Every group a module does not import the file into is
-                    pinned in its declaration as without the file - a tool's closure, as Checkstyle's
-                    with the jars @jenesis.plugin checkstyle:tool adds, as @jenesis.pin
-                    <name>:tool/... lines - and a group it does import loses its own pin lines, which
-                    would override the file. Only a module-info.java reads the file back: a pom.xml
+                    -Djenesis.pin.file=<path> writes the closure of the groups -Djenesis.pin.groups
+                    names (main by default, comma-separated) of every module to that properties file,
+                    in the grammar @jenesis.bom reads, which is how a local bill of materials is
+                    refreshed rather than hand-edited. The file names no group: a module chooses one per
+                    import, as @jenesis.bom launcher/pin-<name>.properties reads it into the launcher
+                    group. It holds one version of a coordinate, so `pin` refuses to write a file in
+                    which those groups resolve one at two versions and names both. Every other group
+                    is pinned in the declarations as without the file - a tool's closure, as
+                    Checkstyle's with the jars @jenesis.plugin checkstyle:tool adds, as @jenesis.pin
+                    <name>:tool/... lines - and a module importing the file into a group the file
+                    holds loses that group's own pin lines, which would override the file. Only a module-info.java reads the file back: a pom.xml
                     build keeps every pin in its POMs, a -SNAPSHOT from the local repository among them,
                     whose checksum strict pinning then holds until that snapshot is installed anew. Each
                     module resolves alone, so nothing makes them agree: pin/divergence reports every
@@ -2991,6 +2990,7 @@ public record Project(
                              String fileName,
                              BiFunction<String, Path, BuildStep> stepFactory,
                              Path file,
+                             SequencedSet<String> groups,
                              SequencedSet<Path> provided,
                              HashDigestFunction hashFunction,
                              Consumer<String> printing,
@@ -3011,10 +3011,12 @@ public record Project(
                     provided.add(root.resolve(entry).normalize());
                 }
             }
+            List<String> groups = environment.entries("pin.groups");
             return new PinModule(root,
                                  fileName,
                                  stepFactory,
                                  file == null ? null : root.resolve(file).normalize(),
+                                 new LinkedHashSet<>(groups == null ? List.of("main") : groups),
                                  provided,
                                  hashFunction,
                                  environment.flag("print.divergence") ? environment.out() : null,
@@ -3023,15 +3025,19 @@ public record Project(
         }
 
         PinModule file(Path file) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, palette, plugins);
+            return new PinModule(root, fileName, stepFactory, file, groups, provided, hashFunction, printing, palette, plugins);
+        }
+
+        PinModule groups(SequencedSet<String> groups) {
+            return new PinModule(root, fileName, stepFactory, file, groups, provided, hashFunction, printing, palette, plugins);
         }
 
         PinModule provided(SequencedSet<Path> provided) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, palette, plugins);
+            return new PinModule(root, fileName, stepFactory, file, groups, provided, hashFunction, printing, palette, plugins);
         }
 
         PinModule plugins(ProjectPlugins plugins) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, palette, plugins);
+            return new PinModule(root, fileName, stepFactory, file, groups, provided, hashFunction, printing, palette, plugins);
         }
 
         @Override
@@ -3063,13 +3069,13 @@ public record Project(
                 BuildStep step = stepFactory.apply(path, declaration);
                 buildExecutor.addStep("module-" + BuildExecutorModule.encodePath(path),
                         file != null && step instanceof PinModuleInfo pin
-                                ? pin.exported(file.getFileName().toString())
+                                ? pin.exported(file.getFileName().toString()).exportedGroups(groups)
                                 : step,
                         built);
             }
             if (file != null) {
                 buildExecutor.addStep("file",
-                        new PinFile(paths, file, provided, hashFunction),
+                        new PinFile(paths, file, groups, provided, hashFunction),
                         built);
             }
             buildExecutor.addStep("divergence",
@@ -4735,7 +4741,8 @@ public record Project(
                 dependency.native|ignore|ignore|warn|strict: what to do when a module runs a jar whose Jenesis-Native-Access names a module it does not grant with @jenesis.native; warn reports it, strict fails the build
                 resolver.maven|maven|maven|closest|latest|release|stable|fail|managed: which version a Maven coordinate resolves to; stable skips pre-release qualifiers, fail rejects a coordinate two dependencies require at different versions, managed rejects that and any version only a dependency's POM names
                 resolver.module|first|first|ignore|fail|managed: what to do with the versions a module-info records; fail rejects two requires that record different versions, managed rejects that and any module only another module's requires names
-                pin.file||Write the pins of every group that imports a file of this name with @jenesis.bom, or of every module's main group while none does, to this properties file, and every other group's to the module declarations; a pom.xml never reads it, and a file a project provides names only a folder inside the project
+                pin.file||Write the pins of the jenesis.pin.groups of every module to this properties file, and every other group's to the module declarations; a pom.xml never reads it, and a file a project provides names only a folder inside the project
+                pin.groups|main|Comma-separated groups whose pins jenesis.pin.file writes to the file; a module importing the file into one of them loses that group's pin lines from its declaration
                 pin.provided||Comma-separated pin files whose entries this one leaves out, where the version and hash are the same
                 pin.concurrency|(processor count)|Rewrite at most this many modules' pins at once; 0 is unbounded
                 pin.checksum|true|Record content checksums in the pins that the pin selector writes

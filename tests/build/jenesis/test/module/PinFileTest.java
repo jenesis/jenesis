@@ -20,16 +20,13 @@ public class PinFileTest {
     private Path root;
     private Path next, input, file;
     private final SequencedProperties inventory = new SequencedProperties();
+    private final List<Path> provided = new ArrayList<>();
 
     @BeforeEach
     public void setUp() throws Exception {
         next = Files.createDirectory(root.resolve("next"));
         input = Files.createDirectory(root.resolve("input"));
         file = root.resolve("pin-shared.properties");
-    }
-
-    private void imports(String path, String declaration) {
-        inventory.setProperty(Inventory.prefixOf(path) + "bom." + count(path, "bom."), "file/" + declaration + " ");
     }
 
     private void resolved(String path, String group, String coordinate, String version) {
@@ -45,9 +42,13 @@ public class PinFileTest {
                 .count();
     }
 
-    private SequencedProperties run(String... paths) throws IOException {
+    private SequencedProperties run(List<String> groups, String... paths) throws IOException {
         inventory.store(input.resolve(Inventory.INVENTORY));
-        new PinFile(new LinkedHashSet<>(List.of(paths)), file, new LinkedHashSet<>(), new HashDigestFunction("SHA-256"))
+        new PinFile(new LinkedHashSet<>(List.of(paths)),
+                file,
+                new LinkedHashSet<>(groups),
+                new LinkedHashSet<>(provided),
+                new HashDigestFunction("SHA-256"))
                 .apply(Runnable::run,
                         new BuildStepContext(root.resolve("previous"),
                                 next,
@@ -62,44 +63,42 @@ public class PinFileTest {
     }
 
     @Test
-    public void writes_every_group_that_imports_the_file() throws IOException {
-        imports("cli", "main/pin-shared.properties");
-        imports("cli", "launcher/pin-shared.properties");
-        resolved("cli", "main", "maven/org.foo/foo", "1.0");
-        resolved("cli", "launcher", "maven/build.jenesis/build.jenesis.launcher", "0.6.3");
-        resolved("cli", "checkstyle:tool", "maven/org.bar/bar", "2.0");
-        assertThat(run("cli")).containsOnly(
-                Map.entry("org.foo/foo", "1.0 SHA-256/1.0"),
-                Map.entry("build.jenesis/build.jenesis.launcher", "0.6.3 SHA-256/0.6.3"));
-    }
-
-    @Test
-    public void leaves_out_the_modules_that_do_not_import_the_file() throws IOException {
-        imports("enterprise", "main/pin-shared.properties");
-        imports("core", "main/pin-core.properties");
-        resolved("enterprise", "main", "maven/org.foo/foo", "2.0");
-        resolved("core", "main", "maven/org.foo/foo", "1.0");
-        resolved("core", "main", "maven/org.baz/baz", "3.0");
-        assertThat(run("enterprise", "core")).containsOnly(Map.entry("org.foo/foo", "2.0 SHA-256/2.0"));
-    }
-
-    @Test
-    public void writes_every_main_group_while_no_module_imports_the_file() throws IOException {
+    public void writes_the_main_group_of_every_module_by_default() throws IOException {
         resolved("first", "main", "maven/org.foo/foo", "1.0");
         resolved("first", "launcher", "maven/build.jenesis/build.jenesis.launcher", "0.6.3");
+        resolved("first", "checkstyle:tool", "maven/org.bar/bar", "2.0");
         resolved("second", "main", "maven/org.baz/baz", "3.0");
-        assertThat(run("first", "second")).containsOnly(
+        assertThat(run(List.of("main"), "first", "second")).containsOnly(
                 Map.entry("org.foo/foo", "1.0 SHA-256/1.0"),
                 Map.entry("org.baz/baz", "3.0 SHA-256/3.0"));
     }
 
     @Test
-    public void refuses_a_coordinate_its_importers_resolve_at_two_versions() {
-        imports("first", "main/pin-shared.properties");
-        imports("second", "launcher/pin-shared.properties");
+    public void writes_every_group_it_is_told_to() throws IOException {
+        resolved("cli", "main", "maven/org.foo/foo", "1.0");
+        resolved("cli", "launcher", "maven/build.jenesis/build.jenesis.launcher", "0.6.3");
+        resolved("cli", "checkstyle:tool", "maven/org.bar/bar", "2.0");
+        assertThat(run(List.of("main", "launcher"), "cli")).containsOnly(
+                Map.entry("org.foo/foo", "1.0 SHA-256/1.0"),
+                Map.entry("build.jenesis/build.jenesis.launcher", "0.6.3 SHA-256/0.6.3"));
+    }
+
+    @Test
+    public void leaves_out_what_a_provided_file_records_before_comparing_versions() throws IOException {
+        Path core = Files.writeString(root.resolve("pin-core.properties"), "org.foo/foo=1.0 SHA-256/1.0\n");
+        provided.add(core);
+        resolved("enterprise", "main", "maven/org.foo/foo", "2.0");
+        resolved("core", "main", "maven/org.foo/foo", "1.0");
+        assertThat(run(List.of("main"), "enterprise", "core"))
+                .as("the provided file's own version neither lands here nor collides with the other")
+                .containsOnly(Map.entry("org.foo/foo", "2.0 SHA-256/2.0"));
+    }
+
+    @Test
+    public void refuses_a_coordinate_its_groups_resolve_at_two_versions() {
         resolved("first", "main", "maven/org.foo/foo", "1.0");
         resolved("second", "launcher", "maven/org.foo/foo", "2.0");
-        assertThatThrownBy(() -> run("first", "second"))
+        assertThatThrownBy(() -> run(List.of("main", "launcher"), "first", "second"))
                 .hasStackTraceContaining("org.foo/foo 1.0 SHA-256/1.0 in first (main), 2.0 SHA-256/2.0 in second (launcher)");
         assertThat(file).doesNotExist();
     }
