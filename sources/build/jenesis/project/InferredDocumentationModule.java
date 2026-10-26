@@ -10,7 +10,6 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
-import build.jenesis.SequencedProperties;
 import build.jenesis.step.Jar;
 import build.jenesis.step.Javadoc;
 import build.jenesis.step.ProcessHandler;
@@ -23,7 +22,6 @@ public class InferredDocumentationModule implements BuildExecutorModule {
     private final Function<InferredDocumentationChainModule, BuildExecutorModule> generate;
     private final BuildStep archiver;
     private final boolean empty;
-    private final boolean tests;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredDocumentationModule(SequencedSet<Path> configuration,
@@ -32,7 +30,6 @@ public class InferredDocumentationModule implements BuildExecutorModule {
         this(new InferredDocumentationChainModule(configuration, repositories, resolvers),
                 value -> value,
                 new Jar(ProcessHandler.Factory.of(), Jar.Sort.JAVADOC),
-                false,
                 false,
                 Collections.emptyNavigableMap());
     }
@@ -48,7 +45,6 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 value -> value,
                 Jar.ofEnvironment(environment, ProcessHandler.Factory.ofEnvironment(environment), Jar.Sort.JAVADOC),
                 environment.flag("documentation.empty", false),
-                environment.flag("stage.tests"),
                 Collections.emptyNavigableMap());
     }
 
@@ -56,13 +52,11 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                                         Function<InferredDocumentationChainModule, BuildExecutorModule> generate,
                                         BuildStep archiver,
                                         boolean empty,
-                                        boolean tests,
                                         SequencedMap<String, BuildExecutorModule> custom) {
         this.generateModule = generateModule;
         this.generate = generate;
         this.archiver = archiver;
         this.empty = empty;
-        this.tests = tests;
         this.custom = custom;
     }
 
@@ -71,7 +65,6 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 generate,
                 archiver,
                 empty,
-                tests,
                 custom);
     }
 
@@ -80,7 +73,6 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 generate,
                 archiver,
                 empty,
-                tests,
                 custom);
     }
 
@@ -89,16 +81,6 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 generate,
                 archiver,
                 empty,
-                tests,
-                custom);
-    }
-
-    public InferredDocumentationModule tests(boolean tests) {
-        return new InferredDocumentationModule(generateModule,
-                generate,
-                archiver,
-                empty,
-                tests,
                 custom);
     }
 
@@ -107,7 +89,6 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 generate,
                 archiver,
                 empty,
-                tests,
                 custom);
     }
 
@@ -116,7 +97,6 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 generate,
                 archiver,
                 empty,
-                tests,
                 custom);
     }
 
@@ -136,10 +116,6 @@ public class InferredDocumentationModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        Path described = BuildStep.locate(new LinkedHashSet<>(inherited.values()), BuildStep.MODULE);
-        if (!tests && described != null && SequencedProperties.ofFiles(described).getProperty("test") != null) {
-            return;
-        }
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
                     nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());

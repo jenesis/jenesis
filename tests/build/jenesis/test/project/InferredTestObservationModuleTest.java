@@ -302,7 +302,7 @@ public class InferredTestObservationModuleTest {
         return new InferredTestObservationModule(new LinkedHashSet<>(List.of(project)),
                 Map.of(),
                 Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(
-                        new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())));
+                        new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())));
     }
 
     private InferredTestObservationModule observation() {

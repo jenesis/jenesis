@@ -106,6 +106,104 @@ public class TestModuleTest {
     }
 
     @Test
+    public void runs_one_test_module_at_a_time_under_a_test_concurrency_of_one() throws Exception {
+        String running = scanned.resolve("running").toString().replace("\\", "\\\\");
+        for (String name : List.of("First", "Second")) {
+            compileSource(module.resolve(name).resolve(Javac.CLASSES + "sample"), name + "Test", """
+                    package sample;
+                    public class %sTest {
+                        @org.junit.jupiter.api.Test
+                        public void test() throws Exception {
+                            java.nio.file.Path running = java.nio.file.Path.of("%s");
+                            java.nio.file.Files.createFile(running);
+                            Thread.sleep(1000);
+                            java.nio.file.Files.delete(running);
+                            System.out.println("Ran alone!");
+                        }
+                    }
+                    """.formatted(name, running), bootModuleJars());
+        }
+        settings.put("test.concurrency", "1");
+        settings.put("process.concurrency", "2");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        for (String name : List.of("First", "Second")) {
+            executor.addSource(name + "-classes", module.resolve(name));
+            executor.addModule(
+                    name,
+                    TestModule.ofEnvironment(new Environment(settings),
+                            Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                            Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                            .isTest(candidate -> candidate.endsWith(name + "Test")).jarsOnly(false),
+                    "dependencies", name + "-classes");
+        }
+        executor.execute();
+
+        for (String name : List.of("First", "Second")) {
+            Path supplement = root.resolve(name).resolve("executed").resolve("supplement");
+            assertThat(supplement.resolve("output")).content()
+                    .as("each module's test held the marker alone, which a second test run at the same time fails to create")
+                    .contains("Ran alone!");
+            assertThat(reportedErrors(supplement)).isEmpty();
+        }
+    }
+
+    @Test
+    public void runs_test_modules_side_by_side_without_a_test_concurrency() throws Exception {
+        for (String name : List.of("First", "Second")) {
+            String own = scanned.resolve(name).toString().replace("\\", "\\\\");
+            String other = scanned.resolve(name.equals("First") ? "Second" : "First").toString().replace("\\", "\\\\");
+            compileSource(module.resolve(name).resolve(Javac.CLASSES + "sample"), name + "Test", """
+                    package sample;
+                    public class %sTest {
+                        @org.junit.jupiter.api.Test
+                        public void test() throws Exception {
+                            java.nio.file.Files.createFile(java.nio.file.Path.of("%s.marker"));
+                            long deadline = System.nanoTime() + 60_000_000_000L;
+                            while (!java.nio.file.Files.exists(java.nio.file.Path.of("%s.marker"))) {
+                                if (System.nanoTime() > deadline) {
+                                    throw new AssertionError("The other test module never ran beside this one");
+                                }
+                                Thread.sleep(50);
+                            }
+                            System.out.println("Ran together!");
+                        }
+                    }
+                    """.formatted(name, own, other), bootModuleJars());
+        }
+        settings.put("process.concurrency", "2");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        for (String name : List.of("First", "Second")) {
+            executor.addSource(name + "-classes", module.resolve(name));
+            executor.addModule(
+                    name,
+                    TestModule.ofEnvironment(new Environment(settings),
+                            Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                            Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                            .isTest(candidate -> candidate.endsWith(name + "Test")).jarsOnly(false),
+                    "dependencies", name + "-classes");
+        }
+        executor.execute();
+
+        for (String name : List.of("First", "Second")) {
+            assertThat(root.resolve(name).resolve("executed").resolve("supplement").resolve("output")).content()
+                    .as("without a test concurrency, each test module waited for the other to start, so they ran at once")
+                    .contains("Ran together!");
+        }
+    }
+
+    @Test
+    public void refuses_a_negative_test_concurrency() {
+        settings.put("test.concurrency", "-1");
+        assertThatThrownBy(() -> TestModule.ofEnvironment(new Environment(settings),
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings)))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.test.concurrency");
+    }
+
+    @Test
     public void runs_only_the_engines_the_selection_leaves_in() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", dependencies);
@@ -1450,7 +1548,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
@@ -1501,7 +1599,7 @@ public class TestModuleTest {
                                                 SequencedMap<String, String> versions,
                                                 DependencyScope scope) {
             ORDER.addAll(coordinates.sequencedKeySet());
-            return new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>());
+            return new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>());
         }
     }
 
@@ -1512,7 +1610,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .observe(new Agent())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
@@ -1538,7 +1636,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .observe(new Agent())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
@@ -1559,7 +1657,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
@@ -1664,7 +1762,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .jarsOnly(false),
                 "dependencies", "classes");
@@ -1689,7 +1787,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .jarsOnly(false),
                 "dependencies", "classes");
@@ -1707,7 +1805,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new MultiRunnerEngine())
                         .jarsOnly(false),
                 "dependencies", "classes");

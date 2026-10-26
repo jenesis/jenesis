@@ -27,6 +27,9 @@
 #     curl -fsSL https://get.jenesis.build | bash -s -- main    # a branch
 #     curl -fsSL https://get.jenesis.build | bash -s -- 1f48f48 # a commit
 #
+# A release's sources jar is installed only if it matches the SHA-256 checksum
+# the repository publishes beside it.
+#
 # When a ref is given, vendor mode copies the bootstrap sources straight from
 # the repository tree at that ref (so unreleased branches and commits work too),
 # and submodule mode checks the submodule out to it.
@@ -257,6 +260,24 @@ if [ "$RELEASE" = "1" ]; then
     say "downloading ${JAR_URL}"
     fetch_to "$JAR_URL" "$TMPDIR/sources.jar" \
         || die "failed to download $JAR_URL - check that version ${VERSION} is published, as Maven Central serves a release some minutes after it is tagged, or pass its tag v${VERSION} to install from GitHub"
+    # The repository publishes a SHA-256 checksum beside every file, and a jar
+    # that does not match it is not installed.
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256() { sha256sum "$1" | awk '{print $1}'; }
+    elif command -v shasum >/dev/null 2>&1; then
+        sha256() { shasum -a 256 "$1" | awk '{print $1}'; }
+    elif command -v openssl >/dev/null 2>&1; then
+        sha256() { openssl dgst -sha256 "$1" | awk '{print $NF}'; }
+    else
+        die "no SHA-256 tool found - install sha256sum, shasum or openssl, so the sources jar can be checked against the checksum ${MAVEN_URI} publishes"
+    fi
+    fetch_to "${JAR_URL}.sha256" "$TMPDIR/sources.jar.sha256" \
+        || die "failed to download ${JAR_URL}.sha256, the checksum of the sources jar"
+    EXPECTED="$(awk '{print tolower($1); exit}' "$TMPDIR/sources.jar.sha256")"
+    ACTUAL="$(sha256 "$TMPDIR/sources.jar" | tr '[:upper:]' '[:lower:]')"
+    [ -n "$EXPECTED" ] && [ "$EXPECTED" = "$ACTUAL" ] \
+        || die "the sources jar at ${JAR_URL} has the SHA-256 checksum ${ACTUAL}, but ${JAR_URL}.sha256 names '${EXPECTED}' - nothing was installed"
+    say "verified the SHA-256 checksum ${ACTUAL}"
     extract "$TMPDIR/sources.jar" "$TMPDIR/extract" \
         || die "failed to extract sources jar"
     SRC_DIR="$TMPDIR/extract/build/jenesis"

@@ -161,7 +161,8 @@ public interface BuildExecutor {
         }
         BuildExecutor executor = new BuildExecutorDefault(target,
                 timeout,
-                hash,
+                hash.algorithm(),
+                HashFunction.ofFileKeys(hash),
                 stepHash,
                 callback,
                 cache,

@@ -134,6 +134,37 @@ public class PinModuleInfoTest {
     }
 
     @Test
+    public void writes_a_line_for_every_pom_the_resolution_read_at_each_of_its_versions() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.pin maven/org.example/parent/pom 63 SHA-256/stale
+                 */
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/library", "1.0 SHA-256/cafebabe"));
+        SequencedProperties properties = loadInventory();
+        Path resolved = Files.createDirectories(input.resolve("resolved"));
+        int index = 0;
+        for (String version : List.of("64", "69")) {
+            Files.writeString(resolved.resolve("parent-" + version + ".pom"), "<project>" + version + "</project>");
+            properties.setProperty("module.pom." + index, "maven/org.example/parent/pom/" + version + " resolved/parent-" + version + ".pom");
+            properties.setProperty("module.pom." + index++ + ".group", "main");
+        }
+        properties.store(input.resolve(Inventory.INVENTORY));
+        String result = run(file);
+        HashDigestFunction digest = new HashDigestFunction("SHA-256");
+        assertThat(result)
+                .as("a parent read at two versions is two files, each pinned by a line of its own")
+                .contains("@jenesis.pin maven/org.example/parent/pom 64 " + digest.encodedHash(resolved.resolve("parent-64.pom")),
+                        "@jenesis.pin maven/org.example/parent/pom 69 " + digest.encodedHash(resolved.resolve("parent-69.pom")))
+                .as("a version no resolution reads any longer is dropped")
+                .doesNotContain("SHA-256/stale");
+        assertThat(run(file)).as("the lines read back as what pin writes").isEqualTo(result);
+    }
+
+    @Test
     public void renders_dependencies_under_their_resolved_group() throws IOException {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """

@@ -51,18 +51,11 @@ public final class TestSelection {
     private static Set<String> references(ClassModel model) {
         Set<String> references = new HashSet<>();
         for (PoolEntry entry : model.constantPool()) {
-            if (entry instanceof ClassEntry classEntry) {
-                addType(references, classEntry.asSymbol().descriptorString());
-            }
-        }
-        for (FieldModel field : model.fields()) {
-            addType(references, field.fieldTypeSymbol().descriptorString());
-        }
-        for (MethodModel method : model.methods()) {
-            MethodTypeDesc descriptor = method.methodTypeSymbol();
-            addType(references, descriptor.returnType().descriptorString());
-            for (ClassDesc parameter : descriptor.parameterArray()) {
-                addType(references, parameter.descriptorString());
+            switch (entry) {
+                case ClassEntry classEntry -> addType(references, classEntry.asSymbol().descriptorString());
+                case Utf8Entry utf8Entry -> addType(references, utf8Entry.stringValue());
+                default -> {
+                }
             }
         }
         return references;
@@ -71,8 +64,11 @@ public final class TestSelection {
     private static void addType(Set<String> references, String descriptor) {
         int index = 0;
         while ((index = descriptor.indexOf('L', index)) >= 0) {
-            int end = descriptor.indexOf(';', index);
-            if (end < 0) {
+            int end = index + 1;
+            while (end < descriptor.length() && descriptor.charAt(end) != ';' && descriptor.charAt(end) != '<') {
+                end++;
+            }
+            if (end == descriptor.length()) {
                 break;
             }
             references.add(descriptor.substring(index + 1, end).replace('/', '.'));

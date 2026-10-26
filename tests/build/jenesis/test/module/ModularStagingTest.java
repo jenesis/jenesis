@@ -37,7 +37,7 @@ public class ModularStagingTest {
         writeArtifact(inv, "sources.jar", "sources-bytes");
         writeArtifact(inv, "javadoc.jar", "javadoc-bytes");
 
-        BuildStepResult result = run(false, inv);
+        BuildStepResult result = run(inv);
 
         assertThat(result.next()).isTrue();
         assertThat(next.resolve("build.jenesis/build.jenesis.jar")).hasContent("classes-bytes");
@@ -55,7 +55,7 @@ public class ModularStagingTest {
         attached.store(additions.resolve(Inventory.INVENTORY));
         Files.writeString(additions.resolve("LICENSES.zip"), "zip");
 
-        run(false, inv, additions);
+        run(inv, additions);
 
         assertThat(next.resolve("org.example.cli/org.example.cli.jar")).hasContent("jar");
         assertThat(next.resolve("org.example.cli/org.example.cli-licenses.zip")).hasContent("zip");
@@ -71,7 +71,7 @@ public class ModularStagingTest {
         inventory.setProperty("module-unstaged.stage", "false");
         inventory.store(unstaged.resolve(Inventory.INVENTORY));
 
-        run(false, staged, unstaged);
+        run(staged, unstaged);
 
         assertThat(next.resolve("demo.staged/demo.staged.jar")).hasContent("jar");
         assertThat(next.resolve("demo.unstaged")).doesNotExist();
@@ -89,7 +89,7 @@ public class ModularStagingTest {
         Files.writeString(Files.createDirectory(folder.resolve("artifacts")).resolve("classes.jar"), "jar");
         Files.writeString(Files.createDirectory(folder.resolve("jmods")).resolve("demo.foo.jmod"), "jmod");
 
-        run(false, folder);
+        run(folder);
 
         assertThat(next.resolve("demo.foo/demo.foo.jar")).hasContent("jar");
         assertThat(next.resolve("demo.foo/demo.foo.jmod")).hasContent("jmod");
@@ -110,7 +110,7 @@ public class ModularStagingTest {
         attached.store(additions.resolve(Inventory.INVENTORY));
         Files.writeString(Files.createDirectories(additions.resolve("attachment/licenses")).resolve("LICENSES.zip"), "zip");
 
-        run(false, folder, additions);
+        run(folder, additions);
 
         assertThat(next.resolve("demo.foo/demo.foo.jar")).hasContent("jar");
         assertThat(next.resolve("demo.foo/demo.foo-licenses.zip")).hasContent("zip");
@@ -130,7 +130,7 @@ public class ModularStagingTest {
         Files.writeString(folder.resolve("sources.jar"), "sources");
         Files.writeString(folder.resolve("other.jar"), "other");
 
-        assertThatThrownBy(() -> run(false, folder))
+        assertThatThrownBy(() -> run(folder))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("demo.foo-sources.jar is staged already");
     }
@@ -147,7 +147,7 @@ public class ModularStagingTest {
         Files.writeString(folder.resolve("classes.jar"), "jar");
         Files.writeString(folder.resolve("other.jar"), "other");
 
-        run(false, folder);
+        run(folder);
 
         assertThat(next.resolve("demo.foo/demo.foo-sources.jar")).hasContent("other");
     }
@@ -169,7 +169,7 @@ public class ModularStagingTest {
         inventory.setProperty("module-mod.pom", "../../produce/describe/pom/output/pom.xml");
         inventory.store(inventoryDir.resolve(Inventory.INVENTORY));
 
-        run(false, inventoryDir);
+        run(inventoryDir);
 
         assertThat(next.resolve("demo.foo/demo.foo.jar")).hasContent("classes-bytes");
         assertThat(next.resolve("demo.foo/demo.foo.pom")).hasContent("<project/>");
@@ -188,7 +188,7 @@ public class ModularStagingTest {
         Files.writeString(Files.createDirectory(folder.resolve("artifacts")).resolve("classes.jar"), "jar");
         Files.writeString(Files.createDirectory(folder.resolve("bom")).resolve("pin-demo.foo.properties"), "a = 1.0\n");
 
-        run(false, folder);
+        run(folder);
 
         assertThat(next.resolve("demo.foo/1.0.0/demo.foo.jar")).hasContent("jar");
         assertThat(next.resolve("demo.foo/1.0.0/demo.foo.properties")).hasContent("a = 1.0\n");
@@ -202,7 +202,7 @@ public class ModularStagingTest {
         writeArtifact(inv, "sources.jar", "s");
         writeArtifact(inv, "javadoc.jar", "j");
 
-        run(false, inv);
+        run(inv);
 
         assertThat(next.resolve("build.jenesis/1.0.0/build.jenesis.jar")).hasContent("c");
         assertThat(next.resolve("build.jenesis/1.0.0/build.jenesis-sources.jar")).hasContent("s");
@@ -216,14 +216,14 @@ public class ModularStagingTest {
         Path bar = inventory("bar", "com.example.bar", null, null, "classes.jar");
         writeArtifact(bar, "classes.jar", "bar-bytes");
 
-        run(false, foo, bar);
+        run(foo, bar);
 
         assertThat(next.resolve("com.example.foo/com.example.foo.jar")).hasContent("foo-bytes");
         assertThat(next.resolve("com.example.bar/com.example.bar.jar")).hasContent("bar-bytes");
     }
 
     @Test
-    public void default_omits_test_modules() throws IOException {
+    public void omits_a_test_module_its_inventory_marks_unstaged() throws IOException {
         Path main = inventory("foo", "foo", null, null, "classes.jar");
         writeArtifact(main, "classes.jar", "main");
         Path test = inventory("foo-test", "foo.test", "foo", null,
@@ -231,22 +231,23 @@ public class ModularStagingTest {
         writeArtifact(test, "classes.jar", "test-classes");
         writeArtifact(test, "sources.jar", "test-sources");
         writeArtifact(test, "javadoc.jar", "test-javadoc");
+        unstaged(test);
 
-        run(false, main, test);
+        run(main, test);
 
         assertThat(next.resolve("foo/foo.jar")).hasContent("main");
         assertThat(next.resolve("foo.test")).doesNotExist();
     }
 
     @Test
-    public void include_tests_emits_test_module_files_under_their_module_name() throws IOException {
+    public void emits_the_files_of_a_staged_test_module_under_its_module_name() throws IOException {
         Path test = inventory("foo-test", "foo.test", "foo", null,
                 "classes.jar", "sources.jar", "javadoc.jar");
         writeArtifact(test, "classes.jar", "test-classes");
         writeArtifact(test, "sources.jar", "test-sources");
         writeArtifact(test, "javadoc.jar", "test-javadoc");
 
-        run(true, test);
+        run(test);
 
         assertThat(next.resolve("foo.test/foo.test.jar")).hasContent("test-classes");
         assertThat(next.resolve("foo.test/foo.test-sources.jar")).hasContent("test-sources");
@@ -254,15 +255,15 @@ public class ModularStagingTest {
     }
 
     @Test
-    public void abstract_test_module_is_not_staged_without_tests() throws IOException {
-        run(false, abstractTestModule());
+    public void omits_an_abstract_test_module_its_inventory_marks_unstaged() throws IOException {
+        run(unstaged(abstractTestModule()));
 
         assertThat(next.resolve("foo.testing")).doesNotExist();
     }
 
     @Test
-    public void abstract_test_module_is_staged_when_tests_are_included() throws IOException {
-        run(true, abstractTestModule());
+    public void stages_an_abstract_test_module_its_inventory_does_not_mark_unstaged() throws IOException {
+        run(abstractTestModule());
 
         assertThat(next.resolve("foo.testing/foo.testing.jar")).hasContent("jar");
     }
@@ -285,7 +286,7 @@ public class ModularStagingTest {
         Path stray = Files.createDirectory(source.resolve("stray"));
         writeArtifact(stray, "classes.jar", "stray");
 
-        BuildStepResult result = run(false, stray);
+        BuildStepResult result = run(stray);
 
         assertThat(result.next()).isTrue();
         try (Stream<Path> stream = Files.walk(next)) {
@@ -301,7 +302,7 @@ public class ModularStagingTest {
         props.store(folder.resolve(Inventory.INVENTORY));
         Files.createDirectories(folder.resolve("packages").resolve("app"));
 
-        BuildStepResult result = run(false, folder);
+        BuildStepResult result = run(folder);
 
         assertThat(result.next()).isTrue();
         try (Stream<Path> stream = Files.walk(next)) {
@@ -314,7 +315,7 @@ public class ModularStagingTest {
         Path inv = inventory("foo", "foo", null, null, "classes.jar", "sources.jar", "javadoc.jar");
         writeArtifact(inv, "classes.jar", "c");
 
-        run(false, inv);
+        run(inv);
 
         assertThat(next.resolve("foo/foo.jar")).hasContent("c");
         assertThat(next.resolve("foo/foo-sources.jar")).doesNotExist();
@@ -326,7 +327,7 @@ public class ModularStagingTest {
         Path inv = inventory("foo", "../escape", null, null, "classes.jar");
         writeArtifact(inv, "classes.jar", "c");
 
-        assertThatThrownBy(() -> run(false, inv))
+        assertThatThrownBy(() -> run(inv))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -372,7 +373,16 @@ public class ModularStagingTest {
         return Files.writeString(dir.resolve(filename), content);
     }
 
-    private BuildStepResult run(boolean includeTests, Path... inventoryFolders) throws IOException {
+    private static Path unstaged(Path folder) throws IOException {
+        SequencedProperties inventory = SequencedProperties.ofFiles(folder.resolve(Inventory.INVENTORY));
+        for (String prefix : Inventory.prefixes(inventory)) {
+            inventory.setProperty(prefix + ".stage", "false");
+        }
+        inventory.store(folder.resolve(Inventory.INVENTORY));
+        return folder;
+    }
+
+    private BuildStepResult run(Path... inventoryFolders) throws IOException {
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
         for (Path folder : inventoryFolders) {
             Map<Path, Checksum> checksums = new LinkedHashMap<>();
@@ -383,7 +393,7 @@ public class ModularStagingTest {
             }
             arguments.put(folder.getFileName().toString(), new BuildStepArgument(folder, checksums));
         }
-        return new ModularStaging(includeTests).apply(Runnable::run,
+        return new ModularStaging().apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement, persistent),
                         arguments)
                 .toCompletableFuture()

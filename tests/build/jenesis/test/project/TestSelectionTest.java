@@ -1,6 +1,8 @@
 package build.jenesis.test.project;
 
 import module java.base;
+import java.lang.classfile.Annotation;
+import java.lang.classfile.Signature;
 import module org.junit.jupiter.api;
 import build.jenesis.project.TestSelection;
 
@@ -47,6 +49,40 @@ public class TestSelectionTest {
 
         assertThat(TestSelection.of(classes).impacted(List.of("java.lang.String"))).isEmpty();
         assertThat(TestSelection.of(classes).impacted(List.of("a.Only"))).containsExactly("a.Only");
+    }
+
+    @Test
+    public void selects_a_class_that_names_a_change_only_as_an_annotation_value() {
+        Map<String, Set<String>> classes = new LinkedHashMap<>();
+        classes.put("a.HStoreType", reference("a.HStoreType"));
+        classes.put("a.Type", reference("a.Type"));
+        classes.put("a.Entity", TestSelection.references(ClassFile.of().build(ClassDesc.of("a.Entity"),
+                builder -> builder.withField("field",
+                        ClassDesc.of("java.util.Map"),
+                        field -> field.withFlags(ClassFile.ACC_PRIVATE).with(RuntimeVisibleAnnotationsAttribute.of(
+                                Annotation.of(ClassDesc.of("a.Type"),
+                                        AnnotationElement.of("value", AnnotationValue.ofClass(ClassDesc.of("a.HStoreType"))))))))));
+
+        assertThat(TestSelection.of(classes).impacted(List.of("a.HStoreType")))
+                .as("@Type(HStoreType.class) stores the class as a descriptor, not as a class of the constant pool")
+                .containsExactlyInAnyOrder("a.HStoreType", "a.Entity");
+        assertThat(TestSelection.of(classes).impacted(List.of("a.Type")))
+                .as("the annotation's own type is a descriptor too")
+                .containsExactlyInAnyOrder("a.Type", "a.Entity");
+    }
+
+    @Test
+    public void selects_a_class_that_names_a_change_only_as_a_type_argument() {
+        Map<String, Set<String>> classes = new LinkedHashMap<>();
+        classes.put("a.Item", reference("a.Item"));
+        classes.put("a.Holder", TestSelection.references(ClassFile.of().build(ClassDesc.of("a.Holder"),
+                builder -> builder.withField("field",
+                        ClassDesc.of("java.util.List"),
+                        field -> field.withFlags(ClassFile.ACC_PRIVATE)
+                                .with(SignatureAttribute.of(Signature.parseFrom("Ljava/util/List<La/Item;>;")))))));
+
+        assertThat(TestSelection.of(classes).impacted(List.of("a.Item")))
+                .containsExactlyInAnyOrder("a.Item", "a.Holder");
     }
 
     private static Set<String> reference(String name, String... fieldTypes) {
