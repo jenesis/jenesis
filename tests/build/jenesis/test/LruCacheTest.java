@@ -13,15 +13,18 @@ public class LruCacheTest {
     private Path files;
 
     @Test
-    public void evicts_the_entry_read_least_recently() {
+    public void evicts_the_entries_not_read_since_the_last_eviction() {
         LruCache<String, String> cache = new LruCache<>(2);
         cache.put("first", "1");
         cache.put("second", "2");
-        assertThat(cache.get("first")).isEqualTo("1");
         cache.put("third", "3");
-        assertThat(cache.get("second")).as("the entry read least recently gives way").isNull();
+        assertThat(cache.size()).as("an entry added or read since the last eviction is kept by the next").isEqualTo(3);
         assertThat(cache.get("first")).isEqualTo("1");
-        assertThat(cache.get("third")).isEqualTo("3");
+        cache.put("fourth", "4");
+        assertThat(cache.get("second")).as("an entry not read since the last eviction gives way").isNull();
+        assertThat(cache.get("third")).isNull();
+        assertThat(cache.get("first")).isEqualTo("1");
+        assertThat(cache.get("fourth")).isEqualTo("4");
         assertThat(cache.size()).isEqualTo(2);
     }
 
