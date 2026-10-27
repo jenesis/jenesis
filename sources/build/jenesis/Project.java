@@ -3050,11 +3050,14 @@ public record Project(
             for (String key : inherited.sequencedKeySet()) {
                 (key.startsWith(prefix) ? released : built).add(key);
             }
-            SequencedSet<String> paths = new LinkedHashSet<>();
-            for (Path folder : inherited.values()) {
-                Path inventoryFile = folder.resolve(Inventory.INVENTORY);
+            SequencedSet<String> paths = new LinkedHashSet<>(), inventories = new LinkedHashSet<>();
+            for (Map.Entry<String, Path> entry : inherited.entrySet()) {
+                Path inventoryFile = entry.getValue().resolve(Inventory.INVENTORY);
                 if (!Files.isRegularFile(inventoryFile)) {
                     continue;
+                }
+                if (built.contains(entry.getKey())) {
+                    inventories.add(entry.getKey());
                 }
                 SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
                 for (String key : inventory.stringPropertyNames()) {
@@ -3071,19 +3074,19 @@ public record Project(
                 }
                 BuildStep step = stepFactory.apply(path, declaration);
                 buildExecutor.addStep("module-" + BuildExecutorModule.encodePath(path),
-                        file != null && step instanceof PinModuleInfo pin
-                                ? pin.exported(file.getFileName().toString()).exportedGroups(groups)
+                        step instanceof PinModuleInfo pin
+                                ? file == null ? pin : pin.exported(file.getFileName().toString()).exportedGroups(groups)
                                 : step,
-                        built);
+                        step instanceof PinModuleInfo ? inventories : built);
             }
             if (file != null) {
                 buildExecutor.addStep("file",
                         new PinFile(paths, file, groups, provided, hashFunction),
-                        built);
+                        inventories);
             }
             buildExecutor.addStep("divergence",
                     new Divergence(paths, printing, palette),
-                    built);
+                    inventories);
             if (!plugins.resolutions().isEmpty()) {
                 SequencedSet<String> tooled = new LinkedHashSet<>(released);
                 built.stream()
