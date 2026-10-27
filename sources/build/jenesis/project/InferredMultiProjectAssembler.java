@@ -655,7 +655,10 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     String named = descriptor.name().endsWith("-")
                             ? descriptor.name().substring(0, descriptor.name().length() - 1)
                             : descriptor.name();
-                    sub.addStep("inventory", new Inventory().module(named), images.stream());
+                    String prefix = MultiProjectModule.MODULE + "-";
+                    sub.addStep("inventory", new Inventory().module(named.startsWith(prefix)
+                            ? prefix + BuildExecutorModule.decodePath(named.substring(prefix.length()))
+                            : named), images.stream());
                 }
             }, packaging.nativeImage()
                     ? AssemblyRequirement.of().after(AssemblyDescriptor.BUILD).tested(AssemblyDescriptor.BUILD)

@@ -157,6 +157,25 @@ public class ImageStagingTest {
     }
 
     @Test
+    public void stages_a_nested_module_into_one_folder_named_like_its_step() throws IOException {
+        Path folder = Files.createDirectory(source.resolve("module"));
+        Path image = folder.resolve("runtime");
+        Files.createDirectories(image.resolve("bin"));
+        Files.writeString(image.resolve("bin").resolve("java"), "launcher");
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-api/client.image", "runtime");
+        inventory.store(folder.resolve(Inventory.INVENTORY));
+
+        new ImageStaging("image").apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement, persistent),
+                        new LinkedHashMap<>(Map.of("module", new BuildStepArgument(folder, Map.of()))))
+                .toCompletableFuture()
+                .join();
+
+        assertThat(next.resolve("module-api+client/bin/java")).hasContent("launcher");
+    }
+
+    @Test
     public void arguments_without_inventory_are_skipped() throws IOException {
         Path stray = Files.createDirectory(source.resolve("stray"));
         Files.createDirectories(stray.resolve("packages").resolve("app"));
