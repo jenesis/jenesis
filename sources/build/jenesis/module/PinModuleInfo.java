@@ -177,10 +177,11 @@ public class PinModuleInfo implements BuildStep {
 
     private CompletionStage<BuildStepResult> pin(SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        SequencedMap<String, Inventory.Dependency> closure = Inventory.closure(arguments.values(), path);
+        Inventory.Inventories inventories = Inventory.Inventories.read(arguments.values());
+        SequencedMap<String, Inventory.Dependency> closure = inventories.closure(path);
         Set<String> skipped = new HashSet<>();
         if (exported != null) {
-            for (String imported : Inventory.bomImports(arguments.values(), path)) {
+            for (String imported : inventories.bomImports(path)) {
                 int slash = imported.indexOf('/');
                 String group = imported.substring(0, slash);
                 if (imported.substring(slash + 1).equals(exported)
@@ -191,10 +192,10 @@ public class PinModuleInfo implements BuildStep {
         }
         SequencedMap<String, Inventory.Dependency> pinned = new LinkedHashMap<>(closure);
         pinned.values().removeIf(dependency -> skipped.contains(dependency.group()));
-        Set<String> internal = collectInternal(Inventory.identities(arguments.values()));
+        Set<String> internal = collectInternal(inventories.identities());
         SequencedMap<String, String> entries = collectEntries(pinned, internal, checksum ? hashFunction : null);
         if (checksum) {
-            for (Map.Entry<String, Inventory.Dependency> pom : Inventory.poms(arguments.values(), path).entrySet()) {
+            for (Map.Entry<String, Inventory.Dependency> pom : inventories.poms(path).entrySet()) {
                 if (skipped.contains(pom.getValue().group())) {
                     continue;
                 }
@@ -206,7 +207,7 @@ public class PinModuleInfo implements BuildStep {
         Set<String> covered = new HashSet<>();
         SequencedMap<String, String> references = new LinkedHashMap<>();
         if (!flatten) {
-            SequencedMap<String, String> managed = Inventory.bomEntries(arguments.values(), path);
+            SequencedMap<String, String> managed = inventories.bomEntries(path);
             Iterator<Map.Entry<String, String>> it = entries.entrySet().iterator();
             while (it.hasNext()) {
                 Map.Entry<String, String> entry = it.next();
@@ -217,14 +218,14 @@ public class PinModuleInfo implements BuildStep {
                     it.remove();
                 }
             }
-            for (Map.Entry<String, Path> reference : Inventory.bomReferences(arguments.values(), path).entrySet()) {
+            for (Map.Entry<String, Path> reference : inventories.bomReferences(path).entrySet()) {
                 int lastSlash = reference.getKey().lastIndexOf('/');
                 String version = reference.getKey().substring(lastSlash + 1);
                 references.put(reference.getKey().substring(0, lastSlash), checksum
                         ? version + " " + hashFunction.encodedHash(reference.getValue())
                         : version);
             }
-            for (Map.Entry<String, String> reference : Inventory.bomVersions(arguments.values(), path).entrySet()) {
+            for (Map.Entry<String, String> reference : inventories.bomVersions(path).entrySet()) {
                 references.putIfAbsent(reference.getKey(), reference.getValue());
             }
         }

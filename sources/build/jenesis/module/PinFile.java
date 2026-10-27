@@ -33,8 +33,9 @@ public record PinFile(SequencedSet<String> paths,
             }
             SequencedProperties.ofFiles(other).forEachProperty((key, value) -> covered.putIfAbsent(key, value.trim()));
         }
+        Inventory.Inventories inventories = Inventory.Inventories.read(arguments.values());
         Set<String> internal = new LinkedHashSet<>();
-        for (String identity : Inventory.identities(arguments.values())) {
+        for (String identity : inventories.identities()) {
             internal.add(identity);
             int first = identity.indexOf('/'), last = identity.lastIndexOf('/');
             if (first > 0 && last > first) {
@@ -47,7 +48,7 @@ public record PinFile(SequencedSet<String> paths,
         for (String path : paths) {
             String module = path.isEmpty() ? "." : path;
             for (Map.Entry<String, Inventory.Dependency> dependency
-                    : Inventory.closure(arguments.values(), path).entrySet()) {
+                    : inventories.closure(path).entrySet()) {
                 String group = dependency.getValue().group();
                 String key = dependency.getKey().substring(group.length() + 1);
                 if (!groups.contains("*") && !groups.contains(group) || internal.contains(key)) {
@@ -96,7 +97,7 @@ public record PinFile(SequencedSet<String> paths,
                     conflicts.add(entry + " " + previous + " in " + owners.get(entry) + ", " + value + " in " + owner);
                 }
             }
-            for (Map.Entry<String, Inventory.Dependency> pom : Inventory.poms(arguments.values(), path).entrySet()) {
+            for (Map.Entry<String, Inventory.Dependency> pom : inventories.poms(path).entrySet()) {
                 String group = pom.getValue().group();
                 if (!groups.contains("*") && !groups.contains(group)) {
                     continue;
