@@ -120,6 +120,11 @@ public class BuildExecutorModuleTest {
     }
 
     @Test
+    public void decodes_an_encoded_path_back_to_its_segments() {
+        assertThat(BuildExecutorModule.decodePath(BuildExecutorModule.encodePath("a+b/c d"))).isEqualTo("a+b/c d");
+    }
+
+    @Test
     public void encodes_the_root_path_as_empty() {
         assertThat(BuildExecutorModule.encodePath("")).isEmpty();
     }
