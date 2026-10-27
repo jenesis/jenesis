@@ -37,6 +37,7 @@ public enum PathPlacement {
             NATIVE_ACCESS = "Jenesis-Native-Access",
             PREVIEW = "Jenesis-Preview";
     private static final Pattern DERIVED_VERSION = Pattern.compile("\\d+(\\..*)?");
+    private static final LruCache<List<Object>, Optional<ModuleDescriptor>> DESCRIPTORS = new LruCache<>(8192);
 
     private final boolean modular;
 
@@ -104,25 +105,29 @@ public enum PathPlacement {
                     return ModuleDescriptor.read(input);
                 }
             }
-            try (JarFile jar = new JarFile(path.toFile(), true, ZipFile.OPEN_READ, JarFile.runtimeVersion())) {
-                JarEntry moduleInfo = jar.getJarEntry("module-info.class");
-                if (moduleInfo != null) {
-                    try (InputStream input = jar.getInputStream(moduleInfo)) {
-                        return ModuleDescriptor.read(input);
+            Path declaration = declaration(path);
+            boolean declared = Files.isRegularFile(declaration);
+            List<Object> key = List.of(LruCache.FileKey.of(path), declared ? LruCache.FileKey.of(declaration) : declaration);
+            return DESCRIPTORS.get(key, _ -> {
+                try (JarFile jar = new JarFile(path.toFile(), true, ZipFile.OPEN_READ, JarFile.runtimeVersion())) {
+                    JarEntry moduleInfo = jar.getJarEntry("module-info.class");
+                    if (moduleInfo != null) {
+                        try (InputStream input = jar.getInputStream(moduleInfo)) {
+                            return Optional.of(ModuleDescriptor.read(input));
+                        }
+                    }
+                    Manifest manifest = jar.getManifest();
+                    String automatic = manifest == null
+                            ? null
+                            : manifest.getMainAttributes().getValue("Automatic-Module-Name");
+                    if (automatic != null) {
+                        return Optional.of(ModuleDescriptor.newAutomaticModule(automatic).build());
                     }
                 }
-                Manifest manifest = jar.getManifest();
-                String automatic = manifest == null
-                        ? null
-                        : manifest.getMainAttributes().getValue("Automatic-Module-Name");
-                if (automatic != null) {
-                    return ModuleDescriptor.newAutomaticModule(automatic).build();
-                }
-            }
-            Path declaration = declaration(path);
-            return Files.isRegularFile(declaration)
-                    ? ModuleDescriptor.newAutomaticModule(Files.readString(declaration).trim()).build()
-                    : null;
+                return declared
+                        ? Optional.of(ModuleDescriptor.newAutomaticModule(Files.readString(declaration).trim()).build())
+                        : Optional.empty();
+            }).orElse(null);
         } catch (IOException | RuntimeException _) {
             return null;
         }
