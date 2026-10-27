@@ -173,6 +173,39 @@ public class PathPlacementTest {
     }
 
     @Test
+    public void module_descriptor_reads_a_jar_again_once_it_is_replaced() throws IOException {
+        Path jar = root.resolve("replaced.jar");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar))) {
+            output.putNextEntry(new JarEntry("module-info.class"));
+            output.write(moduleInfo("sample.first"));
+            output.closeEntry();
+        }
+        assertThat(PathPlacement.moduleDescriptor(jar).name()).isEqualTo("sample.first");
+        FileTime modified = Files.getLastModifiedTime(jar);
+        Path replacement = root.resolve("replacement.jar");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(replacement))) {
+            output.putNextEntry(new JarEntry("module-info.class"));
+            output.write(moduleInfo("sample.other"));
+            output.closeEntry();
+        }
+        Files.move(replacement, jar, StandardCopyOption.REPLACE_EXISTING);
+        Files.setLastModifiedTime(jar, FileTime.from(modified.toInstant().plusSeconds(1)));
+        assertThat(PathPlacement.moduleDescriptor(jar).name()).isEqualTo("sample.other");
+    }
+
+    @Test
+    public void module_descriptor_reads_a_declaration_written_after_the_jar_was_read() throws IOException {
+        Path jar = root.resolve("undeclared.jar");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar))) {
+            output.putNextEntry(new JarEntry("sample/resource.txt"));
+            output.closeEntry();
+        }
+        assertThat(PathPlacement.moduleDescriptor(jar)).isNull();
+        Files.writeString(PathPlacement.declaration(jar), "sample.declared");
+        assertThat(PathPlacement.moduleDescriptor(jar).name()).isEqualTo("sample.declared");
+    }
+
+    @Test
     public void module_descriptor_reads_a_declared_automatic_module() throws IOException {
         Path jar = root.resolve("named.jar");
         Manifest manifest = new Manifest();

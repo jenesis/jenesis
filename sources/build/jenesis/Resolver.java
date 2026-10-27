@@ -158,20 +158,7 @@ public interface Resolver extends Serializable {
             throw new IllegalStateException("Malformed checksum '" + checksum
                     + "' for " + coordinate + ", expected <algorithm>/<hex>");
         }
-        MessageDigest digest;
-        try {
-            digest = MessageDigest.getInstance(checksum.substring(0, slash));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
-        try (InputStream inputStream = Files.newInputStream(file)) {
-            byte[] buffer = new byte[8192];
-            int read;
-            while ((read = inputStream.read(buffer)) != -1) {
-                digest.update(buffer, 0, read);
-            }
-        }
-        byte[] actual = digest.digest();
+        byte[] actual = HashFunction.ofFileKeys(new HashDigestFunction(checksum.substring(0, slash))).hash(file);
         if (!Arrays.equals(actual, HexFormat.of().parseHex(checksum.substring(slash + 1)))) {
             throw new IllegalStateException("Mismatched digest for " + coordinate + ": " + file + " is "
                     + checksum.substring(0, slash) + "/" + HexFormat.of().formatHex(actual) + " where the pin names "
