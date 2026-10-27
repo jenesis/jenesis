@@ -599,6 +599,27 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void a_nested_module_lists_its_package_inventory_under_its_path() throws IOException {
+        Fixture base = setUp("path=api/client\n", false, false, false);
+        Files.writeString(base.configuration().resolve("packaging.properties"), "launcher=true\n");
+        Fixture fixture = new Fixture(base.descriptor().name("module-api+client"),
+                base.build(),
+                base.manifests(),
+                base.sources(),
+                base.artifacts(),
+                base.configuration(),
+                base.profile());
+        SequencedMap<String, Path> outputs = fixture.execute(new InferredMultiProjectAssembler(),
+                served(Files.createDirectory(root.resolve("served"))),
+                Map.of("maven", Resolver.identity()),
+                "package/inventory");
+        assertThat(SequencedProperties.ofFiles(outputs.get("package/inventory").resolve(Inventory.INVENTORY)).stringPropertyNames())
+                .as("the package phase keys what it resolved by the module's path, as the build's inventory and pin do")
+                .isNotEmpty()
+                .allMatch(key -> key.startsWith("module-api/client."));
+    }
+
+    @Test
     public void launcher_describes_the_application_with_the_dependencies_of_the_module_and_the_launcher() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("packaging.properties"), "launcher=true\n");

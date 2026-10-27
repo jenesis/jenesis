@@ -1,6 +1,7 @@
 package build.jenesis.step;
 
 import module java.base;
+import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -49,7 +50,9 @@ public class ImageStaging implements BuildStep {
                     continue;
                 }
                 String prefix = entry.substring(0, entry.length() - suffix.length());
-                Path target = noFolder ? context.next() : context.next().resolve(prefix);
+                Path target = noFolder ? context.next() : context.next().resolve(prefix.startsWith("module-")
+                        ? "module-" + BuildExecutorModule.encodePath(prefix.substring("module-".length()))
+                        : prefix);
                 Files.createDirectories(target);
                 Files.walkFileTree(image, new SimpleFileVisitor<>() {
                     @Override

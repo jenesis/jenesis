@@ -31,6 +31,12 @@ public interface BuildExecutorModule {
         return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
 
+    static String decodePath(String path) {
+        return Arrays.stream(path.split("\\+", -1))
+                .map(BuildExecutorModule::decode)
+                .collect(Collectors.joining("/"));
+    }
+
     default Optional<String> resolve(String path) {
         return Optional.of(path);
     }
