@@ -98,8 +98,9 @@ public class PinPom implements BuildStep {
 
     private CompletionStage<BuildStepResult> pin(SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        SequencedMap<String, Inventory.Dependency> closure = Inventory.closure(arguments.values(), path);
-        Set<String> internal = collectInternal(Inventory.identities(arguments.values()));
+        Inventory.Inventories inventories = Inventory.Inventories.read(arguments.values());
+        SequencedMap<String, Inventory.Dependency> closure = inventories.closure(path);
+        Set<String> internal = collectInternal(inventories.identities());
         Set<String> declared = new HashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -119,7 +120,7 @@ public class PinPom implements BuildStep {
             }
         }
         SequencedMap<String, String> entries = collectEntries(closure, internal, declared, hashFunction);
-        SequencedMap<String, Inventory.Dependency> poms = Inventory.poms(arguments.values(), path);
+        SequencedMap<String, Inventory.Dependency> poms = inventories.poms(path);
         Set<String> groups = new HashSet<>();
         Stream.concat(closure.values().stream(), poms.values().stream()).forEach(dependency -> groups.add(dependency.group()));
         Predicate<String> retained = retain.retains(groups);
