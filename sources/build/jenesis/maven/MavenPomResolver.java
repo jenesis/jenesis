@@ -1302,7 +1302,8 @@ public class MavenPomResolver implements MavenResolver {
                             false);
                 } else {
                     Path file = candidate.file().orElse(null);
-                    Assembly assembly = file == null ? null : new Assembly(LruCache.FileKey.of(file),
+                    Assembly assembly = file == null ? null : new Assembly(file.toAbsolutePath().normalize(),
+                            LruCache.FileKey.of(file),
                             candidate.internal(),
                             jdk,
                             osName,
@@ -2187,7 +2188,8 @@ public class MavenPomResolver implements MavenResolver {
                                  boolean local) {
     }
 
-    private record Assembly(LruCache.FileKey file,
+    private record Assembly(Path path,
+                            LruCache.FileKey file,
                             boolean internal,
                             String jdk,
                             String osName,

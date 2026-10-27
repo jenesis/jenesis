@@ -26,6 +26,21 @@ public class HashFunctionTest {
     }
 
     @Test
+    public void hashes_a_linked_file_once_while_more_links_to_it_are_made() throws IOException {
+        Assumptions.assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        Path file = Files.writeString(folder.resolve("foo"), "bar");
+        Files.createLink(folder.resolve("qux"), file);
+        AtomicInteger hashed = new AtomicInteger();
+        HashFunction hash = HashFunction.ofFileKeys(counted(hashed));
+        hash.hash(file);
+        Files.createLink(folder.resolve("baz"), file);
+        hash.hash(file);
+        assertThat(hashed)
+                .as("a new link changes the inode's change time, but not the contents the hash was taken of")
+                .hasValue(1);
+    }
+
+    @Test
     public void hashes_a_file_without_a_second_link_every_time() throws IOException {
         Path file = Files.writeString(folder.resolve("foo"), "bar");
         AtomicInteger hashed = new AtomicInteger();
