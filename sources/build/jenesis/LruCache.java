@@ -37,6 +37,24 @@ public final class LruCache<K, V> {
 
     public void put(K key, V value) {
         entries.put(key, new Entry<>(value, new AtomicBoolean(true)));
+        sweep();
+    }
+
+    public V putIfAbsent(K key, V value) {
+        Entry<V> entry = entries.putIfAbsent(key, new Entry<>(value, new AtomicBoolean(true)));
+        if (entry != null) {
+            entry.used().set(true);
+            return entry.value();
+        }
+        sweep();
+        return null;
+    }
+
+    public void remove(K key) {
+        entries.remove(key);
+    }
+
+    private void sweep() {
         if (entries.size() > capacity && sweeping.compareAndSet(false, true)) {
             try {
                 entries.values().removeIf(entry -> !entry.used().getAndSet(false));
@@ -59,19 +77,13 @@ public final class LruCache<K, V> {
     private record Entry<V>(V value, AtomicBoolean used) {
     }
 
-    public record FileKey(Path path, Object identity, long size, FileTime modified, FileTime changed) {
+    public record FileKey(Object identity, long size, FileTime modified) {
 
         public static FileKey of(Path file) throws IOException {
-            Path path = file.toAbsolutePath().normalize();
-            BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class);
-            return new FileKey(path,
-                    attributes.fileKey(),
+            BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class);
+            return new FileKey(attributes.fileKey() == null ? file.toAbsolutePath().normalize() : attributes.fileKey(),
                     attributes.size(),
-                    attributes.lastModifiedTime(),
-                    path.getFileSystem().supportedFileAttributeViews().contains("unix")
-                            && Files.getAttribute(path, "unix:ctime") instanceof FileTime changed
-                            ? changed
-                            : attributes.creationTime());
+                    attributes.lastModifiedTime());
         }
     }
 }

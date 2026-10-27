@@ -107,7 +107,8 @@ public enum PathPlacement {
             }
             Path declaration = declaration(path);
             boolean declared = Files.isRegularFile(declaration);
-            List<Object> key = List.of(LruCache.FileKey.of(path), declared ? LruCache.FileKey.of(declaration) : declaration);
+            List<Object> key = List.of(LruCache.FileKey.of(path),
+                    declared ? Optional.of(LruCache.FileKey.of(declaration)) : Optional.empty());
             return DESCRIPTORS.get(key, _ -> {
                 try (JarFile jar = new JarFile(path.toFile(), true, ZipFile.OPEN_READ, JarFile.runtimeVersion())) {
                     JarEntry moduleInfo = jar.getJarEntry("module-info.class");

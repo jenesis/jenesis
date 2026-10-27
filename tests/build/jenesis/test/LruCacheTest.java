@@ -66,6 +66,14 @@ public class LruCacheTest {
     }
 
     @Test
+    public void a_file_key_is_shared_by_the_links_of_a_file() throws IOException {
+        Assumptions.assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
+        Path file = Files.writeString(files.resolve("file"), "foo");
+        Path link = Files.createLink(files.resolve("link"), file);
+        assertThat(LruCache.FileKey.of(link)).isEqualTo(LruCache.FileKey.of(file));
+    }
+
+    @Test
     public void a_file_key_identifies_a_file_on_a_file_system_without_inodes() throws IOException {
         Path archive = files.resolve("archive.zip");
         try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(archive))) {
@@ -76,7 +84,9 @@ public class LruCacheTest {
         try (FileSystem zip = FileSystems.newFileSystem(archive)) {
             Path file = zip.getPath("file");
             LruCache.FileKey key = LruCache.FileKey.of(file);
-            assertThat(key.identity()).as("a zip file system names no file key, as Windows does not").isNull();
+            assertThat(key.identity())
+                    .as("a zip file system names no file key, as Windows does not, so the path stands in")
+                    .isEqualTo(file.toAbsolutePath());
             assertThat(key.size()).isEqualTo(3);
             assertThat(LruCache.FileKey.of(file)).isEqualTo(key);
         }
