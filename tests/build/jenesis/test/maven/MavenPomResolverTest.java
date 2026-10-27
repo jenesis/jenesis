@@ -378,6 +378,52 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void a_resolution_reads_a_parent_changed_since_the_last_one() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>artifact</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>${other.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        for (String version : List.of("1", "2")) {
+            addToRepository("group", "parent", "1", """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>group</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                        <packaging>pom</packaging>
+                        <properties>
+                            <other.version>%s</other.version>
+                        </properties>
+                    </project>
+                    """.formatted(version));
+            Files.setLastModifiedTime(repository.resolve("group/parent/1/parent-1.pom"),
+                    FileTime.from(Instant.now().plusSeconds(Integer.parseInt(version))));
+            addToRepository("other", "artifact", version, leafPom());
+            assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null))
+                    .as("the child is unchanged, but what its parent passes down is read anew")
+                    .containsExactly(Map.entry(
+                            new MavenDependencyKey("other", "artifact", "jar", null),
+                            new MavenDependencyValue(version, MavenDependencyScope.COMPILE, null, null, null)));
+        }
+    }
+
+    @Test
     public void can_resolve_dependencies_with_property() throws IOException {
         addToRepository("group", "artifact", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>

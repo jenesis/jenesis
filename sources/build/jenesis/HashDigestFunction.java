@@ -4,6 +4,8 @@ import module java.base;
 
 public record HashDigestFunction(String algorithm) implements HashFunction, Serializable {
 
+    private static final LruCache<List<Object>, byte[]> DIGESTS = new LruCache<>(16384);
+
     @Override
     public byte[] hash(Path file) throws IOException {
         MessageDigest digest;
@@ -21,6 +23,10 @@ public record HashDigestFunction(String algorithm) implements HashFunction, Seri
             }
         }
         return digest.digest();
+    }
+
+    public byte[] hashCached(Path file) throws IOException {
+        return DIGESTS.get(List.of(algorithm, LruCache.FileKey.of(file)), _ -> hash(file)).clone();
     }
 
     public String encoded(byte[] hash) {
