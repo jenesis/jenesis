@@ -4,24 +4,24 @@ import module java.base;
 
 public final class LruCache<K, V> {
 
-    private final LinkedHashMap<K, V> entries;
+    private final int capacity;
+    private final ConcurrentMap<K, Entry<V>> entries = new ConcurrentHashMap<>();
+    private final AtomicBoolean sweeping = new AtomicBoolean();
 
     public LruCache(int capacity) {
         if (capacity < 1) {
             throw new IllegalArgumentException("A cache holds at least one entry, not " + capacity);
         }
-        entries = new LinkedHashMap<>(16, 0.75f, true) {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
-                return size() > capacity;
-            }
-        };
+        this.capacity = capacity;
     }
 
     public V get(K key) {
-        synchronized (entries) {
-            return entries.get(key);
+        Entry<V> entry = entries.get(key);
+        if (entry == null) {
+            return null;
         }
+        entry.used().set(true);
+        return entry.value();
     }
 
     public V get(K key, Loader<? super K, ? extends V> loader) throws IOException {
@@ -36,21 +36,27 @@ public final class LruCache<K, V> {
     }
 
     public void put(K key, V value) {
-        synchronized (entries) {
-            entries.put(key, value);
+        entries.put(key, new Entry<>(value, new AtomicBoolean(true)));
+        if (entries.size() > capacity && sweeping.compareAndSet(false, true)) {
+            try {
+                entries.values().removeIf(entry -> !entry.used().getAndSet(false));
+            } finally {
+                sweeping.set(false);
+            }
         }
     }
 
     public int size() {
-        synchronized (entries) {
-            return entries.size();
-        }
+        return entries.size();
     }
 
     @FunctionalInterface
     public interface Loader<K, V> {
 
         V load(K key) throws IOException;
+    }
+
+    private record Entry<V>(V value, AtomicBoolean used) {
     }
 
     public record FileKey(Path path, Object identity, long size, FileTime modified, FileTime changed) {
