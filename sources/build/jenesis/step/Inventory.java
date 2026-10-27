@@ -693,62 +693,143 @@ public class Inventory implements BuildStep {
         }
     }
 
-    public static SequencedMap<String, Dependency> closure(Iterable<BuildStepArgument> arguments, String path) throws IOException {
-        SequencedMap<String, Dependency> entries = entries(arguments, List.of(prefixOf(path) + "dependency.", prefixOf(path) + "tool."));
-        Map<String, String> versions = new HashMap<>();
-        entries.forEach((key, dependency) -> {
-            int first = key.indexOf('/'), last = key.lastIndexOf('/');
-            if (dependency.jar() != null && key.indexOf('/', first + 1) < last) {
-                versions.putIfAbsent(dependency.group() + "/" + dependency.jar(), key.substring(last + 1));
-            }
-        });
-        SequencedMap<String, Dependency> closure = new LinkedHashMap<>();
-        entries.forEach((key, dependency) -> {
-            int first = key.indexOf('/');
-            String version = key.startsWith("module/", first + 1) && key.indexOf('/', first + 8) < 0
-                    ? versions.get(dependency.group() + "/" + dependency.jar())
-                    : null;
-            closure.putIfAbsent(version == null ? key : key + "/" + version, dependency);
-        });
-        return closure;
-    }
+    public record Inventories(SequencedMap<Path, SequencedProperties> inventories) {
 
-    public static SequencedMap<String, Dependency> poms(Iterable<BuildStepArgument> arguments, String path) throws IOException {
-        return entries(arguments, List.of(prefixOf(path) + "pom."));
-    }
+        public static Inventories read(Iterable<BuildStepArgument> arguments) throws IOException {
+            SequencedMap<Path, SequencedProperties> inventories = new LinkedHashMap<>();
+            for (BuildStepArgument argument : arguments) {
+                if (argument.removed()) {
+                    continue;
+                }
+                Path inventoryFile = argument.folder().resolve(INVENTORY);
+                if (Files.isRegularFile(inventoryFile)) {
+                    inventories.putIfAbsent(argument.folder(), SequencedProperties.ofFiles(inventoryFile));
+                }
+            }
+            return new Inventories(inventories);
+        }
 
-    private static SequencedMap<String, Dependency> entries(Iterable<BuildStepArgument> arguments, List<String> keys)
-            throws IOException {
-        SequencedMap<String, Dependency> closure = new LinkedHashMap<>();
-        for (BuildStepArgument argument : arguments) {
-            if (argument.removed()) {
-                continue;
-            }
-            Path inventoryFile = argument.folder().resolve(INVENTORY);
-            if (!Files.isRegularFile(inventoryFile)) {
-                continue;
-            }
-            SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
-            for (String key : keys) {
+        public SequencedMap<String, Dependency> closure(String path) {
+            SequencedMap<String, Dependency> entries = entries(List.of(prefixOf(path) + "dependency.", prefixOf(path) + "tool."));
+            Map<String, String> versions = new HashMap<>();
+            entries.forEach((key, dependency) -> {
+                int first = key.indexOf('/'), last = key.lastIndexOf('/');
+                if (dependency.jar() != null && key.indexOf('/', first + 1) < last) {
+                    versions.putIfAbsent(dependency.group() + "/" + dependency.jar(), key.substring(last + 1));
+                }
+            });
+            SequencedMap<String, Dependency> closure = new LinkedHashMap<>();
+            entries.forEach((key, dependency) -> {
+                int first = key.indexOf('/');
+                String version = key.startsWith("module/", first + 1) && key.indexOf('/', first + 8) < 0
+                        ? versions.get(dependency.group() + "/" + dependency.jar())
+                        : null;
+                closure.putIfAbsent(version == null ? key : key + "/" + version, dependency);
+            });
+            return closure;
+        }
+
+        public SequencedMap<String, Dependency> poms(String path) {
+            return entries(List.of(prefixOf(path) + "pom."));
+        }
+
+        private SequencedMap<String, Dependency> entries(List<String> keys) {
+            SequencedMap<String, Dependency> closure = new LinkedHashMap<>();
+            inventories.forEach((folder, inventory) -> {
+                for (String key : keys) {
+                    for (int index = 0; ; index++) {
+                        String value = inventory.getProperty(key + index);
+                        if (value == null) {
+                            break;
+                        }
+                        String[] parts = value.split(" ", 3);
+                        String group = inventory.getProperty(key + index + ".group");
+                        if (group == null) {
+                            group = "main";
+                        }
+                        closure.putIfAbsent(group + "/" + parts[0], new Dependency(
+                                folder.resolve(parts[1]).normalize(),
+                                parts.length > 2 ? parts[2] : "",
+                                inventory.getProperty(key + index + ".scope"),
+                                group));
+                    }
+                }
+            });
+            return closure;
+        }
+
+        public SequencedMap<String, Path> bomReferences(String path) {
+            SequencedMap<String, Path> references = new LinkedHashMap<>();
+            forEachBom(path, (key, value, folder) -> {
+                if (key.startsWith("bom/")) {
+                    references.putIfAbsent(key.substring(4), folder.resolve(value).normalize());
+                }
+            });
+            return references;
+        }
+
+        public SequencedMap<String, String> bomEntries(String path) {
+            SequencedMap<String, String> entries = new LinkedHashMap<>();
+            forEachBom(path, (key, value, _) -> {
+                if (key.startsWith("entry/")) {
+                    entries.putIfAbsent(key.substring(6), value);
+                }
+            });
+            return entries;
+        }
+
+        public SequencedMap<String, String> bomVersions(String path) {
+            SequencedMap<String, String> versions = new LinkedHashMap<>();
+            forEachBom(path, (key, value, _) -> {
+                if (key.startsWith("version/")) {
+                    versions.putIfAbsent(key.substring(8), value);
+                }
+            });
+            return versions;
+        }
+
+        public SequencedSet<String> bomImports(String path) {
+            SequencedSet<String> imports = new LinkedHashSet<>();
+            forEachBom(path, (key, _, _) -> {
+                if (key.startsWith("file/")) {
+                    imports.add(key.substring(5));
+                }
+            });
+            return imports;
+        }
+
+        private void forEachBom(String path, BomConsumer consumer) {
+            String key = prefixOf(path) + "bom.";
+            inventories.forEach((folder, inventory) -> {
                 for (int index = 0; ; index++) {
                     String value = inventory.getProperty(key + index);
                     if (value == null) {
                         break;
                     }
-                    String[] parts = value.split(" ", 3);
-                    String group = inventory.getProperty(key + index + ".group");
-                    if (group == null) {
-                        group = "main";
+                    int space = value.indexOf(' ');
+                    if (space >= 1) {
+                        consumer.accept(value.substring(0, space), value.substring(space + 1), folder);
                     }
-                    closure.putIfAbsent(group + "/" + parts[0], new Dependency(
-                            argument.folder().resolve(parts[1]).normalize(),
-                            parts.length > 2 ? parts[2] : "",
-                            inventory.getProperty(key + index + ".scope"),
-                            group));
+                }
+            });
+        }
+
+        public Set<String> identities() {
+            Set<String> identities = new LinkedHashSet<>();
+            for (SequencedProperties inventory : inventories.values()) {
+                for (String key : inventory.stringPropertyNames()) {
+                    if (key.contains(".identity.")) {
+                        identities.add(inventory.getProperty(key));
+                    }
                 }
             }
+            return identities;
         }
-        return closure;
+
+        private interface BomConsumer {
+
+            void accept(String key, String value, Path folder);
+        }
     }
 
     public static SequencedSet<String> modulePaths(Iterable<BuildStepArgument> arguments) throws IOException {
@@ -803,102 +884,6 @@ public class Inventory implements BuildStep {
             }
         }
         return attachments;
-    }
-
-    public static SequencedMap<String, Path> bomReferences(Iterable<BuildStepArgument> arguments, String path)
-            throws IOException {
-        SequencedMap<String, Path> references = new LinkedHashMap<>();
-        forEachBom(arguments, path, (key, value, folder) -> {
-            if (key.startsWith("bom/")) {
-                references.putIfAbsent(key.substring(4), folder.resolve(value).normalize());
-            }
-        });
-        return references;
-    }
-
-    public static SequencedMap<String, String> bomEntries(Iterable<BuildStepArgument> arguments, String path)
-            throws IOException {
-        SequencedMap<String, String> entries = new LinkedHashMap<>();
-        forEachBom(arguments, path, (key, value, _) -> {
-            if (key.startsWith("entry/")) {
-                entries.putIfAbsent(key.substring(6), value);
-            }
-        });
-        return entries;
-    }
-
-    public static SequencedMap<String, String> bomVersions(Iterable<BuildStepArgument> arguments, String path)
-            throws IOException {
-        SequencedMap<String, String> versions = new LinkedHashMap<>();
-        forEachBom(arguments, path, (key, value, _) -> {
-            if (key.startsWith("version/")) {
-                versions.putIfAbsent(key.substring(8), value);
-            }
-        });
-        return versions;
-    }
-
-    public static SequencedSet<String> bomImports(Iterable<BuildStepArgument> arguments, String path)
-            throws IOException {
-        SequencedSet<String> imports = new LinkedHashSet<>();
-        forEachBom(arguments, path, (key, _, _) -> {
-            if (key.startsWith("file/")) {
-                imports.add(key.substring(5));
-            }
-        });
-        return imports;
-    }
-
-    private interface BomConsumer {
-
-        void accept(String key, String value, Path folder);
-    }
-
-    private static void forEachBom(Iterable<BuildStepArgument> arguments,
-                                   String path,
-                                   BomConsumer consumer) throws IOException {
-        String key = prefixOf(path) + "bom.";
-        for (BuildStepArgument argument : arguments) {
-            if (argument.removed()) {
-                continue;
-            }
-            Path inventoryFile = argument.folder().resolve(INVENTORY);
-            if (!Files.isRegularFile(inventoryFile)) {
-                continue;
-            }
-            SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
-            for (int index = 0; ; index++) {
-                String value = inventory.getProperty(key + index);
-                if (value == null) {
-                    break;
-                }
-                int space = value.indexOf(' ');
-                if (space < 1) {
-                    continue;
-                }
-                consumer.accept(value.substring(0, space), value.substring(space + 1), argument.folder());
-            }
-        }
-    }
-
-    public static Set<String> identities(Iterable<BuildStepArgument> arguments) throws IOException {
-        Set<String> identities = new LinkedHashSet<>();
-        for (BuildStepArgument argument : arguments) {
-            if (argument.removed()) {
-                continue;
-            }
-            Path inventoryFile = argument.folder().resolve(INVENTORY);
-            if (!Files.isRegularFile(inventoryFile)) {
-                continue;
-            }
-            SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
-            for (String key : inventory.stringPropertyNames()) {
-                if (key.contains(".identity.")) {
-                    identities.add(inventory.getProperty(key));
-                }
-            }
-        }
-        return identities;
     }
 
     public static List<Path> paths(SequencedProperties inventory, Path folder, String key) {

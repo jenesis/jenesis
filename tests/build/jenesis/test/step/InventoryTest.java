@@ -153,7 +153,7 @@ public class InventoryTest {
         assertThat(inventory.stringPropertyNames())
                 .as("the module's own dependencies stay what its build resolved")
                 .noneMatch(key -> key.contains(".dependency."));
-        assertThat(Inventory.closure(List.of(new BuildStepArgument(next, Map.of())), "foo"))
+        assertThat(Inventory.Inventories.read(List.of(new BuildStepArgument(next, Map.of()))).closure("foo"))
                 .containsOnlyKeys("pmd/module/build.jenesis.plugin.pmd/1.0")
                 .extractingByKey("pmd/module/build.jenesis.plugin.pmd/1.0")
                 .extracting(Inventory.Dependency::jar, Inventory.Dependency::group)
@@ -169,7 +169,7 @@ public class InventoryTest {
         inventory.setProperty("module-foo.dependency.2", "module/org.bar bar.jar");
         inventory.store(folder.resolve(Inventory.INVENTORY));
 
-        assertThat(Inventory.closure(List.of(new BuildStepArgument(folder, Map.of())), "foo"))
+        assertThat(Inventory.Inventories.read(List.of(new BuildStepArgument(folder, Map.of()))).closure("foo"))
                 .as("a descriptor without a version is pinned at the version of its artifact, so its lookup stays put")
                 .containsOnlyKeys("main/maven/org.foo/foo/1.0", "main/module/org.foo/1.0", "main/module/org.bar");
     }
@@ -938,9 +938,9 @@ public class InventoryTest {
         assertThat(inventory.getProperty("module.bom.0")).startsWith("bom/main/module/acme.platform/1.0 ");
         assertThat(inventory.getProperty("module.bom.1")).isEqualTo("entry/main/module/bar 1.0 SHA-256/aaaa");
         BuildStepArgument argument = new BuildStepArgument(next, Map.of());
-        assertThat(Inventory.bomReferences(List.of(argument), ""))
+        assertThat(Inventory.Inventories.read(List.of(argument)).bomReferences(""))
                 .containsOnly(Map.entry("main/module/acme.platform/1.0", bom));
-        assertThat(Inventory.bomEntries(List.of(argument), ""))
+        assertThat(Inventory.Inventories.read(List.of(argument)).bomEntries(""))
                 .containsOnly(Map.entry("main/module/bar", "1.0 SHA-256/aaaa"));
     }
 

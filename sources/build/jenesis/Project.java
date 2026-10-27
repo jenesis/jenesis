@@ -3202,9 +3202,9 @@ public record Project(
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
             SequencedMap<String, SequencedMap<String, SequencedSet<String>>> versions = new TreeMap<>();
+            Inventory.Inventories inventories = Inventory.Inventories.read(arguments.values());
             for (String path : paths) {
-                for (Map.Entry<String, Inventory.Dependency> entry
-                        : Inventory.closure(arguments.values(), path).entrySet()) {
+                for (Map.Entry<String, Inventory.Dependency> entry : inventories.closure(path).entrySet()) {
                     String key = entry.getKey();
                     int lastSlash = key.lastIndexOf('/');
                     if (lastSlash <= 0 || lastSlash == key.indexOf('/')) {
