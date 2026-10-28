@@ -60,9 +60,12 @@ repository (`target/stage/maven/output`, keyed by the generated coordinate), and
 the published `greeter` artifact.
 
 The published POM names what the module requires, each by the Maven artifact it
-resolved to and at the version the build resolved: the `app` POM lists
-`demo.greeter` alone, and a Maven consumer finds `slf4j-api` through `greeter`'s own
-POM, so its own resolution settles that version as it settles any other. A
+resolved to and at the version the build resolved: the `app` POM's dependencies
+list `demo.greeter` alone, and a Maven consumer finds `slf4j-api` through
+`greeter`'s own POM. Its `<dependencyManagement>` names `slf4j-api` at 2.0.16, the
+version `app` was built against, which Maven 4 applies to what `app` brings in;
+Maven 3 and Gradle read a dependency's management only for its own build, so
+there their own resolution settles that version as it settles any other. A
 `requires static` is published with `provided` scope.
 
 Packaging a resource
