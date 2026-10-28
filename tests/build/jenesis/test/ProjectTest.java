@@ -2134,10 +2134,13 @@ public class ProjectTest {
     public void the_pom_of_a_maven_module_lists_its_own_dependencies_and_not_those_of_a_sibling_it_depends_on() throws IOException {
         writeMavenProjectWithSibling();
         String pom = publishedPom(Project.Layout.MAVEN);
-        assertThat(pom)
+        assertThat(declared(pom))
                 .contains("<artifactId>base</artifactId>")
                 .as("what only the sibling declares reaches a consumer through the sibling's own POM")
                 .doesNotContain("<artifactId>library</artifactId>", "<groupId>*</groupId>");
+        assertThat(managed(pom))
+                .as("the version the module was built with is managed for a consumer that applies a dependency's management")
+                .contains("<artifactId>library</artifactId>");
     }
 
     @Test
@@ -2277,11 +2280,15 @@ public class ProjectTest {
                 """);
         settings.put("maven.uri", elsewhere.resolve("repository").toUri().toString());
         settings.put("maven.local", Files.createDirectories(elsewhere.resolve("local")).toString());
-        assertThat(publishedPom(Project.Layout.MODULAR_TO_MAVEN))
+        String pom = publishedPom(Project.Layout.MODULAR_TO_MAVEN);
+        assertThat(declared(pom))
                 .as("a module declaration publishes what it requires, and what a required module brings is left to"
                         + " that module's own POM")
                 .contains("<artifactId>base</artifactId>")
                 .doesNotContain("<artifactId>library</artifactId>", "<groupId>*</groupId>");
+        assertThat(managed(pom))
+                .as("the version the module was built with is managed for a consumer that applies a dependency's management")
+                .contains("<artifactId>library</artifactId>");
     }
 
     private void writeLibrary() throws IOException {
@@ -2356,6 +2363,14 @@ public class ProjectTest {
                 """);
         settings.put("maven.uri", elsewhere.resolve("repository").toUri().toString());
         settings.put("maven.local", Files.createDirectories(elsewhere.resolve("local")).toString());
+    }
+
+    private static String declared(String pom) {
+        return pom.substring(Math.max(0, pom.indexOf("</dependencyManagement>")));
+    }
+
+    private static String managed(String pom) {
+        return pom.substring(0, Math.max(0, pom.indexOf("</dependencyManagement>")));
     }
 
     private String publishedPom(Project.Layout layout) throws IOException {
