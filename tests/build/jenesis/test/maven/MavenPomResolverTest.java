@@ -712,6 +712,7 @@ public class MavenPomResolverTest {
                 new LinkedHashMap<>(),
                 versions,
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Module classifiers are not supported")
@@ -2776,6 +2777,7 @@ public class MavenPomResolverTest {
                 new LinkedHashMap<>(Map.of("group/artifact/1", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.COMPILE);
         List<String> followed = resolution.edges().stream()
                 .filter(Resolver.Edge::followed)
@@ -2819,6 +2821,7 @@ public class MavenPomResolverTest {
                 new LinkedHashMap<>(Map.of("sample/protoc/exe/linux-x86_64/RELEASE", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("sample/protoc", "4.35.1")),
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.COMPILE);
         assertThat(resolution.vertices().values())
                 .as("a platform's executable is the artifact the pin names, so the pin decides its version")
@@ -3092,6 +3095,7 @@ public class MavenPomResolverTest {
                 new LinkedHashMap<>(Map.of(
                         "middle/artifact", new LinkedHashSet<>(List.of("shared/artifact")),
                         "kept/artifact", new LinkedHashSet<>(List.of("other/artifact")))),
+                Map.of(),
                 DependencyScope.COMPILE);
         assertThat(resolution.vertices().keySet())
                 .as("Maven applies the exclusions a <dependencyManagement> entry declares wherever its dependency"
@@ -3141,6 +3145,7 @@ public class MavenPomResolverTest {
                         "group/artifact/1", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.COMPILE);
         assertThat(resolution.edges())
                 .as("a library's own test and provided dependencies are not followed, so the tree draws no edge to them")
@@ -3210,6 +3215,7 @@ public class MavenPomResolverTest {
                 new LinkedHashMap<>(Map.of("grouping/artifact/pom/1", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.COMPILE);
         assertThat(resolution.artifacts().keySet())
                 .as("Maven adds a jar, and a maven-plugin as one, to a path, but neither a POM nor an archive of"
@@ -3230,6 +3236,7 @@ public class MavenPomResolverTest {
                 new LinkedHashMap<>(Map.of("tool/executable/exe/linux/1", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.RUNTIME);
         assertThat(resolution.artifacts().keySet()).containsExactly("maven/tool/executable/exe/linux/1");
     }
@@ -4101,6 +4108,7 @@ public class MavenPomResolverTest {
                 new LinkedHashMap<>(Map.of("group/artifact/1", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.COMPILE);
         List<String> followedCoordinates = resolution.edges().stream()
                 .filter(Resolver.Edge::followed)
@@ -7138,6 +7146,7 @@ public class MavenPomResolverTest {
                 new LinkedHashMap<>(Map.of("rootgroup/rootlib/1", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.COMPILE);
 
         assertThat(resolution.vertices().get("maven/leafgroup/leaflib").licenses())
@@ -7204,6 +7213,7 @@ public class MavenPomResolverTest {
                 new LinkedHashMap<>(Map.of("rootgroup/rootlib/1", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.COMPILE);
 
         assertThat(resolution.vertices().get("maven/flatgroup/flatlib").licenses())
@@ -7447,6 +7457,7 @@ public class MavenPomResolverTest {
                 coordinates,
                 versions,
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .hasStackTraceContaining("Mismatched digest");
     }
@@ -7779,6 +7790,7 @@ public class MavenPomResolverTest {
                 new LinkedHashMap<>(Map.of("group/artifact/1", Collections.emptyNavigableSet())),
                 versions,
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(resolved).containsOnlyKeys(
                 "maven/group/artifact/1",
@@ -7824,6 +7836,7 @@ public class MavenPomResolverTest {
                 new LinkedHashMap<>(Map.of("group/artifact/1", Collections.emptyNavigableSet())),
                 versions,
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(resolved).containsOnlyKeys(
                 "maven/group/artifact/1",
@@ -7869,6 +7882,7 @@ public class MavenPomResolverTest {
                 new LinkedHashMap<>(Map.of("group/artifact/1", Collections.emptyNavigableSet())),
                 versions,
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(resolved).containsOnlyKeys(
                 "maven/group/artifact/1",
@@ -7905,6 +7919,7 @@ public class MavenPomResolverTest {
                 new LinkedHashMap<>(Map.of("group/artifact/1", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(resolved).containsOnlyKeys(
                 "maven/group/artifact/1",
@@ -7963,6 +7978,7 @@ public class MavenPomResolverTest {
                 new LinkedHashMap<>(Map.of("group/artifact/1", Collections.emptyNavigableSet())),
                 versions,
                 new LinkedHashMap<>(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(resolved).containsOnlyKeys(
                 "maven/group/artifact/1",

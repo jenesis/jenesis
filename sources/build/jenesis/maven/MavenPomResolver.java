@@ -115,6 +115,7 @@ public class MavenPomResolver implements MavenResolver {
                                             SequencedMap<String, SequencedSet<String>> coordinates,
                                             SequencedMap<String, String> versions,
                                             SequencedMap<String, SequencedSet<String>> managedExclusions,
+                                            Map<String, Set<DependencyScope>> scopes,
                                             DependencyScope scope) throws IOException {
         Map<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>();
         versions.forEach((coordinate, value) -> {
@@ -159,6 +160,9 @@ public class MavenPomResolver implements MavenResolver {
                             })
                             .collect(Collectors.toList());
             MavenDependencyKey.Versioned parsed = MavenDependencyKey.tryParse(coordinate);
+            MavenDependencyScope scoped = scopes.containsKey(coordinate)
+                    ? MavenDependencyScope.of(scopes.get(coordinate))
+                    : MavenDependencyScope.COMPILE;
             MavenDependencyValue managed = managedDependencies.get(parsed.key());
             if (managed == null && (parsed.key().classifier() != null || !parsed.key().type().equals("jar"))) {
                 MavenDependencyValue artifact = managedDependencies.get(new MavenDependencyKey(parsed.key().groupId(),
@@ -184,13 +188,13 @@ public class MavenPomResolver implements MavenResolver {
                     checksum = managed.checksum();
                 }
                 dependencies.put(parsed.key(),
-                        new MavenDependencyValue(declared, MavenDependencyScope.COMPILE, null, exclusions, null, checksum));
+                        new MavenDependencyValue(declared, scoped, null, exclusions, null, checksum));
             } else if (managed != null) {
                 dependencies.put(parsed.key(), new MavenDependencyValue(
-                        managed.version(), MavenDependencyScope.COMPILE, null, exclusions, null, managed.checksum()));
+                        managed.version(), scoped, null, exclusions, null, managed.checksum()));
             } else if (declared != null) {
                 dependencies.put(parsed.key(),
-                        new MavenDependencyValue(declared, MavenDependencyScope.COMPILE, null, exclusions, null));
+                        new MavenDependencyValue(declared, scoped, null, exclusions, null));
             } else {
                 throw new IllegalStateException(
                         "No version pinned for " + coordinate + " (add to dependencyManagement)");
@@ -203,8 +207,22 @@ public class MavenPomResolver implements MavenResolver {
                 unresolved,
                 new ConcurrentHashMap<>(),
                 prefix);
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> placements = new LinkedHashMap<>(traversal.dependencies());
+        List<Resolver.Edge> edges = traversal.edges();
+        if (!scopes.isEmpty()) {
+            placements.values().removeIf(value -> !value.scope().places(scope));
+            Set<String> displaced = traversal.dependencies().sequencedKeySet().stream()
+                    .filter(key -> !placements.containsKey(key))
+                    .map(key -> key.coordinate(prefix, null))
+                    .collect(Collectors.toSet());
+            UnaryOperator<String> unversioned = coordinate -> coordinate.substring(0, coordinate.lastIndexOf('/'));
+            edges = edges.stream()
+                    .filter(edge -> !displaced.contains(unversioned.apply(edge.coordinate()))
+                            && (edge.parent() == null || !displaced.contains(unversioned.apply(edge.parent()))))
+                    .toList();
+        }
         SequencedMap<String, String> resolved = new LinkedHashMap<>();
-        traversal.dependencies().forEach((key, value) -> {
+        placements.forEach((key, value) -> {
             if (key.jar() || dependencies.containsKey(key) && !key.type().equals("pom")) {
                 resolved.put(key.coordinate(prefix, value.version()), value.checksum() == null ? "" : value.checksum());
             }
@@ -212,7 +230,7 @@ public class MavenPomResolver implements MavenResolver {
         SequencedMap<String, Resolver.Resolved> artifacts = Resolver.materializeAll(executor, repositories, prefix, resolved);
         Map<String, ModuleDescriptor> descriptors = new ConcurrentHashMap<>();
         List<CompletableFuture<?>> pending = new ArrayList<>();
-        traversal.dependencies().forEach((key, value) -> {
+        placements.forEach((key, value) -> {
             String withVersion = key.coordinate(prefix, value.version());
             Resolver.Resolved artifact = artifacts.get(withVersion);
             if (artifact != null) {
@@ -226,7 +244,7 @@ public class MavenPomResolver implements MavenResolver {
         });
         CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new)).join();
         SequencedMap<String, Resolver.Vertex> nodes = new LinkedHashMap<>();
-        traversal.dependencies().forEach((key, value) -> {
+        placements.forEach((key, value) -> {
             String withVersion = key.coordinate(prefix, value.version());
             ModuleDescriptor descriptor = descriptors.get(withVersion);
             Resolver.Resolved artifact = artifacts.get(withVersion);
@@ -237,7 +255,7 @@ public class MavenPomResolver implements MavenResolver {
                     artifact != null && artifact.internal(),
                     traversal.licenses().getOrDefault(withVersion, List.of())));
         });
-        return new Resolver.Resolution(artifacts, traversal.edges(), nodes, poms(prefix, unresolved));
+        return new Resolver.Resolution(artifacts, edges, nodes, poms(prefix, unresolved));
     }
 
     @Override
@@ -573,7 +591,8 @@ public class MavenPomResolver implements MavenResolver {
                 DependencyResolution resolution = resolutions.computeIfAbsent(
                         entry.getKey(),
                         _ -> new DependencyResolution());
-                MavenDependencyScope scope = resolution.currentScope == null || resolution.currentScope.reduces(resolvedScope)
+                MavenDependencyScope scope = resolution.currentScope == null
+                        || !resolution.declared && resolution.currentScope.reduces(resolvedScope)
                         ? resolvedScope
                         : resolution.currentScope;
                 String version;
@@ -588,6 +607,7 @@ public class MavenPomResolver implements MavenResolver {
                             value.version());
                     resolution.observedVersions.add(value.version());
                     resolution.currentScope = resolution.widestScope = scope;
+                    resolution.declared = current.root() && current.scope() == null;
                     resolution.systemPath = entry.getValue().systemPath();
                     resolution.exclusions = entry.getValue().exclusions();
                     resolution.optional = entry.getValue().optional();
@@ -2216,6 +2236,7 @@ public class MavenPomResolver implements MavenResolver {
         private final Map<String, String> checksums = new HashMap<>();
         private String currentVersion;
         private MavenDependencyScope currentScope, widestScope;
+        private boolean declared;
         private Path systemPath;
         private List<MavenDependencyName> exclusions;
         private Boolean optional;
