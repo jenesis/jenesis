@@ -280,7 +280,7 @@ public class InternalModuleTest {
                     identity.replace("prepared/", ""), folder));
             Observation observation = internal.observation(prepared);
             String engine = observation.engine().name() + " "
-                    + observation.engine().commands(new LinkedHashMap<>(), Path.of("output"));
+                    + observation.engine().commands(Collections.emptyNavigableMap(), Path.of("output"));
             executor.addStep("engine", (_, context, _) -> {
                 Files.writeString(context.next().resolve("engine.txt"), engine);
                 return CompletableFuture.completedStage(new BuildStepResult(true));
@@ -420,7 +420,7 @@ public class InternalModuleTest {
                     + framework.arguments(Path.of("supplement"),
                             Path.of("output"),
                             new LinkedHashSet<>(List.of("example.SampleTest")),
-                            new LinkedHashMap<>(),
+                            Collections.emptyNavigableMap(),
                             false,
                             false);
             executor.addStep("described", (_, context, _) -> {
@@ -735,7 +735,7 @@ public class InternalModuleTest {
                 source,
                 Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
                 Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
-                .properties(new LinkedHashMap<>()));
+                .properties(Collections.emptyNavigableMap()));
 
         assertThat(buildExecutor.execute().get("internal/marker").resolve("out.txt")).content().isEqualTo("hello");
     }

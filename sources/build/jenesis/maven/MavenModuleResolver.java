@@ -52,7 +52,7 @@ public class MavenModuleResolver implements Resolver {
                 true,
                 discovered,
                 Resolver.bomEntries(SequencedProperties.ofFiles(resolved.file())),
-                new LinkedHashMap<>());
+                Collections.emptyNavigableMap());
     }
 
     private static String pomVersion(InputStream stream, String coordinate) throws IOException {

@@ -709,7 +709,7 @@ public class MavenPomResolverTest {
                 Runnable::run,
                 "maven",
                 Map.of(),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 versions,
                 Collections.emptyNavigableMap(),
                 Map.of(),
@@ -2775,7 +2775,7 @@ public class MavenPomResolverTest {
                 "maven",
                 Map.<String, Repository>of("maven", mavenRepository),
                 new LinkedHashMap<>(Map.of("group/artifact/1", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE);
@@ -3091,7 +3091,7 @@ public class MavenPomResolverTest {
                 "maven",
                 Map.<String, Repository>of("maven", mavenRepository),
                 new LinkedHashMap<>(Map.of("group/artifact/1", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 new LinkedHashMap<>(Map.of(
                         "middle/artifact", new LinkedHashSet<>(List.of("shared/artifact")),
                         "kept/artifact", new LinkedHashSet<>(List.of("other/artifact")))),
@@ -3143,7 +3143,7 @@ public class MavenPomResolverTest {
                         "other/tested/1", Collections.emptyNavigableSet(),
                         "other/provided/1", Collections.emptyNavigableSet(),
                         "group/artifact/1", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE);
@@ -3213,7 +3213,7 @@ public class MavenPomResolverTest {
                 "maven",
                 Map.<String, Repository>of("maven", mavenRepository),
                 new LinkedHashMap<>(Map.of("grouping/artifact/pom/1", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE);
@@ -3234,7 +3234,7 @@ public class MavenPomResolverTest {
                 "maven",
                 Map.<String, Repository>of("maven", mavenRepository),
                 new LinkedHashMap<>(Map.of("tool/executable/exe/linux/1", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.RUNTIME);
@@ -4106,7 +4106,7 @@ public class MavenPomResolverTest {
                 "maven",
                 Map.<String, Repository>of("maven", mavenRepository),
                 new LinkedHashMap<>(Map.of("group/artifact/1", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE);
@@ -7144,7 +7144,7 @@ public class MavenPomResolverTest {
                 "maven",
                 Map.<String, Repository>of("maven", mavenRepository),
                 new LinkedHashMap<>(Map.of("rootgroup/rootlib/1", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE);
@@ -7211,7 +7211,7 @@ public class MavenPomResolverTest {
                 "maven",
                 Map.<String, Repository>of("maven", mavenRepository),
                 new LinkedHashMap<>(Map.of("rootgroup/rootlib/1", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE);
@@ -7917,7 +7917,7 @@ public class MavenPomResolverTest {
                 "maven",
                 Map.of("maven", mavenRepository),
                 new LinkedHashMap<>(Map.of("group/artifact/1", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();

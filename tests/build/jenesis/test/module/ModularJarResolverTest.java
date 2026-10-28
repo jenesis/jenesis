@@ -84,7 +84,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
@@ -142,7 +142,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
@@ -168,7 +168,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -193,7 +193,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE);
@@ -223,7 +223,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -245,7 +245,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -269,7 +269,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -295,7 +295,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -321,7 +321,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.RUNTIME).artifacts();
@@ -387,7 +387,7 @@ public class ModularJarResolverTest {
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> Optional.ofNullable(coordinate.equals("root") ? jar : null)),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).vertices().get("foo/root").licenses();
@@ -472,7 +472,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -486,7 +486,7 @@ public class ModularJarResolverTest {
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> Optional.of(toJar("root", "../evil"))),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
@@ -508,7 +508,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -528,7 +528,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
@@ -657,7 +657,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -683,7 +683,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -709,7 +709,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -735,7 +735,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -788,7 +788,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -818,7 +818,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -847,7 +847,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -909,7 +909,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
@@ -937,7 +937,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -993,7 +993,7 @@ public class ModularJarResolverTest {
                         return Optional.ofNullable(item);
                     }),
                     new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                    new LinkedHashMap<>(),
+                    Collections.emptyNavigableMap(),
                     Collections.emptyNavigableMap(),
                     Map.of(),
                     DependencyScope.COMPILE))
@@ -1066,7 +1066,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
@@ -1091,7 +1091,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -1114,7 +1114,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -1258,7 +1258,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
@@ -1280,7 +1280,7 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))

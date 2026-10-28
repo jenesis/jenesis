@@ -49,7 +49,7 @@ public class MavenPomEmitterTest {
         new MavenPomEmitter().emit("group",
                 "artifact",
                 "version",
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 new MavenPomEmitter.Metadata(
                         "Project Name",
                         "Project description.",
@@ -151,7 +151,7 @@ public class MavenPomEmitterTest {
         new MavenPomEmitter().emit("group",
                 "artifact",
                 "version",
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 new MavenPomEmitter.Metadata(
                         null,
                         null,
@@ -185,7 +185,7 @@ public class MavenPomEmitterTest {
         new MavenPomEmitter().emit("group",
                 "artifact",
                 "version",
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 new MavenPomEmitter.Metadata(
                         null,
                         null,
