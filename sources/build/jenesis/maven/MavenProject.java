@@ -65,6 +65,7 @@ public class MavenProject implements BuildExecutorModule {
     private final Palette palette;
     private final Function<List<Path>, SequencedSet<Path>> configurations;
     private final List<String> sources;
+    private final boolean unified;
 
     public MavenProject(Path root,
                         String prefix,
@@ -79,7 +80,8 @@ public class MavenProject implements BuildExecutorModule {
                 null,
                 Palette.NONE,
                 OWN_CONFIGURATIONS,
-                List.of());
+                List.of(),
+                false);
     }
 
     public static MavenProject ofEnvironment(Environment environment,
@@ -90,6 +92,7 @@ public class MavenProject implements BuildExecutorModule {
         List<String> sources = environment.entries("maven.sources");
         return new MavenProject(root, prefix, repository, resolver)
                 .sources(sources == null ? List.of() : sources)
+                .unified(environment.flag("maven.unified", false))
                 .platform(Platform.ofEnvironment(environment))
                 .printing(environment.flag("print.progress", true) ? environment.out() : null,
                         Palette.ofEnvironment(environment));
@@ -104,7 +107,8 @@ public class MavenProject implements BuildExecutorModule {
                          Consumer<String> printing,
                          Palette palette,
                          Function<List<Path>, SequencedSet<Path>> configurations,
-                         List<String> sources) {
+                         List<String> sources,
+                         boolean unified) {
         this.root = root;
         this.group = group;
         this.prefix = prefix;
@@ -115,18 +119,19 @@ public class MavenProject implements BuildExecutorModule {
         this.palette = palette;
         this.configurations = configurations;
         this.sources = sources;
+        this.unified = unified;
     }
 
     public MavenProject group(String group) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources, unified);
     }
 
     public MavenProject platform(Platform platform) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources, unified);
     }
 
     public MavenProject printing(Consumer<String> printing, Palette palette) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources, unified);
     }
 
     public MavenProject sources(List<String> sources) {
@@ -145,11 +150,16 @@ public class MavenProject implements BuildExecutorModule {
                 printing,
                 palette,
                 configurations,
-                List.copyOf(sources));
+                List.copyOf(sources),
+                unified);
+    }
+
+    public MavenProject unified(boolean unified) {
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources, unified);
     }
 
     public MavenProject configurations(Function<List<Path>, SequencedSet<Path>> configurations) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources, unified);
     }
 
     public static BuildExecutorModule make(Environment environment,
@@ -302,7 +312,7 @@ public class MavenProject implements BuildExecutorModule {
         Platform platform = this.platform;
         buildExecutor.addStep(SCAN, new Scan(root));
         buildExecutor.addStep(PREPARE,
-                new Prepare(prefix, resolver, repository, sources),
+                new Prepare(prefix, resolver, repository, sources, unified),
                 Stream.concat(Stream.of(SCAN), inherited.sequencedKeySet().stream()));
         buildExecutor.addModule(BOMS, (boms, prepared) -> {
             SortedSet<String> unstaged = new TreeSet<>();
@@ -603,6 +613,21 @@ public class MavenProject implements BuildExecutorModule {
                                     exclusionsProperties.setProperty(key, exclusion);
                                 }
                             }
+                            String declaredScopes = properties.getProperty("scopes", "");
+                            if (!declaredScopes.isEmpty()) {
+                                SequencedProperties scopes = new SequencedProperties();
+                                for (String entry : declaredScopes.split("\t")) {
+                                    int split = entry.indexOf('=');
+                                    String coordinate = entry.substring(0, split);
+                                    scopes.setProperty(group + "/" + coordinate, entry.substring(split + 1));
+                                    String exclusion = properties.getProperty("exclusions." + coordinate);
+                                    if (exclusion != null) {
+                                        exclusionsProperties.setProperty(group + "/compile/" + coordinate, exclusion);
+                                        exclusionsProperties.setProperty(group + "/runtime/" + coordinate, exclusion);
+                                    }
+                                }
+                                scopes.store(context.next().resolve(BuildStep.SCOPES));
+                            }
                             if (!exclusionsProperties.isEmpty()) {
                                 exclusionsProperties.store(context.next().resolve(BuildStep.EXCLUSIONS));
                             }
@@ -859,13 +884,19 @@ public class MavenProject implements BuildExecutorModule {
         private final String prefix;
         private final MavenResolver resolver;
         private final List<String> sources;
+        private final boolean unified;
         private final transient MavenRepository repository;
 
-        private Prepare(String prefix, MavenResolver resolver, MavenRepository repository, List<String> sources) {
+        private Prepare(String prefix,
+                        MavenResolver resolver,
+                        MavenRepository repository,
+                        List<String> sources,
+                        boolean unified) {
             this.prefix = prefix;
             this.resolver = resolver;
             this.repository = repository;
             this.sources = sources;
+            this.unified = unified;
         }
 
         @Override
@@ -970,7 +1001,8 @@ public class MavenProject implements BuildExecutorModule {
                         selfPom,
                         false,
                         qualifiedDependencies,
-                        attachments(value, false));
+                        attachments(value, false),
+                        siblings);
                 writeModule(maven.resolve(tests + ".properties"),
                         null,
                         value,
@@ -979,7 +1011,8 @@ public class MavenProject implements BuildExecutorModule {
                         selfPom,
                         true,
                         qualifiedDependencies,
-                        attachments(value, true));
+                        attachments(value, true),
+                        siblings);
                 modules.setProperty(main, main + ".properties");
                 modules.setProperty(tests, tests + ".properties");
             }
@@ -1125,7 +1158,8 @@ public class MavenProject implements BuildExecutorModule {
                                  MavenDependencyKey selfPom,
                                  boolean test,
                                  String qualifiedDependencies,
-                                 String attachments) throws IOException {
+                                 String attachments,
+                                 Map<String, String> siblings) throws IOException {
             SequencedProperties properties = new SequencedProperties();
             properties.setProperty("coordinate", test
                     ? new MavenDependencyKey(value.groupId(), value.artifactId(), "jar", "tests")
@@ -1166,6 +1200,23 @@ public class MavenProject implements BuildExecutorModule {
                                     .filter(dep -> dep.getValue().scope() == scope)
                                     .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version()))
                                     .collect(Collectors.joining("\t")));
+                }
+            }
+            if (unified && !test && value.dependencies() != null) {
+                String scopes = value.dependencies().entrySet().stream()
+                        .filter(dep -> dep.getValue().scope() != MavenDependencyScope.SYSTEM
+                                && dep.getValue().scope() != MavenDependencyScope.IMPORT
+                                && !Objects.equals(siblings.get(dep.getKey().groupId() + "/" + dep.getKey().artifactId()),
+                                        dep.getValue().version()))
+                        .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version()) + "=" + switch (dep.getValue().scope()) {
+                            case COMPILE -> "compile runtime";
+                            case PROVIDED -> "compile";
+                            case RUNTIME -> "runtime";
+                            case TEST, SYSTEM, IMPORT -> "";
+                        })
+                        .collect(Collectors.joining("\t"));
+                if (!scopes.isEmpty()) {
+                    properties.setProperty("scopes", scopes);
                 }
             }
             if (!test && value.dependencies() != null) {
