@@ -46,7 +46,22 @@ public class PublishModule implements BuildExecutorModule {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            Path target = Path.of(directory);
+            Path root = null;
+            for (BuildStepArgument argument : arguments.values()) {
+                Path file = argument.folder().resolve("root.properties");
+                if (!argument.removed() && Files.isRegularFile(file)) {
+                    Properties properties = new Properties();
+                    try (Reader reader = Files.newBufferedReader(file)) {
+                        properties.load(reader);
+                    }
+                    root = Path.of(properties.getProperty("root"));
+                }
+            }
+            if (root == null) {
+                throw new IllegalStateException("The plugin publish was handed no root.properties - run it at the"
+                        + " hook point release, as publish+release=./publish");
+            }
+            Path target = root.resolve(directory);
             for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
                 if (!argument.getKey().endsWith("stage/modular") || argument.getValue().removed()) {
                     continue;
@@ -57,7 +72,7 @@ public class PublishModule implements BuildExecutorModule {
                         Path copy = target.resolve(folder.relativize(file).toString());
                         if (!publish) {
                             if (out != null) {
-                                out.accept("Would publish " + copy);
+                                out.accept("Would publish " + root.relativize(copy));
                             }
                             continue;
                         }

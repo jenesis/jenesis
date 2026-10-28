@@ -44,10 +44,10 @@ public class DaemonClientTest {
     }
 
     @Test
-    public void hands_the_builds_of_two_projects_to_one_daemon_where_daemons_are_shared() throws Exception {
+    public void hands_the_builds_of_two_projects_to_one_daemon_by_default() throws Exception {
         Path folder = temporary.resolve("daemons");
-        DaemonClient first = client(project("first"), folder, Map.of("jenesis.daemon.shared", "true")),
-                second = client(project("second"), folder, Map.of("jenesis.daemon.shared", "true"));
+        DaemonClient first = client(project("first"), folder, Map.of()),
+                second = client(project("second"), folder, Map.of());
         try {
             assertThat(first.dispatch("engine", "help")).isEqualTo(0);
             assertThat(second.dispatch("engine", "help")).isEqualTo(0);
@@ -60,10 +60,10 @@ public class DaemonClientTest {
     }
 
     @Test
-    public void keeps_a_daemon_per_project_unless_daemons_are_shared() throws Exception {
+    public void keeps_a_daemon_per_project_where_daemons_are_not_shared() throws Exception {
         Path folder = temporary.resolve("daemons");
-        DaemonClient first = client(project("first"), folder, Map.of()),
-                second = client(project("second"), folder, Map.of());
+        DaemonClient first = client(project("first"), folder, Map.of("jenesis.daemon.shared", "false")),
+                second = client(project("second"), folder, Map.of("jenesis.daemon.shared", "false"));
         try {
             assertThat(first.dispatch("engine", "help")).isEqualTo(0);
             assertThat(second.dispatch("engine", "help")).isEqualTo(0);
@@ -76,7 +76,7 @@ public class DaemonClientTest {
     @Test
     public void stops_the_daemon_used_least_recently_to_stay_within_the_limit() throws Exception {
         Path folder = temporary.resolve("daemons");
-        Map<String, String> settings = Map.of("jenesis.daemon.limit", "1");
+        Map<String, String> settings = Map.of("jenesis.daemon.limit", "1", "jenesis.daemon.shared", "false");
         DaemonClient first = client(project("first"), folder, settings),
                 second = client(project("second"), folder, settings);
         try {
