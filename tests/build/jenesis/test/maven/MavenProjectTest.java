@@ -31,6 +31,8 @@ import static org.assertj.core.api.Assertions.fail;
 
 public class MavenProjectTest {
 
+    private static final Environment UNIFIED = new Environment(Map.of("maven.unified", "true"));
+
     @TempDir
     private Path project, build, repository;
     private MavenRepository mavenRepository;
@@ -396,6 +398,298 @@ public class MavenProjectTest {
                 false,
                 0);
         executor.addModule("maven", MavenProject.make(Environment.NONE,
+                project,
+                "main",
+                "maven",
+                Map.of("maven", new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)),
+                null,
+                Collections.emptyNavigableSet(),
+                LinkedHashSet::new,
+                (_, _, _) -> AssemblyDescriptor.of((buildExecutor, _) -> buildExecutor.addModule("java",
+                        new JavaToolchainModule(),
+                        "../sources",
+                        "../manifests",
+                        "../dependencies/artifacts"), AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD))));
+        return executor;
+    }
+
+    @Test
+    public void by_default_the_main_class_paths_are_resolved_without_the_test_dependencies() throws IOException {
+        SequencedMap<String, Path> results = scopedProject(Environment.NONE, "", "a:1:compile", "t:1:test")
+                .execute(Runnable::run).toCompletableFuture().join();
+        assertThat(classPath(results, "module-", "compile"))
+                .as("the main classes compile with the versions a consumer of the published POM resolves")
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/1");
+        assertThat(classPath(results, "module-", "runtime"))
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/1");
+        assertThat(classPath(results, "testmodule-", "runtime")).contains("org.example/t/1", "org.example/c/2");
+        assertThat(results.get("maven/module-/manifests").resolve(BuildStep.SCOPES)).doesNotExist();
+    }
+
+    @Test
+    public void by_default_a_dependency_declared_for_the_tests_stays_on_the_main_class_paths_where_a_main_dependency_needs_it()
+            throws IOException {
+        SequencedMap<String, Path> results = scopedProject(Environment.NONE, "", "a:1:compile", "c:2:test")
+                .execute(Runnable::run).toCompletableFuture().join();
+        assertThat(classPath(results, "module-", "compile"))
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/1");
+        assertThat(classPath(results, "module-", "runtime"))
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/1");
+        assertThat(classPath(results, "testmodule-", "runtime")).contains("org.example/c/2").doesNotContain("org.example/c/1");
+    }
+
+    @Test
+    public void by_default_a_runtime_dependency_decides_the_versions_of_the_runtime_class_path_alone() throws IOException {
+        SequencedMap<String, Path> results = scopedProject(Environment.NONE, "", "a:1:compile", "r:1:runtime")
+                .execute(Runnable::run).toCompletableFuture().join();
+        assertThat(classPath(results, "module-", "compile"))
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/1");
+        assertThat(classPath(results, "module-", "runtime"))
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/r/1", "org.example/c/2");
+    }
+
+    @Test
+    public void as_one_graph_a_test_dependency_nearer_to_the_project_selects_the_version_the_main_classes_compile_and_run_with()
+            throws IOException {
+        SequencedMap<String, Path> results = scopedProject(UNIFIED, "", "a:1:compile", "t:1:test")
+                .execute(Runnable::run).toCompletableFuture().join();
+        assertThat(classPath(results, "module-", "compile"))
+                .as("Maven resolves the main and the test dependencies as one graph, where c/2 is nearer")
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/2");
+        assertThat(classPath(results, "module-", "runtime"))
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/2");
+        assertThat(classPath(results, "testmodule-", "runtime")).contains("org.example/t/1", "org.example/c/2");
+    }
+
+    @Test
+    public void as_one_graph_a_dependency_declared_for_the_tests_leaves_the_main_class_path_even_where_a_main_dependency_needs_it()
+            throws IOException {
+        SequencedMap<String, Path> results = scopedProject(UNIFIED, "", "a:1:compile", "c:2:test")
+                .execute(Runnable::run).toCompletableFuture().join();
+        assertThat(classPath(results, "module-", "compile"))
+                .as("a declared dependency keeps the scope it is declared in, as Maven's does")
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1");
+        assertThat(classPath(results, "module-", "runtime"))
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1");
+        assertThat(classPath(results, "testmodule-", "runtime")).contains("org.example/c/2").doesNotContain("org.example/c/1");
+    }
+
+    @Test
+    public void as_one_graph_a_runtime_dependency_selects_the_version_the_main_classes_compile_against() throws IOException {
+        SequencedMap<String, Path> results = scopedProject(UNIFIED, "", "a:1:compile", "r:1:runtime")
+                .execute(Runnable::run).toCompletableFuture().join();
+        assertThat(classPath(results, "module-", "compile"))
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/2");
+        assertThat(classPath(results, "module-", "runtime"))
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/r/1", "org.example/c/2");
+    }
+
+    @Test
+    public void as_one_graph_a_test_dependency_declared_first_wins_a_conflict_of_equal_depth() throws IOException {
+        SequencedMap<String, Path> results = scopedProject(UNIFIED, "", "t:1:test", "x:1:compile")
+                .execute(Runnable::run).toCompletableFuture().join();
+        assertThat(classPath(results, "module-", "compile"))
+                .containsExactlyInAnyOrder("org.example/x/1", "org.example/c/2");
+    }
+
+    @Test
+    public void as_one_graph_a_compile_dependency_declared_first_wins_a_conflict_of_equal_depth() throws IOException {
+        SequencedMap<String, Path> results = scopedProject(UNIFIED, "", "x:1:compile", "t:1:test")
+                .execute(Runnable::run).toCompletableFuture().join();
+        assertThat(classPath(results, "module-", "compile"))
+                .containsExactlyInAnyOrder("org.example/x/1", "org.example/c/1");
+        assertThat(classPath(results, "testmodule-", "compile")).contains("org.example/c/1").doesNotContain("org.example/c/2");
+    }
+
+    @Test
+    public void as_one_graph_a_runtime_dependency_of_a_main_dependency_is_left_off_the_main_compile_class_path() throws IOException {
+        SequencedMap<String, Path> results = scopedProject(UNIFIED, "", "d:1:compile")
+                .execute(Runnable::run).toCompletableFuture().join();
+        assertThat(classPath(results, "module-", "compile")).containsExactly("org.example/d/1");
+        assertThat(classPath(results, "module-", "runtime")).containsExactlyInAnyOrder("org.example/d/1", "org.example/e/1");
+    }
+
+    @Test
+    public void as_one_graph_a_test_dependency_inherited_from_a_parent_selects_the_version_the_main_classes_compile_with()
+            throws IOException {
+        Files.writeString(Files.createDirectories(repository.resolve("org/example/parent/1")).resolve("parent-1.pom"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>t</artifactId>
+                            <version>1</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        SequencedMap<String, Path> results = scopedProject(UNIFIED, """
+                        <parent>
+                            <groupId>org.example</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                            <relativePath/>
+                        </parent>""", "a:1:compile")
+                .execute(Runnable::run).toCompletableFuture().join();
+        assertThat(classPath(results, "module-", "compile"))
+                .as("Maven inherits the parent's test dependencies and resolves them with the child's own")
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/2");
+        assertThat(classPath(results, "testmodule-", "compile")).contains("org.example/t/1", "org.example/c/2");
+    }
+
+    @Test
+    public void as_one_graph_the_test_dependencies_of_a_sibling_leave_the_versions_of_a_module_depending_on_it_alone()
+            throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>root</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>lib</module>
+                        <module>app</module>
+                    </modules>
+                </project>
+                """);
+        Map<String, String> declared = Map.of("lib", """
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>a</artifactId>
+                            <version>1</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>t</artifactId>
+                            <version>1</version>
+                            <scope>test</scope>
+                        </dependency>""", "app", """
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>lib</artifactId>
+                            <version>1</version>
+                        </dependency>""");
+        for (Map.Entry<String, String> module : declared.entrySet()) {
+            Path folder = Files.createDirectories(project.resolve(module.getKey()));
+            Files.writeString(folder.resolve("pom.xml"), """
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>group</groupId>
+                            <artifactId>root</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>%s</artifactId>
+                        <dependencies>
+                    %s
+                        </dependencies>
+                    </project>
+                    """.formatted(module.getKey(), module.getValue()));
+            Files.writeString(Files.createDirectories(folder.resolve("src/main/java/" + module.getKey())).resolve("Sample.java"),
+                    "package " + module.getKey() + "; public class Sample { }");
+        }
+        SequencedMap<String, Path> results = scopedBuild(UNIFIED).execute(Runnable::run).toCompletableFuture().join();
+        assertThat(classPath(results, "module-lib", "compile"))
+                .as("the sibling's own main class path is decided with its test dependencies")
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/2");
+        assertThat(classPath(results, "module-app", "compile"))
+                .as("a sibling is a dependency like any other, whose test dependencies Maven leaves out of the graph")
+                .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/1");
+    }
+
+    private static Set<String> classPath(SequencedMap<String, Path> results, String module, String scope) throws IOException {
+        String prefix = "main/" + scope + "/maven/";
+        return SequencedProperties.ofFiles(results.get("maven/build-" + module + "/dependencies/artifacts")
+                        .resolve(BuildStep.DEPENDENCIES))
+                .stringPropertyNames()
+                .stream()
+                .filter(key -> key.startsWith(prefix + "org.example/"))
+                .map(key -> key.substring(prefix.length()))
+                .collect(Collectors.toSet());
+    }
+
+    private BuildExecutor scopedProject(Environment environment, String parent, String... dependencies) throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                %s
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                %s
+                    </dependencies>
+                </project>
+                """.formatted(parent, Stream.of(dependencies).map(dependency -> dependency.split(":")).map(dependency -> """
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>%s</artifactId>
+                            <version>%s</version>
+                            <scope>%s</scope>
+                        </dependency>""".formatted(dependency[0], dependency[1], dependency[2]))
+                .collect(Collectors.joining("\n"))));
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java/sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java/sample")).resolve("SampleTest.java"),
+                "package sample; public class SampleTest { }");
+        return scopedBuild(environment);
+    }
+
+    private BuildExecutor scopedBuild(Environment environment) throws IOException {
+        for (String artifact : List.of("a:1:b/1/compile",
+                "b:1:c/1/compile",
+                "c:1:",
+                "c:2:",
+                "t:1:c/2/compile",
+                "r:1:c/2/compile",
+                "x:1:c/1/compile",
+                "d:1:e/1/runtime",
+                "e:1:")) {
+            String[] coordinate = artifact.split(":", -1);
+            Path folder = Files.createDirectories(repository.resolve("org/example/" + coordinate[0] + "/" + coordinate[1]));
+            String dependency = coordinate[2].isEmpty() ? "" : """
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>%s</artifactId>
+                            <version>%s</version>
+                            <scope>%s</scope>
+                        </dependency>
+                    </dependencies>""".formatted((Object[]) coordinate[2].split("/"));
+            Files.writeString(folder.resolve(coordinate[0] + "-" + coordinate[1] + ".pom"), """
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>org.example</groupId>
+                        <artifactId>%s</artifactId>
+                        <version>%s</version>
+                        %s
+                    </project>
+                    """.formatted(coordinate[0], coordinate[1], dependency));
+            try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(
+                    folder.resolve(coordinate[0] + "-" + coordinate[1] + ".jar")))) {
+                jar.putNextEntry(new JarEntry(coordinate[0] + "/Value" + coordinate[1] + ".class"));
+                jar.closeEntry();
+            }
+        }
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("maven", MavenProject.make(environment,
                 project,
                 "main",
                 "maven",
