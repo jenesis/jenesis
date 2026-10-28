@@ -90,6 +90,7 @@ public class Javac extends ProcessBuildStep {
                 ? ProcessHandler.OfProcess.ofJavaHome("bin/javac").apply(commands)
                         .daemon(terms.daemon())
                         .scoped(terms.shared())
+                        .directory(terms.directory())
                 : super.handler(context, commands);
     }
 

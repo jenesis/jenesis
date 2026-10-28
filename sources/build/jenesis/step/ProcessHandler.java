@@ -231,7 +231,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         private final SortedMap<String, String> environment;
         private final Charset output, error;
         private final boolean main, daemon, scoped, shared;
-        private final Path aot;
+        private final Path aot, directory;
 
         private OfProcess(List<String> commands) {
             this(commands, encoding(), encoding());
@@ -244,7 +244,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     environment.put(name, value);
                 }
             });
-            this(commands, environment, output, error, false, false, false, false, null);
+            this(commands, environment, output, error, false, false, false, false, null, null);
         }
 
         private OfProcess(List<String> commands,
@@ -255,7 +255,8 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                           boolean daemon,
                           boolean scoped,
                           boolean shared,
-                          Path aot) {
+                          Path aot,
+                          Path directory) {
             this.commands = commands;
             this.environment = environment;
             this.output = output;
@@ -265,6 +266,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             this.scoped = scoped;
             this.shared = shared;
             this.aot = aot;
+            this.directory = directory;
         }
 
         public static Function<List<String>, OfProcess> ofJavaHome(String command) {
@@ -303,6 +305,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                         true,
                         false,
                         false,
+                        null,
                         null);
             };
         }
@@ -455,7 +458,16 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess environment(SortedMap<String, String> environment) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
+            return new OfProcess(commands,
+                    new TreeMap<>(environment),
+                    output,
+                    error,
+                    main,
+                    daemon,
+                    scoped,
+                    shared,
+                    aot,
+                    directory);
         }
 
         public boolean daemon() {
@@ -463,7 +475,16 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess daemon(boolean daemon) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
+            return new OfProcess(commands,
+                    new TreeMap<>(environment),
+                    output,
+                    error,
+                    main,
+                    daemon,
+                    scoped,
+                    shared,
+                    aot,
+                    directory);
         }
 
         public boolean scoped() {
@@ -471,7 +492,16 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess scoped(boolean scoped) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
+            return new OfProcess(commands,
+                    new TreeMap<>(environment),
+                    output,
+                    error,
+                    main,
+                    daemon,
+                    scoped,
+                    shared,
+                    aot,
+                    directory);
         }
 
         public boolean shared() {
@@ -479,7 +509,16 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess shared(boolean shared) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
+            return new OfProcess(commands,
+                    new TreeMap<>(environment),
+                    output,
+                    error,
+                    main,
+                    daemon,
+                    scoped,
+                    shared,
+                    aot,
+                    directory);
         }
 
         public Path aot() {
@@ -487,7 +526,33 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess aot(Path aot) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
+            return new OfProcess(commands,
+                    new TreeMap<>(environment),
+                    output,
+                    error,
+                    main,
+                    daemon,
+                    scoped,
+                    shared,
+                    aot,
+                    directory);
+        }
+
+        public Path directory() {
+            return directory;
+        }
+
+        public OfProcess directory(Path directory) {
+            return new OfProcess(commands,
+                    new TreeMap<>(environment),
+                    output,
+                    error,
+                    main,
+                    daemon,
+                    scoped,
+                    shared,
+                    aot,
+                    directory);
         }
 
         @Override
@@ -499,12 +564,15 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         public int execute(Path output, Path error, Tee tee) throws IOException {
             JavaWorker.Call call = main || daemon || scoped ? JavaWorker.call(commands) : null;
             if (call != null && (daemon || scoped && (shared || call.main().equals(Worker.TOOL)))) {
-                return JavaWorker.execute(call, shared, daemon, environment, output, error, tee);
+                return JavaWorker.execute(call, shared, daemon, environment, directory, output, error, tee);
             }
             JavaWorker.Once once = call == null || !main || call.main().endsWith(".java")
                     ? null
                     : JavaWorker.once(call, aot);
             ProcessBuilder builder = new ProcessBuilder(once == null ? commands : once.commands());
+            if (directory != null) {
+                builder.directory(directory.toFile());
+            }
             builder.environment().clear();
             builder.environment().putAll(environment);
             builder.environment().putIfAbsent("COLUMNS", "80");

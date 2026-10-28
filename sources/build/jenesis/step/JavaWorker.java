@@ -83,6 +83,7 @@ final class JavaWorker {
                        boolean shared,
                        boolean lasting,
                        SortedMap<String, String> environment,
+                       Path directory,
                        Path output,
                        Path error,
                        ProcessHandler.Tee tee) throws IOException {
@@ -108,7 +109,7 @@ final class JavaWorker {
                 identities.add(path.toString());
             }
         }
-        Key key = new Key(call.java(), call.options(), List.copyOf(identities), new TreeMap<>(environment));
+        Key key = new Key(call.java(), call.options(), List.copyOf(identities), new TreeMap<>(environment), directory);
         List<String> request = new ArrayList<>();
         if (shared && !call.main().equals(Worker.TOOL)) {
             request.add(Worker.SHARED);
@@ -333,6 +334,9 @@ final class JavaWorker {
         commands.add(classpath.toString());
         commands.add(Worker.class.getName());
         ProcessBuilder builder = new ProcessBuilder(commands).redirectError(ProcessBuilder.Redirect.DISCARD);
+        if (key.directory() != null) {
+            builder.directory(key.directory().toFile());
+        }
         builder.environment().clear();
         builder.environment().putAll(key.environment());
         builder.environment().putIfAbsent("COLUMNS", "80");
@@ -394,7 +398,11 @@ final class JavaWorker {
     record Call(String java, List<String> options, String classpath, String main, List<String> arguments) {
     }
 
-    private record Key(String java, List<String> options, List<Object> classpath, SortedMap<String, String> environment) {
+    private record Key(String java,
+                       List<String> options,
+                       List<Object> classpath,
+                       SortedMap<String, String> environment,
+                       Path directory) {
     }
 
     private record Running(Process process, DataOutputStream requests, DataInputStream frames) {

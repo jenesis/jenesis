@@ -86,13 +86,60 @@ public class DaemonTest {
     }
 
     @Test
-    public void shuts_down_when_the_engine_fingerprint_moved() throws IOException, InterruptedException {
+    public void refuses_a_client_of_another_engine_and_keeps_serving() throws IOException {
         assertThat(request(token(), "a-different-fingerprint", false, null, Map.of(), "help").status())
                 .isEqualTo(Worker.STALE);
+        assertThat(build(Map.of(), "help").code())
+                .as("a daemon other projects share is not ended by a client it cannot serve")
+                .isEqualTo(0);
+    }
+
+    @Test
+    public void stops_on_request_whatever_engine_the_client_runs() throws IOException, InterruptedException {
+        assertThat(request(token(), "a-different-fingerprint", true, null, Map.of()).code()).isEqualTo(0);
         daemon.join(Duration.ofSeconds(10));
-        assertThat(Files.exists(root.resolve(".jenesis").resolve(Worker.PORT)))
-                .as("a retiring daemon takes its port file with it")
+        assertThat(daemon.isAlive())
+                .as("a client stops the daemon used least recently to stay within the limit, whatever it runs")
                 .isFalse();
+    }
+
+    @Test
+    public void restores_the_system_properties_locale_and_time_zone_a_build_changed() throws IOException {
+        Locale locale = Locale.getDefault();
+        TimeZone zone = TimeZone.getDefault();
+        assertThat(request(token(), "fingerprint", false, null, PropertyEntry.class.getName(), Map.of()).code())
+                .isEqualTo(0);
+        assertThat(System.getProperty(PropertyEntry.PROPERTY))
+                .as("a later build of another project in the same daemon sees no property this build set")
+                .isNull();
+        assertThat(Locale.getDefault()).isEqualTo(locale);
+        assertThat(TimeZone.getDefault()).isEqualTo(zone);
+        assertThat(build(Map.of(), "help").code())
+                .as("what the daemon restores does not end it")
+                .isEqualTo(0);
+    }
+
+    @Test
+    public void ends_after_a_build_that_changed_a_default_it_cannot_restore() throws IOException, InterruptedException {
+        try {
+            Exchange exchange = request(token(),
+                    "fingerprint",
+                    false,
+                    null,
+                    AuthenticatorEntry.class.getName(),
+                    Map.of());
+            assertThat(exchange.code()).isEqualTo(0);
+            assertThat(exchange.out())
+                    .as("the build is told why the daemon ends, and the next build starts a fresh one")
+                    .contains("[DAEMON]", "the default authenticator");
+            daemon.join(Duration.ofSeconds(10));
+            assertThat(daemon.isAlive()).isFalse();
+            assertThat(root.resolve(".jenesis").resolve(Worker.PORT))
+                    .as("no later build is handed to a JVM whose defaults an earlier build changed")
+                    .doesNotExist();
+        } finally {
+            Authenticator.setDefault(null);
+        }
     }
 
     @Test
@@ -151,6 +198,25 @@ public class DaemonTest {
                 .singleElement(as(InstanceOfAssertFactories.STRING))
                 .as("a property the request set is reported as set")
                 .contains("[set]");
+    }
+
+    public static final class PropertyEntry {
+
+        static final String PROPERTY = "daemon.test.leaked";
+
+        public static void main(String... selectors) {
+            System.setProperty(PROPERTY, "leaked");
+            Locale.setDefault(Locale.JAPAN);
+            TimeZone.setDefault(TimeZone.getTimeZone("Pacific/Kiritimati"));
+        }
+    }
+
+    public static final class AuthenticatorEntry {
+
+        public static void main(String... selectors) {
+            Authenticator.setDefault(new Authenticator() {
+            });
+        }
     }
 
     public static final class BlockingEntry {

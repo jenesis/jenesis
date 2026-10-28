@@ -53,7 +53,8 @@ public abstract class ProcessBuildStep implements BuildStep {
                         int tail,
                         boolean daemon,
                         boolean shared,
-                        Path aot) {
+                        Path aot,
+                        Path directory) {
 
         public Terms() {
             this(null,
@@ -63,6 +64,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                     TAIL,
                     false,
                     true,
+                    null,
                     null);
         }
 
@@ -85,6 +87,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                 throw new IllegalArgumentException("Malformed value for jenesis.process.mode: '" + mode
                         + "' (expected fork, aot or daemon)");
             }
+            String directory = environment.value("process.directory");
             Consumer<String> out = environment.out();
             Palette palette = Palette.ofEnvironment(environment);
             return new Terms(streamed
@@ -105,39 +108,44 @@ public abstract class ProcessBuildStep implements BuildStep {
                     environment.flag("process.shared", true),
                     mode.equals("aot")
                             ? Path.of(environment.value("aot.folder", ".jenesis/aot")).toAbsolutePath()
-                            : null);
+                            : null,
+                    directory == null ? null : Path.of(directory).toAbsolutePath().normalize());
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
         }
 
         public Terms permits(Permits permits) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
         }
 
         public Terms announcing(Consumer<String> announcing) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
         }
 
         public Terms reporting(Consumer<String> reporting) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
         }
 
         public Terms tail(int tail) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
         }
 
         public Terms daemon(boolean daemon) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
         }
 
         public Terms shared(boolean shared) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
         }
 
         public Terms aot(Path aot) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
+        }
+
+        public Terms directory(Path directory) {
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
         }
     }
 
@@ -148,7 +156,7 @@ public abstract class ProcessBuildStep implements BuildStep {
     protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
         ProcessHandler handler = factory.apply(commands);
         return handler instanceof ProcessHandler.OfProcess process
-                ? process.daemon(process.daemon() && terms.daemon()).aot(terms.aot())
+                ? process.daemon(process.daemon() && terms.daemon()).aot(terms.aot()).directory(terms.directory())
                 : handler;
     }
 

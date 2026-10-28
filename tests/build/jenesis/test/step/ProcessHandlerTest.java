@@ -84,6 +84,28 @@ public class ProcessHandlerTest {
         assertThat(errLines).contains("err-one");
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void starts_a_process_in_the_directory_it_is_handed(boolean warm) throws Exception {
+        Path source = root.resolve("Here.java"), directory = Files.createDirectories(root.resolve("project"));
+        Files.writeString(source, """
+                public class Here {
+                    public static void main(String[] args) {
+                        System.out.println(java.nio.file.Path.of("").toAbsolutePath());
+                    }
+                }
+                """);
+        Path output = root.resolve("output"), error = root.resolve("error");
+        ProcessHandler handler = ProcessHandler.OfProcess.ofJavaMain()
+                .apply(List.of(source.toString()))
+                .daemon(warm)
+                .directory(directory);
+        assertThat(handler.execute(output, error, null)).isZero();
+        assertThat(Files.readString(output).strip())
+                .as("a test reading a file by a relative path reads it from its own project, whichever started the JVM")
+                .isEqualTo(directory.toRealPath().toString());
+    }
+
     @Test
     public void a_forked_process_is_handed_the_platform_variables_and_nothing_else() {
         ProcessHandler.OfProcess handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(List.of());

@@ -16,24 +16,29 @@ From this directory:
 | command                                     | cold  | warm  |
 |---------------------------------------------|-------|-------|
 | `... -Djenesis.make.mode=source`           | 8.0s  | 8.6s  |
-| `java build/jenesis/Make.java` (default)    | 3.6s  | 0.75s |
-| `... -Djenesis.make.mode=daemon`           | 3.7s  | 0.66s |
+| `... -Djenesis.make.mode=compiled`         | 3.6s  | 0.75s |
+| `java build/jenesis/Make.java` (default)    | 3.7s  | 0.66s |
 | `jenesis` (the installed command)           | 3.7s  | 0.15s |
 
 Measured in this folder, deleting `target/` before every run so each does the
-same work. The default compiles the build sources once and runs from those
-classes, which is where most of the difference in the first row comes from; the
-installed command is fastest because it is already compiled.
+same work. Every mode but `source` compiles the build sources once and runs from
+those classes, which is where most of the difference in the first row comes
+from; the installed command is fastest because it is already compiled. The
+first line a build prints names the mode it ran in, as does the `started` line of
+`target/.jenesis.events.jsonl`:
+
+    [STARTED]   Building in '.../demo-06-startup/target' in daemon mode...
 
 Reusing the JVM
 ---------------
 
-A daemon is never started unless you ask for it, either in a `jenesis.properties`
-at the project root or on the command line:
+By default a build is handed to a daemon, a JVM kept running for the builds that
+follow. The first build starts it, every later one reuses it, and `--stop` shuts
+down every daemon of the machine:
 
-    java -Djenesis.make.mode=daemon build/jenesis/Make.java   # first call starts it
-    java -Djenesis.make.mode=daemon build/jenesis/Make.java   # later calls reuse it
-    java build/jenesis/Make.java --stop                       # shut it down
+    java build/jenesis/Make.java          # first call starts it
+    java build/jenesis/Make.java          # later calls reuse it
+    java build/jenesis/Make.java --stop   # shut them down
 
 What it saves is compile time, so it pays in proportion to how much a build
 compiles:
@@ -50,14 +55,39 @@ build's output is streamed back as it happens, so a piped or redirected build
 reads exactly as it does without a daemon, and the command exits with the build's
 status.
 
-Two settings configure the daemon process itself, read when it starts, so a
-change takes effect on the next one:
+`-Djenesis.make.mode=compiled` builds without a daemon, and so does a build that
+names nothing but sets `jenesis.process.mode` to `fork` or `aot`, runs in a
+container (`jenesis.project.docker`), or publishes a release
+(`jenesis.release.publish=true`), so that a release's credentials and signing key
+are only ever handed to a JVM no earlier build ran in. Naming
+`jenesis.make.mode=daemon` keeps the daemon in every one of these cases.
 
+One daemon for many projects
+----------------------------
+
+A daemon is not tied to a project. Any project whose build runs the same engine
+on the same JVM, with the same JVM options and environment, hands its build to
+a daemon that is free, and a project whose engine, JVM or environment differs
+starts one of its own. At most three daemons run at once on a machine; starting a
+fourth first stops the one used least recently, which finishes the build it is
+running. A project's daemons announce themselves in `~/.jenesis/daemons`, each
+with its log, beside a copy of every engine compiled from source that a daemon
+runs, so no project's `.jenesis/classes` is pulled from under another's build.
+
+    -Djenesis.daemon.limit=3            # how many may run at once (default: 3)
+    -Djenesis.daemon.shared=false       # daemons for this project alone (default: true)
     -Djenesis.daemon.idle=600           # exit after ten idle minutes (default: 10800)
-    -Djenesis.daemon.options="-Xmx4g"   # JVM options for the daemon (default: -Xmx2g)
+    -Djenesis.daemon.options="-Xmx4g"   # JVM options of the daemon itself
+    -Djenesis.daemon.folder=...         # where daemons announce themselves (default: ~/.jenesis/daemons)
 
-Any other JVM option you pass applies to your own command rather than to the
-daemon, which was started earlier.
+Unset, `jenesis.daemon.options` hands the daemon the `-X`, `-D` and `-ea` options of
+the JVM that started the build, so `java -Xmx4g build/jenesis/Make.java` builds in
+a daemon with four gigabytes, and a JVM started with other options gets a daemon
+of its own. The folder, the limit, the idle time and the options are the
+machine's to choose: only the command line or `~/.jenesis/jenesis.properties` may
+set them, never a file the project provides. Every process the build starts - a
+test JVM, a warm tool - runs in the project's root, as it would without a daemon
+(`jenesis.process.directory` names another folder of the project).
 
 What travels with a call
 ------------------------
@@ -65,29 +95,56 @@ What travels with a call
 `-Djenesis.*` flags travel with every call and are cleared again afterwards, so
 two calls with different flags cannot contaminate each other:
 
-    java -Djenesis.make.mode=daemon -Djenesis.project.layout=modular build/jenesis/Make.java help
-    java -Djenesis.make.mode=daemon build/jenesis/Make.java help
+    java -Djenesis.project.layout=modular build/jenesis/Make.java help
+    java build/jenesis/Make.java help
 
 The second call reports `modular_to_maven`, the layout this demo's `module-info.java`
 infers, rather than the `modular` the first call asked for.
 
-Everything a running JVM cannot change - the build sources, the environment, the
-JVM arguments, and any `-D` that is not a `jenesis.` one - replaces the daemon
-instead of being served by one configured for something else, so
-`MAVEN_REPOSITORY_URI=...` is honoured at the price of a restart. Editing the
-engine replaces it too, so a daemon never serves a build with stale engine code.
+Everything a running JVM cannot change - the engine, the JVM, its options and the
+environment - is handed to another daemon instead of being served by one
+configured for something else, so `MAVEN_REPOSITORY_URI=...` is honoured at the
+price of a start. Editing the engine does the same, so a daemon never serves a
+build with stale engine code.
+
+What one build can leave to the next
+------------------------------------
+
+A daemon runs the builds of every project that shares it in one JVM, and a build
+runs code its project chose: its plugins, its annotation processors, the tools it
+names. Whatever that code changes for the whole JVM, the next build would
+inherit. So after every build the daemon restores the system properties, the
+default locale and the default time zone, and it ends once a build changed a
+JVM-wide default it cannot restore - the security providers, the default TLS
+context, socket factory and host name verifier, the default authenticator, proxy
+selector, cookie handler or response cache, the uncaught exception handler or the
+standard input - saying which:
+
+    [DAEMON]    The build changed the default authenticator, which a later build in this JVM would inherit - the daemon ends after it
+
+The next build starts a fresh one. The JVMs a build keeps warm for its tools are
+kept per project, as they run in its root.
+
+This keeps one project's settings out of another's build; it does not make a
+daemon a boundary. Since Java 24 no JVM can confine the code it runs, so code that
+sets out to stay - a thread left running, a field changed by reflection, a stream
+handler only the JVM's first caller may install - outlives its build and reaches
+every later build of the daemon, a release excepted, which never runs in one by
+default. Build a project you do not trust with `-Djenesis.make.mode=compiled`,
+which keeps it from the daemons of other projects, or in a container
+(`-Djenesis.project.docker`), which also keeps it from your files.
 
 Limits
 ------
 
-One build at a time: a second build arriving while one runs is refused, exactly
-as it is without a daemon, since two builds over one `target/` would interfere
-either way. A daemon serves one project root. A containerized build
-(`-Djenesis.project.docker`) is refused, because it replaces the running process.
+One build per project at a time: a second build of the same project arriving
+while one runs is refused, exactly as it is without a daemon, since two builds
+over one `target/` would interfere either way. A daemon runs one build at a time,
+so two projects building at once run in two daemons.
 
-When a build behaves in a way you cannot explain, stopping the daemon is the
-first thing to rule out - `java build/jenesis/Make.java` on its own always runs
-with nothing kept.
+When a build behaves in a way you cannot explain, stopping the daemons is the
+first thing to rule out - `java -Djenesis.make.mode=compiled build/jenesis/Make.java`
+always runs with nothing kept.
 
 Starting from a cache instead
 -----------------------------

@@ -18,7 +18,10 @@ public final class Make {
             "jenesis.module.local",
             "jenesis.discovery.ttl",
             "jenesis.sigstore.uri",
-            "jenesis.sigstore.issuers");
+            "jenesis.sigstore.issuers",
+            "jenesis.daemon.folder",
+            "jenesis.daemon.limit",
+            "jenesis.daemon.idle");
     private static final List<String> CONFINED = List.of("jenesis.project.target",
             "jenesis.project.reproduce",
             "jenesis.project.artifacts",
@@ -26,7 +29,8 @@ public final class Make {
             "jenesis.openpgp.local",
             "jenesis.make.classes",
             "jenesis.pin.file",
-            "jenesis.aot.folder");
+            "jenesis.aot.folder",
+            "jenesis.process.directory");
     private static final Set<String> PRINTING = Set.of("help", "skill", "prompt", "configuration", "properties", "--stop");
     static final List<String> CONTAINED = List.of("jenesis.project.docker",
             "jenesis.project.image",
@@ -74,7 +78,7 @@ public final class Make {
         classes = classesLocation == null || classesLocation.isBlank()
                 ? root.resolve(".jenesis").resolve("classes")
                 : root.resolve(classesLocation).normalize();
-        mode = Mode.of(settings.keys().get("make.mode"));
+        mode = Mode.of(settings.keys());
         String cache = settings.keys().get("aot.folder");
         aotFolder = cache == null || cache.isBlank()
                 ? root.resolve(".jenesis").resolve("aot")
@@ -97,10 +101,19 @@ public final class Make {
 
         SOURCE, COMPILED, AOT, DAEMON;
 
-        static Mode of(String value) {
-            if (value == null || value.isBlank()) {
-                return COMPILED;
+        static Mode of(Map<String, String> keys) {
+            String value = keys.get("make.mode"), process = keys.get("process.mode");
+            if (value != null && !value.isBlank()) {
+                return of(value);
             }
+            return process != null && !process.isBlank() && !process.trim().equalsIgnoreCase("daemon")
+                    || Objects.equals(parsed("jenesis.project.docker", keys.get("project.docker")), true)
+                    || Objects.equals(parsed("jenesis.release.publish", keys.get("release.publish")), true)
+                    ? COMPILED
+                    : DAEMON;
+        }
+
+        static Mode of(String value) {
             for (Mode mode : values()) {
                 if (mode.name().equalsIgnoreCase(value.trim())) {
                     return mode;
@@ -404,7 +417,11 @@ public final class Make {
                 new URL[] { folder.toUri().toURL() },
                 ClassLoader.getPlatformClassLoader())) {
             if (mode == Mode.DAEMON || stop) {
-                return dispatched(loader, List.of("-cp", folder.toString()), seed, collected, selectors);
+                return dispatched(loader,
+                        List.of("-cp", folder.toString()),
+                        fingerprint(build, sources, ""),
+                        collected,
+                        selectors);
             }
             if (building && tools()) {
                 sweep(folder);
@@ -588,12 +605,20 @@ public final class Make {
     }
 
     private Map<String, String> settled() {
-        if (!tools()) {
-            return settings.keys();
-        }
         Map<String, String> keys = new HashMap<>(settings.keys());
-        keys.put("process.mode", "aot");
-        keys.put("aot.folder", aotFolder.toString());
+        keys.put("make.mode", mode == Mode.COMPILED && ProcessHandle.current().info().arguments().stream()
+                .flatMap(Stream::of)
+                .anyMatch(argument -> argument.startsWith("-XX:AOTCache"))
+                ? "aot"
+                : mode.name().toLowerCase(Locale.ROOT));
+        String directory = keys.get("process.directory");
+        if (directory != null && !directory.isBlank()) {
+            keys.put("process.directory", root.resolve(directory.strip()).normalize().toString());
+        }
+        if (tools()) {
+            keys.put("process.mode", "aot");
+            keys.put("aot.folder", aotFolder.toString());
+        }
         return Collections.unmodifiableMap(keys);
     }
 
@@ -838,8 +863,8 @@ public final class Make {
         for (String key : SHARED) {
             if (properties.getProperty(key) != null) {
                 throw new IllegalStateException(key + " cannot be set in " + file
-                        + ": it names a cache whose outputs the build runs, a folder this machine shares between"
-                        + " projects or what the build trusts, so only the command line or your own"
+                        + ": it names a cache whose outputs the build runs, a folder or process this machine shares"
+                        + " between projects or what the build trusts, so only the command line or your own"
                         + " ~/.jenesis/jenesis.properties may set it, never a file the project provides"
                         + " (pass -D" + key + " instead)");
             }

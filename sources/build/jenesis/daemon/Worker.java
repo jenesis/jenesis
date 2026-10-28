@@ -223,7 +223,7 @@ public final class Worker {
                     }
                     Thread.ofPlatform().start(() -> {
                         try {
-                            exchange(socket, accepted, token, fingerprint, building, compiled);
+                            exchange(socket, accepted, token, fingerprint, port, building, compiled);
                         } catch (IOException _) {
                             return;
                         }
@@ -241,6 +241,7 @@ public final class Worker {
                                  Socket socket,
                                  byte[] token,
                                  String fingerprint,
+                                 Path port,
                                  ReentrantLock building,
                                  Map<String, Class<?>> compiled) throws IOException {
         try (socket;
@@ -251,12 +252,7 @@ public final class Worker {
                 out.flush();
                 return;
             }
-            if (!in.readUTF().equals(fingerprint)) {
-                out.writeByte(STALE);
-                out.flush();
-                server.close();
-                return;
-            }
+            boolean stale = !in.readUTF().equals(fingerprint);
             if (in.readBoolean()) {
                 out.writeByte(ACCEPTED);
                 out.writeByte(EXIT);
@@ -267,6 +263,11 @@ public final class Worker {
                 server.close();
                 return;
             }
+            if (stale) {
+                out.writeByte(STALE);
+                out.flush();
+                return;
+            }
             int call = in.readInt();
             List<String> request = read(in);
             if (!building.tryLock()) {
@@ -275,20 +276,37 @@ public final class Worker {
                 return;
             }
             try {
+                Files.setLastModifiedTime(port, FileTime.from(Instant.now()));
                 out.writeByte(ACCEPTED);
                 PrintStream systemOut = System.out, systemErr = System.err;
                 PrintStream printed = new PrintStream(new Frames(out, OUT, call), true, StandardCharsets.UTF_8),
                         errored = new PrintStream(new Frames(out, ERR, call), true, StandardCharsets.UTF_8);
+                Properties properties = (Properties) System.getProperties().clone();
+                Locale locale = Locale.getDefault();
+                TimeZone zone = TimeZone.getDefault();
+                SequencedMap<String, Object> global = global();
                 System.setOut(printed);
                 System.setErr(errored);
                 int code;
                 try {
                     code = call(request, compiled);
+                    List<String> changed = global.entrySet().stream()
+                            .filter(entry -> !Objects.equals(entry.getValue(), global().get(entry.getKey())))
+                            .map(Map.Entry::getKey)
+                            .toList();
+                    if (!changed.isEmpty()) {
+                        errored.println("[DAEMON]    The build changed " + String.join(", ", changed)
+                                + ", which a later build in this JVM would inherit - the daemon ends after it");
+                        server.close();
+                    }
                 } finally {
                     printed.flush();
                     errored.flush();
                     System.setOut(systemOut);
                     System.setErr(systemErr);
+                    System.setProperties(properties);
+                    Locale.setDefault(locale);
+                    TimeZone.setDefault(zone);
                 }
                 synchronized (out) {
                     out.writeByte(EXIT);
@@ -300,6 +318,27 @@ public final class Worker {
                 building.unlock();
             }
         }
+    }
+
+    private static SequencedMap<String, Object> global() {
+        SequencedMap<String, Object> global = new LinkedHashMap<>();
+        global.put("the security providers", List.of(Security.getProviders()));
+        global.put("the default authenticator", Authenticator.getDefault());
+        global.put("the default proxy selector", ProxySelector.getDefault());
+        global.put("the default cookie handler", CookieHandler.getDefault());
+        global.put("the default response cache", ResponseCache.getDefault());
+        SSLContext context;
+        try {
+            context = SSLContext.getDefault();
+        } catch (NoSuchAlgorithmException _) {
+            context = null;
+        }
+        global.put("the default TLS context", context);
+        global.put("the default TLS socket factory", HttpsURLConnection.getDefaultSSLSocketFactory());
+        global.put("the default TLS host name verifier", HttpsURLConnection.getDefaultHostnameVerifier());
+        global.put("the default uncaught exception handler", Thread.getDefaultUncaughtExceptionHandler());
+        global.put("the standard input", System.in);
+        return global;
     }
 
     private static List<String> read(DataInputStream in) throws IOException {

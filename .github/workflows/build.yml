@@ -57,7 +57,7 @@ jobs:
       - name: Native image demo
         shell: bash
         working-directory: demo/demo-57-native-image
-        run: java -Djenesis.dependency.pin=strict build/jenesis/Make.java stage
+        run: java -Djenesis.make.mode=compiled -Djenesis.dependency.pin=strict build/jenesis/Make.java stage
 
       - name: Verify native image
         shell: bash
@@ -102,7 +102,7 @@ jobs:
 
       - name: Project layout ${{ matrix.layout }}
         shell: bash
-        run: java -Djenesis.dependency.pin=strict -Djenesis.project.layout=${{ matrix.layout }} build/jenesis/Make.java stage
+        run: java -Djenesis.make.mode=compiled -Djenesis.dependency.pin=strict -Djenesis.project.layout=${{ matrix.layout }} build/jenesis/Make.java stage
 
       - name: Upload target on failure
         if: failure()
@@ -133,7 +133,7 @@ jobs:
         shell: bash
         env:
           JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8
-        run: java -Djenesis.dependency.pin=strict build/jenesis/Make.java +tests
+        run: java -Djenesis.make.mode=compiled -Djenesis.dependency.pin=strict build/jenesis/Make.java +tests
 
       - name: Upload target on failure
         if: failure()
@@ -203,7 +203,7 @@ jobs:
       - name: Stage Jenesis
         shell: bash
         run: |
-          java -Djenesis.dependency.pin=strict \
+          java -Djenesis.make.mode=compiled -Djenesis.dependency.pin=strict \
                -Djenesis.project.version=0.0.0-TEST \
                -Djenesis.project.sources=true \
                -Djenesis.test.skip=true \

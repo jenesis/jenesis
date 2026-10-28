@@ -24,12 +24,14 @@ public interface BuildExecutor {
                          boolean rebuild,
                          boolean aggregate,
                          int concurrency,
+                         String mode,
+                         Path directory,
                          BuildExecutorCache cache,
                          Consumer<String> out,
                          Palette palette) {
 
         public Configuration() {
-            this(Duration.ZERO, "MD5", false, true, true, false, false, false, 0, null, null, Palette.NONE);
+            this(Duration.ZERO, "MD5", false, true, true, false, false, false, 0, null, null, null, null, Palette.NONE);
         }
 
         public static Configuration ofEnvironment(Environment environment) {
@@ -60,53 +62,234 @@ public interface BuildExecutor {
                     environment.flag("executor.rebuild"),
                     environment.flag("executor.aggregate"),
                     environment.number("executor.concurrency", 0),
+                    environment.value("make.mode"),
+                    environment.value("process.directory") == null
+                            ? null
+                            : Path.of(environment.value("process.directory")),
                     cache,
                     environment.out(),
                     Palette.ofEnvironment(environment));
         }
 
         public Configuration timeout(Duration timeout) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout,
+                    digest,
+                    verbose,
+                    progress,
+                    events,
+                    cacheHits,
+                    rebuild,
+                    aggregate,
+                    concurrency,
+                    mode,
+                    directory,
+                    cache,
+                    out,
+                    palette);
         }
 
         public Configuration digest(String digest) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout,
+                    digest,
+                    verbose,
+                    progress,
+                    events,
+                    cacheHits,
+                    rebuild,
+                    aggregate,
+                    concurrency,
+                    mode,
+                    directory,
+                    cache,
+                    out,
+                    palette);
         }
 
         public Configuration verbose(boolean verbose) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout,
+                    digest,
+                    verbose,
+                    progress,
+                    events,
+                    cacheHits,
+                    rebuild,
+                    aggregate,
+                    concurrency,
+                    mode,
+                    directory,
+                    cache,
+                    out,
+                    palette);
         }
 
         public Configuration progress(boolean progress) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout,
+                    digest,
+                    verbose,
+                    progress,
+                    events,
+                    cacheHits,
+                    rebuild,
+                    aggregate,
+                    concurrency,
+                    mode,
+                    directory,
+                    cache,
+                    out,
+                    palette);
         }
 
         public Configuration events(boolean events) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout,
+                    digest,
+                    verbose,
+                    progress,
+                    events,
+                    cacheHits,
+                    rebuild,
+                    aggregate,
+                    concurrency,
+                    mode,
+                    directory,
+                    cache,
+                    out,
+                    palette);
         }
 
         public Configuration cacheHits(boolean cacheHits) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout,
+                    digest,
+                    verbose,
+                    progress,
+                    events,
+                    cacheHits,
+                    rebuild,
+                    aggregate,
+                    concurrency,
+                    mode,
+                    directory,
+                    cache,
+                    out,
+                    palette);
         }
 
         public Configuration rebuild(boolean rebuild) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout,
+                    digest,
+                    verbose,
+                    progress,
+                    events,
+                    cacheHits,
+                    rebuild,
+                    aggregate,
+                    concurrency,
+                    mode,
+                    directory,
+                    cache,
+                    out,
+                    palette);
         }
 
         public Configuration aggregate(boolean aggregate) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout,
+                    digest,
+                    verbose,
+                    progress,
+                    events,
+                    cacheHits,
+                    rebuild,
+                    aggregate,
+                    concurrency,
+                    mode,
+                    directory,
+                    cache,
+                    out,
+                    palette);
         }
 
         public Configuration concurrency(int concurrency) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout,
+                    digest,
+                    verbose,
+                    progress,
+                    events,
+                    cacheHits,
+                    rebuild,
+                    aggregate,
+                    concurrency,
+                    mode,
+                    directory,
+                    cache,
+                    out,
+                    palette);
+        }
+
+        public Configuration mode(String mode) {
+            return new Configuration(timeout,
+                    digest,
+                    verbose,
+                    progress,
+                    events,
+                    cacheHits,
+                    rebuild,
+                    aggregate,
+                    concurrency,
+                    mode,
+                    directory,
+                    cache,
+                    out,
+                    palette);
+        }
+
+        public Configuration directory(Path directory) {
+            return new Configuration(timeout,
+                    digest,
+                    verbose,
+                    progress,
+                    events,
+                    cacheHits,
+                    rebuild,
+                    aggregate,
+                    concurrency,
+                    mode,
+                    directory,
+                    cache,
+                    out,
+                    palette);
         }
 
         public Configuration cache(BuildExecutorCache cache) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout,
+                    digest,
+                    verbose,
+                    progress,
+                    events,
+                    cacheHits,
+                    rebuild,
+                    aggregate,
+                    concurrency,
+                    mode,
+                    directory,
+                    cache,
+                    out,
+                    palette);
         }
 
         public Configuration out(Consumer<String> out, Palette palette) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout,
+                    digest,
+                    verbose,
+                    progress,
+                    events,
+                    cacheHits,
+                    rebuild,
+                    aggregate,
+                    concurrency,
+                    mode,
+                    directory,
+                    cache,
+                    out,
+                    palette);
         }
 
         public BuildExecutor of(Path target) throws IOException {
@@ -115,13 +298,13 @@ public interface BuildExecutor {
 
         public BuildExecutor of(Path target, BuildExecutorCallback callback) throws IOException {
             BuildExecutorCallback printing = progress && out != null
-                    ? BuildExecutorCallback.printing(out, palette, verbose, cacheHits, target, events)
+                    ? BuildExecutorCallback.printing(out, palette, verbose, cacheHits, target, events, mode)
                     : BuildExecutorCallback.nop();
             return BuildExecutor.of(target,
                     timeout,
                     new HashDigestFunction(digest),
                     BuildStepHashFunction.ofSerializationDigest(digest),
-                    (events ? printing.andThen(BuildExecutorCallback.events(target)) : printing).andThen(callback),
+                    (events ? printing.andThen(BuildExecutorCallback.events(target, mode, directory)) : printing).andThen(callback),
                     cache == null ? BuildExecutorCache.nop() : cache,
                     rebuild,
                     aggregate,
