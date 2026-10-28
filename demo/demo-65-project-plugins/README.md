@@ -130,7 +130,7 @@ per value as `<plugin>.<key>`. This demo's holds
     notice.holder=Example Corp.
     notice.@legal=legal
     lines.@sources=sources
-    lines.file=target/LINES
+    lines.file=LINES
 
 and `holder=Example Corp.` reaches the `notice` plugin's factory among its values. A profile
 brings values of its own in `jenesis.plugins.arguments-<profile>.properties`, which
@@ -256,7 +256,8 @@ Delivering what was staged
 
 A releaser runs with `release`, beside the steps Jenesis runs there itself, and is
 handed everything that was staged. The `publish` plugin copies the modular tree into
-the folder its `build.jenesis/plugin-publish.properties` names:
+the folder its `build.jenesis/plugin-publish.properties` names, relative to the project
+root that the `root.properties` every releaser is handed records:
 
     directory=target/published
 
@@ -304,11 +305,12 @@ Running a plugin on demand
 
 A plugin under `plugin` is not part of any goal: nothing waits for it, it waits for
 nothing, and it runs only when its own selector is named, handed only what it binds.
-The `lines` plugin counts the lines of the project's sources without building them:
+The `lines` plugin counts the lines of the project's sources without building them,
+into the file its `lines.file` names among its outputs:
 
     java build/jenesis/Make.java plugin/lines
 
-    target/LINES
+    target/plugin/lines/delegate/lines/output/LINES
 
 Its name cannot collide with anything of Jenesis, as `plugin/` holds nothing else.
 
