@@ -172,12 +172,36 @@ public class Pom implements BuildStep {
                     excludes,
                     coordinateOptionals.contains(name) ? Boolean.TRUE : null));
         }
+        SequencedMap<String, MavenDependencyKey.Versioned> resolved = new TreeMap<>();
+        for (String scope : List.of("runtime", "compile")) {
+            Resolver.Resolution resolution = graph.get(group + "/" + scope);
+            if (resolution != null) {
+                resolution.vertices().forEach((coordinate, vertex) -> {
+                    int separator = coordinate.indexOf('/');
+                    if (vertex.resolvedVersion() != null
+                            && separator > 0
+                            && prefixes.contains(coordinate.substring(0, separator))) {
+                        resolved.putIfAbsent(coordinate.substring(separator + 1),
+                                MavenDependencyKey.parse(coordinate.substring(separator + 1) + "/" + vertex.resolvedVersion()));
+                    }
+                });
+            }
+        }
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> managed = new LinkedHashMap<>();
+        for (MavenDependencyKey.Versioned versioned : resolved.values()) {
+            if (!deps.containsKey(versioned.key())
+                    && !(versioned.key().groupId().equals(groupId) && versioned.key().artifactId().equals(artifactId))) {
+                managed.put(versioned.key(), new MavenDependencyValue(versioned.version(), null, null, null, null));
+            }
+        }
         try (Writer writer = Files.newBufferedWriter(context.next().resolve(POM))) {
             emitter.emit(
                     groupId,
                     artifactId,
                     version,
+                    null,
                     deps,
+                    managed,
                     MavenPomEmitter.Metadata.of(metadata)).accept(writer);
         }
         if (embedded) {
