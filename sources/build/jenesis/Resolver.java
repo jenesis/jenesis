@@ -34,6 +34,7 @@ public interface Resolver extends Serializable {
                             SequencedMap<String, SequencedSet<String>> coordinates,
                             SequencedMap<String, String> versions,
                             SequencedMap<String, SequencedSet<String>> managedExclusions,
+                            Map<String, Set<DependencyScope>> scopes,
                             DependencyScope scope) throws IOException;
 
     default SequencedSet<String> managedPrefixes() {
@@ -100,6 +101,14 @@ public interface Resolver extends Serializable {
     static boolean pom(String coordinate) {
         String[] segments = coordinate.split("/");
         return segments.length == 4 && segments[2].equals("pom");
+    }
+
+    static SequencedMap<String, SequencedSet<String>> placed(SequencedMap<String, SequencedSet<String>> coordinates,
+                                                             Map<String, Set<DependencyScope>> scopes,
+                                                             DependencyScope scope) {
+        SequencedMap<String, SequencedSet<String>> placed = new LinkedHashMap<>(coordinates);
+        placed.keySet().removeIf(coordinate -> !scopes.getOrDefault(coordinate, Set.of(scope)).contains(scope));
+        return placed;
     }
 
     static String pinKey(String key, String value) {
@@ -191,9 +200,9 @@ public interface Resolver extends Serializable {
     }
 
     static Resolver identity() {
-        return (executor, prefix, repositories, coordinates, _, _, _) -> {
+        return (executor, prefix, repositories, coordinates, _, _, scopes, scope) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
-            coordinates.sequencedKeySet().forEach(coordinate -> resolved.put(prefix + "/" + coordinate, ""));
+            placed(coordinates, scopes, scope).sequencedKeySet().forEach(coordinate -> resolved.put(prefix + "/" + coordinate, ""));
             SequencedMap<String, Resolved> artifacts = materializeAll(executor, repositories, prefix, resolved);
             List<Edge> edges = new ArrayList<>();
             SequencedMap<String, Vertex> vertices = new LinkedHashMap<>();

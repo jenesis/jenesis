@@ -470,10 +470,10 @@ public class JpxTest {
         Path folder = storage.resolve("maven").resolve("org.example--tool-main@1.0");
         Repository mavenRepository = new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null);
         Resolver delegate = MavenPomResolver.ofEnvironment(Environment.NONE);
-        Resolver racing = (executor, prefix, repositories, coordinates, versions, managedExclusions, scope) -> {
+        Resolver racing = (executor, prefix, repositories, coordinates, versions, managedExclusions, scopes, scope) -> {
             Files.createDirectories(folder);
             Files.writeString(folder.resolve(Jpx.PROPERTIES), "name=SENTINEL\n");
-            return delegate.dependencies(executor, prefix, repositories, coordinates, versions, managedExclusions, scope);
+            return delegate.dependencies(executor, prefix, repositories, coordinates, versions, managedExclusions, scopes, scope);
         };
         Jpx jpx = new Jpx(storage,
                 Map.of("maven", mavenRepository),
