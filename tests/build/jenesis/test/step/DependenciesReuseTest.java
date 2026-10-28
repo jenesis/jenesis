@@ -252,9 +252,11 @@ public class DependenciesReuseTest {
                                                 Map<String, Repository> repositories,
                                                 SequencedMap<String, SequencedSet<String>> coordinates,
                                                 SequencedMap<String, String> versions,
+                                                SequencedMap<String, SequencedSet<String>> managedExclusions,
+                                                Map<String, Set<DependencyScope>> scopes,
                                                 DependencyScope scope) throws IOException {
             RESOLUTIONS.incrementAndGet();
-            return Resolver.identity().dependencies(executor, prefix, repositories, coordinates, versions, scope);
+            return Resolver.identity().dependencies(executor, prefix, repositories, coordinates, versions, managedExclusions, scopes, scope);
         }
     }
 }

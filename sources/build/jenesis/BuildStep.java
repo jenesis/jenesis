@@ -23,6 +23,7 @@ public interface BuildStep extends Serializable {
             EXCLUSIONS = "exclusions.properties",
             MANAGED = "managed.properties",
             OPTIONALS = "optionals.properties",
+            SCOPES = "scopes.properties",
             OVERRIDES = "overrides.properties",
             ATTACHMENTS = "attachments.properties",
             NATIVES = "natives.properties",

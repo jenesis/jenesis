@@ -28,6 +28,7 @@ public class MultiProjectDependencies implements BuildStep {
                 Path.of(BOMS),
                 Path.of(SIGNATURES),
                 Path.of(EXCLUSIONS),
+                Path.of(SCOPES),
                 Path.of(OVERRIDES),
                 Path.of(IDENTITY),
                 Path.of(Abi.ABI),
@@ -47,7 +48,7 @@ public class MultiProjectDependencies implements BuildStep {
         SequencedMap<String, String> dependencies = new LinkedHashMap<>(), variants = new TreeMap<>(), inactive = new TreeMap<>();
         String path = null, tested = null;
         SequencedMap<String, SequencedMap<String, String>> inherited = new LinkedHashMap<>();
-        for (String name : List.of(VERSIONS, ALIASES, BOMS, SIGNATURES, EXCLUSIONS, OVERRIDES)) {
+        for (String name : List.of(VERSIONS, ALIASES, BOMS, SIGNATURES, EXCLUSIONS, SCOPES, OVERRIDES)) {
             inherited.put(name, new LinkedHashMap<>());
         }
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {

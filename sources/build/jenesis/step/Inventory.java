@@ -334,7 +334,7 @@ public class Inventory implements BuildStep {
                     .toList());
             writePaths(inventory, context, prefix + "documentation", documentation);
             writeClosure(inventory, context, prefix + "tool.", closureJars, closureScopes, closureChecksums);
-            writeClosure(inventory, context, prefix + "pom.", pomFiles, new LinkedHashMap<>(), pomChecksums);
+            writeClosure(inventory, context, prefix + "pom.", pomFiles, Collections.emptyNavigableMap(), pomChecksums);
             if (!inventory.isEmpty()) {
                 inventory.store(context.next().resolve(INVENTORY));
             }
@@ -353,7 +353,7 @@ public class Inventory implements BuildStep {
             inventory.setProperty(prefix + "identity." + identityIndex++, coordinate);
         }
         writeClosure(inventory, context, prefix + "dependency.", closureJars, closureScopes, closureChecksums);
-        writeClosure(inventory, context, prefix + "pom.", pomFiles, new LinkedHashMap<>(), pomChecksums);
+        writeClosure(inventory, context, prefix + "pom.", pomFiles, Collections.emptyNavigableMap(), pomChecksums);
         int agentIndex = 0;
         for (Map.Entry<String, String> attachment : attachments.entrySet()) {
             String key = attachment.getKey();

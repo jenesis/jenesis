@@ -10,12 +10,12 @@ public interface MavenResolver extends Resolver {
 
     SequencedMap<Path, MavenLocalPom> local(Executor executor, Repository repository, Path root) throws IOException;
 
-    Closure dependencies(Executor executor,
-                         MavenRepository repository,
-                         List<RootPom> rootPoms,
-                         Map<MavenDependencyKey, MavenDependencyValue> managedCoordinates,
-                         MavenDependencyScope scope,
-                         String prefix) throws IOException;
+    Closure closure(Executor executor,
+                    MavenRepository repository,
+                    List<RootPom> rootPoms,
+                    Map<MavenDependencyKey, MavenDependencyValue> managedCoordinates,
+                    MavenDependencyScope scope,
+                    String prefix) throws IOException;
 
     record Closure(SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies,
                    SequencedMap<String, MavenDependencyKey> roots,

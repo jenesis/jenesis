@@ -15,7 +15,7 @@ public class NativeImageAgentTest {
 
     @Test
     public void emits_a_tracing_agent_writing_into_the_native_image_directory(@TempDir Path output) {
-        assertThat(new NativeImageAgent().commands(new LinkedHashMap<>(), output))
+        assertThat(new NativeImageAgent().commands(Collections.emptyNavigableMap(), output))
                 .containsExactly("-agentlib:native-image-agent=config-output-dir="
                         + output.resolve("native-image").toAbsolutePath());
     }

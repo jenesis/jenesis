@@ -143,7 +143,8 @@ public class PomTest {
                 .toCompletableFuture()
                 .join();
         String pom = Files.readString(next.resolve(Pom.POM));
-        assertThat(pom)
+        String managed = pom.substring(0, pom.indexOf("</dependencyManagement>")), declared = pom.substring(managed.length());
+        assertThat(declared)
                 .as("each module the declaration requires is named by its artifact, at the version resolved")
                 .contains("<artifactId>lib</artifactId>", "<version>1.2.3</version>",
                         "<artifactId>annotations</artifactId>", "<version>2.0</version>",
@@ -152,10 +153,52 @@ public class PomTest {
                 .contains("<artifactId>unwanted</artifactId>")
                 .as("what a required module brings is left to its own POM")
                 .doesNotContain("<artifactId>transitive</artifactId>", "<groupId>*</groupId>");
+        assertThat(managed)
+                .as("the version a required module brought is managed at the version the module was built with")
+                .contains("<artifactId>transitive</artifactId>", "<version>4.5.6</version>")
+                .doesNotContain("<artifactId>lib</artifactId>");
         assertThat(pom.indexOf("<scope>provided</scope>"))
                 .as("a requires static is needed to compile alone, so it is provided")
                 .isGreaterThan(pom.indexOf("<artifactId>annotations</artifactId>"))
                 .isLessThan(pom.indexOf("<artifactId>aliased</artifactId>"));
+    }
+
+    @Test
+    public void manages_every_version_its_class_paths_resolved_beside_what_it_declares_preferring_the_runtime_one()
+            throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.example/direct/1", "");
+        requires.setProperty("main/runtime/maven/org.example/direct/1", "");
+        requires.store(argument.resolve(BuildStep.REQUIRES));
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("vertex/main/compile/maven/org.example/direct", "1\t\tfalse\tfalse");
+        graph.setProperty("vertex/main/runtime/maven/org.example/direct", "1\t\tfalse\tfalse");
+        graph.setProperty("vertex/main/compile/maven/org.example/shared", "1\t\tfalse\tfalse");
+        graph.setProperty("vertex/main/runtime/maven/org.example/shared", "2\t\tfalse\tfalse");
+        graph.setProperty("vertex/main/compile/maven/org.example/annotations", "3\t\tfalse\tfalse");
+        graph.setProperty("vertex/main/runtime/module/org.example.named", "4\torg.example.named\tfalse\tfalse");
+        graph.store(argument.resolve(Dependencies.GRAPH));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement, persistent),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(argument, Map.of(
+                                Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(Dependencies.GRAPH), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        String pom = Files.readString(next.resolve(Pom.POM));
+        String managed = pom.substring(pom.indexOf("<dependencyManagement>"), pom.indexOf("</dependencyManagement>"));
+        assertThat(managed.replaceAll("\\s", ""))
+                .as("a consumer that applies a dependency's management resolves what the module ran with")
+                .contains("<artifactId>shared</artifactId><version>2</version>",
+                        "<artifactId>annotations</artifactId><version>3</version>")
+                .as("a declared dependency carries its version itself, and what is no Maven artifact is not managed")
+                .doesNotContain("<artifactId>direct</artifactId>", "named", "<scope>");
     }
 
     @Test

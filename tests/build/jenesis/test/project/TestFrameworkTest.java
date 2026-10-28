@@ -23,20 +23,20 @@ public class TestFrameworkTest {
     @Test
     public void detects_junit_platform_from_engine_module() throws IOException {
         writeJar(root.resolve("artifacts"), "engine.jar", "org.junit.platform.engine");
-        assertThat(TestFrameworks.detect(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
+        assertThat(TestFrameworks.detect(List.of(), List.of(root))).get().isInstanceOf(JUnitPlatform.class);
     }
 
     @Test
     public void detects_junit_platform_from_jupiter_api_without_an_engine() throws IOException {
         writeJar(root.resolve("artifacts"), "api.jar", "org.junit.jupiter.api");
-        assertThat(TestFrameworks.detect(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
+        assertThat(TestFrameworks.detect(List.of(), List.of(root))).get().isInstanceOf(JUnitPlatform.class);
     }
 
     @Test
     public void prefers_junit_platform_over_an_incidental_junit4_jar() throws IOException {
         writeJar(root.resolve("artifacts"), "api.jar", "org.junit.jupiter.api");
         writeJar(root.resolve("artifacts"), "junit.jar", "junit");
-        assertThat(TestFrameworks.detect(List.of(root)))
+        assertThat(TestFrameworks.detect(List.of(), List.of(root)))
                 .as("a transitive junit:junit must not outrank the Jupiter API of the tests themselves")
                 .get()
                 .isInstanceOf(JUnitPlatform.class);
@@ -45,13 +45,13 @@ public class TestFrameworkTest {
     @Test
     public void detects_junit4_from_module() throws IOException {
         writeJar(root.resolve("artifacts"), "junit.jar", "junit");
-        assertThat(TestFrameworks.detect(List.of(root))).get().isInstanceOf(JUnit4.class);
+        assertThat(TestFrameworks.detect(List.of(), List.of(root))).get().isInstanceOf(JUnit4.class);
     }
 
     @Test
     public void detects_testng_from_module() throws IOException {
         writeJar(root.resolve("artifacts"), "testng.jar", "org.testng");
-        assertThat(TestFrameworks.detect(List.of(root))).get().isInstanceOf(TestNG.class);
+        assertThat(TestFrameworks.detect(List.of(), List.of(root))).get().isInstanceOf(TestNG.class);
     }
 
     @Test
@@ -60,7 +60,7 @@ public class TestFrameworkTest {
         SequencedProperties index = new SequencedProperties();
         index.setProperty("runtime/maven/engine", "resolved/engine.jar");
         index.store(root.resolve(BuildStep.DEPENDENCIES));
-        assertThat(TestFrameworks.detect(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
+        assertThat(TestFrameworks.detect(List.of(), List.of(root))).get().isInstanceOf(JUnitPlatform.class);
     }
 
     @Test
@@ -79,18 +79,18 @@ public class TestFrameworkTest {
     @Test
     public void detects_no_framework_for_unrelated_module() throws IOException {
         writeJar(root.resolve("artifacts"), "plain.jar", "com.example.something");
-        assertThat(TestFrameworks.detect(List.of(root))).isEmpty();
+        assertThat(TestFrameworks.detect(List.of(), List.of(root))).isEmpty();
     }
 
     @Test
     public void detects_no_framework_from_file_name_alone() throws IOException {
         writeJar(root.resolve("artifacts"), "org.junit.platform.engine.jar", null);
-        assertThat(TestFrameworks.detect(List.of(root))).isEmpty();
+        assertThat(TestFrameworks.detect(List.of(), List.of(root))).isEmpty();
     }
 
     @Test
     public void detects_no_framework_without_jars() throws IOException {
-        assertThat(TestFrameworks.detect(List.of(root))).isEmpty();
+        assertThat(TestFrameworks.detect(List.of(), List.of(root))).isEmpty();
     }
 
     @Test
@@ -260,7 +260,7 @@ public class TestFrameworkTest {
         assertThat(new JUnitPlatform("1.9.3").arguments(root,
                 root,
                 new LinkedHashSet<>(List.of("sample.BetaTest")),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 false,
                 false))
                 .as("the execute command exists from JUnit Platform 1.10 on, and an older launcher rejects it")
@@ -275,7 +275,7 @@ public class TestFrameworkTest {
             assertThat(new JUnitPlatform(version).arguments(root,
                     root,
                     new LinkedHashSet<>(List.of("sample.BetaTest")),
-                    new LinkedHashMap<>(),
+                    Collections.emptyNavigableMap(),
                     false,
                     false))
                     .as("version %s", version)
@@ -289,7 +289,7 @@ public class TestFrameworkTest {
         assertThatThrownBy(() -> new JUnitPlatform("1.3.2").arguments(root,
                 root,
                 new LinkedHashSet<>(List.of("sample.BetaTest")),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 false,
                 false))
                 .isInstanceOf(IllegalStateException.class)

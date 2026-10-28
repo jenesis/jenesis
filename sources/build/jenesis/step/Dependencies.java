@@ -224,6 +224,7 @@ public class Dependencies implements BuildExecutorModule {
                     Path.of(ALIASES),
                     Path.of(BOMS),
                     Path.of(EXCLUSIONS),
+                    Path.of(SCOPES),
                     Path.of(MANAGED),
                     Path.of(OVERRIDES),
                     Path.of(SPDX),
@@ -274,6 +275,7 @@ public class Dependencies implements BuildExecutorModule {
             SequencedMap<String, String> bomTokens = new LinkedHashMap<>();
             SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedSet<String>>>>> exclusions = new LinkedHashMap<>();
             SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedSet<String>>>> managedExclusions = new LinkedHashMap<>();
+            SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, Set<DependencyScope>>>>> declaredScopes = new LinkedHashMap<>();
             SequencedMap<String, String> variants = new TreeMap<>();
             Set<String> handed = new HashSet<>();
             for (BuildStepArgument argument : arguments.values()) {
@@ -403,6 +405,34 @@ public class Dependencies implements BuildExecutorModule {
                                 .put(parts[3], excludes);
                     }
                 }
+                Path scopesFile = argument.folder().resolve(SCOPES);
+                if (Files.exists(scopesFile)) {
+                    SequencedProperties properties = SequencedProperties.ofFiles(scopesFile);
+                    for (String key : properties.stringPropertyNames()) {
+                        String[] parts = split(key);
+                        if (parts == null) {
+                            continue;
+                        }
+                        Set<DependencyScope> placed = EnumSet.noneOf(DependencyScope.class);
+                        for (String word : properties.words(key)) {
+                            placed.add(switch (word) {
+                                case "compile" -> DependencyScope.COMPILE;
+                                case "runtime" -> DependencyScope.RUNTIME;
+                                default -> throw new IllegalArgumentException("Unknown dependency scope '"
+                                        + word
+                                        + "' for "
+                                        + key
+                                        + " in "
+                                        + scopesFile
+                                        + ": expected compile or runtime");
+                            });
+                        }
+                        declaredScopes.computeIfAbsent(parts[0], _ -> new LinkedHashMap<>())
+                                .computeIfAbsent(parts[1], _ -> new LinkedHashMap<>())
+                                .computeIfAbsent(parts[2], _ -> new LinkedHashMap<>())
+                                .putIfAbsent(parts[3], placed);
+                    }
+                }
                 Path managedFile = argument.folder().resolve(MANAGED);
                 if (Files.exists(managedFile)) {
                     SequencedProperties properties = SequencedProperties.ofFiles(managedFile);
@@ -432,6 +462,7 @@ public class Dependencies implements BuildExecutorModule {
                     return second < 0 || !group.equals(token.substring(first + 1, second));
                 });
                 exclusions.keySet().retainAll(Set.of(group));
+                declaredScopes.keySet().retainAll(Set.of(group));
                 managedExclusions.keySet().retainAll(Set.of(group));
                 versions.keySet().retainAll(Set.of(group));
             }
@@ -735,9 +766,15 @@ public class Dependencies implements BuildExecutorModule {
                                 .getOrDefault(group, Collections.emptyNavigableMap())
                                 .getOrDefault(scope, Collections.emptyNavigableMap())
                                 .getOrDefault(repo, Collections.emptyNavigableMap());
+                        SequencedMap<String, Set<DependencyScope>> placements = declaredScopes
+                                .getOrDefault(group, Collections.emptyNavigableMap())
+                                .getOrDefault(scope, Collections.emptyNavigableMap())
+                                .getOrDefault(repo, Collections.emptyNavigableMap());
+                        SequencedSet<String> roots = new LinkedHashSet<>(placements.sequencedKeySet());
+                        roots.addAll(repoEntry.getValue().sequencedKeySet());
                         SequencedMap<String, SequencedSet<String>> coordinates = new LinkedHashMap<>();
                         SequencedMap<String, SequencedSet<String>> deferred = new LinkedHashMap<>();
-                        for (String coordinate : repoEntry.getValue().sequencedKeySet()) {
+                        for (String coordinate : roots) {
                             if (overrideTargets.containsKey(coordinate)) {
                                 continue;
                             }
@@ -818,6 +855,7 @@ public class Dependencies implements BuildExecutorModule {
                                 coordinates,
                                 bom,
                                 managedExcludes,
+                                placements,
                                 intent);
                         if (!deferred.isEmpty()) {
                             SequencedMap<String, SequencedSet<String>> absent = new LinkedHashMap<>();
@@ -831,7 +869,7 @@ public class Dependencies implements BuildExecutorModule {
                             }
                             if (!absent.isEmpty()) {
                                 coordinates.putAll(absent);
-                                resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, managedExcludes, intent);
+                                resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, managedExcludes, placements, intent);
                             }
                         }
                         if (!overrideTargets.isEmpty() && !coordinates.isEmpty()) {
@@ -853,7 +891,7 @@ public class Dependencies implements BuildExecutorModule {
                                     merged.addAll(overridden);
                                     return merged;
                                 });
-                                resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, managedExcludes, intent);
+                                resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, managedExcludes, placements, intent);
                             }
                         }
                         resolution.poms().forEach((key, value) -> poms.putIfAbsent(group + "/" + key, value));

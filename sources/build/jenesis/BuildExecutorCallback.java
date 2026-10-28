@@ -63,14 +63,6 @@ public interface BuildExecutorCallback {
                                           Palette palette,
                                           boolean verbose,
                                           boolean cache,
-                                          Path target) {
-        return printing(out, palette, verbose, cache, target, false);
-    }
-
-    static BuildExecutorCallback printing(Consumer<String> out,
-                                          Palette palette,
-                                          boolean verbose,
-                                          boolean cache,
                                           Path target,
                                           boolean events) {
         return printing(out, palette, verbose, cache, target, events, null);

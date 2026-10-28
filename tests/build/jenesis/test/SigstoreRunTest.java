@@ -2,12 +2,19 @@ package build.jenesis.test;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.Environment;
+import build.jenesis.RepositoryItem;
+import build.jenesis.Resolver;
 import build.jenesis.Sigstore;
+import build.jenesis.maven.MavenDefaultRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class SigstoreRunTest {
+
+    private static final String POM = "SHA-256/3160712b8a77054c86b2eea9c0d0234ea48900b933ddb87e21bc2147acba5e08",
+            BUNDLE = "SHA-256/c60ac0052a263d5440c74049ef53630ef2cbb08e7dd5f7a0fdba4b2880a24dcc";
 
     @TempDir
     private Path root;
@@ -48,26 +55,26 @@ public class SigstoreRunTest {
     }
 
     private Path artifact() throws IOException {
-        return downloaded("https://repo1.maven.org/maven2/dev/sigstore/sigstore-java/2.3.0/sigstore-java-2.3.0.pom",
-                "artifact.pom");
+        return downloaded(null, POM, "artifact.pom");
     }
 
     private Path bundle() throws IOException {
-        return downloaded("https://repo1.maven.org/maven2/dev/sigstore/sigstore-java/2.3.0/"
-                + "sigstore-java-2.3.0.pom.sigstore.json", "bundle.sigstore.json");
+        return downloaded("sigstore.json", BUNDLE, "bundle.sigstore.json");
     }
 
-
-    private Path downloaded(String uri, String name) throws IOException {
+    private Path downloaded(String extension, String checksum, String name) throws IOException {
         Path target = root.resolve(name);
         if (Files.exists(target)) {
             return target;
         }
-        URLConnection connection = URI.create(uri).toURL().openConnection();
-        connection.setConnectTimeout(30_000);
-        connection.setReadTimeout(30_000);
-        try (InputStream stream = connection.getInputStream()) {
-            return Files.write(target, stream.readAllBytes());
+        String coordinate = "maven/dev.sigstore/sigstore-java/pom/2.3.0" + (extension == null ? "" : ":" + extension);
+        RepositoryItem item = MavenDefaultRepository.ofEnvironment(Environment.NONE)
+                .fetch(Runnable::run, "dev.sigstore", "sigstore-java", "2.3.0", "pom", null, extension)
+                .orElseThrow(() -> new IllegalStateException("The configured Maven repository holds no " + coordinate));
+        try (InputStream stream = item.toInputStream()) {
+            Files.write(target, stream.readAllBytes());
         }
+        Resolver.validate(target, checksum, coordinate);
+        return target;
     }
 }
