@@ -282,7 +282,7 @@ public class ModularJarResolver implements Resolver {
                 unresolvedCoordinates.put(coordinate, Collections.emptyNavigableSet());
             }
             Resolver.Resolution fallbackResolution = fallback.dependencies(
-                    executor, prefix, repositories, unresolvedCoordinates, hints, new LinkedHashMap<>(), Map.of(), scope);
+                    executor, prefix, repositories, unresolvedCoordinates, hints, Collections.emptyNavigableMap(), Map.of(), scope);
             fallbackResolution.artifacts().forEach(dependencies::putIfAbsent);
             edges.addAll(fallbackResolution.edges());
             fallbackResolution.vertices().forEach(nodes::putIfAbsent);
