@@ -7,10 +7,13 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.Environment;
 import build.jenesis.Palette;
 import build.jenesis.RepositoryItem;
+import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.Verification;
+import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenRepository;
 import build.jenesis.step.Signatures;
 
@@ -20,8 +23,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class SignaturesBundleRunTest {
 
-    private static final String COORDINATE =
-            "https://repo1.maven.org/maven2/dev/sigstore/protobuf-specs/0.5.2/protobuf-specs-0.5.2";
+    private static final String JAR = "SHA-256/e2368fd262a9bec078dee8868fc82682cb648ec21906f8b399e348977f3e3a3e",
+            JAR_BUNDLE = "SHA-256/286e752b4033acc8fb25f5ab1edb546d18d0e4789ac4ea8a4b562312383f56ff",
+            POM = "SHA-256/f7479ebd996d520be5ad951a53e4fc4c1b1eca6223b7ae6155d6cdf0a90bfb79",
+            POM_BUNDLE = "SHA-256/111ff2ab857997b1d1c9daa7db0d51bfde9e208beb2d11c38b8a072a418583ca";
 
     @TempDir
     private Path root;
@@ -33,10 +38,10 @@ public class SignaturesBundleRunTest {
         supplement = Files.createDirectory(root.resolve("supplement"));
         persistent = Files.createDirectory(root.resolve("persistent"));
         input = Files.createDirectory(root.resolve("input"));
-        Path artifact = downloaded(".jar", "protobuf-specs-0.5.2.jar");
-        downloaded(".jar.sigstore.json", "bundle.sigstore.json");
-        downloaded(".pom", "pom.xml");
-        downloaded(".pom.sigstore.json", "pom.sigstore.json");
+        Path artifact = downloaded("jar", null, JAR, "protobuf-specs-0.5.2.jar");
+        downloaded("jar", "sigstore.json", JAR_BUNDLE, "bundle.sigstore.json");
+        downloaded("pom", null, POM, "pom.xml");
+        downloaded("pom", "sigstore.json", POM_BUNDLE, "pom.sigstore.json");
         SequencedProperties dependencies = new SequencedProperties();
         dependencies.setProperty("main/compile/maven/dev.sigstore/protobuf-specs/0.5.2",
                 input.relativize(artifact).toString());
@@ -111,11 +116,18 @@ public class SignaturesBundleRunTest {
         assertThat(printed()).contains("[VERIFIED]");
     }
 
-    private Path downloaded(String extension, String name) throws IOException {
+    private Path downloaded(String type, String extension, String checksum, String name) throws IOException {
         Path target = input.resolve(name);
-        try (InputStream stream = URI.create(COORDINATE + extension).toURL().openStream()) {
-            return Files.write(target, stream.readAllBytes());
+        String coordinate = "maven/dev.sigstore/protobuf-specs/" + type + "/0.5.2"
+                + (extension == null ? "" : ":" + extension);
+        RepositoryItem item = MavenDefaultRepository.ofEnvironment(Environment.NONE)
+                .fetch(Runnable::run, "dev.sigstore", "protobuf-specs", "0.5.2", type, null, extension)
+                .orElseThrow(() -> new IllegalStateException("The configured Maven repository holds no " + coordinate));
+        try (InputStream stream = item.toInputStream()) {
+            Files.write(target, stream.readAllBytes());
         }
+        Resolver.validate(target, checksum, coordinate);
+        return target;
     }
 
     private void declared(String identity) throws IOException {
