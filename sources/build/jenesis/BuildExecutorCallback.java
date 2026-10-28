@@ -73,13 +73,27 @@ public interface BuildExecutorCallback {
                                           boolean cache,
                                           Path target,
                                           boolean events) {
+        return printing(out, palette, verbose, cache, target, events, null);
+    }
+
+    static BuildExecutorCallback printing(Consumer<String> out,
+                                          Palette palette,
+                                          boolean verbose,
+                                          boolean cache,
+                                          Path target,
+                                          boolean events,
+                                          String mode) {
         return new BuildExecutorCallback() {
             @Override
             public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
                 long started = System.nanoTime();
                 if (identity == null) {
-                    out.accept("%s%-11s%s Building in '%s'...".formatted(
-                            palette.status(), "[STARTED]", palette.reset(), target));
+                    out.accept("%s%-11s%s Building in '%s'%s...".formatted(
+                            palette.status(),
+                            "[STARTED]",
+                            palette.reset(),
+                            target,
+                            mode == null ? "" : " in " + mode + " mode"));
                     if (events) {
                         out.accept("%s%-11s%s Recording each step's outcome as a JSON line in '%s'".formatted(
                                 palette.status(), "[EVENTS]", palette.reset(), target.resolve(BuildExecutor.EVENTS)));
@@ -165,9 +179,13 @@ public interface BuildExecutorCallback {
     }
 
     static BuildExecutorCallback events(Path target) {
+        return events(target, null, null);
+    }
+
+    static BuildExecutorCallback events(Path target, String mode, Path started) {
         Path root = target.toAbsolutePath().normalize(),
                 file = root.resolve(BuildExecutor.EVENTS),
-                directory = Path.of("").toAbsolutePath();
+                directory = (started == null ? Path.of("") : started).toAbsolutePath();
         return new BuildExecutorCallback() {
 
             private Writer writer;
@@ -197,6 +215,7 @@ public interface BuildExecutorCallback {
                         failed = 0;
                         write("{\"status\":\"started\",\"target\":\"" + Json.escaped(root.toString())
                                 + "\",\"directory\":\"" + Json.escaped(directory.toString()) + "\""
+                                + (mode == null ? "" : ",\"mode\":\"" + Json.escaped(mode) + "\"")
                                 + (run == null ? "" : ",\"run\":\"" + Json.escaped(run) + "\"") + "}");
                     }
                     return (_, throwable) -> {

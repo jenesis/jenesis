@@ -66,7 +66,8 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          java -Djenesis.project.version=${VERSION} \
+          java -Djenesis.make.mode=compiled \
+               -Djenesis.project.version=${VERSION} \
                -Djenesis.archive.timestamp="$(git log -1 --format=%cI)" \
                -Djenesis.project.sources=true \
                -Djenesis.project.documentation=true \

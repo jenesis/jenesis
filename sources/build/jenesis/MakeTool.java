@@ -19,7 +19,9 @@ public final class MakeTool extends JenesisTool {
         }
         Path root = root(environment);
         Make.Settings settings = Make.settings(root, environment.keys());
-        return Project.perform(environment.keys(settings.keys()),
+        Map<String, String> keys = new HashMap<>(settings.keys());
+        keys.put("make.mode", "compiled");
+        return Project.perform(environment.keys(keys),
                                root,
                                settings.profiles(),
                                selectors.toArray(String[]::new)) == null ? 1 : 0;

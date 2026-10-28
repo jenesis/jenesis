@@ -102,8 +102,8 @@ in one JVM never see each other's settings. `Make`, `Execute`, `Jpx` and the thr
 arguments it holds, as the JDK's tools do (`@@` escapes, `#` comments, quotes, no nested expansion), and a file may
 lead with `-Djenesis.<key>=<value>` lines. A process the build hands a command line to - a container, the daemon - is
 given the settings rather than left to read its JVM: the daemon receives them with every request and keys its
-fingerprint on the JVM alone, and a container receives every setting save the `jenesis.project.docker` keys that
-start it.
+fingerprint on the engine, the JVM, its options and the environment alone, so one daemon serves every project that
+matches, and a container receives every setting save the `jenesis.project.docker` keys that start it.
 
 **A project's own files are untrusted.** `Make.settings` refuses, in a project's `jenesis.properties` and profiles,
 every key naming a program the build runs or a JVM's options, a credential, a cache, folder or trust root shared
@@ -112,7 +112,10 @@ project root. `~/.jenesis/jenesis.properties` and its profiles outrank the proje
 new property of those kinds joins those lists in the same commit.
 
 **Who reads what.** `jenesis.make.*` is read by `Make` and the main methods it launches, before a `Project` exists:
-`root`, `profiles`, `global`, `mode` (`source`, `compiled`, `aot` or `daemon`) and `classes`. Everything `Project`
+`root`, `profiles`, `global`, `mode` (`source`, `compiled`, `aot` or `daemon`) and `classes`. Unset, the mode is
+`daemon`, or `compiled` where `jenesis.process.mode` names `fork` or `aot`, `jenesis.project.docker` is set or
+`jenesis.release.publish` publishes; `Make` hands the mode it resolved down as `make.mode`, which the executor prints
+in the `[STARTED]` line and the `started` event and nothing else reads. Everything `Project`
 reads is `jenesis.project.*`, read nowhere else; its root is a constructor argument and its profiles are handed in.
 `jenesis.toolchain.*` picks the JVM: `Toolchain` reads `version`, `searchpath` and `installer`, is reached by
 reflection only when a version is set, depends on `java.base` alone, and identifies a JDK by its `release` file
@@ -263,20 +266,33 @@ A tool's main method runs through `ProcessHandler.OfProcess.ofJavaMain()`, by `j
 - `aot` does so from an ahead-of-time cache of the tool in `jenesis.aot.folder`, trained by the first run with the
   JVM's messages off;
 - `daemon`, set for every build the daemon runs, keeps a `Worker` JVM per JVM, options, class path (by file
-  identity) and environment, which compiles a `.java` launcher once, captures each call's output, is replaced after
-  a `System.exit` and ends after ten idle minutes.
+  identity), environment and working directory, which compiles a `.java` launcher once, captures each call's
+  output, is replaced after a `System.exit` and ends after ten idle minutes.
 
 `jenesis.make.mode=aot` and `=daemon` set the process mode alike unless it is set. The AOT folder holds every cache,
 the engine's and the tools', and `Make` clears it whole when `aot.properties` records another engine or JVM or the
 folder outlived `jenesis.aot.lifetime`. The build daemon is the same `Worker` on a loopback socket behind a token,
-running `DaemonBuild` per request. A tool whose main method exits is called through a `<Tool>Driver` of its plugin
-with an `int main(String[])`, compiled against the tool by `requires static` or reaching it by reflection where that does
-not compile; `OfProcess.driver` writes it once per JVM to a private folder ahead of the tool's jars. `javac` with
-`-J` options runs in one warm JVM whose calls run side by side; a tool keeping its state per call asks for the same
-with `shared(true)`, which a compiler does. Under `jenesis.process.shared` (default) that JVM is shared in every
-mode: `fork` and `aot` end it when the last build running in the JVM ends, through the scope `Project.build` holds
-from `ProcessHandler.scope()`, while `daemon` keeps it for the next build; `false` forks such calls as well. A command
-line of another shape forks as `ofJavaHome("bin/java")` does.
+running `DaemonBuild` per request, one at a time. Daemons announce themselves in `jenesis.daemon.folder`
+(`~/.jenesis/daemons`), one folder each named after its fingerprint, beside a copy of every engine compiled from
+source that one runs; a client locks its project's `.jenesis/daemon.lock` for the build, hands it to a free daemon of
+its fingerprint or starts one, and first stops the one used least recently once `jenesis.daemon.limit` (3) run.
+`jenesis.daemon.shared=false` adds the root to the fingerprint. The daemon starts in its own folder, and `DaemonBuild`
+sets `jenesis.process.directory` to the root, so every process the build starts runs where it would without a
+daemon. After each build the daemon restores the system properties, the default locale and time zone, and ends after
+a build that changed a JVM-wide default it cannot restore (the security providers, the default TLS context, socket
+factory and host name verifier, authenticator, proxy selector, cookie handler, response cache, uncaught exception
+handler, standard input), naming it; a new default of that kind joins `Worker.global` in the same commit. That keeps
+one project's settings out of another's build, never its code: a daemon is no boundary, which is why a release and a
+container never run in one unless a mode names it.
+
+A tool whose main method exits is called through a `<Tool>Driver` of its plugin with an `int main(String[])`, compiled
+against the tool by `requires static` or reaching it by reflection where that does not compile; `OfProcess.driver`
+writes it once per JVM to a private folder ahead of the tool's jars. `javac` with `-J` options runs in one warm JVM
+whose calls run side by side; a tool keeping its state per call asks for the same with `shared(true)`, which a
+compiler does. Under `jenesis.process.shared` (default) that JVM is shared in every mode: `fork` and `aot` end it when
+the last build running in the JVM ends, through the scope `Project.build` holds from `ProcessHandler.scope()`, while
+`daemon` keeps it for the next build; `false` forks such calls as well. A command line of another shape forks as
+`ofJavaHome("bin/java")` does.
 Every process the engine waits on is started through `OfProcess.start`, which ends it with the JVM: a shutdown hook
 asks it and its descendants to stop and kills them ten seconds later, so a terminated build leaves no test JVM
 behind. `Make` and `Toolchain`, which compile alone, end the JVM they relaunch with a hook of their own.

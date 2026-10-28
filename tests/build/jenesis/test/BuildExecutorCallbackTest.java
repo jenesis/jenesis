@@ -76,6 +76,23 @@ public class BuildExecutorCallbackTest {
     }
 
     @Test
+    public void names_the_mode_the_build_runs_in_where_it_starts() throws IOException {
+        List<String> printed = new ArrayList<>();
+        BuildExecutorCallback.printing(printed::add, Palette.NONE, false, false, target, false, "daemon")
+                .step(null, new LinkedHashSet<>());
+        assertThat(printed)
+                .as("a reader learns whether a reused JVM ran the build without asking how it was started")
+                .first()
+                .asString()
+                .startsWith("[STARTED]")
+                .contains("in daemon mode");
+        BuildExecutorCallback.events(target, "daemon", null).step(null, new LinkedHashSet<>()).accept(null, null);
+        assertThat(events().getFirst())
+                .containsEntry("status", "started")
+                .containsEntry("mode", "daemon");
+    }
+
+    @Test
     public void names_the_briefing_of_a_coding_agent_where_the_build_starts() {
         List<String> printed = new ArrayList<>();
         BuildExecutorCallback.printing(printed::add, Palette.NONE, false, false, target, true).step(null, new LinkedHashSet<>());
