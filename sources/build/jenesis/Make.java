@@ -571,7 +571,9 @@ public final class Make {
 
     private SequencedMap<String, String> supplied() {
         SequencedMap<String, String> supplied = new LinkedHashMap<>();
-        for (String key : settings.declared()) {
+        SequencedSet<String> keys = new LinkedHashSet<>(new TreeSet<>(ambient.keySet()));
+        keys.addAll(settings.declared());
+        for (String key : keys) {
             String value = settings.keys().get(key);
             if (value != null) {
                 supplied.put("jenesis." + key, value);
