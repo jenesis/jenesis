@@ -497,7 +497,7 @@ class JenesisClassLoaderBridge {
                             } else if (types[index] == Optional.class) {
                                 values[index] = Optional.empty();
                             } else {
-                                values[index] = Stream.of(new LinkedHashMap<>(), new ArrayList<>(), new LinkedHashSet<>())
+                                values[index] = Stream.of(Collections.emptyNavigableMap(), List.of(), Collections.emptyNavigableSet())
                                         .filter(types[index]::isInstance)
                                         .findFirst()
                                         .orElse(null);

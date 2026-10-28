@@ -30,7 +30,7 @@ public class DependencyTreeReportTest {
 
     private static Resolver.Resolution resolution(List<Resolver.Edge> edges,
                                                   SequencedMap<String, Resolver.Vertex> vertices) {
-        return new Resolver.Resolution(new LinkedHashMap<>(), edges, vertices, new LinkedHashMap<>());
+        return new Resolver.Resolution(Collections.emptyNavigableMap(), edges, vertices, Collections.emptyNavigableMap());
     }
 
     @Test
@@ -40,7 +40,7 @@ public class DependencyTreeReportTest {
                 new Resolver.Edge("maven/g/a/1.0", "maven/g/b/2.0", "2.0", "compile", true),
                 new Resolver.Edge("maven/g/a/1.0", "maven/g/d/4.0", "4.0", "compile", true),
                 new Resolver.Edge("maven/g/b/2.0", "maven/g/c/3.0", "3.0", "runtime", true)),
-                new LinkedHashMap<>()));
+                Collections.emptyNavigableMap()));
         String text = output();
         assertThat(text).contains("Dependency tree:");
         assertThat(text).contains("maven/g/a 1.0 [compile]");
@@ -213,7 +213,7 @@ public class DependencyTreeReportTest {
                 new Resolver.Edge("maven/g/a/1.0", "maven/g/b/2.0", "2.0", "compile", true),
                 new Resolver.Edge("maven/g/b/2.0", "maven/g/c/3.0", "3.0", "compile", true),
                 new Resolver.Edge("maven/g/a/1.0", "maven/g/c/3.0", "3.0", "compile", false)),
-                new LinkedHashMap<>()));
+                Collections.emptyNavigableMap()));
         String text = output();
         assertThat(text).contains("maven/g/c 3.0 [compile] (*)");
         assertThat(text.split("\\(\\*\\)", -1).length - 1).isEqualTo(1);
@@ -421,7 +421,7 @@ public class DependencyTreeReportTest {
 
     @Test
     public void summary_prints_nothing_without_dependencies() {
-        report.summary(new LinkedHashMap<>());
+        report.summary(Collections.emptyNavigableMap());
         assertThat(bytes.toString(StandardCharsets.UTF_8)).isEmpty();
     }
 }

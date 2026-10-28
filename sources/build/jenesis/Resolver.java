@@ -58,7 +58,7 @@ public interface Resolver extends Serializable {
                 true,
                 version,
                 bomEntries(SequencedProperties.ofFiles(resolved.file())),
-                new LinkedHashMap<>());
+                Collections.emptyNavigableMap());
     }
 
     static SequencedMap<String, String> bomEntries(SequencedProperties properties) {
@@ -210,7 +210,7 @@ public interface Resolver extends Serializable {
                 edges.add(new Edge(null, coordinate, null, null, true));
                 vertices.put(coordinate, new Vertex(null, null, false, artifacts.get(coordinate).internal(), List.of()));
             });
-            return new Resolution(artifacts, edges, vertices, new LinkedHashMap<>());
+            return new Resolution(artifacts, edges, vertices, Collections.emptyNavigableMap());
         };
     }
 }

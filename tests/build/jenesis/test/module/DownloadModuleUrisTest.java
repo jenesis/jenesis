@@ -23,7 +23,7 @@ public class DownloadModuleUrisTest {
 
         step.apply(Runnable::run,
                         new BuildStepContext(root.resolve("previous"), next, root.resolve("supplement"), root.resolve("persistent")),
-                        new LinkedHashMap<>())
+                        Collections.emptyNavigableMap())
                 .toCompletableFuture().join();
 
         assertThat(next.resolve(DownloadModuleUris.URIS)).hasContent(

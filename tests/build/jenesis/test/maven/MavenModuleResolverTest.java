@@ -59,7 +59,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -84,7 +84,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
@@ -108,7 +108,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -131,7 +131,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -220,7 +220,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -247,7 +247,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE);
@@ -264,7 +264,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
@@ -335,7 +335,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", new LinkedHashSet<>(List.of("org.transitive/lib")))),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -387,7 +387,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar",
                         new LinkedHashSet<>(List.of("org.transitive/first", "org.transitive/third")))),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
@@ -413,7 +413,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", new LinkedHashSet<>(List.of("org.transitive")))),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
@@ -473,7 +473,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();

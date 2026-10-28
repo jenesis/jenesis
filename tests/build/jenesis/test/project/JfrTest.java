@@ -16,7 +16,7 @@ public class JfrTest {
     @Test
     public void records_into_the_reports_of_the_test_step_with_the_options_it_is_given() throws IOException {
         Path output = Files.createDirectory(root.resolve("output"));
-        assertThat(new Jfr(new LinkedHashMap<>(Map.of("settings", "profile"))).commands(new LinkedHashMap<>(), output))
+        assertThat(new Jfr(new LinkedHashMap<>(Map.of("settings", "profile"))).commands(Collections.emptyNavigableMap(), output))
                 .containsExactly("-XX:StartFlightRecording=filename="
                         + output.resolve(BuildStep.REPORTS + "jfr").resolve("tests.jfr").toAbsolutePath()
                         + ",dumponexit=true,settings=profile");

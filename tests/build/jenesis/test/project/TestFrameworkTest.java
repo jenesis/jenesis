@@ -260,7 +260,7 @@ public class TestFrameworkTest {
         assertThat(new JUnitPlatform("1.9.3").arguments(root,
                 root,
                 new LinkedHashSet<>(List.of("sample.BetaTest")),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 false,
                 false))
                 .as("the execute command exists from JUnit Platform 1.10 on, and an older launcher rejects it")
@@ -275,7 +275,7 @@ public class TestFrameworkTest {
             assertThat(new JUnitPlatform(version).arguments(root,
                     root,
                     new LinkedHashSet<>(List.of("sample.BetaTest")),
-                    new LinkedHashMap<>(),
+                    Collections.emptyNavigableMap(),
                     false,
                     false))
                     .as("version %s", version)
@@ -289,7 +289,7 @@ public class TestFrameworkTest {
         assertThatThrownBy(() -> new JUnitPlatform("1.3.2").arguments(root,
                 root,
                 new LinkedHashSet<>(List.of("sample.BetaTest")),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 false,
                 false))
                 .isInstanceOf(IllegalStateException.class)

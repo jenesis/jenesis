@@ -108,7 +108,7 @@ public class InferredJavaToolchainModuleTest {
 
     @Test
     public void a_toolchain_without_a_compiler_names_what_is_missing() {
-        assertThatThrownBy(() -> toolchain().compiler(null).accept(null, new LinkedHashMap<>()))
+        assertThatThrownBy(() -> toolchain().compiler(null).accept(null, Collections.emptyNavigableMap()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("compiler");
     }
