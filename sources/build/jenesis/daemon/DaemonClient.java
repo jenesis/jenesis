@@ -45,7 +45,7 @@ public final class DaemonClient {
                 environment.value("daemon.options", ""),
                 environment.number("daemon.idle", 10_800L),
                 limit,
-                environment.flag("daemon.shared", true),
+                environment.flag("daemon.shared", false),
                 location == null
                         ? Path.of(System.getProperty("user.home"), ".jenesis", "daemons")
                         : Path.of(location).toAbsolutePath().normalize(),
@@ -438,7 +438,7 @@ public final class DaemonClient {
         }
         command.addAll(List.of("listen", instance.toString(), fingerprint, Long.toString(idle)));
         new ProcessBuilder(command)
-                .directory(instance.toFile())
+                .directory(shared ? instance.toFile() : root.toFile())
                 .redirectErrorStream(true)
                 .redirectOutput(ProcessBuilder.Redirect.appendTo(instance.resolve(LOG).toFile()))
                 .start();

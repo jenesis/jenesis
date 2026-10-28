@@ -62,20 +62,25 @@ container (`jenesis.project.docker`), or publishes a release
 are only ever handed to a JVM no earlier build ran in. Naming
 `jenesis.make.mode=daemon` keeps the daemon in every one of these cases.
 
-One daemon for many projects
-----------------------------
+Daemons on one machine
+----------------------
 
-A daemon is not tied to a project. Any project whose build runs the same engine
-on the same JVM, with the same JVM options and environment, hands its build to
-a daemon that is free, and a project whose engine, JVM or environment differs
-starts one of its own. At most three daemons run at once on a machine; starting a
-fourth first stops the one used least recently, which finishes the build it is
-running. A project's daemons announce themselves in `~/.jenesis/daemons`, each
+A daemon serves one project and starts in its root, so a path a plugin or a
+setting names relative to the working directory means what it means without a
+daemon. At most three daemons run at once on a machine, across every project;
+starting a fourth first stops the one used least recently, which finishes the
+build it is running. Daemons announce themselves in `~/.jenesis/daemons`, each
 with its log, beside a copy of every engine compiled from source that a daemon
-runs, so no project's `.jenesis/classes` is pulled from under another's build.
+runs, so no project's `.jenesis/classes` is pulled from under its daemon.
+
+`-Djenesis.daemon.shared=true` hands the build to a daemon any project may use
+instead: every project whose build runs the same engine on the same JVM, with the
+same JVM options and environment, shares the daemons that are free. Such a daemon
+runs in a folder of its own, so it suits builds whose plugins and settings name
+no path relative to the working directory.
 
     -Djenesis.daemon.limit=3            # how many may run at once (default: 3)
-    -Djenesis.daemon.shared=false       # daemons for this project alone (default: true)
+    -Djenesis.daemon.shared=true        # daemons any project may use (default: false)
     -Djenesis.daemon.idle=600           # exit after ten idle minutes (default: 10800)
     -Djenesis.daemon.options="-Xmx4g"   # JVM options of the daemon itself
     -Djenesis.daemon.folder=...         # where daemons announce themselves (default: ~/.jenesis/daemons)
@@ -110,10 +115,10 @@ build with stale engine code.
 What one build can leave to the next
 ------------------------------------
 
-A daemon runs the builds of every project that shares it in one JVM, and a build
-runs code its project chose: its plugins, its annotation processors, the tools it
-names. Whatever that code changes for the whole JVM, the next build would
-inherit. So after every build the daemon restores the system properties, the
+A daemon runs build after build in one JVM - those of several projects, where
+daemons are shared - and a build runs code its project chose: its plugins, its
+annotation processors, the tools it names. Whatever that code changes for the
+whole JVM, the next build would inherit. So after every build the daemon restores the system properties, the
 default locale and the default time zone, and it ends once a build changed a
 JVM-wide default it cannot restore - the security providers, the default TLS
 context, socket factory and host name verifier, the default authenticator, proxy
@@ -125,13 +130,13 @@ standard input - saying which:
 The next build starts a fresh one. The JVMs a build keeps warm for its tools are
 kept per project, as they run in its root.
 
-This keeps one project's settings out of another's build; it does not make a
-daemon a boundary. Since Java 24 no JVM can confine the code it runs, so code that
+This keeps one build's settings out of the next; it does not make a daemon a
+boundary. Since Java 24 no JVM can confine the code it runs, so code that
 sets out to stay - a thread left running, a field changed by reflection, a stream
 handler only the JVM's first caller may install - outlives its build and reaches
 every later build of the daemon, a release excepted, which never runs in one by
-default. Build a project you do not trust with `-Djenesis.make.mode=compiled`,
-which keeps it from the daemons of other projects, or in a container
+default. Shared daemons are therefore for projects you trust alike; build one you
+do not trust with `-Djenesis.make.mode=compiled`, or in a container
 (`-Djenesis.project.docker`), which also keeps it from your files.
 
 Limits
