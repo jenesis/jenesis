@@ -159,6 +159,34 @@ public class WarmJavaTest {
     }
 
     @Test
+    public void reads_the_cache_of_a_jar_restored_as_another_file_and_trains_another_once_the_jar_changes()
+            throws IOException {
+        Path aot = run.resolve("aot"), jar = run.resolve("counter.jar"), restored = run.resolve("restored.jar");
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+            out.putNextEntry(new JarEntry("Counter.class"));
+            out.write(Files.readAllBytes(classes.resolve("Counter.class")));
+            out.closeEntry();
+        }
+        FileTime modified = FileTime.fromMillis(1_700_000_000_000L);
+        Files.setLastModifiedTime(jar, modified);
+        assertThat(forked(aot, "-cp", jar.toString(), "Counter", "a")).isEqualTo("0:1 a");
+        Path cache = caches(aot).getFirst();
+        Files.copy(jar, restored);
+        Files.delete(jar);
+        Files.move(restored, jar);
+        Files.setLastModifiedTime(jar, modified);
+        assertThat(forked(aot, "-cp", jar.toString(), "Counter", "b")).isEqualTo("0:1 b");
+        assertThat(caches(aot))
+                .as("a jar a CI cache restores is another file of the same size and time, which the cache still serves")
+                .containsExactly(cache);
+        Files.setLastModifiedTime(jar, FileTime.fromMillis(modified.toMillis() + 1_000));
+        assertThat(forked(aot, "-cp", jar.toString(), "Counter", "c")).isEqualTo("0:1 c");
+        assertThat(caches(aot))
+                .as("a jar written anew trains a cache of its own")
+                .hasSize(2);
+    }
+
+    @Test
     public void keeps_a_jvm_warm_rather_than_caching_it_when_both_are_asked_for() throws IOException {
         Path aot = run.resolve("aot");
         Path output = run.resolve("warm-output.txt"), error = run.resolve("warm-error.txt");
