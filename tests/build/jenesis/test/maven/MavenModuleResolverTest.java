@@ -60,7 +60,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
 
@@ -85,7 +85,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalStateException.class)
@@ -109,7 +109,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
 
@@ -132,7 +132,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
 
@@ -159,7 +159,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("foo.bar", "9.9")),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
 
@@ -183,7 +183,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("foo.bar", "1.0 " + checksum)),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
 
@@ -221,7 +221,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
 
@@ -248,7 +248,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE);
 
@@ -265,7 +265,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -284,7 +284,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("foo.bar", "9.9")),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -336,7 +336,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", new LinkedHashSet<>(List.of("org.transitive/lib")))),
                 new LinkedHashMap<>(),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
 
@@ -388,7 +388,7 @@ public class MavenModuleResolverTest {
                 new LinkedHashMap<>(Map.of("foo.bar",
                         new LinkedHashSet<>(List.of("org.transitive/first", "org.transitive/third")))),
                 new LinkedHashMap<>(),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
 
@@ -414,7 +414,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", new LinkedHashSet<>(List.of("org.transitive")))),
                 new LinkedHashMap<>(),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -474,7 +474,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
 
@@ -844,7 +844,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(pins),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
     }
@@ -873,7 +873,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("foo.bar", ":linux:1.2.3 " + checksum)),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE).artifacts();
 
@@ -903,7 +903,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("foo.bar", ":linux:1.2.3 SHA-256/0000")),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 Map.of(),
                 DependencyScope.COMPILE))
                 .hasStackTraceContaining("example-core/jar/linux/1.2.3");

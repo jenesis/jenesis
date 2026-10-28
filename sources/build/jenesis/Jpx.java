@@ -433,7 +433,7 @@ public record Jpx(Path storage,
                         repositories,
                         new LinkedHashMap<>(Map.of(command.name(), Collections.emptyNavigableSet())),
                         versions,
-                        new LinkedHashMap<>(),
+                        Collections.emptyNavigableMap(),
                         Map.of(),
                         DependencyScope.RUNTIME);
                 root = null;
@@ -472,7 +472,7 @@ public record Jpx(Path storage,
                         repositories,
                         new LinkedHashMap<>(Map.of(groupId + "/" + artifactId, Collections.emptyNavigableSet())),
                         new LinkedHashMap<>(Map.of(groupId + "/" + artifactId, version)),
-                        new LinkedHashMap<>(),
+                        Collections.emptyNavigableMap(),
                         Map.of(),
                         DependencyScope.RUNTIME);
                 root = "maven/" + groupId + "/" + artifactId + "/" + version;

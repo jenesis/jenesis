@@ -349,7 +349,7 @@ public class DependencyTreeReportTest {
 
     @Test
     public void prints_nothing_when_no_dependencies_were_observed() {
-        render(report, resolution(List.of(), new LinkedHashMap<>()));
+        render(report, resolution(List.of(), Collections.emptyNavigableMap()));
         assertThat(bytes.toString(StandardCharsets.UTF_8)).isEmpty();
     }
 

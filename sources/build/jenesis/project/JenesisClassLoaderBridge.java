@@ -599,7 +599,7 @@ class JenesisClassLoaderBridge {
                         converted[2],
                         converted[3],
                         converted[4],
-                        types.length == 7 ? converted[5] : new LinkedHashMap<>(),
+                        types.length == 7 ? converted[5] : Collections.emptyNavigableMap(),
                         Map.of(),
                         converted[types.length - 1]
                 };
