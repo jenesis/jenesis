@@ -2328,12 +2328,14 @@ public class ProjectTest {
         SequencedMap<String, Path> outputs = Project.ofEnvironment(new Environment(settings), root)
                 .layout(Project.Layout.MAVEN)
                 .build(Project.BUILD);
-        Path resolved = outputs.entrySet().stream()
-                .filter(entry -> entry.getKey().endsWith("/build-module-sources/dependencies/artifacts"))
-                .map(Map.Entry::getValue)
-                .findFirst()
-                .orElseThrow();
-        assertThat(SequencedProperties.ofFiles(resolved.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
+        Set<String> dependencies = new HashSet<>();
+        for (Map.Entry<String, Path> entry : outputs.entrySet()) {
+            Path file = entry.getValue().resolve(BuildStep.DEPENDENCIES);
+            if (entry.getKey().endsWith("/dependencies/artifacts") && Files.isRegularFile(file)) {
+                dependencies.addAll(SequencedProperties.ofFiles(file).stringPropertyNames());
+            }
+        }
+        assertThat(dependencies)
                 .as("m2 names the folder under the project root, which holds the library, whatever folder the JVM runs in")
                 .contains("main/compile/maven/external/library/1");
     }

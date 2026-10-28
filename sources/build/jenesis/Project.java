@@ -3408,8 +3408,8 @@ public record Project(
         return value;
     }
 
-    public static Project ofEnvironment(Environment environment, Path root) {
-        Map<String, String> rooted = new HashMap<>(environment.keys());
+    public static Project ofEnvironment(Environment supplied, Path root) {
+        Map<String, String> rooted = new HashMap<>(supplied.keys());
         Map.of("maven.local", "MAVEN_REPOSITORY_LOCAL",
                 "module.local", "JENESIS_REPOSITORY_LOCAL",
                 "openpgp.local", "OPENPGP_REPOSITORY_LOCAL",
@@ -3432,7 +3432,7 @@ public record Project(
                 rooted.put(key, root.toAbsolutePath().resolve(value.strip()).normalize().toString());
             }
         });
-        environment = environment.keys(rooted);
+        Environment environment = supplied.keys(rooted);
         String layoutName = environment.getProperty("project.layout");
         Layout layout = layoutName == null ? null : switch (layoutName.toLowerCase(Locale.ROOT)) {
             case "auto" -> Layout.AUTO;
