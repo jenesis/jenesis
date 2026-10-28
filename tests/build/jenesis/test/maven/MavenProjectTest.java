@@ -424,7 +424,21 @@ public class MavenProjectTest {
         assertThat(classPath(results, "module-", "runtime"))
                 .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/1");
         assertThat(classPath(results, "testmodule-", "runtime")).contains("org.example/t/1", "org.example/c/2");
-        assertThat(results.get("maven/module-/manifests").resolve(BuildStep.SCOPES)).doesNotExist();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.SCOPES))
+                .stringPropertyNames())
+                .as("each class path lists its own declared dependencies alone")
+                .containsExactlyInAnyOrder("main/compile/maven/org.example/a/1", "main/runtime/maven/org.example/a/1");
+    }
+
+    @Test
+    public void by_default_a_runtime_dependency_of_a_main_dependency_is_left_off_the_main_compile_class_path()
+            throws IOException {
+        SequencedMap<String, Path> results = scopedProject(Environment.NONE, "", "d:1:compile")
+                .execute(Runnable::run).toCompletableFuture().join();
+        assertThat(classPath(results, "module-", "compile"))
+                .as("a dependency's runtime dependencies are not needed to compile against it, as in Maven and Gradle")
+                .containsExactly("org.example/d/1");
+        assertThat(classPath(results, "module-", "runtime")).containsExactlyInAnyOrder("org.example/d/1", "org.example/e/1");
     }
 
     @Test
