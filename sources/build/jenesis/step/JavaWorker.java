@@ -216,8 +216,7 @@ final class JavaWorker {
                     }
                 } else {
                     BasicFileAttributes attributes = Files.readAttributes(entry, BasicFileAttributes.class);
-                    Object identity = attributes.fileKey();
-                    digest.update(((identity == null ? entry.toString() : identity.toString())
+                    digest.update((entry
                             + ":" + attributes.size()
                             + ":" + attributes.lastModifiedTime().toMillis()).getBytes(StandardCharsets.UTF_8));
                 }
