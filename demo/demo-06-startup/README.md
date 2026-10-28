@@ -73,6 +73,11 @@ build it is running. Daemons announce themselves in `~/.jenesis/daemons`, each
 with its log, beside a copy of every engine compiled from source that a daemon
 runs, so no project's `.jenesis/classes` is pulled from under its daemon.
 
+On Windows, a folder a process runs in can be neither deleted nor renamed, so
+a project's folder stays in use for as long as its daemon runs, idle or not.
+`java build/jenesis/Make.java --stop` frees it, as does building with
+`-Djenesis.make.mode=compiled` from the start.
+
 `-Djenesis.daemon.shared=true` hands the build to a daemon any project may use
 instead: every project whose build runs the same engine on the same JVM, with the
 same JVM options and environment, shares the daemons that are free. Such a daemon
