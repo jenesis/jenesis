@@ -923,15 +923,20 @@ public record Project(
                     name the descriptor requires. The old build follows the move: ModiTect's
                     moduleInfoFile, and maven-javadoc-plugin's sourcepath and excludePackageNames.
 
-                    Otherwise a package that SplitPackages.java prints, or one that a dependency
-                    holds as well, rules modules out for now: migrate to pom.xml first, whichever
-                    declaration was asked for, and say so - which packages are split and where.
-                    That is phase one; it changes the build and nothing of the code. Phase two moves the result to
-                    module-info.java as a change of its own, once the pom.xml build compares equal
-                    with the old one, so close phase one by naming the split packages and offering
-                    phase two, as step 3b describes. A Gradle build has no counterpart, since no
-                    build.gradle is read: a pom.xml needs only coordinates, dependencies with their
-                    scopes and maven.compiler.release. The first build that passes is the baseline
+                    Otherwise a package that SplitPackages.java prints, or one that a dependency holds
+                    as well, rules modules out for now: migrate to pom.xml first, whichever declaration
+                    was asked for, and say so - which packages are split and where. That is phase one;
+                    it changes the build and nothing of the code. Phase two moves the result to
+                    module-info.java as a change of its own, once the pom.xml build compares equal with
+                    the old one, and only where every test can follow it onto the module path. A
+                    white-box test that reaches package-private code, or one that needs a jar no module
+                    path can hold, would be left to the old build by the move, and a module build that
+                    runs fewer tests than the pom.xml one is no step forward: such tests keep the build
+                    on pom.xml, which runs them on the class path as the old build does. Close phase one
+                    by naming the split packages and either offering phase two, as step 3b describes, or
+                    naming the tests that keep the build where it is. A Gradle build has no counterpart,
+                    since no build.gradle is read: a pom.xml needs only coordinates, dependencies with
+                    their scopes and maven.compiler.release. The first build that passes is the baseline
                     every later step is compared against. skill/layout has the rest.
 
                     ## 3. Know what a pom.xml keeps
@@ -1042,9 +1047,11 @@ public record Project(
 
                     ## 3b. Or declare the build in module-info.java
 
-                    Directly, where step 2 found no split package, or as phase two over a pom.xml
-                    build that already compares equal. Phase two first takes the splits apart, one
-                    package at a time and building after each:
+                    Directly, where step 2 found no split package, or as phase two over a pom.xml build
+                    that already compares equal and whose tests can all follow, as step 2 decides. A
+                    test that cannot be taken apart as below without rewriting what it tests is a reason
+                    to stay on pom.xml, not one to leave to the old build. Phase two first takes the
+                    splits apart, one package at a time and building after each:
 
                       white-box tests      move them into packages of the test module's own, such
                                            as <package>.test, testing the public API where they
@@ -1451,7 +1458,7 @@ public record Project(
                       the plugins         each plugin of the old build and what replaced it, or
                                           that nothing does and what was done instead
                       split packages      the packages that kept the build on pom.xml, and the
-                                          offer of phase two
+                                          offer of phase two or the tests that rule it out
                       shading             every shaded dependency and the layer or packaging that
                                           replaced it, always, with the licensing, compliance and
                                           funding reason of step 4
