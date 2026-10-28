@@ -616,14 +616,18 @@ public class MavenProject implements BuildExecutorModule {
                             String declaredScopes = properties.getProperty("scopes", "");
                             if (!declaredScopes.isEmpty()) {
                                 SequencedProperties scopes = new SequencedProperties();
+                                boolean unified = properties.flag("unified");
                                 for (String entry : declaredScopes.split("\t")) {
                                     int split = entry.indexOf('=');
-                                    String coordinate = entry.substring(0, split);
-                                    scopes.setProperty(group + "/" + coordinate, entry.substring(split + 1));
+                                    String coordinate = entry.substring(0, split), placed = entry.substring(split + 1);
                                     String exclusion = properties.getProperty("exclusions." + coordinate);
-                                    if (exclusion != null) {
-                                        exclusionsProperties.setProperty(group + "/compile/" + coordinate, exclusion);
-                                        exclusionsProperties.setProperty(group + "/runtime/" + coordinate, exclusion);
+                                    for (String scope : List.of("compile", "runtime")) {
+                                        if (unified || List.of(placed.split(" ")).contains(scope)) {
+                                            scopes.setProperty(group + "/" + scope + "/" + coordinate, placed);
+                                            if (exclusion != null) {
+                                                exclusionsProperties.setProperty(group + "/" + scope + "/" + coordinate, exclusion);
+                                            }
+                                        }
                                     }
                                 }
                                 scopes.store(context.next().resolve(BuildStep.SCOPES));
@@ -1202,7 +1206,7 @@ public class MavenProject implements BuildExecutorModule {
                                     .collect(Collectors.joining("\t")));
                 }
             }
-            if (unified && !test && value.dependencies() != null) {
+            if (!test && value.dependencies() != null) {
                 String scopes = value.dependencies().entrySet().stream()
                         .filter(dep -> dep.getValue().scope() != MavenDependencyScope.SYSTEM
                                 && dep.getValue().scope() != MavenDependencyScope.IMPORT
@@ -1217,6 +1221,9 @@ public class MavenProject implements BuildExecutorModule {
                         .collect(Collectors.joining("\t"));
                 if (!scopes.isEmpty()) {
                     properties.setProperty("scopes", scopes);
+                }
+                if (unified) {
+                    properties.setProperty("unified", "true");
                 }
             }
             if (!test && value.dependencies() != null) {
