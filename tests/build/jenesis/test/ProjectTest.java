@@ -2291,6 +2291,53 @@ public class ProjectTest {
                 .contains("<artifactId>library</artifactId>");
     }
 
+    @Test
+    public void resolves_a_relative_local_repository_against_the_project_root_rather_than_the_working_directory()
+            throws IOException {
+        Path repository = Files.createDirectories(root.resolve("m2/external/library/1"));
+        Files.writeString(repository.resolve("library-1.pom"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>external</groupId>
+                    <artifactId>library</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        try (JarOutputStream _ = new JarOutputStream(Files.newOutputStream(repository.resolve("library-1.jar")))) {
+        }
+        Files.writeString(root.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>user</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>external</groupId>
+                            <artifactId>library</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(root.resolve("src/main/java/user")).resolve("Type.java"),
+                "package user; public class Type { }\n");
+        settings.put("repository.offline", "true");
+        settings.put("maven.local", "m2");
+        settings.put("module.local", elsewhere.resolve("modules").toString());
+        SequencedMap<String, Path> outputs = Project.ofEnvironment(new Environment(settings), root)
+                .layout(Project.Layout.MAVEN)
+                .build(Project.BUILD);
+        Path resolved = outputs.entrySet().stream()
+                .filter(entry -> entry.getKey().endsWith("/build-module-sources/dependencies/artifacts"))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElseThrow();
+        assertThat(SequencedProperties.ofFiles(resolved.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
+                .as("m2 names the folder under the project root, which holds the library, whatever folder the JVM runs in")
+                .contains("main/compile/maven/external/library/1");
+    }
+
     private void writeLibrary() throws IOException {
         Path repository = Files.createDirectories(elsewhere.resolve("repository/external/library/1"));
         Files.writeString(repository.resolve("library-1.pom"), """

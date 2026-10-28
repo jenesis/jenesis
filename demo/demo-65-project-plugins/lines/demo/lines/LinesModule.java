@@ -9,6 +9,10 @@ public class LinesModule implements BuildExecutorModule {
 
     public LinesModule(SequencedMap<String, String> properties) {
         file = properties.getOrDefault("file", "LINES");
+        if (file.contains("/") || file.contains("\\")) {
+            throw new IllegalArgumentException("lines.file is " + file + ", but names the file the report is written"
+                    + " to among the plugin's outputs: a name such as LINES");
+        }
     }
 
     @Override
@@ -40,11 +44,7 @@ public class LinesModule implements BuildExecutorModule {
                     }
                 }
             }
-            Path target = Path.of(file);
-            if (target.getParent() != null) {
-                Files.createDirectories(target.getParent());
-            }
-            Files.write(target, counted.entrySet().stream().map(entry -> entry.getValue() + " " + entry.getKey()).toList());
+            Files.write(context.next().resolve(file), counted.entrySet().stream().map(entry -> entry.getValue() + " " + entry.getKey()).toList());
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }

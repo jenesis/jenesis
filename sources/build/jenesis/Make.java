@@ -613,10 +613,6 @@ public final class Make {
                 .anyMatch(argument -> argument.startsWith("-XX:AOTCache"))
                 ? "aot"
                 : mode.name().toLowerCase(Locale.ROOT));
-        String directory = keys.get("process.directory");
-        if (directory != null && !directory.isBlank()) {
-            keys.put("process.directory", root.resolve(directory.strip()).normalize().toString());
-        }
         if (tools()) {
             keys.put("process.mode", "aot");
             keys.put("aot.folder", aotFolder.toString());
@@ -686,7 +682,7 @@ public final class Make {
         Properties user = null;
         Path home = null;
         if (!location.isEmpty()) {
-            home = Path.of(location).resolve(".jenesis");
+            home = path.toAbsolutePath().resolve(location).resolve(".jenesis");
             Path file = home.resolve("jenesis.properties");
             user = read(file);
             if (user != null) {

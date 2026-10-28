@@ -45,10 +45,10 @@ public final class DaemonClient {
                 environment.value("daemon.options", ""),
                 environment.number("daemon.idle", 10_800L),
                 limit,
-                environment.flag("daemon.shared", false),
+                environment.flag("daemon.shared", true),
                 location == null
                         ? Path.of(System.getProperty("user.home"), ".jenesis", "daemons")
-                        : Path.of(location).toAbsolutePath().normalize(),
+                        : root.toAbsolutePath().resolve(location).normalize(),
                 null);
     }
 
