@@ -18,13 +18,6 @@ public class MavenPomEmitter {
     public IOConsumer emit(String groupId,
                            String artifactId,
                            String version,
-                           SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies) {
-        return emit(groupId, artifactId, version, dependencies, null);
-    }
-
-    public IOConsumer emit(String groupId,
-                           String artifactId,
-                           String version,
                            SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies,
                            Metadata metadata) {
         return emit(groupId, artifactId, version, null, dependencies, Collections.emptyNavigableMap(), metadata);

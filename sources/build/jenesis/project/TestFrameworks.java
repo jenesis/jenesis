@@ -21,18 +21,10 @@ public final class TestFrameworks {
         };
     }
 
-    public static Optional<TestFramework> detect(List<ModuleDescriptor> modules) {
-        return detect(List.of(), modules);
-    }
-
     public static Optional<TestFramework> detect(List<TestFramework> frameworks, List<ModuleDescriptor> modules) {
         return Stream.concat(frameworks.stream(), Stream.<TestFramework>of(new JUnitPlatform(), new JUnit4(), new TestNG()))
                 .filter(framework -> modules.stream().anyMatch(framework::isMarkedBy))
                 .findFirst();
-    }
-
-    public static Optional<TestFramework> detect(Iterable<Path> folders) throws IOException {
-        return detect(List.of(), modules(folders));
     }
 
     public static Optional<TestFramework> detect(List<TestFramework> frameworks, Iterable<Path> folders) throws IOException {

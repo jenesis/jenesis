@@ -1068,7 +1068,7 @@ public class BuildExecutorTest implements Serializable {
             case "step1" -> Optional.empty();
             case "step2" -> Optional.of("");
             default -> throw new AssertionError();
-        });
+        }, new LinkedHashMap<>());
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("step/renamed/source", "step");
         assertThat(root.resolve("step").resolve("step2").resolve("output").resolve("file"))
@@ -1104,7 +1104,7 @@ public class BuildExecutorTest implements Serializable {
                         Files.readString(arguments.get("step1").folder().resolve("file")) + "qux");
                 return CompletableFuture.completedStage(new BuildStepResult(true));
             }, "step1");
-        }, _ -> Optional.of("duplicate"));
+        }, _ -> Optional.of("duplicate"), new LinkedHashMap<>());
         assertThatThrownBy(() -> buildExecutor.execute(Runnable::run).toCompletableFuture().join())
                 .isInstanceOf(BuildExecutorException.class)
                 .hasMessage("Failed to execute step")

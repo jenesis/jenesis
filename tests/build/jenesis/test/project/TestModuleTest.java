@@ -529,7 +529,7 @@ public class TestModuleTest {
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false)
-                        .observe(new Jfr()),
+                        .observe(List.of(new Jfr())),
                 "dependencies", "classes");
         executor.execute();
 
@@ -1612,7 +1612,7 @@ public class TestModuleTest {
                 "test",
                 TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
-                        .observe(new Agent())
+                        .observe(List.of(new Agent()))
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
                 "dependencies",
@@ -1638,7 +1638,7 @@ public class TestModuleTest {
                 "test",
                 TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
-                        .observe(new Agent())
+                        .observe(List.of(new Agent()))
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
                 "dependencies",
