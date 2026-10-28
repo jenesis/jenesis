@@ -46,10 +46,6 @@ public final class DependencyTreeReport {
         return new DependencyTreeReport(out, palette, compact, merged, internal, locations);
     }
 
-    public void render(Resolver.Resolution resolution) {
-        render("Dependency tree:", null, new LinkedHashMap<>(Map.of("", resolution)), false, Map.of());
-    }
-
     public void render(String title, SequencedMap<String, Resolver.Resolution> scopes) {
         if (merged) {
             render(title, null, scopes, true, Map.of());
@@ -61,10 +57,6 @@ public final class DependencyTreeReport {
                     false,
                     Map.of()));
         }
-    }
-
-    public void render(SequencedMap<String, Resolver.Resolution> scopes, String key, Resolver.Vertex root) {
-        render(scopes, key, root, Collections.emptyNavigableMap());
     }
 
     public void render(SequencedMap<String, Resolver.Resolution> scopes,

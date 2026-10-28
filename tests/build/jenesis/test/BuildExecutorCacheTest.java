@@ -180,7 +180,7 @@ public class BuildExecutorCacheTest {
     @Test
     public void callback_prints_cache_loads_and_stores_with_timing() {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        BuildExecutorCallback callback = BuildExecutorCallback.printing(new PrintStream(bytes)::println, Palette.ANSI, false, true, root);
+        BuildExecutorCallback callback = BuildExecutorCallback.printing(new PrintStream(bytes)::println, Palette.ANSI, false, true, root, false);
         callback.loaded("compile/javac", 5_000_000L);
         callback.stored("compile/javac", 7_000_000L);
         String printed = bytes.toString();
@@ -190,7 +190,7 @@ public class BuildExecutorCacheTest {
     @Test
     public void callback_omits_cache_lines_when_not_requested() {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        BuildExecutorCallback callback = BuildExecutorCallback.printing(new PrintStream(bytes)::println, Palette.ANSI, false, false, root);
+        BuildExecutorCallback callback = BuildExecutorCallback.printing(new PrintStream(bytes)::println, Palette.ANSI, false, false, root, false);
         callback.loaded("compile/javac", 5_000_000L);
         callback.stored("compile/javac", 7_000_000L);
         assertThat(bytes.toString()).isEmpty();

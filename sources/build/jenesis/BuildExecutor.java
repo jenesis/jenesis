@@ -223,13 +223,6 @@ public interface BuildExecutor {
         addModule(identity, module, Optional::of, sequencedMapOf(dependencies));
     }
 
-    default void addModule(String identity,
-                           BuildExecutorModule module,
-                           Function<String, Optional<String>> resolver,
-                           String... dependencies) {
-        addModule(identity, module, resolver, sequencedMapOf(dependencies));
-    }
-
     default void addModule(String identity, BuildExecutorModule module, Stream<String> dependencies) {
         addModule(identity, module, Optional::of, sequencedMapOf(dependencies));
     }

@@ -714,10 +714,6 @@ public class TestModule implements BuildExecutorModule {
                 skip);
     }
 
-    public TestModule observe(ObservabilityEngine... observers) {
-        return observe(List.of(observers));
-    }
-
     public TestModule observe(List<ObservabilityEngine> observers) {
         return new TestModule(framework,
                 frameworks,
