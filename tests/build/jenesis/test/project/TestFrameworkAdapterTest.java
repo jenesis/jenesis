@@ -134,7 +134,7 @@ public class TestFrameworkAdapterTest {
 
     @Test
     public void selects_junit_platform_ahead_of_junit4_and_testng() {
-        assertThat(TestFrameworks.detect(List.of(
+        assertThat(TestFrameworks.detect(List.of(), List.of(
                 ModuleDescriptor.newAutomaticModule("junit").build(),
                 ModuleDescriptor.newAutomaticModule("org.testng").build(),
                 ModuleDescriptor.newAutomaticModule("org.junit.platform.engine").build())))
@@ -143,7 +143,7 @@ public class TestFrameworkAdapterTest {
 
     @Test
     public void selects_junit4_ahead_of_testng() {
-        assertThat(TestFrameworks.detect(List.of(
+        assertThat(TestFrameworks.detect(List.of(), List.of(
                 ModuleDescriptor.newAutomaticModule("org.testng").build(),
                 ModuleDescriptor.newAutomaticModule("junit").build())))
                 .get().isInstanceOf(JUnit4.class);
@@ -171,8 +171,8 @@ public class TestFrameworkAdapterTest {
         executor.addSource("dependencies", dependencies);
         executor.addModule("test",
                 new TestModule(Map.of(),
-                        Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(
-                                new LinkedHashMap<>(), List.of(), new LinkedHashMap<>(), new LinkedHashMap<>())))
+                        Map.of("maven", (_, _, _, _, _, _, _, _) -> new Resolver.Resolution(
+                                Collections.emptyNavigableMap(), List.of(), Collections.emptyNavigableMap(), Collections.emptyNavigableMap())))
                         .framework(new JUnitPlatform())
                         .jarsOnly(false),
                 "dependencies");

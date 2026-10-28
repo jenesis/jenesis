@@ -127,7 +127,7 @@ public class ProcessBuildStepTest {
                 ProcessHandler.OfProcess.ofJavaHome("bin/java"),
                 List.of(),
                 List.of(source.toString(), "-Xplugin:Sample -XepExcludedPaths:.*/(generated)/.*", "it's"))
-                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), new LinkedHashMap<>())
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), Collections.emptyNavigableMap())
                 .toCompletableFuture()
                 .join())
                 .rootCause()
@@ -151,7 +151,7 @@ public class ProcessBuildStepTest {
                 ProcessHandler.OfProcess.ofJavaHome("bin/java"),
                 List.of(),
                 List.of(source.toString()))
-                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), new LinkedHashMap<>())
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), Collections.emptyNavigableMap())
                 .toCompletableFuture()
                 .join())
                 .rootCause()
@@ -180,7 +180,7 @@ public class ProcessBuildStepTest {
                 ProcessHandler.OfProcess.ofJavaHome("bin/java"),
                 List.of(),
                 List.of(source.toString()))
-                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), new LinkedHashMap<>())
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), Collections.emptyNavigableMap())
                 .toCompletableFuture()
                 .join())
                 .rootCause()
@@ -208,7 +208,7 @@ public class ProcessBuildStepTest {
                 List.of(),
                 List.of(source.toString()),
                 ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.tail", "2")), "java"))
-                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), new LinkedHashMap<>())
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), Collections.emptyNavigableMap())
                 .toCompletableFuture()
                 .join())
                 .rootCause()
@@ -227,7 +227,7 @@ public class ProcessBuildStepTest {
                 List.of(),
                 List.of(source.toString()),
                 ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("process.tail", "0")), "java"))
-                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), new LinkedHashMap<>())
+                .apply(Runnable::run, new BuildStepContext(null, next, supplement, persistent), Collections.emptyNavigableMap())
                 .toCompletableFuture()
                 .join())
                 .rootCause()
@@ -514,7 +514,7 @@ public class ProcessBuildStepTest {
                         Files.createDirectory(step.resolve("output")),
                         Files.createDirectory(step.resolve("supplement")),
                         Files.createDirectory(step.resolve("persistent"))),
-                new LinkedHashMap<>()).toCompletableFuture().join();
+                Collections.emptyNavigableMap()).toCompletableFuture().join();
     }
 
     private void run(Supplier<ProcessBuildStep> steps) throws Exception {
@@ -527,7 +527,7 @@ public class ProcessBuildStepTest {
                                 Files.createDirectory(folder.resolve("next")),
                                 Files.createDirectory(folder.resolve("supplement")),
                                 Files.createDirectory(folder.resolve("persistent"))),
-                        new LinkedHashMap<>()));
+                        Collections.emptyNavigableMap()));
             }
             for (CompletionStage<BuildStepResult> result : results) {
                 assertThat(result.toCompletableFuture().join().next()).isTrue();

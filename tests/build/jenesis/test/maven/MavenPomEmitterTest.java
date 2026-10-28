@@ -24,7 +24,7 @@ public class MavenPomEmitterTest {
                                 MavenDependencyScope.COMPILE,
                                 null,
                                 null,
-                                null)))).accept(writer);
+                                null))), null).accept(writer);
         assertThat(writer.toString()).isEqualTo("""
                 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
                 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0">
@@ -49,7 +49,7 @@ public class MavenPomEmitterTest {
         new MavenPomEmitter().emit("group",
                 "artifact",
                 "version",
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 new MavenPomEmitter.Metadata(
                         "Project Name",
                         "Project description.",
@@ -115,7 +115,7 @@ public class MavenPomEmitterTest {
                                 MavenDependencyScope.SYSTEM,
                                 Path.of("file.jar"),
                                 List.of(new MavenDependencyName("group", "artifact")),
-                                false)))).accept(writer);
+                                false))), null).accept(writer);
         assertThat(writer.toString()).isEqualTo("""
                 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
                 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0">
@@ -151,7 +151,7 @@ public class MavenPomEmitterTest {
         new MavenPomEmitter().emit("group",
                 "artifact",
                 "version",
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 new MavenPomEmitter.Metadata(
                         null,
                         null,
@@ -185,7 +185,7 @@ public class MavenPomEmitterTest {
         new MavenPomEmitter().emit("group",
                 "artifact",
                 "version",
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
                 new MavenPomEmitter.Metadata(
                         null,
                         null,

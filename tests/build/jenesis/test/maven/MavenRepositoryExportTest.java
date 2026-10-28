@@ -218,7 +218,7 @@ public class MavenRepositoryExportTest {
     @Test
     public void runs_unconditionally_even_when_arguments_unchanged() throws IOException {
         BuildStep export = new MavenRepositoryExport(target);
-        assertThat(export.shouldRun(new LinkedHashMap<>())).isTrue();
+        assertThat(export.shouldRun(Collections.emptyNavigableMap())).isTrue();
     }
 
     private Path stageArtifact(String groupId, String artifactId, String version, String jarBytes) throws IOException {

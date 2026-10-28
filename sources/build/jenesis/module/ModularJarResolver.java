@@ -62,9 +62,12 @@ public class ModularJarResolver implements Resolver {
     public Resolver.Resolution dependencies(Executor executor,
                                             String prefix,
                                             Map<String, Repository> repositories,
-                                            SequencedMap<String, SequencedSet<String>> coordinates,
+                                            SequencedMap<String, SequencedSet<String>> asked,
                                             SequencedMap<String, String> versions,
+                                            SequencedMap<String, SequencedSet<String>> managedExclusions,
+                                            Map<String, Set<DependencyScope>> scopes,
                                             DependencyScope scope) throws IOException {
+        SequencedMap<String, SequencedSet<String>> coordinates = Resolver.placed(asked, scopes, scope);
         coordinates.forEach((coordinate, exclusions) -> {
             if (!exclusions.isEmpty()) {
                 throw new IllegalArgumentException("Cannot exclude "
@@ -279,12 +282,12 @@ public class ModularJarResolver implements Resolver {
                 unresolvedCoordinates.put(coordinate, Collections.emptyNavigableSet());
             }
             Resolver.Resolution fallbackResolution = fallback.dependencies(
-                    executor, prefix, repositories, unresolvedCoordinates, hints, scope);
+                    executor, prefix, repositories, unresolvedCoordinates, hints, Collections.emptyNavigableMap(), Map.of(), scope);
             fallbackResolution.artifacts().forEach(dependencies::putIfAbsent);
             edges.addAll(fallbackResolution.edges());
             fallbackResolution.vertices().forEach(nodes::putIfAbsent);
         }
-        return new Resolver.Resolution(dependencies, edges, nodes, new LinkedHashMap<>());
+        return new Resolver.Resolution(dependencies, edges, nodes, Collections.emptyNavigableMap());
     }
 
     private static String aliased(String module,

@@ -11,6 +11,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.Language;
 import build.jenesis.LanguageFactory;
@@ -496,7 +497,7 @@ class JenesisClassLoaderBridge {
                             } else if (types[index] == Optional.class) {
                                 values[index] = Optional.empty();
                             } else {
-                                values[index] = Stream.of(new LinkedHashMap<>(), new ArrayList<>(), new LinkedHashSet<>())
+                                values[index] = Stream.of(Collections.emptyNavigableMap(), List.of(), Collections.emptyNavigableSet())
                                         .filter(types[index]::isInstance)
                                         .findFirst()
                                         .orElse(null);
@@ -580,8 +581,31 @@ class JenesisClassLoaderBridge {
                         : Class.forName(type.getName(), false, origin);
                 converted[index] = convert(args[index], loader, origin);
             }
-            Method target = Class.forName(method.getDeclaringClass().getName(), false, origin)
-                    .getMethod(method.getName(), types);
+            Class<?> declaring = Class.forName(method.getDeclaringClass().getName(), false, origin);
+            Method target;
+            if (declaring == Resolver.class && method.getName().equals("dependencies") && types.length < 8) {
+                target = Resolver.class.getMethod("dependencies",
+                        Executor.class,
+                        String.class,
+                        Map.class,
+                        SequencedMap.class,
+                        SequencedMap.class,
+                        SequencedMap.class,
+                        Map.class,
+                        DependencyScope.class);
+                converted = new Object[]{
+                        converted[0],
+                        converted[1],
+                        converted[2],
+                        converted[3],
+                        converted[4],
+                        types.length == 7 ? converted[5] : Collections.emptyNavigableMap(),
+                        Map.of(),
+                        converted[types.length - 1]
+                };
+            } else {
+                target = declaring.getMethod(method.getName(), types);
+            }
             try {
                 return convert(target.invoke(delegate, converted), origin, loader);
             } catch (InvocationTargetException e) {

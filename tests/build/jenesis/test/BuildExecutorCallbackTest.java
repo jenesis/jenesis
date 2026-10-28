@@ -20,7 +20,7 @@ public class BuildExecutorCallbackTest {
     @Test
     public void can_print_executed() {
         List<String> printed = new ArrayList<>();
-        BuildExecutorCallback.printing(printed::add, Palette.ANSI, false, false, null)
+        BuildExecutorCallback.printing(printed::add, Palette.ANSI, false, false, null, false)
                 .step("foo", new LinkedHashSet<>(Set.of("bar")))
                 .accept(true, null);
         assertThat(printed).hasSize(1);
@@ -35,7 +35,7 @@ public class BuildExecutorCallbackTest {
     @Test
     public void prints_plain_text_without_colors() {
         List<String> printed = new ArrayList<>();
-        BuildExecutorCallback.printing(printed::add, Palette.NONE, false, false, null)
+        BuildExecutorCallback.printing(printed::add, Palette.NONE, false, false, null, false)
                 .step("foo", new LinkedHashSet<>(Set.of("bar")))
                 .accept(false, null);
         assertThat(printed).containsExactly("[SKIPPED]   foo");
@@ -44,7 +44,7 @@ public class BuildExecutorCallbackTest {
     @Test
     public void can_print_skipped() {
         List<String> printed = new ArrayList<>();
-        BuildExecutorCallback.printing(printed::add, Palette.ANSI, false, false, null)
+        BuildExecutorCallback.printing(printed::add, Palette.ANSI, false, false, null, false)
                 .step("foo", new LinkedHashSet<>(Set.of("bar")))
                 .accept(false, null);
         assertThat(printed).containsExactly(
@@ -54,7 +54,7 @@ public class BuildExecutorCallbackTest {
     @Test
     public void can_print_failed() {
         List<String> printed = new ArrayList<>();
-        BuildExecutorCallback.printing(printed::add, Palette.ANSI, false, false, null)
+        BuildExecutorCallback.printing(printed::add, Palette.ANSI, false, false, null, false)
                 .step("foo", new LinkedHashSet<>(Set.of("bar")))
                 .accept(null, new RuntimeException("message"));
         assertThat(printed)

@@ -84,7 +84,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No version pinned for module plain");
@@ -105,6 +107,8 @@ public class ModularJarResolverTest {
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("plain", "2.0")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet())
                 .as("the root module is a declaration of the project, the pin names what it reaches")
@@ -138,7 +142,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .as("an alias names a Maven artifact, which a coordinate that is a module name cannot")
                 .isInstanceOf(IllegalArgumentException.class)
@@ -162,7 +168,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly(
                 "foo/root",
@@ -185,7 +193,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE);
         List<String> followedEdges = new ArrayList<>();
         List<String> notFollowedEdges = new ArrayList<>();
@@ -213,7 +223,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly("foo/root");
     }
@@ -233,7 +245,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly(
                 "foo/root",
@@ -255,7 +269,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet())
                 .as("java.money is a library's module name, java.sql one of the running JDK")
@@ -279,7 +295,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly(
                 "foo/root",
@@ -303,7 +321,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.RUNTIME).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly("foo/root");
     }
@@ -367,7 +387,9 @@ public class ModularJarResolverTest {
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> Optional.ofNullable(coordinate.equals("root") ? jar : null)),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).vertices().get("foo/root").licenses();
     }
 
@@ -450,7 +472,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly("foo/root/1.2.3");
     }
@@ -462,7 +486,9 @@ public class ModularJarResolverTest {
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> Optional.of(toJar("root", "../evil"))),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unsafe version")
@@ -482,7 +508,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly("foo/root");
     }
@@ -500,7 +528,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("root")
@@ -521,6 +551,8 @@ public class ModularJarResolverTest {
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("root", "9.9")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly("foo/root/9.9");
     }
@@ -539,6 +571,8 @@ public class ModularJarResolverTest {
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("root", "9.9")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("9.9")
@@ -561,6 +595,8 @@ public class ModularJarResolverTest {
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("root", "9.9")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("No module found for root");
@@ -581,6 +617,8 @@ public class ModularJarResolverTest {
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("root", "9.9")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly("foo/root/9.9");
     }
@@ -599,6 +637,8 @@ public class ModularJarResolverTest {
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("root", "7.0")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly("foo/root/7.0");
     }
@@ -617,7 +657,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly(
                 "foo/root/1.0",
@@ -641,7 +683,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly(
                 "foo/root/1.0",
@@ -665,7 +709,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(fetched).containsOnlyKeys("root", "pinned/1.0");
         assertThat(dependencies.sequencedKeySet()).containsExactly(
@@ -689,7 +735,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(fetched).containsOnlyKeys("root", "plain");
         assertThat(dependencies.sequencedKeySet()).containsExactly(
@@ -714,6 +762,8 @@ public class ModularJarResolverTest {
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("dep", "9.9")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(fetched).containsOnlyKeys("root", "dep/9.9");
         assertThat(dependencies.sequencedKeySet()).containsExactly(
@@ -738,7 +788,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(fetched).containsOnlyKeys("root", "middle/1.0", "deep/1.0");
         assertThat(dependencies.sequencedKeySet()).containsExactly(
@@ -766,7 +818,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(fetched).contains(Map.entry("shared/1.0", ""));
         assertThat(dependencies).containsKey("foo/shared/1.0");
@@ -793,7 +847,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(fetched).containsOnlyKeys("root", "middle", "shared");
         assertThat(dependencies.sequencedKeySet()).containsExactly(
@@ -824,6 +880,8 @@ public class ModularJarResolverTest {
                 }),
                 new LinkedHashMap<>(Map.of("root/1.0", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("shared", "9.9")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(fetched).containsOnlyKeys("root/1.0", "middle", "shared/9.9");
         assertThat(dependencies.sequencedKeySet()).containsExactly(
@@ -851,7 +909,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Conflicting compiled versions for module shared:"
@@ -877,7 +937,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly(
                 "foo/root/1.0",
@@ -905,6 +967,8 @@ public class ModularJarResolverTest {
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("shared", "9.9")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly(
                 "foo/root/1.0",
@@ -929,7 +993,9 @@ public class ModularJarResolverTest {
                         return Optional.ofNullable(item);
                     }),
                     new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                    new LinkedHashMap<>(),
+                    Collections.emptyNavigableMap(),
+                    Collections.emptyNavigableMap(),
+                    Map.of(),
                     DependencyScope.COMPILE))
                     .as("resolver=%s", resolver)
                     .isInstanceOf(IllegalArgumentException.class)
@@ -955,6 +1021,8 @@ public class ModularJarResolverTest {
                     }),
                     new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                     new LinkedHashMap<>(Map.of("dep", "9.9")),
+                    Collections.emptyNavigableMap(),
+                    Map.of(),
                     DependencyScope.COMPILE))
                     .as("resolver=%s", resolver)
                     .isInstanceOf(IllegalArgumentException.class)
@@ -977,6 +1045,8 @@ public class ModularJarResolverTest {
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("transitive", "9.9")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly(
                 "foo/root/1.0",
@@ -996,7 +1066,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("../../secret");
@@ -1019,7 +1091,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly("foo/root/2.0");
     }
@@ -1040,7 +1114,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(dependencies.sequencedKeySet()).containsExactly("foo/root/1.0");
     }
@@ -1061,6 +1137,8 @@ public class ModularJarResolverTest {
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("root", ":windows-x86_64:9.9")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(fetched).containsOnlyKeys("root-windows-x86_64/9.9");
         assertThat(dependencies.sequencedKeySet()).containsExactly("foo/root-windows-x86_64/9.9");
@@ -1082,6 +1160,8 @@ public class ModularJarResolverTest {
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("root", ":windows-x86_64")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(fetched).containsOnlyKeys("root-windows-x86_64");
         assertThat(dependencies.sequencedKeySet()).containsExactly("foo/root-windows-x86_64/1.2.3");
@@ -1104,6 +1184,8 @@ public class ModularJarResolverTest {
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("dep", ":win:2.0")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE).artifacts();
         assertThat(fetched).containsOnlyKeys("root", "dep-win/2.0");
         assertThat(dependencies.sequencedKeySet()).containsExactly(
@@ -1125,6 +1207,8 @@ public class ModularJarResolverTest {
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("root", ":win:9.9")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("9.9")
@@ -1139,6 +1223,8 @@ public class ModularJarResolverTest {
                 Map.of("foo", (_, _, _) -> Optional.empty()),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("root", ":")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Malformed classifier");
@@ -1152,6 +1238,8 @@ public class ModularJarResolverTest {
                 Map.of("foo", (_, _, _) -> Optional.empty()),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("root", ":win:")),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Malformed classifier");
@@ -1170,7 +1258,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unsafe")
@@ -1190,7 +1280,9 @@ public class ModularJarResolverTest {
                     return Optional.ofNullable(item);
                 }),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
-                new LinkedHashMap<>(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Map.of(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unsafe compiled version")

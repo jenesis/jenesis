@@ -433,6 +433,8 @@ public record Jpx(Path storage,
                         repositories,
                         new LinkedHashMap<>(Map.of(command.name(), Collections.emptyNavigableSet())),
                         versions,
+                        Collections.emptyNavigableMap(),
+                        Map.of(),
                         DependencyScope.RUNTIME);
                 root = null;
                 for (String coordinate : resolution.artifacts().sequencedKeySet()) {
@@ -470,6 +472,8 @@ public record Jpx(Path storage,
                         repositories,
                         new LinkedHashMap<>(Map.of(groupId + "/" + artifactId, Collections.emptyNavigableSet())),
                         new LinkedHashMap<>(Map.of(groupId + "/" + artifactId, version)),
+                        Collections.emptyNavigableMap(),
+                        Map.of(),
                         DependencyScope.RUNTIME);
                 root = "maven/" + groupId + "/" + artifactId + "/" + version;
                 if (!resolution.artifacts().containsKey(root)) {

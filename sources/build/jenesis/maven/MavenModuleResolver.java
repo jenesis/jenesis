@@ -52,7 +52,7 @@ public class MavenModuleResolver implements Resolver {
                 true,
                 discovered,
                 Resolver.bomEntries(SequencedProperties.ofFiles(resolved.file())),
-                new LinkedHashMap<>());
+                Collections.emptyNavigableMap());
     }
 
     private static String pomVersion(InputStream stream, String coordinate) throws IOException {
@@ -97,23 +97,14 @@ public class MavenModuleResolver implements Resolver {
                                             Map<String, Repository> repositories,
                                             SequencedMap<String, SequencedSet<String>> coordinates,
                                             SequencedMap<String, String> versions,
-                                            DependencyScope scope) throws IOException {
-        return dependencies(executor, prefix, repositories, coordinates, versions, new LinkedHashMap<>(), scope);
-    }
-
-    @Override
-    public Resolver.Resolution dependencies(Executor executor,
-                                            String prefix,
-                                            Map<String, Repository> repositories,
-                                            SequencedMap<String, SequencedSet<String>> coordinates,
-                                            SequencedMap<String, String> versions,
                                             SequencedMap<String, SequencedSet<String>> managedExclusions,
+                                            Map<String, Set<DependencyScope>> scopes,
                                             DependencyScope scope) throws IOException {
         Repository repository = repositories.getOrDefault(Resolver.base(prefix), discovery);
         List<MavenResolver.RootPom> rootPoms = new ArrayList<>();
         SequencedMap<MavenDependencyKey, MavenDependencyValue> mavenPins = new LinkedHashMap<>();
         SequencedMap<String, Map.Entry<String, String>> classified = new LinkedHashMap<>();
-        for (Map.Entry<String, SequencedSet<String>> entry : coordinates.entrySet()) {
+        for (Map.Entry<String, SequencedSet<String>> entry : Resolver.placed(coordinates, scopes, scope).entrySet()) {
             String coordinate = entry.getKey();
             String pinned = versions.get(coordinate);
             if (pinned != null && pinned.startsWith(":")) {
@@ -186,7 +177,7 @@ public class MavenModuleResolver implements Resolver {
                 }).toList(), null, null),
                 (pinned, excluded) -> pinned.exclusions(excluded.exclusions())));
         MavenRepository mavenRepo = MavenRepository.of(repositories.getOrDefault(mavenPrefix, Repository.empty()));
-        MavenResolver.Closure resolution = delegate.dependencies(
+        MavenResolver.Closure resolution = delegate.closure(
                 executor, mavenRepo, rootPoms, mavenPins, MavenDependencyScope.COMPILE, mavenPrefix);
         SequencedMap<MavenDependencyKey, MavenDependencyValue> closure = new LinkedHashMap<>();
         Map<MavenDependencyKey, String> checksums = new HashMap<>();
