@@ -101,9 +101,9 @@ public class ProcessHandlerTest {
                 .daemon(warm)
                 .directory(directory);
         assertThat(handler.execute(output, error, null)).isZero();
-        assertThat(Files.readString(output).strip())
+        assertThat(Files.isSameFile(Path.of(Files.readString(output).strip()), directory))
                 .as("a test reading a file by a relative path reads it from its own project, whichever started the JVM")
-                .isEqualTo(directory.toRealPath().toString());
+                .isTrue();
     }
 
     @Test

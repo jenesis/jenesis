@@ -102,8 +102,9 @@ in one JVM never see each other's settings. `Make`, `Execute`, `Jpx` and the thr
 arguments it holds, as the JDK's tools do (`@@` escapes, `#` comments, quotes, no nested expansion), and a file may
 lead with `-Djenesis.<key>=<value>` lines. A process the build hands a command line to - a container, the daemon - is
 given the settings rather than left to read its JVM: the daemon receives them with every request and keys its
-fingerprint on the engine, the JVM, its options and the environment alone, so one daemon serves every project that
-matches, and a container receives every setting save the `jenesis.project.docker` keys that start it.
+fingerprint on the engine, the JVM, its options, the environment and the project root, which
+`jenesis.daemon.shared=true` leaves out so that one daemon serves every project that matches, and a container receives
+every setting save the `jenesis.project.docker` keys that start it.
 
 **A project's own files are untrusted.** `Make.settings` refuses, in a project's `jenesis.properties` and profiles,
 every key naming a program the build runs or a JVM's options, a credential, a cache, folder or trust root shared
@@ -275,15 +276,17 @@ folder outlived `jenesis.aot.lifetime`. The build daemon is the same `Worker` on
 running `DaemonBuild` per request, one at a time. Daemons announce themselves in `jenesis.daemon.folder`
 (`~/.jenesis/daemons`), one folder each named after its fingerprint, beside a copy of every engine compiled from
 source that one runs; a client locks its project's `.jenesis/daemon.lock` for the build, hands it to a free daemon of
-its fingerprint or starts one, and first stops the one used least recently once `jenesis.daemon.limit` (3) run.
-`jenesis.daemon.shared=false` adds the root to the fingerprint. The daemon starts in its own folder, and `DaemonBuild`
-sets `jenesis.process.directory` to the root, so every process the build starts runs where it would without a
-daemon. After each build the daemon restores the system properties, the default locale and time zone, and ends after
-a build that changed a JVM-wide default it cannot restore (the security providers, the default TLS context, socket
-factory and host name verifier, authenticator, proxy selector, cookie handler, response cache, uncaught exception
-handler, standard input), naming it; a new default of that kind joins `Worker.global` in the same commit. That keeps
-one project's settings out of another's build, never its code: a daemon is no boundary, which is why a release and a
-container never run in one unless a mode names it.
+its fingerprint or starts one, and first stops the one used least recently once `jenesis.daemon.limit` (3) run. The
+fingerprint holds the project root, and the daemon starts there, so a path a plugin or a setting names relative to the
+working directory means what it means without a daemon; `jenesis.daemon.shared=true` leaves the root out and starts
+the daemon in its own folder, for builds that name no such path. Either way `DaemonBuild` sets
+`jenesis.process.directory` to the root, so every process the build starts runs where it would without a daemon. After
+each build the daemon restores the system properties, the default locale and time zone, and ends after a build that
+changed a JVM-wide default it cannot restore (the security providers, the default TLS context, socket factory and host
+name verifier, authenticator, proxy selector, cookie handler, response cache, uncaught exception handler, standard
+input), naming it; a new default of that kind joins `Worker.global` in the same commit. That keeps one build's
+settings out of the next, never its code: a daemon is no boundary, which is why a release and a container never
+run in one unless a mode names it.
 
 A tool whose main method exits is called through a `<Tool>Driver` of its plugin with an `int main(String[])`, compiled
 against the tool by `requires static` or reaching it by reflection where that does not compile; `OfProcess.driver`
