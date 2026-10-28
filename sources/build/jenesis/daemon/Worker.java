@@ -98,6 +98,7 @@ public final class Worker {
     }
 
     private static void piped() throws IOException {
+        URLConnection.setDefaultUseCaches("jar", false);
         DataInputStream requests = new DataInputStream(new BufferedInputStream(new FileInputStream(FileDescriptor.in)));
         DataOutputStream frames = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(FileDescriptor.out)));
         Routed out = new Routed(new Frames(frames, OUT, 0)), err = new Routed(new Frames(frames, ERR, 0));
