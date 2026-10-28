@@ -97,16 +97,6 @@ public class MavenModuleResolver implements Resolver {
                                             Map<String, Repository> repositories,
                                             SequencedMap<String, SequencedSet<String>> coordinates,
                                             SequencedMap<String, String> versions,
-                                            DependencyScope scope) throws IOException {
-        return dependencies(executor, prefix, repositories, coordinates, versions, new LinkedHashMap<>(), scope);
-    }
-
-    @Override
-    public Resolver.Resolution dependencies(Executor executor,
-                                            String prefix,
-                                            Map<String, Repository> repositories,
-                                            SequencedMap<String, SequencedSet<String>> coordinates,
-                                            SequencedMap<String, String> versions,
                                             SequencedMap<String, SequencedSet<String>> managedExclusions,
                                             DependencyScope scope) throws IOException {
         Repository repository = repositories.getOrDefault(Resolver.base(prefix), discovery);

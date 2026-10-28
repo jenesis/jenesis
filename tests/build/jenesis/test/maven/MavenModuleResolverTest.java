@@ -60,6 +60,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
+                new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
 
         assertThat(resolved).containsOnlyKeys("maven/org.example/example-core/1.2.3", "module/foo.bar/1.2.3");
@@ -83,6 +84,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
+                new LinkedHashMap<>(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Expected module foo.bar")
@@ -105,6 +107,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
+                new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
 
         assertThat(resolved).containsKey("module/foo.bar/1.2.3");
@@ -125,6 +128,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
 
@@ -151,6 +155,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("foo.bar", "9.9")),
+                new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
 
         assertThat(resolved).containsOnlyKeys("maven/org.example/example-core/9.9", "module/foo.bar/9.9");
@@ -173,6 +178,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("foo.bar", "1.0 " + checksum)),
+                new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
 
         assertThat(resolved).containsOnlyKeys("maven/org.example/example-core/1.0", "module/foo.bar/1.0");
@@ -209,6 +215,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
+                new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
 
         assertThat(resolved).containsOnlyKeys(
@@ -234,6 +241,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
+                new LinkedHashMap<>(),
                 DependencyScope.COMPILE);
 
         assertThat(Files.exists(mavenRepoFolder.resolve("org.example/example-core/1.0/example-core-1.0.pom"))).isFalse();
@@ -248,6 +256,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -266,6 +275,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("foo.bar", "9.9")),
+                new LinkedHashMap<>(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The module name foo.bar has no artifact behind it in version 9.9")
@@ -315,6 +325,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", new LinkedHashSet<>(List.of("org.transitive/lib")))),
+                new LinkedHashMap<>(),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
 
@@ -366,6 +377,7 @@ public class MavenModuleResolverTest {
                 new LinkedHashMap<>(Map.of("foo.bar",
                         new LinkedHashSet<>(List.of("org.transitive/first", "org.transitive/third")))),
                 new LinkedHashMap<>(),
+                new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
 
         assertThat(resolved).containsOnlyKeys(
@@ -389,6 +401,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", new LinkedHashSet<>(List.of("org.transitive")))),
+                new LinkedHashMap<>(),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -447,6 +460,7 @@ public class MavenModuleResolverTest {
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
 
@@ -816,6 +830,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(pins),
+                new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
     }
 
@@ -843,6 +858,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("foo.bar", ":linux:1.2.3 " + checksum)),
+                new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
 
         assertThat(resolved)
@@ -871,6 +887,7 @@ public class MavenModuleResolverTest {
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("foo.bar", ":linux:1.2.3 SHA-256/0000")),
+                new LinkedHashMap<>(),
                 DependencyScope.COMPILE))
                 .hasStackTraceContaining("example-core/jar/linux/1.2.3");
     }

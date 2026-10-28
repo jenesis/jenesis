@@ -64,6 +64,7 @@ public class ModularJarResolver implements Resolver {
                                             Map<String, Repository> repositories,
                                             SequencedMap<String, SequencedSet<String>> coordinates,
                                             SequencedMap<String, String> versions,
+                                            SequencedMap<String, SequencedSet<String>> managedExclusions,
                                             DependencyScope scope) throws IOException {
         coordinates.forEach((coordinate, exclusions) -> {
             if (!exclusions.isEmpty()) {
@@ -279,7 +280,7 @@ public class ModularJarResolver implements Resolver {
                 unresolvedCoordinates.put(coordinate, Collections.emptyNavigableSet());
             }
             Resolver.Resolution fallbackResolution = fallback.dependencies(
-                    executor, prefix, repositories, unresolvedCoordinates, hints, scope);
+                    executor, prefix, repositories, unresolvedCoordinates, hints, new LinkedHashMap<>(), scope);
             fallbackResolution.artifacts().forEach(dependencies::putIfAbsent);
             edges.addAll(fallbackResolution.edges());
             fallbackResolution.vertices().forEach(nodes::putIfAbsent);

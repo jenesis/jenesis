@@ -33,17 +33,8 @@ public interface Resolver extends Serializable {
                             Map<String, Repository> repositories,
                             SequencedMap<String, SequencedSet<String>> coordinates,
                             SequencedMap<String, String> versions,
+                            SequencedMap<String, SequencedSet<String>> managedExclusions,
                             DependencyScope scope) throws IOException;
-
-    default Resolution dependencies(Executor executor,
-                                    String prefix,
-                                    Map<String, Repository> repositories,
-                                    SequencedMap<String, SequencedSet<String>> coordinates,
-                                    SequencedMap<String, String> versions,
-                                    SequencedMap<String, SequencedSet<String>> managedExclusions,
-                                    DependencyScope scope) throws IOException {
-        return dependencies(executor, prefix, repositories, coordinates, versions, scope);
-    }
 
     default SequencedSet<String> managedPrefixes() {
         return Collections.emptyNavigableSet();
@@ -200,7 +191,7 @@ public interface Resolver extends Serializable {
     }
 
     static Resolver identity() {
-        return (executor, prefix, repositories, coordinates, _, _) -> {
+        return (executor, prefix, repositories, coordinates, _, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             coordinates.sequencedKeySet().forEach(coordinate -> resolved.put(prefix + "/" + coordinate, ""));
             SequencedMap<String, Resolved> artifacts = materializeAll(executor, repositories, prefix, resolved);
