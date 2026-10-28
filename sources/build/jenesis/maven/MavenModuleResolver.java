@@ -186,7 +186,7 @@ public class MavenModuleResolver implements Resolver {
                 }).toList(), null, null),
                 (pinned, excluded) -> pinned.exclusions(excluded.exclusions())));
         MavenRepository mavenRepo = MavenRepository.of(repositories.getOrDefault(mavenPrefix, Repository.empty()));
-        MavenResolver.Closure resolution = delegate.dependencies(
+        MavenResolver.Closure resolution = delegate.closure(
                 executor, mavenRepo, rootPoms, mavenPins, MavenDependencyScope.COMPILE, mavenPrefix);
         SequencedMap<MavenDependencyKey, MavenDependencyValue> closure = new LinkedHashMap<>();
         Map<MavenDependencyKey, String> checksums = new HashMap<>();

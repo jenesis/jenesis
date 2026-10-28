@@ -93,8 +93,8 @@ public class MavenPomResolverTest {
     public void fail_rejects_two_dependencies_that_require_different_versions() throws IOException {
         addDivergingClosure();
 
-        assertThatThrownBy(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.fail()).dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null))
+        assertThatThrownBy(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.fail()).project(
+                Runnable::run, mavenRepository, "group", "artifact", "1"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Diverging versions")
                 .hasMessageContaining("shared:artifact");
@@ -104,8 +104,8 @@ public class MavenPomResolverTest {
     public void fail_accepts_a_closure_that_agrees_on_every_version() throws IOException {
         addAgreeingClosure();
 
-        assertThatCode(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.fail()).dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null))
+        assertThatCode(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.fail()).project(
+                Runnable::run, mavenRepository, "group", "artifact", "1"))
                 .doesNotThrowAnyException();
     }
 
@@ -113,8 +113,8 @@ public class MavenPomResolverTest {
     public void managed_rejects_a_version_only_a_dependency_names() throws IOException {
         addAgreeingClosure();
 
-        assertThatThrownBy(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.managed()).dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null))
+        assertThatThrownBy(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.managed()).project(
+                Runnable::run, mavenRepository, "group", "artifact", "1"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No managed version for shared:artifact");
     }
@@ -133,8 +133,8 @@ public class MavenPomResolverTest {
                     </dependencyManagement>
                     """);
 
-        assertThatCode(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.managed()).dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null))
+        assertThatCode(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.managed()).project(
+                Runnable::run, mavenRepository, "group", "artifact", "1"))
                 .doesNotThrowAnyException();
     }
 
@@ -143,8 +143,8 @@ public class MavenPomResolverTest {
         addToRepository("group", "artifact", "1", rootPom("", "middle"));
         addToRepository("middle", "artifact", "1", leafPom());
 
-        assertThatCode(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.managed()).dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null))
+        assertThatCode(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.managed()).project(
+                Runnable::run, mavenRepository, "group", "artifact", "1"))
                 .as("a dependency the project declares itself is a version the project named")
                 .doesNotThrowAnyException();
     }
@@ -243,13 +243,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -277,13 +276,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", "tests"),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -312,13 +310,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", "fixtures"),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -371,7 +368,7 @@ public class MavenPomResolverTest {
                 </project>
                 """);
         addToRepository("other", "artifact", "1", leafPom());
-        assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null))
+        assertThat(mavenPomResolver.project(Runnable::run, mavenRepository, "group", "artifact", "1"))
                 .containsExactly(Map.entry(
                         new MavenDependencyKey("other", "artifact", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -415,7 +412,7 @@ public class MavenPomResolverTest {
             Files.setLastModifiedTime(repository.resolve("group/parent/1/parent-1.pom"),
                     FileTime.from(Instant.now().plusSeconds(Integer.parseInt(version))));
             addToRepository("other", "artifact", version, leafPom());
-            assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null))
+            assertThat(mavenPomResolver.project(Runnable::run, mavenRepository, "group", "artifact", "1"))
                     .as("the child is unchanged, but what its parent passes down is read anew")
                     .containsExactly(Map.entry(
                             new MavenDependencyKey("other", "artifact", "jar", null),
@@ -447,13 +444,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -483,13 +479,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -550,13 +545,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("intermediate", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -605,13 +599,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("intermediate", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -647,13 +640,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -682,8 +674,8 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        assertThatThrownBy(() -> mavenPomResolver.dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null))
+        assertThatThrownBy(() -> mavenPomResolver.project(
+                Runnable::run, mavenRepository, "group", "artifact", "1"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("The dependency other:artifact:${undefined.property} names the property undefined.property");
     }
@@ -703,8 +695,8 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        assertThatThrownBy(() -> mavenPomResolver.dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null))
+        assertThatThrownBy(() -> mavenPomResolver.project(
+                Runnable::run, mavenRepository, "group", "artifact", "1"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("The dependency other:artifact:${undefined.property} names the property undefined.property");
     }
@@ -751,13 +743,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -788,13 +779,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", "natives${marker"),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -825,13 +815,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", "build$2"),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -852,13 +841,12 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -890,13 +878,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -934,13 +921,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -959,7 +945,7 @@ public class MavenPomResolverTest {
                     </parent>
                 </project>
                 """);
-        assertThatThrownBy(() -> mavenPomResolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null))
+        assertThatThrownBy(() -> mavenPomResolver.project(Runnable::run, mavenRepository, "group", "artifact", "1"))
                 .rootCause()
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Cannot fetch the parent parent:missing:1-SNAPSHOT")
@@ -1011,7 +997,7 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null))
+        assertThat(mavenPomResolver.project(Runnable::run, mavenRepository, "group", "artifact", "1"))
                 .containsExactly(Map.entry(
                         new MavenDependencyKey("other", "artifact", "jar", null),
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -1075,13 +1061,12 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("transitive", "artifact", "jar", null),
@@ -1147,13 +1132,12 @@ public class MavenPomResolverTest {
                     </project>
                     """);
         }
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies.get(new MavenDependencyKey("shared", "artifact", "jar", null)).version())
                 .as("Maven's effective POM lists a module's own dependencies before those of its parent, so at one"
                         + " depth the version an own dependency names wins")
@@ -1205,13 +1189,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("2", MavenDependencyScope.COMPILE, null, null, null)));
@@ -1251,13 +1234,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("other", "artifact", "jar", null),
@@ -1301,13 +1283,12 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1",
@@ -1351,13 +1332,12 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1",
@@ -1396,13 +1376,12 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -1435,13 +1414,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies)
                 .as("a processor compiles the module that declares it and is no artifact of the module's consumers")
                 .containsExactly(Map.entry(
@@ -1501,7 +1479,7 @@ public class MavenPomResolverTest {
         List<String> printed = new ArrayList<>();
         SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver
                 .printing(printed::add, Palette.NONE)
-                .dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null);
+                .project(Runnable::run, mavenRepository, "group", "artifact", "1");
         assertThat(dependencies)
                 .as("the relocated artifact publishes no jar, so the coordinate it names takes its place and scope")
                 .containsExactly(Map.entry(
@@ -1555,13 +1533,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("other", "artifact", "jar", null),
@@ -1595,13 +1572,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.RUNTIME, null, null, null)));
@@ -1623,8 +1599,8 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        assertThatThrownBy(() -> mavenPomResolver.dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null))
+        assertThatThrownBy(() -> mavenPomResolver.project(
+                Runnable::run, mavenRepository, "group", "artifact", "1"))
                 .hasStackTraceContaining("Unknown Maven dependency scope")
                 .hasStackTraceContaining("bogus");
     }
@@ -1658,13 +1634,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -1726,13 +1701,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("intermediate", "artifact", "jar", null),
@@ -1775,13 +1749,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -1833,13 +1806,12 @@ public class MavenPomResolverTest {
                     </dependencyManagement>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -1913,13 +1885,12 @@ public class MavenPomResolverTest {
                     </dependencyManagement>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -1976,13 +1947,12 @@ public class MavenPomResolverTest {
                     </dependencyManagement>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -2051,13 +2021,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("leaf", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -2129,13 +2098,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("leaf", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -2245,13 +2213,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("leaf", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -2322,13 +2289,12 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("deep", "artifact", "jar", null),
@@ -2410,13 +2376,12 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("deep", "artifact", "jar", null),
@@ -2511,13 +2476,12 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("deep", "artifact", "jar", null),
@@ -2572,13 +2536,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("transitive", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -2615,13 +2578,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository.cached(Files.createDirectory(repository.resolve("cache"))),
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("transitive", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -2663,13 +2625,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("transitive", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
@@ -2711,13 +2672,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("transitive", "artifact", "jar", null),
                 new MavenDependencyValue("2", MavenDependencyScope.COMPILE, null, null, null)));
@@ -2759,13 +2719,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("transitive", "artifact", "jar", null),
                 new MavenDependencyValue("2", MavenDependencyScope.COMPILE, null, null, null)));
@@ -2884,8 +2843,8 @@ public class MavenPomResolverTest {
                 """);
         System.setProperty("jenesis.undefined.platform", "linux");
         try {
-            assertThatThrownBy(() -> mavenPomResolver.dependencies(
-                    Runnable::run, mavenRepository, "group", "artifact", "1", null))
+            assertThatThrownBy(() -> mavenPomResolver.project(
+                    Runnable::run, mavenRepository, "group", "artifact", "1"))
                     .as("a POM is read from its model alone, so the build JVM's properties never decide a coordinate")
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("The dependency shared:artifact:${jenesis.undefined.platform}:1 of middle:artifact:1")
@@ -2958,8 +2917,8 @@ public class MavenPomResolverTest {
                 List.of("Windows 11", "amd64", "10.0"), "win");
         for (Map.Entry<List<String>, String> platform : platforms.entrySet()) {
             List<String> os = platform.getKey();
-            assertThat(mavenPomResolver.os(os.get(0), os.get(1), os.get(2)).dependencies(
-                    Runnable::run, mavenRepository, "group", "artifact", "1", null).keySet())
+            assertThat(mavenPomResolver.os(os.get(0), os.get(1), os.get(2)).project(
+                    Runnable::run, mavenRepository, "group", "artifact", "1").keySet())
                     .as("OpenJFX selects its platform's jar by profiles its POM activates on the OS, %s here", os)
                     .contains(new MavenDependencyKey("openjfx", "artifact", "jar", platform.getValue()));
         }
@@ -2999,12 +2958,12 @@ public class MavenPomResolverTest {
                 </project>
                 """);
         MavenDependencyKey linux = new MavenDependencyKey("brotli", "native-linux-x86_64", "jar", null);
-        assertThat(mavenPomResolver.os("Linux", "amd64", "6.1").dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null).keySet())
+        assertThat(mavenPomResolver.os("Linux", "amd64", "6.1").project(
+                Runnable::run, mavenRepository, "group", "artifact", "1").keySet())
                 .as("Maven matches a family it has no name for as a part of os.name, ignoring case")
                 .contains(linux);
-        assertThat(mavenPomResolver.os("Mac OS X", "amd64", "14.4").dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null).keySet())
+        assertThat(mavenPomResolver.os("Mac OS X", "amd64", "14.4").project(
+                Runnable::run, mavenRepository, "group", "artifact", "1").keySet())
                 .doesNotContain(linux);
     }
 
@@ -3077,12 +3036,12 @@ public class MavenPomResolverTest {
             addToRepository(groupId, "artifact", "1", leafPom());
         }
         for (String root : List.of("group", "managing")) {
-            assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, root, "artifact", "1", null).keySet())
+            assertThat(mavenPomResolver.project(Runnable::run, mavenRepository, root, "artifact", "1").keySet())
                     .as("the management a POM inherits shapes its own dependencies before %s's management adds to it", root)
                     .contains(new MavenDependencyKey("guava", "artifact", "jar", null))
                     .doesNotContain(new MavenDependencyKey("j2objc", "artifact", "jar", null));
         }
-        assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, "managing", "artifact", "1", null).keySet())
+        assertThat(mavenPomResolver.project(Runnable::run, mavenRepository, "managing", "artifact", "1").keySet())
                 .as("the exclusion the project manages is applied as well")
                 .doesNotContain(new MavenDependencyKey("other", "artifact", "jar", null));
     }
@@ -3305,13 +3264,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("transitive", "artifact", "jar", null),
                 new MavenDependencyValue("2", MavenDependencyScope.COMPILE, null, null, null)));
@@ -3377,13 +3335,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("transitive", "artifact", "jar", null),
@@ -3477,13 +3434,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("first", "artifact", "jar", null),
@@ -3530,13 +3486,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("transitive", "artifact", "jar", null),
                 new MavenDependencyValue("3", MavenDependencyScope.COMPILE, null, null, null)));
@@ -3579,13 +3534,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("transitive", "artifact", "jar", null),
                 new MavenDependencyValue("2", MavenDependencyScope.COMPILE, null, null, null)));
@@ -3628,13 +3582,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("transitive", "artifact", "jar", null),
                 new MavenDependencyValue("2", MavenDependencyScope.COMPILE, null, null, null)));
@@ -3678,13 +3631,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("transitive", "artifact", "jar", null),
                 new MavenDependencyValue("4", MavenDependencyScope.COMPILE, null, null, null)));
@@ -3730,13 +3682,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("transitive", "artifact", "jar", null),
                 new MavenDependencyValue("5", MavenDependencyScope.COMPILE, null, null, null)));
@@ -3811,13 +3762,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("first", "artifact", "jar", null),
@@ -3904,13 +3854,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        assertThatThrownBy(() -> mavenPomResolver.dependencies(
+        assertThatThrownBy(() -> mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null))
+                "1"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Could not resolve version");
     }
@@ -3950,13 +3899,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        assertThatThrownBy(() -> mavenPomResolver.dependencies(
+        assertThatThrownBy(() -> mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null))
+                "1"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Could not resolve version in range");
     }
@@ -4021,13 +3969,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("dep", "artifact", "jar", null),
@@ -4230,13 +4177,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("first", "artifact", "jar", null),
@@ -4304,13 +4250,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("transitive", "artifact", "jar", null),
@@ -4375,13 +4320,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("transitive", "artifact", "jar", null),
@@ -4431,13 +4375,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("transitive", "artifact", "jar", null),
                 new MavenDependencyValue("1.0", MavenDependencyScope.COMPILE, null, null, null)));
@@ -4481,13 +4424,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("transitive", "artifact", "jar", null),
                 new MavenDependencyValue("2.0", MavenDependencyScope.COMPILE, null, null, null)));
@@ -4563,7 +4505,7 @@ public class MavenPomResolverTest {
         List<String> printed = new ArrayList<>();
         MavenPomResolver resolver = mavenPomResolver.printing(printed::add, Palette.NONE);
         for (int index = 0; index < 2; index++) {
-            resolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null);
+            resolver.project(Runnable::run, mavenRepository, "group", "artifact", "1");
         }
         assertThat(printed)
                 .as("a POM read again by every resolution of a build is named once, as one its artifact was published with")
@@ -5710,7 +5652,7 @@ public class MavenPomResolverTest {
                 </project>
                 """.formatted(dependencyOn("core", "1")));
         addToRepository("core", "artifact", "1", leafPom());
-        assertThat(mavenPomResolver.dependencies(Runnable::run, mavenRepository, "group", "artifact", "1", null).keySet())
+        assertThat(mavenPomResolver.project(Runnable::run, mavenRepository, "group", "artifact", "1").keySet())
                 .containsExactly(
                         new MavenDependencyKey("client", "artifact", "jar", null),
                         new MavenDependencyKey("core", "artifact", "jar", null));
@@ -7469,8 +7411,8 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> deps = mavenPomResolver.dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null);
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> deps = mavenPomResolver.project(
+                Runnable::run, mavenRepository, "group", "artifact", "1");
         assertThat(deps).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null, null)));
@@ -7613,8 +7555,8 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> deps = mavenPomResolver.dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null);
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> deps = mavenPomResolver.project(
+                Runnable::run, mavenRepository, "group", "artifact", "1");
         assertThat(deps.get(new MavenDependencyKey("shared", "artifact", "jar", null)).version())
                 .as("the first-declared imported BOM manages the version")
                 .isEqualTo("1");
@@ -7731,8 +7673,8 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
-                Runnable::run, mavenRepository, "consumer", "artifact", "1", null);
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
+                Runnable::run, mavenRepository, "consumer", "artifact", "1");
         assertThat(dependencies)
                 .as("the POM's own import manages the scope before its parent's import, so the test dependency stays out")
                 .containsOnlyKeys(new MavenDependencyKey("group", "artifact", "jar", null));
@@ -7771,8 +7713,8 @@ public class MavenPomResolverTest {
                     </dependencyManagement>
                 </project>
                 """);
-        assertThatCode(() -> mavenPomResolver.dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null)).doesNotThrowAnyException();
+        assertThatCode(() -> mavenPomResolver.project(
+                Runnable::run, mavenRepository, "group", "artifact", "1")).doesNotThrowAnyException();
     }
 
     @Test
@@ -8050,8 +7992,8 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        assertThatThrownBy(() -> mavenPomResolver.dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null))
+        assertThatThrownBy(() -> mavenPomResolver.project(
+                Runnable::run, mavenRepository, "group", "artifact", "1"))
                 .hasStackTraceContaining("Illegal Maven coordinate groupId");
     }
 
@@ -8109,8 +8051,8 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        assertThatCode(() -> mavenPomResolver.dependencies(
-                Runnable::run, mavenRepository, "group", "artifact", "1", null)).doesNotThrowAnyException();
+        assertThatCode(() -> mavenPomResolver.project(
+                Runnable::run, mavenRepository, "group", "artifact", "1")).doesNotThrowAnyException();
     }
 
     @Test
@@ -8156,13 +8098,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("other", "artifact", "jar", null),
@@ -8193,13 +8134,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1-SNAPSHOT", MavenDependencyScope.COMPILE, null, null, null)));
@@ -8239,13 +8179,12 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1",
@@ -8289,13 +8228,12 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1",
@@ -8340,13 +8278,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("other", "artifact", "jar", null),
@@ -8391,13 +8328,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("other", "artifact", "jar", null),
@@ -8429,13 +8365,12 @@ public class MavenPomResolverTest {
                     <modelVersion>4.0.0</modelVersion>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("other", "artifact", "jar", null),
                 new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, true)));
@@ -8488,13 +8423,12 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(
                 Map.entry(
                         new MavenDependencyKey("mid", "artifact", "jar", null),
@@ -8523,13 +8457,12 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        assertThatThrownBy(() -> mavenPomResolver.dependencies(
+        assertThatThrownBy(() -> mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null))
+                "1"))
                 .hasStackTraceContaining("Invalid version range");
     }
 
@@ -8548,13 +8481,12 @@ public class MavenPomResolverTest {
                     </dependencies>
                 </project>
                 """);
-        assertThatThrownBy(() -> mavenPomResolver.dependencies(
+        assertThatThrownBy(() -> mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null))
+                "1"))
                 .hasStackTraceContaining("No metadata for transitive:artifact");
     }
 
@@ -8586,13 +8518,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        assertThatThrownBy(() -> mavenPomResolver.dependencies(
+        assertThatThrownBy(() -> mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null))
+                "1"))
                 .hasStackTraceContaining("Unknown model version");
     }
 
@@ -8632,13 +8563,12 @@ public class MavenPomResolverTest {
                   </versioning>
                 </metadata>
                 """);
-        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.project(
                 Runnable::run,
                 mavenRepository,
                 "group",
                 "artifact",
-                "1",
-                null);
+                "1");
         assertThat(dependencies).containsExactly(Map.entry(
                 new MavenDependencyKey("transitive", "artifact", "jar", null),
                 new MavenDependencyValue("2", MavenDependencyScope.COMPILE, null, null, null)));

@@ -207,7 +207,7 @@ public class MavenPomResolver implements MavenResolver {
             }
         });
         Map<DependencyCoordinate, UnresolvedPom> unresolved = new ConcurrentHashMap<>();
-        Traversal traversal = dependencies(executor,
+        Traversal traversal = traversal(executor,
                 MavenRepository.of(repositories.getOrDefault(Resolver.base(prefix), Repository.empty())),
                 new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of(), null), true, null, Set.of(), null, null),
                 unresolved,
@@ -248,24 +248,6 @@ public class MavenPomResolver implements MavenResolver {
                     traversal.licenses().getOrDefault(withVersion, List.of())));
         });
         return new Resolver.Resolution(artifacts, traversal.edges(), nodes, poms(prefix, unresolved));
-    }
-
-    public SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies(
-            Executor executor,
-            MavenRepository repository,
-            Map<MavenDependencyKey, MavenDependencyValue> managedDependencies,
-            SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies) throws IOException {
-        return dependencies(executor,
-                repository,
-                new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of(), null),
-                        true,
-                        null,
-                        Set.of(),
-                        null,
-                        null),
-                new ConcurrentHashMap<>(),
-                new ConcurrentHashMap<>(),
-                null).dependencies();
     }
 
     @Override
@@ -313,7 +295,7 @@ public class MavenPomResolver implements MavenResolver {
     }
 
     @Override
-    public MavenResolver.Closure dependencies(
+    public MavenResolver.Closure closure(
             Executor executor,
             MavenRepository repository,
             List<RootPom> rootPoms,
@@ -351,7 +333,7 @@ public class MavenPomResolver implements MavenResolver {
                 roots.put(rootPom.identifier(), key);
             }
         }
-        Traversal traversal = dependencies(executor,
+        Traversal traversal = traversal(executor,
                 repository,
                 new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of(), null), true, scope, Set.of(), null, null),
                 unresolved,
@@ -378,16 +360,14 @@ public class MavenPomResolver implements MavenResolver {
         return poms;
     }
 
-    public SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies(Executor executor,
-                                                                               MavenRepository repository,
-                                                                               String groupId,
-                                                                               String artifactId,
-                                                                               String version,
-                                                                               MavenDependencyScope scope)
-            throws IOException {
+    public SequencedMap<MavenDependencyKey, MavenDependencyValue> project(Executor executor,
+                                                                          MavenRepository repository,
+                                                                          String groupId,
+                                                                          String artifactId,
+                                                                          String version) throws IOException {
         Map<DependencyCoordinate, UnresolvedPom> unresolved = new ConcurrentHashMap<>();
         Map<DependencyCoordinate, ResolvedPom> resolved = new ConcurrentHashMap<>();
-        return dependencies(executor,
+        return traversal(executor,
                 repository,
                 new ContextualPom(resolveOrCached(executor,
                         repository,
@@ -395,13 +375,13 @@ public class MavenPomResolver implements MavenResolver {
                         artifactId,
                         version,
                         resolved,
-                        unresolved), true, scope, Set.of(), null, null),
+                        unresolved), true, null, Set.of(), null, null),
                 unresolved,
                 resolved,
                 null).dependencies();
     }
 
-    private Traversal dependencies(
+    private Traversal traversal(
             Executor executor,
             MavenRepository repository,
             ContextualPom initial,
