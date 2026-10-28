@@ -60,7 +60,7 @@ release() {
 }
 
 builds() {
-    (cd "$TMP/$1" && java build/jenesis/Make.java >"$TMP/$1.build.log" 2>&1)
+    (cd "$TMP/$1" && java -Djenesis.make.mode=compiled build/jenesis/Make.java >"$TMP/$1.build.log" 2>&1)
 }
 
 # --- vendor -----------------------------------------------------------------
