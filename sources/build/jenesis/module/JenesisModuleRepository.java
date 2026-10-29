@@ -80,10 +80,19 @@ public class JenesisModuleRepository implements JenesisRepository {
             Path temporary = Files.createTempFile(target.getParent(), "fetch", "." + type);
             try (InputStream inputStream = item.get().toInputStream()) {
                 Files.copy(inputStream, temporary, StandardCopyOption.REPLACE_EXISTING);
-                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (Throwable t) {
                 Files.deleteIfExists(temporary);
                 throw t;
+            }
+            try {
+                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException _) {
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AccessDeniedException e) {
+                Files.deleteIfExists(temporary);
+                if (!Files.exists(target)) {
+                    throw e;
+                }
             }
             return Optional.of(RepositoryItem.ofLocalFile(target));
         };
