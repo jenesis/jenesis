@@ -375,6 +375,43 @@ public class JenesisModuleRepositoryTest {
     }
 
     @Test
+    public void keeps_and_reads_no_local_repository_where_the_setting_is_empty() throws IOException {
+        settings.put("repository.insecure", "true");
+        settings.put("module.local", "");
+        List<String> requested = new ArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            requested.add(exchange.getRequestURI().getPath());
+            byte[] body = "<project/>".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+        server.start();
+        try {
+            settings.put("module.uri", "http://localhost:" + server.getAddress().getPort() + "/");
+            for (int index = 0; index < 2; index++) {
+                RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings),
+                                JenesisRepository.Scope.ARTIFACT)
+                        .fetch(Runnable::run, "sample.lib/1.0:pom")
+                        .orElseThrow();
+                assertThat(read(item)).isEqualTo("<project/>");
+                assertThat(item.local())
+                        .as("what is kept nowhere on the machine is the project's to keep")
+                        .isFalse();
+            }
+        } finally {
+            server.stop(0);
+            settings.remove("module.uri");
+        }
+        assertThat(requested)
+                .as("with no local repository, each fetch asks the module index")
+                .containsExactly("/artifact/sample.lib/1.0/sample.lib.pom",
+                        "/artifact/sample.lib/1.0/sample.lib.pom");
+    }
+
+    @Test
     public void local_repository_is_consulted_before_the_remote() throws IOException {
         Files.writeString(Files
                 .createDirectories(root.resolve("home/build.jenesis/1.0"))

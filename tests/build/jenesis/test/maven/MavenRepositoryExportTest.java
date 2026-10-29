@@ -8,6 +8,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.Environment;
 import build.jenesis.maven.MavenRepositoryExport;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +28,14 @@ public class MavenRepositoryExportTest {
         persistent = Files.createDirectory(root.resolve("persistent"));
         source = Files.createDirectory(root.resolve("source"));
         target = Files.createDirectory(root.resolve("target"));
+    }
+
+    @Test
+    public void refuses_to_export_where_no_local_repository_is_kept() {
+        assertThatThrownBy(() -> MavenRepositoryExport.ofEnvironment(new Environment(Map.of("maven.local", "")))
+                .apply(Runnable::run, null, new LinkedHashMap<>()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("jenesis.maven.local is empty, so there is no local Maven repository");
     }
 
     @Test
