@@ -65,22 +65,31 @@ are only ever handed to a JVM no earlier build ran in. Naming
 Daemons on one machine
 ----------------------
 
-A daemon serves one project and starts in its root, so a path a plugin or a
-setting names relative to the working directory means what it means without a
-daemon. At most three daemons run at once on a machine, across every project;
-starting a fourth first stops the one used least recently, which finishes the
-build it is running. Daemons announce themselves in `~/.jenesis/daemons`, each
-with its log, beside a copy of every engine compiled from source that a daemon
-runs, so no project's `.jenesis/classes` is pulled from under its daemon.
+Every project whose build runs the same engine on the same JVM, with the same
+JVM options and environment, shares the daemons that are free, so a second
+project builds in a daemon the first one warmed up. At most three daemons run at
+once on a machine; starting a fourth first stops the one used least recently,
+which finishes the build it is running. Daemons announce themselves in
+`~/.jenesis/daemons`, each with its log, beside a copy of every engine compiled
+from source that a daemon runs, so no project's `.jenesis/classes` is pulled from
+under its daemon.
 
-`-Djenesis.daemon.shared=true` hands the build to a daemon any project may use
-instead: every project whose build runs the same engine on the same JVM, with the
-same JVM options and environment, shares the daemons that are free. Such a daemon
-runs in a folder of its own, so it suits builds whose plugins and settings name
-no path relative to the working directory.
+A shared daemon runs in a folder of its own rather than in any project, so
+nothing depends on the folder a build was started from: a relative path in a
+setting - `-Djenesis.maven.local=m2`, a key store, a folder to publish to - names
+a path relative to the project root, with or without a daemon, and every process
+the build starts, a test JVM or a warm tool, runs in the project's root
+(`jenesis.process.directory` names another folder of the project). A plugin reads
+and writes the folders it is handed rather than resolving a path against the
+working directory, which is the daemon's own folder.
+
+`-Djenesis.daemon.shared=false` keeps a daemon for one project alone, started in
+its root. On Windows, a folder a process runs in can be neither deleted nor
+renamed, so the project's folder then stays in use for as long as its daemon
+runs, idle or not; `java build/jenesis/Make.java --stop` frees it.
 
     -Djenesis.daemon.limit=3            # how many may run at once (default: 3)
-    -Djenesis.daemon.shared=true        # daemons any project may use (default: false)
+    -Djenesis.daemon.shared=false       # a daemon per project (default: true)
     -Djenesis.daemon.idle=600           # exit after ten idle minutes (default: 10800)
     -Djenesis.daemon.options="-Xmx4g"   # JVM options of the daemon itself
     -Djenesis.daemon.folder=...         # where daemons announce themselves (default: ~/.jenesis/daemons)
@@ -90,9 +99,7 @@ the JVM that started the build, so `java -Xmx4g build/jenesis/Make.java` builds 
 a daemon with four gigabytes, and a JVM started with other options gets a daemon
 of its own. The folder, the limit, the idle time and the options are the
 machine's to choose: only the command line or `~/.jenesis/jenesis.properties` may
-set them, never a file the project provides. Every process the build starts - a
-test JVM, a warm tool - runs in the project's root, as it would without a daemon
-(`jenesis.process.directory` names another folder of the project).
+set them, never a file the project provides.
 
 What travels with a call
 ------------------------
@@ -115,8 +122,8 @@ build with stale engine code.
 What one build can leave to the next
 ------------------------------------
 
-A daemon runs build after build in one JVM - those of several projects, where
-daemons are shared - and a build runs code its project chose: its plugins, its
+A daemon runs build after build in one JVM - those of several projects, unless
+daemons are kept per project - and a build runs code its project chose: its plugins, its
 annotation processors, the tools it names. Whatever that code changes for the
 whole JVM, the next build would inherit. So after every build the daemon restores the system properties, the
 default locale and the default time zone, and it ends once a build changed a
@@ -135,9 +142,10 @@ boundary. Since Java 24 no JVM can confine the code it runs, so code that
 sets out to stay - a thread left running, a field changed by reflection, a stream
 handler only the JVM's first caller may install - outlives its build and reaches
 every later build of the daemon, a release excepted, which never runs in one by
-default. Shared daemons are therefore for projects you trust alike; build one you
-do not trust with `-Djenesis.make.mode=compiled`, or in a container
-(`-Djenesis.project.docker`), which also keeps it from your files.
+default. Shared daemons are therefore for projects you trust alike; keep a project
+apart with `-Djenesis.daemon.shared=false`, and build one you do not trust with
+`-Djenesis.make.mode=compiled`, or in a container (`-Djenesis.project.docker`),
+which also keeps it from your files.
 
 Limits
 ------

@@ -102,9 +102,17 @@ in one JVM never see each other's settings. `Make`, `Execute`, `Jpx` and the thr
 arguments it holds, as the JDK's tools do (`@@` escapes, `#` comments, quotes, no nested expansion), and a file may
 lead with `-Djenesis.<key>=<value>` lines. A process the build hands a command line to - a container, the daemon - is
 given the settings rather than left to read its JVM: the daemon receives them with every request and keys its
-fingerprint on the engine, the JVM, its options, the environment and the project root, which
-`jenesis.daemon.shared=true` leaves out so that one daemon serves every project that matches, and a container receives
-every setting save the `jenesis.project.docker` keys that start it.
+fingerprint on the engine, the JVM, its options and the environment, so that one daemon serves every project that
+matches, and on the project root as well under `jenesis.daemon.shared=false`; a container receives every setting save
+the `jenesis.project.docker` keys that start it.
+
+**A relative path is relative to the project root**, never to the working directory, which is the daemon's own folder
+under a shared daemon and need not be the root anywhere else. `Project.ofEnvironment` resolves every setting naming a
+file or folder that is read outside a `Project` (`maven.local`, `module.local`, `openpgp.local`, `jarsigner.keystore`,
+`aot.folder`, `process.directory`, which defaults to the root) before handing the environment on, and `Make` resolves
+its own (`make.global`, `daemon.folder`) against the root it holds; a new setting naming a path joins that list in the
+same commit. A step resolves nothing against the working directory either: it reads the folders it is handed and writes
+`context.next()`.
 
 **A project's own files are untrusted.** `Make.settings` refuses, in a project's `jenesis.properties` and profiles,
 every key naming a program the build runs or a JVM's options, a credential, a cache, folder or trust root shared
@@ -276,11 +284,10 @@ folder outlived `jenesis.aot.lifetime`. The build daemon is the same `Worker` on
 running `DaemonBuild` per request, one at a time. Daemons announce themselves in `jenesis.daemon.folder`
 (`~/.jenesis/daemons`), one folder each named after its fingerprint, beside a copy of every engine compiled from
 source that one runs; a client locks its project's `.jenesis/daemon.lock` for the build, hands it to a free daemon of
-its fingerprint or starts one, and first stops the one used least recently once `jenesis.daemon.limit` (3) run. The
-fingerprint holds the project root, and the daemon starts there, so a path a plugin or a setting names relative to the
-working directory means what it means without a daemon; `jenesis.daemon.shared=true` leaves the root out and starts
-the daemon in its own folder, for builds that name no such path. Either way `DaemonBuild` sets
-`jenesis.process.directory` to the root, so every process the build starts runs where it would without a daemon. After
+its fingerprint or starts one, and first stops the one used least recently once `jenesis.daemon.limit` (3) run. A
+shared daemon starts in its own folder; `jenesis.daemon.shared=false` keys the fingerprint on the project root and
+starts the daemon there, which on Windows keeps the project's folder in use for as long as it runs. Either way every
+process the build starts runs in `jenesis.process.directory`, the root by default, as it does without a daemon. After
 each build the daemon restores the system properties, the default locale and time zone, and ends after a build that
 changed a JVM-wide default it cannot restore (the security providers, the default TLS context, socket factory and host
 name verifier, authenticator, proxy selector, cookie handler, response cache, uncaught exception handler, standard
