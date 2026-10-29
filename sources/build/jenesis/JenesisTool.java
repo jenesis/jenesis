@@ -22,7 +22,10 @@ abstract class JenesisTool implements ToolProvider {
             return 2;
         }
         try {
-            return run(new Environment(Make.directed(Make.keys(settings), Path.of("").toAbsolutePath()), out, err), remaining);
+            Environment environment = new Environment(Make.directed(Make.keys(settings), Path.of("").toAbsolutePath()))
+                    .out(out::println)
+                    .err(err::println);
+            return run(environment, remaining);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             err.println(name() + " was interrupted running " + String.join(" ", remaining));

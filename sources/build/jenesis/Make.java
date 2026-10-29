@@ -138,26 +138,39 @@ public final class Make {
                     + "' (expected a path)", e);
         }
         if (listed(keys, PROVIDED, key)) {
-            if (root == null) {
+            if (root == null && setting == Setting.CONFINED) {
+                throw new IllegalStateException("jenesis." + key + " is set in a file the project provides, but the"
+                        + " environment reading it names no project root to confine it to - hand the environment"
+                        + " the root with root(...)");
+            }
+            if (root != null) {
+                Path resolved = root.resolve(path).normalize();
+                if (setting == Setting.CONFINED
+                        && !resolved.toAbsolutePath().normalize().startsWith(root.toAbsolutePath().normalize())) {
+                    throw new IllegalStateException("jenesis." + key + " cannot name '" + location.strip() + "' in a"
+                            + " file the project provides: such a file names only a location inside the project, which"
+                            + " the build writes to and may delete (pass -Djenesis." + key + " on the command line for"
+                            + " one outside it)");
+                }
+                return resolved;
+            }
+        } else {
+            String base = listed(keys, PERSONAL, key)
+                    ? setting == Setting.MACHINE ? keys.get(HOME) : null
+                    : listed(keys, AMBIENT, key) ? keys.get(DIRECTORY) : null;
+            if (base != null) {
+                return Path.of(base).resolve(path).normalize();
+            }
+        }
+        if (root == null) {
+            if (path.isAbsolute()) {
                 return path;
             }
-            Path resolved = root.resolve(path).normalize();
-            if (setting == Setting.CONFINED
-                    && !resolved.toAbsolutePath().normalize().startsWith(root.toAbsolutePath().normalize())) {
-                throw new IllegalStateException("jenesis." + key + " cannot name '" + location.strip() + "' in a file"
-                        + " the project provides: such a file names only a location inside the project, which the"
-                        + " build writes to and may delete (pass -Djenesis." + key + " on the command line for one"
-                        + " outside it)");
-            }
-            return resolved;
+            throw new IllegalStateException("jenesis." + key + " is the relative path '" + location.strip()
+                    + "', but the environment reading it names no project root to resolve it against - name an"
+                    + " absolute path, or hand the environment the root with root(...)");
         }
-        String base = listed(keys, PERSONAL, key)
-                ? setting == Setting.MACHINE ? keys.get(HOME) : null
-                : listed(keys, AMBIENT, key) ? keys.get(DIRECTORY) : null;
-        if (base != null) {
-            return Path.of(base).resolve(path).normalize();
-        }
-        return root == null ? path : root.resolve(path).normalize();
+        return root.resolve(path).normalize();
     }
 
     static boolean listed(Map<String, String> keys, String list, String key) {

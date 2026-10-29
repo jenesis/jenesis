@@ -59,6 +59,43 @@ public class EnvironmentTest {
     }
 
     @Test
+    public void a_relative_path_is_refused_by_an_environment_without_a_root() {
+        assertThatThrownBy(() -> new Environment(Map.of("sample.folder", "folder")).path("sample.folder",
+                Setting.PROJECT))
+                .as("without a root the path would name a folder of whatever directory the JVM started in")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("jenesis.sample.folder is the relative path 'folder', but the environment"
+                        + " reading it names no project root");
+        assertThatThrownBy(() -> Environment.NONE.path("sample.folder", "fallback", Setting.PROJECT))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("jenesis.sample.folder is the relative path 'fallback'");
+    }
+
+    @Test
+    public void an_absolute_path_is_read_by_an_environment_without_a_root(@TempDir Path elsewhere,
+                                                                          @TempDir Path directory) {
+        assertThat(new Environment(Map.of("sample.folder", elsewhere.toString())).path("sample.folder",
+                Setting.PROJECT))
+                .isEqualTo(elsewhere);
+        assertThat(new Environment(Map.of("sample.folder", "typed",
+                "make.ambient", "sample.folder",
+                "make.directory", directory.toString())).path("sample.folder", Setting.PROJECT))
+                .as("a path typed on the command line resolves against the folder the command ran in, root or not")
+                .isEqualTo(directory.resolve("typed"));
+    }
+
+    @Test
+    public void a_confined_path_a_project_s_file_supplied_is_refused_by_an_environment_without_a_root(
+            @TempDir Path elsewhere) {
+        assertThatThrownBy(() -> new Environment(Map.of("sample.folder", elsewhere.toString(),
+                "make.provided", "sample.folder")).path("sample.folder", Setting.CONFINED))
+                .as("without a root nothing can tell whether the project's folder holds the path")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("jenesis.sample.folder is set in a file the project provides, but the"
+                        + " environment reading it names no project root to confine it to");
+    }
+
+    @Test
     public void a_blank_path_reads_as_absent(@TempDir Path root) {
         assertThat(new Environment(Map.of("sample.folder", " ")).root(root).path("sample.folder",
                 "default",

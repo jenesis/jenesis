@@ -89,7 +89,10 @@ public abstract class ProcessBuildStep implements BuildStep {
                 throw new IllegalArgumentException("Malformed value for jenesis.process.mode: '" + mode
                         + "' (expected fork, aot or daemon)");
             }
-            Path directory = environment.path("process.directory", ".", Setting.CONFINED);
+            Path directory = environment.path("process.directory", Setting.CONFINED);
+            if (directory == null) {
+                directory = environment.root();
+            }
             Consumer<String> out = environment.out();
             Palette palette = Palette.ofEnvironment(environment);
             return new Terms(streamed
@@ -111,7 +114,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                     mode.equals("aot")
                             ? environment.path("aot.folder", ".jenesis/aot", Setting.CONFINED).toAbsolutePath()
                             : null,
-                    directory.toAbsolutePath().normalize());
+                    directory == null ? null : directory.toAbsolutePath().normalize());
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {

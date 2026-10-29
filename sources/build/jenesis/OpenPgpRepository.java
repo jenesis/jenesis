@@ -43,10 +43,12 @@ public class OpenPgpRepository implements Repository {
     public static Repository ofEnvironment(Environment environment) {
         String property = environment.getProperty("openpgp.uri", Setting.PROJECT);
         String text = property == null ? System.getenv("OPENPGP_REPOSITORY_URI") : property;
-        Path local = environment.path("openpgp.local",
-                                      System.getenv("OPENPGP_REPOSITORY_LOCAL") == null
-                                      ? ".jenesis/keys"
-                                      : System.getenv("OPENPGP_REPOSITORY_LOCAL"), Setting.CONFINED);
+        Path configured = environment.path("openpgp.local",
+                System.getenv("OPENPGP_REPOSITORY_LOCAL"),
+                Setting.CONFINED);
+        Path local = configured == null && environment.root() != null
+                ? environment.root().resolve(".jenesis/keys")
+                : configured;
         List<URI> servers = new ArrayList<>();
         servers(environment, text == null ? "@" : text, new HashSet<>(), servers);
         List<OpenPgpRepository> chain = servers.stream()
@@ -59,7 +61,7 @@ public class OpenPgpRepository implements Repository {
             Object lock = FETCHING.computeIfAbsent(coordinate, _ -> new Object());
             synchronized (lock) {
                 try {
-                    Optional<RepositoryItem> candidate = cached(local, coordinate);
+                    Optional<RepositoryItem> candidate = local == null ? Optional.empty() : cached(local, coordinate);
                     if (candidate.isPresent()) {
                         return candidate;
                     }

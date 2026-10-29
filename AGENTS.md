@@ -43,9 +43,10 @@ onboarding briefing from the same material, `skill/<page>` one page and `skill` 
 - **Java 25.** Every file starts with `import module java.base;`. Records, sealed types, pattern switches and `_`
   are the normal idiom.
 - **Immutable objects with withers.** Configuration is a record or a final class; each value has a method named
-  exactly like it that returns a copy with that value replaced (`new Project(root).version("1.0.0")`). No setters,
-  no builders, no `with` prefix. A record takes what it is handed: no compact constructor copies a collection or
-  checks a value unless a rule of the type depends on it.
+  exactly like it that returns a copy with that value replaced (`new Project(root).version("1.0.0")`). The
+  constructor a call site uses takes every value the object cannot do without, a wither each optional one, and no
+  shorter constructor stands in for a wither. No setters, no builders, no `with` prefix. A record takes what it is
+  handed: no compact constructor copies a collection or checks a value unless a rule of the type depends on it.
 - **Fail loudly, name the fix.** Bad input is an `IllegalArgumentException` naming what was given and what would be
   valid; a missing prerequisite is an `IllegalStateException` naming it. Nothing silently falls back; a lenient
   wildcard selector is the one documented exception.
@@ -70,9 +71,10 @@ output and errors, and the project root a relative path resolves against, which 
 `jenesis.palette.colors` where the printing object is built, `transient` in a step; it names roles (`status`,
 `failure`, …), and no escape sequence is written outside it. An object built without an environment prints nothing
 until a wither hands it a consumer. `Environment.NONE` holds no setting and writes to the JVM's streams;
-`new Environment(keys)` and `new Environment(keys, out, err)` add settings and writers, each a wither too
-(`Environment.NONE.out(printed::add)`). No environment reads the JVM's properties as they stand, as code running in a
-build could change one between two reads.
+`new Environment(keys)` takes the settings, the one value an environment cannot do without, and the writers and the
+root are withers (`new Environment(keys).out(printed::add).root(root)`). An environment without a root refuses a
+relative path rather than reading it against the working directory. No environment reads the JVM's properties as they
+stand, as code running in a build could change one between two reads.
 
 The environment is an argument of construction, never a field: what keeps talking keeps the consumer it resolved. Only
 `Project` and the multi-project assembler hold one, as they build a module per scanned project module long after the
