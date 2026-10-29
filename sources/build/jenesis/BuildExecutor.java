@@ -63,9 +63,7 @@ public interface BuildExecutor {
                     environment.flag("executor.aggregate"),
                     environment.number("executor.concurrency", 0),
                     environment.value("make.mode"),
-                    environment.value("process.directory") == null
-                            ? null
-                            : Path.of(environment.value("process.directory")),
+                    environment.path("process.directory"),
                     cache,
                     environment.out(),
                     Palette.ofEnvironment(environment));

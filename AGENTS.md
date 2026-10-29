@@ -64,8 +64,9 @@ where the object is built:
 An object that builds children calls their `ofEnvironment` and keeps the result, so no module, step, repository or
 resolver carries an environment, and every setting a child resolved is a wither of its own.
 
-**`Environment` is what a run is given**: the immutable map of settings in force and a `Consumer<String>` each for
-output and errors. Nothing in the engine writes to `System.out` or `System.err`. Colour is a `Palette` resolved from
+**`Environment` is what a run is given**: the immutable map of settings in force, a `Consumer<String>` each for
+output and errors, and the project root a relative path resolves against, which `Project.ofEnvironment` sets with
+`root(root)`. Nothing in the engine writes to `System.out` or `System.err`. Colour is a `Palette` resolved from
 `jenesis.palette.colors` where the printing object is built, `transient` in a step; it names roles (`status`,
 `failure`, …), and no escape sequence is written outside it. An object built without an environment prints nothing
 until a wither hands it a consumer. `Environment.NONE` holds no setting and writes to the JVM's streams;
@@ -89,7 +90,8 @@ parses, what `@<file>` expands to - lives in `Make`, package-private, and the en
 `arguments` on `SequencedProperties`).
 
 **Reading a value.** The accessors are `getProperty` for the raw value, `value` for the trimmed one that reads blank as
-absent, `flag`, `flagOrNull`, `number`, `entries`, `words`, and `variable` for a file value naming
+absent, `flag`, `flagOrNull`, `number`, `entries`, `words`, `path` for a file or folder, resolved against the root,
+and `variable` for a file value naming
 `jenesis.variable.<key>` as `@<key>`. A boolean is the default when absent, true when named with no value or
 `=true`, false at `=false`, and any other value is refused naming the valid ones; `flagOrNull` answers `null` when
 absence is a third state. `Boolean.getBoolean` and `Integer.getInteger` are not used. Environment variables are
@@ -108,15 +110,15 @@ the `jenesis.project.docker` keys that start it.
 
 **A relative path is relative to where it is written.** On a command line it names a folder below the one the command
 runs in: `Make.ambient` and `JenesisTool` resolve every setting naming a path (`Make.PATHS`, the comma-separated
-`Make.LOCATIONS`, the files of `project.resources` and of the jarsigner passwords) against the working directory before
+`Make.LOCATIONS`, the files of `project.resources` and of the jarsigner passwords) through `Make.located` before
 anything else reads them, so a daemon, whose own folder is its working directory, is handed absolute paths. In
 `~/.jenesis/jenesis.properties` and its profiles, a path naming what the machine shares between projects
 (`Make.MACHINE`: the local repositories, `daemon.folder`, the signing key and its passwords) is relative to
-`~/.jenesis`, resolved by `Make.settings` as it reads the file. Everything else, a project's own files and a map a
-program hands `Make` or `Project` included, is relative to the project root: `Project.ofEnvironment` resolves the
-settings read outside a `Project` through the same `Make.located` before handing the environment on, and a `Project`
-resolves its own folders against its root; an absolute path is used as it is. A new setting
-naming a path joins `Make.PATHS` or `Make.LOCATIONS` in the same commit. A step resolves nothing against the working
+`~/.jenesis`, resolved by `Make.settings` as it reads the file. `Make` alone knows where a value was written, so it
+resolves these two before the layers merge. Everything else, a project's own files and a map a program hands `Make`
+or `Project` included, is relative to the project root: a reader takes a path through `environment.path(key)`, never
+`Path.of(environment.value(key))`, and an absolute path is used as it is. A new setting naming a path is read through
+`path` and joins `Make.PATHS` or `Make.LOCATIONS` in the same commit. A step resolves nothing against the working
 directory: it reads the folders it is handed and writes `context.next()`.
 
 **A project's own files are untrusted.** `Make.settings` refuses, in a project's `jenesis.properties` and profiles,

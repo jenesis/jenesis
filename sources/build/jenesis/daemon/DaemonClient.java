@@ -37,7 +37,7 @@ public final class DaemonClient {
             throw new IllegalArgumentException("jenesis.daemon.limit is " + limit
                     + ", but names how many build daemons may run at once: 1 or more");
         }
-        String location = environment.value("daemon.folder");
+        Path location = environment.root(root.toAbsolutePath()).path("daemon.folder");
         this(root,
                 path,
                 mainClass,
@@ -48,7 +48,7 @@ public final class DaemonClient {
                 environment.flag("daemon.shared", true),
                 location == null
                         ? Path.of(System.getProperty("user.home"), ".jenesis", "daemons")
-                        : root.toAbsolutePath().resolve(location).normalize(),
+                        : location,
                 null);
     }
 

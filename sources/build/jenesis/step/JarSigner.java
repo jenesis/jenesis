@@ -30,19 +30,19 @@ public class JarSigner extends ProcessBuildStep {
                 null,
                 List.of(),
                 Terms.ofEnvironment(environment, "jarsigner"));
-        String keystore = environment.getProperty("jarsigner.keystore");
+        Path keystore = environment.path("jarsigner.keystore");
         if (keystore != null) {
-            signer = signer.keystore(keystore);
+            signer = signer.keystore(keystore.toString());
         }
         String alias = environment.getProperty("jarsigner.alias");
         if (alias != null) {
             signer = signer.alias(alias);
         }
-        String storepass = environment.getProperty("jarsigner.storepass");
+        String storepass = source(environment, "jarsigner.storepass");
         if (storepass != null) {
             signer = signer.storepass(storepass);
         }
-        String keypass = environment.getProperty("jarsigner.keypass");
+        String keypass = source(environment, "jarsigner.keypass");
         if (keypass != null) {
             signer = signer.keypass(keypass);
         }
@@ -120,6 +120,14 @@ public class JarSigner extends ProcessBuildStep {
 
     private static List<String> words(String value) {
         return value == null || value.isBlank() ? List.of() : List.of(value.trim().split("\\s+"));
+    }
+
+    private static String source(Environment environment, String key) {
+        String value = environment.getProperty(key);
+        String[] words = value == null ? new String[0] : value.strip().split("\\s+", 2);
+        return words.length == 2 && words[0].equals("file") && environment.root() != null
+                ? "file " + environment.root().resolve(words[1].strip()).normalize()
+                : value;
     }
 
     private static List<String> password(String option, String value) {

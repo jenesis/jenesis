@@ -3017,7 +3017,7 @@ public record Project(
                                        String fileName,
                                        BiFunction<String, Path, BuildStep> stepFactory,
                                        HashDigestFunction hashFunction) {
-            String file = environment.value("pin.file");
+            Path file = environment.path("pin.file");
             List<String> entries = environment.entries("pin.provided");
             SequencedSet<Path> provided = new LinkedHashSet<>();
             if (entries != null) {
@@ -3409,34 +3409,7 @@ public record Project(
     }
 
     public static Project ofEnvironment(Environment supplied, Path root) {
-        Map<String, String> outside = new HashMap<>();
-        Map.of("maven.local", "MAVEN_REPOSITORY_LOCAL",
-                "module.local", "JENESIS_REPOSITORY_LOCAL",
-                "openpgp.local", "OPENPGP_REPOSITORY_LOCAL",
-                "jarsigner.keystore", "",
-                "aot.folder", "",
-                "jarsigner.storepass", "",
-                "jarsigner.keypass", "",
-                "process.directory", "").forEach((key, variable) -> {
-            String value = supplied.keys().get(key);
-            if (value == null && !variable.isEmpty()) {
-                value = System.getenv(variable);
-            }
-            if (value == null || value.isBlank()) {
-                value = switch (key) {
-                    case "openpgp.local" -> ".jenesis/keys";
-                    case "aot.folder" -> ".jenesis/aot";
-                    case "process.directory" -> ".";
-                    default -> null;
-                };
-            }
-            if (value != null) {
-                outside.put(key, value);
-            }
-        });
-        Map<String, String> rooted = new HashMap<>(supplied.keys());
-        rooted.putAll(Make.located(outside, root.toAbsolutePath()));
-        Environment environment = supplied.keys(rooted);
+        Environment environment = supplied.root(root);
         String layoutName = environment.getProperty("project.layout");
         Layout layout = layoutName == null ? null : switch (layoutName.toLowerCase(Locale.ROOT)) {
             case "auto" -> Layout.AUTO;
@@ -3702,17 +3675,17 @@ public record Project(
         if (signatures != null) {
             project = project.signatures(locations(environment, signatures, project).toArray(Path[]::new));
         }
-        String target = environment.getProperty("project.target");
+        Path target = environment.path("project.target");
         if (target != null) {
-            project = project.target(project.root().resolve(target).normalize());
+            project = project.target(target);
         }
-        String reproduce = environment.getProperty("project.reproduce");
+        Path reproduce = environment.path("project.reproduce");
         if (reproduce != null) {
-            project = project.reproduce(project.root().resolve(reproduce).normalize());
+            project = project.reproduce(reproduce);
         }
-        String artifacts = environment.getProperty("project.artifacts");
+        Path artifacts = environment.path("project.artifacts");
         if (artifacts != null) {
-            project = project.artifacts(project.root().resolve(artifacts).normalize());
+            project = project.artifacts(artifacts);
         }
         String cache = environment.getProperty("project.cache");
         if (cache != null) {

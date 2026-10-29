@@ -28,13 +28,13 @@ public final class Discovery {
     }
 
     public static Discovery ofEnvironment(Environment environment) {
-        String local = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
+        Path local = environment.path("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
         return new Discovery(LOCATION,
                 Repository.Connection.ofEnvironment(environment),
                 environment.number("discovery.timeout", 5_000),
                 (local == null
                         ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
-                        : Path.of(local)).resolve(ANSWERS),
+                        : local).resolve(ANSWERS),
                 Duration.ofHours(environment.number("discovery.ttl", 24)));
     }
 

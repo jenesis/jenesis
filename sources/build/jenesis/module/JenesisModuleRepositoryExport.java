@@ -17,10 +17,8 @@ public class JenesisModuleRepositoryExport implements BuildStep {
     }
 
     public static JenesisModuleRepositoryExport ofEnvironment(Environment environment) {
-        String override = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
-        return override == null
-                ? new JenesisModuleRepositoryExport()
-                : new JenesisModuleRepositoryExport(Path.of(override));
+        Path local = environment.path("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
+        return local == null ? new JenesisModuleRepositoryExport() : new JenesisModuleRepositoryExport(local);
     }
 
     public JenesisModuleRepositoryExport(Path target) {
