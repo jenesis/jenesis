@@ -5,6 +5,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
@@ -78,7 +79,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                                                             Path root,
                                                             Map<String, Repository> repositories,
                                                             Map<String, Resolver> resolvers) {
-        String mode = environment.value("abi.mode");
+        String mode = environment.value("abi.mode", Setting.PROJECT);
         InferredJavaToolchainModule module = new InferredJavaToolchainModule(configuration,
                 null,
                 PathPlacement.INFERRED,
@@ -100,8 +101,8 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 location,
                 root,
                 ExternalModule.official(environment, MAVEN_PLUGIN, null, repositories, resolvers),
-                environment.flag("artifact." + MAVEN_PLUGIN, true));
-        return environment.flag("generate.classpath", true) ? module : module.classpath(null);
+                environment.flag("artifact." + MAVEN_PLUGIN, true, Setting.PROJECT));
+        return environment.flag("generate.classpath", true, Setting.PROJECT) ? module : module.classpath(null);
     }
 
     private InferredJavaToolchainModule(SequencedSet<Path> configuration,

@@ -6,6 +6,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 
 public class Legal implements BuildStep {
 
@@ -21,7 +22,7 @@ public class Legal implements BuildStep {
     }
 
     public static Legal ofEnvironment(Environment environment) {
-        List<String> notices = environment.entries("legal.notices");
+        List<String> notices = environment.entries("legal.notices", Setting.PROJECT);
         return new Legal("main", notices == null ? NOTICES : new LinkedHashSet<>(notices));
     }
 

@@ -7,6 +7,7 @@ import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.License;
 import build.jenesis.LruCache;
+import build.jenesis.Make.Setting;
 import build.jenesis.ModuleGraph;
 import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
@@ -43,7 +44,7 @@ public class MavenPomResolver implements MavenResolver {
     }
 
     public static MavenPomResolver ofEnvironment(Environment environment) {
-        String property = environment.value("resolver.maven", "maven");
+        String property = environment.value("resolver.maven", "maven", Setting.PROJECT);
         return new MavenPomResolver(switch (property.toLowerCase(Locale.ROOT)) {
             case "maven" -> MavenDefaultVersionNegotiator.maven();
             case "latest" -> MavenDefaultVersionNegotiator.latest();
@@ -55,7 +56,7 @@ public class MavenPomResolver implements MavenResolver {
             default -> throw new IllegalArgumentException("Unknown jenesis.resolver.maven '"
                     + property
                     + "', expected one of: maven, latest, release, stable, closest, fail, managed");
-        }).printing(environment.flag("print.progress", true) ? environment.out() : null,
+        }).printing(environment.flag("print.progress", true, Setting.PROJECT) ? environment.out() : null,
                 Palette.ofEnvironment(environment));
     }
 

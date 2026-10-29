@@ -7,6 +7,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.License;
+import build.jenesis.Make.Setting;
 import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
@@ -38,7 +39,8 @@ public class Docker implements BuildStep {
         return new Docker(from,
                 "main",
                 Collections.emptyNavigableMap(),
-                environment.value("archive.timestamp") == null ? null : BuildStep.timestamp(environment),
+                environment.value("archive.timestamp",
+                        Setting.PROJECT) == null ? null : BuildStep.timestamp(environment),
                 null);
     }
 

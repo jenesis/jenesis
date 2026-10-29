@@ -1,6 +1,7 @@
 package build.jenesis.maven;
 
 import module java.base;
+import build.jenesis.Make.Setting;
 import build.jenesis.Pinning;
 import module java.xml;
 import build.jenesis.BuildExecutor;
@@ -89,12 +90,12 @@ public class MavenProject implements BuildExecutorModule {
                                       String prefix,
                                       MavenRepository repository,
                                       MavenResolver resolver) {
-        List<String> sources = environment.entries("maven.sources");
+        List<String> sources = environment.entries("maven.sources", Setting.PROJECT);
         return new MavenProject(root, prefix, repository, resolver)
                 .sources(sources == null ? List.of() : sources)
-                .unified(environment.flag("maven.unified", false))
+                .unified(environment.flag("maven.unified", false, Setting.PROJECT))
                 .platform(Platform.ofEnvironment(environment))
-                .printing(environment.flag("print.progress", true) ? environment.out() : null,
+                .printing(environment.flag("print.progress", true, Setting.PROJECT) ? environment.out() : null,
                         Palette.ofEnvironment(environment));
     }
 

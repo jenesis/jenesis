@@ -6,6 +6,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.SafeSegment;
@@ -26,7 +27,7 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
     }
 
     public static URI configured(Environment environment) {
-        String location = environment.value("release.uri");
+        String location = environment.value("release.uri", Setting.PROJECT);
         if (location == null) {
             location = System.getenv("JENESIS_RELEASE_URI");
         }
@@ -34,11 +35,11 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
     }
 
     public static JenesisModuleRepositoryRelease ofEnvironment(Environment environment, URI repository) {
-        Repository.Origin origin = environment.getProperty("release.uri") != null
+        Repository.Origin origin = environment.getProperty("release.uri", Setting.PROJECT) != null
                 ? Repository.Origin.of(environment, "release.uri")
                 : System.getenv("JENESIS_RELEASE_URI") != null ? Repository.Origin.ENVIRONMENT : Repository.Origin.USER;
         return new JenesisModuleRepositoryRelease(repository,
-                environment.flag("release.publish"),
+                environment.flag("release.publish", Setting.COMMAND),
                 Repository.Credential.of(environment, "release.token", "JENESIS_RELEASE_TOKEN").grant(origin),
                 Repository.Connection.ofEnvironment(environment),
                 environment.out(),

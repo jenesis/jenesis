@@ -5,6 +5,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -78,26 +79,26 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 new LicenseHeaderModule(),
                 value -> value,
                 ExternalModule.official(environment, "openrewrite", null, repositories, resolvers),
-                environment.flag("format.openrewrite", true),
+                environment.flag("format.openrewrite", true, Setting.PROJECT),
                 ExternalModule.official(environment, "googlejavaformat", null, repositories, resolvers),
-                environment.flag("format.googlejavaformat", true),
+                environment.flag("format.googlejavaformat", true, Setting.PROJECT),
                 ExternalModule.official(environment, "palantir", null, repositories, resolvers),
-                environment.flag("format.palantir", true),
+                environment.flag("format.palantir", true, Setting.PROJECT),
                 ExternalModule.official(environment, "eclipse", null, repositories, resolvers),
-                environment.flag("format.eclipse", true),
+                environment.flag("format.eclipse", true, Setting.PROJECT),
                 ExternalModule.official(environment, "ktfmt", null, repositories, resolvers),
-                environment.flag("format.ktfmt", true),
+                environment.flag("format.ktfmt", true, Setting.PROJECT),
                 ExternalModule.official(environment, "ktlint", "format", repositories, resolvers),
-                environment.flag("format.ktlint", true),
+                environment.flag("format.ktlint", true, Setting.PROJECT),
                 ExternalModule.official(environment, "scalafmt", "format", repositories, resolvers),
-                environment.flag("format.scalafmt", true),
+                environment.flag("format.scalafmt", true, Setting.PROJECT),
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap());
-        Boolean rewrite = environment.flagOrNull("format.rewrite");
+        Boolean rewrite = environment.flagOrNull("format.rewrite", Setting.PROJECT);
         if (rewrite != null) {
             module = module.verify(!rewrite);
         }
-        Boolean license = environment.flagOrNull("format.license");
+        Boolean license = environment.flagOrNull("format.license", Setting.PROJECT);
         if (license != null) {
             module = module.license(license ? value -> value : null);
         }

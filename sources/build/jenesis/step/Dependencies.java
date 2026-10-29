@@ -12,6 +12,7 @@ import build.jenesis.DependencyScope;
 import build.jenesis.DiscoverySources;
 import build.jenesis.Environment;
 import build.jenesis.License;
+import build.jenesis.Make.Setting;
 import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
@@ -68,7 +69,7 @@ public class Dependencies implements BuildExecutorModule {
                 null,
                 PathPlacement.INFERRED,
                 BuildStep.timestamp(environment),
-                environment.flag("print.aliases") ? environment.out() : null,
+                environment.flag("print.aliases", Setting.PROJECT) ? environment.out() : null,
                 Palette.ofEnvironment(environment));
     }
 

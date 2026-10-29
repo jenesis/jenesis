@@ -7,6 +7,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Make.Setting;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 
@@ -61,7 +62,7 @@ public class Inventory implements BuildStep {
     }
 
     public static Inventory ofEnvironment(Environment environment) {
-        String mode = environment.value("dependency.native", "ignore");
+        String mode = environment.value("dependency.native", "ignore", Setting.PROJECT);
         try {
             return new Inventory()
                     .nativeAccess(NativeAccess.valueOf(mode.toUpperCase(Locale.ROOT)))

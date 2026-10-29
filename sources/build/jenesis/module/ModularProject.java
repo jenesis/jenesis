@@ -8,6 +8,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
@@ -68,7 +69,7 @@ public class ModularProject implements BuildExecutorModule {
 
     public static ModularProject ofEnvironment(Environment environment, String prefix, Path root) {
         ModularProject project = new ModularProject(prefix, root).platform(Platform.ofEnvironment(environment));
-        Integer segments = environment.numberOrNull("maven.segments");
+        Integer segments = environment.numberOrNull("maven.segments", Setting.PROJECT);
         return segments == null ? project : project.segments(segments);
     }
 
@@ -169,7 +170,9 @@ public class ModularProject implements BuildExecutorModule {
                                            SequencedSet<Path> signatures,
                                            MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
         Dependencies dependencyModule = Dependencies.ofEnvironment(environment, repositories, resolvers);
-        Consumer<String> printing = environment.flag("print.progress", true) ? environment.out() : null;
+        Consumer<String> printing = environment.flag("print.progress",
+                true,
+                Setting.PROJECT) ? environment.out() : null;
         Palette palette = Palette.ofEnvironment(environment);
         return new MultiProjectModule(ModularProject.ofEnvironment(environment, prefix, root)
                 .group(group).filter(filter).modular(modular).maven(maven).boms(boms).signatures(signatures),

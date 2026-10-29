@@ -3,6 +3,7 @@ package build.jenesis.module;
 import module java.base;
 import build.jenesis.Discovery;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 
@@ -113,11 +114,12 @@ public interface JenesisRepository extends Repository {
     static JenesisRepository ofEnvironment(Environment environment, Scope scope) {
         return ofEnvironment(environment,
                 scope,
-                environment.flag("repository.discovery") ? Discovery.ofEnvironment(environment) : null);
+                environment.flag("repository.discovery",
+                        Setting.PROJECT) ? Discovery.ofEnvironment(environment) : null);
     }
 
     static JenesisRepository ofEnvironment(Environment environment, Scope scope, Discovery discovery) {
-        String source = environment.value("module.source", "service");
+        String source = environment.value("module.source", "service", Setting.PROJECT);
         JenesisRepository repository = switch (source) {
             case "service" -> JenesisModuleRepository.ofEnvironment(environment, scope);
             case "git" -> JenesisRawGitRepository.ofEnvironment(environment, scope);

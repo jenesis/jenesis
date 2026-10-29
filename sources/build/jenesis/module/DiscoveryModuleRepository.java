@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.DiscoveredLocation;
 import build.jenesis.Discovery;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -45,7 +46,8 @@ public class DiscoveryModuleRepository implements JenesisRepository {
                                              discovery,
                                              MavenDefaultRepository.ofEnvironment(environment, discovery),
                                              Repository.Connection.ofEnvironment(environment),
-                                             environment.flag("print.fetch") ? environment.out() : null,
+                                             environment.flag("print.fetch",
+                                                     Setting.PROJECT) ? environment.out() : null,
                                              Palette.ofEnvironment(environment));
     }
 

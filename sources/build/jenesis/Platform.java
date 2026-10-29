@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Make.Setting;
 
 public record Platform(SequencedSet<String> tokens) implements Serializable {
 
@@ -26,7 +27,7 @@ public record Platform(SequencedSet<String> tokens) implements Serializable {
                 continue;
             }
             String token = key.substring("platform.".length());
-            if (environment.flag(key)) {
+            if (environment.flag(key, Setting.PROJECT)) {
                 tokens.add(token.toLowerCase(Locale.ROOT));
             } else {
                 tokens.remove(token.toLowerCase(Locale.ROOT));

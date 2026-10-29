@@ -2,6 +2,7 @@ package build.jenesis.module;
 
 import module java.base;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -53,9 +54,9 @@ public class JenesisRawGitRepository implements JenesisRepository {
              token,
              _ -> true,
              Repository.Connection.ofEnvironment(environment),
-             environment.flagOrNull("module.prerelease"),
-             environment.flagOrNull("module.speculative"),
-             environment.flag("print.fetch") ? environment.out() : null,
+             environment.flagOrNull("module.prerelease", Setting.PROJECT),
+             environment.flagOrNull("module.speculative", Setting.PROJECT),
+             environment.flag("print.fetch", Setting.PROJECT) ? environment.out() : null,
              Palette.ofEnvironment(environment));
     }
 
@@ -152,8 +153,8 @@ public class JenesisRawGitRepository implements JenesisRepository {
 
     public static JenesisRepository ofEnvironment(Environment environment, Scope scope) {
         Repository.Credential credential = Repository.Credential.of(environment, "maven.token", "MAVEN_REPOSITORY_TOKEN");
-        String index = environment.getProperty("module.index", System.getenv("JENESIS_INDEX_URI"));
-        String property = environment.getProperty("maven.uri");
+        String index = environment.getProperty("module.index", System.getenv("JENESIS_INDEX_URI"), Setting.PROJECT);
+        String property = environment.getProperty("maven.uri", Setting.PROJECT);
         String variable = System.getenv("MAVEN_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
         String text;
@@ -247,7 +248,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
                         spliced = Repository.Origin.DEFAULT;
                     }
                 } else {
-                    String declared = environment.getProperty(name);
+                    String declared = environment.getProperty(name, Setting.PROJECT);
                     value = declared == null ? System.getenv(name) : declared;
                     spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.of(environment, name);
                     if (value == null) {

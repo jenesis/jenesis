@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.License;
+import build.jenesis.Make.Setting;
 import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
@@ -34,7 +35,7 @@ public class ModularJarResolver implements Resolver {
     public static ModularJarResolver ofEnvironment(Environment environment,
                                                    boolean resolveAutomaticModules,
                                                    Resolver fallback) {
-        String property = environment.getProperty("resolver.module");
+        String property = environment.getProperty("resolver.module", Setting.PROJECT);
         if (property == null) {
             return new ModularJarResolver(resolveAutomaticModules, fallback);
         }

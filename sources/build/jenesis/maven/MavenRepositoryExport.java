@@ -7,6 +7,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;
 
@@ -25,7 +26,7 @@ public class MavenRepositoryExport implements BuildStep {
     }
 
     public static MavenRepositoryExport ofEnvironment(Environment environment) {
-        Path local = environment.path("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
+        Path local = environment.path("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"), Setting.MACHINE);
         return local == null ? new MavenRepositoryExport() : new MavenRepositoryExport(local);
     }
 

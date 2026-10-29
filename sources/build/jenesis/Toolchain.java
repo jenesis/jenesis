@@ -21,10 +21,22 @@ public final class Toolchain {
     }
 
     public static Toolchain ofKeys(Map<String, String> keys) {
-        String searchpath = keys.get("toolchain.searchpath"), installer = keys.get("toolchain.installer");
+        String searchpath = machine(keys, "toolchain.searchpath"), installer = machine(keys, "toolchain.installer");
         return new Toolchain(keys.get("toolchain.version"),
                 searchpath == null ? "@" : searchpath,
                 installer == null ? System.getenv("JENESIS_TOOLCHAIN_INSTALLER") : installer);
+    }
+
+    private static String machine(Map<String, String> keys, String key) {
+        String value = keys.get(key), provided = keys.get("make.provided");
+        if (value != null
+                && provided != null
+                && Arrays.stream(provided.split(",")).map(String::strip).anyMatch(key::equals)) {
+            throw new IllegalStateException("jenesis." + key + " cannot be set in a file the project provides: it"
+                    + " decides which programs the build executes, so only the command line or your own"
+                    + " ~/.jenesis/jenesis.properties may set it (pass -Djenesis." + key + " instead)");
+        }
+        return value;
     }
 
     private Toolchain(String version, String searchpath, String installer) {
