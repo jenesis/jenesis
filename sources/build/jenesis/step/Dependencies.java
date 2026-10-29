@@ -467,6 +467,41 @@ public class Dependencies implements BuildExecutorModule {
                 managedExclusions.keySet().retainAll(Set.of(group));
                 versions.keySet().retainAll(Set.of(group));
             }
+            if (resolvers.get("maven") != null) {
+                for (Map.Entry<String, SequencedMap<String, SequencedMap<String, String>>> aliased : moduleAliases.entrySet()) {
+                    SequencedMap<String, SequencedMap<String, String>> pins = versions.computeIfAbsent(aliased.getKey(),
+                            _ -> new LinkedHashMap<>());
+                    for (Map.Entry<String, SequencedMap<String, String>> byRepository : aliased.getValue().entrySet()) {
+                        for (Map.Entry<String, String> alias : byRepository.getValue().entrySet()) {
+                            String named = pins.getOrDefault(byRepository.getKey(), Collections.emptyNavigableMap())
+                                    .get(alias.getKey());
+                            if (named != null) {
+                                pins.get(byRepository.getKey()).remove(alias.getKey());
+                                if (named.strip().contains(" ")
+                                        || !bomTokens.containsKey("entry/" + aliased.getKey() + "/maven/" + alias.getValue())) {
+                                    pins.computeIfAbsent("maven", _ -> new LinkedHashMap<>())
+                                            .putIfAbsent(alias.getValue(), named);
+                                }
+                            }
+                            String target = alias.getValue();
+                            for (SequencedMap<String, SequencedMap<String, String>> scoped
+                                    : requires.getOrDefault(aliased.getKey(), Collections.emptyNavigableMap()).values()) {
+                                String value = scoped.getOrDefault(byRepository.getKey(), Collections.emptyNavigableMap())
+                                        .get(alias.getKey());
+                                if (value != null) {
+                                    scoped.get(byRepository.getKey()).remove(alias.getKey());
+                                    if (scoped.get(byRepository.getKey()).isEmpty()) {
+                                        scoped.remove(byRepository.getKey());
+                                    }
+                                    scoped.computeIfAbsent("maven", _ -> new LinkedHashMap<>()).merge(target,
+                                            value,
+                                            (left, right) -> left.isEmpty() ? right : left);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             Path libs = Files.createDirectories(context.next().resolve(RESOLVED));
             SequencedMap<String, Path> previousArtifacts = new LinkedHashMap<>();
             SequencedSet<String> previousInternal = new LinkedHashSet<>(), previousSnapshots = new LinkedHashSet<>();

@@ -409,6 +409,43 @@ public class DependenciesAliasTest {
     }
 
     @Test
+    public void a_module_name_required_after_the_manifest_resolves_as_its_alias_names_it() throws IOException {
+        plainLib();
+        plainLibVersion("2.0");
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/runtime/module/toolkit.lib", "");
+        requires.store(dependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("main/module/toolkit.lib", "1.0");
+        versions.store(dependencies.resolve(BuildStep.VERSIONS));
+        SequencedProperties aliases = new SequencedProperties();
+        aliases.setProperty("main/module/toolkit.lib", "org.example/plain-lib");
+        aliases.store(dependencies.resolve(BuildStep.ALIASES));
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addSource("dependencies", dependencies);
+        executor.addModule("resolved", new Dependencies(
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
+                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))), "dependencies");
+        next = executor.execute().get("resolved");
+
+        assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
+                .as("a test framework's runner is required by module name once the module's own requirements are"
+                        + " written, and still resolves as the coordinate the module's alias names, at the version"
+                        + " it was handed, rather than through the module repository")
+                .contains("main/runtime/maven/org.example/plain-lib/1.0")
+                .noneMatch(key -> key.startsWith("main/runtime/module/"));
+        assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar")).exists();
+    }
+
+    @Test
     public void an_unpinned_alias_keeps_the_version_the_closure_already_resolved() throws IOException {
         plainLib();
         plainLibVersion("2.0");
