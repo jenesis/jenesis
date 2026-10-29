@@ -1825,6 +1825,46 @@ public class ProjectTest {
     }
 
     @Test
+    public void the_user_global_file_resolves_a_relative_path_against_its_own_folder() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), """
+                jenesis.maven.local=m2
+                jenesis.jarsigner.storepass=file secrets/storepass
+                jenesis.make.profiles=machine
+                """);
+        Files.writeString(home.resolve("jenesis-machine.properties"), "jenesis.module.local=modules\n");
+        settings.put("make.global", root.resolve("home").toString());
+        Map<String, String> keys = Make.settings(root, settings).keys();
+        assertThat(keys.get("maven.local"))
+                .as("a folder the machine shares between projects means the same folder for every project")
+                .isEqualTo(home.resolve("m2").toAbsolutePath().normalize().toString());
+        assertThat(keys.get("module.local")).isEqualTo(home.resolve("modules").toAbsolutePath().normalize().toString());
+        assertThat(keys.get("jarsigner.storepass"))
+                .isEqualTo("file " + home.resolve("secrets/storepass").toAbsolutePath().normalize());
+    }
+
+    @Test
+    public void the_user_global_file_keeps_an_absolute_path() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Path repository = root.resolve("elsewhere/m2").toAbsolutePath();
+        Files.writeString(home.resolve("jenesis.properties"),
+                "jenesis.maven.local=" + repository.toString().replace('\\', '/') + "\n");
+        settings.put("make.global", root.resolve("home").toString());
+        assertThat(Path.of(Make.settings(root, settings).keys().get("maven.local"))).isEqualTo(repository);
+    }
+
+    @Test
+    public void a_relative_path_on_the_command_line_is_left_to_the_project_root() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.maven.local=m2\n");
+        settings.put("make.global", root.resolve("home").toString());
+        settings.put("maven.local", "repository");
+        assertThat(Make.settings(root, settings).keys().get("maven.local"))
+                .as("the command line outranks the user-global file, and the project resolves it against its root")
+                .isEqualTo("repository");
+    }
+
+    @Test
     public void the_layered_settings_rejects_toolchain_searchpath_in_the_project_file() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=/opt/jdks/*\n");
         assertThatThrownBy(() -> Make.settings(root, settings))
