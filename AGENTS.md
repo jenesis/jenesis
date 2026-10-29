@@ -108,11 +108,14 @@ the `jenesis.project.docker` keys that start it.
 
 **A relative path is relative to the project root**, never to the working directory, which is the daemon's own folder
 under a shared daemon and need not be the root anywhere else. `Project.ofEnvironment` resolves every setting naming a
-file or folder that is read outside a `Project` (`maven.local`, `module.local`, `openpgp.local`, `jarsigner.keystore`,
-`aot.folder`, `process.directory`, which defaults to the root) before handing the environment on, and `Make` resolves
-its own (`make.global`, `daemon.folder`) against the root it holds; a new setting naming a path joins that list in the
-same commit. A step resolves nothing against the working directory either: it reads the folders it is handed and writes
-`context.next()`.
+file or folder that is read outside a `Project` (`maven.local`, `module.local`, `openpgp.local`, `jarsigner.keystore`
+and the `file` of its passwords, `aot.folder`, `process.directory`, which defaults to the root) before handing the
+environment on, and `Make` resolves its own (`make.global`, `daemon.folder`) against the root it holds; a new setting
+naming a path joins that list in the same commit. The one exception is a path naming what the machine shares between
+projects - `maven.local`, `module.local`, `daemon.folder`, the signing key and its passwords - in
+`~/.jenesis/jenesis.properties` or a profile beside it: `Make.settings` resolves it against `~/.jenesis` as it reads the
+file, so it names one folder for every project, while the command line keeps naming the root's. A step resolves nothing
+against the working directory either: it reads the folders it is handed and writes `context.next()`.
 
 **A project's own files are untrusted.** `Make.settings` refuses, in a project's `jenesis.properties` and profiles,
 every key naming a program the build runs or a JVM's options, a credential, a cache, folder or trust root shared

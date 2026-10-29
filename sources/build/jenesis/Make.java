@@ -31,6 +31,11 @@ public final class Make {
             "jenesis.pin.file",
             "jenesis.aot.folder",
             "jenesis.process.directory");
+    private static final List<String> MACHINE = List.of("jenesis.maven.local",
+            "jenesis.module.local",
+            "jenesis.daemon.folder",
+            "jenesis.jarsigner.keystore"),
+            PASSWORDS = List.of("jenesis.jarsigner.storepass", "jenesis.jarsigner.keypass");
     private static final Set<String> PRINTING = Set.of("help", "skill", "prompt", "configuration", "properties", "--stop");
     static final List<String> CONTAINED = List.of("jenesis.project.docker",
             "jenesis.project.image",
@@ -703,7 +708,7 @@ public final class Make {
         if (user != null) {
             addProfiles(pending, home, user.getProperty("jenesis.make.profiles"));
             loadProfiles(loaded, layers, pending, home, path, true);
-            layers.add(new Layer(user, true));
+            layers.add(new Layer(anchored(user, home), true));
         }
         layers.addAll(local);
         SequencedSet<Path> profiles = new LinkedHashSet<>();
@@ -781,8 +786,25 @@ public final class Make {
             Properties properties = read(file);
             requireApplicable(root, file, properties, trusted);
             addProfiles(pending, base, properties.getProperty("jenesis.make.profiles"));
-            layers.add(new Layer(properties, trusted));
+            layers.add(new Layer(trusted ? anchored(properties, base) : properties, trusted));
         }
+    }
+
+    private static Properties anchored(Properties properties, Path folder) {
+        for (String key : MACHINE) {
+            String value = properties.getProperty(key);
+            if (value != null && !value.isBlank()) {
+                properties.setProperty(key, folder.resolve(value.strip()).normalize().toString());
+            }
+        }
+        for (String key : PASSWORDS) {
+            String value = properties.getProperty(key);
+            String[] words = value == null ? new String[0] : value.strip().split("\\s+", 2);
+            if (words.length == 2 && words[0].equals("file")) {
+                properties.setProperty(key, "file " + folder.resolve(words[1].strip()).normalize());
+            }
+        }
+        return properties;
     }
 
     private static void requireApplicable(Path root, Path file, Properties properties, boolean trusted) {

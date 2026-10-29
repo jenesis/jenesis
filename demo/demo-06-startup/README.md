@@ -77,7 +77,9 @@ under its daemon.
 A shared daemon runs in a folder of its own rather than in any project, so
 nothing depends on the folder a build was started from: a relative path in a
 setting - `-Djenesis.maven.local=m2`, a key store, a folder to publish to - names
-a path relative to the project root, with or without a daemon, and every process
+a path relative to the project root, with or without a daemon (a local repository,
+a daemon folder or a key store your own `~/.jenesis/jenesis.properties` names is
+relative to `~/.jenesis` instead, the same folder for every project), and every process
 the build starts, a test JVM or a warm tool, runs in the project's root
 (`jenesis.process.directory` names another folder of the project). A plugin reads
 and writes the folders it is handed rather than resolving a path against the
