@@ -76,6 +76,52 @@ public class JenesisModuleRepositoryTest {
     }
 
     @Test
+    public void keeps_a_versioned_item_in_the_local_module_folder_for_an_offline_build() throws IOException {
+        settings.put("repository.insecure", "true");
+        List<String> requested = new ArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            requested.add(exchange.getRequestURI().getPath());
+            byte[] body = "<project/>".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+        server.start();
+        try {
+            settings.put("module.uri", "http://localhost:" + server.getAddress().getPort() + "/");
+            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings),
+                            JenesisRepository.Scope.ARTIFACT)
+                    .fetch(Runnable::run, "sample.lib/1.0:pom")
+                    .orElseThrow();
+            assertThat(read(item)).isEqualTo("<project/>");
+        } finally {
+            server.stop(0);
+            settings.remove("module.uri");
+        }
+        assertThat(root.resolve("home/sample.lib/1.0/sample.lib.pom"))
+                .as("what the module index answers for a version is kept where the local module folder serves it")
+                .hasContent("<project/>");
+        settings.put("module.uri", "http://localhost:" + server.getAddress().getPort() + "/");
+        settings.put("repository.offline", "true");
+        try {
+            RepositoryItem offline = JenesisModuleRepository.ofEnvironment(new Environment(settings),
+                            JenesisRepository.Scope.ARTIFACT)
+                    .fetch(Runnable::run, "sample.lib/1.0:pom")
+                    .orElseThrow();
+            assertThat(read(offline))
+                    .as("a later build finds the module by its name without asking the index again")
+                    .isEqualTo("<project/>");
+            assertThat(requested).containsExactly("/artifact/sample.lib/1.0/sample.lib.pom");
+        } finally {
+            settings.remove("module.uri");
+            settings.remove("repository.offline");
+            settings.remove("repository.insecure");
+        }
+    }
+
+    @Test
     public void network_item_can_be_read_more_than_once() throws IOException {
         settings.put("repository.insecure", "true");
         HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
