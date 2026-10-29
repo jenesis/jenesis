@@ -1876,7 +1876,7 @@ public class ProjectTest {
 
     @Test
     public void the_toolchain_refuses_a_searchpath_the_project_file_names() throws IOException {
-        Files.writeString(root.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=/opt/jdks/*\n");
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=~/.jdks/*\n");
         assertThatThrownBy(() -> Toolchain.ofKeys(Make.settings(root, settings).keys()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.toolchain.searchpath cannot be set in a file the project provides");
@@ -1895,10 +1895,10 @@ public class ProjectTest {
     @Test
     public void the_toolchain_takes_a_searchpath_the_user_global_file_names() throws IOException {
         Path home = Files.createDirectories(root.resolve("home/.jenesis"));
-        Files.writeString(home.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=/opt/jdks/*\n");
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=~/.jdks/*\n");
         settings.put("make.global", root.resolve("home").toString());
         Map<String, String> keys = Make.settings(root, settings).keys();
-        assertThat(keys.get("toolchain.searchpath")).isEqualTo("/opt/jdks/*");
+        assertThat(keys.get("toolchain.searchpath")).isEqualTo("~/.jdks/*");
         assertThat(Toolchain.ofKeys(keys)).isNotNull();
     }
 
