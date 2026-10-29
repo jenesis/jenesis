@@ -2182,11 +2182,15 @@ public record Project(
                           Both forms may cover one coordinate, and each is then verified against
                           whatever it publishes; a coordinate covered only by an identity forks no
                           gpg at all, since the whole check is JDK cryptography in process.
-                      @jenesis.alias <module> <groupId>/<artifactId>[/<type>]
-                          Require a Maven artifact under a stable module name, so a non-modular jar
-                          needs no derived automatic name. It names no classifier: a pin of the
-                          artifact, @jenesis.pin <groupId>/<artifactId> :<classifier>[:<version>],
-                          selects one. Carries no version: a pin or BOM entry
+                      @jenesis.alias <module> <groupId>/<artifactId>
+                      @jenesis.alias <module> <repository>/<coordinate>
+                          Require an artifact under a stable module name, so a non-modular jar
+                          needs no derived automatic name. A target with one slash is a Maven
+                          artifact, as maven/<groupId>/<artifactId> is; with more, its first segment
+                          names the repository it resolves from, maven/<groupId>/<artifactId>/<type>
+                          for a type, and a repository a program configures by its name. It names no
+                          classifier: a pin of the artifact, @jenesis.pin <groupId>/<artifactId>
+                          :<classifier>[:<version>], selects one. Carries no version: a pin or BOM entry
                           states it and is the place for a checksum; failing that the version the
                           closure already resolves is kept, and only a coordinate nothing else pulls
                           in is negotiated as LATEST. It also names the artifact a `requires` takes,

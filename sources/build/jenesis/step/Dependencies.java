@@ -478,6 +478,7 @@ public class Dependencies implements BuildExecutorModule {
                 managedExclusions.keySet().retainAll(Set.of(group));
                 versions.keySet().retainAll(Set.of(group));
             }
+            SequencedMap<String, Alias> aliasTargets = new LinkedHashMap<>();
             for (Map.Entry<String, SequencedMap<String, SequencedMap<String, String>>> aliased : moduleAliases.entrySet()) {
                 SequencedMap<String, SequencedMap<String, String>> pins = versions.getOrDefault(aliased.getKey(),
                         Collections.emptyNavigableMap());
@@ -486,9 +487,7 @@ public class Dependencies implements BuildExecutorModule {
                         int slash = alias.getValue().indexOf('/');
                         String repository = alias.getValue().substring(0, slash),
                                 target = alias.getValue().substring(slash + 1);
-                        if (resolvers.get(Resolver.base(repository)) == null) {
-                            continue;
-                        }
+                        merge(aliasTargets, alias.getKey(), target, LOCAL);
                         String named = pins.getOrDefault(byRepository.getKey(), Collections.emptyNavigableMap())
                                 .get(alias.getKey());
                         if (named != null) {
@@ -753,15 +752,6 @@ public class Dependencies implements BuildExecutorModule {
             }
             SequencedProperties resolved = new SequencedProperties();
             SequencedMap<String, Resolver.Resolved> materialized = new LinkedHashMap<>();
-            SequencedMap<String, Alias> aliasTargets = new LinkedHashMap<>();
-            for (SequencedMap<String, SequencedMap<String, String>> byRepository : moduleAliases.values()) {
-                for (SequencedMap<String, String> byAlias : byRepository.values()) {
-                    byAlias.forEach((alias, token) -> merge(aliasTargets,
-                            alias,
-                            token.substring(token.indexOf('/') + 1),
-                            LOCAL));
-                }
-            }
             SequencedMap<String, Overridden> overrideTargets = new LinkedHashMap<>();
             for (SequencedMap<String, SequencedMap<String, String>> byRepository : moduleOverrides.values()) {
                 for (SequencedMap<String, String> byModule : byRepository.values()) {

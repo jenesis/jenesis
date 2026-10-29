@@ -169,7 +169,8 @@ public class ModuleInfoParserTest {
                 /**
                  * @jenesis.alias toolkit.lib org.example/plain-lib
                  * @jenesis.alias   other.lib   org.example/other-lib \s
-                 * @jenesis.alias pom.lib org.example/plain-pom/pom
+                 * @jenesis.alias pom.lib maven/org.example/plain-pom/pom
+                 * @jenesis.alias internal.lib internal/org.example/internal-lib
                  */
                 module foo {
                     requires toolkit.lib;
@@ -177,16 +178,33 @@ public class ModuleInfoParserTest {
                 """);
         ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
         assertThat(info.aliases())
-                .containsEntry("toolkit.lib", "org.example/plain-lib")
-                .containsEntry("other.lib", "org.example/other-lib")
-                .containsEntry("pom.lib", "org.example/plain-pom/pom");
+                .as("one slash names a Maven artifact, more name the repository first")
+                .containsEntry("toolkit.lib", "maven/org.example/plain-lib")
+                .containsEntry("other.lib", "maven/org.example/other-lib")
+                .containsEntry("pom.lib", "maven/org.example/plain-pom/pom")
+                .containsEntry("internal.lib", "internal/org.example/internal-lib");
+    }
+
+    @Test
+    public void refuses_an_alias_with_a_type_that_names_no_repository() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias pom.lib org.example/plain-pom/pom
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("org.example reads as a repository")
+                .hasMessageContaining("maven/org.example/plain-pom/pom");
     }
 
     @Test
     public void refuses_an_alias_that_names_a_classifier_naming_the_pin_that_selects_one() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
-                 * @jenesis.alias natives.lib org.example/native-lib/jar/linux
+                 * @jenesis.alias natives.lib maven/org.example/native-lib/jar/linux
                  */
                 module foo {
                     requires natives.lib;
@@ -194,7 +212,7 @@ public class ModuleInfoParserTest {
                 """);
         assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("@jenesis.alias natives.lib org.example/native-lib")
+                .hasMessageContaining("@jenesis.alias natives.lib org.example/native-lib and")
                 .hasMessageContaining("@jenesis.pin org.example/native-lib :linux[:<version>]");
     }
 
@@ -472,7 +490,7 @@ public class ModuleInfoParserTest {
                 .as("only a module of the running JDK is a platform module, whatever its name starts with")
                 .containsExactly("java.money", "jdk.example.library");
         assertThat(info.runtimeRequires()).containsExactly("jdk.example.library");
-        assertThat(info.aliases()).containsEntry("java.money", "javax.money/money-api");
+        assertThat(info.aliases()).containsEntry("java.money", "maven/javax.money/money-api");
     }
 
     @Test

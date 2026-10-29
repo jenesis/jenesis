@@ -583,7 +583,7 @@ public class MavenProject implements BuildExecutorModule {
                                 for (String entry : aliased) {
                                     int split = entry.indexOf('=');
                                     aliases.setProperty(group + "/module/" + entry.substring(0, split),
-                                            "maven/" + entry.substring(split + 1));
+                                            entry.substring(split + 1));
                                 }
                                 aliases.store(context.next().resolve(BuildStep.ALIASES));
                             }
@@ -596,7 +596,10 @@ public class MavenProject implements BuildExecutorModule {
                                     manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, named);
                                 }
                                 if (!aliased.isEmpty()) {
-                                    manifest.getMainAttributes().putValue(PathPlacement.ALIASES, String.join(",", aliased));
+                                    manifest.getMainAttributes().putValue(PathPlacement.ALIASES, aliased.stream()
+                                            .map(entry -> entry.substring(0, entry.indexOf('=') + 1)
+                                                    + entry.substring(entry.indexOf('/', entry.indexOf('=')) + 1))
+                                            .collect(Collectors.joining(",")));
                                 }
                                 if (preview) {
                                     manifest.getMainAttributes().putValue(PathPlacement.PREVIEW,
@@ -1317,7 +1320,7 @@ public class MavenProject implements BuildExecutorModule {
             if (!test && value.dependencies() != null) {
                 Map<Boolean, Set<String>> tokens = value.dependencies().entrySet().stream()
                         .collect(Collectors.partitioningBy(dep -> dep.getValue().scope() == MavenDependencyScope.TEST,
-                                Collectors.mapping(dep -> dep.getKey().coordinate(null, null), Collectors.toSet())));
+                                Collectors.mapping(dep -> dep.getKey().coordinate("maven", null), Collectors.toSet())));
                 aliases.values().removeIf(token -> tokens.get(true).contains(token) && !tokens.get(false).contains(token));
             }
             if (!aliases.isEmpty()) {

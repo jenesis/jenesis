@@ -16,6 +16,7 @@ import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.module.ModuleInfoParser;
 import build.jenesis.step.Dependencies;
 
 public class MavenPomResolver implements MavenResolver {
@@ -1896,7 +1897,8 @@ public class MavenPomResolver implements MavenResolver {
                         if (words.length != 2) {
                             throw new IllegalArgumentException("Malformed jenesis.alias declaration '"
                                     + declaration
-                                    + "': expected <module> <groupId>/<artifactId>[/<type>[/<classifier>]]."
+                                    + "': expected <module> <groupId>/<artifactId>"
+                                    + " or <module> <repository>/<coordinate>."
                                     + " Every line inside a jenesis.alias comment is a declaration of its own,"
                                     + " so prose written among them is read as one; move it outside the comment");
                         }
@@ -1905,22 +1907,15 @@ public class MavenPomResolver implements MavenResolver {
                                     + words[0]
                                     + "': expected the name of a module that is not a platform module");
                         }
-                        String[] segments = words[1].split("/", -1);
-                        if (segments.length < 2
-                                || segments.length > 4
-                                || Arrays.stream(segments).anyMatch(String::isEmpty)) {
-                            throw new IllegalArgumentException("Malformed jenesis.alias target '"
-                                    + words[1]
-                                    + "': expected <groupId>/<artifactId>[/<type>[/<classifier>]]");
-                        }
-                        String previous = entries.putIfAbsent(words[0], words[1]);
-                        if (previous != null && !previous.equals(words[1])) {
+                        String target = ModuleInfoParser.alias("jenesis.alias", words[0], words[1], true);
+                        String previous = entries.putIfAbsent(words[0], target);
+                        if (previous != null && !previous.equals(target)) {
                             throw new IllegalArgumentException("Duplicate jenesis.alias for "
                                     + words[0]
                                     + ": "
                                     + previous
                                     + " and "
-                                    + words[1]);
+                                    + target);
                         }
                     }
                 });
