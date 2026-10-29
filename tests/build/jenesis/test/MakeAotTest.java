@@ -59,11 +59,12 @@ public class MakeAotTest {
     }
 
     @Test
-    public void hands_the_tools_the_cache_folder_a_setting_names_relative_to_the_project() throws Exception {
+    public void hands_the_tools_the_cache_folder_a_command_line_names_relative_to_its_working_directory() throws Exception {
         Path folder = aotFolder(make(classPath(), List.of("-Djenesis.aot.folder=caches"), "configuration"));
         assertThat(folder.getFileName()).hasToString("caches");
         assertThat(Files.isSameFile(folder.getParent(), root))
-                .as("a relative folder is resolved against the project root, not " + folder)
+                .as("a relative folder on a command line is resolved against the folder the command runs in,"
+                        + " the project root here, not " + folder)
                 .isTrue();
     }
 

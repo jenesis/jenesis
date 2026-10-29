@@ -1854,17 +1854,6 @@ public class ProjectTest {
     }
 
     @Test
-    public void a_relative_path_on_the_command_line_is_left_to_the_project_root() throws IOException {
-        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
-        Files.writeString(home.resolve("jenesis.properties"), "jenesis.maven.local=m2\n");
-        settings.put("make.global", root.resolve("home").toString());
-        settings.put("maven.local", "repository");
-        assertThat(Make.settings(root, settings).keys().get("maven.local"))
-                .as("the command line outranks the user-global file, and the project resolves it against its root")
-                .isEqualTo("repository");
-    }
-
-    @Test
     public void the_layered_settings_rejects_toolchain_searchpath_in_the_project_file() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=/opt/jdks/*\n");
         assertThatThrownBy(() -> Make.settings(root, settings))

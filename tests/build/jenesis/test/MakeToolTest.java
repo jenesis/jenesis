@@ -36,6 +36,40 @@ public class MakeToolTest {
     }
 
     @Test
+    public void resolves_a_relative_path_of_its_command_line_against_the_working_directory() throws IOException {
+        Files.writeString(root.resolve("module-info.java"), "module foo {}");
+        StringWriter out = new StringWriter(), err = new StringWriter();
+        int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out), new PrintWriter(err),
+                "-Djenesis.make.root=" + root,
+                "-Djenesis.project.artifacts=artifacts",
+                "-Djenesis.project.target=out",
+                "-Djenesis.print.progress=false",
+                "configuration");
+        assertThat(code).as(err.toString()).isEqualTo(0);
+        assertThat(out.toString())
+                .as("a path typed on a command line names a folder below the one the command runs in, as it does"
+                        + " for every other program, whichever project root the build is handed")
+                .contains("jenesis.project.artifacts=" + Path.of("artifacts").toAbsolutePath())
+                .contains("jenesis.project.target=" + Path.of("out").toAbsolutePath());
+    }
+
+    @Test
+    public void resolves_a_relative_path_of_the_project_s_file_against_its_root() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module foo {}");
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.target=out\n");
+        StringWriter out = new StringWriter(), err = new StringWriter();
+        int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out),
+                new PrintWriter(err),
+                "-Djenesis.make.root=" + root,
+                "-Djenesis.print.progress=false");
+        assertThat(code).as(out + "\n" + err).isEqualTo(0);
+        assertThat(root.resolve("out"))
+                .as("a project's own file names a folder of the project, whichever folder the build runs in")
+                .isDirectory();
+        assertThat(Path.of("out")).doesNotExist();
+    }
+
+    @Test
     public void builds_into_the_target_folder_of_the_root_it_is_given() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module foo {}");
         StringWriter out = new StringWriter(), err = new StringWriter();
