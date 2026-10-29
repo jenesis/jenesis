@@ -326,7 +326,7 @@ public class ModularProjectTest {
         Path aliasesFile = module.resolve(BuildStep.ALIASES);
         assertThat(aliasesFile).exists();
         assertThat(SequencedProperties.ofFiles(aliasesFile)).containsOnly(
-                Map.entry("main/module/toolkit.lib", "org.example/plain-lib"));
+                Map.entry("main/module/toolkit.lib", "maven/org.example/plain-lib"));
         assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.VERSIONS)))
                 .as("the alias states no version, so the pin is the only place one can come from")
                 .containsOnly(Map.entry("main/maven/org.example/plain-lib", "1.0 SHA-256/cafebabe"));
@@ -499,7 +499,7 @@ public class ModularProjectTest {
                 .containsOnly(Map.entry("main/compile/maven/org.example/native-lib/jar/linux", ""),
                         Map.entry("main/runtime/maven/org.example/native-lib/jar/linux", ""));
         assertThat(SequencedProperties.ofFiles(manifests.resolve(BuildStep.ALIASES)))
-                .containsOnly(Map.entry("main/module/natives.lib", "org.example/native-lib/jar/linux"));
+                .containsOnly(Map.entry("main/module/natives.lib", "maven/org.example/native-lib/jar/linux"));
     }
 
     @Test

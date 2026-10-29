@@ -2,7 +2,7 @@ package build.jenesis.step;
 
 import module java.base;
 import build.jenesis.Environment;
-import build.jenesis.Make.Setting;
+import build.jenesis.Environment.Setting;
 import build.jenesis.SequencedProperties;
 import build.jenesis.daemon.Worker;
 

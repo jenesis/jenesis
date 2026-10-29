@@ -944,7 +944,7 @@ public class ExternalModuleTest {
                                                               Map<String, Repository> repositories,
                                                               Map<String, Resolver> resolvers) throws IOException {
                                 String text = properties.get("greeting")
-                                        + " " + environment.value("sample.name", build.jenesis.Make.Setting.PROJECT)
+                                        + " " + environment.value("sample.name", build.jenesis.Environment.Setting.PROJECT)
                                         + " " + (permits instanceof build.jenesis.Permits.Counted counted
                                                 ? counted.semaphore().availablePermits()
                                                 : -1)

@@ -419,7 +419,7 @@ public class DependenciesAliasTest {
         versions.setProperty("main/module/toolkit.lib", "1.0");
         versions.store(dependencies.resolve(BuildStep.VERSIONS));
         SequencedProperties aliases = new SequencedProperties();
-        aliases.setProperty("main/module/toolkit.lib", "org.example/plain-lib");
+        aliases.setProperty("main/module/toolkit.lib", "maven/org.example/plain-lib");
         aliases.store(dependencies.resolve(BuildStep.ALIASES));
         BuildExecutor executor = BuildExecutor.of(build,
                 Duration.ZERO,
@@ -550,7 +550,7 @@ public class DependenciesAliasTest {
         }
         if (!aliases.isEmpty()) {
             SequencedProperties declared = new SequencedProperties();
-            aliases.forEach((alias, token) -> declared.setProperty("main/maven/" + alias, token));
+            aliases.forEach((alias, token) -> declared.setProperty("main/maven/" + alias, "maven/" + token));
             declared.store(dependencies.resolve(BuildStep.ALIASES));
         }
         BuildExecutor executor = BuildExecutor.of(build,

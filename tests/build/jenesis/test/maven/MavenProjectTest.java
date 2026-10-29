@@ -1012,7 +1012,7 @@ public class MavenProjectTest {
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         Path manifests = results.get("maven/module-/manifests");
         assertThat(SequencedProperties.ofFiles(manifests.resolve(BuildStep.ALIASES)))
-                .containsOnly(Map.entry("main/module/jline", "jline/jline"));
+                .containsOnly(Map.entry("main/module/jline", "maven/jline/jline"));
         try (InputStream input = Files.newInputStream(manifests.resolve(Versions.MANIFEST))) {
             assertThat(new Manifest(input).getMainAttributes().getValue(PathPlacement.ALIASES))
                     .as("the jar tells a consumer which name its descriptor requires the dependency by")
@@ -1056,10 +1056,10 @@ public class MavenProjectTest {
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.ALIASES)))
                 .as("the main module does not resolve a test dependency, so an alias of one is no alias of it")
-                .containsOnly(Map.entry("main/module/jline", "jline/jline"));
+                .containsOnly(Map.entry("main/module/jline", "maven/jline/jline"));
         assertThat(SequencedProperties.ofFiles(results.get("maven/testmodule-/manifests").resolve(BuildStep.ALIASES)))
-                .containsOnly(Map.entry("main/module/truth", "com.google.truth/truth"),
-                        Map.entry("main/module/jline", "jline/jline"));
+                .containsOnly(Map.entry("main/module/truth", "maven/com.google.truth/truth"),
+                        Map.entry("main/module/jline", "maven/jline/jline"));
     }
 
     @Test

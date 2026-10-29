@@ -82,28 +82,29 @@ settings were read, and `ExternalModule` and `InternalModule`, which hand it to 
 is resolved - so neither has a public constructor. `Make`, `Toolchain` and the daemon are the process boundary and may
 use the streams.
 
-**`Make` reads the JVM once.** It copies every `jenesis.*` property when an entry point starts, lays the command
-line's `-Djenesis.*` arguments over it and hands the map down; a program of its own reads the same through
+**`Make` reads the JVM once.** It copies every `jenesis.*` property when an entry point starts, lays the command line's
+`-Djenesis.*` arguments over it and hands the map down; a program of its own reads the same through
 `Make.settings(root).keys()`. `Make.keys` is the one place the `jenesis.` prefix is spelt. A setting whose keys cannot
 be named in advance (`jenesis.platform.<token>`, `jenesis.plugin.<name>`) is found by listing the map. `Make` and
-`Toolchain` read a bare `Map<String, String>`, because `MakeClosureTest` holds each to compiling alone; `Project.perform`
-and `Project.run` take that map, so the reflective handoff names JDK types alone. A rule both sides need - how a flag
-parses, what `@<file>` expands to, who may set a setting and what its path is relative to - lives in `Make`,
-package-private, and the engine calls it (`flagOrNull` and `arguments` on `SequencedProperties`, every accessor of
-`Environment`).
+`Toolchain` read a bare `Map<String, String>`, because `MakeClosureTest` holds each to compiling alone;
+`Project.perform` and `Project.run` take that map, so the reflective handoff names JDK types alone. A rule both sides
+need - how a flag parses, what `@<file>` expands to, who may set a setting and what its path is relative to - lives in
+`Make`, package-private, and the engine calls it (`flagOrNull` and `arguments` on `SequencedProperties`, every accessor
+of `Environment`, whose `Setting` each maps onto `Make.machine`, `Make.command` and `Make.located`, as `Make` names no
+other class).
 
 **Reading a value.** The accessors are `getProperty` for the raw value, `value` for the trimmed one that reads blank as
 absent, `flag`, `flagOrNull`, `number`, `entries`, `words`, `path` for a file or folder, `located` for a path that is
 part of a value, and `variable` for a file value naming `jenesis.variable.<key>` as `@<key>`. Every accessor but
-`variable` takes a `Make.Setting` naming who may set what it reads, so that the reader, which owns the setting, decides
-it where the value is used and no list elsewhere has to know the key: `PROJECT` any file, `CONFINED` any file, a
-project's naming only a location inside the project (a folder the build writes to, read by `path` alone), `MACHINE`
-the command line and your own files alone (a credential, a program or a JVM's options, a cache, folder or trust root
-shared between projects, the signing key, a container's boundary), `COMMAND` the command line alone. A boolean is the
-default when absent, true when named with no value or `=true`, false at `=false`, and any other value is refused
-naming the valid ones; `flagOrNull` answers `null` when absence is a third state. `Boolean.getBoolean` and
-`Integer.getInteger` are not used. Environment variables are fallbacks for the repository settings
-(`MAVEN_REPOSITORY_URI`, `JENESIS_REPOSITORY_TOKEN`, …) and the toolchain installer alone.
+`variable` takes an `Environment.Setting` naming who may set what it reads, so that the reader, which owns the setting,
+decides it where the value is used and no list elsewhere has to know the key: `PROJECT` any file, `CONFINED` any file, a
+project's naming only a location inside the project (a folder the build writes to, read by `path` alone), `MACHINE` the
+command line and your own files alone (a credential, a program or a JVM's options, a cache, folder or trust root shared
+between projects, the signing key, a container's boundary), `COMMAND` the command line alone. A boolean is the default
+when absent, true when named with no value or `=true`, false at `=false`, and any other value is refused naming the
+valid ones; `flagOrNull` answers `null` when absence is a third state. `Boolean.getBoolean` and `Integer.getInteger` are
+not used. Environment variables are fallbacks for the repository settings (`MAVEN_REPOSITORY_URI`,
+`JENESIS_REPOSITORY_TOKEN`, …) and the toolchain installer alone.
 
 **Files and command lines.** `Make.settings` layers `jenesis.properties` at the project root and the profile files
 under what the entry point holds and hands the result down as one map; nothing is copied into the JVM, so two builds

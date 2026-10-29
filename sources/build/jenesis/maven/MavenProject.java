@@ -1,7 +1,7 @@
 package build.jenesis.maven;
 
 import module java.base;
-import build.jenesis.Make.Setting;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Pinning;
 import module java.xml;
 import build.jenesis.BuildExecutor;
@@ -583,7 +583,7 @@ public class MavenProject implements BuildExecutorModule {
                                 for (String entry : aliased) {
                                     int split = entry.indexOf('=');
                                     aliases.setProperty(group + "/module/" + entry.substring(0, split),
-                                            entry.substring(split + 1));
+                                            "maven/" + entry.substring(split + 1));
                                 }
                                 aliases.store(context.next().resolve(BuildStep.ALIASES));
                             }

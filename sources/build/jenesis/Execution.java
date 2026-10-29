@@ -1,7 +1,7 @@
 package build.jenesis;
 
 import module java.base;
-import build.jenesis.Make.Setting;
+import build.jenesis.Environment.Setting;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Layers;

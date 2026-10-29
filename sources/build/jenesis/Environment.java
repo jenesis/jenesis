@@ -30,64 +30,75 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
         return new Environment(keys, out, err, root);
     }
 
-    public String getProperty(String key, Make.Setting setting) {
-        return Make.setting(keys, key, unconfined(key, setting));
+    public enum Setting {
+
+        PROJECT, CONFINED, MACHINE, COMMAND
     }
 
-    public String getProperty(String key, String defaultValue, Make.Setting setting) {
+    public String getProperty(String key, Setting setting) {
+        if (setting == Setting.CONFINED) {
+            throw new IllegalArgumentException("jenesis." + key + " is read as a value, but only a location can be"
+                    + " confined to the project - read it with path or located");
+        }
+        return read(key, setting);
+    }
+
+    public String getProperty(String key, String defaultValue, Setting setting) {
         String value = getProperty(key, setting);
         return value == null ? defaultValue : value;
     }
 
-    public String value(String key, Make.Setting setting) {
+    public String value(String key, Setting setting) {
         return trimmed(getProperty(key, setting));
     }
 
-    public String value(String key, String defaultValue, Make.Setting setting) {
+    public String value(String key, String defaultValue, Setting setting) {
         String value = value(key, setting);
         return value == null ? defaultValue : value;
     }
 
-    public Path path(String key, Make.Setting setting) {
+    public Path path(String key, Setting setting) {
         return path(key, null, setting);
     }
 
-    public Path path(String key, String defaultValue, Make.Setting setting) {
-        return Make.path(keys, root, key, defaultValue, setting);
+    public Path path(String key, String defaultValue, Setting setting) {
+        read(key, setting);
+        return Make.path(keys, root, key, defaultValue, setting == Setting.CONFINED, setting == Setting.MACHINE);
     }
 
-    public Path located(String key, String part, Make.Setting setting) {
-        return Make.located(keys, root, key, part, setting);
+    public Path located(String key, String part, Setting setting) {
+        read(key, setting);
+        return Make.located(keys, root, key, part, setting == Setting.CONFINED, setting == Setting.MACHINE);
     }
 
     public boolean provided(String key) {
         return Make.listed(keys, "make.provided", key);
     }
 
-    public boolean flag(String key, Make.Setting setting) {
+    public boolean flag(String key, Setting setting) {
         return flag(key, false, setting);
     }
 
-    public boolean flag(String key, boolean defaultValue, Make.Setting setting) {
+    public boolean flag(String key, boolean defaultValue, Setting setting) {
         Boolean value = flagOrNull(key, setting);
         return value == null ? defaultValue : value;
     }
 
-    public Boolean flagOrNull(String key, Make.Setting setting) {
+    public Boolean flagOrNull(String key, Setting setting) {
         return Make.parsed("jenesis." + key, getProperty(key, setting));
     }
 
-    public int number(String key, int defaultValue, Make.Setting setting) {
+    public int number(String key, int defaultValue, Setting setting) {
         Integer value = numberOrNull(key, setting);
         return value == null ? defaultValue : value;
     }
 
-    public long number(String key, long defaultValue, Make.Setting setting) {
+    public long number(String key, long defaultValue, Setting setting) {
         Long value = longOrNull(key, setting);
         return value == null ? defaultValue : value;
     }
 
-    public Integer numberOrNull(String key, Make.Setting setting) {
+    public Integer numberOrNull(String key, Setting setting) {
         String value = value(key, setting);
         if (value == null) {
             return null;
@@ -100,7 +111,7 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
         }
     }
 
-    public Long longOrNull(String key, Make.Setting setting) {
+    public Long longOrNull(String key, Setting setting) {
         String value = value(key, setting);
         if (value == null) {
             return null;
@@ -113,7 +124,7 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
         }
     }
 
-    public List<String> entries(String key, Make.Setting setting) {
+    public List<String> entries(String key, Setting setting) {
         String value = value(key, setting);
         if (value == null) {
             return null;
@@ -128,7 +139,7 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
         return entries;
     }
 
-    public List<String> words(String key, Make.Setting setting) {
+    public List<String> words(String key, Setting setting) {
         String value = value(key, setting);
         return value == null ? List.of() : List.of(value.split("\\s+"));
     }
@@ -141,7 +152,7 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
         String name = value.substring(1, slash == -1 ? value.length() : slash);
         String resolved = value("variable." + name,
                 slash == -1 ? null : value.substring(slash + 1),
-                Make.Setting.PROJECT);
+                Setting.PROJECT);
         if (resolved == null) {
             throw new IllegalArgumentException(origin + " to " + value + ", but jenesis.variable." + name
                     + " is not set - set it, or give a default as @" + name + "/<default>");
@@ -149,12 +160,12 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
         return resolved;
     }
 
-    private static Make.Setting unconfined(String key, Make.Setting setting) {
-        if (setting == Make.Setting.CONFINED) {
-            throw new IllegalArgumentException("jenesis." + key + " is read as a value, but only a location can be"
-                    + " confined to the project - read it with path or located");
-        }
-        return setting;
+    private String read(String key, Setting setting) {
+        return switch (setting) {
+            case PROJECT, CONFINED -> keys.get(key);
+            case MACHINE -> Make.machine(keys, key);
+            case COMMAND -> Make.command(keys, key);
+        };
     }
 
     private static String trimmed(String value) {
