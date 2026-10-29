@@ -1,6 +1,7 @@
 package build.jenesis.module;
 
 import module java.base;
+import build.jenesis.BuildStep;
 import build.jenesis.Environment;
 import build.jenesis.Make.Setting;
 import build.jenesis.Palette;
@@ -57,10 +58,36 @@ public class JenesisModuleRepository implements JenesisRepository {
         if (repository == null) {
             throw new IllegalStateException("No Jenesis module repository is configured by: " + text);
         }
-        Path local = environment.path("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"), Setting.MACHINE);
-        return repository.prepend(ofEnvironment(environment, (local == null
-                ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
-                : local).toUri()));
+        Path configured = environment.path("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"), Setting.MACHINE);
+        Path local = configured == null ? Path.of(System.getProperty("user.home")).resolve(".jenesis") : configured;
+        JenesisRepository remote = repository;
+        JenesisRepository kept = (executor, module, classifier, version, type) -> {
+            Optional<RepositoryItem> item = remote.fetch(executor, module, classifier, version, type);
+            if (item.isEmpty() || version == null || item.get().local() || item.get().internal()) {
+                return item;
+            }
+            Path target = BuildStep.resolveContained(local, module
+                    + "/" + version
+                    + "/" + (classifier == null ? module : module + "-" + classifier) + "." + type);
+            try {
+                Files.createDirectories(target.getParent());
+            } catch (IOException _) {
+                return item;
+            }
+            if (!Files.isWritable(target.getParent())) {
+                return item;
+            }
+            Path temporary = Files.createTempFile(target.getParent(), "fetch", "." + type);
+            try (InputStream inputStream = item.get().toInputStream()) {
+                Files.copy(inputStream, temporary, StandardCopyOption.REPLACE_EXISTING);
+                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (Throwable t) {
+                Files.deleteIfExists(temporary);
+                throw t;
+            }
+            return Optional.of(RepositoryItem.ofLocalFile(target));
+        };
+        return kept.prepend(ofEnvironment(environment, local.toUri()));
     }
 
     private static JenesisRepository chain(Environment environment,
