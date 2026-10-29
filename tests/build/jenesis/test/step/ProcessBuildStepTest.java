@@ -378,10 +378,10 @@ public class ProcessBuildStepTest {
     }
 
     @Test
-    public void starts_a_tool_from_a_cache_in_the_folder_of_caches_when_the_mode_asks_for_one() {
+    public void starts_a_tool_from_a_cache_in_the_folder_of_caches_when_the_mode_asks_for_one(@TempDir Path caches) {
         ProcessBuildStep.Terms terms = ProcessBuildStep.Terms.ofEnvironment(
-                new Environment(Map.of("process.mode", "aot", "aot.folder", "/caches")), "gated");
-        assertThat(terms.aot()).isEqualTo(Path.of("/caches").toAbsolutePath());
+                new Environment(Map.of("process.mode", "aot", "aot.folder", caches.toString())), "gated");
+        assertThat(terms.aot()).isEqualTo(caches.toAbsolutePath());
         assertThat(terms.daemon()).as("a tool runs either from a cache or kept warm, never both").isFalse();
     }
 
