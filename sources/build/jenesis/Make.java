@@ -48,10 +48,10 @@ public final class Make {
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot read the properties that configure this build", e);
         }
-        classes = path(settings.keys(), root, "make.classes", ".jenesis/classes", Setting.CONFINED);
+        classes = path(settings.keys(), root, "make.classes", ".jenesis/classes", true, false);
         mode = Mode.of(settings.keys());
-        aotFolder = path(settings.keys(), root, "aot.folder", ".jenesis/aot", Setting.CONFINED);
-        String lifetime = setting(settings.keys(), "aot.lifetime", Setting.PROJECT);
+        aotFolder = path(settings.keys(), root, "aot.folder", ".jenesis/aot", true, false);
+        String lifetime = settings.keys().get("aot.lifetime");
         if (lifetime == null || lifetime.isBlank()) {
             aotLifetime = Duration.ZERO;
         } else {
@@ -70,16 +70,15 @@ public final class Make {
         SOURCE, COMPILED, AOT, DAEMON;
 
         static Mode of(Map<String, String> keys) {
-            String value = setting(keys, "make.mode", Setting.PROJECT),
-                    process = setting(keys, "process.mode", Setting.PROJECT);
+            String value = keys.get("make.mode"), process = keys.get("process.mode");
             if (value != null && !value.isBlank()) {
                 return of(value);
             }
             return process != null && !process.isBlank() && !process.trim().equalsIgnoreCase("daemon")
                     || Objects.equals(parsed("jenesis.project.docker",
-                            setting(keys, "project.docker", Setting.MACHINE)), true)
+                            machine(keys, "project.docker")), true)
                     || Objects.equals(parsed("jenesis.release.publish",
-                            setting(keys, "release.publish", Setting.COMMAND)), true)
+                            command(keys, "release.publish")), true)
                     ? COMPILED
                     : DAEMON;
         }
@@ -96,36 +95,43 @@ public final class Make {
         }
     }
 
-    public enum Setting {
-
-        PROJECT, CONFINED, MACHINE, COMMAND
-    }
-
-    static String setting(Map<String, String> keys, String key, Setting setting) {
+    static String machine(Map<String, String> keys, String key) {
         String value = keys.get(key);
-        if (value != null && setting == Setting.MACHINE && listed(keys, PROVIDED, key)) {
+        if (value != null && listed(keys, PROVIDED, key)) {
             throw new IllegalStateException("jenesis." + key + " cannot be set in a file the project provides: it"
                     + " configures what the machine running the build trusts, runs or shares between projects, so"
                     + " only the command line or your own ~/.jenesis/jenesis.properties may set it"
                     + " (pass -Djenesis." + key + " instead)");
         }
-        if (value != null
-                && setting == Setting.COMMAND
-                && (listed(keys, PROVIDED, key) || listed(keys, PERSONAL, key))) {
+        return value;
+    }
+
+    static String command(Map<String, String> keys, String key) {
+        String value = keys.get(key);
+        if (value != null && (listed(keys, PROVIDED, key) || listed(keys, PERSONAL, key))) {
             throw new IllegalStateException("jenesis." + key + " cannot be set in a file: it is what one run is"
                     + " asked to do, so only the command line may name it (pass -Djenesis." + key + " instead)");
         }
         return value;
     }
 
-    static Path path(Map<String, String> keys, Path root, String key, String defaultValue, Setting setting) {
-        String value = setting(keys, key, setting);
+    static Path path(Map<String, String> keys,
+                     Path root,
+                     String key,
+                     String defaultValue,
+                     boolean confined,
+                     boolean machine) {
+        String value = keys.get(key);
         String location = value == null || value.isBlank() ? defaultValue : value;
-        return location == null ? null : located(keys, root, key, location, setting);
+        return location == null ? null : located(keys, root, key, location, confined, machine);
     }
 
-    static Path located(Map<String, String> keys, Path root, String key, String location, Setting setting) {
-        setting(keys, key, setting);
+    static Path located(Map<String, String> keys,
+                        Path root,
+                        String key,
+                        String location,
+                        boolean confined,
+                        boolean machine) {
         if (location.contains("://")) {
             throw new IllegalArgumentException("Malformed value for jenesis." + key + ": '" + location
                     + "' (expected a path, not a URI)");
@@ -138,14 +144,14 @@ public final class Make {
                     + "' (expected a path)", e);
         }
         if (listed(keys, PROVIDED, key)) {
-            if (root == null && setting == Setting.CONFINED) {
+            if (root == null && confined) {
                 throw new IllegalStateException("jenesis." + key + " is set in a file the project provides, but the"
                         + " environment reading it names no project root to confine it to - hand the environment"
                         + " the root with root(...)");
             }
             if (root != null) {
                 Path resolved = root.resolve(path).normalize();
-                if (setting == Setting.CONFINED
+                if (confined
                         && !resolved.toAbsolutePath().normalize().startsWith(root.toAbsolutePath().normalize())) {
                     throw new IllegalStateException("jenesis." + key + " cannot name '" + location.strip() + "' in a"
                             + " file the project provides: such a file names only a location inside the project, which"
@@ -156,7 +162,7 @@ public final class Make {
             }
         } else {
             String base = listed(keys, PERSONAL, key)
-                    ? setting == Setting.MACHINE ? keys.get(HOME) : null
+                    ? machine ? keys.get(HOME) : null
                     : listed(keys, AMBIENT, key) ? keys.get(DIRECTORY) : null;
             if (base != null) {
                 return Path.of(base).resolve(path).normalize();
@@ -673,7 +679,7 @@ public final class Make {
     }
 
     private boolean tools() {
-        String process = setting(settings.keys(), "process.mode", Setting.PROJECT);
+        String process = settings.keys().get("process.mode");
         return process == null || process.isBlank() ? mode == Mode.AOT : process.trim().equalsIgnoreCase("aot");
     }
 

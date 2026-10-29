@@ -3,7 +3,7 @@ package build.jenesis.maven;
 import module java.base;
 import module java.xml;
 import build.jenesis.Environment;
-import build.jenesis.Make.Setting;
+import build.jenesis.Environment.Setting;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;

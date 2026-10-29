@@ -7,7 +7,7 @@ import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.License;
 import build.jenesis.LruCache;
-import build.jenesis.Make.Setting;
+import build.jenesis.Environment.Setting;
 import build.jenesis.ModuleGraph;
 import build.jenesis.Palette;
 import build.jenesis.PathPlacement;

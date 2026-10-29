@@ -18,7 +18,7 @@ import build.jenesis.Environment;
 import build.jenesis.Execution;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Make;
-import build.jenesis.Make.Setting;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Project;
 import build.jenesis.SequencedProperties;
 import build.jenesis.Toolchain;

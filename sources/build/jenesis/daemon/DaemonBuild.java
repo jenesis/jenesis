@@ -3,7 +3,7 @@ package build.jenesis.daemon;
 import module java.base;
 import build.jenesis.Environment;
 import build.jenesis.Make;
-import build.jenesis.Make.Setting;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Project;
 import build.jenesis.SequencedProperties;
 

@@ -3,7 +3,7 @@ package build.jenesis.module;
 import module java.base;
 import build.jenesis.Discovery;
 import build.jenesis.Environment;
-import build.jenesis.Make.Setting;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 

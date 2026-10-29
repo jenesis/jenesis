@@ -8,7 +8,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.DependencyTreeReport;
 import build.jenesis.Environment;
 import build.jenesis.License;
-import build.jenesis.Make.Setting;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Palette;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;

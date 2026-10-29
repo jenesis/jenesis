@@ -1,7 +1,7 @@
 package build.jenesis;
 
 import module java.base;
-import build.jenesis.Make.Setting;
+import build.jenesis.Environment.Setting;
 import build.jenesis.module.JenesisModuleRepository;
 import java.security.cert.CertificateException;
 

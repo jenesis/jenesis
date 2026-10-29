@@ -8,7 +8,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
-import build.jenesis.Make.Setting;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
@@ -501,7 +501,7 @@ public class ModularProject implements BuildExecutorModule {
             if (!targets.isEmpty()) {
                 SequencedProperties aliases = new SequencedProperties();
                 for (Map.Entry<String, String> entry : targets.entrySet()) {
-                    aliases.setProperty(group + "/" + prefix + "/" + entry.getKey(), entry.getValue());
+                    aliases.setProperty(group + "/" + prefix + "/" + entry.getKey(), "maven/" + entry.getValue());
                 }
                 aliases.store(context.next().resolve(BuildStep.ALIASES));
             }

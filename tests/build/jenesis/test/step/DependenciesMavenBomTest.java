@@ -296,7 +296,7 @@ public class DependenciesMavenBomTest {
         requires.setProperty("main/compile/maven/org.acme/lib", "");
         requires.store(dependencies.resolve(BuildStep.REQUIRES));
         SequencedProperties aliases = new SequencedProperties();
-        aliases.setProperty("main/module/com.acme.lib", "org.acme/lib");
+        aliases.setProperty("main/module/com.acme.lib", "maven/org.acme/lib");
         aliases.store(dependencies.resolve(BuildStep.ALIASES));
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("entry/main/module/com.acme.lib", "2.0");
@@ -306,7 +306,7 @@ public class DependenciesMavenBomTest {
                 Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)))))
                 .as("an entry under a module name sends every module importing the file to the module"
                         + " repository, which is the lookup the alias exists to replace")
-                .hasStackTraceContaining("names a module this project aliases to org.acme/lib")
+                .hasStackTraceContaining("names a module this project aliases to maven/org.acme/lib")
                 .hasStackTraceContaining("Pin the coordinate the alias names instead");
     }
 

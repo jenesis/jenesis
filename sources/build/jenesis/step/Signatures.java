@@ -6,7 +6,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.KeyExpiry;
-import build.jenesis.Make.Setting;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;

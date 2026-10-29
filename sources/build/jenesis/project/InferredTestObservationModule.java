@@ -5,7 +5,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
-import build.jenesis.Make.Setting;
+import build.jenesis.Environment.Setting;
 import build.jenesis.ObservabilityEngine;
 import build.jenesis.Observation;
 import build.jenesis.PathPlacement;
