@@ -33,8 +33,6 @@ public final class DaemonBuild {
         requested.put("jenesis.make.root", root.toString());
         requested.put("jenesis.make.mode", "daemon");
         requested.putIfAbsent("jenesis.process.mode", "daemon");
-        requested.put("jenesis.process.directory",
-                root.resolve(requested.getOrDefault("jenesis.process.directory", "")).normalize().toString());
         requested.putIfAbsent("jenesis.project.target", root.resolve("target").toString());
         requested.putIfAbsent("jenesis.project.artifacts", root.resolve(".jenesis").resolve("artifacts").toString());
         Map<String, String> keys = Make.keys(requested);
