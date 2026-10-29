@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Make.Setting;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenDefaultVersionNegotiator;
@@ -32,7 +33,8 @@ public record Jpx(Path storage,
 
     private Jpx(Environment environment, PathPlacement placement) {
         boolean modular = placement == PathPlacement.MODULE_PATH;
-        Discovery discovery = environment.flag("repository.discovery") ? Discovery.ofEnvironment(environment) : null;
+        Discovery discovery = environment.flag("repository.discovery",
+                Setting.PROJECT) ? Discovery.ofEnvironment(environment) : null;
         Repository module = JenesisRepository.ofEnvironment(environment, modular
                                                                   ? JenesisRepository.Scope.MODULE
                                                                   : JenesisRepository.Scope.ARTIFACT, discovery);

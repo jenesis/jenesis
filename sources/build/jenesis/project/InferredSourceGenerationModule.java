@@ -5,6 +5,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -73,19 +74,19 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                 location,
                 root,
                 ExternalModule.official(environment, "xjc", null, repositories, resolvers),
-                environment.flag("generate.xjc", true),
+                environment.flag("generate.xjc", true, Setting.PROJECT),
                 ExternalModule.official(environment, "protoc", null, repositories, resolvers),
-                environment.flag("generate.protoc", true),
+                environment.flag("generate.protoc", true, Setting.PROJECT),
                 ExternalModule.official(environment, "avro", null, repositories, resolvers),
-                environment.flag("generate.avro", true),
+                environment.flag("generate.avro", true, Setting.PROJECT),
                 ExternalModule.official(environment, "wsimport", null, repositories, resolvers),
-                environment.flag("generate.wsimport", true),
+                environment.flag("generate.wsimport", true, Setting.PROJECT),
                 ExternalModule.official(environment, "openapi", null, repositories, resolvers),
-                environment.flag("generate.openapi", true),
+                environment.flag("generate.openapi", true, Setting.PROJECT),
                 ExternalModule.official(environment, "antlr", null, repositories, resolvers),
-                environment.flag("generate.antlr", true),
+                environment.flag("generate.antlr", true, Setting.PROJECT),
                 ExternalModule.official(environment, "ksp", null, repositories, resolvers),
-                environment.flag("generate.ksp", true),
+                environment.flag("generate.ksp", true, Setting.PROJECT),
                 Collections.emptyNavigableMap());
     }
 

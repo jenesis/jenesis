@@ -8,6 +8,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.ObservabilityEngine;
 import build.jenesis.PathPlacement;
 import build.jenesis.Permits;
@@ -85,7 +86,7 @@ public class TestModule implements BuildExecutorModule {
                                     Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) {
         ProcessBuildStep.Terms terms = ProcessBuildStep.Terms.ofEnvironment(environment, "tests");
-        int concurrency = environment.number("test.concurrency", 0);
+        int concurrency = environment.number("test.concurrency", 0, Setting.PROJECT);
         if (concurrency < 0) {
             throw new IllegalArgumentException("jenesis.test.concurrency is " + concurrency
                     + ", but names how many test runs execute at once: 0 or more, 0 bounding them by"
@@ -99,24 +100,24 @@ public class TestModule implements BuildExecutorModule {
                 null,
                 resolvers,
                 Dependencies.ofEnvironment(environment, repositories, resolvers),
-                environment.flag("test.jars", true),
+                environment.flag("test.jars", true, Setting.PROJECT),
                 true,
                 null,
                 PathPlacement.CLASS_PATH,
                 null,
-                environment.getProperty("test.filter"),
-                environment.getProperty("test.exclude"),
-                environment.getProperty("test.tag"),
+                environment.getProperty("test.filter", Setting.PROJECT),
+                environment.getProperty("test.exclude", Setting.PROJECT),
+                environment.getProperty("test.tag", Setting.PROJECT),
                 null,
                 List.of(),
-                environment.flag("test.force"),
-                environment.flag("test.parallel"),
-                environment.flag("test.reporting"),
+                environment.flag("test.force", Setting.PROJECT),
+                environment.flag("test.parallel", Setting.PROJECT),
+                environment.flag("test.reporting", Setting.PROJECT),
                 "main",
                 List.of(),
-                incrementalDigest(environment.getProperty("test.incremental")),
+                incrementalDigest(environment.getProperty("test.incremental", Setting.PROJECT)),
                 terms,
-                environment.flag("test.skip"));
+                environment.flag("test.skip", Setting.PROJECT));
     }
 
     private static String incrementalDigest(String property) {

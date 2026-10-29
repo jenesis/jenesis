@@ -8,6 +8,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.License;
+import build.jenesis.Make.Setting;
 import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
@@ -316,7 +317,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 frameworks = hooks.getOrDefault("test", none),
                 languages = hooks.getOrDefault("language", none);
         Classifiers classifiers = Classifiers.configured(descriptor.configuration(), descriptor.location(), descriptor.root());
-        Sbom sbom = environment.flag("sbom.cyclonedx", true)
+        Sbom sbom = environment.flag("sbom.cyclonedx", true, Setting.PROJECT)
                 ? Sbom.configured(BuildStep.locate(descriptor.configuration(), "sbom.properties"))
                 : null;
         AssemblyDescriptor assembly = AssemblyDescriptor.of((sub, outerInherited) -> {
@@ -328,7 +329,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             sub.addStep("prepare",
                     new Prepare(descriptor.pathPlacement(),
                             packaging.stage(),
-                            environment.flag("stage.tests"),
+                            environment.flag("stage.tests", Setting.PROJECT),
                             List.copyOf(packaging.formats()),
                             List.copyOf(descriptor.manifests()),
                             overrides,
@@ -399,7 +400,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         InferredTestObservationModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
                                 .pinning(descriptor.pinning())
                                 .pathPlacement(descriptor.pathPlacement())
-                                .untested(environment.flag("test.jars", true)
+                                .untested(environment.flag("test.jars", true, Setting.PROJECT)
                                         ? Collections.emptyNavigableSet()
                                         : new LinkedHashSet<>(List.of("binary/" + JavaToolchainModule.ARTIFACTS)))
                                 .custom(hooks.getOrDefault("observed", none))
@@ -624,7 +625,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         images.add("native-image");
                     } else {
                         sub.addStep("native-sbom",
-                                sbom.type("application").graalvmLicense(environment.value("graalvm.license")),
+                                sbom.type("application").graalvmLicense(environment.value("graalvm.license",
+                                        Setting.PROJECT)),
                                 Stream.concat(described.stream(), Stream.of("native-image")));
                         sub.addStep("native", new Described(), "native-image", "native-sbom");
                         images.add("native");

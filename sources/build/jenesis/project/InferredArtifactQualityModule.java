@@ -5,6 +5,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -38,9 +39,9 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
                                                               Map<String, Resolver> resolvers) {
         return new InferredArtifactQualityModule(configuration,
                 ExternalModule.official(environment, "japicmp", null, repositories, resolvers),
-                environment.flag("artifact.japicmp", true),
+                environment.flag("artifact.japicmp", true, Setting.PROJECT),
                 ExternalModule.official(environment, "revapi", null, repositories, resolvers),
-                environment.flag("artifact.revapi", true),
+                environment.flag("artifact.revapi", true, Setting.PROJECT),
                 Collections.emptyNavigableMap());
     }
 

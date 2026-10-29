@@ -3,6 +3,7 @@ package build.jenesis.maven;
 import module java.base;
 import module java.xml;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;
@@ -29,7 +30,9 @@ public class MavenModuleRepository implements JenesisRepository {
     }
 
     public static MavenModuleRepository ofEnvironment(Environment environment, MavenRepository repository) {
-        return new MavenModuleRepository(repository).segments(environment.number("maven.segments", DEFAULT_SEGMENTS));
+        return new MavenModuleRepository(repository).segments(environment.number("maven.segments",
+                DEFAULT_SEGMENTS,
+                Setting.PROJECT));
     }
 
     private MavenModuleRepository(MavenRepository repository,

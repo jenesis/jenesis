@@ -6,6 +6,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.KeyExpiry;
+import build.jenesis.Make.Setting;
 import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -48,19 +49,19 @@ public class Signatures extends ProcessBuildStep {
         Signatures signatures = new Signatures(repositories)
                 .verification(Verification.ofEnvironment(environment))
                 .expiry(KeyExpiry.ofEnvironment(environment));
-        String command = environment.getProperty("openpgp.command");
+        String command = environment.getProperty("openpgp.command", Setting.MACHINE);
         if (command != null) {
             signatures = signatures.command(command);
         }
-        String issuers = environment.getProperty("sigstore.issuers");
+        String issuers = environment.getProperty("sigstore.issuers", Setting.MACHINE);
         if (issuers != null) {
             signatures = signatures.issuers(issuers);
         }
-        String sigstore = environment.getProperty("sigstore.uri");
+        String sigstore = environment.getProperty("sigstore.uri", Setting.MACHINE);
         if (sigstore != null) {
             signatures = signatures.trustedRoot(URI.create(sigstore));
         }
-        Boolean print = environment.flagOrNull("print.signatures");
+        Boolean print = environment.flagOrNull("print.signatures", Setting.PROJECT);
         return print == null || !print ? signatures : signatures.printing(environment.out(), Palette.ofEnvironment(environment));
     }
 

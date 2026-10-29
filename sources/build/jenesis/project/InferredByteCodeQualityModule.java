@@ -5,6 +5,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -51,14 +52,14 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 JDeprScanModule.ofEnvironment(environment),
                 value -> value,
                 ExternalModule.official(environment, "spotbugs", null, repositories, resolvers),
-                environment.flag("validate.spotbugs", true),
+                environment.flag("validate.spotbugs", true, Setting.PROJECT),
                 ExternalModule.official(environment, "forbiddenapis", null, repositories, resolvers),
-                environment.flag("validate.forbiddenapis", true),
+                environment.flag("validate.forbiddenapis", true, Setting.PROJECT),
                 Collections.emptyNavigableMap());
-        if (!environment.flag("validate.jdeps", true)) {
+        if (!environment.flag("validate.jdeps", true, Setting.PROJECT)) {
             module = module.jdeps(null);
         }
-        if (!environment.flag("validate.jdeprscan", true)) {
+        if (!environment.flag("validate.jdeprscan", true, Setting.PROJECT)) {
             module = module.jdeprscan(null);
         }
         return module;

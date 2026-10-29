@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Make.Setting;
 
 @FunctionalInterface
 public interface BuildStep extends Serializable {
@@ -147,7 +148,7 @@ public interface BuildStep extends Serializable {
     }
 
     static OffsetDateTime timestamp(Environment environment) {
-        String value = environment.getProperty("archive.timestamp", "1980-02-01T00:00:00Z");
+        String value = environment.getProperty("archive.timestamp", "1980-02-01T00:00:00Z", Setting.PROJECT);
         if (value.isBlank()) {
             return null;
         }

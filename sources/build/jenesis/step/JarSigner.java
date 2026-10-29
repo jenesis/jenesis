@@ -5,6 +5,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.SequencedProperties;
 
 public class JarSigner extends ProcessBuildStep {
@@ -30,11 +31,11 @@ public class JarSigner extends ProcessBuildStep {
                 null,
                 List.of(),
                 Terms.ofEnvironment(environment, "jarsigner"));
-        Path keystore = environment.path("jarsigner.keystore");
+        Path keystore = environment.path("jarsigner.keystore", Setting.MACHINE);
         if (keystore != null) {
             signer = signer.keystore(keystore.toString());
         }
-        String alias = environment.getProperty("jarsigner.alias");
+        String alias = environment.getProperty("jarsigner.alias", Setting.MACHINE);
         if (alias != null) {
             signer = signer.alias(alias);
         }
@@ -46,15 +47,15 @@ public class JarSigner extends ProcessBuildStep {
         if (keypass != null) {
             signer = signer.keypass(keypass);
         }
-        String storetype = environment.getProperty("jarsigner.storetype");
+        String storetype = environment.getProperty("jarsigner.storetype", Setting.MACHINE);
         if (storetype != null) {
             signer = signer.storetype(storetype);
         }
-        String tsa = environment.getProperty("jarsigner.tsa");
+        String tsa = environment.getProperty("jarsigner.tsa", Setting.MACHINE);
         if (tsa != null) {
             signer = signer.tsa(tsa);
         }
-        String arguments = environment.getProperty("jarsigner.arguments");
+        String arguments = environment.getProperty("jarsigner.arguments", Setting.MACHINE);
         return arguments == null ? signer : signer.arguments(words(arguments));
     }
 
@@ -123,10 +124,10 @@ public class JarSigner extends ProcessBuildStep {
     }
 
     private static String source(Environment environment, String key) {
-        String value = environment.getProperty(key);
+        String value = environment.getProperty(key, Setting.MACHINE);
         String[] words = value == null ? new String[0] : value.strip().split("\\s+", 2);
-        return words.length == 2 && words[0].equals("file") && environment.root() != null
-                ? "file " + environment.root().resolve(words[1].strip()).normalize()
+        return words.length == 2 && words[0].equals("file")
+                ? "file " + environment.located(key, words[1], Setting.MACHINE)
                 : value;
     }
 

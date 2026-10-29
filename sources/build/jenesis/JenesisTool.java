@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Make.Setting;
 
 abstract class JenesisTool implements ToolProvider {
 
@@ -21,7 +22,7 @@ abstract class JenesisTool implements ToolProvider {
             return 2;
         }
         try {
-            return run(new Environment(Make.located(Make.keys(settings), Path.of("").toAbsolutePath()), out, err), remaining);
+            return run(new Environment(Make.directed(Make.keys(settings), Path.of("").toAbsolutePath()), out, err), remaining);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             err.println(name() + " was interrupted running " + String.join(" ", remaining));
@@ -47,16 +48,16 @@ abstract class JenesisTool implements ToolProvider {
     }
 
     protected Path root(Environment environment) {
-        return Path.of(environment.getProperty("make.root", "")).toAbsolutePath().normalize();
+        return Path.of(environment.getProperty("make.root", "", Setting.COMMAND)).toAbsolutePath().normalize();
     }
 
     protected void requireInProcess(Environment environment) {
-        if (environment.getProperty("toolchain.version") != null) {
+        if (environment.getProperty("toolchain.version", Setting.PROJECT) != null) {
             throw new IllegalStateException("jenesis.toolchain.version cannot be honored by the "
                     + name() + " tool, because a toolchain replaces the JVM a build runs on"
                     + " - run the " + name() + " command instead");
         }
-        if (environment.flag("project.docker")) {
+        if (environment.flag("project.docker", Setting.MACHINE)) {
             throw new IllegalStateException("A dockerized build cannot be run by the "
                     + name() + " tool, because a container replaces the process a build runs in"
                     + " - unset jenesis.project.docker, or run the " + name() + " command instead");

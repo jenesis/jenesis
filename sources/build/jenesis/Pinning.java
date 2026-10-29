@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Make.Setting;
 
 public enum Pinning {
 
@@ -18,7 +19,7 @@ public enum Pinning {
 
     public static Permits permits(Environment environment) {
         int concurrency = environment.number("pin.concurrency",
-                                             Runtime.getRuntime().availableProcessors());
+                                             Runtime.getRuntime().availableProcessors(), Setting.PROJECT);
         if (concurrency < 0) {
             throw new IllegalArgumentException("Pin concurrency must not be negative: " + concurrency);
         }
@@ -26,7 +27,7 @@ public enum Pinning {
     }
 
     public static Pinning ofEnvironment(Environment environment) {
-        String property = environment.getProperty("dependency.pin");
+        String property = environment.getProperty("dependency.pin", Setting.PROJECT);
         if (property == null) {
             return null;
         }

@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Make.Setting;
 import java.security.cert.CertificateException;
 
 public final class Discovery {
@@ -28,14 +29,14 @@ public final class Discovery {
     }
 
     public static Discovery ofEnvironment(Environment environment) {
-        Path local = environment.path("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
+        Path local = environment.path("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"), Setting.MACHINE);
         return new Discovery(LOCATION,
                 Repository.Connection.ofEnvironment(environment),
-                environment.number("discovery.timeout", 5_000),
+                environment.number("discovery.timeout", 5_000, Setting.PROJECT),
                 (local == null
                         ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
                         : local).resolve(ANSWERS),
-                Duration.ofHours(environment.number("discovery.ttl", 24)));
+                Duration.ofHours(environment.number("discovery.ttl", 24, Setting.MACHINE)));
     }
 
     public Discovery(String uri, Repository.Connection connection, int timeout, Path cache, Duration ttl) {

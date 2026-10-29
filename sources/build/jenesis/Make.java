@@ -4,65 +4,18 @@ import module java.base;
 
 public final class Make {
 
-    private static final String PROVIDED = "jenesis.make.provided";
-    private static final List<String> CREDENTIALS = List.of("jenesis.maven.token",
-            "jenesis.module.token",
-            "jenesis.release.token",
-            "jenesis.deploy.token",
-            "jenesis.cache.key");
-    private static final List<String> PLAINTEXT = List.of("jenesis.repository.insecure", "jenesis.cache.insecure");
-    private static final List<String> PROGRAMS = List.of("jenesis.daemon.options",
-            "jenesis.openpgp.command");
-    private static final List<String> SHARED = List.of("jenesis.cache.uri",
-            "jenesis.maven.local",
-            "jenesis.module.local",
-            "jenesis.discovery.ttl",
-            "jenesis.sigstore.uri",
-            "jenesis.sigstore.issuers",
-            "jenesis.daemon.folder",
-            "jenesis.daemon.limit",
-            "jenesis.daemon.idle");
-    private static final List<String> CONFINED = List.of("jenesis.project.target",
-            "jenesis.project.reproduce",
-            "jenesis.project.artifacts",
-            "jenesis.project.cache",
-            "jenesis.openpgp.local",
-            "jenesis.make.classes",
-            "jenesis.pin.file",
-            "jenesis.aot.folder",
-            "jenesis.process.directory");
-    private static final List<String> MACHINE = List.of("maven.local",
-            "module.local",
-            "daemon.folder",
-            "jarsigner.keystore",
-            "jarsigner.storepass",
-            "jarsigner.keypass");
-    private static final List<String> PATHS = List.of("project.target",
-            "project.reproduce",
-            "project.artifacts",
-            "project.cache",
-            "make.global",
-            "make.classes",
-            "daemon.folder",
-            "aot.folder",
-            "process.directory",
-            "pin.file",
-            "maven.local",
-            "module.local",
-            "openpgp.local",
-            "jarsigner.keystore"),
-            LOCATIONS = List.of("project.configuration", "project.boms", "project.signatures", "pin.provided");
+    private static final String PROVIDED = "make.provided",
+            PERSONAL = "make.personal",
+            HOME = "make.home",
+            AMBIENT = "make.ambient",
+            DIRECTORY = "make.directory";
+    private static final List<String> RECORDED = List.of(PROVIDED, PERSONAL, HOME, AMBIENT, DIRECTORY);
     private static final Set<String> PRINTING = Set.of("help", "skill", "prompt", "configuration", "properties", "--stop");
     static final List<String> CONTAINED = List.of("jenesis.project.docker",
             "jenesis.project.image",
             "jenesis.project.readable",
             "jenesis.project.writable",
-            "jenesis.project.env"),
-            EXECUTED = List.of("jenesis.execute.docker",
-                    "jenesis.execute.image",
-                    "jenesis.execute.readable",
-                    "jenesis.execute.writable",
-                    "jenesis.execute.env");
+            "jenesis.project.env");
 
     private final String mainClass;
     private final Map<String, String> ambient;
@@ -95,16 +48,10 @@ public final class Make {
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot read the properties that configure this build", e);
         }
-        String classesLocation = settings.keys().get("make.classes");
-        classes = classesLocation == null || classesLocation.isBlank()
-                ? root.resolve(".jenesis").resolve("classes")
-                : root.resolve(classesLocation).normalize();
+        classes = path(settings.keys(), root, "make.classes", ".jenesis/classes", Setting.CONFINED);
         mode = Mode.of(settings.keys());
-        String cache = settings.keys().get("aot.folder");
-        aotFolder = cache == null || cache.isBlank()
-                ? root.resolve(".jenesis").resolve("aot")
-                : root.resolve(cache.trim()).normalize();
-        String lifetime = settings.keys().get("aot.lifetime");
+        aotFolder = path(settings.keys(), root, "aot.folder", ".jenesis/aot", Setting.CONFINED);
+        String lifetime = setting(settings.keys(), "aot.lifetime", Setting.PROJECT);
         if (lifetime == null || lifetime.isBlank()) {
             aotLifetime = Duration.ZERO;
         } else {
@@ -123,13 +70,16 @@ public final class Make {
         SOURCE, COMPILED, AOT, DAEMON;
 
         static Mode of(Map<String, String> keys) {
-            String value = keys.get("make.mode"), process = keys.get("process.mode");
+            String value = setting(keys, "make.mode", Setting.PROJECT),
+                    process = setting(keys, "process.mode", Setting.PROJECT);
             if (value != null && !value.isBlank()) {
                 return of(value);
             }
             return process != null && !process.isBlank() && !process.trim().equalsIgnoreCase("daemon")
-                    || Objects.equals(parsed("jenesis.project.docker", keys.get("project.docker")), true)
-                    || Objects.equals(parsed("jenesis.release.publish", keys.get("release.publish")), true)
+                    || Objects.equals(parsed("jenesis.project.docker",
+                            setting(keys, "project.docker", Setting.MACHINE)), true)
+                    || Objects.equals(parsed("jenesis.release.publish",
+                            setting(keys, "release.publish", Setting.COMMAND)), true)
                     ? COMPILED
                     : DAEMON;
         }
@@ -144,6 +94,83 @@ public final class Make {
                     + value
                     + "' (expected source, compiled, aot or daemon)");
         }
+    }
+
+    public enum Setting {
+
+        PROJECT, CONFINED, MACHINE, COMMAND
+    }
+
+    static String setting(Map<String, String> keys, String key, Setting setting) {
+        String value = keys.get(key);
+        if (value != null && setting == Setting.MACHINE && listed(keys, PROVIDED, key)) {
+            throw new IllegalStateException("jenesis." + key + " cannot be set in a file the project provides: it"
+                    + " configures what the machine running the build trusts, runs or shares between projects, so"
+                    + " only the command line or your own ~/.jenesis/jenesis.properties may set it"
+                    + " (pass -Djenesis." + key + " instead)");
+        }
+        if (value != null
+                && setting == Setting.COMMAND
+                && (listed(keys, PROVIDED, key) || listed(keys, PERSONAL, key))) {
+            throw new IllegalStateException("jenesis." + key + " cannot be set in a file: it is what one run is"
+                    + " asked to do, so only the command line may name it (pass -Djenesis." + key + " instead)");
+        }
+        return value;
+    }
+
+    static Path path(Map<String, String> keys, Path root, String key, String defaultValue, Setting setting) {
+        String value = setting(keys, key, setting);
+        String location = value == null || value.isBlank() ? defaultValue : value;
+        return location == null ? null : located(keys, root, key, location, setting);
+    }
+
+    static Path located(Map<String, String> keys, Path root, String key, String location, Setting setting) {
+        setting(keys, key, setting);
+        if (location.contains("://")) {
+            throw new IllegalArgumentException("Malformed value for jenesis." + key + ": '" + location
+                    + "' (expected a path, not a URI)");
+        }
+        Path path;
+        try {
+            path = Path.of(location.strip());
+        } catch (InvalidPathException e) {
+            throw new IllegalArgumentException("Malformed value for jenesis." + key + ": '" + location
+                    + "' (expected a path)", e);
+        }
+        if (listed(keys, PROVIDED, key)) {
+            if (root == null) {
+                return path;
+            }
+            Path resolved = root.resolve(path).normalize();
+            if (setting == Setting.CONFINED
+                    && !resolved.toAbsolutePath().normalize().startsWith(root.toAbsolutePath().normalize())) {
+                throw new IllegalStateException("jenesis." + key + " cannot name '" + location.strip() + "' in a file"
+                        + " the project provides: such a file names only a location inside the project, which the"
+                        + " build writes to and may delete (pass -Djenesis." + key + " on the command line for one"
+                        + " outside it)");
+            }
+            return resolved;
+        }
+        String base = listed(keys, PERSONAL, key)
+                ? setting == Setting.MACHINE ? keys.get(HOME) : null
+                : listed(keys, AMBIENT, key) ? keys.get(DIRECTORY) : null;
+        if (base != null) {
+            return Path.of(base).resolve(path).normalize();
+        }
+        return root == null ? path : root.resolve(path).normalize();
+    }
+
+    static boolean listed(Map<String, String> keys, String list, String key) {
+        String value = keys.get(list);
+        if (value == null) {
+            return false;
+        }
+        for (String entry : value.split(",")) {
+            if (entry.strip().equals(key)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static Boolean parsed(String name, String value) {
@@ -235,49 +262,16 @@ public final class Make {
             }
         }
         properties.putAll(named);
-        return located(keys(properties), Path.of("").toAbsolutePath());
+        return directed(keys(properties), Path.of("").toAbsolutePath());
     }
 
-    static Map<String, String> located(Map<String, String> keys, Path folder) {
-        Map<String, String> located = new HashMap<>(keys);
-        for (String key : PATHS) {
-            String value = keys.get(key);
-            if (value != null && !value.isBlank() && !value.contains("://")) {
-                located.put(key, folder.resolve(value.strip()).normalize().toString());
-            }
+    static Map<String, String> directed(Map<String, String> keys, Path directory) {
+        if (keys.containsKey(DIRECTORY)) {
+            return keys;
         }
-        for (String key : LOCATIONS) {
-            String value = keys.get(key);
-            if (value != null && !value.isBlank()) {
-                List<String> entries = new ArrayList<>();
-                for (String entry : value.split(",")) {
-                    String candidate = entry.strip();
-                    entries.add(candidate.isEmpty() || candidate.startsWith("@")
-                            ? candidate
-                            : folder.resolve(candidate).normalize().toString());
-                }
-                located.put(key, String.join(",", entries));
-            }
-        }
-        String resources = keys.get("project.resources");
-        if (resources != null && !resources.isBlank()) {
-            List<String> entries = new ArrayList<>();
-            for (String entry : resources.split(",")) {
-                int colon = entry.lastIndexOf(':');
-                entries.add(colon <= 0
-                        ? entry
-                        : folder.resolve(entry.substring(0, colon).strip()).normalize() + entry.substring(colon));
-            }
-            located.put("project.resources", String.join(",", entries));
-        }
-        for (String key : List.of("jarsigner.storepass", "jarsigner.keypass")) {
-            String value = keys.get(key);
-            String[] words = value == null ? new String[0] : value.strip().split("\\s+", 2);
-            if (words.length == 2 && words[0].equals("file")) {
-                located.put(key, "file " + folder.resolve(words[1].strip()).normalize());
-            }
-        }
-        return Map.copyOf(located);
+        Map<String, String> directed = new HashMap<>(keys);
+        directed.put(DIRECTORY, directory.toString());
+        return Map.copyOf(directed);
     }
 
     public static Map<String, String> keys(Map<String, String> properties) {
@@ -636,6 +630,7 @@ public final class Make {
         SequencedMap<String, String> supplied = new LinkedHashMap<>();
         SequencedSet<String> keys = new LinkedHashSet<>(new TreeSet<>(ambient.keySet()));
         keys.addAll(settings.declared());
+        keys.addAll(List.of(PROVIDED, PERSONAL, HOME));
         for (String key : keys) {
             String value = settings.keys().get(key);
             if (value != null) {
@@ -665,7 +660,7 @@ public final class Make {
     }
 
     private boolean tools() {
-        String process = settings.keys().get("process.mode");
+        String process = setting(settings.keys(), "process.mode", Setting.PROJECT);
         return process == null || process.isBlank() ? mode == Mode.AOT : process.trim().equalsIgnoreCase("aot");
     }
 
@@ -738,18 +733,21 @@ public final class Make {
         Path base = path.resolve("jenesis.properties");
         Properties project = read(base);
         if (project != null) {
-            requireApplicable(path, base, project, false);
+            requireApplicable(base, project);
         }
-        String configured = ambient.get("make.global");
+        String configured = ambient.get("make.global"), directory = ambient.get(DIRECTORY);
         String location = configured == null ? System.getProperty("user.home") : configured;
         Properties user = null;
         Path home = null;
         if (!location.isEmpty()) {
-            home = path.toAbsolutePath().resolve(location).resolve(".jenesis");
+            home = (directory == null ? path : Path.of(directory)).toAbsolutePath()
+                    .resolve(location)
+                    .resolve(".jenesis")
+                    .normalize();
             Path file = home.resolve("jenesis.properties");
             user = read(file);
             if (user != null) {
-                requireApplicable(path, file, user, true);
+                requireApplicable(file, user);
             }
         }
         Set<Path> loaded = new LinkedHashSet<>();
@@ -759,14 +757,14 @@ public final class Make {
         if (project != null) {
             addProfiles(pending, path, project.getProperty("jenesis.make.profiles"));
         }
-        loadProfiles(loaded, local, pending, path, path, false);
+        loadProfiles(loaded, local, pending, path, false);
         if (project != null) {
             local.add(new Layer(project, false));
         }
         if (user != null) {
             addProfiles(pending, home, user.getProperty("jenesis.make.profiles"));
-            loadProfiles(loaded, layers, pending, home, path, true);
-            layers.add(new Layer(anchored(user, home), true));
+            loadProfiles(loaded, layers, pending, home, true);
+            layers.add(new Layer(user, true));
         }
         layers.addAll(local);
         SequencedSet<Path> profiles = new LinkedHashSet<>();
@@ -782,35 +780,50 @@ public final class Make {
                 }
             }
         }
-        return new Settings(layered(ambient, layers), profiles, declared);
+        return new Settings(layered(ambient, layers, home), profiles, declared);
     }
 
-    private static Map<String, String> layered(Map<String, String> ambient, List<Layer> layers) {
-        SequencedSet<String> provided = new LinkedHashSet<>();
+    private static Map<String, String> layered(Map<String, String> ambient, List<Layer> layers, Path home) {
+        SequencedSet<String> provided = new TreeSet<>(), personal = new TreeSet<>(), named = new TreeSet<>();
         Set<String> declared = new HashSet<>();
         for (Layer layer : layers) {
             for (String name : layer.properties().stringPropertyNames()) {
-                if (!name.startsWith("jenesis.")) {
-                    continue;
-                }
                 String key = name.substring("jenesis.".length());
-                if (declared.add(key) && !ambient.containsKey(key) && !layer.trusted()) {
-                    provided.add(key);
+                if (declared.add(key) && !ambient.containsKey(key)) {
+                    (layer.trusted() ? personal : provided).add(key);
                 }
+            }
+        }
+        for (String key : ambient.keySet()) {
+            if (RECORDED.contains(key)) {
+                continue;
+            }
+            if (listed(ambient, PROVIDED, key)) {
+                provided.add(key);
+            } else if (listed(ambient, PERSONAL, key)) {
+                personal.add(key);
+            } else {
+                named.add(key);
             }
         }
         Map<String, String> keys = new HashMap<>();
         for (Layer layer : layers.reversed()) {
             for (String name : layer.properties().stringPropertyNames()) {
-                if (name.startsWith("jenesis.")) {
-                    keys.put(name.substring("jenesis.".length()), layer.properties().getProperty(name));
-                }
+                keys.put(name.substring("jenesis.".length()), layer.properties().getProperty(name));
             }
         }
         keys.putAll(ambient);
-        keys.remove("make.provided");
-        if (!provided.isEmpty()) {
-            keys.put("make.provided", String.join(",", provided));
+        keys.keySet().removeAll(List.of(PROVIDED, PERSONAL, HOME, AMBIENT));
+        String recorded = ambient.get(HOME);
+        if (recorded != null || home != null) {
+            keys.put(HOME, recorded == null ? home.toString() : recorded);
+        }
+        for (Map.Entry<String, SequencedSet<String>> entry : Map.of(PROVIDED, provided,
+                PERSONAL, personal,
+                AMBIENT, named).entrySet()) {
+            if (!entry.getValue().isEmpty()) {
+                keys.put(entry.getKey(), String.join(",", entry.getValue()));
+            }
         }
         return Map.copyOf(keys);
     }
@@ -834,7 +847,6 @@ public final class Make {
                                      List<Layer> layers,
                                      Deque<Path> pending,
                                      Path base,
-                                     Path root,
                                      boolean trusted) throws IOException {
         while (!pending.isEmpty()) {
             Path file = pending.removeFirst().normalize();
@@ -842,51 +854,21 @@ public final class Make {
                 continue;
             }
             Properties properties = read(file);
-            requireApplicable(root, file, properties, trusted);
+            requireApplicable(file, properties);
             addProfiles(pending, base, properties.getProperty("jenesis.make.profiles"));
-            layers.add(new Layer(trusted ? anchored(properties, base) : properties, trusted));
+            layers.add(new Layer(properties, trusted));
         }
     }
 
-    private static Properties anchored(Properties properties, Path folder) {
-        Map<String, String> machine = new HashMap<>();
-        for (String key : MACHINE) {
-            String value = properties.getProperty("jenesis." + key);
-            if (value != null) {
-                machine.put(key, value);
-            }
-        }
-        located(machine, folder).forEach((key, value) -> properties.setProperty("jenesis." + key, value));
-        return properties;
-    }
-
-    private static void requireApplicable(Path root, Path file, Properties properties, boolean trusted) {
+    private static void requireApplicable(Path file, Properties properties) {
         for (String name : new TreeSet<>(properties.stringPropertyNames())) {
             if (!name.startsWith("jenesis.")) {
                 throw new IllegalArgumentException(name + " in " + file + " is no setting: every key of this file"
                         + " is written in full, as `configuration` prints it, so write jenesis." + name);
             }
-        }
-        if (properties.getProperty(PROVIDED) != null) {
-            throw new IllegalStateException(PROVIDED + " cannot be set in " + file
-                    + ": it records which settings the files a project provides supplied, and Make derives it");
-        }
-        if (!trusted) {
-            for (String key : CREDENTIALS) {
-                if (properties.getProperty(key) != null) {
-                    throw new IllegalStateException(key + " cannot be set in " + file
-                            + ": a credential is yours to hand out, so only the command line, your own"
-                            + " ~/.jenesis/jenesis.properties or the environment may name one"
-                            + " (pass -D" + key + " instead)");
-                }
-            }
-            for (String key : PLAINTEXT) {
-                if (properties.getProperty(key) != null) {
-                    throw new IllegalStateException(key + " cannot be set in " + file
-                            + ": whether this build may talk plaintext http is yours to decide, so only the"
-                            + " command line or your own ~/.jenesis/jenesis.properties may allow it"
-                            + " (pass -D" + key + " instead)");
-                }
+            if (RECORDED.contains(name.substring("jenesis.".length()))) {
+                throw new IllegalStateException(name + " cannot be set in " + file
+                        + ": it records where the settings in force were written, and Make derives it");
             }
         }
         if (properties.getProperty("jenesis.make.root") != null) {
@@ -894,80 +876,10 @@ public final class Make {
                     + ": the project root locates this file, so it is resolved before the file is read"
                     + " (pass -Djenesis.make.root on the command line instead)");
         }
-        if (properties.getProperty("jenesis.release.publish") != null) {
-            throw new IllegalStateException("jenesis.release.publish cannot be set in " + file
-                    + ": publishing is what one run is asked to do, and every pin runs the release, so only the"
-                    + " command line may name it (pass -Djenesis.release.publish=true to the release that publishes)");
-        }
         if (properties.getProperty("jenesis.make.global") != null) {
             throw new IllegalStateException("jenesis.make.global cannot be set in " + file
                     + ": it locates your own user-global settings, which no file may move, least of all one a"
                     + " project provides (pass -Djenesis.make.global on the command line instead)");
-        }
-        if (!trusted) {
-            for (String name : properties.stringPropertyNames()) {
-                if (CONTAINED.contains(name) || EXECUTED.contains(name)) {
-                    throw new IllegalStateException(name + " cannot be set in " + file
-                            + ": whether and how the build is isolated is yours to decide, so only the command line"
-                            + " or your own ~/.jenesis/jenesis.properties may configure Docker, never a file the"
-                            + " project provides (pass -D" + name + " instead)");
-                }
-            }
-        }
-        for (String key : List.of("jenesis.toolchain.searchpath", "jenesis.toolchain.installer")) {
-            if (!trusted && properties.getProperty(key) != null) {
-                throw new IllegalStateException(key + " cannot be set in " + file
-                        + ": it decides which programs the build executes, so only the command line or your own"
-                        + " ~/.jenesis/jenesis.properties may set it, never a file the project provides"
-                        + " (pass -D" + key + " instead)");
-            }
-        }
-        if (trusted) {
-            return;
-        }
-        for (String key : PROGRAMS) {
-            if (properties.getProperty(key) != null) {
-                throw new IllegalStateException(key + " cannot be set in " + file
-                        + ": it names a program the build runs, or the options a JVM runs with, so only the command"
-                        + " line or your own ~/.jenesis/jenesis.properties may set it, never a file the project"
-                        + " provides (pass -D" + key + " instead)");
-            }
-        }
-        for (String key : SHARED) {
-            if (properties.getProperty(key) != null) {
-                throw new IllegalStateException(key + " cannot be set in " + file
-                        + ": it names a cache whose outputs the build runs, a folder or process this machine shares"
-                        + " between projects or what the build trusts, so only the command line or your own"
-                        + " ~/.jenesis/jenesis.properties may set it, never a file the project provides"
-                        + " (pass -D" + key + " instead)");
-            }
-        }
-        for (String name : properties.stringPropertyNames()) {
-            if (name.startsWith("jenesis.jarsigner.")) {
-                throw new IllegalStateException(name + " cannot be set in " + file
-                        + ": it names the key a jar is signed with or where its password is read from, which the"
-                        + " machine that signs supplies, so only the command line or your own"
-                        + " ~/.jenesis/jenesis.properties may set it, never a file the project provides"
-                        + " (pass -D" + name + " instead)");
-            }
-        }
-        Path base = root.toAbsolutePath().normalize();
-        for (String key : CONFINED) {
-            String value = properties.getProperty(key);
-            if (value == null || value.isBlank()) {
-                continue;
-            }
-            Path folder;
-            try {
-                folder = Path.of(value.strip());
-            } catch (InvalidPathException _) {
-                folder = null;
-            }
-            if (folder == null || folder.isAbsolute() || !base.resolve(folder).normalize().startsWith(base)) {
-                throw new IllegalStateException(key + " cannot name '" + value.strip() + "' in " + file
-                        + ": a file the project provides names only a folder inside the project, which the build"
-                        + " writes to and may delete (pass -D" + key + " on the command line for one outside it)");
-            }
         }
     }
 

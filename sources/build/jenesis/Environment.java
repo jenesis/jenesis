@@ -38,68 +38,65 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
         return new Environment(keys, out, err, root);
     }
 
-    public String getProperty(String key) {
-        return keys.get(key);
+    public String getProperty(String key, Make.Setting setting) {
+        return Make.setting(keys, key, unconfined(key, setting));
     }
 
-    public String getProperty(String key, String defaultValue) {
-        String value = keys.get(key);
+    public String getProperty(String key, String defaultValue, Make.Setting setting) {
+        String value = getProperty(key, setting);
         return value == null ? defaultValue : value;
     }
 
-    public String value(String key) {
-        return trimmed(keys.get(key));
+    public String value(String key, Make.Setting setting) {
+        return trimmed(getProperty(key, setting));
     }
 
-    public String value(String key, String defaultValue) {
-        String value = trimmed(keys.get(key));
+    public String value(String key, String defaultValue, Make.Setting setting) {
+        String value = value(key, setting);
         return value == null ? defaultValue : value;
     }
 
-    public Path path(String key) {
-        return path(key, null);
+    public Path path(String key, Make.Setting setting) {
+        return path(key, null, setting);
     }
 
-    public Path path(String key, String defaultValue) {
-        String value = value(key, defaultValue);
-        if (value == null) {
-            return null;
-        }
-        Path path;
-        try {
-            path = Path.of(value);
-        } catch (InvalidPathException e) {
-            throw new IllegalArgumentException("Malformed value for jenesis." + key + ": '" + value
-                    + "' (expected a path, absolute or relative to the project root)", e);
-        }
-        return root == null ? path : root.resolve(path).normalize();
+    public Path path(String key, String defaultValue, Make.Setting setting) {
+        return Make.path(keys, root, key, defaultValue, setting);
     }
 
-    public boolean flag(String key) {
-        return flag(key, false);
+    public Path located(String key, String part, Make.Setting setting) {
+        return Make.located(keys, root, key, part, setting);
     }
 
-    public boolean flag(String key, boolean defaultValue) {
-        Boolean value = flagOrNull(key);
+    public boolean provided(String key) {
+        return Make.listed(keys, "make.provided", key);
+    }
+
+    public boolean flag(String key, Make.Setting setting) {
+        return flag(key, false, setting);
+    }
+
+    public boolean flag(String key, boolean defaultValue, Make.Setting setting) {
+        Boolean value = flagOrNull(key, setting);
         return value == null ? defaultValue : value;
     }
 
-    public Boolean flagOrNull(String key) {
-        return Make.parsed("jenesis." + key, keys.get(key));
+    public Boolean flagOrNull(String key, Make.Setting setting) {
+        return Make.parsed("jenesis." + key, getProperty(key, setting));
     }
 
-    public int number(String key, int defaultValue) {
-        Integer value = numberOrNull(key);
+    public int number(String key, int defaultValue, Make.Setting setting) {
+        Integer value = numberOrNull(key, setting);
         return value == null ? defaultValue : value;
     }
 
-    public long number(String key, long defaultValue) {
-        Long value = longOrNull(key);
+    public long number(String key, long defaultValue, Make.Setting setting) {
+        Long value = longOrNull(key, setting);
         return value == null ? defaultValue : value;
     }
 
-    public Integer numberOrNull(String key) {
-        String value = value(key);
+    public Integer numberOrNull(String key, Make.Setting setting) {
+        String value = value(key, setting);
         if (value == null) {
             return null;
         }
@@ -111,8 +108,8 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
         }
     }
 
-    public Long longOrNull(String key) {
-        String value = value(key);
+    public Long longOrNull(String key, Make.Setting setting) {
+        String value = value(key, setting);
         if (value == null) {
             return null;
         }
@@ -124,8 +121,8 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
         }
     }
 
-    public List<String> entries(String key) {
-        String value = value(key);
+    public List<String> entries(String key, Make.Setting setting) {
+        String value = value(key, setting);
         if (value == null) {
             return null;
         }
@@ -139,8 +136,8 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
         return entries;
     }
 
-    public List<String> words(String key) {
-        String value = value(key);
+    public List<String> words(String key, Make.Setting setting) {
+        String value = value(key, setting);
         return value == null ? List.of() : List.of(value.split("\\s+"));
     }
 
@@ -150,12 +147,22 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
         }
         int slash = value.indexOf('/');
         String name = value.substring(1, slash == -1 ? value.length() : slash);
-        String resolved = value("variable." + name, slash == -1 ? null : value.substring(slash + 1));
+        String resolved = value("variable." + name,
+                slash == -1 ? null : value.substring(slash + 1),
+                Make.Setting.PROJECT);
         if (resolved == null) {
             throw new IllegalArgumentException(origin + " to " + value + ", but jenesis.variable." + name
                     + " is not set - set it, or give a default as @" + name + "/<default>");
         }
         return resolved;
+    }
+
+    private static Make.Setting unconfined(String key, Make.Setting setting) {
+        if (setting == Make.Setting.CONFINED) {
+            throw new IllegalArgumentException("jenesis." + key + " is read as a value, but only a location can be"
+                    + " confined to the project - read it with path or located");
+        }
+        return setting;
     }
 
     private static String trimmed(String value) {

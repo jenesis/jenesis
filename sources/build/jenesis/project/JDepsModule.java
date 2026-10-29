@@ -7,6 +7,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.PathPlacement;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Findings;
@@ -33,7 +34,7 @@ public class JDepsModule implements BuildExecutorModule {
     public static JDepsModule ofEnvironment(Environment environment) {
         return new JDepsModule(ProcessHandler.Factory.ofEnvironment(environment),
                 "main",
-                environment.flag(STRICT, false),
+                environment.flag(STRICT, false, Setting.PROJECT),
                 List.of(),
                 ProcessBuildStep.Terms.ofEnvironment(environment, "jdeps"));
     }

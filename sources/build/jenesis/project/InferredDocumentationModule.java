@@ -8,6 +8,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.step.Jar;
@@ -44,7 +45,7 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                         resolvers),
                 value -> value,
                 Jar.ofEnvironment(environment, ProcessHandler.Factory.ofEnvironment(environment), Jar.Sort.JAVADOC),
-                environment.flag("documentation.empty", false),
+                environment.flag("documentation.empty", false, Setting.PROJECT),
                 Collections.emptyNavigableMap());
     }
 

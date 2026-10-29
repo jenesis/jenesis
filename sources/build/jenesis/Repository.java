@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Make.Setting;
 import java.security.cert.X509Certificate;
 
 @FunctionalInterface
@@ -301,8 +302,7 @@ public interface Repository {
         DEFAULT;
 
         public static Origin of(Environment environment, String key) {
-            List<String> provided = environment.entries("make.provided");
-            return provided != null && provided.contains(key) ? PROJECT : USER;
+            return environment.provided(key) ? PROJECT : USER;
         }
     }
 
@@ -315,7 +315,7 @@ public interface Repository {
     record Credential(String token, Origin origin) {
 
         public static Credential of(Environment environment, String key, String variable) {
-            String value = environment.getProperty(key);
+            String value = environment.getProperty(key, Setting.MACHINE);
             if (value != null) {
                 return new Credential(value, Origin.of(environment, key));
             }
@@ -371,12 +371,12 @@ public interface Repository {
         }
 
         private Connection(Environment environment) {
-            this(environment.number("repository.retries", 2),
-                 Duration.ofMillis(environment.number("repository.backoff", 125)),
-                 environment.flag("repository.insecure"),
-                 environment.number("repository.connect", 10_000),
-                 environment.number("repository.read", 30_000),
-                 environment.flag("repository.offline"));
+            this(environment.number("repository.retries", 2, Setting.PROJECT),
+                 Duration.ofMillis(environment.number("repository.backoff", 125, Setting.PROJECT)),
+                 environment.flag("repository.insecure", Setting.MACHINE),
+                 environment.number("repository.connect", 10_000, Setting.PROJECT),
+                 environment.number("repository.read", 30_000, Setting.PROJECT),
+                 environment.flag("repository.offline", Setting.PROJECT));
         }
 
         public Connection retries(int retries) {

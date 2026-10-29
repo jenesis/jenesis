@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Make.Setting;
 
 public final class ExecuteTool extends JenesisTool {
 
@@ -13,7 +14,7 @@ public final class ExecuteTool extends JenesisTool {
     protected int run(Environment environment, List<String> arguments)
             throws IOException, InterruptedException {
         requireInProcess(environment);
-        if (environment.flag("execute.docker")) {
+        if (environment.flag("execute.docker", Setting.MACHINE)) {
             throw new IllegalStateException("A dockerized program cannot be run by the " + name()
                     + " tool, because a container replaces the process it runs in"
                     + " - unset jenesis.execute.docker, or run the " + name() + " command instead");

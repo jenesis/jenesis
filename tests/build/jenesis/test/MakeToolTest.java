@@ -48,9 +48,10 @@ public class MakeToolTest {
         assertThat(code).as(err.toString()).isEqualTo(0);
         assertThat(out.toString())
                 .as("a path typed on a command line names a folder below the one the command runs in, as it does"
-                        + " for every other program, whichever project root the build is handed")
-                .contains("jenesis.project.artifacts=" + Path.of("artifacts").toAbsolutePath())
-                .contains("jenesis.project.target=" + Path.of("out").toAbsolutePath());
+                        + " for every other program, whichever project root the build is handed, so the tool"
+                        + " records the folder it runs in beside the settings it was handed")
+                .contains("jenesis.project.artifacts=artifacts")
+                .contains("jenesis.make.directory=" + Path.of("").toAbsolutePath());
     }
 
     @Test

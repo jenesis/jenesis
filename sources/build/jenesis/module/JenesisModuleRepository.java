@@ -2,6 +2,7 @@ package build.jenesis.module;
 
 import module java.base;
 import build.jenesis.Environment;
+import build.jenesis.Make.Setting;
 import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -34,7 +35,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                                                                     "module.token",
                                                                     "JENESIS_REPOSITORY_TOKEN");
         Repository.Credential maven = Repository.Credential.of(environment, "maven.token", "MAVEN_REPOSITORY_TOKEN");
-        String property = environment.getProperty("module.uri");
+        String property = environment.getProperty("module.uri", Setting.PROJECT);
         String variable = System.getenv("JENESIS_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
         String text;
@@ -56,7 +57,7 @@ public class JenesisModuleRepository implements JenesisRepository {
         if (repository == null) {
             throw new IllegalStateException("No Jenesis module repository is configured by: " + text);
         }
-        Path local = environment.path("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
+        Path local = environment.path("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"), Setting.MACHINE);
         return repository.prepend(ofEnvironment(environment, (local == null
                 ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
                 : local).toUri()));
@@ -206,7 +207,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                         spliced = Repository.Origin.DEFAULT;
                     }
                 } else {
-                    String declared = environment.getProperty(name);
+                    String declared = environment.getProperty(name, Setting.PROJECT);
                     value = declared == null ? System.getenv(name) : declared;
                     spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.of(environment, name);
                     if (value == null) {
@@ -322,10 +323,10 @@ public class JenesisModuleRepository implements JenesisRepository {
              token,
              Repository.Connection.ofEnvironment(environment),
              toMavenRepository(environment.getProperty("maven.uri",
-                                                       System.getenv("MAVEN_REPOSITORY_URI"))),
-             environment.flagOrNull("module.prerelease"),
-             environment.flagOrNull("module.speculative"),
-             environment.flag("print.fetch") ? environment.out() : null,
+                                                       System.getenv("MAVEN_REPOSITORY_URI"), Setting.PROJECT)),
+             environment.flagOrNull("module.prerelease", Setting.PROJECT),
+             environment.flagOrNull("module.speculative", Setting.PROJECT),
+             environment.flag("print.fetch", Setting.PROJECT) ? environment.out() : null,
              Palette.ofEnvironment(environment));
     }
 

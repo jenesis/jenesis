@@ -8,6 +8,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Make.Setting;
 import build.jenesis.Palette;
 import build.jenesis.Permits;
 import build.jenesis.Pinning;
@@ -62,7 +63,7 @@ public class PinModuleInfo implements BuildStep {
                 .retain(Retain.ofEnvironment(environment))
                 .permits(Pinning.permits(environment))
                 .platform(Platform.ofEnvironment(environment));
-        Boolean pins = environment.flagOrNull("print.pins");
+        Boolean pins = environment.flagOrNull("print.pins", Setting.PROJECT);
         return pins == null || !pins ? pin : pin.printing(environment.out(), Palette.ofEnvironment(environment));
     }
 
@@ -127,7 +128,7 @@ public class PinModuleInfo implements BuildStep {
     }
 
     private static boolean checksumFrom(Environment environment) {
-        String value = environment.getProperty("pin.checksum");
+        String value = environment.getProperty("pin.checksum", Setting.PROJECT);
         if (value == null || value.equals("true")) {
             return true;
         }
@@ -138,7 +139,7 @@ public class PinModuleInfo implements BuildStep {
     }
 
     private static boolean flattenFrom(Environment environment) {
-        String value = environment.getProperty("pin.bom");
+        String value = environment.getProperty("pin.bom", Setting.PROJECT);
         if (value == null || value.equals("keep")) {
             return false;
         }
@@ -670,7 +671,7 @@ public class PinModuleInfo implements BuildStep {
         GROUPS, ALL, NONE;
 
         public static Retain ofEnvironment(Environment environment) {
-            String value = environment.value("pin.retain", "groups");
+            String value = environment.value("pin.retain", "groups", Setting.PROJECT);
             return switch (value) {
                 case "groups" -> GROUPS;
                 case "all" -> ALL;

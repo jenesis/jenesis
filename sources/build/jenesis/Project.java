@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Make.Setting;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenModuleResolver;
@@ -139,13 +140,13 @@ public record Project(
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(PROMPT, new PromptModule(project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
-            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await")),
+            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await", Setting.PROJECT)),
                     null,
                     null,
-                    project.environment().flag("maven.embed", true));
+                    project.environment().flag("maven.embed", true, Setting.PROJECT));
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
-                Discovery discovery = project.environment().flag("repository.discovery")
+                Discovery discovery = project.environment().flag("repository.discovery", Setting.PROJECT)
                         ? Discovery.ofEnvironment(project.environment())
                         : null;
                 repositories.putIfAbsent("maven",
@@ -235,10 +236,10 @@ public record Project(
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(PROMPT, new PromptModule(project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
-            MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await")), project.hashFunction());
+            MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await", Setting.PROJECT)), project.hashFunction());
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
-                Discovery discovery = project.environment().flag("repository.discovery")
+                Discovery discovery = project.environment().flag("repository.discovery", Setting.PROJECT)
                         ? Discovery.ofEnvironment(project.environment())
                         : null;
                 repositories.putIfAbsent("module",
@@ -334,14 +335,14 @@ public record Project(
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(PROMPT, new PromptModule(project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
-            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await")),
+            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await", Setting.PROJECT)),
                     BuildExecutorModule.PREVIOUS.repeat(2) + MultiProjectModule.MANIFESTS,
                     "module",
-                    project.environment().flag("maven.embed", true));
+                    project.environment().flag("maven.embed", true, Setting.PROJECT));
             MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(pomAware, project.hashFunction());
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
-                Discovery discovery = project.environment().flag("repository.discovery")
+                Discovery discovery = project.environment().flag("repository.discovery", Setting.PROJECT)
                         ? Discovery.ofEnvironment(project.environment())
                         : null;
                 repositories.putIfAbsent("maven",
@@ -3017,15 +3018,15 @@ public record Project(
                                        String fileName,
                                        BiFunction<String, Path, BuildStep> stepFactory,
                                        HashDigestFunction hashFunction) {
-            Path file = environment.path("pin.file");
-            List<String> entries = environment.entries("pin.provided");
+            Path file = environment.path("pin.file", Setting.CONFINED);
+            List<String> entries = environment.entries("pin.provided", Setting.PROJECT);
             SequencedSet<Path> provided = new LinkedHashSet<>();
             if (entries != null) {
                 for (String entry : entries) {
-                    provided.add(root.resolve(entry).normalize());
+                    provided.add(environment.located("pin.provided", entry, Setting.PROJECT));
                 }
             }
-            List<String> groups = environment.entries("pin.groups");
+            List<String> groups = environment.entries("pin.groups", Setting.PROJECT);
             return new PinModule(root,
                                  fileName,
                                  stepFactory,
@@ -3033,7 +3034,7 @@ public record Project(
                                  new LinkedHashSet<>(groups == null ? List.of("main") : groups),
                                  provided,
                                  hashFunction,
-                                 environment.flag("print.divergence") ? environment.out() : null,
+                                 environment.flag("print.divergence", Setting.PROJECT) ? environment.out() : null,
                                  Palette.ofEnvironment(environment),
                                  new ProjectPlugins());
         }
@@ -3410,7 +3411,7 @@ public record Project(
 
     public static Project ofEnvironment(Environment supplied, Path root) {
         Environment environment = supplied.root(root);
-        String layoutName = environment.getProperty("project.layout");
+        String layoutName = environment.getProperty("project.layout", Setting.PROJECT);
         Layout layout = layoutName == null ? null : switch (layoutName.toLowerCase(Locale.ROOT)) {
             case "auto" -> Layout.AUTO;
             case "maven" -> Layout.MAVEN;
@@ -3442,7 +3443,7 @@ public record Project(
             } catch (IOException e) {
                 throw new UncheckedIOException("Cannot read " + file, e);
             }
-            boolean switchedOn = environment.flag("project.plugins", true);
+            boolean switchedOn = environment.flag("project.plugins", true, Setting.PROJECT);
             Map<String, Repository> pluginRepositories = ProjectPlugins.repositories(Map.of(), environment);
             Map<String, Resolver> pluginResolvers = ProjectPlugins.resolvers(Map.of(), environment);
             declared.forEachProperty((key, value) -> {
@@ -3452,7 +3453,7 @@ public record Project(
                 if (!projectWide) {
                     modulePlugins.add(name);
                 }
-                boolean enabled = switchedOn && environment.flag(ProjectPlugins.declared(name), true);
+                boolean enabled = switchedOn && environment.flag(ProjectPlugins.declared(name), true, Setting.PROJECT);
                 if (!projectWide && !enabled) {
                     return;
                 }
@@ -3544,7 +3545,7 @@ public record Project(
                     hooks.get(PLUGIN),
                     resolutions);
         }
-        List<String> included = environment.entries("project.resources");
+        List<String> included = environment.entries("project.resources", Setting.PROJECT);
         if (included != null) {
             SequencedMap<Path, Path> resources = new LinkedHashMap<>();
             for (String entry : included) {
@@ -3554,7 +3555,9 @@ public record Project(
                     throw new IllegalArgumentException(origin + " does not name a file and where to place it - write"
                             + " <path>:<target>");
                 }
-                Path source = Bind.contained(root, root.resolve(entry.substring(0, colon).trim()), origin);
+                Path source = Bind.contained(root,
+                        environment.located("project.resources", entry.substring(0, colon), Setting.PROJECT),
+                        origin);
                 if (!Files.exists(source)) {
                     throw new IllegalArgumentException(origin + " names " + source + ", which does not exist");
                 }
@@ -3571,14 +3574,14 @@ public record Project(
             assembler = assembler.resources(resources);
         }
         Project project = new Project(root, assembler, environment).plugins(projectPlugins);
-        String configuration = environment.getProperty("project.configuration");
+        String configuration = environment.getProperty("project.configuration", Setting.PROJECT);
         if (configuration != null) {
-            project = project.configuration(locations(environment, configuration, project).toArray(Path[]::new));
+            project = project.configuration(locations(environment, "project.configuration", configuration, project).toArray(Path[]::new));
             project = project.boms(project.configuration().toArray(Path[]::new));
             project = project.signatures(project.configuration().toArray(Path[]::new));
         }
         ExternalModule releasing = ExternalModule.official(environment, ProjectPlugins.JRELEASER, null, Map.of(), Map.of());
-        boolean releasable = environment.flag("release." + ProjectPlugins.JRELEASER, true);
+        boolean releasable = environment.flag("release." + ProjectPlugins.JRELEASER, true, Setting.PROJECT);
         Path jreleaser = releasable
                 ? BuildStep.locate(project.configuration(), ProjectPlugins.JRELEASER + ".properties")
                 : null;
@@ -3609,7 +3612,7 @@ public record Project(
                     .resolutions(resolutions));
         }
         ExternalModule documenting = ExternalModule.official(environment, ProjectPlugins.ASCIIDOCTOR, null, Map.of(), Map.of());
-        Path asciidoctor = environment.flag("documentation." + ProjectPlugins.ASCIIDOCTOR, true)
+        Path asciidoctor = environment.flag("documentation." + ProjectPlugins.ASCIIDOCTOR, true, Setting.PROJECT)
                 ? BuildStep.locate(project.configuration(), ProjectPlugins.ASCIIDOCTOR + ".properties")
                 : null;
         if (asciidoctor != null) {
@@ -3640,7 +3643,7 @@ public record Project(
                     .resolutions(resolutions));
         }
         ExternalModule marking = ExternalModule.official(environment, ProjectPlugins.GRADLE_PLUGIN, null, Map.of(), Map.of());
-        Path gradlePlugin = environment.flag("artifact." + ProjectPlugins.GRADLE_PLUGIN, true)
+        Path gradlePlugin = environment.flag("artifact." + ProjectPlugins.GRADLE_PLUGIN, true, Setting.PROJECT)
                 ? BuildStep.locate(project.configuration(), ProjectPlugins.GRADLE_PLUGIN + ".properties")
                 : null;
         if (gradlePlugin != null) {
@@ -3667,60 +3670,55 @@ public record Project(
                     .supplements(supplements)
                     .resolutions(resolutions));
         }
-        String boms = environment.getProperty("project.boms");
+        String boms = environment.getProperty("project.boms", Setting.PROJECT);
         if (boms != null) {
-            project = project.boms(locations(environment, boms, project).toArray(Path[]::new));
+            project = project.boms(locations(environment, "project.boms", boms, project).toArray(Path[]::new));
         }
-        String signatures = environment.getProperty("project.signatures");
+        String signatures = environment.getProperty("project.signatures", Setting.PROJECT);
         if (signatures != null) {
-            project = project.signatures(locations(environment, signatures, project).toArray(Path[]::new));
+            project = project.signatures(locations(environment, "project.signatures", signatures, project).toArray(Path[]::new));
         }
-        Path target = environment.path("project.target");
+        Path target = environment.path("project.target", Setting.CONFINED);
         if (target != null) {
             project = project.target(target);
         }
-        Path reproduce = environment.path("project.reproduce");
+        Path reproduce = environment.path("project.reproduce", Setting.CONFINED);
         if (reproduce != null) {
             project = project.reproduce(reproduce);
         }
-        Path artifacts = environment.path("project.artifacts");
+        Path artifacts = environment.path("project.artifacts", Setting.CONFINED);
         if (artifacts != null) {
             project = project.artifacts(artifacts);
         }
-        String cache = environment.getProperty("project.cache");
-        if (cache != null) {
-            if (cache.contains("://")) {
-                throw new IllegalArgumentException("jenesis.project.cache is a filesystem path, not a URI"
-                        + " (use jenesis.cache.uri for a URI): " + cache);
-            }
-            project = project.cache(new BuildExecutorFileCache(project.root().resolve(cache.isEmpty()
-                    ? Path.of(".jenesis", "cache")
-                    : Path.of(cache))));
+        if (environment.keys().containsKey("project.cache")) {
+            project = project.cache(new BuildExecutorFileCache(environment.path("project.cache",
+                    ".jenesis/cache",
+                    Setting.CONFINED)));
         }
         if (layout != null) {
             project = project.layout(layout);
         }
-        String metadata = environment.getProperty("project.metadata");
+        String metadata = environment.getProperty("project.metadata", Setting.PROJECT);
         if (metadata != null) {
             project = project.metadata(Arrays.stream(metadata.split(","))
                     .map(String::trim)
                     .filter(value -> !value.isEmpty())
-                    .map(Path::of)
+                    .map(value -> environment.located("project.metadata", value, Setting.PROJECT))
                     .toArray(Path[]::new));
         }
-        String digest = environment.getProperty("project.digest");
+        String digest = environment.getProperty("project.digest", Setting.PROJECT);
         if (digest != null) {
             project = project.hashFunction(new HashDigestFunction(digest));
         }
-        Boolean sources = environment.flagOrNull("project.sources");
+        Boolean sources = environment.flagOrNull("project.sources", Setting.PROJECT);
         if (sources != null) {
             project = project.sources(sources);
         }
-        Boolean documentation = environment.flagOrNull("project.documentation");
+        Boolean documentation = environment.flagOrNull("project.documentation", Setting.PROJECT);
         if (documentation != null) {
             project = project.documentation(documentation);
         }
-        String version = environment.getProperty("project.version");
+        String version = environment.getProperty("project.version", Setting.PROJECT);
         if (version != null) {
             try {
                 ModuleDescriptor.Version.parse(version);
@@ -3732,15 +3730,15 @@ public record Project(
             }
             project = project.version(version);
         }
-        String tag = environment.getProperty("project.tag");
+        String tag = environment.getProperty("project.tag", Setting.PROJECT);
         if (tag != null) {
             project = project.tag(tag);
         }
-        String revision = environment.getProperty("project.revision");
+        String revision = environment.getProperty("project.revision", Setting.PROJECT);
         if (revision != null) {
             project = project.revision(revision);
         }
-        String tree = environment.getProperty("project.tree");
+        String tree = environment.getProperty("project.tree", Setting.PROJECT);
         if (tree != null) {
             project = project.tree(tree);
         }
@@ -3748,15 +3746,15 @@ public record Project(
         return project.pinning(Pinning.ofEnvironment(environment)).configurator(() -> executor);
     }
 
-    private static SequencedSet<Path> locations(Environment environment, String text, Project project) {
+    private static SequencedSet<Path> locations(Environment environment, String key, String text, Project project) {
         SequencedSet<Path> target = new LinkedHashSet<>();
-        locations(environment, text, project.root(), project.configuration(), new HashSet<>(), target);
+        locations(environment, key, text, project.configuration(), new HashSet<>(), target);
         return target;
     }
 
     private static void locations(Environment environment,
+                                  String key,
                                   String text,
-                                  Path root,
                                   SequencedSet<Path> defaults,
                                   Set<String> visited,
                                   SequencedSet<Path> target) {
@@ -3770,18 +3768,18 @@ public record Project(
                 if (name.isEmpty()) {
                     target.addAll(defaults);
                 } else {
-                    String value = environment.getProperty(name, System.getenv(name));
+                    String value = environment.getProperty(name, System.getenv(name), Setting.PROJECT);
                     if (value == null) {
                         throw new IllegalStateException("Unresolved location reference: @" + name);
                     }
                     if (!visited.add(name)) {
                         throw new IllegalStateException("Circular location reference: @" + name);
                     }
-                    locations(environment, value, root, defaults, visited, target);
+                    locations(environment, name, value, defaults, visited, target);
                     visited.remove(name);
                 }
             } else {
-                target.add(root.resolve(Path.of(candidate)));
+                target.add(environment.located(key, candidate, Setting.PROJECT));
             }
         }
     }
@@ -4610,7 +4608,7 @@ public record Project(
                     }
                 }, selectors);
         if (new Reproduction(target, firstSteps, reproduce, secondSteps).verify(environment.out(),
-                environment.flag("print.reproduce", true))) {
+                environment.flag("print.reproduce", true, Setting.PROJECT))) {
             Files.walkFileTree(reproduce, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
@@ -4717,7 +4715,11 @@ public record Project(
                 make.root|.|Folder Make looks for the project in; only settable on the command line
                 make.profiles||Comma-separated profiles layered over jenesis.properties
                 make.global||Folder holding the user-global .jenesis/jenesis.properties, relative to the working directory; default: the home folder; only settable on the command line
-                make.provided||Settings that the files a project provides supplied, comma-separated and named without the jenesis. prefix; derived by Make and settable in no file, so that a repository or cache URL a project named is never sent a credential
+                make.provided||Settings that the files a project provides supplied, comma-separated and named without the jenesis. prefix; derived by Make and settable in no file, so that a repository or cache URL a project named is never sent a credential, a setting of the machine named there is refused where it is read, and a path named there is relative to the project root
+                make.personal||Settings that ~/.jenesis/jenesis.properties and its profiles supplied, likewise, so that a path of the machine named there is relative to make.home
+                make.home||The folder holding ~/.jenesis/jenesis.properties, derived by Make and settable in no file
+                make.ambient||Settings that the command line supplied, likewise, so that a path named there is relative to make.directory
+                make.directory||The working directory of the command line, which a relative path named there resolves against; set by the command and the tools, kept by a daemon or container they hand the build to, and settable in no file
                 make.mode|daemon|How the engine runs: source runs it from the build sources, compiled compiles them once and runs from those classes, aot runs those classes in a JVM that loads them from an ahead-of-time cache in aot.folder, trained on the first build that finds none and reused by every later one, and daemon hands the build to a reused JVM, which --stop as the only selector shuts down, every daemon of daemon.folder with it; unset, it is daemon, or compiled where process.mode names fork or aot, project.docker is set or release.publish publishes, so that a release runs in a JVM no earlier build ran in; aot applies where the engine runs compiled, as the installed CLI runs it, and in source mode caches only the tools, whose JVM is running before it could be handed a cache; aot and daemon set process.mode to the same unless it is set; the [STARTED] line and the started event of the events file name the mode the build ran in
                 make.classes|.jenesis/classes|Where those classes land, relative to the working directory on the command line and to the project root in a file; a file a project provides names only a folder inside the project
                 daemon.idle|10800|Seconds an idle daemon waits before exiting; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
@@ -4912,7 +4914,7 @@ public record Project(
         for (String line : CATALOGUE.lines().toList()) {
             String[] entry = line.split("\\|", 3);
             String name = "jenesis." + entry[0];
-            String value = environment.getProperty(entry[0]);
+            String value = environment.getProperty(entry[0], Setting.PROJECT);
             String assignment = name + "=" + (value == null ? entry[1] : value);
             String state = value != null ? "[set]" : entry[1].isEmpty() ? "[unset]" : "[default]";
             String prefix = assignment + " ".repeat(Math.max(1, 46 - assignment.length())) + state;
@@ -4929,10 +4931,10 @@ public record Project(
             settings(environment).forEach((name, value) -> environment.out().accept(name + "=" + value));
             return Collections.emptyNavigableMap();
         }
-        if (environment.flag("project.docker")) {
+        if (environment.flag("project.docker", Setting.MACHINE)) {
             SortedMap<String, String> properties = new TreeMap<>(settings(environment));
             properties.keySet().removeAll(Make.CONTAINED);
-            String image = environment.getProperty("project.image");
+            String image = environment.getProperty("project.image", Setting.MACHINE);
             Path root = this.root().toAbsolutePath().normalize();
             DockerizedJava docker = image == null ? new DockerizedJava(root) : new DockerizedJava(root, image);
             for (Path path : Stream.of(this.target(), this.reproduce(), this.artifacts())
@@ -4958,62 +4960,69 @@ public record Project(
                     docker = docker.mount(absolute, absolute.toString(), true);
                 }
             }
-            String cacheOverride = environment.getProperty("project.cache");
-            if (cacheOverride != null && !cacheOverride.contains("://")) {
-                Path cache = root.resolve(cacheOverride.isEmpty()
-                        ? Path.of(".jenesis", "cache")
-                        : Path.of(cacheOverride)).normalize();
+            if (environment.keys().containsKey("project.cache")) {
+                Path cache = environment.path("project.cache", ".jenesis/cache", Setting.CONFINED)
+                        .toAbsolutePath()
+                        .normalize();
                 if (!cache.startsWith(root)) {
                     docker = docker.mount(Files.createDirectories(cache), cache.toString(), false);
                 }
             }
-            String cacheUri = environment.getProperty("cache.uri");
+            String cacheUri = environment.getProperty("cache.uri", Setting.MACHINE);
             if (cacheUri != null && cacheUri.startsWith("file:")) {
                 Path cache = Path.of(URI.create(cacheUri)).toAbsolutePath().normalize();
                 if (!cache.startsWith(root)) {
                     docker = docker.mount(Files.createDirectories(cache), cache.toString(), false);
                 }
             }
-            docker = docker.mounts(environment.getProperty("project.readable"), root, true);
-            docker = docker.mounts(environment.getProperty("project.writable"), root, false);
-            docker = docker.envs(environment.getProperty("project.env"));
-            String mavenRepositoryUri = environment.getProperty("maven.uri", System.getenv("MAVEN_REPOSITORY_URI"));
+            docker = docker.mounts(environment.getProperty("project.readable", Setting.MACHINE), root, true);
+            docker = docker.mounts(environment.getProperty("project.writable", Setting.MACHINE), root, false);
+            docker = docker.envs(environment.getProperty("project.env", Setting.MACHINE));
+            String mavenRepositoryUri = environment.getProperty("maven.uri",
+                    System.getenv("MAVEN_REPOSITORY_URI"),
+                    Setting.PROJECT);
             if (mavenRepositoryUri != null) {
                 docker = docker.env("MAVEN_REPOSITORY_URI", mavenRepositoryUri);
             }
-            String jenesisRepositoryUri = environment.getProperty("module.uri", System.getenv("JENESIS_REPOSITORY_URI"));
+            String jenesisRepositoryUri = environment.getProperty("module.uri", System.getenv("JENESIS_REPOSITORY_URI"), Setting.PROJECT);
             if (jenesisRepositoryUri != null) {
                 docker = docker.env("JENESIS_REPOSITORY_URI", jenesisRepositoryUri);
             }
-            String mavenRepositoryLocal = environment.getProperty("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
+            Path mavenRepositoryLocal = environment.path("maven.local",
+                    System.getenv("MAVEN_REPOSITORY_LOCAL"),
+                    Setting.MACHINE);
             Path mavenLocal = (mavenRepositoryLocal == null
                                ? Path.of(System.getProperty("user.home"), ".m2", "repository")
-                               : Path.of(mavenRepositoryLocal)).toAbsolutePath().normalize();
+                               : mavenRepositoryLocal).toAbsolutePath().normalize();
             if (Files.isDirectory(mavenLocal)) {
                 docker = docker.mount(mavenLocal, mavenLocal.toString(), true);
                 docker = docker.env("MAVEN_REPOSITORY_LOCAL", mavenLocal.toString());
             }
-            String openPgpRepositoryUri = environment.getProperty("openpgp.uri", System.getenv("OPENPGP_REPOSITORY_URI"));
+            String openPgpRepositoryUri = environment.getProperty("openpgp.uri", System.getenv("OPENPGP_REPOSITORY_URI"), Setting.PROJECT);
             if (openPgpRepositoryUri != null) {
                 docker = docker.env("OPENPGP_REPOSITORY_URI", openPgpRepositoryUri);
             }
-            String openPgpRepositoryLocal = environment.getProperty("openpgp.local", System.getenv("OPENPGP_REPOSITORY_LOCAL"));
+            Path openPgpRepositoryLocal = environment.path("openpgp.local",
+                    System.getenv("OPENPGP_REPOSITORY_LOCAL"),
+                    Setting.CONFINED);
             if (openPgpRepositoryLocal != null) {
-                Path openPgpLocal = Path.of(openPgpRepositoryLocal).toAbsolutePath().normalize();
+                Path openPgpLocal = openPgpRepositoryLocal.toAbsolutePath().normalize();
                 if (Files.isDirectory(openPgpLocal) && !openPgpLocal.startsWith(root)) {
                     docker = docker.mount(openPgpLocal, openPgpLocal.toString(), true);
                 }
                 docker = docker.env("OPENPGP_REPOSITORY_LOCAL", openPgpLocal.toString());
             }
-            String jenesisRepositoryLocal = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
+            Path jenesisRepositoryLocal = environment.path("module.local",
+                    System.getenv("JENESIS_REPOSITORY_LOCAL"),
+                    Setting.MACHINE);
             Path jenesisLocal = (jenesisRepositoryLocal == null
                                  ? Path.of(System.getProperty("user.home"), ".jenesis")
-                                 : Path.of(jenesisRepositoryLocal)).toAbsolutePath().normalize();
+                                 : jenesisRepositoryLocal).toAbsolutePath().normalize();
             if (Files.isDirectory(jenesisLocal)) {
                 docker = docker.mount(jenesisLocal, jenesisLocal.toString(), true);
                 docker = docker.env("JENESIS_REPOSITORY_LOCAL", jenesisLocal.toString());
             }
-            if (environment.flag("print.docker", true)) {
+            if (environment.flag("print.docker", true, Setting.PROJECT)) {
                 environment.out().accept("Launching build within Docker image: " + docker.image());
             }
             int code = docker.execute("build/jenesis/Make.java", properties, selectors);
@@ -5022,7 +5031,7 @@ public record Project(
             }
             return Collections.emptyNavigableMap();
         }
-        if (environment.flag("project.watch")) {
+        if (environment.flag("project.watch", Setting.PROJECT)) {
             watch(selectors);
             return Collections.emptyNavigableMap();
         }

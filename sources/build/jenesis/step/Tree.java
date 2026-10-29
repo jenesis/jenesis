@@ -8,6 +8,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.DependencyTreeReport;
 import build.jenesis.Environment;
 import build.jenesis.License;
+import build.jenesis.Make.Setting;
 import build.jenesis.Palette;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -27,12 +28,12 @@ public class Tree implements BuildStep {
         Tree tree = new Tree(environment.out(),
                 Palette.ofEnvironment(environment),
                 false,
-                environment.flag("tree.merge", true),
-                environment.flag("tree.internal", false),
-                environment.flag("tree.tests", true),
-                environment.flag("tree.tools", false),
+                environment.flag("tree.merge", true, Setting.PROJECT),
+                environment.flag("tree.internal", false, Setting.PROJECT),
+                environment.flag("tree.tests", true, Setting.PROJECT),
+                environment.flag("tree.tools", false, Setting.PROJECT),
                 "main");
-        String format = environment.getProperty("tree.format");
+        String format = environment.getProperty("tree.format", Setting.PROJECT);
         return format == null ? tree : tree.compact(switch (format) {
             case "full" -> false;
             case "compact" -> true;

@@ -56,8 +56,8 @@ onboarding briefing from the same material, `skill/<page>` one page and `skill` 
 where the object is built:
 
 - `ofEnvironment(environment, …)` reads every setting from the `Environment` it is handed
-  (`environment.value("executor.digest", "MD5")`), with what the object cannot do without as further arguments
-  (`Project.ofEnvironment(environment, root)`);
+  (`environment.value("executor.digest", "MD5", Setting.PROJECT)`), with what the object cannot do without as
+  further arguments (`Project.ofEnvironment(environment, root)`);
 - the public short constructor reads nothing and takes every default, as `Environment.NONE` would;
 - the canonical constructor takes every value; a wither replaces one and calls it.
 
@@ -86,17 +86,22 @@ line's `-Djenesis.*` arguments over it and hands the map down; a program of its 
 be named in advance (`jenesis.platform.<token>`, `jenesis.plugin.<name>`) is found by listing the map. `Make` and
 `Toolchain` read a bare `Map<String, String>`, because `MakeClosureTest` holds each to compiling alone; `Project.perform`
 and `Project.run` take that map, so the reflective handoff names JDK types alone. A rule both sides need - how a flag
-parses, what `@<file>` expands to - lives in `Make`, package-private, and the engine calls it (`flagOrNull` and
-`arguments` on `SequencedProperties`).
+parses, what `@<file>` expands to, who may set a setting and what its path is relative to - lives in `Make`,
+package-private, and the engine calls it (`flagOrNull` and `arguments` on `SequencedProperties`, every accessor of
+`Environment`).
 
 **Reading a value.** The accessors are `getProperty` for the raw value, `value` for the trimmed one that reads blank as
-absent, `flag`, `flagOrNull`, `number`, `entries`, `words`, `path` for a file or folder, resolved against the root,
-and `variable` for a file value naming
-`jenesis.variable.<key>` as `@<key>`. A boolean is the default when absent, true when named with no value or
-`=true`, false at `=false`, and any other value is refused naming the valid ones; `flagOrNull` answers `null` when
-absence is a third state. `Boolean.getBoolean` and `Integer.getInteger` are not used. Environment variables are
-fallbacks for the repository settings (`MAVEN_REPOSITORY_URI`, `JENESIS_REPOSITORY_TOKEN`, …) and the toolchain
-installer alone.
+absent, `flag`, `flagOrNull`, `number`, `entries`, `words`, `path` for a file or folder, `located` for a path that is
+part of a value, and `variable` for a file value naming `jenesis.variable.<key>` as `@<key>`. Every accessor but
+`variable` takes a `Make.Setting` naming who may set what it reads, so that the reader, which owns the setting, decides
+it where the value is used and no list elsewhere has to know the key: `PROJECT` any file, `CONFINED` any file, a
+project's naming only a location inside the project (a folder the build writes to, read by `path` alone), `MACHINE`
+the command line and your own files alone (a credential, a program or a JVM's options, a cache, folder or trust root
+shared between projects, the signing key, a container's boundary), `COMMAND` the command line alone. A boolean is the
+default when absent, true when named with no value or `=true`, false at `=false`, and any other value is refused
+naming the valid ones; `flagOrNull` answers `null` when absence is a third state. `Boolean.getBoolean` and
+`Integer.getInteger` are not used. Environment variables are fallbacks for the repository settings
+(`MAVEN_REPOSITORY_URI`, `JENESIS_REPOSITORY_TOKEN`, …) and the toolchain installer alone.
 
 **Files and command lines.** `Make.settings` layers `jenesis.properties` at the project root and the profile files
 under what the entry point holds and hands the result down as one map; nothing is copied into the JVM, so two builds
@@ -108,24 +113,26 @@ fingerprint on the engine, the JVM, its options and the environment, so that one
 matches, and on the project root as well under `jenesis.daemon.shared=false`; a container receives every setting save
 the `jenesis.project.docker` keys that start it.
 
-**A relative path is relative to where it is written.** On a command line it names a folder below the one the command
-runs in: `Make.ambient` and `JenesisTool` resolve every setting naming a path (`Make.PATHS`, the comma-separated
-`Make.LOCATIONS`, the files of `project.resources` and of the jarsigner passwords) through `Make.located` before
-anything else reads them, so a daemon, whose own folder is its working directory, is handed absolute paths. In
-`~/.jenesis/jenesis.properties` and its profiles, a path naming what the machine shares between projects
-(`Make.MACHINE`: the local repositories, `daemon.folder`, the signing key and its passwords) is relative to
-`~/.jenesis`, resolved by `Make.settings` as it reads the file. `Make` alone knows where a value was written, so it
-resolves these two before the layers merge. Everything else, a project's own files and a map a program hands `Make`
-or `Project` included, is relative to the project root: a reader takes a path through `environment.path(key)`, never
-`Path.of(environment.value(key))`, and an absolute path is used as it is. A new setting naming a path is read through
-`path` and joins `Make.PATHS` or `Make.LOCATIONS` in the same commit. A step resolves nothing against the working
-directory: it reads the folders it is handed and writes `context.next()`.
+**Make records where each setting was written.** `Make.settings` lists the keys whose value in force a project's files
+supplied as `make.provided`, those your own `~/.jenesis/jenesis.properties` and its profiles supplied as
+`make.personal`, beside their folder as `make.home`, and those the command line supplied as `make.ambient`, beside the
+folder it ran in as `make.directory`, which `Make.ambient` and `JenesisTool` record; no file may set any of them. A
+build handed its settings by another - the daemon, a container - is handed these lists too and keeps them, so a
+project's setting never passes for its user's. `Make.setting` is the one rule every accessor applies: a `MACHINE`
+setting a project's file supplied, or a `COMMAND` setting any file supplied, is refused naming it, when it is read.
+`Make.settings` itself refuses only what it reads before the layers merge (`make.root`, `make.global`) and the lists.
 
-**A project's own files are untrusted.** `Make.settings` refuses, in a project's `jenesis.properties` and profiles,
-every key naming a program the build runs or a JVM's options, a credential, a cache, folder or trust root shared
-between projects, the signing key, or a container's boundary, and keeps the folders it names for writing below the
-project root. `~/.jenesis/jenesis.properties` and its profiles outrank the project, the command line outranks both. A
-new property of those kinds joins those lists in the same commit.
+**A relative path is relative to where it is written.** On a command line it names a folder below the one the command
+runs in, in your own files a `MACHINE` path names one below `~/.jenesis` and every other one a folder of the project,
+and in a project's files and a map a program hands `Make` or `Project` a folder of the project. A reader takes a path
+through `environment.path(key, setting)`, or `located` for a part of a value, never `Path.of(environment.value(key))`,
+and an absolute path is used as it is. A step resolves nothing against the working directory: it reads the folders it
+is handed and writes `context.next()`.
+
+**A project's own files are untrusted.** A reader names a setting `MACHINE` where a project must not choose it, and
+`CONFINED` where a project may only name a folder of its own; `~/.jenesis/jenesis.properties` and its profiles outrank
+the project, the command line outranks both. `Toolchain`, which compiles alone, applies the same rule to its search
+path and installer itself.
 
 **Who reads what.** `jenesis.make.*` is read by `Make` and the main methods it launches, before a `Project` exists:
 `root`, `profiles`, `global`, `mode` (`source`, `compiled`, `aot` or `daemon`) and `classes`. Unset, the mode is
