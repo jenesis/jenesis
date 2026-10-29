@@ -31,11 +31,27 @@ public final class Make {
             "jenesis.pin.file",
             "jenesis.aot.folder",
             "jenesis.process.directory");
-    private static final List<String> MACHINE = List.of("jenesis.maven.local",
-            "jenesis.module.local",
-            "jenesis.daemon.folder",
-            "jenesis.jarsigner.keystore"),
-            PASSWORDS = List.of("jenesis.jarsigner.storepass", "jenesis.jarsigner.keypass");
+    private static final List<String> MACHINE = List.of("maven.local",
+            "module.local",
+            "daemon.folder",
+            "jarsigner.keystore",
+            "jarsigner.storepass",
+            "jarsigner.keypass");
+    private static final List<String> PATHS = List.of("project.target",
+            "project.reproduce",
+            "project.artifacts",
+            "project.cache",
+            "make.global",
+            "make.classes",
+            "daemon.folder",
+            "aot.folder",
+            "process.directory",
+            "pin.file",
+            "maven.local",
+            "module.local",
+            "openpgp.local",
+            "jarsigner.keystore"),
+            LOCATIONS = List.of("project.configuration", "project.boms", "project.signatures", "pin.provided");
     private static final Set<String> PRINTING = Set.of("help", "skill", "prompt", "configuration", "properties", "--stop");
     static final List<String> CONTAINED = List.of("jenesis.project.docker",
             "jenesis.project.image",
@@ -219,7 +235,49 @@ public final class Make {
             }
         }
         properties.putAll(named);
-        return keys(properties);
+        return located(keys(properties), Path.of("").toAbsolutePath());
+    }
+
+    static Map<String, String> located(Map<String, String> keys, Path folder) {
+        Map<String, String> located = new HashMap<>(keys);
+        for (String key : PATHS) {
+            String value = keys.get(key);
+            if (value != null && !value.isBlank() && !value.contains("://")) {
+                located.put(key, folder.resolve(value.strip()).normalize().toString());
+            }
+        }
+        for (String key : LOCATIONS) {
+            String value = keys.get(key);
+            if (value != null && !value.isBlank()) {
+                List<String> entries = new ArrayList<>();
+                for (String entry : value.split(",")) {
+                    String candidate = entry.strip();
+                    entries.add(candidate.isEmpty() || candidate.startsWith("@")
+                            ? candidate
+                            : folder.resolve(candidate).normalize().toString());
+                }
+                located.put(key, String.join(",", entries));
+            }
+        }
+        String resources = keys.get("project.resources");
+        if (resources != null && !resources.isBlank()) {
+            List<String> entries = new ArrayList<>();
+            for (String entry : resources.split(",")) {
+                int colon = entry.lastIndexOf(':');
+                entries.add(colon <= 0
+                        ? entry
+                        : folder.resolve(entry.substring(0, colon).strip()).normalize() + entry.substring(colon));
+            }
+            located.put("project.resources", String.join(",", entries));
+        }
+        for (String key : List.of("jarsigner.storepass", "jarsigner.keypass")) {
+            String value = keys.get(key);
+            String[] words = value == null ? new String[0] : value.strip().split("\\s+", 2);
+            if (words.length == 2 && words[0].equals("file")) {
+                located.put(key, "file " + folder.resolve(words[1].strip()).normalize());
+            }
+        }
+        return Map.copyOf(located);
     }
 
     public static Map<String, String> keys(Map<String, String> properties) {
@@ -791,19 +849,14 @@ public final class Make {
     }
 
     private static Properties anchored(Properties properties, Path folder) {
+        Map<String, String> machine = new HashMap<>();
         for (String key : MACHINE) {
-            String value = properties.getProperty(key);
-            if (value != null && !value.isBlank()) {
-                properties.setProperty(key, folder.resolve(value.strip()).normalize().toString());
+            String value = properties.getProperty("jenesis." + key);
+            if (value != null) {
+                machine.put(key, value);
             }
         }
-        for (String key : PASSWORDS) {
-            String value = properties.getProperty(key);
-            String[] words = value == null ? new String[0] : value.strip().split("\\s+", 2);
-            if (words.length == 2 && words[0].equals("file")) {
-                properties.setProperty(key, "file " + folder.resolve(words[1].strip()).normalize());
-            }
-        }
+        located(machine, folder).forEach((key, value) -> properties.setProperty("jenesis." + key, value));
         return properties;
     }
 

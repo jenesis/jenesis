@@ -106,16 +106,18 @@ fingerprint on the engine, the JVM, its options and the environment, so that one
 matches, and on the project root as well under `jenesis.daemon.shared=false`; a container receives every setting save
 the `jenesis.project.docker` keys that start it.
 
-**A relative path is relative to the project root**, never to the working directory, which is the daemon's own folder
-under a shared daemon and need not be the root anywhere else. `Project.ofEnvironment` resolves every setting naming a
-file or folder that is read outside a `Project` (`maven.local`, `module.local`, `openpgp.local`, `jarsigner.keystore`
-and the `file` of its passwords, `aot.folder`, `process.directory`, which defaults to the root) before handing the
-environment on, and `Make` resolves its own (`make.global`, `daemon.folder`) against the root it holds; a new setting
-naming a path joins that list in the same commit. The one exception is a path naming what the machine shares between
-projects - `maven.local`, `module.local`, `daemon.folder`, the signing key and its passwords - in
-`~/.jenesis/jenesis.properties` or a profile beside it: `Make.settings` resolves it against `~/.jenesis` as it reads the
-file, so it names one folder for every project, while the command line keeps naming the root's. A step resolves nothing
-against the working directory either: it reads the folders it is handed and writes `context.next()`.
+**A relative path is relative to where it is written.** On a command line it names a folder below the one the command
+runs in: `Make.ambient` and `JenesisTool` resolve every setting naming a path (`Make.PATHS`, the comma-separated
+`Make.LOCATIONS`, the files of `project.resources` and of the jarsigner passwords) against the working directory before
+anything else reads them, so a daemon, whose own folder is its working directory, is handed absolute paths. In
+`~/.jenesis/jenesis.properties` and its profiles, a path naming what the machine shares between projects
+(`Make.MACHINE`: the local repositories, `daemon.folder`, the signing key and its passwords) is relative to
+`~/.jenesis`, resolved by `Make.settings` as it reads the file. Everything else, a project's own files and a map a
+program hands `Make` or `Project` included, is relative to the project root: `Project.ofEnvironment` resolves the
+settings read outside a `Project` through the same `Make.located` before handing the environment on, and a `Project`
+resolves its own folders against its root; an absolute path is used as it is. A new setting
+naming a path joins `Make.PATHS` or `Make.LOCATIONS` in the same commit. A step resolves nothing against the working
+directory: it reads the folders it is handed and writes `context.next()`.
 
 **A project's own files are untrusted.** `Make.settings` refuses, in a project's `jenesis.properties` and profiles,
 every key naming a program the build runs or a JVM's options, a credential, a cache, folder or trust root shared
