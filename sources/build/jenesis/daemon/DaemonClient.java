@@ -32,13 +32,13 @@ public final class DaemonClient {
     private final SequencedMap<String, String> outputs;
 
     public DaemonClient(Path root, List<String> path, String mainClass, SequencedMap<String, String> supplied) {
-        Environment environment = new Environment(Make.keys(effective(supplied)));
+        Environment environment = new Environment(Make.keys(effective(supplied))).root(root.toAbsolutePath());
         int limit = environment.number("daemon.limit", 3, Setting.MACHINE);
         if (limit < 1) {
             throw new IllegalArgumentException("jenesis.daemon.limit is " + limit
                     + ", but names how many build daemons may run at once: 1 or more");
         }
-        Path location = environment.root(root.toAbsolutePath()).path("daemon.folder", Setting.MACHINE);
+        Path location = environment.path("daemon.folder", Setting.MACHINE);
         this(root,
                 path,
                 mainClass,

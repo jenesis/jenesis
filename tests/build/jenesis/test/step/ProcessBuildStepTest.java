@@ -338,7 +338,7 @@ public class ProcessBuildStepTest {
     @Test
     public void the_command_specific_setting_enables_streaming() {
         List<String> printed = new ArrayList<>();
-        assertThat(new Probe(new Environment(Map.of("print.probe", "true"), printed::add, printed::add)).streams())
+        assertThat(new Probe(new Environment(Map.of("print.probe", "true")).out(printed::add).err(printed::add)).streams())
                 .isTrue();
         assertThat(printed)
                 .as("the lines go to the output the run was given, never to the stream of the JVM")
