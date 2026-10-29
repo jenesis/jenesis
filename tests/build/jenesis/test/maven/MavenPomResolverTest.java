@@ -5185,7 +5185,8 @@ public class MavenPomResolverTest {
                 """);
         assertThat(mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of("child")).aliases())
                 .as("a jar without a module name is named for the module path, as @jenesis.alias does in module-info.java")
-                .containsExactly(Map.entry("jline", "jline/jline"), Map.entry("groovy.all", "org.codehaus.groovy/groovy-all"));
+                .containsExactly(Map.entry("jline", "maven/jline/jline"),
+                        Map.entry("groovy.all", "maven/org.codehaus.groovy/groovy-all"));
     }
 
     @Test
@@ -5201,7 +5202,7 @@ public class MavenPomResolverTest {
                 </project>
                 """);
         assertThat(mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of("")).aliases())
-                .containsExactly(Map.entry("java.money", "javax.money/money-api"));
+                .containsExactly(Map.entry("java.money", "maven/javax.money/money-api"));
         Files.writeString(project.resolve("pom.xml"), Files.readString(project.resolve("pom.xml"))
                 .replace("java.money", "java.sql"));
         assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))

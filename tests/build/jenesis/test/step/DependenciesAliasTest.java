@@ -412,6 +412,43 @@ public class DependenciesAliasTest {
     public void a_module_name_required_after_the_manifest_resolves_as_its_alias_names_it() throws IOException {
         plainLib();
         plainLibVersion("2.0");
+        aliasedTo("maven/org.example/plain-lib");
+        next = aliasedExecutor("maven").execute().get("resolved");
+
+        assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
+                .as("a test framework's runner is required by module name once the module's own requirements are"
+                        + " written, and still resolves as the coordinate the module's alias names, at the version"
+                        + " it was handed, rather than through the module repository")
+                .contains("main/runtime/maven/org.example/plain-lib/1.0")
+                .noneMatch(key -> key.startsWith("main/runtime/module/"));
+        assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar")).exists();
+    }
+
+    @Test
+    public void an_alias_resolves_its_target_from_the_repository_it_names() throws IOException {
+        plainLib();
+        aliasedTo("internal/org.example/plain-lib");
+        next = aliasedExecutor("internal").execute().get("resolved");
+
+        assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
+                .as("the alias names the repository its artifact is resolved from")
+                .contains("main/runtime/internal/org.example/plain-lib/1.0");
+        assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar")).exists();
+    }
+
+    @Test
+    public void an_alias_naming_a_repository_the_build_does_not_resolve_is_refused() throws IOException {
+        plainLib();
+        aliasedTo("absent/org.example/plain-lib");
+
+        assertThatThrownBy(() -> aliasedExecutor("maven").execute())
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot resolve [absent/org.example/plain-lib")
+                .hasMessageContaining("resolves no absent coordinate, only those of [maven]");
+    }
+
+    private void aliasedTo(String target) throws IOException {
         SequencedProperties requires = new SequencedProperties();
         requires.setProperty("main/runtime/module/toolkit.lib", "");
         requires.store(dependencies.resolve(BuildStep.REQUIRES));
@@ -419,8 +456,11 @@ public class DependenciesAliasTest {
         versions.setProperty("main/module/toolkit.lib", "1.0");
         versions.store(dependencies.resolve(BuildStep.VERSIONS));
         SequencedProperties aliases = new SequencedProperties();
-        aliases.setProperty("main/module/toolkit.lib", "maven/org.example/plain-lib");
+        aliases.setProperty("main/module/toolkit.lib", target);
         aliases.store(dependencies.resolve(BuildStep.ALIASES));
+    }
+
+    private BuildExecutor aliasedExecutor(String repository) throws IOException {
         BuildExecutor executor = BuildExecutor.of(build,
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
@@ -432,17 +472,10 @@ public class DependenciesAliasTest {
                 0);
         executor.addSource("dependencies", dependencies);
         executor.addModule("resolved", new Dependencies(
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
-                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))), "dependencies");
-        next = executor.execute().get("resolved");
-
-        assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
-                .as("a test framework's runner is required by module name once the module's own requirements are"
-                        + " written, and still resolves as the coordinate the module's alias names, at the version"
-                        + " it was handed, rather than through the module repository")
-                .contains("main/runtime/maven/org.example/plain-lib/1.0")
-                .noneMatch(key -> key.startsWith("main/runtime/module/"));
-        assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar")).exists();
+                Map.of(repository,
+                        new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
+                Map.of(repository, new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))), "dependencies");
+        return executor;
     }
 
     @Test

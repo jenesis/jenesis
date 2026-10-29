@@ -29,6 +29,11 @@ The tag reads `@jenesis.alias <module-name> <groupId>/<artifactId>`. From then o
 other. The name is this project's to pick; `org.kohsuke.args4j`, matching the
 library's package, is the obvious one.
 
+A target with one slash is a Maven artifact. With more, its first segment names
+the repository it resolves from, as pins do: `maven/<groupId>/<artifactId>/pom`
+aliases an artifact of another type, and a repository a program configures is
+named the same way.
+
 Run it
 ------
 
