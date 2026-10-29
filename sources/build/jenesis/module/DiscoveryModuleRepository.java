@@ -140,6 +140,7 @@ public class DiscoveryModuleRepository implements JenesisRepository {
             } else if (!location.template()) {
                 URI root = location.root(connection).resolve(scope == Scope.MODULE ? "module/" : "artifact/");
                 item = repositories.computeIfAbsent(root, _ -> new JenesisModuleRepository(root)
+                        .local(null)
                         .connection(connection)
                         .printing(printing, palette)).fetch(executor, module, classifier, resolved, type);
             } else {

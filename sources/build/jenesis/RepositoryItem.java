@@ -27,6 +27,11 @@ public interface RepositoryItem {
                 Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
             } catch (FileAlreadyExistsException _) {
                 Files.deleteIfExists(temporary);
+            } catch (AccessDeniedException e) {
+                Files.deleteIfExists(temporary);
+                if (!Files.exists(target)) {
+                    throw e;
+                }
             } catch (Throwable t) {
                 Files.deleteIfExists(temporary);
                 throw t;
