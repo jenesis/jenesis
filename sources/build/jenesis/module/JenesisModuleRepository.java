@@ -56,10 +56,10 @@ public class JenesisModuleRepository implements JenesisRepository {
         if (repository == null) {
             throw new IllegalStateException("No Jenesis module repository is configured by: " + text);
         }
-        String local = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
+        Path local = environment.path("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
         return repository.prepend(ofEnvironment(environment, (local == null
                 ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
-                : Path.of(local)).toUri()));
+                : local).toUri()));
     }
 
     private static JenesisRepository chain(Environment environment,

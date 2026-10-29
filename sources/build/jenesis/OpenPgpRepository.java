@@ -42,10 +42,10 @@ public class OpenPgpRepository implements Repository {
     public static Repository ofEnvironment(Environment environment) {
         String property = environment.getProperty("openpgp.uri");
         String text = property == null ? System.getenv("OPENPGP_REPOSITORY_URI") : property;
-        Path local = Path.of(environment.getProperty("openpgp.local",
-                                                     System.getenv("OPENPGP_REPOSITORY_LOCAL") == null
-                                                     ? ".jenesis/keys"
-                                                     : System.getenv("OPENPGP_REPOSITORY_LOCAL")));
+        Path local = environment.path("openpgp.local",
+                                      System.getenv("OPENPGP_REPOSITORY_LOCAL") == null
+                                      ? ".jenesis/keys"
+                                      : System.getenv("OPENPGP_REPOSITORY_LOCAL"));
         List<URI> servers = new ArrayList<>();
         servers(environment, text == null ? "@" : text, new HashSet<>(), servers);
         List<OpenPgpRepository> chain = servers.stream()

@@ -42,6 +42,28 @@ public class EnvironmentTest {
     }
 
     @Test
+    public void a_relative_path_is_resolved_against_the_root_of_the_environment(@TempDir Path root) {
+        Environment environment = new Environment(Map.of("sample.folder", " folder/../repository ")).root(root);
+        assertThat(environment.path("sample.folder"))
+                .as("a setting names a folder of the project, never one of the working directory")
+                .isEqualTo(root.resolve("repository"));
+        assertThat(environment.path("sample.missing", "fallback")).isEqualTo(root.resolve("fallback"));
+        assertThat(environment.path("sample.missing")).isNull();
+    }
+
+    @Test
+    public void an_absolute_path_is_used_as_it_is(@TempDir Path root, @TempDir Path elsewhere) {
+        Environment environment = new Environment(Map.of("sample.folder", elsewhere.toString())).root(root);
+        assertThat(environment.path("sample.folder")).isEqualTo(elsewhere);
+    }
+
+    @Test
+    public void a_blank_path_reads_as_absent(@TempDir Path root) {
+        assertThat(new Environment(Map.of("sample.folder", " ")).root(root).path("sample.folder", "default"))
+                .isEqualTo(root.resolve("default"));
+    }
+
+    @Test
     public void a_flag_ignores_case_and_surrounding_space() {
         assertThat(new Environment(Map.of("sample.flag", " TRUE ")).flag("sample.flag")).isTrue();
     }

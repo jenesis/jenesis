@@ -25,8 +25,8 @@ public class MavenRepositoryExport implements BuildStep {
     }
 
     public static MavenRepositoryExport ofEnvironment(Environment environment) {
-        String override = environment.getProperty("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
-        return override == null ? new MavenRepositoryExport() : new MavenRepositoryExport(Path.of(override));
+        Path local = environment.path("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
+        return local == null ? new MavenRepositoryExport() : new MavenRepositoryExport(local);
     }
 
     public MavenRepositoryExport(Path target) {

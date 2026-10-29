@@ -2,7 +2,7 @@ package build.jenesis;
 
 import module java.base;
 
-public record Environment(Map<String, String> keys, Consumer<String> out, Consumer<String> err) {
+public record Environment(Map<String, String> keys, Consumer<String> out, Consumer<String> err, Path root) {
 
     public static final Environment NONE = new Environment(Map.of());
 
@@ -18,16 +18,24 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
         this(keys, out::println, err::println);
     }
 
+    public Environment(Map<String, String> keys, Consumer<String> out, Consumer<String> err) {
+        this(keys, out, err, null);
+    }
+
     public Environment keys(Map<String, String> keys) {
-        return new Environment(keys, out, err);
+        return new Environment(keys, out, err, root);
     }
 
     public Environment out(Consumer<String> out) {
-        return new Environment(keys, out, err);
+        return new Environment(keys, out, err, root);
     }
 
     public Environment err(Consumer<String> err) {
-        return new Environment(keys, out, err);
+        return new Environment(keys, out, err, root);
+    }
+
+    public Environment root(Path root) {
+        return new Environment(keys, out, err, root);
     }
 
     public String getProperty(String key) {
@@ -46,6 +54,25 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
     public String value(String key, String defaultValue) {
         String value = trimmed(keys.get(key));
         return value == null ? defaultValue : value;
+    }
+
+    public Path path(String key) {
+        return path(key, null);
+    }
+
+    public Path path(String key, String defaultValue) {
+        String value = value(key, defaultValue);
+        if (value == null) {
+            return null;
+        }
+        Path path;
+        try {
+            path = Path.of(value);
+        } catch (InvalidPathException e) {
+            throw new IllegalArgumentException("Malformed value for jenesis." + key + ": '" + value
+                    + "' (expected a path, absolute or relative to the project root)", e);
+        }
+        return root == null ? path : root.resolve(path).normalize();
     }
 
     public boolean flag(String key) {

@@ -74,12 +74,11 @@ public class MavenDefaultRepository implements MavenRepository {
     }
 
     static Path localRepository(Environment environment) {
-        String override = environment.getProperty("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
-        if (override == null) {
+        Path local = environment.path("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
+        if (local == null) {
             Path candidate = Path.of(System.getProperty("user.home"), ".m2", "repository");
             return Files.isDirectory(candidate) ? candidate : null;
         }
-        Path local = Path.of(override);
         if (!Files.isDirectory(local)) {
             throw new IllegalStateException("Local Maven repository does not point at a directory: " + local);
         }
