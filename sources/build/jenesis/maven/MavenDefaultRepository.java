@@ -75,7 +75,11 @@ public class MavenDefaultRepository implements MavenRepository {
                 environment.flag("print.fetch", Setting.PROJECT) ? environment.out() : null);
     }
 
-    static Path localRepository(Environment environment) {
+    public static Path localRepository(Environment environment) {
+        String declared = environment.getProperty("maven.local", Setting.MACHINE);
+        if (declared != null && declared.isBlank()) {
+            return null;
+        }
         Path local = environment.path("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"), Setting.MACHINE);
         if (local == null) {
             Path candidate = Path.of(System.getProperty("user.home"), ".m2", "repository");

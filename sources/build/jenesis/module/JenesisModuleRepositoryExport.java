@@ -6,7 +6,6 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
-import build.jenesis.Make.Setting;
 import build.jenesis.SequencedProperties;
 
 public class JenesisModuleRepositoryExport implements BuildStep {
@@ -18,8 +17,7 @@ public class JenesisModuleRepositoryExport implements BuildStep {
     }
 
     public static JenesisModuleRepositoryExport ofEnvironment(Environment environment) {
-        Path local = environment.path("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"), Setting.MACHINE);
-        return local == null ? new JenesisModuleRepositoryExport() : new JenesisModuleRepositoryExport(local);
+        return new JenesisModuleRepositoryExport(JenesisModuleRepository.localRepository(environment));
     }
 
     public JenesisModuleRepositoryExport(Path target) {
@@ -36,6 +34,10 @@ public class JenesisModuleRepositoryExport implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
+        if (target == null) {
+            throw new IllegalStateException("jenesis.module.local is empty, so there is no local module repository to"
+                    + " export into - name a folder, or leave it unset for ~/.jenesis");
+        }
         Set<Path> cleaned = new HashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {

@@ -17,40 +17,7 @@ public class HermeticRunTest {
     @ParameterizedTest
     @ValueSource(strings = {"maven", "modular", "modular_to_maven"})
     public void a_pinned_project_builds_and_tests_offline_from_a_fresh_checkout(String layout) throws IOException {
-        if (layout.equals("maven")) {
-            Files.writeString(root.resolve("pom.xml"), """
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <project xmlns="http://maven.apache.org/POM/4.0.0">
-                        <modelVersion>4.0.0</modelVersion>
-                        <groupId>sample</groupId>
-                        <artifactId>sample</artifactId>
-                        <version>1.0</version>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.junit.jupiter</groupId>
-                                <artifactId>junit-jupiter-api</artifactId>
-                                <version>5.11.3</version>
-                                <scope>test</scope>
-                            </dependency>
-                        </dependencies>
-                    </project>
-                    """);
-            write("src/main/java/sample/Sample.java", sample("sample"));
-            write("src/test/java/sample/SampleTest.java", test("sample", "Sample"));
-        } else {
-            write("sources/module-info.java", "module sample {\n    exports sample;\n}\n");
-            write("sources/sample/Sample.java", sample("sample"));
-            write("tests/module-info.java", """
-                    /**
-                     * @jenesis.test sample
-                     */
-                    open module sample.test {
-                        requires sample;
-                        requires org.junit.jupiter.api;
-                    }
-                    """);
-            write("tests/sample/test/SampleTest.java", test("sample.test", "sample.Sample"));
-        }
+        project(layout);
         List<String> settings = List.of("-Djenesis.project.layout=" + layout);
         make("the project is resolved and pinned once while the network is reachable", settings, "pin");
         make("pinning again reads what the first pin wrote", settings, "pin");
@@ -58,6 +25,27 @@ public class HermeticRunTest {
         make("a fresh checkout builds and runs its tests from what the machine keeps, every artifact pinned",
                 Stream.concat(settings.stream(), OFFLINE.stream()).toList());
         assertThat(tested()).contains("1 tests successful");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"maven", "modular"})
+    public void a_project_keeping_no_local_repository_builds_offline_from_its_own_folder(String layout)
+            throws IOException {
+        project(layout);
+        List<String> settings = List.of("-Djenesis.project.layout=" + layout,
+                "-Djenesis.maven.local=",
+                "-Djenesis.module.local=");
+        make("the project is resolved and pinned once while the network is reachable", settings, "pin");
+        make("a build from the pins keeps every pinned artifact in the project's own folder", settings, "pin");
+        delete(root.resolve("target"));
+        make("a checkout whose .jenesis folder was kept builds and runs its tests with the network refused",
+                Stream.concat(settings.stream(), OFFLINE.stream()).toList());
+        assertThat(tested()).contains("1 tests successful");
+        try (Stream<Path> kept = Files.walk(machine).filter(Files::isRegularFile)) {
+            assertThat(kept.toList())
+                    .as("with both local repositories switched off, nothing is kept outside the project")
+                    .isEmpty();
+        }
     }
 
     @Test
@@ -150,14 +138,53 @@ public class HermeticRunTest {
         assertThat(code).as("%s%n%s%n%s", reason, out, err).isZero();
     }
 
-    private void fresh() throws IOException {
-        for (String folder : List.of("target", ".jenesis")) {
-            Path location = root.resolve(folder);
-            if (Files.exists(location)) {
-                try (Stream<Path> files = Files.walk(location)) {
-                    for (Path file : files.sorted(Comparator.reverseOrder()).toList()) {
-                        Files.delete(file);
+    private void project(String layout) throws IOException {
+        if (layout.equals("maven")) {
+            Files.writeString(root.resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>sample</groupId>
+                        <artifactId>sample</artifactId>
+                        <version>1.0</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.junit.jupiter</groupId>
+                                <artifactId>junit-jupiter-api</artifactId>
+                                <version>5.11.3</version>
+                                <scope>test</scope>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                    """);
+            write("src/main/java/sample/Sample.java", sample("sample"));
+            write("src/test/java/sample/SampleTest.java", test("sample", "Sample"));
+        } else {
+            write("sources/module-info.java", "module sample {\n    exports sample;\n}\n");
+            write("sources/sample/Sample.java", sample("sample"));
+            write("tests/module-info.java", """
+                    /**
+                     * @jenesis.test sample
+                     */
+                    open module sample.test {
+                        requires sample;
+                        requires org.junit.jupiter.api;
                     }
+                    """);
+            write("tests/sample/test/SampleTest.java", test("sample.test", "sample.Sample"));
+        }
+    }
+
+    private void fresh() throws IOException {
+        delete(root.resolve("target"));
+        delete(root.resolve(".jenesis"));
+    }
+
+    private static void delete(Path location) throws IOException {
+        if (Files.exists(location)) {
+            try (Stream<Path> files = Files.walk(location)) {
+                for (Path file : files.sorted(Comparator.reverseOrder()).toList()) {
+                    Files.delete(file);
                 }
             }
         }
