@@ -702,9 +702,10 @@ The demo ships that file under a profile, so both paths stay runnable:
 ## 31. Which tests run - [`test-selection`](demo-39-test-selection/README.md), [`test-runs`](demo-40-test-runs/README.md)
 
 `test-selection` re-runs only the test classes a change can reach, which is worth
-having in a watch loop and not in continuous integration:
+having in a watch loop and not in continuous integration, or runs them first
+ahead of the rest with `prioritized`:
 
-    java -Djenesis.test.incremental -Djenesis.project.watch=true build/jenesis/Make.java
+    java -Djenesis.test.mode=incremental -Djenesis.project.watch=true build/jenesis/Make.java
 
 `test-runs` runs more tests rather than fewer. A module runs the tests it
 compiles, and also those of a dependency its `test.properties` names:

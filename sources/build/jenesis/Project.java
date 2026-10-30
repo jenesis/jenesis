@@ -1360,9 +1360,9 @@ public record Project(
                     drops that check, unlike Surefire's includes, so under JUnit 4 every class it
                     matches runs, a nested helper included: where the default naming fits, leave
                     classes out with jenesis.test.exclude, which keeps the check. A filter, an exclude
-                    and a tag each switch off -Djenesis.test.incremental, so a rerun runs every test
-                    they select rather than those a change reaches. A
-                    <module>/<regex> entry reaches that module only, and a module no entry reaches
+                    and a tag each switch off -Djenesis.test.mode=incremental, so a rerun runs every
+                    test they select rather than those a change reaches, which prioritized still runs
+                    first. A <module>/<regex> entry reaches that module only, and a module no entry reaches
                     runs no tests. In a pom.xml build <module> is the folder of the module's pom.xml
                     relative to the root, so the root module's entry is written /<regex>, with
                     nothing before the slash. jenesis.test.exclude takes the same entries, without a #method,
@@ -4820,7 +4820,7 @@ public record Project(
                 test.tag||Comma-separated alternatives, a test running when it matches any of them: a tag, several joined by + for the tests carrying all of them, and -<tag> for the tests not carrying it, as -container or release+-soak,-container, with nothing to quote on a command line and translated for the test framework; a run remembers what it covered until the tests' inputs change, so a later selection runs only the tests no earlier one ran
                 test.force|false|Execute tests even where a previous run already covered them
                 test.jars|true|Run the tests against the packaged test jar; false runs them against the module's classes and resources folders instead, as Maven and Gradle do, so a test can read its own resources as files, while the modules it depends on stay jars; a module tested on the module path refuses false
-                test.incremental||Run only the tests a change can reach: true, or the setting named with no value, detects changes with MD5, the name of another message digest with that one, and false runs every test
+                test.mode|alphabetic|Which tests run and in which order: alphabetic runs every test by class name, incremental only those a change reaches since the last successful run, none where it reaches none, and prioritized those first and every other test after them; incremental runs every test a filter, an exclude or a tag selects, and both run every test by class name where no earlier run is recorded or nothing changed
                 test.parallel|false|Let the engine execute the matched tests concurrently
                 test.concurrency|0|Run at most this many test runs at once across the build, each a forked JVM, while every other step keeps running; 1 runs one module's tests at a time, as Maven does, and 0 leaves them bounded by process.concurrency alone
                 test.reporting|false|Write a test run's reports into the module's reports/tests folder - the legacy JUnit XML and the open-test-reporting XML - and name that folder when the run fails; without it the JUnit Platform writes none
