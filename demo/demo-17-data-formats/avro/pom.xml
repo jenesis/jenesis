@@ -22,9 +22,16 @@
         </dependency>
     </dependencies>
     <!--jenesis.pin
-    avro/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
-    avro/module/build.jenesis.plugin.avro 0.1.0 SHA-256/728932e797c8bf270d03b6f011fca3f342dce3a7ba53de97e947864c7e5048ab
+    avro/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    avro/module/build.jenesis.plugin.avro 0.2.0 SHA-256/6e9bbfeff675c817779b27d48431515df981b35db09652af0e20e1915765d7c4
+    avro:tool/maven/com.fasterxml.jackson/jackson-bom/pom 2.22.1 SHA-256/b366aa5fd26958e2308a4807e5d42b14706b001b3ccbf138e31b8698dc0ac0ec
+    avro:tool/maven/com.fasterxml.jackson/jackson-parent/pom 2.22 SHA-256/7d45a7efb69df207bed7cc54b87a0bb012f10952c095570a273b49485da0d129
+    avro:tool/maven/com.fasterxml/oss-parent/pom 79 SHA-256/9206b7dd67fb138036576c3dfca947a2a8f3e2c4d2d9c1f2d1dea519b3a4dae1
+    avro:tool/maven/org.apache.avro/avro-parent/pom 1.12.2 SHA-256/ae436924d7acd1561984ee8b2a371aa92d47692a2f8f778e053eefd072225141
     avro:tool/maven/org.apache.avro/avro-tools 1.12.2 SHA-256/6220e8bc089aaf917cdad4cd358bd651fc0394c0e5ddb8b36da402012c294a68
+    avro:tool/maven/org.apache.avro/avro-tools/pom 1.12.2 SHA-256/f2d28fc9b71b85a77e53ca63632f767c93136dc7219592319c6e0e463398b448
+    avro:tool/maven/org.apache.avro/avro-toplevel/pom 1.12.2 SHA-256/f2256409c5cd5f937c67a5389b1b803bdf09ee30412ae49ded3de322cbf378f2
+    avro:tool/maven/org.apache/apache/pom 39 SHA-256/71752ed4c2435a1d8385fe0a4d330f39d04efec89f0d1ba5d1598d39f7397a44
     com.fasterxml.jackson.core/jackson-annotations 2.22 SHA-256/21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0
     maven/com.fasterxml.jackson.core/jackson-annotations/pom 2.22 SHA-256/38c3ba52a0eade3e3eacc5b13499d56e1038ccbad8ec4bb79426dc21432b46d0
     com.fasterxml.jackson.core/jackson-core 2.22.1 SHA-256/941ff029bcdb93e83d209ce516c1a7fb8bbac07d0a2fa122f5bf194b2cd7b4f4
