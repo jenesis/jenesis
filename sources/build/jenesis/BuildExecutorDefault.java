@@ -156,8 +156,18 @@ class BuildExecutorDefault implements BuildExecutor {
                         location + identity,
                         new LinkedHashSet<>(summaries.keySet()));
                 boolean cacheRemotely = step.shouldCacheRemotely();
-                Path next = target.resolve(identity + BuildExecutor.NEXT);
+                Path next = target.resolve(identity + BuildExecutor.NEXT),
+                        salvaged = target.resolve(identity + BuildExecutor.NEXT + PERSISTENT);
+                if (Files.exists(salvaged)) {
+                    Files.walkFileTree(salvaged, new RecursiveFolderDeletion(null));
+                }
                 if (Files.exists(next)) {
+                    Path marker = next.resolve(BuildExecutor.FAILED_MARKER), failed = next.resolve(PERSISTENT);
+                    if (Files.isDirectory(failed)
+                            && Files.isRegularFile(marker)
+                            && Files.readString(marker).equals(HexFormat.of().formatHex(currentStepHash))) {
+                        Files.move(failed, salvaged);
+                    }
                     Files.walkFileTree(next, new RecursiveFolderDeletion(null));
                 }
                 if (!consistent || step.shouldRun(arguments)) {
@@ -176,10 +186,15 @@ class BuildExecutorDefault implements BuildExecutor {
                         callback.loaded(location + identity, System.nanoTime() - fetchStarted);
                     }
                     Path nextPersistent = next.resolve(PERSISTENT);
-                    if (!fromCache && consistent && Files.isDirectory(previous.persistent())) {
+                    if (!fromCache && Files.isDirectory(salvaged)) {
+                        Files.move(salvaged, nextPersistent);
+                    } else if (!fromCache && consistent && Files.isDirectory(previous.persistent())) {
                         Files.move(previous.persistent(), nextPersistent);
                     } else {
                         Files.createDirectory(nextPersistent);
+                    }
+                    if (Files.exists(salvaged)) {
+                        Files.walkFileTree(salvaged, new RecursiveFolderDeletion(null));
                     }
                     CompletionStage<BuildStepResult> stepStage;
                     if (fromCache) {
@@ -283,7 +298,8 @@ class BuildExecutorDefault implements BuildExecutor {
                         };
                         try {
                             if (Files.isDirectory(next)) {
-                                Files.createFile(next.resolve(BuildExecutor.FAILED_MARKER));
+                                Files.writeString(next.resolve(BuildExecutor.FAILED_MARKER),
+                                        HexFormat.of().formatHex(currentStepHash));
                             }
                         } catch (IOException e) {
                             wrapped.addSuppressed(e);
@@ -292,6 +308,9 @@ class BuildExecutorDefault implements BuildExecutor {
                         return CompletableFuture.failedStage(wrapped);
                     }, executor);
                 } else {
+                    if (Files.exists(salvaged)) {
+                        Files.walkFileTree(salvaged, new RecursiveFolderDeletion(null));
+                    }
                     if (!vanished.isEmpty()) {
                         previous.forget(recorded, vanished.keySet());
                     }
