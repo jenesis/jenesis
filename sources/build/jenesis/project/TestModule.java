@@ -1552,11 +1552,6 @@ public class TestModule implements BuildExecutorModule {
             return super.acceptableExitCode(code, executor, context, arguments);
         }
 
-        @Override
-        public boolean persistsOnFailure() {
-            return mode.recordsFailures();
-        }
-
         private TestFramework framework(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             List<Path> folders = arguments.values().stream()
                     .filter(argument -> !argument.removed())
