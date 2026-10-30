@@ -702,8 +702,9 @@ The demo ships that file under a profile, so both paths stay runnable:
 ## 31. Which tests run - [`test-selection`](demo-39-test-selection/README.md), [`test-runs`](demo-40-test-runs/README.md)
 
 `test-selection` re-runs only the test classes a change can reach, which is worth
-having in a watch loop and not in continuous integration, or runs them first
-ahead of the rest with `prioritized`:
+having in a watch loop and not in continuous integration, runs them first
+ahead of the rest with `prioritized`, and runs the classes that failed last
+first with `failedfirst`, or only those with `failed`:
 
     java -Djenesis.test.mode=incremental -Djenesis.project.watch=true build/jenesis/Make.java
 

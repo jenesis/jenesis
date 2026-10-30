@@ -604,7 +604,14 @@ class JenesisClassLoaderBridge {
                         converted[types.length - 1]
                 };
             } else {
-                target = declaring.getMethod(method.getName(), types);
+                try {
+                    target = declaring.getMethod(method.getName(), types);
+                } catch (NoSuchMethodException e) {
+                    if (method.isDefault()) {
+                        return InvocationHandler.invokeDefault(proxy, method, args);
+                    }
+                    throw e;
+                }
             }
             try {
                 return convert(target.invoke(delegate, converted), origin, loader);

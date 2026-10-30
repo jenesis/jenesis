@@ -7,6 +7,8 @@ import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildExecutorFileCache;
 import build.jenesis.BuildStep;
+import build.jenesis.BuildStepArgument;
+import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
@@ -50,6 +52,34 @@ public class BuildExecutorPersistentTest {
         assertThat(build("third", counting(0)))
                 .as("what a failed run left behind may be inconsistent, so it is not handed on")
                 .isEqualTo("0");
+    }
+
+    @Test
+    public void hands_a_step_that_persists_on_failure_the_persistent_folder_of_its_failed_run() throws IOException {
+        assertThat(build("first", new Persisting(0))).isEqualTo("0");
+        assertThatThrownBy(() -> build("fail", new Persisting(0)))
+                .hasStackTraceContaining("failed after counting");
+        assertThat(build("third", new Persisting(0)))
+                .as("a step that persists on failure is handed what its failed run left")
+                .isEqualTo("2");
+    }
+
+    @Test
+    public void hands_a_step_that_persists_on_failure_the_folder_of_a_first_run_that_failed() throws IOException {
+        assertThatThrownBy(() -> build("fail", new Persisting(0)))
+                .hasStackTraceContaining("failed after counting");
+        assertThat(build("second", new Persisting(0)))
+                .as("no run succeeded before, so the failed run is the only one to remember")
+                .isEqualTo("1");
+    }
+
+    @Test
+    public void drops_the_folder_of_a_failed_run_of_a_step_whose_definition_changed() throws IOException {
+        assertThatThrownBy(() -> build("fail", new Persisting(0)))
+                .hasStackTraceContaining("failed after counting");
+        assertThat(build("second", new Persisting(1)))
+                .as("the folder describes a step that no longer exists")
+                .isEqualTo("1");
     }
 
     @Test
@@ -97,6 +127,22 @@ public class BuildExecutorPersistentTest {
         executor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(root.resolve("dependent").resolve("output").resolve("files")).content().isEqualTo("file");
         assertThat(root.resolve("step").resolve("checksum").resolve("output.properties")).content().doesNotContain("count");
+    }
+
+    private record Persisting(int offset) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            return counting(offset).apply(executor, context, arguments);
+        }
+
+        @Override
+        public boolean persistsOnFailure() {
+            return true;
+        }
     }
 
     private static BuildStep counting(int offset) {

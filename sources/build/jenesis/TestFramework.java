@@ -35,6 +35,11 @@ public interface TestFramework extends Serializable {
                            boolean parallel,
                            boolean reporting);
 
+    default Optional<SequencedMap<String, SequencedSet<String>>> failed(Path supplement,
+                                                                        Path output) throws IOException {
+        return Optional.empty();
+    }
+
     default List<String> tags(List<String> arguments, TestTags requested, List<TestTags> ran) {
         if (!requested.all()) {
             throw new IllegalArgumentException(getClass().getSimpleName() + " cannot select tests by tag, so it cannot run "

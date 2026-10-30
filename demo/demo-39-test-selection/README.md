@@ -17,7 +17,10 @@ integration should keep running the whole suite (a plain `build` with selection
 off), because static selection cannot see reflection, resources or other
 indirect couplings. `-Djenesis.test.mode=prioritized` keeps the whole suite and
 runs the tests a change reaches first, so their outcome is printed before the
-rest has run.
+rest has run. `-Djenesis.test.mode=failedfirst` keeps the whole suite as well
+and runs the classes that failed in the previous run first, and
+`-Djenesis.test.mode=failed` runs only those. Both record what failed in the
+test step's persistent folder, which a failed run keeps in these modes.
 
 What is re-run
 --------------
@@ -32,7 +35,7 @@ whole suite.
 What the demo does
 ------------------
 
-`build/Demo.java` runs the build four times. Each test records that it ran by
+`build/Demo.java` runs the build seven times. Each test records that it ran by
 touching a marker file under `target/ran/`, and appends its name to
 `target/ran/order`.
 
@@ -47,6 +50,13 @@ touching a marker file under `target/ran/`, and appends its name to
 4. The driver edits `Subtractor` and rebuilds with
    `-Djenesis.test.mode=prioritized`. Both tests run, but `SubtractorTest`,
    which reaches the change, runs before `AdderTest`, although it sorts after it.
+5. The driver breaks `Subtractor` and rebuilds with
+   `-Djenesis.test.mode=failedfirst`. No test failed before, so the tests run by
+   name, `SubtractorTest` last, and the build fails.
+6. The driver edits `Adder` and rebuilds in failedfirst mode. `SubtractorTest`,
+   which failed in the run before, now runs first, and the build fails again.
+7. The driver restores `Adder` and rebuilds with `-Djenesis.test.mode=failed`.
+   Only `SubtractorTest`, which failed before, runs, and the build fails again.
 
 The driver asserts exactly that, then restores `Adder` and `Subtractor` and removes `Multiplier`. Run it with:
 

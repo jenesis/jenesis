@@ -318,7 +318,7 @@ public abstract class ProcessBuildStep implements BuildStep {
         return factory;
     }
 
-    protected static boolean parsed(Path report, DefaultHandler handler) throws IOException {
+    public static boolean parsed(Path report, DefaultHandler handler) throws IOException {
         try {
             REPORTS.newSAXParser().parse(report.toFile(), handler);
             return true;

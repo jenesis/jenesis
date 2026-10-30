@@ -422,7 +422,8 @@ public class InternalModuleTest {
                             new LinkedHashSet<>(List.of("example.SampleTest")),
                             Collections.emptyNavigableMap(),
                             false,
-                            false);
+                            false) + " "
+                    + framework.failed(Path.of("supplement"), Path.of("output")).isPresent();
             executor.addStep("described", (_, context, _) -> {
                 Files.writeString(context.next().resolve("framework.txt"), described);
                 return CompletableFuture.completedStage(new BuildStepResult(true));
@@ -433,7 +434,7 @@ public class InternalModuleTest {
         assertThat(steps.get("framework/described").resolve("framework.txt"))
                 .as("the framework the plugin creates answers through the bridge with the values it was handed")
                 .content()
-                .isEqualTo("example.Runner true false [example.SampleTest]");
+                .isEqualTo("example.Runner true false [example.SampleTest] false");
     }
 
     @Test
