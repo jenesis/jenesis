@@ -163,8 +163,7 @@ class BuildExecutorDefault implements BuildExecutor {
                 }
                 if (Files.exists(next)) {
                     Path marker = next.resolve(BuildExecutor.FAILED_MARKER), failed = next.resolve(PERSISTENT);
-                    if (step.persistsOnFailure()
-                            && Files.isDirectory(failed)
+                    if (Files.isDirectory(failed)
                             && Files.isRegularFile(marker)
                             && Files.readString(marker).equals(HexFormat.of().formatHex(currentStepHash))) {
                         Files.move(failed, salvaged);
