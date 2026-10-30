@@ -17,6 +17,7 @@ import build.jenesis.module.ModularJarResolver;
 import build.jenesis.project.InferredCompilerChainModule;
 import build.jenesis.project.InferredDocumentationChainModule;
 import build.jenesis.project.InternalModule;
+import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -175,6 +176,9 @@ public class LanguageTest {
                         Files.writeString(Files.createDirectories(context.next().resolve("resolved")).resolve("tool.jar"), "tool");
                         Files.writeString(context.next().resolve(BuildStep.DEPENDENCIES),
                                 group + "\\\\:tool/runtime/maven/sample/tool=resolved/tool.jar SHA-256/0123\\n");
+                        Files.writeString(context.next().resolve("resolved").resolve("tool.pom"), "<project/>");
+                        Files.writeString(context.next().resolve("poms.properties"),
+                                group + "\\\\:tool/maven/sample/tool/pom/1.0=resolved/tool.pom SHA-256/4567\\n");
                         return CompletableFuture.completedStage(new BuildStepResult(true));
                     }
                 }
@@ -249,6 +253,22 @@ public class LanguageTest {
         String value = dependencies.getProperty("greet:tool/runtime/maven/sample/tool");
         assertThat(value).endsWith(" SHA-256/0123");
         assertThat(resolved.resolve(value.substring(0, value.indexOf(' ')))).hasContent("tool");
+    }
+
+    @Test
+    public void hands_on_the_poms_a_language_read_for_its_compiler_so_that_they_are_pinned() throws IOException {
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Greeting.greet"),
+                "Hello");
+
+        SequencedMap<String, Path> result = compile(Language.Order.BEFORE_JAVAC);
+
+        Path resolved = result.get("chain/" + InferredCompilerChainModule.RESOLVED);
+        SequencedProperties poms = SequencedProperties.ofFiles(resolved.resolve(Dependencies.POMS));
+        String value = poms.getProperty("greet:tool/maven/sample/tool/pom/1.0");
+        assertThat(value)
+                .as("strict pinning checks every POM a compiler's resolution read, so the pins must list them")
+                .endsWith(" SHA-256/4567");
+        assertThat(resolved.resolve(value.substring(0, value.indexOf(' ')))).hasContent("<project/>");
     }
 
     @Test
