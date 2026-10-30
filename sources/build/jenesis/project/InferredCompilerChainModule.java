@@ -14,6 +14,7 @@ import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Dependencies;
 import build.jenesis.step.Javac;
 import build.jenesis.step.ProcessHandler;
 
@@ -428,7 +429,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            SequencedProperties resolved = new SequencedProperties();
+            SequencedProperties resolved = new SequencedProperties(), poms = new SequencedProperties();
             int index = 0;
             for (BuildStepArgument argument : arguments.values()) {
                 Path file = argument.folder().resolve(BuildStep.DEPENDENCIES);
@@ -438,22 +439,43 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 String folder = Integer.toString(index++);
                 SequencedProperties dependencies = SequencedProperties.ofFiles(file);
                 for (String key : dependencies.stringPropertyNames()) {
-                    String value = dependencies.getProperty(key);
-                    int space = value.indexOf(' ');
-                    String location = space < 0 ? value : value.substring(0, space);
-                    Path jar = argument.folder().resolve(location).normalize();
-                    if (key.chars().filter(character -> character == '/').count() < 2 || !Files.isRegularFile(jar)) {
-                        continue;
+                    if (key.chars().filter(character -> character == '/').count() >= 2) {
+                        link(argument, context, folder, key, dependencies.getProperty(key), resolved);
                     }
-                    String linked = folder + "/" + argument.folder().relativize(jar).toString().replace('\\', '/');
-                    Path target = context.next().resolve(linked);
-                    Files.createDirectories(target.getParent());
-                    BuildStep.linkOrCopy(target, jar);
-                    resolved.setProperty(key, space < 0 ? linked : linked + value.substring(space));
+                }
+                Path pomFile = argument.folder().resolve(Dependencies.POMS);
+                if (Files.isRegularFile(pomFile)) {
+                    SequencedProperties read = SequencedProperties.ofFiles(pomFile);
+                    for (String key : read.stringPropertyNames()) {
+                        link(argument, context, folder, key, read.getProperty(key), poms);
+                    }
                 }
             }
             resolved.store(context.next().resolve(BuildStep.DEPENDENCIES));
+            if (!poms.isEmpty()) {
+                poms.store(context.next().resolve(Dependencies.POMS));
+            }
             return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+
+        private void link(BuildStepArgument argument,
+                          BuildStepContext context,
+                          String folder,
+                          String key,
+                          String value,
+                          SequencedProperties index) throws IOException {
+            int space = value.indexOf(' ');
+            Path file = argument.folder().resolve(space < 0 ? value : value.substring(0, space)).normalize();
+            if (!Files.isRegularFile(file)) {
+                return;
+            }
+            String linked = folder + "/" + argument.folder().relativize(file).toString().replace('\\', '/');
+            Path target = context.next().resolve(linked);
+            if (!Files.exists(target)) {
+                Files.createDirectories(target.getParent());
+                BuildStep.linkOrCopy(target, file);
+            }
+            index.setProperty(key, space < 0 ? linked : linked + value.substring(space));
         }
     }
 
