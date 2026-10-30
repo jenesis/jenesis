@@ -85,6 +85,7 @@ public class JenesisModuleRepositoryReleaseTest {
 
         JenesisModuleRepository resolved = new JenesisModuleRepository(
                 URI.create("http://localhost:" + server.getAddress().getPort() + "/repository/releases/module/"))
+                .local(null)
                 .connection(new Repository.Connection().insecure(true));
         try (InputStream versioned = resolved.fetch(Runnable::run, "demo.greeter", null, "1.0.0", "jar")
                 .orElseThrow()

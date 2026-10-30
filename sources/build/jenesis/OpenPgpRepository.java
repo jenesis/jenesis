@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Environment.Setting;
 
 public class OpenPgpRepository implements Repository {
 
@@ -40,12 +41,14 @@ public class OpenPgpRepository implements Repository {
     }
 
     public static Repository ofEnvironment(Environment environment) {
-        String property = environment.getProperty("openpgp.uri");
+        String property = environment.getProperty("openpgp.uri", Setting.PROJECT);
         String text = property == null ? System.getenv("OPENPGP_REPOSITORY_URI") : property;
-        Path local = Path.of(environment.getProperty("openpgp.local",
-                                                     System.getenv("OPENPGP_REPOSITORY_LOCAL") == null
-                                                     ? ".jenesis/keys"
-                                                     : System.getenv("OPENPGP_REPOSITORY_LOCAL")));
+        Path configured = environment.path("openpgp.local",
+                System.getenv("OPENPGP_REPOSITORY_LOCAL"),
+                Setting.CONFINED);
+        Path local = configured == null && environment.root() != null
+                ? environment.root().resolve(".jenesis/keys")
+                : configured;
         List<URI> servers = new ArrayList<>();
         servers(environment, text == null ? "@" : text, new HashSet<>(), servers);
         List<OpenPgpRepository> chain = servers.stream()
@@ -58,7 +61,7 @@ public class OpenPgpRepository implements Repository {
             Object lock = FETCHING.computeIfAbsent(coordinate, _ -> new Object());
             synchronized (lock) {
                 try {
-                    Optional<RepositoryItem> candidate = cached(local, coordinate);
+                    Optional<RepositoryItem> candidate = local == null ? Optional.empty() : cached(local, coordinate);
                     if (candidate.isPresent()) {
                         return candidate;
                     }
@@ -113,7 +116,7 @@ public class OpenPgpRepository implements Repository {
                         target.addAll(DEFAULTS);
                     }
                 } else {
-                    String value = environment.getProperty(name, System.getenv(name));
+                    String value = environment.getProperty(name, System.getenv(name), Setting.PROJECT);
                     if (value == null) {
                         throw new IllegalStateException("Unresolved key server reference: @" + name);
                     }

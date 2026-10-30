@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Environment.Setting;
 
 public final class BuildExecutorHttpCache implements BuildExecutorCache {
 
@@ -22,23 +23,25 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
 
     public static BuildExecutorHttpCache ofEnvironment(Environment environment, URI uri) {
         BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri);
-        String key = environment.getProperty("cache.key", System.getenv("JENESIS_CACHE_KEY"));
+        String key = environment.getProperty("cache.key", System.getenv("JENESIS_CACHE_KEY"), Setting.MACHINE);
         if (key != null) {
             cache = cache.key(key);
         }
-        String project = environment.getProperty("cache.project", System.getenv("JENESIS_CACHE_PROJECT"));
+        String project = environment.getProperty("cache.project",
+                System.getenv("JENESIS_CACHE_PROJECT"),
+                Setting.PROJECT);
         if (project != null) {
             cache = cache.project(project);
         }
-        String connect = environment.getProperty("cache.connect");
+        String connect = environment.getProperty("cache.connect", Setting.PROJECT);
         if (connect != null) {
             cache = cache.connectTimeout(Duration.parse(connect));
         }
-        String read = environment.getProperty("cache.read");
+        String read = environment.getProperty("cache.read", Setting.PROJECT);
         if (read != null) {
             cache = cache.readTimeout(Duration.parse(read));
         }
-        Boolean insecure = environment.flagOrNull("cache.insecure");
+        Boolean insecure = environment.flagOrNull("cache.insecure", Setting.MACHINE);
         return insecure == null ? cache : cache.insecure(insecure);
     }
 

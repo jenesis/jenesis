@@ -5,6 +5,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.LicenseCheck;
@@ -38,11 +39,11 @@ public class InferredComplianceModule implements BuildExecutorModule {
                 value -> value,
                 value -> value,
                 Collections.emptyNavigableMap());
-        Boolean license = environment.flagOrNull("compliance.license");
+        Boolean license = environment.flagOrNull("compliance.license", Setting.PROJECT);
         if (license != null) {
             module = module.license(license ? value -> value : null);
         }
-        Boolean vulnerability = environment.flagOrNull("compliance.vulnerability");
+        Boolean vulnerability = environment.flagOrNull("compliance.vulnerability", Setting.PROJECT);
         if (vulnerability != null) {
             module = module.vulnerability(vulnerability ? value -> value : null);
         }

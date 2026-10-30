@@ -285,7 +285,8 @@ public class ModuleInfoParser {
                                 if (words.length != 2) {
                                     throw new IllegalArgumentException("Malformed @jenesis.alias declaration '"
                                             + content
-                                            + "': expected <module-name> <groupId>/<artifactId>[/<type>]");
+                                            + "': expected <module-name> <groupId>/<artifactId>[/<type>]"
+                                            + " or <module-name> <repository>/<coordinate>");
                                 }
                                 String alias = words[0];
                                 if (ModuleGraph.isSystemModule(alias)) {
@@ -298,22 +299,7 @@ public class ModuleInfoParser {
                                             + alias
                                             + "': expected a module name");
                                 }
-                                String[] segments = words[1].split("/", -1);
-                                if (segments.length == 4 && Arrays.stream(segments).noneMatch(String::isEmpty)) {
-                                    throw new IllegalArgumentException("Malformed @jenesis.alias target '"
-                                            + words[1]
-                                            + "': an alias names an artifact and no classifier, which a pin selects"
-                                            + " - write @jenesis.alias " + alias + " " + segments[0] + "/" + segments[1]
-                                            + (segments[2].equals("jar") ? "" : "/" + segments[2])
-                                            + " and @jenesis.pin " + segments[0] + "/" + segments[1] + " :" + segments[3]
-                                            + "[:<version>]");
-                                } else if (segments.length < 2 || segments.length > 3
-                                        || Arrays.stream(segments).anyMatch(String::isEmpty)) {
-                                    throw new IllegalArgumentException("Malformed @jenesis.alias target '"
-                                            + words[1]
-                                            + "': expected <groupId>/<artifactId>[/<type>]");
-                                }
-                                String value = words[1];
+                                String value = alias("@jenesis.alias", alias, words[1], false);
                                 String previous = aliases.putIfAbsent(alias, value);
                                 if (previous != null && !previous.equals(value)) {
                                     throw new IllegalArgumentException("Duplicate @jenesis.alias for "
@@ -596,6 +582,44 @@ public class ModuleInfoParser {
 
     private String expand(String tag, String token) {
         return expand(group, tag, token);
+    }
+
+    public static String alias(String tag, String alias, String token, boolean classifier) {
+        String[] segments = token.split("/", -1);
+        if (segments.length < 2 || Arrays.stream(segments).anyMatch(String::isEmpty)) {
+            throw new IllegalArgumentException("Malformed " + tag + " target '"
+                    + token
+                    + "': expected <groupId>/<artifactId>, or <repository>/<coordinate> such as maven/"
+                    + "<groupId>/<artifactId>/<type>");
+        }
+        if (segments.length == 2) {
+            return "maven/" + token;
+        }
+        if (segments[0].indexOf('.') >= 0) {
+            throw new IllegalArgumentException("Malformed " + tag + " target '"
+                    + token
+                    + "': " + segments[0] + " reads as a repository, which names none - a Maven coordinate with"
+                    + " a type is written maven/" + token);
+        }
+        if (!Resolver.base(segments[0]).equals("maven")) {
+            return token;
+        }
+        if (segments.length == 5 && !classifier) {
+            String artifact = (segments[0].equals("maven") ? "" : segments[0] + "/") + segments[1] + "/" + segments[2];
+            throw new IllegalArgumentException("Malformed " + tag + " target '"
+                    + token
+                    + "': an alias names an artifact and no classifier, which a pin selects - write "
+                    + tag + " " + alias + " "
+                    + (segments[3].equals("jar") ? artifact : segments[0] + "/" + artifact + "/" + segments[3])
+                    + " and @jenesis.pin " + artifact + " :" + segments[4] + "[:<version>]");
+        }
+        if (segments.length > (classifier ? 5 : 4)) {
+            throw new IllegalArgumentException("Malformed " + tag + " target '"
+                    + token
+                    + "': expected " + segments[0] + "/<groupId>/<artifactId>[/<type>"
+                    + (classifier ? "[/<classifier>]]" : "]"));
+        }
+        return token;
     }
 
     static String expand(String group, String tag, String token) {

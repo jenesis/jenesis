@@ -7,6 +7,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.SafeSegment;
@@ -32,7 +33,7 @@ public class MavenRepositoryRelease implements BuildStep {
     }
 
     public static URI configured(Environment environment) {
-        String location = environment.value("deploy.uri");
+        String location = environment.value("deploy.uri", Setting.PROJECT);
         if (location == null) {
             location = System.getenv("MAVEN_RELEASE_URI");
         }
@@ -40,11 +41,11 @@ public class MavenRepositoryRelease implements BuildStep {
     }
 
     public static MavenRepositoryRelease ofEnvironment(Environment environment, URI repository) {
-        Repository.Origin origin = environment.getProperty("deploy.uri") != null
+        Repository.Origin origin = environment.getProperty("deploy.uri", Setting.PROJECT) != null
                 ? Repository.Origin.of(environment, "deploy.uri")
                 : System.getenv("MAVEN_RELEASE_URI") != null ? Repository.Origin.ENVIRONMENT : Repository.Origin.USER;
         return new MavenRepositoryRelease(repository,
-                environment.flag("release.publish"),
+                environment.flag("release.publish", Setting.COMMAND),
                 Repository.Credential.of(environment, "deploy.token", "MAVEN_RELEASE_TOKEN").grant(origin),
                 Repository.Connection.ofEnvironment(environment),
                 environment.out(),

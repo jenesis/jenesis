@@ -25,6 +25,17 @@ public class DiscoveryTest {
     }
 
     @Test
+    public void asks_the_domain_each_time_where_no_folder_keeps_its_answers() throws IOException {
+        server.domain("bytebuddy.net", "maven=https://example.com/");
+        Discovery discovery = server.discovery().cache(null).ttl(Duration.ofHours(1));
+
+        assertThat(discovery.lookup("net.bytebuddy", "maven", "byte-buddy")).isPresent();
+        assertThat(server.discovery().cache(null).ttl(Duration.ofHours(1))
+                .lookup("net.bytebuddy", "maven", "byte-buddy")).isPresent();
+        assertThat(server.queried()).containsExactly("bytebuddy.net", "bytebuddy.net");
+    }
+
+    @Test
     public void names_a_namespace_as_the_domain_it_reverses() {
         assertThat(Discovery.domain("net.bytebuddy.agent")).isEqualTo("agent.bytebuddy.net");
     }

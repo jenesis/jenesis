@@ -9,6 +9,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.Language;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -67,11 +68,11 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 ExternalModule.official(environment, InferredCompilerChainModule.KOTLIN, null, repositories, resolvers),
-                environment.flag("language.kotlin", true),
+                environment.flag("language.kotlin", true, Setting.PROJECT),
                 ExternalModule.official(environment, InferredCompilerChainModule.SCALA, null, repositories, resolvers),
-                environment.flag("language.scala", true),
+                environment.flag("language.scala", true, Setting.PROJECT),
                 ExternalModule.official(environment, InferredCompilerChainModule.GROOVY, null, repositories, resolvers),
-                environment.flag("language.groovy", true));
+                environment.flag("language.groovy", true, Setting.PROJECT));
     }
 
     private InferredDocumentationChainModule(SequencedSet<Path> configuration,

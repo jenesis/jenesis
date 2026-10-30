@@ -43,9 +43,10 @@ onboarding briefing from the same material, `skill/<page>` one page and `skill` 
 - **Java 25.** Every file starts with `import module java.base;`. Records, sealed types, pattern switches and `_`
   are the normal idiom.
 - **Immutable objects with withers.** Configuration is a record or a final class; each value has a method named
-  exactly like it that returns a copy with that value replaced (`new Project(root).version("1.0.0")`). No setters,
-  no builders, no `with` prefix. A record takes what it is handed: no compact constructor copies a collection or
-  checks a value unless a rule of the type depends on it.
+  exactly like it that returns a copy with that value replaced (`new Project(root).version("1.0.0")`). The
+  constructor a call site uses takes every value the object cannot do without, a wither each optional one, and no
+  shorter constructor stands in for a wither. No setters, no builders, no `with` prefix. A record takes what it is
+  handed: no compact constructor copies a collection or checks a value unless a rule of the type depends on it.
 - **Fail loudly, name the fix.** Bad input is an `IllegalArgumentException` naming what was given and what would be
   valid; a missing prerequisite is an `IllegalStateException` naming it. Nothing silently falls back; a lenient
   wildcard selector is the one documented exception.
@@ -56,22 +57,24 @@ onboarding briefing from the same material, `skill/<page>` one page and `skill` 
 where the object is built:
 
 - `ofEnvironment(environment, …)` reads every setting from the `Environment` it is handed
-  (`environment.value("executor.digest", "MD5")`), with what the object cannot do without as further arguments
-  (`Project.ofEnvironment(environment, root)`);
+  (`environment.value("executor.digest", "MD5", Setting.PROJECT)`), with what the object cannot do without as
+  further arguments (`Project.ofEnvironment(environment, root)`);
 - the public short constructor reads nothing and takes every default, as `Environment.NONE` would;
 - the canonical constructor takes every value; a wither replaces one and calls it.
 
 An object that builds children calls their `ofEnvironment` and keeps the result, so no module, step, repository or
 resolver carries an environment, and every setting a child resolved is a wither of its own.
 
-**`Environment` is what a run is given**: the immutable map of settings in force and a `Consumer<String>` each for
-output and errors. Nothing in the engine writes to `System.out` or `System.err`. Colour is a `Palette` resolved from
+**`Environment` is what a run is given**: the immutable map of settings in force, a `Consumer<String>` each for
+output and errors, and the project root a relative path resolves against, which `Project.ofEnvironment` sets with
+`root(root)`. Nothing in the engine writes to `System.out` or `System.err`. Colour is a `Palette` resolved from
 `jenesis.palette.colors` where the printing object is built, `transient` in a step; it names roles (`status`,
 `failure`, …), and no escape sequence is written outside it. An object built without an environment prints nothing
 until a wither hands it a consumer. `Environment.NONE` holds no setting and writes to the JVM's streams;
-`new Environment(keys)` and `new Environment(keys, out, err)` add settings and writers, each a wither too
-(`Environment.NONE.out(printed::add)`). No environment reads the JVM's properties as they stand, as code running in a
-build could change one between two reads.
+`new Environment(keys)` takes the settings, the one value an environment cannot do without, and the writers and the
+root are withers (`new Environment(keys).out(printed::add).root(root)`). An environment without a root refuses a
+relative path rather than reading it against the working directory. No environment reads the JVM's properties as they
+stand, as code running in a build could change one between two reads.
 
 The environment is an argument of construction, never a field: what keeps talking keeps the consumer it resolved. Only
 `Project` and the multi-project assembler hold one, as they build a module per scanned project module long after the
@@ -79,22 +82,29 @@ settings were read, and `ExternalModule` and `InternalModule`, which hand it to 
 is resolved - so neither has a public constructor. `Make`, `Toolchain` and the daemon are the process boundary and may
 use the streams.
 
-**`Make` reads the JVM once.** It copies every `jenesis.*` property when an entry point starts, lays the command
-line's `-Djenesis.*` arguments over it and hands the map down; a program of its own reads the same through
+**`Make` reads the JVM once.** It copies every `jenesis.*` property when an entry point starts, lays the command line's
+`-Djenesis.*` arguments over it and hands the map down; a program of its own reads the same through
 `Make.settings(root).keys()`. `Make.keys` is the one place the `jenesis.` prefix is spelt. A setting whose keys cannot
 be named in advance (`jenesis.platform.<token>`, `jenesis.plugin.<name>`) is found by listing the map. `Make` and
-`Toolchain` read a bare `Map<String, String>`, because `MakeClosureTest` holds each to compiling alone; `Project.perform`
-and `Project.run` take that map, so the reflective handoff names JDK types alone. A rule both sides need - how a flag
-parses, what `@<file>` expands to - lives in `Make`, package-private, and the engine calls it (`flagOrNull` and
-`arguments` on `SequencedProperties`).
+`Toolchain` read a bare `Map<String, String>`, because `MakeClosureTest` holds each to compiling alone;
+`Project.perform` and `Project.run` take that map, so the reflective handoff names JDK types alone. A rule both sides
+need - how a flag parses, what `@<file>` expands to, who may set a setting and what its path is relative to - lives in
+`Make`, package-private, and the engine calls it (`flagOrNull` and `arguments` on `SequencedProperties`, every accessor
+of `Environment`, whose `Setting` each maps onto `Make.machine`, `Make.command` and `Make.located`, as `Make` names no
+other class).
 
 **Reading a value.** The accessors are `getProperty` for the raw value, `value` for the trimmed one that reads blank as
-absent, `flag`, `flagOrNull`, `number`, `entries`, `words`, and `variable` for a file value naming
-`jenesis.variable.<key>` as `@<key>`. A boolean is the default when absent, true when named with no value or
-`=true`, false at `=false`, and any other value is refused naming the valid ones; `flagOrNull` answers `null` when
-absence is a third state. `Boolean.getBoolean` and `Integer.getInteger` are not used. Environment variables are
-fallbacks for the repository settings (`MAVEN_REPOSITORY_URI`, `JENESIS_REPOSITORY_TOKEN`, …) and the toolchain
-installer alone.
+absent, `flag`, `flagOrNull`, `number`, `entries`, `words`, `path` for a file or folder, `located` for a path that is
+part of a value, and `variable` for a file value naming `jenesis.variable.<key>` as `@<key>`. Every accessor but
+`variable` takes an `Environment.Setting` naming who may set what it reads, so that the reader, which owns the setting,
+decides it where the value is used and no list elsewhere has to know the key: `PROJECT` any file, `CONFINED` any file, a
+project's naming only a location inside the project (a folder the build writes to, read by `path` alone), `MACHINE` the
+command line and your own files alone (a credential, a program or a JVM's options, a cache, folder or trust root shared
+between projects, the signing key, a container's boundary), `COMMAND` the command line alone. A boolean is the default
+when absent, true when named with no value or `=true`, false at `=false`, and any other value is refused naming the
+valid ones; `flagOrNull` answers `null` when absence is a third state. `Boolean.getBoolean` and `Integer.getInteger` are
+not used. Environment variables are fallbacks for the repository settings (`MAVEN_REPOSITORY_URI`,
+`JENESIS_REPOSITORY_TOKEN`, …) and the toolchain installer alone.
 
 **Files and command lines.** `Make.settings` layers `jenesis.properties` at the project root and the profile files
 under what the entry point holds and hands the result down as one map; nothing is copied into the JVM, so two builds
@@ -106,19 +116,26 @@ fingerprint on the engine, the JVM, its options and the environment, so that one
 matches, and on the project root as well under `jenesis.daemon.shared=false`; a container receives every setting save
 the `jenesis.project.docker` keys that start it.
 
-**A relative path is relative to the project root**, never to the working directory, which is the daemon's own folder
-under a shared daemon and need not be the root anywhere else. `Project.ofEnvironment` resolves every setting naming a
-file or folder that is read outside a `Project` (`maven.local`, `module.local`, `openpgp.local`, `jarsigner.keystore`,
-`aot.folder`, `process.directory`, which defaults to the root) before handing the environment on, and `Make` resolves
-its own (`make.global`, `daemon.folder`) against the root it holds; a new setting naming a path joins that list in the
-same commit. A step resolves nothing against the working directory either: it reads the folders it is handed and writes
-`context.next()`.
+**Make records where each setting was written.** `Make.settings` lists the keys whose value in force a project's files
+supplied as `make.provided`, those your own `~/.jenesis/jenesis.properties` and its profiles supplied as
+`make.personal`, beside their folder as `make.home`, and those the command line supplied as `make.ambient`, beside the
+folder it ran in as `make.directory`, which `Make.ambient` and `JenesisTool` record; no file may set any of them. A
+build handed its settings by another - the daemon, a container - is handed these lists too and keeps them, so a
+project's setting never passes for its user's. `Make.setting` is the one rule every accessor applies: a `MACHINE`
+setting a project's file supplied, or a `COMMAND` setting any file supplied, is refused naming it, when it is read.
+`Make.settings` itself refuses only what it reads before the layers merge (`make.root`, `make.global`) and the lists.
 
-**A project's own files are untrusted.** `Make.settings` refuses, in a project's `jenesis.properties` and profiles,
-every key naming a program the build runs or a JVM's options, a credential, a cache, folder or trust root shared
-between projects, the signing key, or a container's boundary, and keeps the folders it names for writing below the
-project root. `~/.jenesis/jenesis.properties` and its profiles outrank the project, the command line outranks both. A
-new property of those kinds joins those lists in the same commit.
+**A relative path is relative to where it is written.** On a command line it names a folder below the one the command
+runs in, in your own files a `MACHINE` path names one below `~/.jenesis` and every other one a folder of the project,
+and in a project's files and a map a program hands `Make` or `Project` a folder of the project. A reader takes a path
+through `environment.path(key, setting)`, or `located` for a part of a value, never `Path.of(environment.value(key))`,
+and an absolute path is used as it is. A step resolves nothing against the working directory: it reads the folders it
+is handed and writes `context.next()`.
+
+**A project's own files are untrusted.** A reader names a setting `MACHINE` where a project must not choose it, and
+`CONFINED` where a project may only name a folder of its own; `~/.jenesis/jenesis.properties` and its profiles outrank
+the project, the command line outranks both. `Toolchain`, which compiles alone, applies the same rule to its search
+path and installer itself.
 
 **Who reads what.** `jenesis.make.*` is read by `Make` and the main methods it launches, before a `Project` exists:
 `root`, `profiles`, `global`, `mode` (`source`, `compiled`, `aot` or `daemon`) and `classes`. Unset, the mode is

@@ -20,6 +20,13 @@ public class MavenDefaultRepositoryTest {
     private Path repository, local, result;
 
     @Test
+    public void keeps_no_local_repository_where_the_setting_is_empty() {
+        assertThat(MavenDefaultRepository.localRepository(new Environment(Map.of("maven.local", ""))))
+                .as("an empty value switches the local repository off, so the project keeps what it resolves")
+                .isNull();
+    }
+
+    @Test
     public void cached_repository_prepended_with_overlay_resolves_sibling_without_caching() throws IOException {
         Path sibling = local.resolve("sibling.jar");
         Files.writeString(sibling, "sibling-content");

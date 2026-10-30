@@ -13,18 +13,29 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Discovery;
 import build.jenesis.Environment;
+import build.jenesis.Execution;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Make;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Project;
 import build.jenesis.SequencedProperties;
+import build.jenesis.Toolchain;
+import build.jenesis.maven.MavenDefaultRepository;
+import build.jenesis.maven.MavenRepositoryRelease;
+import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisModuleRepositoryExport;
+import build.jenesis.module.JenesisModuleRepositoryRelease;
+import build.jenesis.module.JenesisRepository;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.AssemblyRequirement;
 import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.ProjectModuleDescriptor;
 import build.jenesis.project.ProjectPlugins;
+import build.jenesis.step.JarSigner;
+import build.jenesis.step.Signatures;
 import org.assertj.core.api.InstanceOfAssertFactories;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +47,10 @@ public class ProjectTest {
 
     @TempDir
     private Path root, elsewhere;
+
+    private Environment layered() throws IOException {
+        return new Environment(Make.settings(root, settings).keys()).root(root);
+    }
 
     @Test
     public void reads_the_tag_revision_and_tree_from_their_properties_and_keeps_empty_ones() {
@@ -780,13 +795,13 @@ public class ProjectTest {
         assertThat(Project.ofEnvironment(new Environment(settings), Path.of(".")).boms())
                 .containsExactly(Path.of(".").resolve("build.jenesis"));
         settings.put("project.configuration", "config");
-        assertThat(Project.ofEnvironment(new Environment(settings), Path.of(".")).boms()).containsExactly(Path.of(".").resolve("config"));
+        assertThat(Project.ofEnvironment(new Environment(settings), Path.of(".")).boms()).containsExactly(Path.of("config"));
     }
 
     @Test
     public void boms_property_overrides_the_configuration() {
         settings.put("project.boms", "platform");
-        assertThat(Project.ofEnvironment(new Environment(settings), Path.of(".")).boms()).containsExactly(Path.of(".").resolve("platform"));
+        assertThat(Project.ofEnvironment(new Environment(settings), Path.of(".")).boms()).containsExactly(Path.of("platform"));
         settings.put("project.boms", "");
         assertThat(Project.ofEnvironment(new Environment(settings), Path.of(".")).boms()).isEmpty();
     }
@@ -799,14 +814,14 @@ public class ProjectTest {
     @Test
     public void configuration_reference_splices_the_default() {
         assertThat(Project.ofEnvironment(new Environment(Map.of("project.configuration", "shared,@")), Path.of(".")).configuration())
-                .containsExactly(Path.of(".").resolve("shared"), Path.of(".").resolve("build.jenesis"));
+                .containsExactly(Path.of("shared"), Path.of(".").resolve("build.jenesis"));
     }
 
     @Test
     public void configuration_named_reference_splices_a_property_value() {
         assertThat(Project.ofEnvironment(new Environment(Map.of("test.sample.key", "shared,extra", "project.configuration", "@test.sample.key,@")), Path.of(".")).configuration())
-                .containsExactly(Path.of(".").resolve("shared"),
-                        Path.of(".").resolve("extra"),
+                .containsExactly(Path.of("shared"),
+                        Path.of("extra"),
                         Path.of(".").resolve("build.jenesis"));
     }
 
@@ -827,7 +842,7 @@ public class ProjectTest {
     @Test
     public void boms_reference_splices_the_configuration() {
         assertThat(Project.ofEnvironment(new Environment(Map.of("project.configuration", "config", "project.boms", "platform,@")), Path.of(".")).boms())
-                .containsExactly(Path.of(".").resolve("platform"), Path.of(".").resolve("config"));
+                .containsExactly(Path.of("platform"), Path.of("config"));
     }
 
     @Test
@@ -1779,20 +1794,21 @@ public class ProjectTest {
     }
 
     @Test
-    public void the_layered_settings_rejects_publishing_in_the_project_file_and_in_the_user_global_file() throws IOException {
+    public void publishing_is_refused_where_the_project_file_or_the_user_global_file_names_it() throws IOException {
+        settings.put("make.root", root.toString());
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.release.publish=true\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> new Make("build.jenesis.Project", settings))
                 .as("a project that could publish would publish with every pin")
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.release.publish cannot be set in");
+                .hasMessageContaining("jenesis.release.publish cannot be set in a file");
         Files.delete(root.resolve("jenesis.properties"));
         Path home = Files.createDirectories(root.resolve("home/.jenesis"));
         Files.writeString(home.resolve("jenesis.properties"), "jenesis.release.publish=true\n");
         settings.put("make.global", root.resolve("home").toString());
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> new Make("build.jenesis.Project", settings))
                 .as("publishing is asked of one run, never settled for every run of a machine")
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.release.publish cannot be set in");
+                .hasMessageContaining("jenesis.release.publish cannot be set in a file");
     }
 
     @Test
@@ -1825,82 +1841,122 @@ public class ProjectTest {
     }
 
     @Test
-    public void the_layered_settings_rejects_toolchain_searchpath_in_the_project_file() throws IOException {
-        Files.writeString(root.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=/opt/jdks/*\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.toolchain.searchpath cannot be set in");
+    public void the_user_global_file_resolves_a_relative_path_against_its_own_folder() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), """
+                jenesis.maven.local=m2
+                jenesis.project.target=out
+                jenesis.jarsigner.storepass=file secrets/storepass
+                jenesis.make.profiles=machine
+                """);
+        Files.writeString(home.resolve("jenesis-machine.properties"), "jenesis.module.local=modules\n");
+        settings.put("make.global", root.resolve("home").toString());
+        Environment environment = layered();
+        assertThat(environment.path("maven.local", Setting.MACHINE))
+                .as("a folder the machine shares between projects means the same folder for every project")
+                .isEqualTo(home.resolve("m2").toAbsolutePath().normalize());
+        assertThat(environment.path("module.local", Setting.MACHINE))
+                .isEqualTo(home.resolve("modules").toAbsolutePath().normalize());
+        assertThat(environment.located("jarsigner.storepass", "secrets/storepass", Setting.MACHINE))
+                .isEqualTo(home.resolve("secrets/storepass").toAbsolutePath().normalize());
+        assertThat(environment.path("project.target", Setting.CONFINED))
+                .as("a folder of the project named in your own file names that folder of every project")
+                .isEqualTo(root.resolve("out"));
     }
 
     @Test
-    public void the_layered_settings_rejects_toolchain_searchpath_in_a_profile() throws IOException {
+    public void the_user_global_file_keeps_an_absolute_path() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Path repository = root.resolve("elsewhere/m2").toAbsolutePath();
+        Files.writeString(home.resolve("jenesis.properties"),
+                "jenesis.maven.local=" + repository.toString().replace('\\', '/') + "\n");
+        settings.put("make.global", root.resolve("home").toString());
+        assertThat(layered().path("maven.local", Setting.MACHINE)).isEqualTo(repository);
+    }
+
+    @Test
+    public void the_toolchain_refuses_a_searchpath_the_project_file_names() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=~/.jdks/*\n");
+        assertThatThrownBy(() -> Toolchain.ofKeys(Make.settings(root, settings).keys()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.toolchain.searchpath cannot be set in a file the project provides");
+    }
+
+    @Test
+    public void the_toolchain_refuses_a_searchpath_a_profile_names() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
         Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.toolchain.searchpath=\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> Toolchain.ofKeys(Make.settings(root, settings).keys()))
                 .as("even an empty search path is the user's to set, so a project file never names one")
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.toolchain.searchpath cannot be set in");
+                .hasMessageContaining("jenesis.toolchain.searchpath cannot be set in a file the project provides");
     }
 
     @Test
-    public void the_layered_settings_accepts_toolchain_searchpath_in_the_user_global_file() throws IOException {
+    public void the_toolchain_takes_a_searchpath_the_user_global_file_names() throws IOException {
         Path home = Files.createDirectories(root.resolve("home/.jenesis"));
-        Files.writeString(home.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=/opt/jdks/*\n");
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=~/.jdks/*\n");
         settings.put("make.global", root.resolve("home").toString());
-        assertThat(Make.settings(root, settings).keys().get("toolchain.searchpath")).isEqualTo("/opt/jdks/*");
+        Map<String, String> keys = Make.settings(root, settings).keys();
+        assertThat(keys.get("toolchain.searchpath")).isEqualTo("~/.jdks/*");
+        assertThat(Toolchain.ofKeys(keys)).isNotNull();
     }
 
     @Test
-    public void the_layered_settings_rejects_toolchain_installer_in_the_project_file() throws IOException {
+    public void the_toolchain_refuses_an_installer_the_project_file_names() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.toolchain.installer=/opt/tools/install-jdk\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> Toolchain.ofKeys(Make.settings(root, settings).keys()))
                 .as("a project that names the installer would choose a program the build runs")
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.toolchain.installer cannot be set in");
+                .hasMessageContaining("jenesis.toolchain.installer cannot be set in a file the project provides");
     }
 
     @Test
-    public void the_layered_settings_rejects_toolchain_installer_in_a_profile() throws IOException {
+    public void the_toolchain_refuses_an_installer_a_profile_names() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
         Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.toolchain.installer=jenesis-jdk\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> Toolchain.ofKeys(Make.settings(root, settings).keys()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.toolchain.installer cannot be set in");
+                .hasMessageContaining("jenesis.toolchain.installer cannot be set in a file the project provides");
     }
 
     @Test
-    public void the_layered_settings_accepts_toolchain_installer_in_the_user_global_file() throws IOException {
+    public void the_toolchain_takes_an_installer_the_user_global_file_names() throws IOException {
         Path home = Files.createDirectories(root.resolve("home/.jenesis"));
         Files.writeString(home.resolve("jenesis.properties"), "jenesis.toolchain.installer=jenesis-jdk\n");
         settings.put("make.global", root.resolve("home").toString());
-        assertThat(Make.settings(root, settings).keys().get("toolchain.installer")).isEqualTo("jenesis-jdk");
+        Map<String, String> keys = Make.settings(root, settings).keys();
+        assertThat(keys.get("toolchain.installer")).isEqualTo("jenesis-jdk");
+        assertThat(Toolchain.ofKeys(keys)).isNotNull();
     }
 
     @Test
-    public void the_layered_settings_rejects_docker_settings_in_the_project_file() throws IOException {
+    public void a_container_the_project_file_switches_is_refused() throws IOException {
+        settings.put("make.root", root.toString());
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.docker=false\n");
-        assertThatThrownBy(() -> Make.settings(root, Map.of()))
+        assertThatThrownBy(() -> new Make("build.jenesis.Project", settings))
                 .as("a project cannot switch off the isolation its user asked for")
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.project.docker cannot be set in");
+                .hasMessageContaining("jenesis.project.docker cannot be set in a file the project provides");
     }
 
     @Test
-    public void the_layered_settings_rejects_docker_settings_in_a_profile() throws IOException {
+    public void a_container_a_profile_widens_is_refused() throws IOException {
+        settings.put("execute.docker", "");
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
         Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.execute.writable=/\n");
-        assertThatThrownBy(() -> Make.settings(root, Map.of()))
+        assertThatThrownBy(() -> Execution.Container.ofEnvironment(layered()))
+                .as("the container the command line asks for keeps the boundary the user gives it")
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.execute.writable cannot be set in");
+                .hasMessageContaining("jenesis.execute.writable cannot be set in a file the project provides");
     }
 
     @Test
-    public void the_layered_settings_accepts_docker_settings_in_the_user_global_file() throws IOException {
+    public void a_container_the_user_global_file_asks_for_is_honoured() throws IOException {
         Path home = Files.createDirectories(root.resolve("home/.jenesis"));
         Files.writeString(home.resolve("jenesis.properties"), "jenesis.project.docker=true\n");
-        assertThat(Make.settings(root, Map.of("make.global", root.resolve("home").toString()))
-                .keys()
-                .get("project.docker")).isEqualTo("true");
+        settings.put("make.global", root.resolve("home").toString());
+        assertThat(layered().flag("project.docker", Setting.MACHINE)).isTrue();
     }
 
     @Test
@@ -1933,87 +1989,124 @@ public class ProjectTest {
     }
 
     @Test
-    public void the_layered_settings_rejects_a_credential_in_the_project_file() throws IOException {
+    public void a_credential_the_project_file_names_is_refused() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.maven.token=Bearer secret\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> MavenDefaultRepository.ofEnvironment(layered()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.maven.token cannot be set in");
+                .hasMessageContaining("jenesis.maven.token cannot be set in a file the project provides");
     }
 
     @Test
-    public void the_layered_settings_rejects_the_release_token_in_a_file_the_project_provides() throws IOException {
+    public void the_release_token_a_project_file_names_is_refused() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.release.token=Bearer secret\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> JenesisModuleRepositoryRelease.ofEnvironment(layered(), URI.create("https://example.com/")))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.release.token cannot be set in");
+                .hasMessageContaining("jenesis.release.token cannot be set in a file the project provides");
     }
 
     @Test
-    public void the_layered_settings_rejects_the_maven_release_token_in_a_file_the_project_provides() throws IOException {
+    public void the_maven_release_token_a_project_file_names_is_refused() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.deploy.token=Basic c2VjcmV0\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> MavenRepositoryRelease.ofEnvironment(layered(), URI.create("https://example.com/")))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.deploy.token cannot be set in");
+                .hasMessageContaining("jenesis.deploy.token cannot be set in a file the project provides");
     }
 
     @Test
-    public void the_layered_settings_rejects_a_program_in_the_project_file() throws IOException {
+    public void a_program_the_project_file_names_is_refused() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.openpgp.command=./verify.sh\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> Signatures.ofEnvironment(layered(), Map.of()))
                 .as("a program the build runs is the machine's to name, never a file that travels with a clone")
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.openpgp.command cannot be set in");
+                .hasMessageContaining("jenesis.openpgp.command cannot be set in a file the project provides");
     }
 
     @Test
-    public void the_layered_settings_rejects_a_shared_folder_in_the_project_file() throws IOException {
+    public void a_shared_folder_the_project_file_names_is_refused() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.maven.local=/tmp/shared\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> MavenDefaultRepository.ofEnvironment(layered()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.maven.local cannot be set in");
+                .hasMessageContaining("jenesis.maven.local cannot be set in a file the project provides");
     }
 
     @Test
-    public void the_layered_settings_rejects_the_time_discovery_keeps_an_answer_in_the_project_file() throws IOException {
+    public void the_time_discovery_keeps_an_answer_is_refused_where_the_project_file_names_it() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.discovery.ttl=100000\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> Discovery.ofEnvironment(layered()))
                 .as("what a domain answered is kept for every project of the machine, which a project cannot prolong")
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.discovery.ttl cannot be set in");
+                .hasMessageContaining("jenesis.discovery.ttl cannot be set in a file the project provides");
     }
 
     @Test
-    public void the_layered_settings_rejects_a_signing_setting_in_a_profile() throws IOException {
+    public void a_signing_setting_a_profile_names_is_refused() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=release\n");
         Files.writeString(root.resolve("jenesis-release.properties"), "jenesis.jarsigner.alias=release\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> JarSigner.ofEnvironment(layered()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.jarsigner.alias cannot be set in");
+                .hasMessageContaining("jenesis.jarsigner.alias cannot be set in a file the project provides");
     }
 
     @Test
-    public void the_layered_settings_accepts_a_signing_setting_in_the_user_global_file() throws IOException {
+    public void a_signing_setting_the_user_global_file_names_is_taken() throws IOException {
         Path home = Files.createDirectories(root.resolve("home/.jenesis"));
         Files.writeString(home.resolve("jenesis.properties"), "jenesis.jarsigner.alias=me\n");
         settings.put("make.global", root.resolve("home").toString());
-        assertThat(Make.settings(root, settings).keys().get("jarsigner.alias")).isEqualTo("me");
+        assertThat(layered().getProperty("jarsigner.alias", Setting.MACHINE)).isEqualTo("me");
+        assertThat(JarSigner.ofEnvironment(layered())).isNotNull();
     }
 
     @Test
-    public void the_layered_settings_rejects_a_target_outside_the_project() throws IOException {
-        Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.target=../elsewhere\n");
+    public void the_layered_settings_records_what_the_user_global_file_and_the_command_line_supplied() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.test.sample.b=fromGlobal\n");
+        settings.put("make.global", root.resolve("home").toString());
+        settings.put("test.sample.c", "fromCommandLine");
+        Map<String, String> keys = Make.settings(root, settings).keys();
+        assertThat(keys.get("make.personal")).isEqualTo("test.sample.b");
+        assertThat(keys.get("make.home")).isEqualTo(home.toAbsolutePath().normalize().toString());
+        assertThat(keys.get("make.ambient"))
+                .as("a path is resolved against the folder of the file or the command line that named it")
+                .isEqualTo("make.global,test.sample.c");
+    }
+
+    @Test
+    public void the_layered_settings_keep_where_a_handed_on_setting_was_written() throws IOException {
+        settings.put("test.sample.a", "fromProject");
+        settings.put("make.provided", "test.sample.a");
+        Map<String, String> keys = Make.settings(root, settings).keys();
+        assertThat(keys.get("make.provided"))
+                .as("a daemon or a container is handed every setting on its command line, and still tells a"
+                        + " project's from its user's")
+                .isEqualTo("test.sample.a");
+        assertThat(keys.get("make.ambient")).isNull();
+    }
+
+    @Test
+    public void the_layered_settings_refuse_a_record_of_where_settings_were_written_in_a_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.personal=maven.local\n");
         assertThatThrownBy(() -> Make.settings(root, settings))
+                .as("a project that could name its settings the user's own could set the user's settings")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.make.personal cannot be set in");
+    }
+
+    @Test
+    public void a_target_outside_the_project_is_refused_where_the_project_file_names_it() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.target=../elsewhere\n");
+        assertThatThrownBy(() -> Project.ofEnvironment(layered(), root))
                 .as("the build writes to and may delete its target, so a project's file keeps it inside the project")
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.project.target cannot name '../elsewhere'");
     }
 
     @Test
-    public void the_layered_settings_rejects_an_absolute_folder_in_a_profile() throws IOException {
+    public void an_absolute_folder_outside_the_project_is_refused_where_a_profile_names_it() throws IOException {
+        settings.put("make.root", root.toString());
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
         Files.writeString(root.resolve("jenesis-ci.properties"),
                 "jenesis.make.classes=" + elsewhere.toAbsolutePath().toString().replace('\\', '/') + "\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> new Make("build.jenesis.Project", settings))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.make.classes cannot name");
     }
@@ -2077,12 +2170,12 @@ public class ProjectTest {
     }
 
     @Test
-    public void the_layered_settings_rejects_a_credential_in_a_profile() throws IOException {
+    public void a_credential_a_profile_names_is_refused() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
         Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.module.token=Bearer secret\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(layered(), JenesisRepository.Scope.MODULE))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.module.token cannot be set in");
+                .hasMessageContaining("jenesis.module.token cannot be set in a file the project provides");
     }
 
     @Test
@@ -2094,11 +2187,11 @@ public class ProjectTest {
     }
 
     @Test
-    public void the_layered_settings_rejects_a_plaintext_permission_in_the_project_file() throws IOException {
+    public void a_plaintext_permission_the_project_file_names_is_refused() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.repository.insecure=true\n");
-        assertThatThrownBy(() -> Make.settings(root, settings))
+        assertThatThrownBy(() -> MavenDefaultRepository.ofEnvironment(layered()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.repository.insecure cannot be set in");
+                .hasMessageContaining("jenesis.repository.insecure cannot be set in a file the project provides");
     }
 
     @Test

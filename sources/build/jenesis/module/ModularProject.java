@@ -8,6 +8,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
@@ -68,7 +69,7 @@ public class ModularProject implements BuildExecutorModule {
 
     public static ModularProject ofEnvironment(Environment environment, String prefix, Path root) {
         ModularProject project = new ModularProject(prefix, root).platform(Platform.ofEnvironment(environment));
-        Integer segments = environment.numberOrNull("maven.segments");
+        Integer segments = environment.numberOrNull("maven.segments", Setting.PROJECT);
         return segments == null ? project : project.segments(segments);
     }
 
@@ -169,7 +170,9 @@ public class ModularProject implements BuildExecutorModule {
                                            SequencedSet<Path> signatures,
                                            MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
         Dependencies dependencyModule = Dependencies.ofEnvironment(environment, repositories, resolvers);
-        Consumer<String> printing = environment.flag("print.progress", true) ? environment.out() : null;
+        Consumer<String> printing = environment.flag("print.progress",
+                true,
+                Setting.PROJECT) ? environment.out() : null;
         Palette palette = Palette.ofEnvironment(environment);
         return new MultiProjectModule(ModularProject.ofEnvironment(environment, prefix, root)
                 .group(group).filter(filter).modular(modular).maven(maven).boms(boms).signatures(signatures),
@@ -389,9 +392,14 @@ public class ModularProject implements BuildExecutorModule {
                     versions.put(variant.getKey(), selected);
                 }
             }
-            if (!maven && !info.aliases().isEmpty()) {
-                Map.Entry<String, String> alias = info.aliases().firstEntry();
-                throw new IllegalArgumentException("@jenesis.alias " + alias.getKey() + " " + alias.getValue() + " in "
+            Map.Entry<String, String> unresolvable = maven ? null : info.aliases().entrySet().stream()
+                    .filter(alias -> Resolver.base(alias.getValue().substring(0, alias.getValue().indexOf('/')))
+                            .equals("maven"))
+                    .findFirst()
+                    .orElse(null);
+            if (unresolvable != null) {
+                throw new IllegalArgumentException("@jenesis.alias " + unresolvable.getKey() + " "
+                        + unresolvable.getValue() + " in "
                         + Path.of(path).resolve("module-info.java") + " names a Maven artifact, which the modular layout"
                         + " does not resolve, as it reads modules by name from the module repository alone - build"
                         + " with -Djenesis.project.layout=modular_to_maven, or require the module by a name the module"
@@ -400,25 +408,25 @@ public class ModularProject implements BuildExecutorModule {
             for (Map.Entry<String, String> alias : info.aliases().entrySet()) {
                 String named = versions.remove(group + "/" + prefix + "/" + alias.getKey());
                 if (named != null) {
-                    versions.putIfAbsent(group + "/maven/" + alias.getValue(), named);
+                    versions.putIfAbsent(group + "/" + alias.getValue(), named);
                 }
             }
             SequencedMap<String, String> targets = new LinkedHashMap<>(info.aliases());
             for (Map.Entry<String, String> alias : targets.entrySet()) {
-                String declared = versions.get(group + "/maven/" + alias.getValue());
-                if (declared == null || !declared.startsWith(":")) {
+                String[] segments = alias.getValue().split("/");
+                String declared = versions.get(group + "/" + alias.getValue());
+                if (!Resolver.base(segments[0]).equals("maven") || declared == null || !declared.startsWith(":")) {
                     continue;
                 }
                 int space = declared.indexOf(' ');
                 String qualifier = space < 0 ? declared : declared.substring(0, space);
                 int divider = qualifier.indexOf(':', 1);
                 String classifier = divider < 0 ? qualifier.substring(1) : qualifier.substring(1, divider);
-                String[] segments = alias.getValue().split("/");
-                String target = segments[0] + "/" + segments[1] + "/" + (segments.length > 2 ? segments[2] : "jar")
-                        + "/" + classifier;
-                versions.remove(group + "/maven/" + alias.getValue());
+                String target = segments[0] + "/" + segments[1] + "/" + segments[2] + "/"
+                        + (segments.length > 3 ? segments[3] : "jar") + "/" + classifier;
+                versions.remove(group + "/" + alias.getValue());
                 if (divider > 0) {
-                    versions.put(group + "/maven/" + target,
+                    versions.put(group + "/" + target,
                             qualifier.substring(divider + 1) + (space < 0 ? "" : declared.substring(space)));
                 }
                 alias.setValue(target);
@@ -428,7 +436,7 @@ public class ModularProject implements BuildExecutorModule {
                 String target = targets.get(dependency);
                 String coordinate = target == null
                         ? prefix + "/" + dependency
-                        : "maven/" + target + pinned(versions, group + "/maven/" + target);
+                        : target + pinned(versions, group + "/" + target);
                 requires.setProperty(group + "/compile/" + coordinate, "");
                 if (info.runtimeRequires().contains(dependency)) {
                     requires.setProperty(group + "/runtime/" + coordinate, "");
@@ -523,7 +531,8 @@ public class ModularProject implements BuildExecutorModule {
                 }
                 if (!targets.isEmpty()) {
                     List<String> declarations = new ArrayList<>();
-                    targets.forEach((alias, target) -> declarations.add(alias + "=" + target));
+                    targets.forEach((alias, target) ->
+                            declarations.add(alias + "=" + target.substring(target.indexOf('/') + 1)));
                     manifest.getMainAttributes().putValue(PathPlacement.ALIASES, String.join(",", declarations));
                 }
                 if (!info.overrides().isEmpty()) {
@@ -563,7 +572,7 @@ public class ModularProject implements BuildExecutorModule {
                     String target = targets.get(entry.getKey());
                     String coordinate = target == null
                             ? prefix + "/" + entry.getKey()
-                            : "maven/" + target + pinned(versions, group + "/maven/" + target);
+                            : target + pinned(versions, group + "/" + target);
                     String excluded = String.join(",", entry.getValue());
                     exclusions.setProperty(group + "/compile/" + coordinate, excluded);
                     if (info.runtimeRequires().contains(entry.getKey())) {

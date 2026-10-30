@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Environment.Setting;
 
 public interface BuildExecutor {
 
@@ -35,14 +36,14 @@ public interface BuildExecutor {
         }
 
         public static Configuration ofEnvironment(Environment environment) {
-            String location = environment.getProperty("cache.uri");
+            String location = environment.getProperty("cache.uri", Setting.MACHINE);
             BuildExecutorCache cache;
             if (location == null || location.isEmpty()) {
                 cache = null;
             } else {
                 URI uri = URI.create(location);
                 cache = switch (uri.getScheme() == null ? "" : uri.getScheme()) {
-                    case "http", "https" -> environment.flag("repository.offline")
+                    case "http", "https" -> environment.flag("repository.offline", Setting.PROJECT)
                             ? null
                             : Repository.Origin.of(environment, "cache.uri") == Repository.Origin.PROJECT
                             ? BuildExecutorHttpCache.ofEnvironment(environment, uri).key(null)
@@ -53,19 +54,19 @@ public interface BuildExecutor {
                 };
             }
             return new Configuration(
-                    Duration.parse(environment.getProperty("executor.timeout", Duration.ZERO.toString())),
-                    environment.getProperty("executor.digest", "MD5"),
-                    environment.flag("print.checksum"),
-                    environment.flag("print.progress", true),
-                    environment.flag("executor.events", true),
-                    environment.flag("print.cache"),
-                    environment.flag("executor.rebuild"),
-                    environment.flag("executor.aggregate"),
-                    environment.number("executor.concurrency", 0),
-                    environment.value("make.mode"),
-                    environment.value("process.directory") == null
-                            ? null
-                            : Path.of(environment.value("process.directory")),
+                    Duration.parse(environment.getProperty("executor.timeout",
+                            Duration.ZERO.toString(),
+                            Setting.PROJECT)),
+                    environment.getProperty("executor.digest", "MD5", Setting.PROJECT),
+                    environment.flag("print.checksum", Setting.PROJECT),
+                    environment.flag("print.progress", true, Setting.PROJECT),
+                    environment.flag("executor.events", true, Setting.PROJECT),
+                    environment.flag("print.cache", Setting.PROJECT),
+                    environment.flag("executor.rebuild", Setting.PROJECT),
+                    environment.flag("executor.aggregate", Setting.PROJECT),
+                    environment.number("executor.concurrency", 0, Setting.PROJECT),
+                    environment.value("make.mode", Setting.PROJECT),
+                    environment.path("process.directory", Setting.CONFINED),
                     cache,
                     environment.out(),
                     Palette.ofEnvironment(environment));

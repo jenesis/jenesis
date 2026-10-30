@@ -9,6 +9,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.Language;
+import build.jenesis.Environment.Setting;
 import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
@@ -65,11 +66,11 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 ExternalModule.official(environment, KOTLIN, null, repositories, resolvers),
-                environment.flag("language.kotlin", true),
+                environment.flag("language.kotlin", true, Setting.PROJECT),
                 ExternalModule.official(environment, SCALA, null, repositories, resolvers),
-                environment.flag("language.scala", true),
+                environment.flag("language.scala", true, Setting.PROJECT),
                 ExternalModule.official(environment, GROOVY, null, repositories, resolvers),
-                environment.flag("language.groovy", true));
+                environment.flag("language.groovy", true, Setting.PROJECT));
     }
 
     private InferredCompilerChainModule(PathPlacement pathPlacement,

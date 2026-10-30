@@ -326,7 +326,7 @@ public class ModularProjectTest {
         Path aliasesFile = module.resolve(BuildStep.ALIASES);
         assertThat(aliasesFile).exists();
         assertThat(SequencedProperties.ofFiles(aliasesFile)).containsOnly(
-                Map.entry("main/module/toolkit.lib", "org.example/plain-lib"));
+                Map.entry("main/module/toolkit.lib", "maven/org.example/plain-lib"));
         assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.VERSIONS)))
                 .as("the alias states no version, so the pin is the only place one can come from")
                 .containsOnly(Map.entry("main/maven/org.example/plain-lib", "1.0 SHA-256/cafebabe"));
@@ -340,6 +340,43 @@ public class ModularProjectTest {
         }
         assertThat(manifest.getMainAttributes().getValue(PathPlacement.ALIASES))
                 .as("a consumer of this module inherits the declaration through its manifest")
+                .isEqualTo("toolkit.lib=org.example/plain-lib");
+    }
+
+    @Test
+    public void an_alias_naming_a_repository_requires_its_target_from_that_repository() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias toolkit.lib internal/org.example/plain-lib
+                 * @jenesis.pin main/internal/org.example/plain-lib 1.0 SHA-256/cafebabe
+                 */
+                module foo {
+                  requires toolkit.lib;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path module = results.get("module/module-/manifests");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.ALIASES))).containsOnly(
+                Map.entry("main/module/toolkit.lib", "internal/org.example/plain-lib"));
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES)))
+                .containsOnly(Map.entry("main/compile/internal/org.example/plain-lib/1.0", ""),
+                        Map.entry("main/runtime/internal/org.example/plain-lib/1.0", ""));
+        Manifest manifest = new Manifest();
+        try (InputStream input = Files.newInputStream(module.resolve("manifest.mf"))) {
+            manifest.read(input);
+        }
+        assertThat(manifest.getMainAttributes().getValue(PathPlacement.ALIASES))
+                .as("the manifest names the artifact, which a consumer finds in whichever repository resolved it")
                 .isEqualTo("toolkit.lib=org.example/plain-lib");
     }
 
@@ -499,7 +536,7 @@ public class ModularProjectTest {
                 .containsOnly(Map.entry("main/compile/maven/org.example/native-lib/jar/linux", ""),
                         Map.entry("main/runtime/maven/org.example/native-lib/jar/linux", ""));
         assertThat(SequencedProperties.ofFiles(manifests.resolve(BuildStep.ALIASES)))
-                .containsOnly(Map.entry("main/module/natives.lib", "org.example/native-lib/jar/linux"));
+                .containsOnly(Map.entry("main/module/natives.lib", "maven/org.example/native-lib/jar/linux"));
     }
 
     @Test
@@ -557,7 +594,7 @@ public class ModularProjectTest {
         assertThatThrownBy(() -> manifests(new ModularProject("module", project).maven(false)))
                 .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("@jenesis.alias natives.lib org.example/native-lib")
+                .hasMessageContaining("@jenesis.alias natives.lib maven/org.example/native-lib")
                 .hasMessageContaining("-Djenesis.project.layout=modular_to_maven");
     }
 

@@ -1,7 +1,9 @@
 package build.jenesis.module;
 
 import module java.base;
+import build.jenesis.BuildStep;
 import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -24,6 +26,7 @@ public class JenesisModuleRepository implements JenesisRepository {
     private final Boolean speculative;
     private final Consumer<String> printing;
     private final Palette palette;
+    private final Path local;
 
     public static JenesisRepository of(Scope scope) {
         return ofEnvironment(Environment.NONE, scope);
@@ -34,7 +37,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                                                                     "module.token",
                                                                     "JENESIS_REPOSITORY_TOKEN");
         Repository.Credential maven = Repository.Credential.of(environment, "maven.token", "MAVEN_REPOSITORY_TOKEN");
-        String property = environment.getProperty("module.uri");
+        String property = environment.getProperty("module.uri", Setting.PROJECT);
         String variable = System.getenv("JENESIS_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
         String text;
@@ -56,10 +59,17 @@ public class JenesisModuleRepository implements JenesisRepository {
         if (repository == null) {
             throw new IllegalStateException("No Jenesis module repository is configured by: " + text);
         }
-        String local = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
-        return repository.prepend(ofEnvironment(environment, (local == null
-                ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
-                : Path.of(local)).toUri()));
+        Path local = localRepository(environment);
+        return local == null ? repository : repository.prepend(ofEnvironment(environment, local.toUri()));
+    }
+
+    public static Path localRepository(Environment environment) {
+        String declared = environment.getProperty("module.local", Setting.MACHINE);
+        if (declared != null && declared.isBlank()) {
+            return null;
+        }
+        Path local = environment.path("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"), Setting.MACHINE);
+        return local == null ? Path.of(System.getProperty("user.home")).resolve(".jenesis") : local;
     }
 
     private static JenesisRepository chain(Environment environment,
@@ -206,7 +216,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                         spliced = Repository.Origin.DEFAULT;
                     }
                 } else {
-                    String declared = environment.getProperty(name);
+                    String declared = environment.getProperty(name, Setting.PROJECT);
                     value = declared == null ? System.getenv(name) : declared;
                     spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.of(environment, name);
                     if (value == null) {
@@ -322,11 +332,12 @@ public class JenesisModuleRepository implements JenesisRepository {
              token,
              Repository.Connection.ofEnvironment(environment),
              toMavenRepository(environment.getProperty("maven.uri",
-                                                       System.getenv("MAVEN_REPOSITORY_URI"))),
-             environment.flagOrNull("module.prerelease"),
-             environment.flagOrNull("module.speculative"),
-             environment.flag("print.fetch") ? environment.out() : null,
-             Palette.ofEnvironment(environment));
+                                                       System.getenv("MAVEN_REPOSITORY_URI"), Setting.PROJECT)),
+             environment.flagOrNull("module.prerelease", Setting.PROJECT),
+             environment.flagOrNull("module.speculative", Setting.PROJECT),
+             environment.flag("print.fetch", Setting.PROJECT) ? environment.out() : null,
+             Palette.ofEnvironment(environment),
+             localRepository(environment));
     }
 
     private JenesisModuleRepository(URI root,
@@ -336,7 +347,8 @@ public class JenesisModuleRepository implements JenesisRepository {
                                     Boolean prerelease,
                                     Boolean speculative,
                                     Consumer<String> printing,
-                                    Palette palette) {
+                                    Palette palette,
+                                    Path local) {
         String text = root.toString();
         this.root = text.endsWith("/") ? root : URI.create(text + "/");
         this.token = token;
@@ -346,26 +358,79 @@ public class JenesisModuleRepository implements JenesisRepository {
         this.speculative = speculative;
         this.printing = printing;
         this.palette = palette;
+        this.local = local;
     }
 
     public JenesisModuleRepository connection(Repository.Connection connection) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing, palette);
+        return new JenesisModuleRepository(root,
+                token,
+                connection,
+                maven,
+                prerelease,
+                speculative,
+                printing,
+                palette,
+                local);
     }
 
     public JenesisModuleRepository maven(URI maven) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing, palette);
+        return new JenesisModuleRepository(root,
+                token,
+                connection,
+                maven,
+                prerelease,
+                speculative,
+                printing,
+                palette,
+                local);
     }
 
     public JenesisModuleRepository prerelease(Boolean prerelease) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing, palette);
+        return new JenesisModuleRepository(root,
+                token,
+                connection,
+                maven,
+                prerelease,
+                speculative,
+                printing,
+                palette,
+                local);
     }
 
     public JenesisModuleRepository speculative(Boolean speculative) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing, palette);
+        return new JenesisModuleRepository(root,
+                token,
+                connection,
+                maven,
+                prerelease,
+                speculative,
+                printing,
+                palette,
+                local);
     }
 
     public JenesisModuleRepository printing(Consumer<String> printing, Palette palette) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing, palette);
+        return new JenesisModuleRepository(root,
+                token,
+                connection,
+                maven,
+                prerelease,
+                speculative,
+                printing,
+                palette,
+                local);
+    }
+
+    public JenesisModuleRepository local(Path local) {
+        return new JenesisModuleRepository(root,
+                token,
+                connection,
+                maven,
+                prerelease,
+                speculative,
+                printing,
+                palette,
+                local);
     }
 
     private static URI toMavenRepository(String declaration) {
@@ -450,10 +515,17 @@ public class JenesisModuleRepository implements JenesisRepository {
                     uri));
         }
         AtomicReference<InputStream> first = new AtomicReference<>(stream);
-        return Optional.of(() -> {
+        RepositoryItem item = () -> {
             InputStream reopened = first.getAndSet(null);
             return reopened != null ? reopened : Repository.open(connection, uri, token, headers);
-        });
+        };
+        if (version == null || local == null || !Files.isDirectory(local) || !Files.isWritable(local)) {
+            return Optional.of(item);
+        }
+        Path target = BuildStep.resolveContained(local, relative);
+        Files.createDirectories(target.getParent());
+        item.spill(target);
+        return Optional.of(RepositoryItem.ofLocalFile(target));
     }
 
 }
