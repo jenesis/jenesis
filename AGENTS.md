@@ -276,9 +276,10 @@ serialised form is part of the cache key: a value that should trigger a re-run i
 step holds (a `Resolver`, a lambda typed as a serialisable functional interface) is `Serializable`, its scaffolding
 `transient`; a module never reaches a key. Steps compose by folders (`sources/`, `classes/`, `artifacts/`), never by
 names. Two builds of the same inputs write the same bytes, which `jenesis.project.reproduce` reports step by step.
-What a step keeps for its next run - an incremental compiler's state - goes to `context.persistent()`: the folder of
-the last successful run, moved and handed only with `previous`, discarded after a failure, empty when the step changed
-or the build cache supplied its output, kept when a run reports nothing new. A run from an empty folder writes the same
+What a step keeps for its next run - an incremental compiler's state, the tests that failed - goes to
+`context.persistent()`: the folder of the step's last run, kept whether that run succeeded or failed, empty when the
+step changed or the build cache supplied its output, kept when a run reports nothing new. A step therefore reads what a
+failed run left as well and does not trust it beyond what it can check. A run from an empty folder writes the same
 bytes, only more slowly.
 
 **Processes.** A step forking a JDK tool extends `ProcessBuildStep` and accepts `process-<tool>.properties`; one running

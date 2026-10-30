@@ -5,18 +5,22 @@ Jenesis already skips a module's test step entirely when none of that module's
 inputs changed. This demo shows the finer-grained companion: within a module
 that did change, run only the test classes that can actually be affected by the
 change, and leave the rest cached. It is enabled by passing
-`-Djenesis.test.incremental`, whose value names the message-digest algorithm
-used for change detection; passing it bare or as `true` picks `MD5`, and
-`false` or leaving the property unset disables selection. It is meant mainly for **watching** a project during development,
+`-Djenesis.test.mode=incremental`; the default, `alphabetic`, runs every test by
+class name. It is meant mainly for **watching** a project during development,
 where the build re-runs on every save and a fast, narrowed test pass keeps the
 feedback loop tight:
 
-    java -Djenesis.project.watch=true -Djenesis.test.incremental build/jenesis/Make.java
+    java -Djenesis.project.watch=true -Djenesis.test.mode=incremental build/jenesis/Make.java
 
 It is a development-loop optimisation, not a correctness gate: continuous
 integration should keep running the whole suite (a plain `build` with selection
 off), because static selection cannot see reflection, resources or other
-indirect couplings.
+indirect couplings. `-Djenesis.test.mode=prioritized` keeps the whole suite and
+runs the tests a change reaches first, so their outcome is printed before the
+rest has run. `-Djenesis.test.mode=failedfirst` keeps the whole suite as well
+and runs the classes that failed in the previous run first, and
+`-Djenesis.test.mode=failed` runs only those. Both record what failed in the
+test step's persistent folder, which a failed run keeps in these modes.
 
 What is re-run
 --------------
@@ -31,10 +35,11 @@ whole suite.
 What the demo does
 ------------------
 
-`build/Demo.java` runs the build three times. Each test records that it ran by
-touching a marker file under `target/ran/`.
+`build/Demo.java` runs the build seven times. Each test records that it ran by
+touching a marker file under `target/ran/`, and appends its name to
+`target/ran/order`.
 
-1. A first build (`-Djenesis.test.incremental`) has no previous snapshot, so it
+1. A first build (`-Djenesis.test.mode=incremental`) has no previous snapshot, so it
    runs the whole suite: both markers appear.
 2. The driver edits `Adder` and rebuilds. Only `Adder`'s bytecode changed, and
    only `AdderTest` reaches `Adder`, so the second build re-runs `AdderTest`
@@ -42,7 +47,17 @@ touching a marker file under `target/ran/`.
 3. The driver adds `Multiplier`, a class no test reaches, and rebuilds. The
    module changed, so its test step runs, but it selects no test: neither
    marker appears.
+4. The driver edits `Subtractor` and rebuilds with
+   `-Djenesis.test.mode=prioritized`. Both tests run, but `SubtractorTest`,
+   which reaches the change, runs before `AdderTest`, although it sorts after it.
+5. The driver breaks `Subtractor` and rebuilds with
+   `-Djenesis.test.mode=failedfirst`. No test failed before, so the tests run by
+   name, `SubtractorTest` last, and the build fails.
+6. The driver edits `Adder` and rebuilds in failedfirst mode. `SubtractorTest`,
+   which failed in the run before, now runs first, and the build fails again.
+7. The driver restores `Adder` and rebuilds with `-Djenesis.test.mode=failed`.
+   Only `SubtractorTest`, which failed before, runs, and the build fails again.
 
-The driver asserts exactly that, then restores `Adder` and removes `Multiplier`. Run it with:
+The driver asserts exactly that, then restores `Adder` and `Subtractor` and removes `Multiplier`. Run it with:
 
     java build/Demo.java

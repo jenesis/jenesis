@@ -43,13 +43,31 @@ public class BuildExecutorPersistentTest {
     }
 
     @Test
-    public void starts_from_an_empty_persistent_folder_after_a_run_that_failed() throws IOException {
+    public void hands_a_step_the_persistent_folder_of_its_failed_run() throws IOException {
         assertThat(build("first", counting(0))).isEqualTo("0");
         assertThatThrownBy(() -> build("fail", counting(0)))
                 .hasStackTraceContaining("failed after counting");
         assertThat(build("third", counting(0)))
-                .as("what a failed run left behind may be inconsistent, so it is not handed on")
-                .isEqualTo("0");
+                .as("the folder of the last run is kept whether it succeeded or failed")
+                .isEqualTo("2");
+    }
+
+    @Test
+    public void hands_a_step_the_persistent_folder_of_a_first_run_that_failed() throws IOException {
+        assertThatThrownBy(() -> build("fail", counting(0)))
+                .hasStackTraceContaining("failed after counting");
+        assertThat(build("second", counting(0)))
+                .as("no run succeeded before, so the failed run is the only one to remember")
+                .isEqualTo("1");
+    }
+
+    @Test
+    public void drops_the_folder_of_a_failed_run_of_a_step_whose_definition_changed() throws IOException {
+        assertThatThrownBy(() -> build("fail", counting(0)))
+                .hasStackTraceContaining("failed after counting");
+        assertThat(build("second", counting(1)))
+                .as("the folder describes a step that no longer exists")
+                .isEqualTo("1");
     }
 
     @Test

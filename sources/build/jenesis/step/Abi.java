@@ -107,14 +107,14 @@ public record Abi(Mode mode) implements BuildStep {
                 }
             }
         }
-        SequencedProperties written = new SequencedProperties();
-        written.setProperty("format", FORMAT);
-        entries.forEach((key, entry) -> written.setProperty(key, entry.toString()));
-        written.store(state);
         Map<String, List<Entry>> named = new HashMap<>();
         entries.values().forEach(entry -> named.computeIfAbsent(entry.name(), _ -> new ArrayList<>()).add(entry));
         view(mode, entries, named).store(context.next().resolve(ABI));
         view(Mode.CLASSPATH, entries, named).store(context.next().resolve(TESTED));
+        SequencedProperties written = new SequencedProperties();
+        written.setProperty("format", FORMAT);
+        entries.forEach((key, entry) -> written.setProperty(key, entry.toString()));
+        written.store(state);
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 

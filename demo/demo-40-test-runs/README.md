@@ -65,7 +65,7 @@ package-private here.
 
 A scanned jar is an input of the test run like any other: when `suite` changes,
 `fast` and `slow` test again, and when it does not, both keep their results.
-With `-Djenesis.test.incremental`, as `test-selection` shows, a change to the
+With `-Djenesis.test.mode=incremental`, as `test-selection` shows, a change to the
 jar re-runs only the scanned tests it reaches.
 
 The same tests, run twice
