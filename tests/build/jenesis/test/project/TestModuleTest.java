@@ -412,8 +412,8 @@ public class TestModuleTest {
     }
 
     @Test
-    public void selects_the_tests_a_change_reaches_when_incremental_is_true() throws IOException {
-        settings.put("test.incremental", "true");
+    public void selects_the_tests_a_change_reaches_in_incremental_mode() throws IOException {
+        settings.put("test.mode", "incremental");
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", dependencies);
         executor.addSource("classes", classes);
@@ -433,7 +433,7 @@ public class TestModuleTest {
 
     @Test
     public void runs_no_test_when_a_change_reaches_none_of_them() throws IOException {
-        settings.put("test.incremental", "true");
+        settings.put("test.mode", "incremental");
         Path sampleClasses = classes.resolve(Javac.CLASSES + "sample");
         compileSource(sampleClasses, "Unreached", """
                 package sample;
@@ -470,10 +470,64 @@ public class TestModuleTest {
     }
 
     @Test
-    public void refuses_an_incremental_setting_that_names_no_digest() {
-        assertThatThrownBy(() -> TestModule.ofEnvironment(new Environment(Map.of("test.incremental", "yes")), Map.of(), Map.of()))
+    public void prioritized_mode_runs_the_tests_a_change_reaches_first_and_the_rest_after() throws IOException {
+        settings.put("test.mode", "prioritized");
+        Path sampleClasses = classes.resolve(Javac.CLASSES + "sample");
+        Files.delete(sampleClasses.resolve("TestSample.class"));
+        compileSource(sampleClasses, "AlphaTestSample", """
+                package sample;
+                public class AlphaTestSample {
+                    @org.junit.jupiter.api.Test
+                    public void test() { System.out.println("Alpha ran"); }
+                }
+                """, bootModuleJars());
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        for (String value : List.of("first", "second")) {
+            compileSource(sampleClasses, "Reached", """
+                    package sample;
+                    public class Reached {
+                        public static String value() { return "%s"; }
+                    }
+                    """.formatted(value), bootModuleJars());
+            compileSource(sampleClasses, "ZetaTestSample", """
+                    package sample;
+                    public class ZetaTestSample {
+                        @org.junit.jupiter.api.Test
+                        public void test() { System.out.println("Zeta ran " + Reached.value()); }
+                    }
+                    """, Stream.concat(bootModuleJars().stream(), Stream.of(sampleClasses.getParent())).toList());
+            BuildExecutor executor = newExecutor();
+            executor.addSource("dependencies", dependencies);
+            executor.addSource("classes", classes);
+            executor.addModule(
+                    "test",
+                    TestModule.ofEnvironment(new Environment(settings),
+                            Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                            Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                            .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
+                    "dependencies", "classes");
+            executor.execute();
+            String output = Files.readString(supplement.resolve("output"));
+            assertThat(output).contains("Alpha ran", "Zeta ran " + value);
+            if (value.equals("first")) {
+                assertThat(output.indexOf("Alpha ran"))
+                        .as("without an earlier run every test runs by class name")
+                        .isLessThan(output.indexOf("Zeta ran"));
+            } else {
+                assertThat(output.indexOf("Zeta ran"))
+                        .as("the test a change reaches runs first, and every other test still runs after it")
+                        .isLessThan(output.indexOf("Alpha ran"));
+            }
+        }
+    }
+
+    @Test
+    public void refuses_a_test_mode_it_does_not_know() {
+        assertThatThrownBy(() -> TestModule.ofEnvironment(new Environment(Map.of("test.mode", "yes")),
+                Map.of(),
+                Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("jenesis.test.incremental is true, false or the name of a message digest");
+                .hasMessageContaining("jenesis.test.mode is yes - expected alphabetic");
     }
 
     @Test
@@ -1386,9 +1440,9 @@ public class TestModuleTest {
     }
 
     @Test
-    public void selects_the_scanned_tests_a_change_of_the_scanned_jar_reaches_when_incremental_is_true()
+    public void selects_the_scanned_tests_a_change_of_the_scanned_jar_reaches_in_incremental_mode()
             throws IOException {
-        settings.put("test.incremental", "true");
+        settings.put("test.mode", "incremental");
         for (String value : List.of("first", "second")) {
             scannedJar(scanned, "main/runtime/maven/org.example/tck/1.0", bootModuleJars(), Map.of(
                     "tck/Alpha", """

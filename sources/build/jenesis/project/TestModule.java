@@ -51,7 +51,7 @@ public class TestModule implements BuildExecutorModule {
     private final boolean reporting;
     private final String group;
     private final List<ObservabilityEngine> observers;
-    private final String incrementalDigest;
+    private final Mode mode;
     private final ProcessBuildStep.Terms terms;
     private final boolean skip;
 
@@ -115,21 +115,25 @@ public class TestModule implements BuildExecutorModule {
                 environment.flag("test.reporting", Setting.PROJECT),
                 "main",
                 List.of(),
-                incrementalDigest(environment.getProperty("test.incremental", Setting.PROJECT)),
+                Mode.of(environment.value("test.mode", "alphabetic", Setting.PROJECT)),
                 terms,
                 environment.flag("test.skip", Setting.PROJECT));
     }
 
-    private static String incrementalDigest(String property) {
-        if (property == null || property.strip().equals("false")) {
-            return null;
-        } else if (property.isBlank() || property.strip().equals("true")) {
-            return "MD5";
-        } else if (!Security.getAlgorithms("MessageDigest").contains(property.strip().toUpperCase(Locale.ROOT))) {
-            throw new IllegalArgumentException("jenesis.test.incremental is true, false or the name of a message digest,"
-                    + " one of " + new TreeSet<>(Security.getAlgorithms("MessageDigest")) + ": " + property);
+    public enum Mode {
+
+        ALPHABETIC, INCREMENTAL, PRIORITIZED;
+
+        public static Mode of(String value) {
+            return switch (value) {
+                case "alphabetic" -> ALPHABETIC;
+                case "incremental" -> INCREMENTAL;
+                case "prioritized" -> PRIORITIZED;
+                default -> throw new IllegalArgumentException("jenesis.test.mode is " + value
+                        + " - expected alphabetic, to run every test by class name, incremental, to run only the"
+                        + " tests a change reaches, or prioritized, to run those first and every other test after");
+            };
         }
-        return property.strip();
     }
 
     private static Predicate<String> defaultIsTest() {
@@ -163,7 +167,7 @@ public class TestModule implements BuildExecutorModule {
                        boolean reporting,
                        String group,
                        List<ObservabilityEngine> observers,
-                       String incrementalDigest,
+                       Mode mode,
                        ProcessBuildStep.Terms terms,
                        boolean skip) {
         this.skip = skip;
@@ -188,7 +192,7 @@ public class TestModule implements BuildExecutorModule {
         this.reporting = reporting;
         this.group = group;
         this.observers = observers;
-        this.incrementalDigest = incrementalDigest;
+        this.mode = mode;
         this.terms = terms;
     }
 
@@ -214,7 +218,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -241,7 +245,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -268,7 +272,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -295,7 +299,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -322,7 +326,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -349,7 +353,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -376,7 +380,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -403,7 +407,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -430,7 +434,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -457,7 +461,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -484,7 +488,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -511,7 +515,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -538,7 +542,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -575,7 +579,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -602,7 +606,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -629,7 +633,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -656,7 +660,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -683,7 +687,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms.permits(permits),
                 skip);
     }
@@ -710,7 +714,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -737,7 +741,34 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
+                terms,
+                skip);
+    }
+
+    public TestModule mode(Mode mode) {
+        return new TestModule(framework,
+                frameworks,
+                isTest,
+                factory,
+                resolvers,
+                dependencies,
+                jarsOnly,
+                requireFramework,
+                pinning,
+                pathPlacement,
+                moduleName,
+                filter,
+                exclude,
+                tag,
+                engines,
+                scan,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                mode,
                 terms,
                 skip);
     }
@@ -764,7 +795,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -791,7 +822,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -846,7 +877,7 @@ public class TestModule implements BuildExecutorModule {
                         reporting,
                         group,
                         observers,
-                        incrementalDigest),
+                        mode),
                 Stream.concat(upstream.stream(), Stream.of(DEPENDENCIES)));
     }
 
@@ -1041,7 +1072,7 @@ public class TestModule implements BuildExecutorModule {
         private final boolean reporting;
         private final String group;
         private final List<ObservabilityEngine> observers;
-        private final transient String incrementalDigest;
+        private final transient Mode mode;
 
         private Run(ProcessBuildStep.Terms terms,
                     Function<List<String>, ProcessHandler.OfProcess> factory,
@@ -1061,7 +1092,7 @@ public class TestModule implements BuildExecutorModule {
                     boolean reporting,
                     String group,
                     List<ObservabilityEngine> observers,
-                    String incrementalDigest) {
+                    Mode mode) {
             super(factory == null ? ProcessHandler.OfProcess.ofJavaHome("bin/java") : factory,
                   pathPlacement,
                   jarsOnly,
@@ -1081,7 +1112,7 @@ public class TestModule implements BuildExecutorModule {
             this.reporting = reporting;
             this.group = group;
             this.observers = observers;
-            this.incrementalDigest = incrementalDigest;
+            this.mode = mode;
         }
 
         @Override
@@ -1456,12 +1487,23 @@ public class TestModule implements BuildExecutorModule {
                 return CompletableFuture.completedFuture(null);
             }
             SequencedSet<String> selection = matchedClasses;
-            if (incrementalDigest != null && filter == null && exclude == null && tags.all() && ran.isEmpty() && !matchedClasses.isEmpty()) {
+            if (mode == Mode.INCREMENTAL
+                    && filter == null
+                    && exclude == null
+                    && tags.all()
+                    && ran.isEmpty()
+                    && !matchedClasses.isEmpty()) {
                 SequencedSet<String> narrowed = selected(arguments, context, matchedClasses);
                 if (narrowed != null && narrowed.isEmpty()) {
                     return CompletableFuture.completedFuture(null);
                 } else if (narrowed != null) {
                     selection = narrowed;
+                }
+            } else if (mode == Mode.PRIORITIZED && !matchedClasses.isEmpty()) {
+                SequencedSet<String> reached = selected(arguments, context, matchedClasses);
+                if (reached != null && !reached.isEmpty()) {
+                    selection = new LinkedHashSet<>(reached);
+                    selection.addAll(matchedClasses);
                 }
             }
             commands.addAll(resolved.engines(resolved.tags(resolved.arguments(
@@ -1497,7 +1539,7 @@ public class TestModule implements BuildExecutorModule {
                                               SequencedSet<String> candidates) throws IOException {
             MessageDigest digest;
             try {
-                digest = MessageDigest.getInstance(incrementalDigest);
+                digest = MessageDigest.getInstance("SHA-256");
             } catch (NoSuchAlgorithmException e) {
                 throw new IllegalStateException(e);
             }
