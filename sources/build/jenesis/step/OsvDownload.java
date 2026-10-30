@@ -7,6 +7,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.Json;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Repository;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDependencyKey;
@@ -22,8 +23,8 @@ public class OsvDownload implements BuildStep {
 
     public static OsvDownload ofEnvironment(Environment environment) {
         return new OsvDownload(URI.create("https://api.osv.dev"),
-                environment.flag("repository.insecure"),
-                environment.flag("repository.offline"));
+                environment.flag("repository.insecure", Setting.MACHINE),
+                environment.flag("repository.offline", Setting.PROJECT));
     }
 
     private OsvDownload(URI endpoint, boolean insecure, boolean offline) {

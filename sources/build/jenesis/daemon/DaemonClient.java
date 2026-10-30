@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Make;
+import build.jenesis.Environment.Setting;
 import build.jenesis.SequencedProperties;
 
 public final class DaemonClient {
@@ -31,24 +32,24 @@ public final class DaemonClient {
     private final SequencedMap<String, String> outputs;
 
     public DaemonClient(Path root, List<String> path, String mainClass, SequencedMap<String, String> supplied) {
-        Environment environment = new Environment(Make.keys(effective(supplied)));
-        int limit = environment.number("daemon.limit", 3);
+        Environment environment = new Environment(Make.keys(effective(supplied))).root(root.toAbsolutePath());
+        int limit = environment.number("daemon.limit", 3, Setting.MACHINE);
         if (limit < 1) {
             throw new IllegalArgumentException("jenesis.daemon.limit is " + limit
                     + ", but names how many build daemons may run at once: 1 or more");
         }
-        String location = environment.value("daemon.folder");
+        Path location = environment.path("daemon.folder", Setting.MACHINE);
         this(root,
                 path,
                 mainClass,
                 supplied,
-                environment.value("daemon.options", ""),
-                environment.number("daemon.idle", 10_800L),
+                environment.value("daemon.options", "", Setting.MACHINE),
+                environment.number("daemon.idle", 10_800L, Setting.MACHINE),
                 limit,
-                environment.flag("daemon.shared", true),
+                environment.flag("daemon.shared", true, Setting.PROJECT),
                 location == null
                         ? Path.of(System.getProperty("user.home"), ".jenesis", "daemons")
-                        : root.toAbsolutePath().resolve(location).normalize(),
+                        : location,
                 null);
     }
 

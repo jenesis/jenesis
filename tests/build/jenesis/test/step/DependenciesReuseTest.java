@@ -208,7 +208,7 @@ public class DependenciesReuseTest {
             BuildStep.BOMS + ", entry/main/foo/library=1.0",
             BuildStep.EXCLUSIONS + ", main/compile/foo/library=other",
             BuildStep.MANAGED + ", main/foo/library=other",
-            BuildStep.ALIASES + ", main/foo/sample.other=foo/library"
+            BuildStep.ALIASES + ", main/foo/sample.other=maven/foo/library"
     })
     public void resolves_again_when_an_input_other_than_an_internal_artifact_changed(String file, String line)
             throws IOException {

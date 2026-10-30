@@ -1,13 +1,14 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Environment.Setting;
 
 public enum Palette {
 
     ANSI, NONE;
 
     public static Palette ofEnvironment(Environment environment) {
-        String colors = environment.value("palette.colors", "ansi");
+        String colors = environment.value("palette.colors", "ansi", Setting.PROJECT);
         return switch (colors) {
             case "ansi" -> ANSI;
             case "none" -> NONE;

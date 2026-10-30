@@ -1,6 +1,7 @@
 package build.jenesis.maven;
 
 import module java.base;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Pinning;
 import module java.xml;
 import build.jenesis.BuildExecutor;
@@ -89,12 +90,12 @@ public class MavenProject implements BuildExecutorModule {
                                       String prefix,
                                       MavenRepository repository,
                                       MavenResolver resolver) {
-        List<String> sources = environment.entries("maven.sources");
+        List<String> sources = environment.entries("maven.sources", Setting.PROJECT);
         return new MavenProject(root, prefix, repository, resolver)
                 .sources(sources == null ? List.of() : sources)
-                .unified(environment.flag("maven.unified", false))
+                .unified(environment.flag("maven.unified", false, Setting.PROJECT))
                 .platform(Platform.ofEnvironment(environment))
-                .printing(environment.flag("print.progress", true) ? environment.out() : null,
+                .printing(environment.flag("print.progress", true, Setting.PROJECT) ? environment.out() : null,
                         Palette.ofEnvironment(environment));
     }
 
@@ -595,7 +596,10 @@ public class MavenProject implements BuildExecutorModule {
                                     manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, named);
                                 }
                                 if (!aliased.isEmpty()) {
-                                    manifest.getMainAttributes().putValue(PathPlacement.ALIASES, String.join(",", aliased));
+                                    manifest.getMainAttributes().putValue(PathPlacement.ALIASES, aliased.stream()
+                                            .map(entry -> entry.substring(0, entry.indexOf('=') + 1)
+                                                    + entry.substring(entry.indexOf('/', entry.indexOf('=')) + 1))
+                                            .collect(Collectors.joining(",")));
                                 }
                                 if (preview) {
                                     manifest.getMainAttributes().putValue(PathPlacement.PREVIEW,
@@ -1316,7 +1320,7 @@ public class MavenProject implements BuildExecutorModule {
             if (!test && value.dependencies() != null) {
                 Map<Boolean, Set<String>> tokens = value.dependencies().entrySet().stream()
                         .collect(Collectors.partitioningBy(dep -> dep.getValue().scope() == MavenDependencyScope.TEST,
-                                Collectors.mapping(dep -> dep.getKey().coordinate(null, null), Collectors.toSet())));
+                                Collectors.mapping(dep -> dep.getKey().coordinate("maven", null), Collectors.toSet())));
                 aliases.values().removeIf(token -> tokens.get(true).contains(token) && !tokens.get(false).contains(token));
             }
             if (!aliases.isEmpty()) {

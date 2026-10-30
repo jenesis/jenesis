@@ -7,6 +7,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;
 
@@ -25,8 +26,12 @@ public class MavenRepositoryExport implements BuildStep {
     }
 
     public static MavenRepositoryExport ofEnvironment(Environment environment) {
-        String override = environment.getProperty("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
-        return override == null ? new MavenRepositoryExport() : new MavenRepositoryExport(Path.of(override));
+        String declared = environment.getProperty("maven.local", Setting.MACHINE);
+        if (declared != null && declared.isBlank()) {
+            return new MavenRepositoryExport(null);
+        }
+        Path local = environment.path("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"), Setting.MACHINE);
+        return local == null ? new MavenRepositoryExport() : new MavenRepositoryExport(local);
     }
 
     public MavenRepositoryExport(Path target) {
@@ -43,6 +48,10 @@ public class MavenRepositoryExport implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
+        if (target == null) {
+            throw new IllegalStateException("jenesis.maven.local is empty, so there is no local Maven repository to"
+                    + " export into - name a folder, or leave it unset for ~/.m2/repository");
+        }
         SequencedMap<Path, Coordinates> stagedByVersionDir = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {

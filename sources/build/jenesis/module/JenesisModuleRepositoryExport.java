@@ -17,10 +17,7 @@ public class JenesisModuleRepositoryExport implements BuildStep {
     }
 
     public static JenesisModuleRepositoryExport ofEnvironment(Environment environment) {
-        String override = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
-        return override == null
-                ? new JenesisModuleRepositoryExport()
-                : new JenesisModuleRepositoryExport(Path.of(override));
+        return new JenesisModuleRepositoryExport(JenesisModuleRepository.localRepository(environment));
     }
 
     public JenesisModuleRepositoryExport(Path target) {
@@ -37,6 +34,10 @@ public class JenesisModuleRepositoryExport implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
+        if (target == null) {
+            throw new IllegalStateException("jenesis.module.local is empty, so there is no local module repository to"
+                    + " export into - name a folder, or leave it unset for ~/.jenesis");
+        }
         Set<Path> cleaned = new HashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {

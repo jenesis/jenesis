@@ -5,6 +5,7 @@ import module java.xml;
 import build.jenesis.BuildStep;
 import build.jenesis.Discovery;
 import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -25,14 +26,15 @@ public class MavenDefaultRepository implements MavenRepository {
 
     public static MavenRepository ofEnvironment(Environment environment) {
         return ofEnvironment(environment,
-                environment.flag("repository.discovery") ? Discovery.ofEnvironment(environment) : null);
+                environment.flag("repository.discovery",
+                        Setting.PROJECT) ? Discovery.ofEnvironment(environment) : null);
     }
 
     public static MavenRepository ofEnvironment(Environment environment, Discovery discovery) {
         Path local = localRepository(environment);
         Repository.Credential credential = Repository.Credential.of(environment, "maven.token", "MAVEN_REPOSITORY_TOKEN");
-        Consumer<String> printing = environment.flag("print.fetch") ? environment.out() : null;
-        String property = environment.getProperty("maven.uri");
+        Consumer<String> printing = environment.flag("print.fetch", Setting.PROJECT) ? environment.out() : null;
+        String property = environment.getProperty("maven.uri", Setting.PROJECT);
         String variable = System.getenv("MAVEN_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
         String text;
@@ -70,16 +72,19 @@ public class MavenDefaultRepository implements MavenRepository {
                 repository.toString().endsWith("/") ? repository : URI.create(repository + "/"),
                 localRepository(environment),
                 token,
-                environment.flag("print.fetch") ? environment.out() : null);
+                environment.flag("print.fetch", Setting.PROJECT) ? environment.out() : null);
     }
 
-    static Path localRepository(Environment environment) {
-        String override = environment.getProperty("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
-        if (override == null) {
+    public static Path localRepository(Environment environment) {
+        String declared = environment.getProperty("maven.local", Setting.MACHINE);
+        if (declared != null && declared.isBlank()) {
+            return null;
+        }
+        Path local = environment.path("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"), Setting.MACHINE);
+        if (local == null) {
             Path candidate = Path.of(System.getProperty("user.home"), ".m2", "repository");
             return Files.isDirectory(candidate) ? candidate : null;
         }
-        Path local = Path.of(override);
         if (!Files.isDirectory(local)) {
             throw new IllegalStateException("Local Maven repository does not point at a directory: " + local);
         }
@@ -147,7 +152,7 @@ public class MavenDefaultRepository implements MavenRepository {
                         spliced = Repository.Origin.DEFAULT;
                     }
                 } else {
-                    String declared = environment.getProperty(name);
+                    String declared = environment.getProperty(name, Setting.PROJECT);
                     value = declared == null ? System.getenv(name) : declared;
                     spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.of(environment, name);
                     if (value == null) {

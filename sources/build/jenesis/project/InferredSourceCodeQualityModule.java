@@ -5,6 +5,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -64,19 +65,19 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
                                                                 Map<String, Resolver> resolvers) {
         return new InferredSourceCodeQualityModule(configuration,
                 ExternalModule.official(environment, "checkstyle", null, repositories, resolvers),
-                environment.flag("check.checkstyle", true),
+                environment.flag("check.checkstyle", true, Setting.PROJECT),
                 ExternalModule.official(environment, "pmd", null, repositories, resolvers),
-                environment.flag("check.pmd", true),
+                environment.flag("check.pmd", true, Setting.PROJECT),
                 ExternalModule.official(environment, "detekt", null, repositories, resolvers),
-                environment.flag("check.detekt", true),
+                environment.flag("check.detekt", true, Setting.PROJECT),
                 ExternalModule.official(environment, "ktlint", "check", repositories, resolvers),
-                environment.flag("check.ktlint", true),
+                environment.flag("check.ktlint", true, Setting.PROJECT),
                 ExternalModule.official(environment, "scalastyle", null, repositories, resolvers),
-                environment.flag("check.scalastyle", true),
+                environment.flag("check.scalastyle", true, Setting.PROJECT),
                 ExternalModule.official(environment, "scalafmt", "check", repositories, resolvers),
-                environment.flag("check.scalafmt", true),
+                environment.flag("check.scalafmt", true, Setting.PROJECT),
                 ExternalModule.official(environment, "codenarc", null, repositories, resolvers),
-                environment.flag("check.codenarc", true),
+                environment.flag("check.codenarc", true, Setting.PROJECT),
                 Collections.emptyNavigableMap());
     }
 

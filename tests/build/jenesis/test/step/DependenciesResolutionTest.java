@@ -261,7 +261,7 @@ public class DependenciesResolutionTest {
         properties.setProperty("tool/runtime/foo/baz", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
         SequencedProperties aliases = new SequencedProperties();
-        aliases.setProperty("main/foo/toolkit.lib", "org.example/plain-lib");
+        aliases.setProperty("main/foo/toolkit.lib", "foo/org.example/plain-lib");
         aliases.store(dependencies.resolve(BuildStep.ALIASES));
         execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _, _, _) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();

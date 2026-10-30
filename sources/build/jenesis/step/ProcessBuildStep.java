@@ -7,6 +7,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Palette;
 import build.jenesis.Permits;
 import build.jenesis.SequencedProperties;
@@ -75,19 +76,23 @@ public abstract class ProcessBuildStep implements BuildStep {
         public static Terms ofEnvironment(Environment environment,
                                    String command,
                                    boolean printing) {
-            int tail = environment.number("process.tail", TAIL);
+            int tail = environment.number("process.tail", TAIL, Setting.PROJECT);
             if (tail < 0) {
                 throw new IllegalArgumentException("jenesis.process.tail is " + tail
                         + ", but names how many lines of a failed tool's output to print: 0 or more, 0 printing all");
             }
             boolean streamed = environment.flag("print." + command,
-                    environment.flag("print.process", printing));
-            String mode = environment.value("process.mode", "fork").toLowerCase(Locale.ROOT);
+                    environment.flag("print.process", printing, Setting.PROJECT),
+                    Setting.PROJECT);
+            String mode = environment.value("process.mode", "fork", Setting.PROJECT).toLowerCase(Locale.ROOT);
             if (!List.of("fork", "aot", "daemon").contains(mode)) {
                 throw new IllegalArgumentException("Malformed value for jenesis.process.mode: '" + mode
                         + "' (expected fork, aot or daemon)");
             }
-            String directory = environment.value("process.directory");
+            Path directory = environment.path("process.directory", Setting.CONFINED);
+            if (directory == null) {
+                directory = environment.root();
+            }
             Consumer<String> out = environment.out();
             Palette palette = Palette.ofEnvironment(environment);
             return new Terms(streamed
@@ -95,21 +100,21 @@ public abstract class ProcessBuildStep implements BuildStep {
                             + command + " >>>> " + line + palette.reset())
                     : null,
                     ProcessBuildStep.permits(environment),
-                    environment.flag("print.command")
+                    environment.flag("print.command", Setting.PROJECT)
                             ? executed -> out.accept("%s%-11s%s %s".formatted(
                                     palette.info(), "[EXECUTED]", palette.reset(), executed))
                             : null,
-                    environment.flag("print.findings", true)
+                    environment.flag("print.findings", true, Setting.PROJECT)
                             ? found -> out.accept("%s%-11s%s %s".formatted(
                                     palette.warning(), "[FINDINGS]", palette.reset(), found))
                             : null,
                     tail,
                     mode.equals("daemon"),
-                    environment.flag("process.shared", true),
+                    environment.flag("process.shared", true, Setting.PROJECT),
                     mode.equals("aot")
-                            ? Path.of(environment.value("aot.folder", ".jenesis/aot")).toAbsolutePath()
+                            ? environment.path("aot.folder", ".jenesis/aot", Setting.CONFINED).toAbsolutePath()
                             : null,
-                    directory == null ? null : Path.of(directory).toAbsolutePath().normalize());
+                    directory == null ? null : directory.toAbsolutePath().normalize());
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {
@@ -242,7 +247,9 @@ public abstract class ProcessBuildStep implements BuildStep {
     }
 
     public static Permits permits(Environment environment) {
-        int concurrency = environment.number("process.concurrency", Runtime.getRuntime().availableProcessors());
+        int concurrency = environment.number("process.concurrency",
+                Runtime.getRuntime().availableProcessors(),
+                Setting.PROJECT);
         if (concurrency < 0) {
             throw new IllegalArgumentException("Process concurrency must not be negative: " + concurrency);
         }

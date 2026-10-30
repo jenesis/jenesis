@@ -1,6 +1,8 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Environment.Setting;
+import build.jenesis.module.JenesisModuleRepository;
 import java.security.cert.CertificateException;
 
 public final class Discovery {
@@ -28,14 +30,12 @@ public final class Discovery {
     }
 
     public static Discovery ofEnvironment(Environment environment) {
-        String local = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
+        Path local = JenesisModuleRepository.localRepository(environment);
         return new Discovery(LOCATION,
                 Repository.Connection.ofEnvironment(environment),
-                environment.number("discovery.timeout", 5_000),
-                (local == null
-                        ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
-                        : Path.of(local)).resolve(ANSWERS),
-                Duration.ofHours(environment.number("discovery.ttl", 24)));
+                environment.number("discovery.timeout", 5_000, Setting.PROJECT),
+                local == null ? null : local.resolve(ANSWERS),
+                Duration.ofHours(environment.number("discovery.ttl", 24, Setting.MACHINE)));
     }
 
     public Discovery(String uri, Repository.Connection connection, int timeout, Path cache, Duration ttl) {
@@ -95,8 +95,10 @@ public final class Discovery {
             URI source = URI.create(uri.replace("{domain}", domain));
             FutureTask<Optional<Properties>> task = new FutureTask<>(() -> {
                 String entry = URLEncoder.encode(source.toString(), StandardCharsets.UTF_8);
-                Path present = cache.resolve(entry), absent = cache.resolve(entry + ABSENT), kept = null;
-                if (!ttl.isZero()) {
+                Path present = cache == null ? null : cache.resolve(entry),
+                        absent = cache == null ? null : cache.resolve(entry + ABSENT),
+                        kept = null;
+                if (cache != null && !ttl.isZero()) {
                     for (Path candidate : List.of(present, absent)) {
                         if (Files.isRegularFile(candidate) && (kept == null || Files.getLastModifiedTime(candidate)
                                 .compareTo(Files.getLastModifiedTime(kept)) > 0)) {

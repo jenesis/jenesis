@@ -1315,7 +1315,7 @@ public class InternalModuleTest {
                         """));
         Path outer = Files.createDirectories(work.resolve("outer"));
         SequencedProperties aliases = new SequencedProperties();
-        aliases.setProperty("main/module/build.jenesis", "sample/elsewhere");
+        aliases.setProperty("main/module/build.jenesis", "maven/sample/elsewhere");
         aliases.store(outer.resolve(BuildStep.ALIASES));
         List<String> asked = Collections.synchronizedList(new ArrayList<>());
         buildExecutor.addSource("outer", outer);

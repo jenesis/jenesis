@@ -55,7 +55,7 @@ public class TreeTest {
             inventory.store(argument.resolve(Inventory.INVENTORY));
 
             List<String> printed = new ArrayList<>();
-            Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
+            Tree.ofEnvironment(new Environment(keys).out(printed::add).err(printed::add)).apply(
                     Runnable::run,
                     new BuildStepContext(previous, next, supplement, persistent),
                     new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
@@ -97,7 +97,7 @@ public class TreeTest {
             arguments.put("bar", new BuildStepArgument(testArgument,
                     Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))));
             List<String> printed = new ArrayList<>();
-            Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
+            Tree.ofEnvironment(new Environment(keys).out(printed::add).err(printed::add)).apply(
                     Runnable::run,
                     new BuildStepContext(previous, next, supplement, persistent),
                     arguments)
@@ -251,7 +251,7 @@ public class TreeTest {
         inventory.store(argument.resolve(Inventory.INVENTORY));
 
         List<String> printed = new ArrayList<>();
-        Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
+        Tree.ofEnvironment(new Environment(keys).out(printed::add).err(printed::add)).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
@@ -276,7 +276,7 @@ public class TreeTest {
         inventory.store(argument.resolve(Inventory.INVENTORY));
 
         List<String> printed = new ArrayList<>();
-        Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
+        Tree.ofEnvironment(new Environment(keys).out(printed::add).err(printed::add)).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
@@ -376,7 +376,7 @@ public class TreeTest {
         inventory.store(argument.resolve(Inventory.INVENTORY));
 
         List<String> printed = new ArrayList<>();
-        configured.apply(Tree.ofEnvironment(new Environment(keys, printed::add, printed::add))).apply(
+        configured.apply(Tree.ofEnvironment(new Environment(keys).out(printed::add).err(printed::add))).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement, persistent),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
@@ -412,7 +412,7 @@ public class TreeTest {
         arguments.put("greeter", new BuildStepArgument(testArgument,
                 Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))));
         List<String> printed = new ArrayList<>();
-        Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
+        Tree.ofEnvironment(new Environment(keys).out(printed::add).err(printed::add)).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement, persistent),
                 arguments)

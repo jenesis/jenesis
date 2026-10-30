@@ -7,6 +7,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Findings;
 import build.jenesis.step.ProcessBuildStep;
@@ -29,7 +30,7 @@ public class JDeprScanModule implements BuildExecutorModule {
 
     public static JDeprScanModule ofEnvironment(Environment environment) {
         return new JDeprScanModule("main",
-                environment.flag(STRICT, false),
+                environment.flag(STRICT, false, Setting.PROJECT),
                 true,
                 null,
                 ProcessBuildStep.Terms.ofEnvironment(environment, "jdeprscan"));

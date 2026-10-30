@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Environment.Setting;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenModuleResolver;
@@ -139,15 +140,13 @@ public record Project(
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(PROMPT, new PromptModule(project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
-            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await")),
+            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await", Setting.PROJECT)),
                     null,
                     null,
-                    project.environment().flag("maven.embed", true));
+                    project.environment().flag("maven.embed", true, Setting.PROJECT));
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
-                Discovery discovery = project.environment().flag("repository.discovery")
-                        ? Discovery.ofEnvironment(project.environment())
-                        : null;
+                Discovery discovery = discovery(project);
                 repositories.putIfAbsent("maven",
                         MavenDefaultRepository.ofEnvironment(project.environment(), discovery)
                                 .cached(project.artifacts() == null ? null : skipped(project.artifacts())));
@@ -235,12 +234,10 @@ public record Project(
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(PROMPT, new PromptModule(project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
-            MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await")), project.hashFunction());
+            MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await", Setting.PROJECT)), project.hashFunction());
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
-                Discovery discovery = project.environment().flag("repository.discovery")
-                        ? Discovery.ofEnvironment(project.environment())
-                        : null;
+                Discovery discovery = discovery(project);
                 repositories.putIfAbsent("module",
                         JenesisRepository.ofEnvironment(project.environment(),
                                         JenesisRepository.Scope.MODULE,
@@ -334,16 +331,14 @@ public record Project(
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(PROMPT, new PromptModule(project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
-            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await")),
+            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(new AwaitingAssembler(assembler, project.environment().entries("project.await", Setting.PROJECT)),
                     BuildExecutorModule.PREVIOUS.repeat(2) + MultiProjectModule.MANIFESTS,
                     "module",
-                    project.environment().flag("maven.embed", true));
+                    project.environment().flag("maven.embed", true, Setting.PROJECT));
             MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(pomAware, project.hashFunction());
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
-                Discovery discovery = project.environment().flag("repository.discovery")
-                        ? Discovery.ofEnvironment(project.environment())
-                        : null;
+                Discovery discovery = discovery(project);
                 repositories.putIfAbsent("maven",
                         MavenDefaultRepository.ofEnvironment(project.environment(), discovery)
                                 .cached(project.artifacts() == null ? null : skipped(project.artifacts())));
@@ -2187,11 +2182,15 @@ public record Project(
                           Both forms may cover one coordinate, and each is then verified against
                           whatever it publishes; a coordinate covered only by an identity forks no
                           gpg at all, since the whole check is JDK cryptography in process.
-                      @jenesis.alias <module> <groupId>/<artifactId>[/<type>]
-                          Require a Maven artifact under a stable module name, so a non-modular jar
-                          needs no derived automatic name. It names no classifier: a pin of the
-                          artifact, @jenesis.pin <groupId>/<artifactId> :<classifier>[:<version>],
-                          selects one. Carries no version: a pin or BOM entry
+                      @jenesis.alias <module> <groupId>/<artifactId>
+                      @jenesis.alias <module> <repository>/<coordinate>
+                          Require an artifact under a stable module name, so a non-modular jar
+                          needs no derived automatic name. A target with one slash is a Maven
+                          artifact, as maven/<groupId>/<artifactId> is; with more, its first segment
+                          names the repository it resolves from, maven/<groupId>/<artifactId>/<type>
+                          for a type, and a repository a program configures by its name. It names no
+                          classifier: a pin of the artifact, @jenesis.pin <groupId>/<artifactId>
+                          :<classifier>[:<version>], selects one. Carries no version: a pin or BOM entry
                           states it and is the place for a checksum; failing that the version the
                           closure already resolves is kept, and only a coordinate nothing else pulls
                           in is negotiated as LATEST. It also names the artifact a `requires` takes,
@@ -3017,15 +3016,15 @@ public record Project(
                                        String fileName,
                                        BiFunction<String, Path, BuildStep> stepFactory,
                                        HashDigestFunction hashFunction) {
-            String file = environment.value("pin.file");
-            List<String> entries = environment.entries("pin.provided");
+            Path file = environment.path("pin.file", Setting.CONFINED);
+            List<String> entries = environment.entries("pin.provided", Setting.PROJECT);
             SequencedSet<Path> provided = new LinkedHashSet<>();
             if (entries != null) {
                 for (String entry : entries) {
-                    provided.add(root.resolve(entry).normalize());
+                    provided.add(environment.located("pin.provided", entry, Setting.PROJECT));
                 }
             }
-            List<String> groups = environment.entries("pin.groups");
+            List<String> groups = environment.entries("pin.groups", Setting.PROJECT);
             return new PinModule(root,
                                  fileName,
                                  stepFactory,
@@ -3033,7 +3032,7 @@ public record Project(
                                  new LinkedHashSet<>(groups == null ? List.of("main") : groups),
                                  provided,
                                  hashFunction,
-                                 environment.flag("print.divergence") ? environment.out() : null,
+                                 environment.flag("print.divergence", Setting.PROJECT) ? environment.out() : null,
                                  Palette.ofEnvironment(environment),
                                  new ProjectPlugins());
         }
@@ -3409,31 +3408,8 @@ public record Project(
     }
 
     public static Project ofEnvironment(Environment supplied, Path root) {
-        Map<String, String> rooted = new HashMap<>(supplied.keys());
-        Map.of("maven.local", "MAVEN_REPOSITORY_LOCAL",
-                "module.local", "JENESIS_REPOSITORY_LOCAL",
-                "openpgp.local", "OPENPGP_REPOSITORY_LOCAL",
-                "jarsigner.keystore", "",
-                "aot.folder", "",
-                "process.directory", "").forEach((key, variable) -> {
-            String value = rooted.get(key);
-            if (value == null && !variable.isEmpty()) {
-                value = System.getenv(variable);
-            }
-            if (value == null || value.isBlank()) {
-                value = switch (key) {
-                    case "openpgp.local" -> ".jenesis/keys";
-                    case "aot.folder" -> ".jenesis/aot";
-                    case "process.directory" -> "";
-                    default -> null;
-                };
-            }
-            if (value != null) {
-                rooted.put(key, root.toAbsolutePath().resolve(value.strip()).normalize().toString());
-            }
-        });
-        Environment environment = supplied.keys(rooted);
-        String layoutName = environment.getProperty("project.layout");
+        Environment environment = supplied.root(root);
+        String layoutName = environment.getProperty("project.layout", Setting.PROJECT);
         Layout layout = layoutName == null ? null : switch (layoutName.toLowerCase(Locale.ROOT)) {
             case "auto" -> Layout.AUTO;
             case "maven" -> Layout.MAVEN;
@@ -3465,7 +3441,7 @@ public record Project(
             } catch (IOException e) {
                 throw new UncheckedIOException("Cannot read " + file, e);
             }
-            boolean switchedOn = environment.flag("project.plugins", true);
+            boolean switchedOn = environment.flag("project.plugins", true, Setting.PROJECT);
             Map<String, Repository> pluginRepositories = ProjectPlugins.repositories(Map.of(), environment);
             Map<String, Resolver> pluginResolvers = ProjectPlugins.resolvers(Map.of(), environment);
             declared.forEachProperty((key, value) -> {
@@ -3475,7 +3451,7 @@ public record Project(
                 if (!projectWide) {
                     modulePlugins.add(name);
                 }
-                boolean enabled = switchedOn && environment.flag(ProjectPlugins.declared(name), true);
+                boolean enabled = switchedOn && environment.flag(ProjectPlugins.declared(name), true, Setting.PROJECT);
                 if (!projectWide && !enabled) {
                     return;
                 }
@@ -3567,17 +3543,19 @@ public record Project(
                     hooks.get(PLUGIN),
                     resolutions);
         }
-        List<String> included = environment.entries("project.resources");
+        List<String> included = environment.entries("project.resources", Setting.PROJECT);
         if (included != null) {
             SequencedMap<Path, Path> resources = new LinkedHashMap<>();
             for (String entry : included) {
-                int colon = entry.indexOf(':');
+                int colon = entry.lastIndexOf(':');
                 String origin = "The resource " + entry + " of jenesis.project.resources";
                 if (colon <= 0 || colon == entry.length() - 1) {
                     throw new IllegalArgumentException(origin + " does not name a file and where to place it - write"
                             + " <path>:<target>");
                 }
-                Path source = Bind.contained(root, root.resolve(entry.substring(0, colon).trim()), origin);
+                Path source = Bind.contained(root,
+                        environment.located("project.resources", entry.substring(0, colon), Setting.PROJECT),
+                        origin);
                 if (!Files.exists(source)) {
                     throw new IllegalArgumentException(origin + " names " + source + ", which does not exist");
                 }
@@ -3594,14 +3572,14 @@ public record Project(
             assembler = assembler.resources(resources);
         }
         Project project = new Project(root, assembler, environment).plugins(projectPlugins);
-        String configuration = environment.getProperty("project.configuration");
+        String configuration = environment.getProperty("project.configuration", Setting.PROJECT);
         if (configuration != null) {
-            project = project.configuration(locations(environment, configuration, project).toArray(Path[]::new));
+            project = project.configuration(locations(environment, "project.configuration", configuration, project).toArray(Path[]::new));
             project = project.boms(project.configuration().toArray(Path[]::new));
             project = project.signatures(project.configuration().toArray(Path[]::new));
         }
         ExternalModule releasing = ExternalModule.official(environment, ProjectPlugins.JRELEASER, null, Map.of(), Map.of());
-        boolean releasable = environment.flag("release." + ProjectPlugins.JRELEASER, true);
+        boolean releasable = environment.flag("release." + ProjectPlugins.JRELEASER, true, Setting.PROJECT);
         Path jreleaser = releasable
                 ? BuildStep.locate(project.configuration(), ProjectPlugins.JRELEASER + ".properties")
                 : null;
@@ -3632,7 +3610,7 @@ public record Project(
                     .resolutions(resolutions));
         }
         ExternalModule documenting = ExternalModule.official(environment, ProjectPlugins.ASCIIDOCTOR, null, Map.of(), Map.of());
-        Path asciidoctor = environment.flag("documentation." + ProjectPlugins.ASCIIDOCTOR, true)
+        Path asciidoctor = environment.flag("documentation." + ProjectPlugins.ASCIIDOCTOR, true, Setting.PROJECT)
                 ? BuildStep.locate(project.configuration(), ProjectPlugins.ASCIIDOCTOR + ".properties")
                 : null;
         if (asciidoctor != null) {
@@ -3663,7 +3641,7 @@ public record Project(
                     .resolutions(resolutions));
         }
         ExternalModule marking = ExternalModule.official(environment, ProjectPlugins.GRADLE_PLUGIN, null, Map.of(), Map.of());
-        Path gradlePlugin = environment.flag("artifact." + ProjectPlugins.GRADLE_PLUGIN, true)
+        Path gradlePlugin = environment.flag("artifact." + ProjectPlugins.GRADLE_PLUGIN, true, Setting.PROJECT)
                 ? BuildStep.locate(project.configuration(), ProjectPlugins.GRADLE_PLUGIN + ".properties")
                 : null;
         if (gradlePlugin != null) {
@@ -3690,60 +3668,55 @@ public record Project(
                     .supplements(supplements)
                     .resolutions(resolutions));
         }
-        String boms = environment.getProperty("project.boms");
+        String boms = environment.getProperty("project.boms", Setting.PROJECT);
         if (boms != null) {
-            project = project.boms(locations(environment, boms, project).toArray(Path[]::new));
+            project = project.boms(locations(environment, "project.boms", boms, project).toArray(Path[]::new));
         }
-        String signatures = environment.getProperty("project.signatures");
+        String signatures = environment.getProperty("project.signatures", Setting.PROJECT);
         if (signatures != null) {
-            project = project.signatures(locations(environment, signatures, project).toArray(Path[]::new));
+            project = project.signatures(locations(environment, "project.signatures", signatures, project).toArray(Path[]::new));
         }
-        String target = environment.getProperty("project.target");
+        Path target = environment.path("project.target", Setting.CONFINED);
         if (target != null) {
-            project = project.target(project.root().resolve(target).normalize());
+            project = project.target(target);
         }
-        String reproduce = environment.getProperty("project.reproduce");
+        Path reproduce = environment.path("project.reproduce", Setting.CONFINED);
         if (reproduce != null) {
-            project = project.reproduce(project.root().resolve(reproduce).normalize());
+            project = project.reproduce(reproduce);
         }
-        String artifacts = environment.getProperty("project.artifacts");
+        Path artifacts = environment.path("project.artifacts", Setting.CONFINED);
         if (artifacts != null) {
-            project = project.artifacts(project.root().resolve(artifacts).normalize());
+            project = project.artifacts(artifacts);
         }
-        String cache = environment.getProperty("project.cache");
-        if (cache != null) {
-            if (cache.contains("://")) {
-                throw new IllegalArgumentException("jenesis.project.cache is a filesystem path, not a URI"
-                        + " (use jenesis.cache.uri for a URI): " + cache);
-            }
-            project = project.cache(new BuildExecutorFileCache(project.root().resolve(cache.isEmpty()
-                    ? Path.of(".jenesis", "cache")
-                    : Path.of(cache))));
+        if (environment.keys().containsKey("project.cache")) {
+            project = project.cache(new BuildExecutorFileCache(environment.path("project.cache",
+                    ".jenesis/cache",
+                    Setting.CONFINED)));
         }
         if (layout != null) {
             project = project.layout(layout);
         }
-        String metadata = environment.getProperty("project.metadata");
+        String metadata = environment.getProperty("project.metadata", Setting.PROJECT);
         if (metadata != null) {
             project = project.metadata(Arrays.stream(metadata.split(","))
                     .map(String::trim)
                     .filter(value -> !value.isEmpty())
-                    .map(Path::of)
+                    .map(value -> environment.located("project.metadata", value, Setting.PROJECT))
                     .toArray(Path[]::new));
         }
-        String digest = environment.getProperty("project.digest");
+        String digest = environment.getProperty("project.digest", Setting.PROJECT);
         if (digest != null) {
             project = project.hashFunction(new HashDigestFunction(digest));
         }
-        Boolean sources = environment.flagOrNull("project.sources");
+        Boolean sources = environment.flagOrNull("project.sources", Setting.PROJECT);
         if (sources != null) {
             project = project.sources(sources);
         }
-        Boolean documentation = environment.flagOrNull("project.documentation");
+        Boolean documentation = environment.flagOrNull("project.documentation", Setting.PROJECT);
         if (documentation != null) {
             project = project.documentation(documentation);
         }
-        String version = environment.getProperty("project.version");
+        String version = environment.getProperty("project.version", Setting.PROJECT);
         if (version != null) {
             try {
                 ModuleDescriptor.Version.parse(version);
@@ -3755,15 +3728,15 @@ public record Project(
             }
             project = project.version(version);
         }
-        String tag = environment.getProperty("project.tag");
+        String tag = environment.getProperty("project.tag", Setting.PROJECT);
         if (tag != null) {
             project = project.tag(tag);
         }
-        String revision = environment.getProperty("project.revision");
+        String revision = environment.getProperty("project.revision", Setting.PROJECT);
         if (revision != null) {
             project = project.revision(revision);
         }
-        String tree = environment.getProperty("project.tree");
+        String tree = environment.getProperty("project.tree", Setting.PROJECT);
         if (tree != null) {
             project = project.tree(tree);
         }
@@ -3771,15 +3744,15 @@ public record Project(
         return project.pinning(Pinning.ofEnvironment(environment)).configurator(() -> executor);
     }
 
-    private static SequencedSet<Path> locations(Environment environment, String text, Project project) {
+    private static SequencedSet<Path> locations(Environment environment, String key, String text, Project project) {
         SequencedSet<Path> target = new LinkedHashSet<>();
-        locations(environment, text, project.root(), project.configuration(), new HashSet<>(), target);
+        locations(environment, key, text, project.configuration(), new HashSet<>(), target);
         return target;
     }
 
     private static void locations(Environment environment,
+                                  String key,
                                   String text,
-                                  Path root,
                                   SequencedSet<Path> defaults,
                                   Set<String> visited,
                                   SequencedSet<Path> target) {
@@ -3793,18 +3766,18 @@ public record Project(
                 if (name.isEmpty()) {
                     target.addAll(defaults);
                 } else {
-                    String value = environment.getProperty(name, System.getenv(name));
+                    String value = environment.getProperty(name, System.getenv(name), Setting.PROJECT);
                     if (value == null) {
                         throw new IllegalStateException("Unresolved location reference: @" + name);
                     }
                     if (!visited.add(name)) {
                         throw new IllegalStateException("Circular location reference: @" + name);
                     }
-                    locations(environment, value, root, defaults, visited, target);
+                    locations(environment, name, value, defaults, visited, target);
                     visited.remove(name);
                 }
             } else {
-                target.add(root.resolve(Path.of(candidate)));
+                target.add(environment.located(key, candidate, Setting.PROJECT));
             }
         }
     }
@@ -4633,7 +4606,7 @@ public record Project(
                     }
                 }, selectors);
         if (new Reproduction(target, firstSteps, reproduce, secondSteps).verify(environment.out(),
-                environment.flag("print.reproduce", true))) {
+                environment.flag("print.reproduce", true, Setting.PROJECT))) {
             Files.walkFileTree(reproduce, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
@@ -4677,6 +4650,16 @@ public record Project(
         try (Closeable _ = ProcessHandler.scope()) {
             return executor.execute(required, optional);
         }
+    }
+
+    private static Discovery discovery(Project project) {
+        if (!project.environment().flag("repository.discovery", Setting.PROJECT)) {
+            return null;
+        }
+        Discovery discovery = Discovery.ofEnvironment(project.environment());
+        return JenesisModuleRepository.localRepository(project.environment()) == null && project.artifacts() != null
+                ? discovery.cache(project.artifacts().resolve("well-known"))
+                : discovery;
     }
 
     private static Path skipped(Path folder) throws IOException {
@@ -4739,16 +4722,20 @@ public record Project(
                 project.env||Host environment variables to forward, name[=value],...
                 make.root|.|Folder Make looks for the project in; only settable on the command line
                 make.profiles||Comma-separated profiles layered over jenesis.properties
-                make.global||Folder holding the user-global .jenesis/jenesis.properties, relative to the project root; default: the home folder; only settable on the command line
-                make.provided||Settings that the files a project provides supplied, comma-separated and named without the jenesis. prefix; derived by Make and settable in no file, so that a repository or cache URL a project named is never sent a credential
+                make.global||Folder holding the user-global .jenesis/jenesis.properties, relative to the working directory; default: the home folder; only settable on the command line
+                make.provided||Settings that the files a project provides supplied, comma-separated and named without the jenesis. prefix; derived by Make and settable in no file, so that a repository or cache URL a project named is never sent a credential, a setting of the machine named there is refused where it is read, and a path named there is relative to the project root
+                make.personal||Settings that ~/.jenesis/jenesis.properties and its profiles supplied, likewise, so that a path of the machine named there is relative to make.home
+                make.home||The folder holding ~/.jenesis/jenesis.properties, derived by Make and settable in no file
+                make.ambient||Settings that the command line supplied, likewise, so that a path named there is relative to make.directory
+                make.directory||The working directory of the command line, which a relative path named there resolves against; set by the command and the tools, kept by a daemon or container they hand the build to, and settable in no file
                 make.mode|daemon|How the engine runs: source runs it from the build sources, compiled compiles them once and runs from those classes, aot runs those classes in a JVM that loads them from an ahead-of-time cache in aot.folder, trained on the first build that finds none and reused by every later one, and daemon hands the build to a reused JVM, which --stop as the only selector shuts down, every daemon of daemon.folder with it; unset, it is daemon, or compiled where process.mode names fork or aot, project.docker is set or release.publish publishes, so that a release runs in a JVM no earlier build ran in; aot applies where the engine runs compiled, as the installed CLI runs it, and in source mode caches only the tools, whose JVM is running before it could be handed a cache; aot and daemon set process.mode to the same unless it is set; the [STARTED] line and the started event of the events file name the mode the build ran in
-                make.classes|.jenesis/classes|Where those classes land, relative to the root; a file a project provides names only a folder inside the project
+                make.classes|.jenesis/classes|Where those classes land, relative to the working directory on the command line and to the project root in a file; a file a project provides names only a folder inside the project
                 daemon.idle|10800|Seconds an idle daemon waits before exiting; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 daemon.options||JVM options for the daemon process itself, whitespace separated; unset, the daemon starts with the -D, -X and -ea options of the JVM that hands it the build, and a JVM started with others gets a daemon of its own; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 daemon.shared|true|Hand the build to a daemon any project may use that runs the same engine on the same JVM with the same options and environment, which runs in a folder of its own, so that a plugin resolving a path against the working directory rather than against a folder it is handed resolves it in that folder; false keeps daemons for this project alone, started in its root, which on Windows keeps the project's folder in use for as long as one runs; either way, after each build a daemon restores the system properties, the default locale and the default time zone, and ends once a build changed a JVM-wide default it cannot restore, as the security providers, the default TLS context, authenticator, proxy selector, cookie handler or uncaught exception handler
                 daemon.limit|3|How many build daemons may run at once on this machine, across every project; starting one more first stops the one used least recently, which finishes the build it is running; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
-                daemon.folder||Folder the build daemons announce themselves in, each with its log, and where a daemon keeps its copy of an engine compiled from source, relative to the project root; default: ~/.jenesis/daemons; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
-                aot.folder|.jenesis/aot|The folder of every ahead-of-time cache, the engine's and the tools', relative to the project root; aot.properties in it records the engine and the JVM the folder was started for and when, and a build that finds either changed or the folder older than aot.lifetime clears it at once; a file the project provides names only a location inside the project
+                daemon.folder||Folder the build daemons announce themselves in, each with its log, and where a daemon keeps its copy of an engine compiled from source, relative to the working directory on the command line, to ~/.jenesis in its files and to the project root in a project's; default: ~/.jenesis/daemons; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                aot.folder|.jenesis/aot|The folder of every ahead-of-time cache, the engine's and the tools', relative to the working directory on the command line and to the project root in a file; aot.properties in it records the engine and the JVM the folder was started for and when, and a build that finds either changed or the folder older than aot.lifetime clears it at once; a file the project provides names only a location inside the project
                 aot.lifetime||ISO-8601 age after which the folder of caches is cleared and every cache in it trained again, as PT12H or P7D; empty keeps it until the engine or the JVM changes
                 toolchain.version||JDK the build runs on, as 25, 25.0.3 or 25-temurin: the numbers match as a prefix, every word must be one of the vendor and version words in the JDK's release file, and a pre-release matches only when its word is named; Make and Execute relaunch on a match when the running JVM is none
                 toolchain.searchpath|@|Comma-separated JDK folders searched for toolchain.version, absolute or under ~, * standing for any one folder name; @ splices this system's usual JDK locations and empty only checks the running JVM; settable only on the command line or in ~/.jenesis/jenesis.properties
@@ -4762,7 +4749,7 @@ public record Project(
                 process.concurrency|(processor count)|Run at most this many tool runs at once - a compiler, a JDK tool, a forked JVM such as a test run; 0 is unbounded
                 process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
                 process.mode|fork|How the main method of a tool that a plugin starts through ProcessHandler.OfProcess.ofJavaMain() runs, and javac where a -J option forks it: fork starts a JVM for every call that process.shared does not hand to a shared JVM, so that a build without the daemon leaves no JVM running; aot starts that JVM from an ahead-of-time cache of the tool in aot.folder, which its first run trains and every later one reads, one per JVM, options and jars, with the jars linked into it; daemon runs it in one JVM that runs its compilations side by side, as it runs the calls a plugin marks shared, kept for the next call with the same jars on its class path, wherever a module resolved them, and the same options, environment and working directory, idle ones ending after ten minutes; make.mode=aot and make.mode=daemon set it to the same unless it is set
-                process.directory||Working directory of every process the build starts, a test JVM and a warm JVM included, relative to the project root; default: the project root
+                process.directory||Working directory of every process the build starts, a test JVM and a warm JVM included, relative to the working directory on the command line and to the project root in a file; default: the project root
                 process.shared|true|Run the calls a plugin marks shared, a compiler above all, and javac where a -J option forks it, side by side in one JVM per JVM, options, jars and environment, ended when the build ends, under process.mode fork and aot as under daemon, which keeps it for the next build; false starts a JVM for every such call
                 process.tail|200|Lines of a failed tool's output and of its error printed with the failure, the last ones, beside how many there were and the file under supplement/ that holds all of them; 0 prints every line
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
@@ -4804,23 +4791,23 @@ public record Project(
                 repository.offline|false|Download nothing: every module, artifact, checksum and key comes from the pinned artifacts, the local Maven repository or the local module folder, Maven metadata an earlier resolution stored beside the pinned artifacts answers a version range at the versions it named then, a fetch that would need the network fails the build naming what was missing, no domain is asked for its discovery file, whose answer an earlier build kept is read whatever its age, a locally cached Maven file is trusted without its remote checksum, the remote build cache at jenesis.cache.uri is skipped, and a vulnerability lookup or a release fails the build
                 repository.discovery|false|Ask the domain a module or Maven group is named after, before the module remotes and before the Maven remotes, how it is published: for net.bytebuddy.agent, as a module or a group, the file at https://<domain>/.well-known/java-repository.properties for bytebuddy.net and, only where it publishes none, for agent.bytebuddy.net, a java.util.Properties file in UTF-8; the first file found speaks for every name below its domain, so a key it does not hold is absent rather than asked of a subdomain, unless it says delegate=true, which lets the files of its subdomains answer first and keeps its own entries for a key none of them holds. A module is answered by module=<location>, where its files are, and by moduletomaven=<groupId>:<artifactId>[:<extension>[:<classifier>]], the Maven artifact it is published as, resolved through the Maven remotes and maven= entries; the modular layout asks module= first and the others moduletomaven= first, a key that does not answer leaving the request to the other; a group is answered by maven=<location>. A coordinate may name the module as {module} and the labels of its name below the file's domain, joined by dashes after a leading one, as {-suffix}, and without either applies only to the module whose own domain holds it. A key may name what it is for as <kind>[<name>], an artifact ID for maven= and a module name for the others, or as <kind>[<prefix>*], the exact name being chosen over the longest prefix and either over the key for all, and the keys beside it then follow its selector, as maven[<name>].latest; a coordinate a selected key names applies to that module wherever it sits below the domain. <kind>.since=<version> serves only that version and later ones, ordered as Maven orders versions, and <kind>.suffixes=<suffix>[,<suffix>...] only a version whose qualifier after its first dash starts with one of those words, ignoring case, none naming a version without one; a version an entry does not admit is left to the remotes, as is a request naming no version where the entry restricts versions. A location without placeholders is a root, a Jenesis module service for module= and a Maven repository for maven=, whose Maven metadata, limited to the versions the entry admits, is merged with that of the remotes; one with placeholders is a template naming each file, {module} and {-suffix} for module=, {groupId}, {groupPath} and {artifactId} for maven=, and {version}, {-classifier} and {type} for both, where a template without {-classifier} or {type} serves only the plain jar, a file is validated against the .sha512, .sha256 or .sha1 beside it, and no Maven metadata is read, so only a named version resolves, unless <kind>.latest=<link> beside a template naming {version} names a link to the newest version: a request naming no version sends it a HEAD request, follows no redirect, and reads the version from a Jenesis-ModuleVersion or Jenesis-MavenVersion header or else from where the link redirects, matched against the template up to the end of the path segment holding {version}, as GitHub's releases/latest/download/<name> redirects to the newest release, and a maven= template then answers Maven metadata naming that version; a link ending in /maven-metadata.xml is read as that file instead, its release among the versions the key serves being the newest, and a maven= template answers its versions, limited to those it serves, as its metadata. sources=<template> names the archive of the sources of a version, its {version} filled in beside the placeholders of maven= and module=, which the SBOM lists as the source-distribution reference of each dependency the file answers for. Of a key named twice the last one counts, as java.util.Properties reads it; a placeholder a key does not know, a module= that is no location, a moduletomaven= that is no coordinate, a location not read over https or a module jar that does not declare the name it was asked for in its module-info or as its Automatic-Module-Name fails the build, an unknown key is ignored, and a file that cannot be fetched counts as absent, a TLS handshake that is reset, refused by an alert or spoken in another protocol included, save where the certificate it is served with does not verify or does not name its host, which fails the build. What a domain answered is kept for jenesis.discovery.ttl hours
                 discovery.timeout|5000|Connect and read timeout, in milliseconds, for the file a domain publishes for discovery, which is asked once rather than with the retries of jenesis.repository.retries; a domain that does not answer in time counts as absent, and a value that is not positive is refused
-                discovery.ttl|24|Hours a domain's answer is kept in the local module folder, under well-known/ in jenesis.module.local or ~/.jenesis, so that a later build reads it rather than asking again: the file the domain publishes, or that it answered 404 or 410 for none, while a fetch that failed otherwise, as by a timeout, a reset or a server error, is kept as nothing and a certificate that does not verify fails the build; jenesis.repository.offline reads what is kept whatever its age, a local module folder that cannot be written, as a container mounts it, is read alone, and 0 keeps nothing; no switch asks a domain again early, so delete well-known/ for that; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                discovery.ttl|24|Hours a domain's answer is kept in the local module folder, under well-known/ in jenesis.module.local or ~/.jenesis, or in the project's jenesis.project.artifacts where jenesis.module.local is empty, so that a later build reads it rather than asking again: the file the domain publishes, or that it answered 404 or 410 for none, while a fetch that failed otherwise, as by a timeout, a reset or a server error, is kept as nothing and a certificate that does not verify fails the build; jenesis.repository.offline reads what is kept whatever its age, a local module folder that cannot be written, as a container mounts it, is read alone, and 0 keeps nothing; no switch asks a domain again early, so delete well-known/ for that; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 maven.uri||Maven remotes, comma-separated and queried left to right; a |<groupId> suffix, repeatable, asks a remote only for that group and the groups below it, and @<name> splices the chain that jenesis.<name> or the environment variable <name> holds; an empty value names no remote at all, so only discovery and the artifacts a build stored answer (env MAVEN_REPOSITORY_URI)
-                maven.local||Local Maven cache folder (env MAVEN_REPOSITORY_LOCAL), relative to the project root; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                maven.local||Local Maven repository (env MAVEN_REPOSITORY_LOCAL), ~/.m2/repository where it exists, relative to the working directory on the command line, to ~/.jenesis in its files and to the project root in a project's; empty keeps no local Maven repository, so that everything resolved is kept in jenesis.project.artifacts alone and a CI job caches the project's .jenesis folder only, while export refuses to run; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 maven.token||Authorization header value for the Maven remotes, sent as given, so it names its scheme, as Bearer <token> or Basic <credentials> (env MAVEN_REPOSITORY_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one; a token the environment provides is sent only to the remotes the environment names, a remote a project's own files named is never sent one, and neither is the built-in public repository
                 maven.embed|true|Carry the POM and a pom.properties in the jar under META-INF/maven/<groupId>/<artifactId>/, as Maven does, where the layout publishes to Maven
                 maven.sources||Folders beside src/main/java and src/test/java that a pom.xml module compiles too, comma-separated names such as kotlin,groovy, each read as src/main/<name> and src/test/<name> where it exists
                 maven.unified|false|Resolve the compile, provided, runtime and test dependencies a pom.xml module declares as one graph, as Maven does, so that a test or runtime dependency decides which version of a shared dependency the main classes compile and run with; false resolves each class path on its own, so the main classes compile and run with the versions a consumer of the published POM resolves
                 maven.segments|2|Leading dot-separated segments of a module name that form its Maven groupId, when a module is published or resolved by the coordinate convention; a shorter name becomes the groupId in full
                 module.uri||Jenesis module remotes, likewise, where a |<module> suffix asks a remote only for that module and the modules whose name it prefixes, and a maven:[<segments>:]<uri> entry reads a remote as a Maven repository by the publishing convention, taking that many leading segments of a module name as its groupId where it names a count and jenesis.maven.segments where it does not, and a mapped:<uri or @>:<list>[;<list>...] entry reads a module only from the Maven repository at that URI, or the one jenesis.maven.uri configures for @, at the <groupId>/<artifactId>[/<type>[/<classifier>]] that one of the properties lists, each a URI or an absolute path, maps it to; an empty value names no remote at all, so only discovery, the local module folder and the artifacts a build stored answer (env JENESIS_REPOSITORY_URI)
-                module.local||Local module cache folder (env JENESIS_REPOSITORY_LOCAL), relative to the project root, which also keeps the answers of discovery under well-known/; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                module.local||Local module repository (env JENESIS_REPOSITORY_LOCAL), ~/.jenesis by default, relative to the working directory on the command line, to ~/.jenesis in its files and to the project root in a project's, read before every module remote and keeping each versioned module, artifact and POM the module index served under <module>/<version>/, so that an offline build of a fresh checkout finds what a module name resolved to, and the answers of discovery under well-known/; empty keeps no local module repository, so that everything resolved and every answer of discovery is kept in jenesis.project.artifacts alone and a CI job caches the project's .jenesis folder only, while export refuses to run; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 module.token||Authorization header value for the module remote, sent as given (env JENESIS_REPOSITORY_TOKEN); likewise, and only the first remote of the chain is sent it, so a fallback mirror never sees it
                 module.source|service|Who resolves a module's coordinates: service asks the repository at jenesis.module.uri, git reads the published index itself and fetches from jenesis.maven.uri
                 module.index||Location of that published index when git resolves it, a folder of per-module TSV files (env JENESIS_INDEX_URI); default: the jenesis-modules data on GitHub
                 module.prerelease||Accept a pre-release when asking the module index for a module's newest version
                 module.speculative||Accept a version the module index has not recorded but guesses exists
                 openpgp.uri|keyserver.ubuntu.com, keys.openpgp.org|HKP key server roots, likewise, and @<name> splices what jenesis.<name> or the environment variable <name> holds; a server speaking another protocol is another repository (env OPENPGP_REPOSITORY_URI)
-                openpgp.local|.jenesis/keys|Local key cache folder, one file per fingerprint (env OPENPGP_REPOSITORY_LOCAL), relative to the project root; a file a project provides names only a folder inside the project
+                openpgp.local|.jenesis/keys|Local key cache folder, one file per fingerprint (env OPENPGP_REPOSITORY_LOCAL), relative to the working directory on the command line and to the project root in a file; a file a project provides names only a folder inside the project
                 cache.uri||Build cache: a file:// folder, or an http(s):// cache server; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 cache.project||Project name sent to a cache server (env JENESIS_CACHE_PROJECT)
                 cache.key||Access key sent to a cache server (env JENESIS_CACHE_KEY); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and a cache server a project's own files named is not sent it
@@ -4910,9 +4897,9 @@ public record Project(
                 language.groovy|true|Groovy, the official plugin build.jenesis.plugin.groovy, resolved where a module holds a .groovy source; false leaves it out, and such a source then fails the build
                 kotlin.incremental|false|Compile Kotlin incrementally through the Kotlin Build Tools API of Kotlin 2.3 or newer, resolved as org.jetbrains.kotlin:kotlin-build-tools-impl, which recompiles only what a change reaches, in a JVM of its own per compile or in one kept warm under process.mode=daemon; the -J and -D lines of process-kotlinc.properties configure that JVM
                 scala.incremental|false|Compile Scala incrementally with Zinc, resolved as org.scala-sbt:zinc_2.13 in the group scala:zinc and driving the compiler through org.scala-lang:scala3-sbt-bridge at the compiler's version, which recompiles only what a change reaches, in a JVM of its own per compile or in one kept warm under process.mode=daemon; the lines of process-scalac.properties configure that JVM
-                jarsigner.keystore||Key store jarsigner signs the produced jar with, in place of the unsigned one, relative to the project root; a release machine supplies it, and a build that names any jarsigner setting without it fails rather than shipping unsigned; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                jarsigner.keystore||Key store jarsigner signs the produced jar with, in place of the unsigned one, relative to the working directory on the command line, to ~/.jenesis in its files and to the project root in a project's; a release machine supplies it, and a build that names any jarsigner setting without it fails rather than shipping unsigned; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jarsigner.alias||Name of the key within that store; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
-                jarsigner.storepass||Where that store's password is read from: env <variable>, or file <path>; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                jarsigner.storepass||Where that store's password is read from: env <variable>, or file <path>, relative to the working directory on the command line, to ~/.jenesis in its files and to the project root in a project's; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jarsigner.keypass||The same for the key's own password, where it has one of its own; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jarsigner.storetype||Type of the store, as jarsigner names it: PKCS12, JKS, ...; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jarsigner.tsa||Timestamp authority to stamp the signature with, so it outlives the certificate; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
@@ -4935,7 +4922,7 @@ public record Project(
         for (String line : CATALOGUE.lines().toList()) {
             String[] entry = line.split("\\|", 3);
             String name = "jenesis." + entry[0];
-            String value = environment.getProperty(entry[0]);
+            String value = environment.getProperty(entry[0], Setting.PROJECT);
             String assignment = name + "=" + (value == null ? entry[1] : value);
             String state = value != null ? "[set]" : entry[1].isEmpty() ? "[unset]" : "[default]";
             String prefix = assignment + " ".repeat(Math.max(1, 46 - assignment.length())) + state;
@@ -4952,10 +4939,10 @@ public record Project(
             settings(environment).forEach((name, value) -> environment.out().accept(name + "=" + value));
             return Collections.emptyNavigableMap();
         }
-        if (environment.flag("project.docker")) {
+        if (environment.flag("project.docker", Setting.MACHINE)) {
             SortedMap<String, String> properties = new TreeMap<>(settings(environment));
             properties.keySet().removeAll(Make.CONTAINED);
-            String image = environment.getProperty("project.image");
+            String image = environment.getProperty("project.image", Setting.MACHINE);
             Path root = this.root().toAbsolutePath().normalize();
             DockerizedJava docker = image == null ? new DockerizedJava(root) : new DockerizedJava(root, image);
             for (Path path : Stream.of(this.target(), this.reproduce(), this.artifacts())
@@ -4981,62 +4968,63 @@ public record Project(
                     docker = docker.mount(absolute, absolute.toString(), true);
                 }
             }
-            String cacheOverride = environment.getProperty("project.cache");
-            if (cacheOverride != null && !cacheOverride.contains("://")) {
-                Path cache = root.resolve(cacheOverride.isEmpty()
-                        ? Path.of(".jenesis", "cache")
-                        : Path.of(cacheOverride)).normalize();
+            if (environment.keys().containsKey("project.cache")) {
+                Path cache = environment.path("project.cache", ".jenesis/cache", Setting.CONFINED)
+                        .toAbsolutePath()
+                        .normalize();
                 if (!cache.startsWith(root)) {
                     docker = docker.mount(Files.createDirectories(cache), cache.toString(), false);
                 }
             }
-            String cacheUri = environment.getProperty("cache.uri");
+            String cacheUri = environment.getProperty("cache.uri", Setting.MACHINE);
             if (cacheUri != null && cacheUri.startsWith("file:")) {
                 Path cache = Path.of(URI.create(cacheUri)).toAbsolutePath().normalize();
                 if (!cache.startsWith(root)) {
                     docker = docker.mount(Files.createDirectories(cache), cache.toString(), false);
                 }
             }
-            docker = docker.mounts(environment.getProperty("project.readable"), root, true);
-            docker = docker.mounts(environment.getProperty("project.writable"), root, false);
-            docker = docker.envs(environment.getProperty("project.env"));
-            String mavenRepositoryUri = environment.getProperty("maven.uri", System.getenv("MAVEN_REPOSITORY_URI"));
+            docker = docker.mounts(environment.getProperty("project.readable", Setting.MACHINE), root, true);
+            docker = docker.mounts(environment.getProperty("project.writable", Setting.MACHINE), root, false);
+            docker = docker.envs(environment.getProperty("project.env", Setting.MACHINE));
+            String mavenRepositoryUri = environment.getProperty("maven.uri",
+                    System.getenv("MAVEN_REPOSITORY_URI"),
+                    Setting.PROJECT);
             if (mavenRepositoryUri != null) {
                 docker = docker.env("MAVEN_REPOSITORY_URI", mavenRepositoryUri);
             }
-            String jenesisRepositoryUri = environment.getProperty("module.uri", System.getenv("JENESIS_REPOSITORY_URI"));
+            String jenesisRepositoryUri = environment.getProperty("module.uri", System.getenv("JENESIS_REPOSITORY_URI"), Setting.PROJECT);
             if (jenesisRepositoryUri != null) {
                 docker = docker.env("JENESIS_REPOSITORY_URI", jenesisRepositoryUri);
             }
-            String mavenRepositoryLocal = environment.getProperty("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
-            Path mavenLocal = (mavenRepositoryLocal == null
-                               ? Path.of(System.getProperty("user.home"), ".m2", "repository")
-                               : Path.of(mavenRepositoryLocal)).toAbsolutePath().normalize();
-            if (Files.isDirectory(mavenLocal)) {
+            Path mavenLocal = MavenDefaultRepository.localRepository(environment);
+            if (mavenLocal != null) {
+                mavenLocal = mavenLocal.toAbsolutePath().normalize();
                 docker = docker.mount(mavenLocal, mavenLocal.toString(), true);
                 docker = docker.env("MAVEN_REPOSITORY_LOCAL", mavenLocal.toString());
             }
-            String openPgpRepositoryUri = environment.getProperty("openpgp.uri", System.getenv("OPENPGP_REPOSITORY_URI"));
+            String openPgpRepositoryUri = environment.getProperty("openpgp.uri", System.getenv("OPENPGP_REPOSITORY_URI"), Setting.PROJECT);
             if (openPgpRepositoryUri != null) {
                 docker = docker.env("OPENPGP_REPOSITORY_URI", openPgpRepositoryUri);
             }
-            String openPgpRepositoryLocal = environment.getProperty("openpgp.local", System.getenv("OPENPGP_REPOSITORY_LOCAL"));
+            Path openPgpRepositoryLocal = environment.path("openpgp.local",
+                    System.getenv("OPENPGP_REPOSITORY_LOCAL"),
+                    Setting.CONFINED);
             if (openPgpRepositoryLocal != null) {
-                Path openPgpLocal = Path.of(openPgpRepositoryLocal).toAbsolutePath().normalize();
+                Path openPgpLocal = openPgpRepositoryLocal.toAbsolutePath().normalize();
                 if (Files.isDirectory(openPgpLocal) && !openPgpLocal.startsWith(root)) {
                     docker = docker.mount(openPgpLocal, openPgpLocal.toString(), true);
                 }
                 docker = docker.env("OPENPGP_REPOSITORY_LOCAL", openPgpLocal.toString());
             }
-            String jenesisRepositoryLocal = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
-            Path jenesisLocal = (jenesisRepositoryLocal == null
-                                 ? Path.of(System.getProperty("user.home"), ".jenesis")
-                                 : Path.of(jenesisRepositoryLocal)).toAbsolutePath().normalize();
-            if (Files.isDirectory(jenesisLocal)) {
+            Path jenesisRepositoryLocal = JenesisModuleRepository.localRepository(environment);
+            Path jenesisLocal = jenesisRepositoryLocal == null
+                    ? null
+                    : jenesisRepositoryLocal.toAbsolutePath().normalize();
+            if (jenesisLocal != null && Files.isDirectory(jenesisLocal)) {
                 docker = docker.mount(jenesisLocal, jenesisLocal.toString(), true);
                 docker = docker.env("JENESIS_REPOSITORY_LOCAL", jenesisLocal.toString());
             }
-            if (environment.flag("print.docker", true)) {
+            if (environment.flag("print.docker", true, Setting.PROJECT)) {
                 environment.out().accept("Launching build within Docker image: " + docker.image());
             }
             int code = docker.execute("build/jenesis/Make.java", properties, selectors);
@@ -5045,7 +5033,7 @@ public record Project(
             }
             return Collections.emptyNavigableMap();
         }
-        if (environment.flag("project.watch")) {
+        if (environment.flag("project.watch", Setting.PROJECT)) {
             watch(selectors);
             return Collections.emptyNavigableMap();
         }

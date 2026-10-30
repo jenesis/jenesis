@@ -5,6 +5,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.ObservabilityEngine;
 import build.jenesis.Observation;
 import build.jenesis.PathPlacement;
@@ -86,16 +87,16 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableSet(),
                 ExternalModule.official(environment, JACOCO, null, repositories, resolvers),
-                environment.flag("observe.jacoco", true),
+                environment.flag("observe.jacoco", true, Setting.PROJECT),
                 ExternalModule.official(environment, ASYNCPROFILER, null, repositories, resolvers),
-                environment.flag("observe.asyncprofiler", true),
+                environment.flag("observe.asyncprofiler", true, Setting.PROJECT),
                 ExternalModule.official(environment, PITEST, null, repositories, resolvers),
-                environment.flag("observe.pitest", true));
-        Boolean nativeImage = environment.flagOrNull("observe.native");
+                environment.flag("observe.pitest", true, Setting.PROJECT));
+        Boolean nativeImage = environment.flagOrNull("observe.native", Setting.PROJECT);
         if (nativeImage != null) {
             module = module.nativeImage(nativeImage ? value -> value : null);
         }
-        Boolean jfr = environment.flagOrNull("observe.jfr");
+        Boolean jfr = environment.flagOrNull("observe.jfr", Setting.PROJECT);
         if (jfr != null) {
             module = module.jfr(jfr ? value -> value : null);
         }

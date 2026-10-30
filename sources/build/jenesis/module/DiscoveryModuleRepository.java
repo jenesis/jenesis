@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.DiscoveredLocation;
 import build.jenesis.Discovery;
 import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -45,7 +46,8 @@ public class DiscoveryModuleRepository implements JenesisRepository {
                                              discovery,
                                              MavenDefaultRepository.ofEnvironment(environment, discovery),
                                              Repository.Connection.ofEnvironment(environment),
-                                             environment.flag("print.fetch") ? environment.out() : null,
+                                             environment.flag("print.fetch",
+                                                     Setting.PROJECT) ? environment.out() : null,
                                              Palette.ofEnvironment(environment));
     }
 
@@ -138,6 +140,7 @@ public class DiscoveryModuleRepository implements JenesisRepository {
             } else if (!location.template()) {
                 URI root = location.root(connection).resolve(scope == Scope.MODULE ? "module/" : "artifact/");
                 item = repositories.computeIfAbsent(root, _ -> new JenesisModuleRepository(root)
+                        .local(null)
                         .connection(connection)
                         .printing(printing, palette)).fetch(executor, module, classifier, resolved, type);
             } else {

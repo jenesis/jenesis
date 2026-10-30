@@ -74,14 +74,16 @@ which finishes the build it is running. Daemons announce themselves in
 from source that a daemon runs, so no project's `.jenesis/classes` is pulled from
 under its daemon.
 
-A shared daemon runs in a folder of its own rather than in any project, so
-nothing depends on the folder a build was started from: a relative path in a
-setting - `-Djenesis.maven.local=m2`, a key store, a folder to publish to - names
-a path relative to the project root, with or without a daemon, and every process
-the build starts, a test JVM or a warm tool, runs in the project's root
-(`jenesis.process.directory` names another folder of the project). A plugin reads
-and writes the folders it is handed rather than resolving a path against the
-working directory, which is the daemon's own folder.
+A shared daemon runs in a folder of its own rather than in any project, so a
+relative path is resolved before the build reaches it, against where the path
+was written: `-Djenesis.maven.local=m2` on the command line names `m2/` in the
+folder you typed it in, a local repository, daemon folder or key store your own
+`~/.jenesis/jenesis.properties` names is relative to `~/.jenesis`, the same
+folder for every project, and a path in the project's own files is relative to
+the project root. Every process the build starts, a test JVM or a warm tool,
+runs in the project's root (`jenesis.process.directory` names another folder).
+A plugin reads and writes the folders it is handed rather than resolving a path
+against the working directory, which is the daemon's own folder.
 
 `-Djenesis.daemon.shared=false` keeps a daemon for one project alone, started in
 its root. On Windows, a folder a process runs in can be neither deleted nor
@@ -198,7 +200,7 @@ folder records the engine and the JVM it was started for, so a changed engine or
 an upgraded JDK clears it at once and the caches are trained again. Two settings
 configure it:
 
-    -Djenesis.aot.folder=.jenesis/aot   # where it lives, relative to the project
+    -Djenesis.aot.folder=.jenesis/aot   # where it lives (default: the project's .jenesis/aot)
     -Djenesis.aot.lifetime=P7D          # clear it once it is this old
 
 `help`, `skill` and its pages, `configuration` and `properties` only print, so they never train

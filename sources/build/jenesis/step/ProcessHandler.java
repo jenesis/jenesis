@@ -2,6 +2,7 @@ package build.jenesis.step;
 
 import module java.base;
 import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.SequencedProperties;
 import build.jenesis.daemon.Worker;
 
@@ -63,7 +64,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public static Factory ofEnvironment(Environment environment) {
-            String factory = environment.getProperty("process.factory");
+            String factory = environment.getProperty("process.factory", Setting.PROJECT);
             if (factory == null) {
                 if (System.getProperty("org.graalvm.nativeimage.imagecode") == null) {
                     return TOOL;

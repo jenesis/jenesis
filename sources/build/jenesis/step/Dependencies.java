@@ -12,6 +12,7 @@ import build.jenesis.DependencyScope;
 import build.jenesis.DiscoverySources;
 import build.jenesis.Environment;
 import build.jenesis.License;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
@@ -68,7 +69,7 @@ public class Dependencies implements BuildExecutorModule {
                 null,
                 PathPlacement.INFERRED,
                 BuildStep.timestamp(environment),
-                environment.flag("print.aliases") ? environment.out() : null,
+                environment.flag("print.aliases", Setting.PROJECT) ? environment.out() : null,
                 Palette.ofEnvironment(environment));
     }
 
@@ -335,9 +336,20 @@ public class Dependencies implements BuildExecutorModule {
                                     + aliasesFile
                                     + ": expected <group>/<repository>/<module-name>");
                         }
+                        String target = properties.getProperty(key);
+                        int slash = target.indexOf('/');
+                        if (slash < 1 || slash == target.length() - 1) {
+                            throw new IllegalArgumentException("Malformed target '"
+                                    + target
+                                    + "' of module alias '"
+                                    + key
+                                    + "' in "
+                                    + aliasesFile
+                                    + ": expected <repository>/<coordinate>");
+                        }
                         moduleAliases.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashMap<>())
                                 .computeIfAbsent(key.substring(first + 1, second), _ -> new LinkedHashMap<>())
-                                .putIfAbsent(key.substring(second + 1), properties.getProperty(key));
+                                .putIfAbsent(key.substring(second + 1), target);
                     }
                 }
                 Path overridesFile = argument.folder().resolve(OVERRIDES);
@@ -465,6 +477,44 @@ public class Dependencies implements BuildExecutorModule {
                 declaredScopes.keySet().retainAll(Set.of(group));
                 managedExclusions.keySet().retainAll(Set.of(group));
                 versions.keySet().retainAll(Set.of(group));
+            }
+            SequencedMap<String, Alias> aliasTargets = new LinkedHashMap<>();
+            for (Map.Entry<String, SequencedMap<String, SequencedMap<String, String>>> aliased : moduleAliases.entrySet()) {
+                SequencedMap<String, SequencedMap<String, String>> pins = versions.getOrDefault(aliased.getKey(),
+                        Collections.emptyNavigableMap());
+                for (Map.Entry<String, SequencedMap<String, String>> byRepository : aliased.getValue().entrySet()) {
+                    for (Map.Entry<String, String> alias : byRepository.getValue().entrySet()) {
+                        int slash = alias.getValue().indexOf('/');
+                        String repository = alias.getValue().substring(0, slash),
+                                target = alias.getValue().substring(slash + 1);
+                        merge(aliasTargets, alias.getKey(), target, LOCAL);
+                        String named = pins.getOrDefault(byRepository.getKey(), Collections.emptyNavigableMap())
+                                .get(alias.getKey());
+                        if (named != null) {
+                            pins.get(byRepository.getKey()).remove(alias.getKey());
+                            if (named.strip().contains(" ")
+                                    || !bomTokens.containsKey("entry/" + aliased.getKey() + "/" + alias.getValue())) {
+                                versions.get(aliased.getKey())
+                                        .computeIfAbsent(repository, _ -> new LinkedHashMap<>())
+                                        .putIfAbsent(target, named);
+                            }
+                        }
+                        for (SequencedMap<String, SequencedMap<String, String>> scoped
+                                : requires.getOrDefault(aliased.getKey(), Collections.emptyNavigableMap()).values()) {
+                            String value = scoped.getOrDefault(byRepository.getKey(), Collections.emptyNavigableMap())
+                                    .get(alias.getKey());
+                            if (value != null) {
+                                scoped.get(byRepository.getKey()).remove(alias.getKey());
+                                if (scoped.get(byRepository.getKey()).isEmpty()) {
+                                    scoped.remove(byRepository.getKey());
+                                }
+                                scoped.computeIfAbsent(repository, _ -> new LinkedHashMap<>()).merge(target,
+                                        value,
+                                        (left, right) -> left.isEmpty() ? right : left);
+                            }
+                        }
+                    }
+                }
             }
             Path libs = Files.createDirectories(context.next().resolve(RESOLVED));
             SequencedMap<String, Path> previousArtifacts = new LinkedHashMap<>();
@@ -702,12 +752,6 @@ public class Dependencies implements BuildExecutorModule {
             }
             SequencedProperties resolved = new SequencedProperties();
             SequencedMap<String, Resolver.Resolved> materialized = new LinkedHashMap<>();
-            SequencedMap<String, Alias> aliasTargets = new LinkedHashMap<>();
-            for (SequencedMap<String, SequencedMap<String, String>> byRepository : moduleAliases.values()) {
-                for (SequencedMap<String, String> byAlias : byRepository.values()) {
-                    byAlias.forEach((alias, token) -> merge(aliasTargets, alias, token, LOCAL));
-                }
-            }
             SequencedMap<String, Overridden> overrideTargets = new LinkedHashMap<>();
             for (SequencedMap<String, SequencedMap<String, String>> byRepository : moduleOverrides.values()) {
                 for (SequencedMap<String, String> byModule : byRepository.values()) {
