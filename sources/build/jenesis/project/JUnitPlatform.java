@@ -1,10 +1,13 @@
 package build.jenesis.project;
 
 import module java.base;
+import module java.xml;
 import build.jenesis.BuildStep;
 import build.jenesis.PathPlacement;
 import build.jenesis.TestFramework;
 import build.jenesis.TestTags;
+import build.jenesis.step.ProcessBuildStep;
+import org.xml.sax.Attributes;
 
 public record JUnitPlatform(String console) implements TestFramework {
 
@@ -133,6 +136,58 @@ public record JUnitPlatform(String console) implements TestFramework {
             }
         }
         return commands;
+    }
+
+    @Override
+    public Optional<SequencedMap<String, SequencedSet<String>>> failed(Path supplement,
+                                                                       Path output) throws IOException {
+        Path reports = output.resolve(BuildStep.REPORTS + "tests");
+        if (!Files.isDirectory(reports)) {
+            return Optional.empty();
+        }
+        List<Path> legacy;
+        try (Stream<Path> files = Files.list(reports)) {
+            legacy = files.filter(file -> file.getFileName().toString().startsWith("TEST-")
+                    && file.getFileName().toString().endsWith(".xml")).sorted().toList();
+        }
+        if (legacy.isEmpty()) {
+            return Optional.empty();
+        }
+        SequencedMap<String, SequencedSet<String>> failed = new TreeMap<>();
+        for (Path report : legacy) {
+            boolean read = ProcessBuildStep.parsed(report, new DefaultHandler() {
+                private String type, method;
+
+                @Override
+                public void startElement(String uri, String localName, String qualifiedName, Attributes attributes) {
+                    switch (qualifiedName) {
+                        case "testcase" -> {
+                            type = attributes.getValue("classname");
+                            method = attributes.getValue("name");
+                        }
+                        case "failure", "error" -> {
+                            if (type != null) {
+                                failed.computeIfAbsent(type, _ -> new TreeSet<>()).add(method == null ? "" : method);
+                            }
+                        }
+                        default -> {
+                        }
+                    }
+                }
+
+                @Override
+                public void endElement(String uri, String localName, String qualifiedName) {
+                    if (qualifiedName.equals("testcase")) {
+                        type = null;
+                        method = null;
+                    }
+                }
+            });
+            if (!read) {
+                return Optional.empty();
+            }
+        }
+        return Optional.of(failed);
     }
 
     @Override

@@ -278,8 +278,10 @@ step holds (a `Resolver`, a lambda typed as a serialisable functional interface)
 names. Two builds of the same inputs write the same bytes, which `jenesis.project.reproduce` reports step by step.
 What a step keeps for its next run - an incremental compiler's state - goes to `context.persistent()`: the folder of
 the last successful run, moved and handed only with `previous`, discarded after a failure, empty when the step changed
-or the build cache supplied its output, kept when a run reports nothing new. A run from an empty folder writes the same
-bytes, only more slowly.
+or the build cache supplied its output, kept when a run reports nothing new. A step whose record matters most after a
+failure - the test step in `jenesis.test.mode=failed` or `failedfirst`, which keeps what failed - returns true from
+`persistsOnFailure()` and is handed the folder of its last run, failed or not, as long as the step is unchanged. A run
+from an empty folder writes the same bytes, only more slowly.
 
 **Processes.** A step forking a JDK tool extends `ProcessBuildStep` and accepts `process-<tool>.properties`; one running
 a program extends `EnvironmentalProcessBuildStep` and accepts `environment-<tool>.properties`, whose variables (with

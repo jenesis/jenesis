@@ -52,6 +52,38 @@ public class Demo {
                         + " tests ran as " + order);
             }
             System.out.println("Editing Subtractor in prioritized mode ran SubtractorTest first, then AdderTest.");
+
+            delete(ran);
+            Files.writeString(subtractor, subtracting.replace("return left - right;", "return left + right;"));
+            build("failedfirst", false);
+            order = Files.readAllLines(ran.resolve("order"));
+            if (!order.equals(List.of("AdderTest", "SubtractorTest"))) {
+                throw new AssertionError("AdderTest was expected to run first, by its name, but the tests ran as "
+                        + order);
+            }
+            System.out.println("Breaking Subtractor in failedfirst mode failed SubtractorTest, which ran last.");
+
+            delete(ran);
+            Files.writeString(source, original.replace(
+                    "return left + right;",
+                    "int total = left + right;\n        return total;"));
+            build("failedfirst", false);
+            order = Files.readAllLines(ran.resolve("order"));
+            if (!order.equals(List.of("SubtractorTest", "AdderTest"))) {
+                throw new AssertionError("SubtractorTest, which failed before, was expected to run first, but the"
+                        + " tests ran as " + order);
+            }
+            System.out.println("Editing Adder in failedfirst mode ran SubtractorTest, which failed before, first.");
+
+            delete(ran);
+            Files.writeString(source, original);
+            build("failed", false);
+            order = Files.readAllLines(ran.resolve("order"));
+            if (!order.equals(List.of("SubtractorTest"))) {
+                throw new AssertionError("Only SubtractorTest, which failed before, was expected to run, but the"
+                        + " tests ran as " + order);
+            }
+            System.out.println("Restoring Adder in failed mode ran only SubtractorTest, which failed before.");
         } finally {
             Files.writeString(source, original);
             Files.writeString(subtractor, subtracting);
@@ -60,6 +92,10 @@ public class Demo {
     }
 
     private static void build(String mode) throws IOException, InterruptedException {
+        build(mode, true);
+    }
+
+    private static void build(String mode, boolean succeeds) throws IOException, InterruptedException {
         String java = ProcessHandle.current().info().command().orElseGet(() -> Path.of(
                 System.getProperty("java.home"),
                 "bin",
@@ -70,8 +106,10 @@ public class Demo {
                 "build/jenesis/Make.java")
                 .inheritIO()
                 .start();
-        if (process.waitFor() != 0) {
-            throw new IllegalStateException("Build exited with a non-zero status");
+        if ((process.waitFor() == 0) != succeeds) {
+            throw new IllegalStateException(succeeds
+                    ? "Build exited with a non-zero status"
+                    : "Build was expected to fail on the broken test, but succeeded");
         }
     }
 

@@ -54,6 +54,10 @@ public interface BuildStep extends Serializable {
         return true;
     }
 
+    default boolean persistsOnFailure() {
+        return false;
+    }
+
     CompletionStage<BuildStepResult> apply(Executor executor,
                                            BuildStepContext context,
                                            SequencedMap<String, BuildStepArgument> arguments) throws IOException;

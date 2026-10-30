@@ -21,6 +21,65 @@ public class TestFrameworkTest {
     private Path root;
 
     @Test
+    public void reads_the_failed_tests_of_the_junit_platform_from_its_legacy_report() throws IOException {
+        Path reports = Files.createDirectories(root.resolve("output").resolve(BuildStep.REPORTS + "tests"));
+        Files.writeString(reports.resolve("TEST-junit-jupiter.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <testsuite name="JUnit Jupiter" tests="3" failures="1" errors="1">
+                  <testcase name="passes()" classname="sample.FirstTest" time="0.01"/>
+                  <testcase name="fails()" classname="sample.FirstTest" time="0.01">
+                    <failure message="expected">stack</failure>
+                  </testcase>
+                  <testcase name="errs()" classname="sample.SecondTest" time="0.01">
+                    <error message="unexpected">stack</error>
+                  </testcase>
+                </testsuite>
+                """);
+        assertThat(new JUnitPlatform().failed(root.resolve("supplement"), root.resolve("output")))
+                .contains(new TreeMap<>(Map.of(
+                        "sample.FirstTest", new TreeSet<>(Set.of("fails()")),
+                        "sample.SecondTest", new TreeSet<>(Set.of("errs()")))));
+    }
+
+    @Test
+    public void reads_no_failed_tests_of_the_junit_platform_where_it_wrote_no_report() throws IOException {
+        assertThat(new JUnitPlatform().failed(root.resolve("supplement"), root.resolve("output")))
+                .as("a run that wrote no report says nothing about what failed")
+                .isEmpty();
+    }
+
+    @Test
+    public void reads_the_failed_tests_of_testng_from_its_results() throws IOException {
+        Path results = Files.createDirectories(root.resolve("supplement").resolve("test-output"));
+        Files.writeString(results.resolve("testng-results.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <testng-results>
+                  <suite name="Command line suite">
+                    <test name="Command line test">
+                      <class name="sample.FirstTest">
+                        <test-method status="PASS" name="passes"/>
+                        <test-method status="FAIL" name="fails"/>
+                        <test-method status="SKIP" name="skipped"/>
+                      </class>
+                      <class name="sample.SecondTest">
+                        <test-method status="PASS" name="passes"/>
+                      </class>
+                    </test>
+                  </suite>
+                </testng-results>
+                """);
+        assertThat(new TestNG().failed(root.resolve("supplement"), root.resolve("output")))
+                .contains(new TreeMap<>(Map.of("sample.FirstTest", new TreeSet<>(Set.of("fails")))));
+    }
+
+    @Test
+    public void reads_no_failed_tests_of_junit_4() throws IOException {
+        assertThat(new JUnit4().failed(root.resolve("supplement"), root.resolve("output")))
+                .as("JUnit 4 writes no report to read, so failed and failedfirst run every test by class name")
+                .isEmpty();
+    }
+
+    @Test
     public void detects_junit_platform_from_engine_module() throws IOException {
         writeJar(root.resolve("artifacts"), "engine.jar", "org.junit.platform.engine");
         assertThat(TestFrameworks.detect(List.of(), List.of(root))).get().isInstanceOf(JUnitPlatform.class);

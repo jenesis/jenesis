@@ -1,9 +1,12 @@
 package build.jenesis.project;
 
 import module java.base;
+import module java.xml;
 import build.jenesis.BuildStep;
 import build.jenesis.TestFramework;
 import build.jenesis.TestTags;
+import build.jenesis.step.ProcessBuildStep;
+import org.xml.sax.Attributes;
 
 public record TestNG() implements TestFramework {
 
@@ -56,6 +59,41 @@ public record TestNG() implements TestFramework {
             commands.add(String.join(",", joined));
         }
         return commands;
+    }
+
+    @Override
+    public Optional<SequencedMap<String, SequencedSet<String>>> failed(Path supplement,
+                                                                       Path output) throws IOException {
+        Path results = Stream.of(output.resolve(BuildStep.REPORTS + "tests"), supplement.resolve("test-output"))
+                .map(folder -> folder.resolve("testng-results.xml"))
+                .filter(Files::isRegularFile)
+                .findFirst()
+                .orElse(null);
+        if (results == null) {
+            return Optional.empty();
+        }
+        SequencedMap<String, SequencedSet<String>> failed = new TreeMap<>();
+        return ProcessBuildStep.parsed(results, new DefaultHandler() {
+            private String type;
+
+            @Override
+            public void startElement(String uri, String localName, String qualifiedName, Attributes attributes) {
+                if (qualifiedName.equals("class")) {
+                    type = attributes.getValue("name");
+                } else if (qualifiedName.equals("test-method")
+                        && type != null
+                        && "FAIL".equals(attributes.getValue("status"))) {
+                    failed.computeIfAbsent(type, _ -> new TreeSet<>()).add(attributes.getValue("name"));
+                }
+            }
+
+            @Override
+            public void endElement(String uri, String localName, String qualifiedName) {
+                if (qualifiedName.equals("class")) {
+                    type = null;
+                }
+            }
+        }) ? Optional.of(failed) : Optional.empty();
     }
 
     @Override
