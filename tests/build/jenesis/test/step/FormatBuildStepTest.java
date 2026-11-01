@@ -68,6 +68,33 @@ public class FormatBuildStepTest {
     }
 
     @Test
+    public void verifies_the_resources_of_a_module_beside_its_sources() throws IOException {
+        Path resources = Files.createDirectories(sources.getParent().resolve(BuildStep.RESOURCES));
+        Files.writeString(resources.resolve("settings.json"), "{}");
+        verify();
+        Files.writeString(resources.resolve("settings.json"), "{ }");
+        verify();
+
+        assertThat(VERIFIED)
+                .as("a resource is verified with the sources, and again only once it changed")
+                .containsExactly(List.of("settings.json", "A.java", "B.java"), List.of("settings.json"));
+    }
+
+    @Test
+    public void a_rewriting_formatter_that_fails_fails_the_build_and_formats_the_source_again_next_time()
+            throws IOException {
+        Files.writeString(sources.resolve("A.java"), "class A { unformatted }");
+
+        assertThatThrownBy(() -> execute(false))
+                .as("a formatter that fails while rewriting fails the build");
+        assertThatThrownBy(() -> execute(false))
+                .as("the source it failed on is not recorded as formatted, so the next run formats it again");
+        assertThat(VERIFIED)
+                .as("both runs hand the formatter the source it failed on")
+                .containsExactly(List.of("A.java", "B.java"), List.of("A.java", "B.java"));
+    }
+
+    @Test
     public void an_unformatted_edit_keeps_failing_while_another_source_changes() throws IOException {
         verify();
         Files.writeString(sources.resolve("A.java"), "class A { unformatted }");
@@ -118,6 +145,10 @@ public class FormatBuildStepTest {
     }
 
     private void verify() throws IOException {
+        execute(true);
+    }
+
+    private void execute(boolean verify) throws IOException {
         BuildExecutor buildExecutor = BuildExecutor.of(root.resolve("target"),
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
@@ -129,7 +160,7 @@ public class FormatBuildStepTest {
                 0);
         buildExecutor.addSource("tool", tool);
         buildExecutor.addSource("input", sources.getParent());
-        buildExecutor.addStep("format", new Formatter(true), "tool", "input");
+        buildExecutor.addStep("format", new Formatter(verify), "tool", "input");
         buildExecutor.execute();
     }
 
@@ -146,7 +177,7 @@ public class FormatBuildStepTest {
 
         @Override
         protected boolean isFormattable(Path file) {
-            return file.toString().endsWith(".java");
+            return file.toString().endsWith(".java") || file.toString().endsWith(".json");
         }
 
         @Override
