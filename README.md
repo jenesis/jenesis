@@ -89,6 +89,22 @@ to validate a change before trusting the self-hosted build again. It is a valida
 release tree, no pinning, no staging - so a green `mvn test` means the sources and tests are sound, not that
 the build tool works.
 
+### When Maven Central rate-limits the build
+
+The build fetches Maven artifacts from the remotes `MAVEN_REPOSITORY_URI` names, or `-Djenesis.maven.uri`, which
+outranks it: a comma-separated list asked left to right, where a remote is asked only for what the one before it
+answers 404 to. Central answers an address that fetches a lot with 429, so a machine that builds often can name
+Google's mirror of Central first and Central itself second, the pair the workflows of this repository use:
+
+```bash
+export MAVEN_REPOSITORY_URI=https://maven-central.storage-download.googleapis.com/maven2/,https://repo1.maven.org/maven2/
+```
+
+The mirror syncs some hours behind Central, so Central still serves a release the mirror lacks. Two things stay
+with the first remote that answers: a `maven-metadata.xml`, so a version range or a `pin` proposal sees the
+mirror's list of versions, and an official plugin or other `module/` name, which the module index redirects to
+the first remote alone.
+
 Build performance
 -----------------
 
@@ -161,7 +177,9 @@ Continuous integration
   - `sdk` - stages the jar, populates the SDKMAN layout and runs the `sdk/jenesis` and `sdk/jpx` script tests.
 
   Every build runs under `-Djenesis.dependency.pin=strict`, so an unpinned dependency fails CI: run `pin` and
-  commit the result when you change one. Each job uploads its `target/` on failure.
+  commit the result when you change one. Each job uploads its `target/` on failure. Every workflow names
+  `MAVEN_REPOSITORY_URI` in its file as Google's mirror of Central followed by Central itself, as described under
+  *When Maven Central rate-limits the build*.
 
 - **`.github/workflows/benchmark.yml`** is on-demand (`workflow_dispatch`) and runs `benchmark/benchmark.sh`
   unattended on all three runners. It is where the performance figures come from: the tables land in the run
