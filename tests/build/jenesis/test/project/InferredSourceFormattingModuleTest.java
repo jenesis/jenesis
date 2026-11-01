@@ -12,6 +12,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.SequencedProperties;
 import build.jenesis.project.InferredSourceFormattingModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -276,6 +277,103 @@ public class InferredSourceFormattingModuleTest {
                 .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("[palantir, princeofspace]");
+    }
+
+    @Test
+    public void switches_spotless_on_by_its_properties_beside_a_java_formatter_where_no_set_formats_java()
+            throws IOException {
+        Files.writeString(project.resolve("googlejavaformat.properties"), "");
+        Files.writeString(project.resolve("spotless.properties"), "json.target=*.json\njson.steps=jacksonJson\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+        executor.execute("format/" + InferredSourceFormattingModule.SPOTLESS + "/coordinate",
+                "format/" + InferredSourceFormattingModule.GOOGLEJAVAFORMAT + "/coordinate");
+
+        assertThat(SequencedProperties.ofFiles(root.resolve("format/" + InferredSourceFormattingModule.SPOTLESS
+                        + "/coordinate/output/" + BuildStep.REQUIRES)).stringPropertyNames())
+                .as("a spotless.properties wires the official Spotless plugin, resolved by its module name")
+                .anyMatch(coordinate -> coordinate.contains("module/build.jenesis.plugin.spotless"));
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.GOOGLEJAVAFORMAT + "/coordinate"))
+                .as("Spotless formatting no Java source runs beside the Java formatter")
+                .exists();
+    }
+
+    @Test
+    public void counts_a_spotless_set_running_a_java_formatter_as_a_java_formatter() throws IOException {
+        Files.writeString(project.resolve("palantir.properties"), "");
+        Files.writeString(project.resolve("spotless.properties"), "java.target=*.java\njava.steps=removeUnusedImports, googleJavaFormat\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .as("a Spotless set running google-java-format formats the Java sources Palantir would")
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("[palantir, spotless]");
+    }
+
+    @Test
+    public void counts_a_spotless_set_running_ktfmt_or_ktlint_as_the_kotlin_formatter() throws IOException {
+        Files.writeString(project.resolve("ktfmt.properties"), "");
+        Files.writeString(project.resolve("spotless.properties"), "kotlin.target=*.kt\nkotlin.steps=ktlint\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .as("a Spotless set running ktlint formats the Kotlin sources ktfmt would")
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("runs a Kotlin formatter of Spotless while ktfmt formats the same Kotlin sources")
+                .hasMessageContaining("jenesis.format.ktfmt=false");
+    }
+
+    @Test
+    public void counts_a_spotless_set_running_scalafmt_as_the_scala_formatter() throws IOException {
+        Files.writeString(project.resolve(".scalafmt.conf"), "version = \"3.11.5\"\n");
+        Files.writeString(project.resolve("spotless.properties"), "scala.target=*.scala\nscala.steps=scalafmt\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("runs Spotless's scalafmt step while scalafmt formats the same Scala sources");
+    }
+
+    @Test
+    public void counts_a_spotless_set_running_license_header_as_the_license_header_check() throws IOException {
+        Files.writeString(project.resolve("licenseheader.properties"), "text=Licensed.\n");
+        Files.writeString(project.resolve("spotless.properties"), "java.target=*.java\njava.steps=licenseHeader\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("runs Spotless's licenseHeader step while a licenseheader.properties checks the same header");
+    }
+
+    @Test
+    public void switches_spotless_off_by_its_boolean_setting() throws IOException {
+        Files.writeString(project.resolve("spotless.properties"), "json.target=*.json\njson.steps=jacksonJson\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                InferredSourceFormattingModule.ofEnvironment(new Environment(Map.of("format.spotless", "false")),
+                        new LinkedHashSet<>(List.of(project)),
+                        Map.of(),
+                        Map.of()),
+                "project");
+        executor.execute();
+
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.SPOTLESS))
+                .as("jenesis.format.spotless=false leaves spotless.properties unread")
+                .doesNotExist();
     }
 
     @Test

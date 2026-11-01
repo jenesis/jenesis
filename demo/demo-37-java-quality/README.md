@@ -53,14 +53,20 @@ as `build.jenesis/eclipse/`, is read only under that profile:
     |   |   `-- eclipse-formatter.xml  the formatter profile Eclipse exports
     |   |-- openrewrite/
     |   |   `-- rewrite.yml        switches OpenRewrite on, under a profile: its recipes
+    |   |-- princeofspace/
+    |   |   `-- princeofspace.properties  switches Prince of Space on, under a profile, with its options
+    |   |-- spotless/
+    |   |   `-- spotless.properties  switches Spotless on, under a profile, naming sets of files and steps
     |   `-- spdx/
     |       `-- licenseheader.properties  no text: the header is derived, under a profile
     |-- jenesis-eclipse.properties  switches google-java-format off under the eclipse profile
+    |-- jenesis-princeofspace.properties  switches google-java-format off under the princeofspace profile
     |-- project.properties         the license and copyright the derived header names
     `-- sources
         |-- module-info.java
         `-- sample
-            `-- Sample.java
+            |-- Sample.java
+            `-- greeting.json      a resource, formatted under the spotless profile
 
 How Jenesis infers the tools
 ----------------------------
@@ -115,7 +121,7 @@ skips the tool. It is named after the part of the build the tool runs in:
 
     jenesis.check.<tool>         the source checks: Checkstyle, PMD, ...
     jenesis.validate.<tool>      the checks of the classes: SpotBugs, forbiddenapis, jdeps, jdeprscan
-    jenesis.format.<tool>        the formatters: openrewrite, googlejavaformat, palantir, princeofspace, eclipse, license
+    jenesis.format.<tool>        the formatters: openrewrite, googlejavaformat, palantir, princeofspace, eclipse, spotless, license
 
 A plugin of the project's own, which `jenesis.plugins.properties` names, is
 switched by `jenesis.plugin.<name>` instead, so it shares no setting with an
@@ -274,6 +280,62 @@ its release knows, whatever compiler level an exported profile names. Moving the
 profile file changes nothing, as long as `profile` follows it; editing a setting
 in it verifies every source again.
 
+The `princeofspace` profile formats with Prince of Space. Its
+`build.jenesis/princeofspace/` folder holds a `princeofspace.properties` that
+keeps the demo's two-space indentation and line length:
+
+    indent-size=2
+    line-length=100
+
+`indent-size` counts indentation units, so with `indent-style=tabs` it counts
+tabs. The profile's own `jenesis-princeofspace.properties` switches
+google-java-format off, as the `eclipse` profile does. Prince of Space keeps no
+blank line between the license header and the `package` line, where
+google-java-format keeps one, so the demo's source fails its verify gate as it
+stands. The rewrite switch removes the line:
+
+    java -Djenesis.make.profiles=princeofspace -Djenesis.format.rewrite=true build/jenesis/Make.java
+
+and the license header check still passes, as the header is the source's first
+comment either way. A plain build under the profile then passes:
+
+    java -Djenesis.make.profiles=princeofspace build/jenesis/Make.java
+
+The build resolves Prince of Space from Maven Central as a library, so there is
+nothing to install. Like the other formatters, it is switched off by
+`-Djenesis.format.princeofspace=false`.
+
+Formatting other files with Spotless
+------------------------------------
+
+A formatter reads a module's resources as well as its sources: the files beside
+the Java sources here, and `src/main/resources` in a `pom.xml` project. The
+`spotless` profile formats the module's `greeting.json` with
+[Spotless](https://github.com/diffplug/spotless). Its
+`build.jenesis/spotless/spotless.properties` names a set of files and the steps
+applied to them, in order:
+
+    json.target=*.json
+    json.steps=jacksonJson,endWithNewline
+
+A set takes a name of its own, `<set>.target` the globs its files match and
+`<set>.steps` its steps, and `<set>.<step>.<option>` configures one of them. The
+steps include `trimTrailingWhitespace`, `endWithNewline`, `replaceRegex`,
+`importOrder`, `jacksonJson`, `jacksonYaml` and `flexmark` for Markdown. Each
+step that needs a tool resolves it in a group of its own, as `spotless:jacksonjson`
+here, pinned like any other tool. As the other formatters, Spotless verifies by
+default; a `greeting.json` written on one line fails the build,
+
+    .../sample/greeting.json is not formatted as its Spotless steps format it
+
+and the rewrite switch formats it:
+
+    java -Djenesis.make.profiles=spotless -Djenesis.format.rewrite=true build/jenesis/Make.java
+
+A set that formats JSON runs beside google-java-format. A set running
+`googleJavaFormat` or `palantirJavaFormat` makes Spotless a Java formatter,
+refused beside another one. `-Djenesis.format.spotless=false` switches it off.
+
 Rewriting with recipes
 ----------------------
 
@@ -421,8 +483,9 @@ Pinning
 -------
 
 Each tool resolves in its own group (`checkstyle:tool`, `pmd:tool`, `spotbugs:tool`,
-`forbiddenapis:tool`, `googlejavaformat:tool`, and `eclipse:tool` under the `eclipse`
-profile), kept separate from the module's `main`-group dependencies, and floats a
+`forbiddenapis:tool`, `googlejavaformat:tool`, `eclipse:tool` under the `eclipse`
+profile, `princeofspace:tool` under the `princeofspace` profile, and `spotless:tool`
+and one group per step under the `spotless` profile), kept separate from the module's `main`-group dependencies, and floats a
 `RELEASE` version until pinned; a plugin's own jars are pinned apart, in the group
 of its name. The license header check, jdeps and jdeprscan need no tool. The `dependencies`
 selector therefore shows none of them as a dependency of the module;
