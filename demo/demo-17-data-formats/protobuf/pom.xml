@@ -81,7 +81,10 @@
     maven/org.junit/junit-bom/pom 5.14.1 SHA-256/01b01dfa366550b40ac5760548a7d728b6109d17c451e83864d1e5e0ce862c94
     maven/org.sonatype.oss/oss-parent/pom 7 SHA-256/b51f8867c92b6a722499557fc3a1fdea77bdf9ef574722fe90ce436a29559454
     maven/org.sonatype.oss/oss-parent/pom 9 SHA-256/fb40265f982548212ff82e362e59732b2187ec6f0d80182885c14ef1f982827a
-    protoc/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
-    protoc/module/build.jenesis.plugin.protoc 0.1.0 SHA-256/ed7dfb8c3f3ec1ba8835989c7c32b122b3a832dceaf8e0bd8927fe0f9df29c6b
+    protoc/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    protoc/module/build.jenesis.plugin.protoc 0.2.0 SHA-256/1038a2e83ee4f052a7e288c9f706bc9a79a8fb3dad332f88f37d86023c938a85
+    protoc:grpc-java/maven/io.grpc/protoc-gen-grpc-java/pom 1.83.1 SHA-256/24517b10ad6e61e1ea918d46a44ea86896c0a46a05c368122334d345358e9b5c
+    protoc:tool/maven/com.google.protobuf/protoc/pom 4.32.1 SHA-256/6d8f4fdde88a2ec829043b7dbe7f949cae44cddb19a8bf004910444a8a556885
+    protoc:tool/maven/com.google/google/pom 5 SHA-256/e09d345e73ca3fbca7f3e05f30deb74e9d39dd6b79a93fee8c511f23417b6828
     -->
 </project>
