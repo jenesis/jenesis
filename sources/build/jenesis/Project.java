@@ -1607,25 +1607,22 @@ public record Project(
                           deprecations of that Java release. Both run the build JDK's tool, so a
                           build on a newer JDK (jenesis.toolchain.version) finds what that JDK
                           encapsulated or scheduled for removal
-                      fmt-maven-plugin, Spotless googleJavaFormat() / the same
+                      fmt-maven-plugin (com.spotify.fmt)
                           -> googlejavaformat.properties (37), which verifies and
                           fails the build on an unformatted source; -Djenesis.format.rewrite=true
-                          rewrites. It takes style=aosp for googleJavaFormat().aosp(), javadoc=false for
-                          formatJavadoc(false), reflow=false for skipReflowingLongStrings, which a
-                          Spotless googleJavaFormat() without reflowLongStrings() needs as well, and
-                          imports=remove, imports=sort or imports=none for skipSortingImports and
+                          rewrites. It takes style=aosp for the AOSP style, javadoc=false,
+                          reflow=false for skipReflowingLongStrings, and imports=remove,
+                          imports=sort or imports=none for skipSortingImports and
                           skipRemovingUnusedImports
-                      Spotless palantirJavaFormat() / com.palantir.java-format, the same
-                          -> palantir.properties, which takes reflow and imports alike
-                      Spotless princeOfSpace() / prince-of-space-cli, the same
-                          -> princeofspace.properties, which takes wrap-style, indent-style,
-                          indent-size, line-length, closing-paren-on-new-line, trailing-commas and
-                          java-version as the CLI names them
-                      Spotless eclipse().configFile(...), formatter-maven-plugin (net.revelc)
-                          configFile -> eclipse.properties with configuration=<the profile Eclipse
-                          exports, relative to it>, or an eclipse-formatter.xml alone (37); Spotless's importOrder is a
-                          step of spotless.properties, and the formatter plugin's import and cache
-                          settings have no counterpart
+                      com.palantir.java-format -> palantir.properties, which takes reflow and
+                          imports alike
+                      prince-of-space-cli -> princeofspace.properties, which takes wrap-style,
+                          indent-style, indent-size, line-length, closing-paren-on-new-line,
+                          trailing-commas and java-version as the CLI names them
+                      formatter-maven-plugin (net.revelc) configFile -> eclipse.properties with
+                          configuration=<the profile Eclipse exports, relative to it>, or an
+                          eclipse-formatter.xml alone (37); its import and cache settings have no
+                          counterpart
                       rewrite-maven-plugin / org.openrewrite.rewrite -> rewrite.yml in
                           build.jenesis/ (37), or an openrewrite.properties with
                           configuration=<path of rewrite.yml, relative to it>, which runs
@@ -1638,21 +1635,16 @@ public record Project(
                           openrewrite:tool <coordinate> in the module-info.java, and a module the
                           library and OpenRewrite ask two versions of -> the @jenesis.pin
                           openrewrite:tool/... line the build names
-                      Spotless ktlint() / the same -> .editorconfig in build.jenesis/ (47), or a
-                          ktlint.properties with configuration=<path of .editorconfig>
-                      Spotless ktfmt() / the same -> ktfmt.properties (47): style=google for googleStyle(),
-                          kotlinlang for kotlinlangStyle(), meta, the default, otherwise;
-                          removeUnusedImports false -> imports=sort; maxWidth and the indents have
-                          no counterpart, as ktfmt's command line takes none
-                      Spotless scalafmt() / the same -> .scalafmt.conf in build.jenesis/ (51), or
-                          a scalafmt.properties with configuration=<path of .scalafmt.conf>
-                      Spotless licenseHeader(), licenseHeaderFile() / the same,
-                          license-maven-plugin (com.mycila) check and format
+                      com.ncorti.ktfmt.gradle -> ktfmt.properties (47): style=google, kotlinlang
+                          or meta, the default; removeUnusedImports false -> imports=sort;
+                          maxWidth and the indents have no counterpart, as ktfmt's command line
+                          takes none
+                      license-maven-plugin (com.mycila) check and format
                           -> licenseheader.properties (37), text=<the header>, which every Java,
                           Kotlin, Scala and Groovy source starts with as a block comment, or as
-                          written where the text is a comment already, as Spotless's file is; the
-                          header is matched and written exactly as it stands, so Spotless's $YEAR
-                          and mycila's ${...} properties are written out, a year included; without
+                          written where the text is a comment already; the header is matched and
+                          written exactly as it stands, so mycila's ${...} properties are written
+                          out, a year included; without
                           text, the header is // SPDX-FileCopyrightText: <copyright> and
                           // SPDX-License-Identifier: <id> of the one license the project declares
                       detekt, ktlint / the same -> detekt.yml and .editorconfig in build.jenesis/
@@ -1915,15 +1907,27 @@ public record Project(
                           project.tag and project.tree, which the POM and SBOM record and a
                           plugin reads as scm.revision, scm.tag and scm.tree of the
                           metadata.properties its hook point is handed
-                      Spotless json(), yaml(), markdown(), format(...) and the steps beside a Java
-                          formatter (trimTrailingWhitespace, endWithNewline, leadingTabsToSpaces,
-                          leadingSpacesToTabs, replaceRegex, importOrder, removeUnusedImports,
-                          formatAnnotations) -> spotless.properties, one set per format:
-                          <set>.target=<glob>[,...], <set>.steps=<step>[,...] and
-                          <set>.<step>.<option>=<value>, with jacksonJson, jacksonYaml and flexmark for
-                          JSON, YAML and Markdown; googleJavaFormat and palantirJavaFormat run there as
-                          well, as the one Java formatter; a step run by npm or a native program,
-                          kotlinGradle and groovy -> none
+                      Spotless (com.diffplug.spotless), whatever it formats -> spotless.properties
+                          alone (37), never another tool's file: one set per format block,
+                          <set>.target=<glob>[,...] for its target, <set>.steps=<step>[,...] in
+                          Spotless's order, and <set>.<step>.<option>=<value> for each option the
+                          step takes, named as Spotless names it: googleJavaFormat (version, style=AOSP,
+                          reflowLongStrings, reorderImports, formatJavadoc), palantirJavaFormat
+                          (version, style, formatJavadoc), princeOfSpace (version, wrapStyle,
+                          indentStyle, indentSize, lineLength, closingParenOnNewLine, trailingCommas,
+                          javaLanguageLevel), removeUnusedImports, importOrder (order),
+                          formatAnnotations, ktfmt (version, style=GOOGLE or KOTLINLANG, maxWidth,
+                          blockIndent, continuationIndent, removeUnusedImports), ktlint (version, and
+                          each editorConfigOverride entry or .editorconfig property as an option),
+                          scalafmt (version, which it requires, scalaMajorVersion, and each key of
+                          its .scalafmt.conf as an option), licenseHeader (header, its lines
+                          separated by \\n, and delimiter), trimTrailingWhitespace, endWithNewline,
+                          leadingTabsToSpaces and leadingSpacesToTabs (size), replaceRegex (regex,
+                          replacement), jacksonJson, jacksonYaml and flexmark (version). A set
+                          running a Java, Kotlin or Scala formatter or licenseHeader is that tool
+                          of the build, refused beside another; eclipse() and greclipse(), which
+                          resolve from Eclipse's p2 repositories, a step run by npm or a native
+                          program, and kotlinGradle -> none
                       maven-bundle-plugin, bnd / biz.aQute.bnd, an OSGi manifest -> none; a pom.xml
                           of packaging bundle builds a jar, whose headers a MANIFEST.MF among the
                           resources or a plugin at binary/transform supplies, which is handed the
@@ -2469,8 +2473,8 @@ public record Project(
                     eclipse.properties switches on that Java formatter, refused beside another, a
                     ktlint.properties ktlint, a ktfmt.properties ktfmt, a scalafmt.properties scalafmt,
                     a spotless.properties the Spotless steps each of its sets names for the files the set
-                    selects, counted as a Java formatter where a set runs googleJavaFormat or
-                    palantirJavaFormat, and a licenseheader.properties the header every source starts
+                    selects, counted as the Java, Kotlin or Scala formatter or the license header check
+                    where a set runs one, and a licenseheader.properties the header every source starts
                     with; without the properties of ktlint or scalafmt, an .editorconfig or
                     .scalafmt.conf of a configuration folder activates it. An openrewrite.properties runs every OpenRewrite
                     recipe of the rewrite.yml it names as configuration=, or the recipes it names as
@@ -4889,7 +4893,7 @@ public record Project(
                 format.openrewrite|true|OpenRewrite, activated by an openrewrite.properties naming a rewrite.yml as configuration=, whose recipes it runs, or recipes as recipes=, or, where none is found, by a rewrite.yml of a configuration folder; it runs before the Java formatter and reads the module's dependencies
                 format.googlejavaformat|true|google-java-format, activated by a googlejavaformat.properties whose lines are its options; refused beside another Java formatter
                 format.palantir|true|palantir-java-format, activated by a palantir.properties whose lines are its options; refused beside another Java formatter
-                format.spotless|true|Spotless, activated by a spotless.properties naming sets of files of a module's sources and resources and the Spotless steps each set runs; a set running googleJavaFormat or palantirJavaFormat is refused beside another Java formatter
+                format.spotless|true|Spotless, activated by a spotless.properties naming sets of files of a module's sources and resources and the Spotless steps each set runs; a set running a Java, Kotlin or Scala formatter or licenseHeader is refused beside that tool's own file
                 format.princeofspace|true|The Prince of Space formatter, activated by a princeofspace.properties whose lines are its options; refused beside another Java formatter
                 format.eclipse|true|The Eclipse formatter, activated by an eclipse.properties, which may name the profile Eclipse exports as configuration=, or, where none is found, by an eclipse-formatter.xml of a configuration folder; refused beside another Java formatter
                 format.ktlint|true|ktlint formatting the Kotlin sources, activated by what activates its linting; false leaves the formatting out while ktlint still lints, as where ktfmt formats them

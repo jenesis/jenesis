@@ -25,6 +25,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     private static final String LICENSE = "license",
             TEXT = "text",
             RECIPES = "recipes";
+    private static final Set<String> SPOTLESS_JAVA = Set.of("googleJavaFormat", "palantirJavaFormat", "princeOfSpace");
+    private static final Set<String> SPOTLESS_KOTLIN = Set.of("ktfmt", "ktlint");
 
     private final SequencedSet<Path> configuration;
     private final boolean verify;
@@ -623,17 +625,22 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
             formatters.put(ECLIPSE, module);
         }
         Path spotlessFile = spotless ? BuildStep.locate(configuration, SPOTLESS + ".properties") : null;
-        ExternalModule spotlessDiscovered = null;
+        SequencedMap<String, String> spotlessValues = new LinkedHashMap<>();
+        Set<String> spotlessSteps = new HashSet<>();
         if (spotlessFile != null) {
-            SequencedMap<String, String> values = new LinkedHashMap<>();
-            SequencedProperties.ofFiles(spotlessFile).forEachProperty(values::put);
-            if (values.entrySet().stream()
-                    .filter(entry -> entry.getKey().endsWith(".steps") && entry.getValue() != null)
-                    .flatMap(entry -> Arrays.stream(entry.getValue().split(",")).map(String::trim))
-                    .anyMatch(step -> step.equals("googleJavaFormat") || step.equals("palantirJavaFormat"))) {
-                formatters.put(SPOTLESS, spotlessModule.properties(values));
-            } else {
-                spotlessDiscovered = spotlessModule.properties(values);
+            SequencedProperties.ofFiles(spotlessFile).forEachProperty(spotlessValues::put);
+            spotlessValues.forEach((key, value) -> {
+                if (key.endsWith(".steps") && value != null) {
+                    Arrays.stream(value.split(",")).map(String::trim).forEach(spotlessSteps::add);
+                }
+            });
+            if (spotlessSteps.contains("licenseHeader") && inputs.contains(LICENSE)) {
+                throw new IllegalArgumentException(spotlessFile + " runs Spotless's licenseHeader step while a "
+                        + LicenseHeaderModule.CONFIGURATION + " checks the same header - keep one, or switch the"
+                        + " check off with jenesis.format.license=false");
+            }
+            if (!Collections.disjoint(spotlessSteps, SPOTLESS_JAVA)) {
+                formatters.put(SPOTLESS, spotlessModule.properties(spotlessValues));
             }
         }
         if (formatters.size() > 1) {
@@ -642,8 +649,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                     + " switch the others off with jenesis.format.<name>=false");
         }
         formatters.forEach((name, module) -> buildExecutor.addModule(name, module, inputs));
-        if (spotlessDiscovered != null) {
-            buildExecutor.addModule(SPOTLESS, spotlessDiscovered, inputs);
+        if (spotlessFile != null && !formatters.containsKey(SPOTLESS)) {
+            buildExecutor.addModule(SPOTLESS, spotlessModule.properties(spotlessValues), inputs);
         }
         Path ktfmtFile = ktfmt ? BuildStep.locate(configuration, "ktfmt.properties") : null;
         ExternalModule ktlintDiscovered = ktlint ? ktlintModule.discovered(configuration, Path.of(".editorconfig")) : null;
@@ -651,6 +658,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
             throw new IllegalArgumentException(ktfmtFile + " selects ktfmt while ktlint formats the same Kotlin sources,"
                     + " as a configuration folder holds a ktlint.properties or an .editorconfig - set"
                     + " jenesis.format.ktlint=false to format with ktfmt alone, or remove ktfmt.properties");
+        }
+        if ((ktfmtFile != null || ktlintDiscovered != null) && !Collections.disjoint(spotlessSteps, SPOTLESS_KOTLIN)) {
+            throw new IllegalArgumentException(spotlessFile + " runs a Kotlin formatter of Spotless while "
+                    + (ktfmtFile != null ? "ktfmt" : "ktlint") + " formats the same Kotlin sources - keep the Spotless"
+                    + " step, or switch the other off with jenesis.format." + (ktfmtFile != null ? KTFMT : KTLINT)
+                    + "=false");
         }
         if (ktfmtFile != null) {
             SequencedMap<String, String> values = new LinkedHashMap<>();
@@ -661,6 +674,11 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
             buildExecutor.addModule(KTLINT, ktlintDiscovered, inputs);
         }
         ExternalModule scalafmtDiscovered = scalafmt ? scalafmtModule.discovered(configuration, Path.of(".scalafmt.conf")) : null;
+        if (scalafmtDiscovered != null && spotlessSteps.contains("scalafmt")) {
+            throw new IllegalArgumentException(spotlessFile + " runs Spotless's scalafmt step while scalafmt formats the"
+                    + " same Scala sources - keep the Spotless step, or switch the other off with"
+                    + " jenesis.format.scalafmt=false");
+        }
         if (scalafmtDiscovered != null) {
             buildExecutor.addModule(SCALAFMT, scalafmtDiscovered, inputs);
         }

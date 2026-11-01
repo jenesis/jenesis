@@ -315,6 +315,50 @@ public class InferredSourceFormattingModuleTest {
     }
 
     @Test
+    public void counts_a_spotless_set_running_ktfmt_or_ktlint_as_the_kotlin_formatter() throws IOException {
+        Files.writeString(project.resolve("ktfmt.properties"), "");
+        Files.writeString(project.resolve("spotless.properties"), "kotlin.target=*.kt\nkotlin.steps=ktlint\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .as("a Spotless set running ktlint formats the Kotlin sources ktfmt would")
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("runs a Kotlin formatter of Spotless while ktfmt formats the same Kotlin sources")
+                .hasMessageContaining("jenesis.format.ktfmt=false");
+    }
+
+    @Test
+    public void counts_a_spotless_set_running_scalafmt_as_the_scala_formatter() throws IOException {
+        Files.writeString(project.resolve(".scalafmt.conf"), "version = \"3.11.5\"\n");
+        Files.writeString(project.resolve("spotless.properties"), "scala.target=*.scala\nscala.steps=scalafmt\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("runs Spotless's scalafmt step while scalafmt formats the same Scala sources");
+    }
+
+    @Test
+    public void counts_a_spotless_set_running_license_header_as_the_license_header_check() throws IOException {
+        Files.writeString(project.resolve("licenseheader.properties"), "text=Licensed.\n");
+        Files.writeString(project.resolve("spotless.properties"), "java.target=*.java\njava.steps=licenseHeader\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("runs Spotless's licenseHeader step while a licenseheader.properties checks the same header");
+    }
+
+    @Test
     public void switches_spotless_off_by_its_boolean_setting() throws IOException {
         Files.writeString(project.resolve("spotless.properties"), "json.target=*.json\njson.steps=jacksonJson\n");
         BuildExecutor executor = newExecutor();
