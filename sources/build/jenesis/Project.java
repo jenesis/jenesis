@@ -1422,13 +1422,13 @@ public record Project(
                     module-info.java build resolves as a pom.xml does. Compare the dependency trees
                     and pin each version Gradle resolved higher - in <dependencyManagement>, or as
                     @jenesis.pin <groupId>/<artifactId> <version> for one only a POM brings in.
-                    Each class path is resolved on its own, so a version a test dependency wins in
-                    mvn dependency:tree does not reach the main classes, unless
-                    jenesis.maven.unified=true resolves them as one graph, as Maven does. Where the
-                    compile class path, which holds the provided dependencies, settles on one
-                    version of a module and the runtime class path on another, a module path could
-                    hold either, and the build stops naming both: manage the version, or set
-                    jenesis.maven.unified=true where the old build relied on Maven's one graph.
+                    A pom.xml module resolves its class paths as one graph, as Maven does, so its
+                    versions are those of mvn dependency:tree. jenesis.maven.unified=false resolves
+                    each class path on its own, so that a version a test dependency wins does not
+                    reach the main classes. Where the compile class path, which holds the provided
+                    dependencies, then settles on one version of a module and the runtime class path
+                    on another, a module path could hold either, and the build stops naming both:
+                    manage the version, or resolve the class paths as one graph again.
 
                     ## 6. Retire the old build
 
@@ -4803,7 +4803,7 @@ public record Project(
                 maven.token||Authorization header value for the Maven remotes, sent as given, so it names its scheme, as Bearer <token> or Basic <credentials> (env MAVEN_REPOSITORY_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one; a token the environment provides is sent only to the remotes the environment names, a remote a project's own files named is never sent one, and neither is the built-in public repository
                 maven.embed|true|Carry the POM and a pom.properties in the jar under META-INF/maven/<groupId>/<artifactId>/, as Maven does, where the layout publishes to Maven
                 maven.sources||Folders beside src/main/java and src/test/java that a pom.xml module compiles too, comma-separated names such as kotlin,groovy, each read as src/main/<name> and src/test/<name> where it exists
-                maven.unified|false|Resolve the compile, provided, runtime and test dependencies a pom.xml module declares as one graph, as Maven does, so that a test or runtime dependency decides which version of a shared dependency the main classes compile and run with; false resolves each class path on its own, so the main classes compile and run with the versions a consumer of the published POM resolves
+                maven.unified|true|Resolve the compile, provided, runtime and test dependencies a pom.xml module declares as one graph, as Maven does, so that a test or runtime dependency decides which version of a shared dependency the main classes compile and run with; false resolves each class path on its own, so the main classes compile and run with the versions a consumer of the published POM resolves; a MavenProject built in code resolves as one graph unless unified(false) says otherwise
                 maven.segments|2|Leading dot-separated segments of a module name that form its Maven groupId, when a module is published or resolved by the coordinate convention; a shorter name becomes the groupId in full
                 module.uri||Jenesis module remotes, likewise, where a |<module> suffix asks a remote only for that module and the modules whose name it prefixes, and a maven:[<segments>:]<uri> entry reads a remote as a Maven repository by the publishing convention, taking that many leading segments of a module name as its groupId where it names a count and jenesis.maven.segments where it does not, and a mapped:<uri or @>:<list>[;<list>...] entry reads a module only from the Maven repository at that URI, or the one jenesis.maven.uri configures for @, at the <groupId>/<artifactId>[/<type>[/<classifier>]] that one of the properties lists, each a URI or an absolute path, maps it to; an empty value names no remote at all, so only discovery, the local module folder and the artifacts a build stored answer (env JENESIS_REPOSITORY_URI)
                 module.local||Local module repository (env JENESIS_REPOSITORY_LOCAL), ~/.jenesis by default, relative to the working directory on the command line, to ~/.jenesis in its files and to the project root in a project's, read before every module remote and keeping each versioned module, artifact and POM the module index served under <module>/<version>/, so that an offline build of a fresh checkout finds what a module name resolved to, and the answers of discovery under well-known/; empty keeps no local module repository, so that everything resolved and every answer of discovery is kept in jenesis.project.artifacts alone and a CI job caches the project's .jenesis folder only, while export refuses to run; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
