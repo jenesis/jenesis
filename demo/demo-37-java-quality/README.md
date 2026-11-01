@@ -53,9 +53,12 @@ as `build.jenesis/eclipse/`, is read only under that profile:
     |   |   `-- eclipse-formatter.xml  the formatter profile Eclipse exports
     |   |-- openrewrite/
     |   |   `-- rewrite.yml        switches OpenRewrite on, under a profile: its recipes
+    |   |-- princeofspace/
+    |   |   `-- princeofspace.properties  switches Prince of Space on, under a profile, with its options
     |   `-- spdx/
     |       `-- licenseheader.properties  no text: the header is derived, under a profile
     |-- jenesis-eclipse.properties  switches google-java-format off under the eclipse profile
+    |-- jenesis-princeofspace.properties  switches google-java-format off under the princeofspace profile
     |-- project.properties         the license and copyright the derived header names
     `-- sources
         |-- module-info.java
@@ -274,6 +277,31 @@ its release knows, whatever compiler level an exported profile names. Moving the
 profile file changes nothing, as long as `profile` follows it; editing a setting
 in it verifies every source again.
 
+The `princeofspace` profile formats with Prince of Space. Its
+`build.jenesis/princeofspace/` folder holds a `princeofspace.properties` that
+keeps the demo's two-space indentation and line length:
+
+    indent-size=2
+    line-length=100
+
+`indent-size` counts indentation units, so with `indent-style=tabs` it counts
+tabs. The profile's own `jenesis-princeofspace.properties` switches
+google-java-format off, as the `eclipse` profile does. Prince of Space keeps no
+blank line between the license header and the `package` line, where
+google-java-format keeps one, so the demo's source fails its verify gate as it
+stands. The rewrite switch removes the line:
+
+    java -Djenesis.make.profiles=princeofspace -Djenesis.format.rewrite=true build/jenesis/Make.java
+
+and the license header check still passes, as the header is the source's first
+comment either way. A plain build under the profile then passes:
+
+    java -Djenesis.make.profiles=princeofspace build/jenesis/Make.java
+
+The build resolves Prince of Space from Maven Central as a library, so there is
+nothing to install. Like the other formatters, it is switched off by
+`-Djenesis.format.princeofspace=false`.
+
 Rewriting with recipes
 ----------------------
 
@@ -421,8 +449,8 @@ Pinning
 -------
 
 Each tool resolves in its own group (`checkstyle:tool`, `pmd:tool`, `spotbugs:tool`,
-`forbiddenapis:tool`, `googlejavaformat:tool`, and `eclipse:tool` under the `eclipse`
-profile), kept separate from the module's `main`-group dependencies, and floats a
+`forbiddenapis:tool`, `googlejavaformat:tool`, `eclipse:tool` under the `eclipse`
+profile and `princeofspace:tool` under the `princeofspace` profile), kept separate from the module's `main`-group dependencies, and floats a
 `RELEASE` version until pinned; a plugin's own jars are pinned apart, in the group
 of its name. The license header check, jdeps and jdeprscan need no tool. The `dependencies`
 selector therefore shows none of them as a dependency of the module;
