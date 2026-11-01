@@ -1674,7 +1674,10 @@ public class Dependencies implements BuildExecutorModule {
                                                 + group
                                                 + "/"
                                                 + dependency.substring(0, dependency.lastIndexOf('/'))
-                                                + " <version> line in module-info.java manages it"
+                                                + " <version> line in module-info.java manages it, and a pom.xml module"
+                                                + " whose class paths are resolved each on its own can resolve them as"
+                                                + " one graph, as Maven does, with jenesis.maven.unified=true, or"
+                                                + " MavenProject.unified(true) in code"
                                         : "drop one: an <exclusions> entry in pom.xml or @jenesis.exclude in"
                                                 + " module-info.java"));
                     }

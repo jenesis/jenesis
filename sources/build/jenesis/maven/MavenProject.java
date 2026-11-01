@@ -82,7 +82,7 @@ public class MavenProject implements BuildExecutorModule {
                 Palette.NONE,
                 OWN_CONFIGURATIONS,
                 List.of(),
-                false);
+                true);
     }
 
     public static MavenProject ofEnvironment(Environment environment,
@@ -93,7 +93,7 @@ public class MavenProject implements BuildExecutorModule {
         List<String> sources = environment.entries("maven.sources", Setting.PROJECT);
         return new MavenProject(root, prefix, repository, resolver)
                 .sources(sources == null ? List.of() : sources)
-                .unified(environment.flag("maven.unified", false, Setting.PROJECT))
+                .unified(environment.flag("maven.unified", true, Setting.PROJECT))
                 .platform(Platform.ofEnvironment(environment))
                 .printing(environment.flag("print.progress", true, Setting.PROJECT) ? environment.out() : null,
                         Palette.ofEnvironment(environment));

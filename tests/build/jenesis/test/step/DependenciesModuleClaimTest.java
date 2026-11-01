@@ -61,7 +61,10 @@ public class DependenciesModuleClaimTest {
                 .hasStackTraceContaining("maven/org.example/lib/1.0 and maven/org.example/lib/2.0"
                         + " both carry module lib.shared in group main")
                 .hasStackTraceContaining("settle on one version: a <dependencyManagement> entry in pom.xml"
-                        + " or a @jenesis.pin main/maven/org.example/lib <version> line in module-info.java manages it");
+                        + " or a @jenesis.pin main/maven/org.example/lib <version> line in module-info.java manages it,"
+                        + " and a pom.xml module whose class paths are resolved each on its own can resolve them as one"
+                        + " graph, as Maven does, with jenesis.maven.unified=true, or MavenProject.unified(true)"
+                        + " in code");
     }
 
     @Test
