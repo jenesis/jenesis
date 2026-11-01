@@ -1424,7 +1424,11 @@ public record Project(
                     @jenesis.pin <groupId>/<artifactId> <version> for one only a POM brings in.
                     Each class path is resolved on its own, so a version a test dependency wins in
                     mvn dependency:tree does not reach the main classes, unless
-                    jenesis.maven.unified=true resolves them as one graph, as Maven does.
+                    jenesis.maven.unified=true resolves them as one graph, as Maven does. Where the
+                    compile class path, which holds the provided dependencies, settles on one
+                    version of a module and the runtime class path on another, a module path could
+                    hold either, and the build stops naming both: manage the version, or set
+                    jenesis.maven.unified=true where the old build relied on Maven's one graph.
 
                     ## 6. Retire the old build
 
