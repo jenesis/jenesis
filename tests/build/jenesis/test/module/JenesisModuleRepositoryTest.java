@@ -177,7 +177,7 @@ public class JenesisModuleRepositoryTest {
         server.start();
         try {
             JenesisModuleRepository.ofEnvironment(new Environment(settings), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
-                    .maven(null)
+                    .mavens(List.of())
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
             assertThat(requests)
@@ -239,7 +239,7 @@ public class JenesisModuleRepositoryTest {
         server.start();
         try {
             JenesisModuleRepository.ofEnvironment(new Environment(settings), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
-                    .maven(null)
+                    .mavens(List.of())
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
             assertThat(requests)
@@ -261,7 +261,7 @@ public class JenesisModuleRepositoryTest {
         server.start();
         try {
             JenesisModuleRepository.ofEnvironment(new Environment(settings), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
-                    .maven(null)
+                    .mavens(List.of())
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
             assertThat(requests)
@@ -282,7 +282,7 @@ public class JenesisModuleRepositoryTest {
         server.start();
         try {
             JenesisModuleRepository.ofEnvironment(new Environment(settings), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
-                    .maven(URI.create("https://repo.example.com/maven2/"))
+                    .mavens(List.of(URI.create("https://repo.example.com/maven2/")))
                     .prerelease(true)
                     .speculative(false)
                     .fetch(Runnable::run, "build.jenesis")
@@ -307,7 +307,7 @@ public class JenesisModuleRepositoryTest {
         server.start();
         try {
             JenesisModuleRepository.ofEnvironment(new Environment(settings), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
-                    .maven(null)
+                    .mavens(List.of())
                     .prerelease(null)
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
@@ -352,6 +352,86 @@ public class JenesisModuleRepositoryTest {
             settings.remove("repository.insecure");
             settings.remove("maven.uri");
         }
+    }
+
+    @Test
+    public void asks_the_module_index_again_for_the_next_repository_where_a_redirect_target_lacks_the_module()
+            throws IOException {
+        HttpServer target = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        target.createContext("/", exchange -> {
+            byte[] bytes = "classes".getBytes(StandardCharsets.UTF_8);
+            if (exchange.getRequestURI().getPath().startsWith("/present/")) {
+                exchange.sendResponseHeaders(200, bytes.length);
+                try (OutputStream out = exchange.getResponseBody()) {
+                    out.write(bytes);
+                }
+            } else {
+                exchange.sendResponseHeaders(404, -1);
+                exchange.close();
+            }
+        });
+        target.start();
+        String missing = "http://localhost:" + target.getAddress().getPort() + "/missing/",
+                present = "http://localhost:" + target.getAddress().getPort() + "/present/";
+        settings.put("repository.insecure", "true");
+        settings.put("maven.uri", missing + "," + present);
+        List<String> named = new ArrayList<>();
+        HttpServer index = redirecting(named);
+        index.start();
+        try {
+            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings),
+                    URI.create("http://localhost:" + index.getAddress().getPort() + "/"))
+                    .fetch(Runnable::run, "build.jenesis", null, "1", "jar")
+                    .orElseThrow();
+            assertThat(read(item)).isEqualTo("classes");
+            assertThat(named)
+                    .as("a repository the mirror has not synced yet is followed by the next one of the chain")
+                    .containsExactly(missing, present);
+        } finally {
+            index.stop(0);
+            target.stop(0);
+            settings.remove("repository.insecure");
+            settings.remove("maven.uri");
+        }
+    }
+
+    @Test
+    public void asks_no_further_repository_where_the_module_index_knows_no_module() throws IOException {
+        settings.put("repository.insecure", "true");
+        settings.put("maven.uri", "https://repo.example.com/maven2/,https://other.example.com/maven2/");
+        List<String> named = new ArrayList<>();
+        HttpServer index = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        index.createContext("/", exchange -> {
+            named.add(exchange.getRequestHeaders().getFirst("Jenesis-Repository"));
+            exchange.sendResponseHeaders(404, -1);
+            exchange.close();
+        });
+        index.start();
+        try {
+            assertThat(JenesisModuleRepository.ofEnvironment(new Environment(settings),
+                    URI.create("http://localhost:" + index.getAddress().getPort() + "/"))
+                    .fetch(Runnable::run, "build.jenesis", null, "1", "jar"))
+                    .isEmpty();
+            assertThat(named)
+                    .as("no other repository changes the answer of an index that knows no such module")
+                    .containsExactly("https://repo.example.com/maven2/");
+        } finally {
+            index.stop(0);
+            settings.remove("repository.insecure");
+            settings.remove("maven.uri");
+        }
+    }
+
+    private static HttpServer redirecting(List<String> named) throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            String repository = exchange.getRequestHeaders().getFirst("Jenesis-Repository");
+            named.add(repository);
+            exchange.getResponseHeaders().add("Location", repository + "build/jenesis/build.jenesis/1/build.jenesis-1.jar");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        });
+        return server;
     }
 
     private static HttpServer serving(List<Map<String, String>> requests) throws IOException {
