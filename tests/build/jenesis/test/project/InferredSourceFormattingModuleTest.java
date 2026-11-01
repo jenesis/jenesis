@@ -264,6 +264,21 @@ public class InferredSourceFormattingModuleTest {
     }
 
     @Test
+    public void switches_prince_of_space_on_by_its_properties_beside_the_other_java_formatters() throws IOException {
+        Files.writeString(project.resolve("palantir.properties"), "");
+        Files.writeString(project.resolve("princeofspace.properties"), "wrap-style=wide\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .as("a princeofspace.properties switches Prince of Space on, which formats the Java sources Palantir would")
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("[palantir, princeofspace]");
+    }
+
+    @Test
     public void switches_a_java_formatter_off_by_its_boolean_setting() throws IOException {
         Files.writeString(project.resolve("googlejavaformat.properties"), "");
         Files.writeString(project.resolve("eclipse-formatter.xml"), "<profiles/>");

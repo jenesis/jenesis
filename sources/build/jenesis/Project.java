@@ -1617,6 +1617,10 @@ public record Project(
                           skipRemovingUnusedImports
                       Spotless palantirJavaFormat() / com.palantir.java-format, the same
                           -> palantir.properties, which takes reflow and imports alike
+                      Spotless princeOfSpace() / prince-of-space-cli, the same
+                          -> princeofspace.properties, which takes wrap-style, indent-style,
+                          indent-size, line-length, closing-paren-on-new-line, trailing-commas and
+                          java-version as the CLI names them
                       Spotless eclipse().configFile(...), formatter-maven-plugin (net.revelc)
                           configFile -> eclipse.properties with configuration=<the profile Eclipse
                           exports, relative to it>, or an eclipse-formatter.xml alone (37); Spotless's importOrder and the
@@ -2450,10 +2454,10 @@ public record Project(
 
                     The formatters verify a module's sources and fail the build on a source they would
                     change; -Djenesis.format.rewrite=true lets them rewrite it instead. A
-                    googlejavaformat.properties, palantir.properties or eclipse.properties switches
-                    on that Java formatter, refused beside another, a ktlint.properties
-                    ktlint, a ktfmt.properties ktfmt, a scalafmt.properties scalafmt, and a
-                    licenseheader.properties the header every source starts with; without the
+                    googlejavaformat.properties, palantir.properties, princeofspace.properties or
+                    eclipse.properties switches on that Java formatter, refused beside another, a
+                    ktlint.properties ktlint, a ktfmt.properties ktfmt, a scalafmt.properties scalafmt,
+                    and a licenseheader.properties the header every source starts with; without the
                     properties of ktlint or scalafmt, an .editorconfig or .scalafmt.conf of a
                     configuration folder activates it. An openrewrite.properties runs every OpenRewrite
                     recipe of the rewrite.yml it names as configuration=, or the recipes it names as
@@ -4872,6 +4876,7 @@ public record Project(
                 format.openrewrite|true|OpenRewrite, activated by an openrewrite.properties naming a rewrite.yml as configuration=, whose recipes it runs, or recipes as recipes=, or, where none is found, by a rewrite.yml of a configuration folder; it runs before the Java formatter and reads the module's dependencies
                 format.googlejavaformat|true|google-java-format, activated by a googlejavaformat.properties whose lines are its options; refused beside another Java formatter
                 format.palantir|true|palantir-java-format, activated by a palantir.properties whose lines are its options; refused beside another Java formatter
+                format.princeofspace|true|The Prince of Space formatter, activated by a princeofspace.properties whose lines are its options; refused beside another Java formatter
                 format.eclipse|true|The Eclipse formatter, activated by an eclipse.properties, which may name the profile Eclipse exports as configuration=, or, where none is found, by an eclipse-formatter.xml of a configuration folder; refused beside another Java formatter
                 format.ktlint|true|ktlint formatting the Kotlin sources, activated by what activates its linting; false leaves the formatting out while ktlint still lints, as where ktfmt formats them
                 format.ktfmt|true|ktfmt formatting, activated by a ktfmt.properties, which names its style and what it does to the imports; refused beside ktlint formatting the same sources
