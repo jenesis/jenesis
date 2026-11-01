@@ -77,15 +77,15 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
             }
             Map<Path, byte[]> formattable = formattable(argument.folder(), hash, executor);
             current.putAll(formattable);
-            Path sources = argument.folder().resolve(Bind.SOURCES);
-            formattable.keySet().forEach(file -> located.put(file, sources.resolve(file)));
+            formattable.keySet().forEach(file -> located.put(file, argument.folder().resolve(file)));
         }
         if (current.isEmpty()) {
             return CompletableFuture.completedStage(null);
         }
         boolean reconfigured = arguments.values().stream().anyMatch(argument -> argument.files().entrySet().stream()
                 .anyMatch(entry -> entry.getValue().status() != ChecksumStatus.RETAINED
-                        && !(entry.getKey().startsWith(Bind.SOURCES) && isFormattable(entry.getKey()))));
+                        && !((entry.getKey().startsWith(Bind.SOURCES) || entry.getKey().startsWith(Bind.RESOURCES))
+                                && isFormattable(entry.getKey()))));
         Map<Path, byte[]> stored = !reconfigured
                 && context.previous() != null
                 && Files.exists(context.previous().resolve(FORMATTED))
@@ -135,14 +135,16 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
     }
 
     private Map<Path, byte[]> formattable(Path folder, HashFunction hash, Executor executor) throws IOException {
-        Path sources = folder.resolve(Bind.SOURCES);
-        if (!Files.isDirectory(sources)) {
-            return Map.of();
-        }
         Map<Path, byte[]> formattable = new LinkedHashMap<>();
-        for (Map.Entry<Path, byte[]> entry : HashFunction.read(sources, hash, executor).entrySet()) {
-            if (isFormattable(sources.resolve(entry.getKey()))) {
-                formattable.put(entry.getKey(), entry.getValue());
+        for (String prefix : List.of(Bind.SOURCES, Bind.RESOURCES)) {
+            Path root = folder.resolve(prefix);
+            if (!Files.isDirectory(root)) {
+                continue;
+            }
+            for (Map.Entry<Path, byte[]> entry : HashFunction.read(root, hash, executor).entrySet()) {
+                if (isFormattable(root.resolve(entry.getKey()))) {
+                    formattable.put(Path.of(prefix).resolve(entry.getKey()), entry.getValue());
+                }
             }
         }
         return formattable;

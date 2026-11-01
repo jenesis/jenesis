@@ -20,7 +20,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
             ECLIPSE = "eclipse",
             KTFMT = "ktfmt",
             KTLINT = "ktlint",
-            SCALAFMT = "scalafmt";
+            SCALAFMT = "scalafmt",
+            SPOTLESS = "spotless";
     private static final String LICENSE = "license",
             TEXT = "text",
             RECIPES = "recipes";
@@ -45,6 +46,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     private final boolean ktlint;
     private final ExternalModule scalafmtModule;
     private final boolean scalafmt;
+    private final ExternalModule spotlessModule;
+    private final boolean spotless;
     private final SequencedSet<String> dependencies;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
@@ -70,6 +73,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ExternalModule.official(Environment.NONE, "ktlint", "format", repositories, resolvers),
                 true,
                 ExternalModule.official(Environment.NONE, "scalafmt", "format", repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, "spotless", null, repositories, resolvers),
                 true,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap());
@@ -99,6 +104,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 environment.flag("format.ktlint", true, Setting.PROJECT),
                 ExternalModule.official(environment, "scalafmt", "format", repositories, resolvers),
                 environment.flag("format.scalafmt", true, Setting.PROJECT),
+                ExternalModule.official(environment, "spotless", null, repositories, resolvers),
+                environment.flag("format.spotless", true, Setting.PROJECT),
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap());
         Boolean rewrite = environment.flagOrNull("format.rewrite", Setting.PROJECT);
@@ -132,6 +139,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                                            boolean ktlint,
                                            ExternalModule scalafmtModule,
                                            boolean scalafmt,
+                                           ExternalModule spotlessModule,
+                                           boolean spotless,
                                            SequencedSet<String> dependencies,
                                            SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
@@ -154,6 +163,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         this.ktlint = ktlint;
         this.scalafmtModule = scalafmtModule;
         this.scalafmt = scalafmt;
+        this.spotlessModule = spotlessModule;
+        this.spotless = spotless;
         this.dependencies = dependencies;
         this.custom = custom;
     }
@@ -179,6 +190,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                spotlessModule,
+                spotless,
                 dependencies,
                 custom);
     }
@@ -204,6 +217,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                spotlessModule,
+                spotless,
                 dependencies,
                 custom);
     }
@@ -229,6 +244,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                spotlessModule,
+                spotless,
                 dependencies,
                 custom);
     }
@@ -254,6 +271,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                spotlessModule,
+                spotless,
                 dependencies,
                 custom);
     }
@@ -279,6 +298,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                spotlessModule,
+                spotless,
                 dependencies,
                 custom);
     }
@@ -304,6 +325,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                spotlessModule,
+                spotless,
                 dependencies,
                 custom);
     }
@@ -329,6 +352,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                spotlessModule,
+                spotless,
                 dependencies,
                 custom);
     }
@@ -354,6 +379,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                spotlessModule,
+                spotless,
                 dependencies,
                 custom);
     }
@@ -379,6 +406,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                spotlessModule,
+                spotless,
                 dependencies,
                 custom);
     }
@@ -404,6 +433,35 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                spotlessModule,
+                spotless,
+                dependencies,
+                custom);
+    }
+
+    public InferredSourceFormattingModule spotless(boolean spotless) {
+        return new InferredSourceFormattingModule(configuration,
+                verify,
+                licenseModule,
+                license,
+                openRewriteModule,
+                openrewrite,
+                googleJavaFormatModule,
+                googlejavaformat,
+                palantirJavaFormatModule,
+                palantir,
+                princeOfSpaceModule,
+                princeofspace,
+                eclipseJavaFormatModule,
+                eclipse,
+                ktfmtModule,
+                ktfmt,
+                ktlintModule,
+                ktlint,
+                scalafmtModule,
+                scalafmt,
+                spotlessModule,
+                spotless,
                 dependencies,
                 custom);
     }
@@ -429,6 +487,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                spotlessModule,
+                spotless,
                 dependencies,
                 custom);
     }
@@ -454,6 +514,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlint,
                 scalafmtModule,
                 scalafmt,
+                spotlessModule,
+                spotless,
                 dependencies,
                 custom);
     }
@@ -560,12 +622,29 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
             }
             formatters.put(ECLIPSE, module);
         }
+        Path spotlessFile = spotless ? BuildStep.locate(configuration, SPOTLESS + ".properties") : null;
+        ExternalModule spotlessDiscovered = null;
+        if (spotlessFile != null) {
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(spotlessFile).forEachProperty(values::put);
+            if (values.entrySet().stream()
+                    .filter(entry -> entry.getKey().endsWith(".steps") && entry.getValue() != null)
+                    .flatMap(entry -> Arrays.stream(entry.getValue().split(",")).map(String::trim))
+                    .anyMatch(step -> step.equals("googleJavaFormat") || step.equals("palantirJavaFormat"))) {
+                formatters.put(SPOTLESS, spotlessModule.properties(values));
+            } else {
+                spotlessDiscovered = spotlessModule.properties(values);
+            }
+        }
         if (formatters.size() > 1) {
             throw new IllegalArgumentException("A configuration folder switches on " + formatters.sequencedKeySet()
                     + ", which would each format the same Java sources - keep the <name>.properties of one, or"
                     + " switch the others off with jenesis.format.<name>=false");
         }
         formatters.forEach((name, module) -> buildExecutor.addModule(name, module, inputs));
+        if (spotlessDiscovered != null) {
+            buildExecutor.addModule(SPOTLESS, spotlessDiscovered, inputs);
+        }
         Path ktfmtFile = ktfmt ? BuildStep.locate(configuration, "ktfmt.properties") : null;
         ExternalModule ktlintDiscovered = ktlint ? ktlintModule.discovered(configuration, Path.of(".editorconfig")) : null;
         if (ktfmtFile != null && ktlintDiscovered != null) {

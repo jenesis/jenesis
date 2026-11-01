@@ -617,6 +617,24 @@
  * @jenesis.pin spotbugs:tool/maven/org.xmlresolver/xmlresolver 5.3.3 SHA-256/1fe4d5b92f708dcdb82dbce12919e0171e6b5ca62c6dca6220483625098feb5f
  * @jenesis.pin spotbugs:tool/maven/org.xmlresolver/xmlresolver/jar/data 5.3.3 SHA-256/b0c487ad2f3e558be8d829c916d2458d10aca6a5bafa7a4d0524b70845e48a5c
  * @jenesis.pin spotbugs:tool/maven/org.xmlresolver/xmlresolver/pom 5.3.3 SHA-256/261ada76d9e6676008dcac377a4d4589749166b606559f59f2e45ea62d8b75ec
+ * @jenesis.pin spotless/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin spotless:jacksonjson/maven/com.fasterxml.jackson.core/jackson-annotations 2.22 SHA-256/21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0
+ * @jenesis.pin spotless:jacksonjson/maven/com.fasterxml.jackson.core/jackson-annotations/pom 2.22 SHA-256/38c3ba52a0eade3e3eacc5b13499d56e1038ccbad8ec4bb79426dc21432b46d0
+ * @jenesis.pin spotless:jacksonjson/maven/com.fasterxml.jackson.core/jackson-core 2.22.4 SHA-256/2d30c375cddea9657a1e1ef97547a2694b663b355facb4de53a097782b312d1a
+ * @jenesis.pin spotless:jacksonjson/maven/com.fasterxml.jackson.core/jackson-core/pom 2.22.4 SHA-256/371b6859b58c3fc1c0823fe66e1e6d6ab251ba99b26f7dce883bbb7c43906c21
+ * @jenesis.pin spotless:jacksonjson/maven/com.fasterxml.jackson.core/jackson-databind 2.22.4 SHA-256/d4cbf8947087f305869826801913abdc50735a1fab2074a1993e7bc67ca974a3
+ * @jenesis.pin spotless:jacksonjson/maven/com.fasterxml.jackson.core/jackson-databind/pom 2.22.4 SHA-256/81867c3c99c0e014d133554f2d30cdad78ec58cf1b56087088204e1e5eb34baa
+ * @jenesis.pin spotless:jacksonjson/maven/com.fasterxml.jackson/jackson-base/pom 2.22.4 SHA-256/51b5cc57df78f50a43210e577075f68399e31dde7150455e179d249e637582a1
+ * @jenesis.pin spotless:jacksonjson/maven/com.fasterxml.jackson/jackson-bom/pom 2.22.4 SHA-256/a3c00688a7bf8e128451137b68f90d9137957a372756083d74555a47241d1636
+ * @jenesis.pin spotless:jacksonjson/maven/com.fasterxml.jackson/jackson-parent/pom 2.22 SHA-256/7d45a7efb69df207bed7cc54b87a0bb012f10952c095570a273b49485da0d129
+ * @jenesis.pin spotless:jacksonjson/maven/com.fasterxml/oss-parent/pom 79 SHA-256/9206b7dd67fb138036576c3dfca947a2a8f3e2c4d2d9c1f2d1dea519b3a4dae1
+ * @jenesis.pin spotless:jacksonjson/maven/org.junit/junit-bom/pom 5.14.3 SHA-256/08a02856e487c9357f9b29e38745f8ae805848111e72d15aad0352338f1632e1
+ * @jenesis.pin spotless:tool/maven/com.diffplug.spotless/spotless-lib 4.10.4 SHA-256/efd428f9e4fdf187dc0eca0aee020d639874cd839b458f39566bf105f61502aa
+ * @jenesis.pin spotless:tool/maven/com.diffplug.spotless/spotless-lib/pom 4.10.4 SHA-256/75f6d72eb586e18b344c945fdecf90b977933a4818aff0a22f137dcd8bf38626
+ * @jenesis.pin spotless:tool/maven/org.slf4j/slf4j-api 2.0.20 SHA-256/7e1446499b359675d8aabe6af2de86b85e72ae8a2a932c0b40d0e5ba57097439
+ * @jenesis.pin spotless:tool/maven/org.slf4j/slf4j-api/pom 2.0.20 SHA-256/2e625c3f553cddd49f8554cea9926cbf70673b3d6833464f0c5a02f4d9130594
+ * @jenesis.pin spotless:tool/maven/org.slf4j/slf4j-bom/pom 2.0.20 SHA-256/351a3d34f0886942268efcf291708c48dfadce7f2643837efdb4a6954d4e6c62
+ * @jenesis.pin spotless:tool/maven/org.slf4j/slf4j-parent/pom 2.0.20 SHA-256/d931cf99cfd3554d322809df03c43ef897082cd480d6ff91b44d8f067ca324c8
  */
 module demo.quality {
     exports sample;
