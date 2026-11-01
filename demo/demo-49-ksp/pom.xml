@@ -30,18 +30,27 @@
         </dependency>
     </dependencies>
     <!--jenesis.pin
-    kotlin/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
-    kotlin/module/build.jenesis.plugin.kotlin 0.1.0 SHA-256/8ae119271454d849d712d61b0166b5879f6c6493897beaa4d76b1aa5319545c6
+    kotlin/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    kotlin/module/build.jenesis.plugin.kotlin 0.2.0 SHA-256/5976a9349da491c1edbe526734ba8856316ca746124fc872c4ae574f76f909fc
     kotlin:tool/maven/org.jetbrains.kotlin/kotlin-build-tools-api 2.4.21 SHA-256/c5cd6a49bd072b529ae10809111c16a7aa0f92147e95d288354017fd65799461
+    kotlin:tool/maven/org.jetbrains.kotlin/kotlin-build-tools-api/pom 2.4.21 SHA-256/4b909e42d55242520278d5397eca1edd58921fe128942eeff95a6da279c2eb27
     kotlin:tool/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable 2.4.21 SHA-256/ef19419c765e7ac8404465fa026ca8fc4dbb8a822de0fc79aa53c8dce29f1d02
+    kotlin:tool/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable/pom 2.4.21 SHA-256/e1620d2b18319cf7495dc67697ab03ba23a7d6d9da685285884a7a8aa08ae891
     kotlin:tool/maven/org.jetbrains.kotlin/kotlin-daemon-embeddable 2.4.21 SHA-256/7b3ef24674e5bcffcadfc4e43202ea314194939ecbcdd90a4770b2f1b04e0d07
+    kotlin:tool/maven/org.jetbrains.kotlin/kotlin-daemon-embeddable/pom 2.4.21 SHA-256/95236a3a7e9953545e2ff7c6dc0ea7ffeb27560000f20abe89dc53790fec3c7e
     kotlin:tool/maven/org.jetbrains.kotlin/kotlin-reflect 1.6.10 SHA-256/3277ac102ae17aad10a55abec75ff5696c8d109790396434b496e75087854203
+    kotlin:tool/maven/org.jetbrains.kotlin/kotlin-reflect/pom 1.6.10 SHA-256/57905524274a00ae028aaccc27283f6bc5925a934a046c1cc5d06c8ee4d6d5a9
     kotlin:tool/maven/org.jetbrains.kotlin/kotlin-script-runtime 2.4.21 SHA-256/a658cf5902a1525a06c264a5e42b437e97a6679ddeef8ca641246f270cf6a013
+    kotlin:tool/maven/org.jetbrains.kotlin/kotlin-script-runtime/pom 2.4.21 SHA-256/425d1683a903d085a1718122918242ad6ad0246c79283786697395e4d3a8c801
     kotlin:tool/maven/org.jetbrains.kotlin/kotlin-stdlib 2.4.21 SHA-256/bd8250210584cb659847dce9cda660f8e9906e5def7fbebcea93dc6dcb6a88a3
+    kotlin:tool/maven/org.jetbrains.kotlin/kotlin-stdlib/pom 2.4.21 SHA-256/b92b23ec9c444b2578b9852447565efc72c24b3ea77b4c3bf4e644f685eeef07
+    kotlin:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-bom/pom 1.8.0 SHA-256/1239e9dbe1397cd5971342956b2511bc3ace7b641842e4372a088dcfa8b9ad55
     kotlin:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm 1.8.0 SHA-256/9860906a1937490bf5f3b06d2f0e10ef451e65b95b269f22daf68a3d1f5065c5
+    kotlin:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/pom 1.8.0 SHA-256/a5633abd53467ceb91622d81f2e982080877145e0b76e1b75788715434885d0b
     kotlin:tool/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
-    ksp/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
-    ksp/module/build.jenesis.plugin.ksp 0.1.0 SHA-256/a1914de7c83d3c06696d7e1834db3180155ad6b8033613b4e12eb4c764d577aa
+    kotlin:tool/maven/org.jetbrains/annotations/pom 13.0 SHA-256/965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397
+    ksp/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    ksp/module/build.jenesis.plugin.ksp 0.2.0 SHA-256/2f1f03bd58b39f8c574d7c186dbbba9814a6450b2aa610a311cbea493baf2ae7
     ksp:processor/maven/com.google.auto.service/auto-service-aggregator/pom 1.0 SHA-256/c97acb57d385e70257643123aa824c7d343613fe93035529c0868e949cb60461
     ksp:processor/maven/com.google.auto.service/auto-service-annotations 1.0 SHA-256/44752893119fdaf01b4c5ee74e46e5dab86f2dcda18114c562f877355c6ed26e
     ksp:processor/maven/com.google.auto.service/auto-service-annotations/pom 1.0 SHA-256/9797b771f59106b9ab87a8cdd98a142173ad8e4790fc5e6bfc79316d8732c701
@@ -91,10 +100,15 @@
     ksp:processor/maven/org.sonatype.oss/oss-parent/pom 7 SHA-256/b51f8867c92b6a722499557fc3a1fdea77bdf9ef574722fe90ce436a29559454
     ksp:processor/maven/org.sonatype.oss/oss-parent/pom 9 SHA-256/fb40265f982548212ff82e362e59732b2187ec6f0d80182885c14ef1f982827a
     ksp:tool/maven/com.google.devtools.ksp/symbol-processing-aa-embeddable 2.3.12 SHA-256/862f0042fc2467cdcf7752e15880f97396a29e2469741dc6453f37584f1b4c69
+    ksp:tool/maven/com.google.devtools.ksp/symbol-processing-aa-embeddable/pom 2.3.12 SHA-256/e15b1eb427a85eeb5aad9941bf0d465e249cb260dbfb80e6b424215f26817dc2
     ksp:tool/maven/com.google.devtools.ksp/symbol-processing-api 2.3.12 SHA-256/fc7d11cea3bcd873589c8914ad6320bdc877bce14cc7c2f717394646af56bd37
+    ksp:tool/maven/com.google.devtools.ksp/symbol-processing-api/pom 2.3.12 SHA-256/fe49a060c61f31c92278c14a55338f26d336d3bc5788b391e02e64d72f0da0f7
     ksp:tool/maven/com.google.devtools.ksp/symbol-processing-common-deps 2.3.12 SHA-256/30510a4364e02880ce2fbf0c4f0ef564dead3818eef4fc0500cbcee23fc362af
+    ksp:tool/maven/com.google.devtools.ksp/symbol-processing-common-deps/pom 2.3.12 SHA-256/8f62292379ca7c1cb8c68a6dc38dbd1d25cc8a16a111b5d97b458db1112c8794
     ksp:tool/maven/org.jetbrains.kotlin/kotlin-stdlib 2.3.20 SHA-256/0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e
+    ksp:tool/maven/org.jetbrains.kotlin/kotlin-stdlib/pom 2.3.20 SHA-256/c83c02d9a7e2e954730491c33c2f1dc03c27662e27b566ec2b44d2d018639b98
     ksp:tool/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
+    ksp:tool/maven/org.jetbrains/annotations/pom 13.0 SHA-256/965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397
     com.squareup.moshi/moshi 1.15.2 SHA-256/767f7592c6c61eb693549a26d333c121f5383826bd287b899867aa326dae55e4
     maven/com.squareup.moshi/moshi/pom 1.15.2 SHA-256/317a1d3fb7054031bfe90cca89b1024901fd9b9fcca99166c2ce7853b5fc7bd9
     com.squareup.okio/okio-jvm 3.7.0 SHA-256/d8b35adc28768f43ae5afe6a7d1aa2a878ba51e0b96a4f308811f3b1f5b13e55

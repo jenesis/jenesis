@@ -10,46 +10,125 @@
         <sourceDirectory>sources</sourceDirectory>
     </build>
     <!--jenesis.pin
-    japicmp/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
-    japicmp/module/build.jenesis.plugin.japicmp 0.1.0 SHA-256/d2118292b0dc76b88ff0d90f34022210e1481d7b962de83df329c41cce30fd8c
+    japicmp/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    japicmp/module/build.jenesis.plugin.japicmp 0.2.0 SHA-256/dfad1f7b95b7cfd63432422692305d20112b5bdbf3808c2496f916f5e5f5de3c
     japicmp:tool/maven/build.jenesis.demo/api-compatibility 1.0.0 SHA-256/b069b5880803e7f780ce7750727bba2b5b8a117dd8dc019234f23016cfb71b93
+    japicmp:tool/maven/build.jenesis.demo/api-compatibility/pom 1.0.0 SHA-256/feae26bee142731bfbb7a881aa68338105f2866c446fc795ae14d8567c745165
     japicmp:tool/maven/com.github.siom79.japicmp/japicmp 0.26.2 SHA-256/317c4d11ef25469203d6de9c5b804c62392f52e3edc9e42e42161a192335bc3a
+    japicmp:tool/maven/com.github.siom79.japicmp/japicmp-base/pom 0.26.2 SHA-256/69db85c998c74286a2ccb626522947303ca48bffe6a159ef2499338d3de3636d
+    japicmp:tool/maven/com.github.siom79.japicmp/japicmp/pom 0.26.2 SHA-256/efea5822cfda3cd777442994845e3556842159e397c28071e277bb673927bb09
     japicmp:tool/maven/com.google.errorprone/error_prone_annotations 2.36.0 SHA-256/77440e270b0bc9a249903c5a076c36a722c4886ca4f42675f2903a1c53ed61a5
+    japicmp:tool/maven/com.google.errorprone/error_prone_annotations/pom 2.36.0 SHA-256/d79cfd37c85f76d6b754c7501ee1dc8447b7b2642c2382d778252166bd331e9c
+    japicmp:tool/maven/com.google.errorprone/error_prone_parent/pom 2.36.0 SHA-256/3a4cfc8a6bed61eb48e969796fc31ea0d270b63e670599946a61883adb7094dc
     japicmp:tool/maven/com.google.guava/failureaccess 1.0.3 SHA-256/cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb
+    japicmp:tool/maven/com.google.guava/failureaccess/pom 1.0.3 SHA-256/c54beff37f6d42d43e14722d54a522c9ad51ef97fc5b79277e62a3ebf882f3bb
     japicmp:tool/maven/com.google.guava/guava 33.4.8-jre SHA-256/f3d7f57f67fd622f4d468dfdd692b3a5e3909246c28017ac3263405f0fe617ed
+    japicmp:tool/maven/com.google.guava/guava-parent/pom 26.0-android SHA-256/f8698ab46ca996ce889c1afc8ca4f25eb8ac6b034dc898d4583742360016cc04
+    japicmp:tool/maven/com.google.guava/guava-parent/pom 33.4.0-android SHA-256/7220ede61026596fbc720ee4b93246fa2d14f328058532b59ef053de397c7d83
+    japicmp:tool/maven/com.google.guava/guava-parent/pom 33.4.8-jre SHA-256/a03c5199a1be14443df7fd40ba8673b1c6aae04deef6688ce7d573ea489e3a20
+    japicmp:tool/maven/com.google.guava/guava/pom 33.4.8-jre SHA-256/04365d4b6ef22c8cf9349fe628069fc3e81a2c838351402ef4e95f9e757beebc
     japicmp:tool/maven/com.google.guava/listenablefuture 9999.0-empty-to-avoid-conflict-with-guava SHA-256/b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99
+    japicmp:tool/maven/com.google.guava/listenablefuture/pom 9999.0-empty-to-avoid-conflict-with-guava SHA-256/18d4b1db26153d4e55079ce1f76bb1fe05cdb862ef9954a88cbcc4ff38b8679b
     japicmp:tool/maven/com.google.j2objc/j2objc-annotations 3.0.0 SHA-256/88241573467ddca44ffd4d74aa04c2bbfd11bf7c17e0c342c94c9de7a70a7c64
+    japicmp:tool/maven/com.google.j2objc/j2objc-annotations/pom 3.0.0 SHA-256/23b3d039e168ad89dd114698e6dd7be383f4a2c577b8877d82c73a6515e74a17
+    japicmp:tool/maven/com.sun.activation/all/pom 1.2.1 SHA-256/360883bf64486ecef161b8f282f6503536dd1a670d53a0a871c8fb20170e6795
     japicmp:tool/maven/com.sun.istack/istack-commons-runtime 3.0.8 SHA-256/4ffabb06be454a05e4398e20c77fa2b6308d4b88dfbef7ca30a76b5b7d5505ef
+    japicmp:tool/maven/com.sun.istack/istack-commons-runtime/pom 3.0.8 SHA-256/c2e014d34cb84ed287d064986c45c305a4124228a7337eccf6c421d14d708f1c
+    japicmp:tool/maven/com.sun.istack/istack-commons/pom 3.0.8 SHA-256/a0f0517e8512f0fbcc7b8295c12f6566a3d0c2d86d655639dc662ef8c0c7ebe5
+    japicmp:tool/maven/com.sun.xml.bind.mvn/jaxb-parent/pom 2.3.2 SHA-256/20dd6dc34ab7549ac40da1d82e92222ec4347ad0ec0cb118ef6c5703bed53a18
+    japicmp:tool/maven/com.sun.xml.bind.mvn/jaxb-runtime-parent/pom 2.3.2 SHA-256/b24f8d51f184a68bc1b86d48c0e3cfefeb21a44ede1c5f7303c58ae0488533ec
+    japicmp:tool/maven/com.sun.xml.bind.mvn/jaxb-txw-parent/pom 2.3.2 SHA-256/b55d3efa9b158f483a30e92c78ccb600f93314733d089eba9b74436f01b314a4
+    japicmp:tool/maven/com.sun.xml.bind/jaxb-bom-ext/pom 2.3.2 SHA-256/1a7dec2b27e7e055744cdb8cf1b90def4fd473acd1b804eff098139358959bd7
     japicmp:tool/maven/com.sun.xml.fastinfoset/FastInfoset 1.2.16 SHA-256/056f3a1e144409f21ed16afc26805f58e9a21f3fce1543c42d400719d250c511
+    japicmp:tool/maven/com.sun.xml.fastinfoset/FastInfoset/pom 1.2.16 SHA-256/e147d258ab6e6691f70599a952400e6e6c7558f8c9c028dbe1be23178308e830
+    japicmp:tool/maven/com.sun.xml.fastinfoset/fastinfoset-project/pom 1.2.16 SHA-256/90582425adc1f40b41362dafb95173931225acaa5e79620d5e6bd52f646292ba
     japicmp:tool/maven/jakarta.activation/jakarta.activation-api 1.2.1 SHA-256/8b0a0f52fa8b05c5431921a063ed866efaa41dadf2e3a7ee3e1961f2b0d9645b
+    japicmp:tool/maven/jakarta.activation/jakarta.activation-api/pom 1.2.1 SHA-256/42585cb07dda7f23aa04eb5e0940061944a246a67ad3d16942fbe569ff03cd31
     japicmp:tool/maven/jakarta.xml.bind/jakarta.xml.bind-api 2.3.2 SHA-256/69156304079bdeed9fc0ae3b39389f19b3cc4ba4443bc80508995394ead742ea
+    japicmp:tool/maven/jakarta.xml.bind/jakarta.xml.bind-api-parent/pom 2.3.2 SHA-256/15a55b7d537c9f9970aead28d2af97c059f65ff6102f76bbd29f1247dd8a6dfb
+    japicmp:tool/maven/jakarta.xml.bind/jakarta.xml.bind-api/pom 2.3.2 SHA-256/b537b388dbab4cc0690b9d2fb0c74124d672531734567acf6e53130eab131ad6
+    japicmp:tool/maven/org.eclipse.ee4j/project/pom 1.0.2 SHA-256/7495a07a797e88e43c3bc1a87421bd8b1fc55e32291fa18e4e32d8031ddc873f
+    japicmp:tool/maven/org.eclipse.ee4j/project/pom 1.0.5 SHA-256/916b4794d8d8220a59a3fdf6a64dbe794aeb23395e888b81ae36a9b5a2c591a6
+    japicmp:tool/maven/org.glassfish.jaxb/jaxb-bom/pom 2.3.2 SHA-256/a1018bb54678ed9f5acb2f7a4084e385ff510201f4e9dbf5f75dc6a675f66be7
     japicmp:tool/maven/org.glassfish.jaxb/jaxb-runtime 2.3.2 SHA-256/e6e0a1e89fb6ff786279e6a0082d5cef52dc2ebe67053d041800737652b4fd1b
+    japicmp:tool/maven/org.glassfish.jaxb/jaxb-runtime/pom 2.3.2 SHA-256/9448a5ad7fa68a6083dfbe4f42c8c83e082b9202a105401fc68e944c26548b34
     japicmp:tool/maven/org.glassfish.jaxb/txw2 2.3.2 SHA-256/4a6a9f483388d461b81aa9a28c685b8b74c0597993bf1884b04eddbca95f48fe
+    japicmp:tool/maven/org.glassfish.jaxb/txw2/pom 2.3.2 SHA-256/a79dd002fb038183ff286a2635be2e68c103b87e0e64717d8d44bfd017fd33ea
     japicmp:tool/maven/org.javassist/javassist 3.30.2-GA SHA-256/eba37290994b5e4868f3af98ff113f6244a6b099385d9ad46881307d3cb01aaf
+    japicmp:tool/maven/org.javassist/javassist/pom 3.30.2-GA SHA-256/4227851cb70e43f73aced8bffe692de3ae4412c4a62dcdff055e513ee3d801a3
     japicmp:tool/maven/org.jspecify/jspecify 1.0.0 SHA-256/1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab
+    japicmp:tool/maven/org.jspecify/jspecify/pom 1.0.0 SHA-256/cdab929a3b95211f43d2090c5e2d0dfe8465960e378bc32b35841dab324433a6
     japicmp:tool/maven/org.jvnet.staxex/stax-ex 1.8.1 SHA-256/20522549056e9e50aa35ef0b445a2e47a53d06be0b0a9467d704e2483ffb049a
-    revapi/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
-    revapi/module/build.jenesis.plugin.revapi 0.1.0 SHA-256/8f0abdf3cf0b31271e4cd1d31c5bc0bbdf0194718b6303d38e8612098d051c59
+    japicmp:tool/maven/org.jvnet.staxex/stax-ex/pom 1.8.1 SHA-256/8fc84f36ce6da6ce8c893b6538199a7f69a69a0706d9b17a3ee6a3a09452eed6
+    japicmp:tool/maven/org.sonatype.oss/oss-parent/pom 9 SHA-256/fb40265f982548212ff82e362e59732b2187ec6f0d80182885c14ef1f982827a
+    revapi/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    revapi/module/build.jenesis.plugin.revapi 0.2.0 SHA-256/1402a8122559b07d397eb2fd531c7d439939a54616ba73b2b655fb8d71c995b1
     revapi:tool/maven/build.jenesis.demo/api-compatibility 1.0.0 SHA-256/b069b5880803e7f780ce7750727bba2b5b8a117dd8dc019234f23016cfb71b93
+    revapi:tool/maven/build.jenesis.demo/api-compatibility/pom 1.0.0 SHA-256/feae26bee142731bfbb7a881aa68338105f2866c446fc795ae14d8567c745165
     revapi:tool/maven/com.fasterxml.jackson.core/jackson-annotations 2.10.4 SHA-256/9d07ea7ce579a678e7aea61249fa82c46469af9d02c5b5f13e84beb7b0827dbc
+    revapi:tool/maven/com.fasterxml.jackson.core/jackson-annotations/pom 2.10.4 SHA-256/d888fb6d1477489ad7468cb08d96d8948dd0a6922ce0ad41f54a171d19006f30
     revapi:tool/maven/com.fasterxml.jackson.core/jackson-core 2.13.3 SHA-256/ab119a8ea3cc69472ebc0e870b849bfbbe536ad57d613dc38453ccd592ca6a3d
+    revapi:tool/maven/com.fasterxml.jackson.core/jackson-core/pom 2.13.3 SHA-256/3d3c8e4439bf2db43760a61207dfc957ad99a59b752cc8476990b49de00cdefc
     revapi:tool/maven/com.fasterxml.jackson.core/jackson-databind 2.10.4 SHA-256/55312662a420c71508e6159c86aa41c1694c52e89a1b90dc94bcf4358134005e
+    revapi:tool/maven/com.fasterxml.jackson.core/jackson-databind/pom 2.10.4 SHA-256/effcef26670ed615feb691b19e7971a8de924920216f3cd183993cde29bb5910
+    revapi:tool/maven/com.fasterxml.jackson/jackson-base/pom 2.10.4 SHA-256/77645a51baa64eb13595d1a148fbd3847050e34f0e3c162880c0a2134063bdb0
+    revapi:tool/maven/com.fasterxml.jackson/jackson-base/pom 2.13.3 SHA-256/72d67291876c63e1896bc7d8ff799033d3a4b9029020110488af9c97315ed939
+    revapi:tool/maven/com.fasterxml.jackson/jackson-bom/pom 2.10.4 SHA-256/b4e95b1851dcbdcf0ea90bc7d6d1e00e6635329b3c8ea171eb591f16a5745c83
+    revapi:tool/maven/com.fasterxml.jackson/jackson-bom/pom 2.13.3 SHA-256/df675b83b6caba7602fb47d75d4bb513c2af4c0a6155d7e397c0ec0f34112c75
+    revapi:tool/maven/com.fasterxml.jackson/jackson-parent/pom 2.10 SHA-256/a50db80829c4f897c6d0e7e95472cbb43b0ebece135a68e39c27b8a6fe33e481
+    revapi:tool/maven/com.fasterxml.jackson/jackson-parent/pom 2.13 SHA-256/2bba89978172af1effcb4d143d09921a3f3082ca4dcf122b1ded98bf55b2ad57
+    revapi:tool/maven/com.fasterxml/oss-parent/pom 38 SHA-256/c83f8f45dfdca8d0b6b3661c60b3f84780f671b12e06f91ad5d1c1a1d1f966e8
+    revapi:tool/maven/com.fasterxml/oss-parent/pom 43 SHA-256/e5585cc1c37079b2e3817a8997945736f158831844d59d0e4d3a45b27611f926
     revapi:tool/maven/com.networknt/json-schema-validator 1.0.43 SHA-256/7c10b089a973fe15d13fbe3205c30eb751d6770354ffe77643c9d6133073a7bf
+    revapi:tool/maven/com.networknt/json-schema-validator/pom 1.0.43 SHA-256/4846a58e50e12a07e17feea441e426077213aacb6d14f2cffc3f2967e7cf577c
+    revapi:tool/maven/org.antlr/antlr4-master/pom 4.7.2 SHA-256/ba99cb25d2390f38680c7502842a0ee0959d1e6403e013ccff698fd5856eead1
     revapi:tool/maven/org.antlr/antlr4-runtime 4.7.2 SHA-256/4c518b87d4bdff8b44cd8cbc1af816e944b62a3fe5b80b781501cf1f4759bbc4
+    revapi:tool/maven/org.antlr/antlr4-runtime/pom 4.7.2 SHA-256/dc09cba98c25d3c06e4aec516885d4c3af03062ba55f4fe6283fc9cf176a60fb
     revapi:tool/maven/org.apache.commons/commons-lang3 3.5 SHA-256/8ac96fc686512d777fca85e144f196cd7cfe0c0aec23127229497d1a38ff651c
+    revapi:tool/maven/org.apache.commons/commons-lang3/pom 3.5 SHA-256/45e7fbb2c231db903a5d5aadafc636a173a4d54560f78a11ff498028ef9e345e
+    revapi:tool/maven/org.apache.commons/commons-parent/pom 41 SHA-256/b2877c8016f8b28924c8e90dd5ae40cd11f328d02a1de98d80de22574ab36ec7
     revapi:tool/maven/org.apache.logging.log4j/log4j-api 2.17.1 SHA-256/b0d8a4c8ab4fb8b1888d0095822703b0e6d4793c419550203da9e69196161de4
+    revapi:tool/maven/org.apache.logging.log4j/log4j-api/pom 2.17.1 SHA-256/1e2acef3220b29be10ae099728b158b18d943f91a193cc4501bb42f929c1e88a
     revapi:tool/maven/org.apache.logging.log4j/log4j-core 2.17.1 SHA-256/c967f223487980b9364e94a7c7f9a8a01fd3ee7c19bdbf0b0f9f8cb8511f3d41
+    revapi:tool/maven/org.apache.logging.log4j/log4j-core/pom 2.17.1 SHA-256/0bbb3bf6d4d22a1bfa3c3c0927c29410af14a0fb26e3b02b93726f5c7e98aafd
+    revapi:tool/maven/org.apache.logging.log4j/log4j/pom 2.17.1 SHA-256/967abc024443a9cb096935559af5e9ad6f0ff61375f84b27d440d2fa70806b09
+    revapi:tool/maven/org.apache.logging/logging-parent/pom 3 SHA-256/763a2ec2b8094d4161deb6c264b1262085b9be30bf3a31c2ce137242e57722a7
+    revapi:tool/maven/org.apache/apache/pom 18 SHA-256/7831307285fd475bbc36b20ae38e7882f11c3153b1d5930f852d44eda8f33c17
+    revapi:tool/maven/org.apache/apache/pom 23 SHA-256/bc10624e0623f36577fac5639ca2936d3240ed152fb6d8d533ab4d270543491c
+    revapi:tool/maven/org.jboss.shrinkwrap/shrinkwrap-bom/pom 1.0.1 SHA-256/e3876f389154317f448fdc33978bcdae397eddcf47fe555019780853a22b24f1
     revapi:tool/maven/org.jboss/jboss-dmr 1.5.0.Final SHA-256/cbbe302464ff99bc0656be2343958f3eb7a4ffc575e03bb7399fccbb327be6c5
+    revapi:tool/maven/org.jboss/jboss-dmr/pom 1.5.0.Final SHA-256/f3fc704495a5e6fe9010d8d6ee2d9f5473a24f4773b292535c05aa88aef28f03
+    revapi:tool/maven/org.jboss/jboss-parent/pom 25 SHA-256/f662a20adbe6fd575f37976b0a7cec81d2f0a0435dd49086badecc0efc901a0b
     revapi:tool/maven/org.jruby.jcodings/jcodings 1.0.46 SHA-256/13e7fa99093b729fe736f1bf6886e6230065b36bd3dc9117ee14942883e3e515
+    revapi:tool/maven/org.jruby.jcodings/jcodings/pom 1.0.46 SHA-256/375abc55cfc82cba3dd9252d067e35a13dfd46807b37dba99ed9e0045a4cd701
     revapi:tool/maven/org.jruby.joni/joni 2.1.31 SHA-256/96c8d65e99d16a2ee48046fa352a972feadbc15420ed576a3c13d8339cdbe1f0
+    revapi:tool/maven/org.jruby.joni/joni/pom 2.1.31 SHA-256/9181678fff2f1fba274f27ff3c2e96fb68cb7988bf6a059e7cc5a03db0067412
+    revapi:tool/maven/org.junit/junit-bom/pom 5.7.0 SHA-256/35fb15f8d0bee2b5900a22832762366552f9a349c56ced60ba123ce47738ff00
     revapi:tool/maven/org.revapi.classif/classif 0.1.1 SHA-256/56b3a356500b2a0acfa964b960d593361acd6c6324bcd13ffd26802b38b44412
     revapi:tool/maven/org.revapi.classif/classif-dsl 0.1.1 SHA-256/eb62873779b25e8b997172b0e88900ac0835489611d7b24d0521861e6ffee081
+    revapi:tool/maven/org.revapi.classif/classif-dsl/pom 0.1.1 SHA-256/1d0d5c68a5ed000ba4dc74b766d9dfa6f8c2e94cc2f593f781faf23caf752896
+    revapi:tool/maven/org.revapi.classif/classif-parent/pom 0.1.1 SHA-256/fbedb43a98ea92d6c6cf06719170130f55845b766308a3aeb9019089a458f5c9
+    revapi:tool/maven/org.revapi.classif/classif/pom 0.1.1 SHA-256/0f7dc3d6300e1ec834e3f22c97f4d7e3f91beaac15c14514e69939c1e5fb4012
     revapi:tool/maven/org.revapi/revapi 0.15.1 SHA-256/c41a393d7216e56f98d66a57ca964ffceb658849b42ef488b71f89a600beae72
     revapi:tool/maven/org.revapi/revapi-basic-features 0.13.1 SHA-256/9eade0d8c45f2d99b5b39b42b2f63cb15904db6f3583c89c370b78e8825f76e2
+    revapi:tool/maven/org.revapi/revapi-basic-features/pom 0.13.1 SHA-256/11b60c00c19ac27ec377c9a980e4f49f3d5ff7659256440a8b716bc43eb4cde3
+    revapi:tool/maven/org.revapi/revapi-build/pom 37 SHA-256/4214af66979ed210bda89287f94a8de8c704f88bd0ee995d4a1e46d3751a0573
+    revapi:tool/maven/org.revapi/revapi-build/pom 47 SHA-256/bfb10a3999a7b0340bf9f6d519ad4b0adcfe897e88ae3a331a844d54f66e901c
     revapi:tool/maven/org.revapi/revapi-java 0.28.4 SHA-256/95f9edd7082703037fa229a415bc7aaf14b60a85319c893d1a9cd0e665e3a825
     revapi:tool/maven/org.revapi/revapi-java-spi 0.25.1 SHA-256/8fd32703b52df0e206ff55c4e3b97525cc4cd790693972e1746cdd4230d3a42a
+    revapi:tool/maven/org.revapi/revapi-java-spi/pom 0.25.1 SHA-256/6ef646d056040e38b0823385f8d32deb4dc308ba701436797c4f71b8d2c82d65
+    revapi:tool/maven/org.revapi/revapi-java/pom 0.28.4 SHA-256/465d7bb63d2708b89561e2a6697507bbd13502d8bc685acb62c28b419c3a65ba
+    revapi:tool/maven/org.revapi/revapi-parent/pom 11 SHA-256/b5ddbf314a649ad9eac8ef383c26c8ce0db33a06587586f8ec6259bdcf9d6e0e
+    revapi:tool/maven/org.revapi/revapi-parent/pom 16 SHA-256/bbe20625ffc2a33600be241c3c48f42677ce21686a7432b38f85f4aa1b516544
     revapi:tool/maven/org.revapi/revapi-reporter-file-base 0.5.1 SHA-256/eb8e10d0d8c9e3c9945cdb2315fbc351ee0bb884cb86e1498c10179ae4f00495
+    revapi:tool/maven/org.revapi/revapi-reporter-file-base/pom 0.5.1 SHA-256/144c410941b2788d4d38416e23461ef8e0edbc309b5f2ea838e9113cc936330e
     revapi:tool/maven/org.revapi/revapi-reporter-json 0.5.1 SHA-256/2b385bb37d92dd48ea0ecb85269194485dfb4fb5757afe278d8a43e6ce169b62
+    revapi:tool/maven/org.revapi/revapi-reporter-json/pom 0.5.1 SHA-256/a3c3baf676a95759c8d7ad248853fe5bc585f31e77be0501a34ddfab48385390
+    revapi:tool/maven/org.revapi/revapi/pom 0.15.1 SHA-256/63e78d7d62d9a90148815856973bd98fcfed4791ee0b38dd173d5e0753e120d3
     revapi:tool/maven/org.slf4j/slf4j-api 1.7.5 SHA-256/fe30825245d2336c859dc38d60c0fc5f3668dbf29cd586828d2b5667ec355b91
+    revapi:tool/maven/org.slf4j/slf4j-api/pom 1.7.5 SHA-256/afaf8e74019b230d3f56fdd7c93fb1070c0dca34f3d2d5ab5dea9fc616bd5ca4
+    revapi:tool/maven/org.slf4j/slf4j-parent/pom 1.7.5 SHA-256/c43bc5a022dbfd9de82be232dffe46208cbc7de12c14385b5da824e331e535bb
+    revapi:tool/maven/org.sonatype.oss/oss-parent/pom 7 SHA-256/b51f8867c92b6a722499557fc3a1fdea77bdf9ef574722fe90ce436a29559454
+    revapi:tool/maven/org.sonatype.oss/oss-parent/pom 9 SHA-256/fb40265f982548212ff82e362e59732b2187ec6f0d80182885c14ef1f982827a
     -->
 </project>

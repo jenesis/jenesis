@@ -57,68 +57,182 @@
     maven/org.junit/junit-bom/pom 5.11.4 SHA-256/19d4b747b204805325b6334553296f986562277a4ac1cb5e593a5e4c4f5e4115
     maven/org.junit/junit-bom/pom 5.12.2 SHA-256/cef80fec86454f6806bfb0df24669b5c6f32e2cb728539ea859f47dfdc9bbc17
     maven/org.junit/junit-bom/pom 5.13.1 SHA-256/fa68451ea830572ed43ffe51d75b6a05f7a5e665a602a51f49d6be02063a65f3
-    mavenplugin/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
-    mavenplugin/module/build.jenesis.plugin.mavenplugin 0.1.0 SHA-256/bed4810e084959d8205aa48417dcbacdfeffe47a08bbffd8f2dfdfe584af1289
+    mavenplugin/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    mavenplugin/module/build.jenesis.plugin.mavenplugin 0.2.0 SHA-256/583d2e4a0ea1ae61a0485008a9dcdf9629ed9a32a030e6d2a172c2d8e4699d95
     mavenplugin:tool/maven/aopalliance/aopalliance 1.0 SHA-256/0addec670fedcd3f113c5c8091d783280d23f75e3acb841b61a9cdb079376a08
+    mavenplugin:tool/maven/aopalliance/aopalliance/pom 1.0 SHA-256/26e82330157d6b844b67a8064945e206581e772977183e3e31fec6058aa9a59b
     mavenplugin:tool/maven/com.github.luben/zstd-jni 1.5.6-3 SHA-256/f72ede1b39258faf81277dc58de30c71cbae4253732558d2ce10b53d8b5763d5
+    mavenplugin:tool/maven/com.github.luben/zstd-jni/pom 1.5.6-3 SHA-256/dfd2fa7b1d23939216902f844fa5e86a79cdfb9209760e4c04242b5a58d49490
     mavenplugin:tool/maven/com.google.guava/failureaccess 1.0.3 SHA-256/cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb
+    mavenplugin:tool/maven/com.google.guava/failureaccess/pom 1.0.3 SHA-256/c54beff37f6d42d43e14722d54a522c9ad51ef97fc5b79277e62a3ebf882f3bb
     mavenplugin:tool/maven/com.google.guava/guava 33.4.8-jre SHA-256/f3d7f57f67fd622f4d468dfdd692b3a5e3909246c28017ac3263405f0fe617ed
+    mavenplugin:tool/maven/com.google.guava/guava-parent/pom 33.4.0-android SHA-256/7220ede61026596fbc720ee4b93246fa2d14f328058532b59ef053de397c7d83
+    mavenplugin:tool/maven/com.google.guava/guava-parent/pom 33.4.8-jre SHA-256/a03c5199a1be14443df7fd40ba8673b1c6aae04deef6688ce7d573ea489e3a20
+    mavenplugin:tool/maven/com.google.guava/guava/pom 33.4.8-jre SHA-256/04365d4b6ef22c8cf9349fe628069fc3e81a2c838351402ef4e95f9e757beebc
+    mavenplugin:tool/maven/com.google.inject/guice-parent/pom 5.1.0 SHA-256/63d5c0c641797deba6c051c47d5f6923f3a103ef71e4ebc3a85d01c3e878596c
     mavenplugin:tool/maven/com.google.inject/guice/jar/classes 5.1.0 SHA-256/142ad4475e19524d2fe3ac995b3f7cbc962fc726f2edb9dbdccc61feab9b2bf9
+    mavenplugin:tool/maven/com.google.inject/guice/pom 5.1.0 SHA-256/b3b8dc65213d623fb70ed7958dbdd616324256ba836a31652560c388999fd9cd
+    mavenplugin:tool/maven/com.google/google/pom 5 SHA-256/e09d345e73ca3fbca7f3e05f30deb74e9d39dd6b79a93fee8c511f23417b6828
     mavenplugin:tool/maven/com.thoughtworks.qdox/qdox 2.1.0 SHA-256/804d51f9bae9e0a84889f3d1b79f5b6586aa91baaa33a8f2175a7b327bd9910e
+    mavenplugin:tool/maven/com.thoughtworks.qdox/qdox/pom 2.1.0 SHA-256/5369969fd55b0155c5b847d2c325b1be2bdfa8d41010cc5a17e275e384e470b6
     mavenplugin:tool/maven/commons-codec/commons-codec 1.11 SHA-256/e599d5318e97aa48f42136a2927e6dfa4e8881dff0e6c8e3109ddbbff51d7b7d
+    mavenplugin:tool/maven/commons-codec/commons-codec/pom 1.11 SHA-256/c1e7140d1dea8fdf3528bc1e3c5444ac0b541297311f45f9806c213ec3ee9a10
     mavenplugin:tool/maven/commons-io/commons-io 2.16.1 SHA-256/f41f7baacd716896447ace9758621f62c1c6b0a91d89acee488da26fc477c84f
+    mavenplugin:tool/maven/commons-io/commons-io/pom 2.16.1 SHA-256/5777d292251c7895c04a4c57015683ec3b353a12486c9b3e7178e9b0b3c38fff
     mavenplugin:tool/maven/commons-logging/commons-logging 1.2 SHA-256/daddea1ea0be0f56978ab3006b8ac92834afeefbd9b7e4e6316fca57df0fa636
+    mavenplugin:tool/maven/commons-logging/commons-logging/pom 1.2 SHA-256/c91ab5aa570d86f6fd07cc158ec6bc2c50080402972ee9179fe24100739fbb20
+    mavenplugin:tool/maven/io.airlift/airbase/pom 112 SHA-256/18ccd104cbd97eb44bd57b68c047ab7ff81fbc800987f82d815c68ac4c2304ce
     mavenplugin:tool/maven/io.airlift/aircompressor 0.27 SHA-256/fdbef3137a28f63bb0cb93487803080ede746a4ec3d421e36c6f0c305c35e5e4
+    mavenplugin:tool/maven/io.airlift/aircompressor/pom 0.27 SHA-256/5aacda89be38563bdf3bfac79333616c0802ca617070dea66ba649507c994441
     mavenplugin:tool/maven/javax.inject/javax.inject 1 SHA-256/91c77044a50c481636c32d916fd89c9118a72195390452c81065080f957de7ff
+    mavenplugin:tool/maven/javax.inject/javax.inject/pom 1 SHA-256/943e12b100627804638fa285805a0ab788a680266531e650921ebfe4621a8bfa
     mavenplugin:tool/maven/net.sf.jtidy/jtidy r938 SHA-256/6fc03e51e73fa884f06e7eae0761e045e56fdeb4e146a4d952e3023cc9e3fb43
+    mavenplugin:tool/maven/net.sf.jtidy/jtidy/pom r938 SHA-256/842738466999d276fa47c2f519514f577b1e5db067ca856057dfd524b9ac6770
     mavenplugin:tool/maven/org.apache.commons/commons-compress 1.26.2 SHA-256/9168a03141d8fc7eda21a2360d83cc0412bcbb1d6204d992bd48c2573cb3c6b8
+    mavenplugin:tool/maven/org.apache.commons/commons-compress/pom 1.26.2 SHA-256/1428719895cd0a913aee33e2424b9a804b10f1197e5d35a9ce99cf2a1174cb0e
     mavenplugin:tool/maven/org.apache.commons/commons-lang3 3.17.0 SHA-256/6ee731df5c8e5a2976a1ca023b6bb320ea8d3539fbe64c8a1d5cb765127c33b4
+    mavenplugin:tool/maven/org.apache.commons/commons-lang3/pom 3.17.0 SHA-256/351c6e4940e939b1f330df47f60f13ba383db81ee008181af541f3a2a6d2a56c
+    mavenplugin:tool/maven/org.apache.commons/commons-parent/pom 34 SHA-256/3a2e69d06d641d1f3b293126dc9e2e4ea6563bf8c36c87e0ab6fa4292d04b79c
+    mavenplugin:tool/maven/org.apache.commons/commons-parent/pom 42 SHA-256/cd313494c670b483ec256972af1698b330e598f807002354eb765479f604b09c
+    mavenplugin:tool/maven/org.apache.commons/commons-parent/pom 69 SHA-256/d50da9c39bdca823d618d1b4a03b73f196497fcb8616fd0da727c8623592a9bb
+    mavenplugin:tool/maven/org.apache.commons/commons-parent/pom 73 SHA-256/4ed44560b07f8448479dfd1e83a422ba4e83e60b36e51b2871ac502a6d5c1bea
     mavenplugin:tool/maven/org.apache.httpcomponents/httpclient 4.5.14 SHA-256/c8bc7e1c51a6d4ce72f40d2ebbabf1c4b68bfe76e732104b04381b493478e9d6
+    mavenplugin:tool/maven/org.apache.httpcomponents/httpclient/pom 4.5.14 SHA-256/f18355af4cf80a8a4ef04ebd742a47e90a7eaf080c725b2095dbc4fc5dbdefb7
+    mavenplugin:tool/maven/org.apache.httpcomponents/httpcomponents-client/pom 4.5.14 SHA-256/5bad1de4f101447659f89d089868ccbad64a68cc503d2d65410b51f6904aa061
+    mavenplugin:tool/maven/org.apache.httpcomponents/httpcomponents-core/pom 4.4.16 SHA-256/f2d75a2c2d423ad18539bf21656d56f88a4091944a662fcaf159d5ae283db7f7
+    mavenplugin:tool/maven/org.apache.httpcomponents/httpcomponents-parent/pom 11 SHA-256/a901f87b115c55070c7ee43efff63e20e7b02d30af2443ae292bf1f4e532d3aa
     mavenplugin:tool/maven/org.apache.httpcomponents/httpcore 4.4.16 SHA-256/6c9b3dd142a09dc468e23ad39aad6f75a0f2b85125104469f026e52a474e464f
+    mavenplugin:tool/maven/org.apache.httpcomponents/httpcore/pom 4.4.16 SHA-256/3cbad849b35dacfe6cec31adada2c623c026c3261141b0d26eec7e399c6cd7fa
     mavenplugin:tool/maven/org.apache.maven.doxia/doxia-sink-api 2.0.0 SHA-256/fba33eaee3b01547bcd14b05ebc37f7dacef1819ad9ee7a5b27899afd3472cf4
+    mavenplugin:tool/maven/org.apache.maven.doxia/doxia-sink-api/pom 2.0.0 SHA-256/4b05895d1cd65013d4b8e7eeb09cde6b567b4c31729fe5c77c0f0898b5e04b88
+    mavenplugin:tool/maven/org.apache.maven.doxia/doxia/pom 2.0.0 SHA-256/59f40c92b9f525bb6ca6f8845ec63b13dab18c3c1da93d17620cb8d2ea4c61b8
     mavenplugin:tool/maven/org.apache.maven.plugin-tools/maven-plugin-annotations 3.15.1 SHA-256/b58bcb3a1f362f6e1efa2772064026bb3d4ad92e6f43a1812d8d2886489912f5
+    mavenplugin:tool/maven/org.apache.maven.plugin-tools/maven-plugin-annotations/pom 3.15.1 SHA-256/672153410b4093dae58b4ce819d37e1e0163b686ce7ba871cf233a18622b261b
     mavenplugin:tool/maven/org.apache.maven.plugin-tools/maven-plugin-tools-annotations 3.15.1 SHA-256/cb812be374f19da55406714c648534c91b234d73fdaa386afda9ad51a025f208
+    mavenplugin:tool/maven/org.apache.maven.plugin-tools/maven-plugin-tools-annotations/pom 3.15.1 SHA-256/6b2e1fb697151cfdeadbb3207b5cc60ffe1875aadcb7ff8763f43df533d618cb
     mavenplugin:tool/maven/org.apache.maven.plugin-tools/maven-plugin-tools-api 3.15.1 SHA-256/38556a754b8c947c674d1678270aa36cb6a98d9443235229c6d09f8154837098
+    mavenplugin:tool/maven/org.apache.maven.plugin-tools/maven-plugin-tools-api/pom 3.15.1 SHA-256/ef7a829f135bb937c8b5eb026e7ad195eb24bfa5361068dfb87f98b5707a9c5a
     mavenplugin:tool/maven/org.apache.maven.plugin-tools/maven-plugin-tools-generators 3.15.1 SHA-256/c9e76fc2501852d55d258e1210ad5eb306686b2f31cfa55b185991a79b1cb392
+    mavenplugin:tool/maven/org.apache.maven.plugin-tools/maven-plugin-tools-generators/pom 3.15.1 SHA-256/f035c2441812218e5af3d621e69c8afaedd9aacf29141b900baf2078b8658b46
+    mavenplugin:tool/maven/org.apache.maven.plugin-tools/maven-plugin-tools/pom 3.15.1 SHA-256/051a6b8612b16f6593b8ac5635e0167dcff42972f02528b8d756ae900e2fcf26
     mavenplugin:tool/maven/org.apache.maven.reporting/maven-reporting-api 4.0.0 SHA-256/cb2cbde3c9c7288f7398a250dcf3c90cf92714cff301f22b298e1091b5def33c
+    mavenplugin:tool/maven/org.apache.maven.reporting/maven-reporting-api/pom 4.0.0 SHA-256/2032531f05994121c2fdb5df7235ed548f53d294d0b7ac45e797148d85a30ee2
     mavenplugin:tool/maven/org.apache.maven.resolver/maven-resolver-api 1.9.24 SHA-256/c0ce14849298720dcf3b09fe9e263b3c576d2d6cd43c61f8aa9d6117e04e5e47
+    mavenplugin:tool/maven/org.apache.maven.resolver/maven-resolver-api/pom 1.9.24 SHA-256/97c497208afe007e11696c9deaa2e3022eb7de5ba9f20167e459aeb77d62cce7
     mavenplugin:tool/maven/org.apache.maven.resolver/maven-resolver-impl 1.9.24 SHA-256/3cd88edda00c46242cdbe57aefb47703519d176d9e8a500333de15faf41b0e1d
+    mavenplugin:tool/maven/org.apache.maven.resolver/maven-resolver-impl/pom 1.9.24 SHA-256/cbca1b4895fe10ecf1cc448967d22999ce7b2dc43e5f92484e68479aa5f71ac8
     mavenplugin:tool/maven/org.apache.maven.resolver/maven-resolver-named-locks 1.9.24 SHA-256/a222b0a5ca4c145e8e0f45207a23bcce18bdbe1f1c980e4e9fb332591ee8c91a
+    mavenplugin:tool/maven/org.apache.maven.resolver/maven-resolver-named-locks/pom 1.9.24 SHA-256/f22c1ba8b7c15816c8085f12c64024b03cbacb2a908588c267647dd067ee541a
     mavenplugin:tool/maven/org.apache.maven.resolver/maven-resolver-spi 1.9.24 SHA-256/e3153906e93333c106ee18babb72ba7984ccb15e9116ea08f88c71b8d9387e01
+    mavenplugin:tool/maven/org.apache.maven.resolver/maven-resolver-spi/pom 1.9.24 SHA-256/f6f693f85df3f94695b2b7a1ce0ff89ca9b4b1f1861d8f54bdd52bfc053d7a49
     mavenplugin:tool/maven/org.apache.maven.resolver/maven-resolver-util 1.9.24 SHA-256/aeb7e776a8c47b1c317a2581f299e2525b044cb8abde31164e970bbbefab12b1
+    mavenplugin:tool/maven/org.apache.maven.resolver/maven-resolver-util/pom 1.9.24 SHA-256/72fb9203656c9fcf187b59968f6c76a3532009fe8f240d4ad11764f4ba3e9df3
+    mavenplugin:tool/maven/org.apache.maven.resolver/maven-resolver/pom 1.9.24 SHA-256/6ad2158ab7ea911d4e0b66ba3838f8e5b1d6b5ab31721770d914d0e8771d2917
+    mavenplugin:tool/maven/org.apache.maven.shared/maven-shared-components/pom 39 SHA-256/17e81388d88ba61c4055450ec90a32ee30acd07f46dc6e31e096b8e53735f4b2
+    mavenplugin:tool/maven/org.apache.maven.shared/maven-shared-components/pom 43 SHA-256/6072dd103bdba3199584c5b73ed45b00567cd3ea918e2160b10bc7437c9e8181
     mavenplugin:tool/maven/org.apache.maven.shared/maven-shared-utils 3.4.2 SHA-256/b613357e1bad4dfc1dead801691c9460f9585fe7c6b466bc25186212d7d18487
+    mavenplugin:tool/maven/org.apache.maven.shared/maven-shared-utils/pom 3.4.2 SHA-256/a941745d7faeb8dc9a75edc2c330c994b7440b9a44d21142716b6053967a41c1
     mavenplugin:tool/maven/org.apache.maven.wagon/wagon-provider-api 3.5.3 SHA-256/5e72000338945ed3e96f8e4f578d1d0672e1af7e19c0e9014197ae5b31af3ef4
+    mavenplugin:tool/maven/org.apache.maven.wagon/wagon-provider-api/pom 3.5.3 SHA-256/64d6a085e8a6bede9607cbd029ea58cd1c87304410862492174a6d59b9d17142
+    mavenplugin:tool/maven/org.apache.maven.wagon/wagon/pom 3.5.3 SHA-256/7c10b8bac59268fe7957f2ab2b50965d90069ebf850c756bb55ea807ce440f0b
     mavenplugin:tool/maven/org.apache.maven/maven-artifact 3.9.11 SHA-256/0bfd1c121f907642344311d81e4dfd93eba6c24dc712cc0aeae273eb22833022
+    mavenplugin:tool/maven/org.apache.maven/maven-artifact/pom 3.9.11 SHA-256/cbece09715ae8a67cbe712f8667e28c194000c5c4f3b86864c2a2b4178e1b538
     mavenplugin:tool/maven/org.apache.maven/maven-builder-support 3.9.11 SHA-256/5b1de1560ec19c4c69a655f986455888f3a0bcc3c160cac1f1edb87de3825f77
+    mavenplugin:tool/maven/org.apache.maven/maven-builder-support/pom 3.9.11 SHA-256/50e37657465341146697bd7f5cbcff2ce1f7eb99b0b56143d1d99edb01960e6b
     mavenplugin:tool/maven/org.apache.maven/maven-core 3.9.11 SHA-256/93d3c0523dda6c86c6620d9e692e7df39d0e2e4e4cd860061a8c0d274c2ad185
+    mavenplugin:tool/maven/org.apache.maven/maven-core/pom 3.9.11 SHA-256/dffdee6851fc9f961493a982af5a62902ddd7dfc450e296263175fb7a0cc5e85
     mavenplugin:tool/maven/org.apache.maven/maven-model 3.9.11 SHA-256/163aa596f976264384efeb50b4cb8a806086fd64a9b755ad1f69195fed3998ad
     mavenplugin:tool/maven/org.apache.maven/maven-model-builder 3.9.11 SHA-256/c4c72accdcd848332c1a37995610a6a369d49fdaabc43e85f0022a5b77de3ba7
+    mavenplugin:tool/maven/org.apache.maven/maven-model-builder/pom 3.9.11 SHA-256/799254bead4b47346f3de3117238f23660840dee6b1548c624922c3dfe1dbf5d
+    mavenplugin:tool/maven/org.apache.maven/maven-model/pom 3.9.11 SHA-256/d433602623b3f422e5c92eb0560d10f1872a4976d4500a0a8d57702c24885aa6
+    mavenplugin:tool/maven/org.apache.maven/maven-parent/pom 34 SHA-256/1a8faf7a6a2b848acb26a959954ee115c0d79dbe75a6206fb3b8c7c2f45a237f
+    mavenplugin:tool/maven/org.apache.maven/maven-parent/pom 39 SHA-256/cfe4820aa1d96ae51d1dc5b0e2a9dc582c42478c24c95ca8238f547e60bef721
+    mavenplugin:tool/maven/org.apache.maven/maven-parent/pom 43 SHA-256/468a1262e9aaa5febf9d604e2836267f815351f2b4520f28fb17f53c71e33554
+    mavenplugin:tool/maven/org.apache.maven/maven-parent/pom 45 SHA-256/94fe869eb9b4ce9fce3995d05ea86b168c85d927f9d17beb814a1960c76d7e6f
     mavenplugin:tool/maven/org.apache.maven/maven-plugin-api 3.9.11 SHA-256/8e985a56412564cf687040efed8bcd3a63eac2202a824bb01e1d5ece2b87458f
+    mavenplugin:tool/maven/org.apache.maven/maven-plugin-api/pom 3.9.11 SHA-256/982b253265d0ba0a175e5688f6886950f6920400a5aa38db958711df2cabb72a
     mavenplugin:tool/maven/org.apache.maven/maven-repository-metadata 3.9.11 SHA-256/f8655f5f0060e0032944f2a23688d186e140d2184749bcfa1927f83cd6a8b1a2
+    mavenplugin:tool/maven/org.apache.maven/maven-repository-metadata/pom 3.9.11 SHA-256/c7e5ae0f7f03ec65ef5d89f8d38db768f5eb76b992459d52ea035979e76b829e
     mavenplugin:tool/maven/org.apache.maven/maven-resolver-provider 3.9.11 SHA-256/b5d6e52ae1ecf1cb62ede2234234ba3093149524066488e84415187ce478c582
+    mavenplugin:tool/maven/org.apache.maven/maven-resolver-provider/pom 3.9.11 SHA-256/727eaaa3fd3aaf8be1a7e1f26af332a863a8b59cbfcef77533bfad81633cdab9
     mavenplugin:tool/maven/org.apache.maven/maven-settings 3.9.11 SHA-256/026718d47d19e360d978857bc63d3dc065884fc2c801563d8a2a77b5ab74ccf8
     mavenplugin:tool/maven/org.apache.maven/maven-settings-builder 3.9.11 SHA-256/33c96e4ca5a15b7c93180f6b2f8deb15f511dfc15dda0d2b671c968b22108972
+    mavenplugin:tool/maven/org.apache.maven/maven-settings-builder/pom 3.9.11 SHA-256/03835d1ac5abbe8f1b4d95d2afa3092cc555e75ced99c95cccbc665a93f63a3b
+    mavenplugin:tool/maven/org.apache.maven/maven-settings/pom 3.9.11 SHA-256/306d9044deedd33318c63257cc749faebfbb9643506997fc5f4bd9bb0f02850a
+    mavenplugin:tool/maven/org.apache.maven/maven/pom 3.9.11 SHA-256/2cbd997caf71fe79c8010c440d0dcf72ec5d7aa346b89a20171b7f1ba289af42
     mavenplugin:tool/maven/org.apache.velocity/velocity-engine-core 2.4 SHA-256/1bf78c2ade46f209bf93ebe72ed2af5b989ca7a1de0a015fc1b92a62f56b6549
+    mavenplugin:tool/maven/org.apache.velocity/velocity-engine-core/pom 2.4 SHA-256/a9eee9d59ac787f9c379ec4f37af7e04f8d62161a1e602a4274014d0dc41b0cb
+    mavenplugin:tool/maven/org.apache.velocity/velocity-engine-parent/pom 2.4 SHA-256/d4b9e31a7e9ea490c562a2bdeced94eef3f08c8d0a5378add3d6bcf8828334bf
+    mavenplugin:tool/maven/org.apache.velocity/velocity-master/pom 7 SHA-256/943a046c1fe36b28b3cea11fb0d34e8b836b245433087f8fa916c0a752393181
+    mavenplugin:tool/maven/org.apache/apache/pom 13 SHA-256/ff513db0361fd41237bef4784968bc15aae478d4ec0a9496f811072ccaf3841d
+    mavenplugin:tool/maven/org.apache/apache/pom 18 SHA-256/7831307285fd475bbc36b20ae38e7882f11c3153b1d5930f852d44eda8f33c17
+    mavenplugin:tool/maven/org.apache/apache/pom 21 SHA-256/af10c108da014f17cafac7b52b2b4b5a3a1c18265fa2af97a325d9143537b380
+    mavenplugin:tool/maven/org.apache/apache/pom 23 SHA-256/bc10624e0623f36577fac5639ca2936d3240ed152fb6d8d533ab4d270543491c
+    mavenplugin:tool/maven/org.apache/apache/pom 29 SHA-256/3e49037174820bbd0df63420a977255886398954c2a06291fa61f727ac35b377
+    mavenplugin:tool/maven/org.apache/apache/pom 31 SHA-256/555d0c9eaa69c042aff924927b9381e8f8174136d355eead445224452e6291cc
+    mavenplugin:tool/maven/org.apache/apache/pom 33 SHA-256/d78bd8524c5f8380a190a6525686629a95dfe512df21111383a6d8c0923a4415
+    mavenplugin:tool/maven/org.apache/apache/pom 35 SHA-256/ea297dcd114136e8b8e8b630230d52a76c2fc69f6c5db25d672b1857000728b8
     mavenplugin:tool/maven/org.codehaus.plexus/plexus-archiver 4.10.0 SHA-256/4c07814ff4a39199999ae82bba1e38aa4f25637467fcac6a66ed63a76535799a
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus-archiver/pom 4.10.0 SHA-256/93ca001fd33da53d38b74f6daf19e71bc9736ed6143091ff9003cd4c05ace6c9
     mavenplugin:tool/maven/org.codehaus.plexus/plexus-cipher 2.0 SHA-256/9a7f1b5c5a9effd61eadfd8731452a2f76a8e79111fac391ef75ea801bea203a
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus-cipher/pom 2.0 SHA-256/04842f331b0225b85a5e20439710d228ea7a6302abe6d53c9c9846fbc5bf99ff
     mavenplugin:tool/maven/org.codehaus.plexus/plexus-classworlds 2.9.0 SHA-256/1ad3292cd563381e3fd632f3fded1988f9e9b2be7a9f3db63ff4c4cedba13fa5
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus-classworlds/pom 2.9.0 SHA-256/d9a3fe6374558b88948a96382b6b8a7ad75c23bed754994ea6f002586bb35f27
     mavenplugin:tool/maven/org.codehaus.plexus/plexus-component-annotations 2.2.0 SHA-256/50edb93c73786e62822b4fe1336e22880fdf147191373cf5c911370e16748fcf
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus-component-annotations/pom 2.2.0 SHA-256/c5483fc9c8e1a7ef6b0f899e37aaa6ce2f8afae54955bfa559fd63a33dbb065b
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus-containers/pom 2.2.0 SHA-256/743f42d967d02826ee79f0601108e2deeb11dd3e6add24fc5f2758b1b68634ec
     mavenplugin:tool/maven/org.codehaus.plexus/plexus-interpolation 1.28 SHA-256/ab2a8715570438a2e4164d85ad3e8d489eabc38ea5093c2eb8ab7f58403535b5
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus-interpolation/pom 1.28 SHA-256/0f4665c943df2692d75e28b6b24923ab18ff00369b8c7f5eba4bedef07e4ecd4
     mavenplugin:tool/maven/org.codehaus.plexus/plexus-io 3.5.0 SHA-256/965ed28912cf1ae4c628112c4009e0c19819bc44ed5db8af54ee5eda21036a3e
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus-io/pom 3.5.0 SHA-256/f5b86cd223a0bf4ba649de19e7e8e4e1f14344ff636f8b0024c89c46d28cc9d8
     mavenplugin:tool/maven/org.codehaus.plexus/plexus-java 1.3.0 SHA-256/f455405f84e37e6b998970cab24e3963a4fdd802e9830fecac7549378b1048a9
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus-java/pom 1.3.0 SHA-256/f18c521aa078ab7862f6c9913a3beb3f1237cf3a89fc4211e71221b2100a440b
     mavenplugin:tool/maven/org.codehaus.plexus/plexus-sec-dispatcher 2.0 SHA-256/873139960c4c780176dda580b003a2c4bf82188bdce5bb99234e224ef7acfceb
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus-sec-dispatcher/pom 2.0 SHA-256/9b28bb307017938a94d06c85b2b099bc46912b859d084fb293e569f432eadb7c
     mavenplugin:tool/maven/org.codehaus.plexus/plexus-utils 3.6.0 SHA-256/27ef130e32c236090e408fb5498d94cb9ea26d14070fb1c8985d607b62d098d1
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus-utils/pom 3.6.0 SHA-256/6138300481471c7fe6aeb115f912961f886e1a46ee9c2bd2841b65184824da28
     mavenplugin:tool/maven/org.codehaus.plexus/plexus-velocity 2.2.0 SHA-256/3e7e902f492c973cf210ddb8267843a3b65e83f5067467e2f4d9af0051f6b8b9
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus-velocity/pom 2.2.0 SHA-256/6f6a9b05f40e8e84af4aa9576f6b1e435ded6d5b56931b2a269b697bf72ce49d
     mavenplugin:tool/maven/org.codehaus.plexus/plexus-xml 3.0.1 SHA-256/c1a510a87a62bd2d74ac1472dd31c3f9e9b0b8b8568f37d77c0f135415bebd05
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus-xml/pom 3.0.1 SHA-256/3242ddc20873f71b381c333b22afb9cf3596d6a63b6683036a16bd51bc8721a4
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus/pom 16 SHA-256/68d4eed65a3dbbc342ed80dd138fbe9c67cb7fb4c2abc4f5201cdb5b9f645868
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus/pom 18 SHA-256/b43ee89c8890b9e5bc48d079fcb4c44f082b5139253356dc455806a33c3dd8fd
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus/pom 19 SHA-256/8d3e51c3902fd7596e548eab121ebf6b0d4aa73857077f26a24fc86f9b8455b4
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus/pom 20 SHA-256/a7b594b002fc791733c8e94470d09045f4fd69a93ad5c375752f2057f84633b4
+    mavenplugin:tool/maven/org.codehaus.plexus/plexus/pom 8 SHA-256/ffa349db04e7abf65885bdc5a2062f4197c0ff9d3f1f4e2aa5720b77233f742c
     mavenplugin:tool/maven/org.eclipse.sisu/org.eclipse.sisu.inject 0.9.0.M4 SHA-256/1cbd7a965a5e2a9ea823bab311962a4e5aa5c240705bdbad5a52b40ffdfa1004
+    mavenplugin:tool/maven/org.eclipse.sisu/org.eclipse.sisu.inject/pom 0.9.0.M4 SHA-256/33966b3abd12908001b707688dfb7c09908b1e86556dc3fac1e85122a686f059
     mavenplugin:tool/maven/org.eclipse.sisu/org.eclipse.sisu.plexus 0.9.0.M4 SHA-256/b90579bc652eac7331436e0a25533fce14130b9c6e015f2dd3a3d4bb07e942b7
+    mavenplugin:tool/maven/org.eclipse.sisu/org.eclipse.sisu.plexus/pom 0.9.0.M4 SHA-256/90b4be7a71c979d0c4dea20c20a28eb9e76a29df68ab9018cf011019a3e4f562
+    mavenplugin:tool/maven/org.eclipse.sisu/sisu-inject/pom 0.9.0.M4 SHA-256/0c829c9641ccac870d7d7ff012cbbad8447e912eb9a26d0d7283f09cba44c0d9
     mavenplugin:tool/maven/org.jsoup/jsoup 1.18.1 SHA-256/3bb5b0ec02998abe45a51f37d7ce67c3068b4ccd4ab63c965929ec5074d64e91
+    mavenplugin:tool/maven/org.jsoup/jsoup/pom 1.18.1 SHA-256/c4de3a84fbb5eef4bd2298d6de981c6cd9722879505c8373e1b67f11d1caf27d
     mavenplugin:tool/maven/org.jspecify/jspecify 1.0.0 SHA-256/1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab
+    mavenplugin:tool/maven/org.jspecify/jspecify/pom 1.0.0 SHA-256/cdab929a3b95211f43d2090c5e2d0dfe8465960e378bc32b35841dab324433a6
+    mavenplugin:tool/maven/org.junit/junit-bom/pom 5.10.1 SHA-256/21c4b0286f4b20069577ff4b20978a85c100ac8a46b6f1c8672fbaab337bc3f2
+    mavenplugin:tool/maven/org.junit/junit-bom/pom 5.10.2 SHA-256/169dd904a4b0f6520cffe658cc62292bfe9f3c14a989fa92120724cde43a9968
+    mavenplugin:tool/maven/org.junit/junit-bom/pom 5.10.3 SHA-256/10937d44c425984cb8739225d34712e1a3145641ca93ac3f7ef186fa25f6babc
+    mavenplugin:tool/maven/org.junit/junit-bom/pom 5.11.0 SHA-256/e67459d4882424ac6374f40db1c8f4a2e88946b340ba072c80be932a2be4644d
+    mavenplugin:tool/maven/org.junit/junit-bom/pom 5.11.1 SHA-256/c72124a9c9a79910c1858766b72c350e1a39244cbfb4b076348fbfe078281965
+    mavenplugin:tool/maven/org.junit/junit-bom/pom 5.11.3 SHA-256/f13df2e4caf1febce567667e7c378101a0331d53d1324d6e2dfe3aecfb1f7774
+    mavenplugin:tool/maven/org.junit/junit-bom/pom 5.11.4 SHA-256/19d4b747b204805325b6334553296f986562277a4ac1cb5e593a5e4c4f5e4115
+    mavenplugin:tool/maven/org.junit/junit-bom/pom 5.12.2 SHA-256/cef80fec86454f6806bfb0df24669b5c6f32e2cb728539ea859f47dfdc9bbc17
+    mavenplugin:tool/maven/org.junit/junit-bom/pom 5.13.1 SHA-256/fa68451ea830572ed43ffe51d75b6a05f7a5e665a602a51f49d6be02063a65f3
+    mavenplugin:tool/maven/org.junit/junit-bom/pom 5.8.0-M1 SHA-256/77144432ffc68bd98a790ab1069619d91032cfc0e4e13c08163aa03da36fd6e2
     mavenplugin:tool/maven/org.ow2.asm/asm 9.8 SHA-256/876eab6a83daecad5ca67eb9fcabb063c97b5aeb8cf1fca7a989ecde17522051
     mavenplugin:tool/maven/org.ow2.asm/asm-analysis 9.7.1 SHA-256/85b29371884ba31bb76edf22323c2c24e172c3267a67152eba3d1ccc2e041ef2
+    mavenplugin:tool/maven/org.ow2.asm/asm-analysis/pom 9.7.1 SHA-256/25c2379f2bfc2a1e64e62c39e2b93cfb0e489707852b08d6fc470b1c6a52b9ee
     mavenplugin:tool/maven/org.ow2.asm/asm-tree 9.7.1 SHA-256/9929881f59eb6b840e86d54570c77b59ce721d104e6dfd7a40978991c2d3b41f
+    mavenplugin:tool/maven/org.ow2.asm/asm-tree/pom 9.7.1 SHA-256/13b905f65e7fd43ca7674f40cdaa37679ba4858c6c9d9fb8f17a7afd9baabc9e
     mavenplugin:tool/maven/org.ow2.asm/asm-util 9.7.1 SHA-256/f885be71b5c90556f5f1ad1c4f9276b29b96057c497d46666fe4ddbec3cb43c6
+    mavenplugin:tool/maven/org.ow2.asm/asm-util/pom 9.7.1 SHA-256/7fb5e63362b2d52d77dca3b754aebad635751d3fc520191e9500ece9e2345b71
+    mavenplugin:tool/maven/org.ow2.asm/asm/pom 9.8 SHA-256/c1367c3bb383d7619e7f797e38df7513885f2eef04ae7b5908f68222657b5baa
+    mavenplugin:tool/maven/org.ow2/ow2/pom 1.5.1 SHA-256/321ddbb7ee6fe4f53dea6b4cd6db74154d6bfa42391c1f763b361b9f485acf05
     mavenplugin:tool/maven/org.slf4j/slf4j-api 1.7.36 SHA-256/d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0
+    mavenplugin:tool/maven/org.slf4j/slf4j-api/pom 1.7.36 SHA-256/fb046a9c229437928bb11c2d27c8b5d773eb8a25e60cbd253d985210dedc2684
+    mavenplugin:tool/maven/org.slf4j/slf4j-parent/pom 1.7.36 SHA-256/bb388d37fbcdd3cde64c3cede21838693218dc451f04040c5df360a78ed7e812
+    mavenplugin:tool/maven/org.sonatype.oss/oss-parent/pom 9 SHA-256/fb40265f982548212ff82e362e59732b2187ec6f0d80182885c14ef1f982827a
     mavenplugin:tool/maven/org.tukaani/xz 1.9 SHA-256/211b306cfc44f8f96df3a0a3ddaf75ba8c5289eed77d60d72f889bb855f535e5
+    mavenplugin:tool/maven/org.tukaani/xz/pom 1.9 SHA-256/093be1b03331bce2932d6825c37e98272d7621e6a9e9fb93289a002518b8dd5a
     -->
 </project>

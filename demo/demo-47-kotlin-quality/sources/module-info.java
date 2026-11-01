@@ -7,125 +7,249 @@
  * ships against, while the quality tools float their own {@code RELEASE}.
  *
  * @jenesis.release 25
- * @jenesis.pin detekt/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
- * @jenesis.pin detekt/module/build.jenesis.plugin.detekt 0.1.0 SHA-256/9b7c3f82060632df6955c55cd2299690987cff69b4de2f7a1e85b325472bd346
+ * @jenesis.pin detekt/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin detekt/module/build.jenesis.plugin.detekt 0.2.0 SHA-256/865654d33cf219672dcfa845d77d4394492777fa032709333adc7d81b259a067
  * @jenesis.pin detekt:tool/maven/dev.drewhamilton.poko/poko-annotations-jvm 0.17.1 SHA-256/940e6d50445bc6b0ae26ad414ec7b953a3e4e802dc7756cc14d56958bc97cc31
+ * @jenesis.pin detekt:tool/maven/dev.drewhamilton.poko/poko-annotations-jvm/pom 0.17.1 SHA-256/1bb53afd8230ffde373b5b8b1711dca0c83d3ad561f3a50e39c4a8029d832392
  * @jenesis.pin detekt:tool/maven/io.github.davidburstrom.contester/contester-breakpoint 0.2.0 SHA-256/672cbebb5d45a72b35dd81fd6127e187451bb6fb7fba35315bbdf2f57cfce835
+ * @jenesis.pin detekt:tool/maven/io.github.davidburstrom.contester/contester-breakpoint/pom 0.2.0 SHA-256/be2d22c5019386656299e8f16342c68c52645b747ffb86192908d17b16fec0ae
  * @jenesis.pin detekt:tool/maven/io.github.detekt.sarif4k/sarif4k-jvm 0.6.0 SHA-256/b3ac96dd97acba8318dbe26f6a432d6c6db91c46c780805e8928b8103e5763dc
+ * @jenesis.pin detekt:tool/maven/io.github.detekt.sarif4k/sarif4k-jvm/pom 0.6.0 SHA-256/8b90fc3745f008f510886ce707539f6bb71bbdd1b7c9db8fd1db0ae566a1c0af
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-api 1.23.8 SHA-256/dd5b84d420904d5c564aab115d36e6290a9d7daf6955923099015618f2b5c83f
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-api/pom 1.23.8 SHA-256/283010a48e95f3e3f370efaa21c75ed979306b99eb51d726d97e62e55eb6847e
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-cli 1.23.8 SHA-256/ead7ccd320bf304cece189438d6a384747c76545a0f880d9c91d5ca5d2d30a63
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-cli/pom 1.23.8 SHA-256/45e437150eb60e29749ac96b91a990e092523b295e13b8e5348fe7e41bc0da2c
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-core 1.23.8 SHA-256/1981dea8e4e2e8541af2d83e4f8d3581ce647cfe63175b9eb9ac2a07849d74c9
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-core/pom 1.23.8 SHA-256/896d0d5af3efd9d19ffee9ad55e20a874b633f84785f4cb777cb42273d5690a0
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-metrics 1.23.8 SHA-256/718e8f71f5872986e4f5cd4887a41e26aa0aeff42e99cf4a42582291b8738cc4
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-metrics/pom 1.23.8 SHA-256/79832186045a218b73fbd7d86e2ac43b2d3b38069a22a9a11214bd2631798a81
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-parser 1.23.8 SHA-256/5cdf45a0172d934d6e7401cd43838e7b954f7adb117eed8358fcae0b177e90e5
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-parser/pom 1.23.8 SHA-256/41f0ba7fb7670e1e5bd3351eca5c7e2990f75059a92ca453731d91769341f2b7
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-psi-utils 1.23.8 SHA-256/9505fa9d4f9a771d256a5d415b5d51ffd7a24e5019f6a60e5a69a12633dcf7ba
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-psi-utils/pom 1.23.8 SHA-256/b4749c58eede8a5e7ceeda408c534605808bbef5d7008d7220d94943feab26b8
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-report-html 1.23.8 SHA-256/8068a15e07718e3bdbf501ede5f666812fb5f9fb1450db060449534c05e6722a
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-report-html/pom 1.23.8 SHA-256/8cc752a6f36932b98b8e511202d69f1149a597669154157ec7d20c590009c97e
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-report-md 1.23.8 SHA-256/cc5b90b1476cef99e112162dbcd1db32b040284a768f3c975a49ec0b63980ca3
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-report-md/pom 1.23.8 SHA-256/25af4631ef7c94a4cd4e672013e85b085719801f25c24405f2db36f655699196
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-report-sarif 1.23.8 SHA-256/c9f9221fc57ed1fbd1374de5c4da6c069160f892a71f83b551d3a32c8cbad13d
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-report-sarif/pom 1.23.8 SHA-256/6daf4b76e96a1d9e05cd624270c758df2076267b8fedd3680ad14b66cbf1248e
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-report-txt 1.23.8 SHA-256/41e85ca3587abce9a03f8dcb2a67e05fcf59b7518fa016c9350ea73c79f9c54a
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-report-txt/pom 1.23.8 SHA-256/9945fbb33e29993df643407d07ca2626fa8851e9f8d4951d05c43077b004851e
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-report-xml 1.23.8 SHA-256/d71abaa98890cae8a618839b1309c013dff39c6bd7d0de0b704e6193e027ef09
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-report-xml/pom 1.23.8 SHA-256/db100bb90f7baf8aed2118778d183404eab0eb6b13476b6580dc294b1c493df9
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules 1.23.8 SHA-256/a3ee516f3837fbc01d5c3b86f5dc7be7dba81345bfc57c4eb58af12f6923a560
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-complexity 1.23.8 SHA-256/3a169746e38b93eebb8eb7e10dedb06657ca294bc81cf675a735f85b5f371e6e
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-complexity/pom 1.23.8 SHA-256/037bf72ceaa6e684bb5764baba0bdfdaf747fa774e750b61cb8c41b01b28b3f4
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-coroutines 1.23.8 SHA-256/afe8c973c17457f714f05795046115188c03f4506903bb25b84da846e2e56816
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-coroutines/pom 1.23.8 SHA-256/665bad3c7ae1291cd04d0442b4f957470e6768417439f2027369a501638d07b7
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-documentation 1.23.8 SHA-256/d25367855d8ccd156f283e1cd6de0fd15b8f3e9530a970206f41d619fb4fbdcd
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-documentation/pom 1.23.8 SHA-256/613a4c5c5708552d810b8d8475cd6d047d201fdec8c1f0cb51bc71cf1a40e360
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-empty 1.23.8 SHA-256/888641114789ac43292d44836221565da47a9228f7fb7dfe0c6b3f94e7f58afa
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-empty/pom 1.23.8 SHA-256/a684179717a7a2d3b367a362d8829a1a0527434e4407cca7179410470fd0483d
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-errorprone 1.23.8 SHA-256/fee1ee765168a5896162ebe39b34fa421c0a5b769abc8f150f9e3596912a49c4
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-errorprone/pom 1.23.8 SHA-256/94e7ab920614373fbd277d24f82d6fd59d7be27532f78d1c46b66fc16effdbd4
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-exceptions 1.23.8 SHA-256/889ffc72aff0624132e0b10932332c71d24f5bab8f1c10c20bf5ac592ca2caf6
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-exceptions/pom 1.23.8 SHA-256/e0f2ad9cca419eb378bc6bb53fe8f31ce431f10d294337776c4dacc4224fa5c7
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-naming 1.23.8 SHA-256/ed1992b1bdb0494567805b0a8145ce978f46e5ad743e2e83bf84bd5ec661baeb
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-naming/pom 1.23.8 SHA-256/7f2e31ad1a4708e8346e1dbdc59cf5e2db7c5ab231ab094d1da71725a6584b97
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-performance 1.23.8 SHA-256/dbf5e06e2fa18a6cf57ae2621e4274c163bb5bbb351a5db75f724f86f22d436b
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-performance/pom 1.23.8 SHA-256/45aada1236b2cfda64f90ca294cb5cba06f5948043d52af5557cf631b2da486e
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-style 1.23.8 SHA-256/af2644c226d2ba0679ea86bca52ef90c8d9f64f446efa9d74cbd0e6311b038a8
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules-style/pom 1.23.8 SHA-256/ee4715a86302e048f04407c0a75b6951a1c792c9be504b911347942e58e12c7e
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-rules/pom 1.23.8 SHA-256/b22e3eaebd8b0220e4e5b0a2557005d55d169fd8dad53035d905bd2fbde8ad03
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-tooling 1.23.8 SHA-256/7e93e9a23b478f70128893b06748673f912100b7ef03040d7d0331e26d30d092
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-tooling/pom 1.23.8 SHA-256/ae44bb0742255cbfc6ce3dfb6efb66d3bec4e1db787a689d490eb8bba214e591
  * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-utils 1.23.8 SHA-256/f75fd7e924b9267d9ec661859ca913102de4a8f5895b09685ce10797dc26d056
+ * @jenesis.pin detekt:tool/maven/io.gitlab.arturbosch.detekt/detekt-utils/pom 1.23.8 SHA-256/bdcbfdfeffb7cba9933a87d7565e7daf21c5feba6451cd9fdebed1b2d5d08dcc
  * @jenesis.pin detekt:tool/maven/org.jcommander/jcommander 1.85 SHA-256/fa7552d2831a2b20778d86851d093edca68fbc0a77f792b6223110e4fae67a70
+ * @jenesis.pin detekt:tool/maven/org.jcommander/jcommander/pom 1.85 SHA-256/e61401cfd1e4f20e2a4048872e45eeee7716a1d6f99f668a4777122dd2882c48
  * @jenesis.pin detekt:tool/maven/org.jetbrains.intellij.deps/trove4j 1.0.20200330 SHA-256/c5fd725bffab51846bf3c77db1383c60aaaebfe1b7fe2f00d23fe1b7df0a439d
+ * @jenesis.pin detekt:tool/maven/org.jetbrains.intellij.deps/trove4j/pom 1.0.20200330 SHA-256/87721cbaa65a3c97d8b1ba9d207840f164c9fe38759fc9ea10ffe26565f8d3e9
  * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable 2.0.21 SHA-256/9fa8cdd1de0dccffe154c997d423ec6b5f53cd6d9177e3a77a9b0de03fb1bc81
+ * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable/pom 2.0.21 SHA-256/bd4656a46ec418252e5bc5e1c20eb2029fb2a8e0e3cc94eeddfac7e87c8cd5b6
  * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-daemon-embeddable 2.0.21 SHA-256/b1a0a73c5022f8dd05a638c6b76b2bd7361818a1f3860ff2644133b1dd2bdb03
+ * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-daemon-embeddable/pom 2.0.21 SHA-256/8db67b40dd6025a2ed069294f2c9bcfb6b96db3159cfef76edd7841c266afbf0
  * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-reflect 1.6.10 SHA-256/3277ac102ae17aad10a55abec75ff5696c8d109790396434b496e75087854203
+ * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-reflect/pom 1.6.10 SHA-256/57905524274a00ae028aaccc27283f6bc5925a934a046c1cc5d06c8ee4d6d5a9
  * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-script-runtime 2.0.21 SHA-256/9c111f8d08ade455566272d561921adc2b2cb6b7a4ccee38d9829c5e3a1ca6a3
+ * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-script-runtime/pom 2.0.21 SHA-256/95b2e929afa1071bd952fd137b2e7e81d04fe1bbb81b757ebed06b216e5a4524
  * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-stdlib 2.0.21 SHA-256/f31cc53f105a7e48c093683bbd5437561d1233920513774b470805641bedbc09
  * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-stdlib-common 1.7.20 SHA-256/e0e91962bc0007338bf5b1739f62927ac32d14ba3d827fa608ab4e5351729d5d
+ * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-stdlib-common/pom 1.7.20 SHA-256/1862fe818a7e7bb8d0a7c031aea238b59d549453b10859ce07638c9f96ff4885
  * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-stdlib-jdk7 1.7.20 SHA-256/524da3c1a2ad56fd52c4ae2272ef3de421de8d2047ab1c51fc306d351243f2f5
+ * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-stdlib-jdk7/pom 1.7.20 SHA-256/3b91f670de0b0f4c78549a2f5e60b57548a33ab6416b1054ef63865d6c62ae95
  * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-stdlib-jdk8 1.7.20 SHA-256/1da0d306c995945e1f807240ef64b5cd2dd5ac58612afb1a8596143d10b7ded5
+ * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-stdlib-jdk8/pom 1.7.20 SHA-256/491ffbc948a3477491a7fbd43a368c5731cfafe6432af80783b2bbfe67e09fa7
+ * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlin/kotlin-stdlib/pom 2.0.21 SHA-256/fcbada4cd2e9f39658293570ef613752331db69fd1dad1cabaa60548403e17da
+ * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-bom/pom 1.6.4 SHA-256/ab2614855fba66aa8a42514dbe3d5a884315ffe1ed63f5932e710a8006245ce1
  * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm 1.6.4 SHA-256/c24c8bb27bb320c4a93871501a7e5e0c61607638907b197aef675513d4c820be
+ * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/pom 1.6.4 SHA-256/09d960f85922903c2e52e126b17e9fa5020b425c469ec61944b3c01835547224
  * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlinx/kotlinx-html-jvm 0.8.1 SHA-256/98bda1c78a5028a134ceb25b63f5c130c89349730d35fd47ef7490b6bf0b63b3
+ * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlinx/kotlinx-html-jvm/pom 0.8.1 SHA-256/a4a8317010c319a6c777176bef6319b32cc96e16b484394e26a2cbf8571ffd04
  * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlinx/kotlinx-serialization-core-jvm 1.4.1 SHA-256/eba7f1c854296e4ce1418fb01360f8f10c5683e7c45aa3472018417a067636f3
+ * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlinx/kotlinx-serialization-core-jvm/pom 1.4.1 SHA-256/6e522e0a863ead95d7f2732e00f6f45bf302ea32e09be88c64d060c07655f832
  * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlinx/kotlinx-serialization-json-jvm 1.4.1 SHA-256/af604c46737121d4225fdb60ef0e17766a3c94b7c1c9ef76b4e3a5c7733d557e
+ * @jenesis.pin detekt:tool/maven/org.jetbrains.kotlinx/kotlinx-serialization-json-jvm/pom 1.4.1 SHA-256/32d9347c710135fbe70a70192857bc73b06959962edecfff31926039be24b861
  * @jenesis.pin detekt:tool/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
+ * @jenesis.pin detekt:tool/maven/org.jetbrains/annotations/pom 13.0 SHA-256/965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397
  * @jenesis.pin detekt:tool/maven/org.snakeyaml/snakeyaml-engine 2.7 SHA-256/4053f878c171692aab8782f53a3974f43e55e2b6ed12c3682b36a46968c5ded1
+ * @jenesis.pin detekt:tool/maven/org.snakeyaml/snakeyaml-engine/pom 2.7 SHA-256/a52a6243f8615856791d1297f97374076bf81348061af714ad0963d375ae5cb7
  * @jenesis.pin kotlin.stdlib 1.9.10 SHA-256/55e989c512b80907799f854309f3bc7782c5b3d13932442d0379d5c472711504
- * @jenesis.pin kotlin/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
- * @jenesis.pin kotlin/module/build.jenesis.plugin.kotlin 0.1.0 SHA-256/8ae119271454d849d712d61b0166b5879f6c6493897beaa4d76b1aa5319545c6
+ * @jenesis.pin kotlin/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin kotlin/module/build.jenesis.plugin.kotlin 0.2.0 SHA-256/5976a9349da491c1edbe526734ba8856316ca746124fc872c4ae574f76f909fc
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-build-tools-api 2.4.0-RC2 SHA-256/ca5f829936a739cb90146359159a8ecdfe2f1a0ae21f8e2da5868b6413320a1d
+ * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-build-tools-api/pom 2.4.0-RC2 SHA-256/40f1954811bd0c6643a4fe959da42c881bf7f09a4fcd5107083995226e4378c9
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable 2.4.0-RC2 SHA-256/923181ab0d2dc773b36d526081567bd7755f06e26d32c0f8a6537a31cf0a0229
+ * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable/pom 2.4.0-RC2 SHA-256/13600ab0bc98fdc926bbf3672082dc14376b5b66c490767a7e001acdbe1643f8
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-daemon-embeddable 2.4.0-RC2 SHA-256/2fc1f1ee5f7fccda091bf34473c6cee44f131ea1b7da9f600a706fdc68716dba
+ * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-daemon-embeddable/pom 2.4.0-RC2 SHA-256/19dd1948449b0418d47139d8742716a763c6dfa3726aa728b3ec56a458e018be
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-reflect 1.6.10 SHA-256/3277ac102ae17aad10a55abec75ff5696c8d109790396434b496e75087854203
+ * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-reflect/pom 1.6.10 SHA-256/57905524274a00ae028aaccc27283f6bc5925a934a046c1cc5d06c8ee4d6d5a9
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-script-runtime 2.4.0-RC2 SHA-256/676934238966d037834d8285bfd7bd14c0c57f3b7ddd597f7ebd9e3c574a812f
+ * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-script-runtime/pom 2.4.0-RC2 SHA-256/3b2a64d3daeb7069ae033cc12188ee0b5ea2842cf78cebd3f4f24c99b2a8c771
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-stdlib 2.4.0-RC2 SHA-256/c67ed4aa99b5766e016f7c1a5d76424b67512cc8b6ca3a9f4ea97526bfee7a5e
+ * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-stdlib/pom 2.4.0-RC2 SHA-256/458715b80ad8497fcae7f3a434e69e32b2e2adba0ab3425e96d6fbbe545343f0
+ * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-bom/pom 1.8.0 SHA-256/1239e9dbe1397cd5971342956b2511bc3ace7b641842e4372a088dcfa8b9ad55
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm 1.8.0 SHA-256/9860906a1937490bf5f3b06d2f0e10ef451e65b95b269f22daf68a3d1f5065c5
+ * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/pom 1.8.0 SHA-256/a5633abd53467ceb91622d81f2e982080877145e0b76e1b75788715434885d0b
  * @jenesis.pin kotlin:tool/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
- * @jenesis.pin ktfmt/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
- * @jenesis.pin ktfmt/module/build.jenesis.plugin.ktfmt 0.1.0 SHA-256/ec73213860311e5bbecf2cf9ca79649be8f951e470dd1b36aa497cc67b906d65
+ * @jenesis.pin kotlin:tool/maven/org.jetbrains/annotations/pom 13.0 SHA-256/965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397
+ * @jenesis.pin ktfmt/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin ktfmt/module/build.jenesis.plugin.ktfmt 0.2.0 SHA-256/acc0e92844856057fdae0874c2673b410bda0e88284bebbbb2e4fbb4ce949ce6
  * @jenesis.pin ktfmt:tool/maven/com.facebook/ktfmt 0.64 SHA-256/7e4dbb5392b99fba5b5ccbe24a2eb4a6d88e419b97887520380c1f2550779b62
+ * @jenesis.pin ktfmt:tool/maven/com.facebook/ktfmt/pom 0.64 SHA-256/6797627da300dd341ffea2aab489e47d1b8aa4afbc20b0bba225f63bfded7d17
  * @jenesis.pin ktfmt:tool/maven/com.google.errorprone/error_prone_annotations 2.41.0 SHA-256/a56e782b5b50811ac204073a355a21d915a2107fce13ec711331ad036f660fcc
+ * @jenesis.pin ktfmt:tool/maven/com.google.errorprone/error_prone_annotations/pom 2.41.0 SHA-256/a151df1e2e0b48618d8b06a180748a29b3abb39b1b2396f6a1c879a727488c6e
+ * @jenesis.pin ktfmt:tool/maven/com.google.errorprone/error_prone_parent/pom 2.41.0 SHA-256/c538388d760a5c1c98dcf06f6ed3cfe5f11a651827db5cbd2ed8288c795cad42
  * @jenesis.pin ktfmt:tool/maven/com.google.googlejavaformat/google-java-format 1.23.0 SHA-256/f9c5f181faee5c7b380feb96c1a94bec0c55859baeb2d14e9a47d92d40bef021
+ * @jenesis.pin ktfmt:tool/maven/com.google.googlejavaformat/google-java-format-parent/pom 1.23.0 SHA-256/56091d29a0599cd00a9579ebcd3d1d9d185f5f76f4437df30f40b85fe2c852a4
+ * @jenesis.pin ktfmt:tool/maven/com.google.googlejavaformat/google-java-format/pom 1.23.0 SHA-256/df28c5bcd9ae2ec973177cbb5aa57b732276c98c5ed67f91ef93a37e61b5f6a0
  * @jenesis.pin ktfmt:tool/maven/com.google.guava/failureaccess 1.0.3 SHA-256/cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb
+ * @jenesis.pin ktfmt:tool/maven/com.google.guava/failureaccess/pom 1.0.3 SHA-256/c54beff37f6d42d43e14722d54a522c9ad51ef97fc5b79277e62a3ebf882f3bb
  * @jenesis.pin ktfmt:tool/maven/com.google.guava/guava 33.5.0-jre SHA-256/1e301f0c52ac248b0b14fdc3d12283c77252d4d6f48521d572e7d8c4c2cc4ac7
+ * @jenesis.pin ktfmt:tool/maven/com.google.guava/guava-parent/pom 26.0-android SHA-256/f8698ab46ca996ce889c1afc8ca4f25eb8ac6b034dc898d4583742360016cc04
+ * @jenesis.pin ktfmt:tool/maven/com.google.guava/guava-parent/pom 33.4.0-android SHA-256/7220ede61026596fbc720ee4b93246fa2d14f328058532b59ef053de397c7d83
+ * @jenesis.pin ktfmt:tool/maven/com.google.guava/guava-parent/pom 33.5.0-jre SHA-256/68719e687c6e4c9ff3e0fecbef7bd20896f0f4f7b314743ed33c72f962568215
+ * @jenesis.pin ktfmt:tool/maven/com.google.guava/guava/pom 33.5.0-jre SHA-256/0478fa78a908b3c31fe6d77be9978aaa621e2a181db84007e3d3b37424a2ac61
  * @jenesis.pin ktfmt:tool/maven/com.google.guava/listenablefuture 9999.0-empty-to-avoid-conflict-with-guava SHA-256/b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99
+ * @jenesis.pin ktfmt:tool/maven/com.google.guava/listenablefuture/pom 9999.0-empty-to-avoid-conflict-with-guava SHA-256/18d4b1db26153d4e55079ce1f76bb1fe05cdb862ef9954a88cbcc4ff38b8679b
  * @jenesis.pin ktfmt:tool/maven/com.google.j2objc/j2objc-annotations 3.1 SHA-256/84d3a150518485f8140ea99b8a985656749629f6433c92b80c75b36aba3b099b
+ * @jenesis.pin ktfmt:tool/maven/com.google.j2objc/j2objc-annotations/pom 3.1 SHA-256/14570838500034fc1b47c8205ce1c9d6b255c1ccdd2d1afdcdcbf75e89b24a33
  * @jenesis.pin ktfmt:tool/maven/net.java.dev.jna/jna 4.2.2 SHA-256/1f38af54e06c6e6f6dbf39ba2c052b952dea5dddb4871127b34639ddeb11bdbe
+ * @jenesis.pin ktfmt:tool/maven/net.java.dev.jna/jna/pom 4.2.2 SHA-256/abd66d98c9b3ddd82f9d79cafa4d661f41bbc595d2c81da7af3fc019109af7b7
  * @jenesis.pin ktfmt:tool/maven/org.ec4j.core/ec4j-core 1.2.0 SHA-256/7517c08e91ba0925f9470b21e538bc0feac48398fc650eb1bae8af7c92492117
+ * @jenesis.pin ktfmt:tool/maven/org.ec4j.core/ec4j-core-parent/pom 1.2.0 SHA-256/7b599ea029e118faf94e9846558330867cd2f0a0612f06b83aa0c22b1861b584
+ * @jenesis.pin ktfmt:tool/maven/org.ec4j.core/ec4j-core/pom 1.2.0 SHA-256/d9cbe9e89e889d6ee2b03e4df50e3b1cc21688a0d3de04fea24e656bd8f6434b
  * @jenesis.pin ktfmt:tool/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable 2.3.20 SHA-256/976f989d0b5f5d80e8e8a8ad4b73da0bfc27fdd965b9fa38362b2be79ecc1337
+ * @jenesis.pin ktfmt:tool/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable/pom 2.3.20 SHA-256/0c35aeee372f07514ebed37b9407b8e1181d1427755139e5cee7719ca05fe7e8
  * @jenesis.pin ktfmt:tool/maven/org.jetbrains.kotlin/kotlin-daemon-embeddable 2.3.20 SHA-256/8870bab840b8087c96c4ddc06088b4aedf5131c408af3674306304f1f96af3f4
+ * @jenesis.pin ktfmt:tool/maven/org.jetbrains.kotlin/kotlin-daemon-embeddable/pom 2.3.20 SHA-256/61540e5b3a32c0b11962449665924c6cd7554ea9aee0855bd8e4f5b7f610a0ab
  * @jenesis.pin ktfmt:tool/maven/org.jetbrains.kotlin/kotlin-reflect 1.6.10 SHA-256/3277ac102ae17aad10a55abec75ff5696c8d109790396434b496e75087854203
+ * @jenesis.pin ktfmt:tool/maven/org.jetbrains.kotlin/kotlin-reflect/pom 1.6.10 SHA-256/57905524274a00ae028aaccc27283f6bc5925a934a046c1cc5d06c8ee4d6d5a9
  * @jenesis.pin ktfmt:tool/maven/org.jetbrains.kotlin/kotlin-script-runtime 2.3.20 SHA-256/6fcdb7da6e65cf8cc43e5aabab94bdcc48825e7933686f8a1bf694eb88f8e00e
+ * @jenesis.pin ktfmt:tool/maven/org.jetbrains.kotlin/kotlin-script-runtime/pom 2.3.20 SHA-256/66099676703a081fd9ac43139665883e5c145020b640759de0539d8916ff247f
  * @jenesis.pin ktfmt:tool/maven/org.jetbrains.kotlin/kotlin-stdlib 2.3.20 SHA-256/0ae12504a5040ebaf37703908483420d1a5624dd1d93f357665f8c77c848a01e
+ * @jenesis.pin ktfmt:tool/maven/org.jetbrains.kotlin/kotlin-stdlib/pom 2.3.20 SHA-256/c83c02d9a7e2e954730491c33c2f1dc03c27662e27b566ec2b44d2d018639b98
+ * @jenesis.pin ktfmt:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-bom/pom 1.8.0 SHA-256/1239e9dbe1397cd5971342956b2511bc3ace7b641842e4372a088dcfa8b9ad55
  * @jenesis.pin ktfmt:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm 1.8.0 SHA-256/9860906a1937490bf5f3b06d2f0e10ef451e65b95b269f22daf68a3d1f5065c5
+ * @jenesis.pin ktfmt:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/pom 1.8.0 SHA-256/a5633abd53467ceb91622d81f2e982080877145e0b76e1b75788715434885d0b
  * @jenesis.pin ktfmt:tool/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
+ * @jenesis.pin ktfmt:tool/maven/org.jetbrains/annotations/pom 13.0 SHA-256/965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397
  * @jenesis.pin ktfmt:tool/maven/org.jspecify/jspecify 1.0.0 SHA-256/1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab
- * @jenesis.pin ktlint/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
- * @jenesis.pin ktlint/module/build.jenesis.plugin.ktlint 0.1.0 SHA-256/b4208e720454d8fc4f99073dfc62f8b7a448a99d7b64e7debfd454c324da8684
+ * @jenesis.pin ktfmt:tool/maven/org.jspecify/jspecify/pom 1.0.0 SHA-256/cdab929a3b95211f43d2090c5e2d0dfe8465960e378bc32b35841dab324433a6
+ * @jenesis.pin ktfmt:tool/maven/org.sonatype.oss/oss-parent/pom 9 SHA-256/fb40265f982548212ff82e362e59732b2187ec6f0d80182885c14ef1f982827a
+ * @jenesis.pin ktlint/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin ktlint/module/build.jenesis.plugin.ktlint 0.2.0 SHA-256/a9514b8d42f304cd9e36085f3a23bdfe7a0c31aa50bd0c281c972e5467046bde
  * @jenesis.pin ktlint:tool/maven/ch.qos.logback/logback-classic 1.3.16 SHA-256/3f63cbc593b91670f75890ab256aa47c123a9b125185939a272c720ca1417c2c
+ * @jenesis.pin ktlint:tool/maven/ch.qos.logback/logback-classic/pom 1.3.16 SHA-256/ce1b4f5896e3e5cc747e1673a6efc937544d429cf264ac445ea2ca89d76fb32c
  * @jenesis.pin ktlint:tool/maven/ch.qos.logback/logback-core 1.3.16 SHA-256/f153c7d582ad19219c906dd728df335232790663f5b3d2db187ac83d9e5a3b8b
+ * @jenesis.pin ktlint:tool/maven/ch.qos.logback/logback-core/pom 1.3.16 SHA-256/d6c710b1f4812bf5ea77fcbe228ce07bd1a2ee80306814d79bd93366b22e4153
+ * @jenesis.pin ktlint:tool/maven/ch.qos.logback/logback-parent/pom 1.3.16 SHA-256/8c4379286e75397fdce84170066a8670a94748ce2d8b99e90f5860fee7c27173
  * @jenesis.pin ktlint:tool/maven/com.github.ajalt.clikt/clikt-core-jvm 5.0.3 SHA-256/69cba94a2291f74b78c88239cd8b67eaf3f08e0dad297749abe6477b3e9b81b1
+ * @jenesis.pin ktlint:tool/maven/com.github.ajalt.clikt/clikt-core-jvm/pom 5.0.3 SHA-256/08fa428333156308bd28b63236287a3172152dcbbf71c831e0b3ac8623e5e171
  * @jenesis.pin ktlint:tool/maven/com.github.ajalt.clikt/clikt-jvm 5.0.3 SHA-256/9cd19e04782f461dffeb183d17e576984febb7934932cb406646ac41e428863b
+ * @jenesis.pin ktlint:tool/maven/com.github.ajalt.clikt/clikt-jvm/pom 5.0.3 SHA-256/09c01bb12d1fa17fe129ca1282f1e99a908011b183039a6d4fccf6b5c95a4e8b
  * @jenesis.pin ktlint:tool/maven/com.github.ajalt.colormath/colormath-jvm 3.6.0 SHA-256/59f741adfe62053066782d8b1a45afd06685a4bc64b33277e54876b993ed885c
+ * @jenesis.pin ktlint:tool/maven/com.github.ajalt.colormath/colormath-jvm/pom 3.6.0 SHA-256/f03c35d505110d0673345f4740e55bcd976a9a9fa5a1b13caa2ad398f3bc1e5d
  * @jenesis.pin ktlint:tool/maven/com.github.ajalt.mordant/mordant-core-jvm 3.0.1 SHA-256/9cf9b46d1f49f2d6cf2635462b29dc59e0c29b1fb2f085b3312888bbe9c7cd31
+ * @jenesis.pin ktlint:tool/maven/com.github.ajalt.mordant/mordant-core-jvm/pom 3.0.1 SHA-256/d5896de5e34a9d56ab2786398b260724b181f39cc0508cbb2a1f7e886cd25d87
  * @jenesis.pin ktlint:tool/maven/com.github.ajalt.mordant/mordant-jvm 3.0.1 SHA-256/9ed3b976fcccc78da746d49866fa8ebb8f10530a93c544ea0420259a607dd95e
  * @jenesis.pin ktlint:tool/maven/com.github.ajalt.mordant/mordant-jvm-ffm-jvm 3.0.1 SHA-256/2041c2f5f7b87095b115cb19155ee9257451854d08e5b8671165b43bc7e114cf
+ * @jenesis.pin ktlint:tool/maven/com.github.ajalt.mordant/mordant-jvm-ffm-jvm/pom 3.0.1 SHA-256/6b36e7661ad828de03a28992d8ae96256ceadf3fda128f8ec489a8d65bbbac53
  * @jenesis.pin ktlint:tool/maven/com.github.ajalt.mordant/mordant-jvm-graal-ffi-jvm 3.0.1 SHA-256/6dd4bebc164aeacddacc8f98e8f871e00fd21ce7bc2eb0d18230ea83bddfc86a
+ * @jenesis.pin ktlint:tool/maven/com.github.ajalt.mordant/mordant-jvm-graal-ffi-jvm/pom 3.0.1 SHA-256/0a6f792f1c936095f8746991d64da8b3ff8409acde3948abe5de2fd56888783a
  * @jenesis.pin ktlint:tool/maven/com.github.ajalt.mordant/mordant-jvm-jna-jvm 3.0.1 SHA-256/41063442c8891b2774536a9b87a5062a7fd20e6f1949974c6da72f49472d6f4d
+ * @jenesis.pin ktlint:tool/maven/com.github.ajalt.mordant/mordant-jvm-jna-jvm/pom 3.0.1 SHA-256/fe15a8c64b47e07f2f99d883286e4efb14746245658746b2550f6f9688645f80
+ * @jenesis.pin ktlint:tool/maven/com.github.ajalt.mordant/mordant-jvm/pom 3.0.1 SHA-256/b009da4c37db8e1736b8482b44f209d82771ff1c8d3bdf946eb684d3b9ce9965
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli 1.8.0 SHA-256/eb540f5ad442ba0b3392c7947c87929dab709ac056fdde7e300beaffcb86e243
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-baseline 1.8.0 SHA-256/be11607d9cebcc1456ab6ccb2578484c0f63c0288ad0fff278813d7251b8f6ed
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-baseline/pom 1.8.0 SHA-256/28af4bad0337acdba02e7682c218fa1fd3c2293abc054d0b319877821cd0ca58
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-checkstyle 1.8.0 SHA-256/c8c0789cf5e146d9bf8f57b1e8d1af928f1eac5653a4fbc0ccfcbe5d7906e427
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-checkstyle/pom 1.8.0 SHA-256/95b7ea0c0724310cc2421871e51cb0a76a63f40d4df7318a002867efe04312ca
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-core 1.8.0 SHA-256/554d980c1e8b0afd6404dcc77e6022e0466273d1300fda5a6d25a85759cbafaa
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-core/pom 1.8.0 SHA-256/1aeb0b3d4a6360e8302137a31b07dc4552be38f4a66aa0e7ad3975fd85639a81
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-format 1.8.0 SHA-256/0f6639379e3341ffea2ca6aff2b72e904e778cdcba31f885edb412270e591bb8
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-format/pom 1.8.0 SHA-256/48b7b361a66f77b08f3a3f0e0164994530ed82519a703d7ca2f84848d4f13f2f
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-html 1.8.0 SHA-256/9c45e72d24ae81b2b1c028fcf95c8d8f914a050fcf6029e2d4c2cd9c55340d72
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-html/pom 1.8.0 SHA-256/be3902538f6c77caf298f2a046603b4faf043ff872c7df67f32b55368c973110
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-json 1.8.0 SHA-256/115db6ad3a6eb18b33bb44a0f7b8dc7639b429ba1fa4fc39863d163a3003efb5
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-json/pom 1.8.0 SHA-256/86e9f1a53d73d73c86932c0228cd804797c0d5cfca719a4a50821985678d763f
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-plain 1.8.0 SHA-256/05bd03b465fe6bfe885777adf8c251bfe6ddc004086dbfcdfacb0061936b111d
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-plain-summary 1.8.0 SHA-256/003eb83d33467f43bf32b6cb7390d387a823301344fd0705750f9cf4fa42fb28
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-plain-summary/pom 1.8.0 SHA-256/c69859289478e00b5b4c1424e02d31a85f2b78305716113e494f2f80ae15e268
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-plain/pom 1.8.0 SHA-256/6b041349d486513c7d872065689b1238e4c54cdd2f8aee294a769cc11a3c13f7
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-sarif 1.8.0 SHA-256/8dd41428e258947f9731e7c14f80b795b7d19321c3b4f8eac7549dc335824f35
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-reporter-sarif/pom 1.8.0 SHA-256/f54790496035867a1f1a19b062ee4a54f9c8dfab11edb0a16f80007a16dd860b
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-ruleset-core 1.8.0 SHA-256/3cde07dd36b3d2b0ad9bf6320a15d74a1d16999361a2943ec89a77035f88cef8
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli-ruleset-core/pom 1.8.0 SHA-256/098563d4ba79ab5868f5a11c4bfaed3cc8f1f3ed808110b663c9c7c6e128e705
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-cli/pom 1.8.0 SHA-256/8ef948a60ef1441e6ecc5928c216685b70cb8dd79eb897372289db0b9e36cf09
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-logger 1.8.0 SHA-256/323a2587bc5d658acac2ab84081be1a91ec272447ddae23e889ffeeea03a6a19
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-logger/pom 1.8.0 SHA-256/b0cb9da9dce8dffc0eb78d82d895961b6516f833d8123671946e93e0aa84194b
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-rule-engine 1.8.0 SHA-256/26b2bc7b840dad219d56a276f11fe4a39c35e567a061d719a50914b30f403772
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-rule-engine-core 1.8.0 SHA-256/bd99dbc888be66aea31db45f4dce5ca56f465afbf02fee639bd2346d2cd864ec
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-rule-engine-core/pom 1.8.0 SHA-256/e132020f6c3205fa3ddf17dd572bb5de0002e1de3085f5770fec3db2f5bb5ee4
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-rule-engine/pom 1.8.0 SHA-256/1b15fbb3cf02d8dddb6e2a1a75b85d81335fa2651a6c54a71a4a1eee7ce54ade
  * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-ruleset-standard 1.8.0 SHA-256/82972b4cb2e9cd682840061b2de9d342044846f0d816ecc58f50958824760d69
+ * @jenesis.pin ktlint:tool/maven/com.pinterest.ktlint/ktlint-ruleset-standard/pom 1.8.0 SHA-256/6bf5b99e59c08f1841622661824201e4805891a5c8c69fc407cf4a3e68080eeb
  * @jenesis.pin ktlint:tool/maven/dev.drewhamilton.poko/poko-annotations-jvm 0.20.1 SHA-256/173fc443f30b8185295c9c9b9401272be84f553e5835e3767c7daafe5be606c9
+ * @jenesis.pin ktlint:tool/maven/dev.drewhamilton.poko/poko-annotations-jvm/pom 0.20.1 SHA-256/eef578f5793b9c8f103b232beeca259316eb0f3abfdc46a40026aca2dd30ed21
  * @jenesis.pin ktlint:tool/maven/io.github.detekt.sarif4k/sarif4k-jvm 0.6.0 SHA-256/b3ac96dd97acba8318dbe26f6a432d6c6db91c46c780805e8928b8103e5763dc
+ * @jenesis.pin ktlint:tool/maven/io.github.detekt.sarif4k/sarif4k-jvm/pom 0.6.0 SHA-256/8b90fc3745f008f510886ce707539f6bb71bbdd1b7c9db8fd1db0ae566a1c0af
  * @jenesis.pin ktlint:tool/maven/io.github.oshai/kotlin-logging-jvm 7.0.13 SHA-256/c373f7f4c9efc85c4f70f11519f2a1b7878bc0ed75a325364d034af3fa21f776
+ * @jenesis.pin ktlint:tool/maven/io.github.oshai/kotlin-logging-jvm/pom 7.0.13 SHA-256/d8adba1021851c4797139ae0d27736131547ef63001881838d21b159e2811d21
  * @jenesis.pin ktlint:tool/maven/net.java.dev.jna/jna 5.14.0 SHA-256/34ed1e1f27fa896bca50dbc4e99cf3732967cec387a7a0d5e3486c09673fe8c6
+ * @jenesis.pin ktlint:tool/maven/net.java.dev.jna/jna/pom 5.14.0 SHA-256/e04e25951501df25adc7b1dcdb6c53373c94897b84d3e14921292763ee07ae3d
  * @jenesis.pin ktlint:tool/maven/org.ec4j.core/ec4j-core 1.1.1 SHA-256/d73dee44fefb725dfc658267465fe5a768a666313d8acd701209f5836f1431d8
+ * @jenesis.pin ktlint:tool/maven/org.ec4j.core/ec4j-core-parent/pom 1.1.1 SHA-256/21ddde91eb897c03775c1015320767e260968ee1919ba6b8a9802e2ba197d953
+ * @jenesis.pin ktlint:tool/maven/org.ec4j.core/ec4j-core/pom 1.1.1 SHA-256/9acd3bb3c0689e6095698bf66e64312646917880adff61d3492810126129b93a
  * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable 2.2.21 SHA-256/9588fa696ac5507af764fd5660df6894185e12704ec1bc3f5cb772af4987f295
+ * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable/pom 2.2.21 SHA-256/0b33c64f2622ba3bc8283378bdb7505f2be330a2275807038ad54359b33ddf9b
  * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-daemon-embeddable 2.2.21 SHA-256/91c0673c22e44b054ae0314d323860ebe1f3aff3f0ebc74fff82c4733dde09be
+ * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-daemon-embeddable/pom 2.2.21 SHA-256/170bdbecba57ff00a2b8d17ef2c79e08b85f67df69d853ba0a259a4183bfb923
  * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-reflect 1.6.10 SHA-256/3277ac102ae17aad10a55abec75ff5696c8d109790396434b496e75087854203
+ * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-reflect/pom 1.6.10 SHA-256/57905524274a00ae028aaccc27283f6bc5925a934a046c1cc5d06c8ee4d6d5a9
  * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-script-runtime 2.2.21 SHA-256/2b1519b427b514d1536c1b425674b03fe914af637924028e9959c6625442df51
+ * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-script-runtime/pom 2.2.21 SHA-256/8767a540fc5dbe20b7e1283a95f510297e6c0c98b2eac2edc4d0612a2d0f2eaf
  * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-stdlib 2.2.21 SHA-256/6558a3d233da56a20934b32159f9db5f86ed5816ef098f78a2c223dc6abb79dd
  * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-stdlib-common 1.7.20 SHA-256/e0e91962bc0007338bf5b1739f62927ac32d14ba3d827fa608ab4e5351729d5d
+ * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-stdlib-common/pom 1.7.20 SHA-256/1862fe818a7e7bb8d0a7c031aea238b59d549453b10859ce07638c9f96ff4885
  * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-stdlib-jdk7 1.7.20 SHA-256/524da3c1a2ad56fd52c4ae2272ef3de421de8d2047ab1c51fc306d351243f2f5
+ * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-stdlib-jdk7/pom 1.7.20 SHA-256/3b91f670de0b0f4c78549a2f5e60b57548a33ab6416b1054ef63865d6c62ae95
  * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-stdlib-jdk8 1.7.20 SHA-256/1da0d306c995945e1f807240ef64b5cd2dd5ac58612afb1a8596143d10b7ded5
+ * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-stdlib-jdk8/pom 1.7.20 SHA-256/491ffbc948a3477491a7fbd43a368c5731cfafe6432af80783b2bbfe67e09fa7
+ * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlin/kotlin-stdlib/pom 2.2.21 SHA-256/cf31f923196c63aedecd0a57c24269bd3702a4e47c0bf0bd64b5ada5de522272
+ * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-bom/pom 1.8.0 SHA-256/1239e9dbe1397cd5971342956b2511bc3ace7b641842e4372a088dcfa8b9ad55
  * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm 1.8.0 SHA-256/9860906a1937490bf5f3b06d2f0e10ef451e65b95b269f22daf68a3d1f5065c5
+ * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/pom 1.8.0 SHA-256/a5633abd53467ceb91622d81f2e982080877145e0b76e1b75788715434885d0b
  * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlinx/kotlinx-serialization-core-jvm 1.4.1 SHA-256/eba7f1c854296e4ce1418fb01360f8f10c5683e7c45aa3472018417a067636f3
+ * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlinx/kotlinx-serialization-core-jvm/pom 1.4.1 SHA-256/6e522e0a863ead95d7f2732e00f6f45bf302ea32e09be88c64d060c07655f832
  * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlinx/kotlinx-serialization-json-jvm 1.4.1 SHA-256/af604c46737121d4225fdb60ef0e17766a3c94b7c1c9ef76b4e3a5c7733d557e
+ * @jenesis.pin ktlint:tool/maven/org.jetbrains.kotlinx/kotlinx-serialization-json-jvm/pom 1.4.1 SHA-256/32d9347c710135fbe70a70192857bc73b06959962edecfff31926039be24b861
  * @jenesis.pin ktlint:tool/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
+ * @jenesis.pin ktlint:tool/maven/org.jetbrains/annotations/pom 13.0 SHA-256/965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397
  * @jenesis.pin ktlint:tool/maven/org.slf4j/slf4j-api 2.0.7 SHA-256/5d6298b93a1905c32cda6478808ac14c2d4a47e91535e53c41f7feeb85d946f4
+ * @jenesis.pin ktlint:tool/maven/org.slf4j/slf4j-api/pom 2.0.7 SHA-256/2d403ccf0e0a02d5c1a8667b0e2a33c8dfc6038ab287b9671dd681c205267981
+ * @jenesis.pin ktlint:tool/maven/org.slf4j/slf4j-parent/pom 2.0.7 SHA-256/c182bb36cd3af1c93c1603cdfefe7889157db30ba8b584f4a44535fcd22e45e7
  * @jenesis.pin maven/org.jetbrains.kotlin/kotlin-stdlib-common/pom 1.9.10 SHA-256/7d4b70547910676b3bdfc8925a88f3b6bfb24582c9784542805544ceef490a92
  * @jenesis.pin maven/org.jetbrains.kotlin/kotlin-stdlib/pom 1.9.10 SHA-256/7e29fbf73fdf71e0679d3dee7e680fd573464fa01644a4f58ab819d2c088d3d2
  * @jenesis.pin maven/org.jetbrains/annotations/pom 13.0 SHA-256/965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397
