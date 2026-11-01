@@ -1623,8 +1623,9 @@ public record Project(
                           java-version as the CLI names them
                       Spotless eclipse().configFile(...), formatter-maven-plugin (net.revelc)
                           configFile -> eclipse.properties with configuration=<the profile Eclipse
-                          exports, relative to it>, or an eclipse-formatter.xml alone (37); Spotless's importOrder and the
-                          formatter plugin's import and cache settings have no counterpart
+                          exports, relative to it>, or an eclipse-formatter.xml alone (37); Spotless's importOrder is a
+                          step of spotless.properties, and the formatter plugin's import and cache
+                          settings have no counterpart
                       rewrite-maven-plugin / org.openrewrite.rewrite -> rewrite.yml in
                           build.jenesis/ (37), or an openrewrite.properties with
                           configuration=<path of rewrite.yml, relative to it>, which runs
@@ -1911,8 +1912,15 @@ public record Project(
                           project.tag and project.tree, which the POM and SBOM record and a
                           plugin reads as scm.revision, scm.tag and scm.tree of the
                           metadata.properties its hook point is handed
-                      Spotless beyond formatting Java, Kotlin and Scala and a license header,
-                          as misc, markdown or kotlinGradle -> none
+                      Spotless json(), yaml(), markdown(), format(...) and the steps beside a Java
+                          formatter (trimTrailingWhitespace, endWithNewline, leadingTabsToSpaces,
+                          leadingSpacesToTabs, replaceRegex, importOrder, removeUnusedImports,
+                          formatAnnotations) -> spotless.properties, one set per format:
+                          <set>.target=<glob>[,...], <set>.steps=<step>[,...] and
+                          <set>.<step>.<option>=<value>, with jacksonJson, jacksonYaml and flexmark for
+                          JSON, YAML and Markdown; googleJavaFormat and palantirJavaFormat run there as
+                          well, as the one Java formatter; a step run by npm or a native program,
+                          kotlinGradle and groovy -> none
                       maven-bundle-plugin, bnd / biz.aQute.bnd, an OSGi manifest -> none; a pom.xml
                           of packaging bundle builds a jar, whose headers a MANIFEST.MF among the
                           resources or a plugin at binary/transform supplies, which is handed the
@@ -2452,14 +2460,16 @@ public record Project(
                     group, where @jenesis.pin checkstyle:tool/maven/<groupId>/<artifactId> <version>
                     pins it.
 
-                    The formatters verify a module's sources and fail the build on a source they would
-                    change; -Djenesis.format.rewrite=true lets them rewrite it instead. A
+                    The formatters verify a module's sources and resources and fail the build on a file
+                    they would change; -Djenesis.format.rewrite=true lets them rewrite it instead. A
                     googlejavaformat.properties, palantir.properties, princeofspace.properties or
                     eclipse.properties switches on that Java formatter, refused beside another, a
                     ktlint.properties ktlint, a ktfmt.properties ktfmt, a scalafmt.properties scalafmt,
-                    and a licenseheader.properties the header every source starts with; without the
-                    properties of ktlint or scalafmt, an .editorconfig or .scalafmt.conf of a
-                    configuration folder activates it. An openrewrite.properties runs every OpenRewrite
+                    a spotless.properties the Spotless steps each of its sets names for the files the set
+                    selects, counted as a Java formatter where a set runs googleJavaFormat or
+                    palantirJavaFormat, and a licenseheader.properties the header every source starts
+                    with; without the properties of ktlint or scalafmt, an .editorconfig or
+                    .scalafmt.conf of a configuration folder activates it. An openrewrite.properties runs every OpenRewrite
                     recipe of the rewrite.yml it names as configuration=, or the recipes it names as
                     recipes=<recipe>[,...], and without one a rewrite.yml of a configuration folder
                     runs its recipes, before the Java
@@ -4876,6 +4886,7 @@ public record Project(
                 format.openrewrite|true|OpenRewrite, activated by an openrewrite.properties naming a rewrite.yml as configuration=, whose recipes it runs, or recipes as recipes=, or, where none is found, by a rewrite.yml of a configuration folder; it runs before the Java formatter and reads the module's dependencies
                 format.googlejavaformat|true|google-java-format, activated by a googlejavaformat.properties whose lines are its options; refused beside another Java formatter
                 format.palantir|true|palantir-java-format, activated by a palantir.properties whose lines are its options; refused beside another Java formatter
+                format.spotless|true|Spotless, activated by a spotless.properties naming sets of files of a module's sources and resources and the Spotless steps each set runs; a set running googleJavaFormat or palantirJavaFormat is refused beside another Java formatter
                 format.princeofspace|true|The Prince of Space formatter, activated by a princeofspace.properties whose lines are its options; refused beside another Java formatter
                 format.eclipse|true|The Eclipse formatter, activated by an eclipse.properties, which may name the profile Eclipse exports as configuration=, or, where none is found, by an eclipse-formatter.xml of a configuration folder; refused beside another Java formatter
                 format.ktlint|true|ktlint formatting the Kotlin sources, activated by what activates its linting; false leaves the formatting out while ktlint still lints, as where ktfmt formats them

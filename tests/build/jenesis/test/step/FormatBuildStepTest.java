@@ -68,6 +68,19 @@ public class FormatBuildStepTest {
     }
 
     @Test
+    public void verifies_the_resources_of_a_module_beside_its_sources() throws IOException {
+        Path resources = Files.createDirectories(sources.getParent().resolve(BuildStep.RESOURCES));
+        Files.writeString(resources.resolve("settings.json"), "{}");
+        verify();
+        Files.writeString(resources.resolve("settings.json"), "{ }");
+        verify();
+
+        assertThat(VERIFIED)
+                .as("a resource is verified with the sources, and again only once it changed")
+                .containsExactly(List.of("settings.json", "A.java", "B.java"), List.of("settings.json"));
+    }
+
+    @Test
     public void an_unformatted_edit_keeps_failing_while_another_source_changes() throws IOException {
         verify();
         Files.writeString(sources.resolve("A.java"), "class A { unformatted }");
@@ -146,7 +159,7 @@ public class FormatBuildStepTest {
 
         @Override
         protected boolean isFormattable(Path file) {
-            return file.toString().endsWith(".java");
+            return file.toString().endsWith(".java") || file.toString().endsWith(".json");
         }
 
         @Override
