@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.fail;
 
 public class MavenProjectTest {
 
-    private static final Environment UNIFIED = new Environment(Map.of("maven.unified", "true"));
+    private static final Environment APART = new Environment(Map.of("maven.unified", "false"));
 
     @TempDir
     private Path project, build, repository;
@@ -415,8 +415,8 @@ public class MavenProjectTest {
     }
 
     @Test
-    public void by_default_the_main_class_paths_are_resolved_without_the_test_dependencies() throws IOException {
-        SequencedMap<String, Path> results = scopedProject(Environment.NONE, "", "a:1:compile", "t:1:test")
+    public void apart_the_main_class_paths_are_resolved_without_the_test_dependencies() throws IOException {
+        SequencedMap<String, Path> results = scopedProject(APART, "", "a:1:compile", "t:1:test")
                 .execute(Runnable::run).toCompletableFuture().join();
         assertThat(classPath(results, "module-", "compile"))
                 .as("the main classes compile with the versions a consumer of the published POM resolves")
@@ -431,9 +431,9 @@ public class MavenProjectTest {
     }
 
     @Test
-    public void by_default_a_runtime_dependency_of_a_main_dependency_is_left_off_the_main_compile_class_path()
+    public void apart_a_runtime_dependency_of_a_main_dependency_is_left_off_the_main_compile_class_path()
             throws IOException {
-        SequencedMap<String, Path> results = scopedProject(Environment.NONE, "", "d:1:compile")
+        SequencedMap<String, Path> results = scopedProject(APART, "", "d:1:compile")
                 .execute(Runnable::run).toCompletableFuture().join();
         assertThat(classPath(results, "module-", "compile"))
                 .as("a dependency's runtime dependencies are not needed to compile against it, as in Maven and Gradle")
@@ -442,9 +442,9 @@ public class MavenProjectTest {
     }
 
     @Test
-    public void by_default_a_dependency_declared_for_the_tests_stays_on_the_main_class_paths_where_a_main_dependency_needs_it()
+    public void apart_a_dependency_declared_for_the_tests_stays_on_the_main_class_paths_where_a_main_dependency_needs_it()
             throws IOException {
-        SequencedMap<String, Path> results = scopedProject(Environment.NONE, "", "a:1:compile", "c:2:test")
+        SequencedMap<String, Path> results = scopedProject(APART, "", "a:1:compile", "c:2:test")
                 .execute(Runnable::run).toCompletableFuture().join();
         assertThat(classPath(results, "module-", "compile"))
                 .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/1");
@@ -454,8 +454,8 @@ public class MavenProjectTest {
     }
 
     @Test
-    public void by_default_a_runtime_dependency_decides_the_versions_of_the_runtime_class_path_alone() throws IOException {
-        SequencedMap<String, Path> results = scopedProject(Environment.NONE, "", "a:1:compile", "r:1:runtime")
+    public void apart_a_runtime_dependency_decides_the_versions_of_the_runtime_class_path_alone() throws IOException {
+        SequencedMap<String, Path> results = scopedProject(APART, "", "a:1:compile", "r:1:runtime")
                 .execute(Runnable::run).toCompletableFuture().join();
         assertThat(classPath(results, "module-", "compile"))
                 .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/1");
@@ -466,7 +466,7 @@ public class MavenProjectTest {
     @Test
     public void as_one_graph_a_test_dependency_nearer_to_the_project_selects_the_version_the_main_classes_compile_and_run_with()
             throws IOException {
-        SequencedMap<String, Path> results = scopedProject(UNIFIED, "", "a:1:compile", "t:1:test")
+        SequencedMap<String, Path> results = scopedProject(Environment.NONE, "", "a:1:compile", "t:1:test")
                 .execute(Runnable::run).toCompletableFuture().join();
         assertThat(classPath(results, "module-", "compile"))
                 .as("Maven resolves the main and the test dependencies as one graph, where c/2 is nearer")
@@ -479,7 +479,7 @@ public class MavenProjectTest {
     @Test
     public void as_one_graph_a_dependency_declared_for_the_tests_leaves_the_main_class_path_even_where_a_main_dependency_needs_it()
             throws IOException {
-        SequencedMap<String, Path> results = scopedProject(UNIFIED, "", "a:1:compile", "c:2:test")
+        SequencedMap<String, Path> results = scopedProject(Environment.NONE, "", "a:1:compile", "c:2:test")
                 .execute(Runnable::run).toCompletableFuture().join();
         assertThat(classPath(results, "module-", "compile"))
                 .as("a declared dependency keeps the scope it is declared in, as Maven's does")
@@ -491,7 +491,7 @@ public class MavenProjectTest {
 
     @Test
     public void as_one_graph_a_runtime_dependency_selects_the_version_the_main_classes_compile_against() throws IOException {
-        SequencedMap<String, Path> results = scopedProject(UNIFIED, "", "a:1:compile", "r:1:runtime")
+        SequencedMap<String, Path> results = scopedProject(Environment.NONE, "", "a:1:compile", "r:1:runtime")
                 .execute(Runnable::run).toCompletableFuture().join();
         assertThat(classPath(results, "module-", "compile"))
                 .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/2");
@@ -501,7 +501,7 @@ public class MavenProjectTest {
 
     @Test
     public void as_one_graph_a_test_dependency_declared_first_wins_a_conflict_of_equal_depth() throws IOException {
-        SequencedMap<String, Path> results = scopedProject(UNIFIED, "", "t:1:test", "x:1:compile")
+        SequencedMap<String, Path> results = scopedProject(Environment.NONE, "", "t:1:test", "x:1:compile")
                 .execute(Runnable::run).toCompletableFuture().join();
         assertThat(classPath(results, "module-", "compile"))
                 .containsExactlyInAnyOrder("org.example/x/1", "org.example/c/2");
@@ -509,7 +509,7 @@ public class MavenProjectTest {
 
     @Test
     public void as_one_graph_a_compile_dependency_declared_first_wins_a_conflict_of_equal_depth() throws IOException {
-        SequencedMap<String, Path> results = scopedProject(UNIFIED, "", "x:1:compile", "t:1:test")
+        SequencedMap<String, Path> results = scopedProject(Environment.NONE, "", "x:1:compile", "t:1:test")
                 .execute(Runnable::run).toCompletableFuture().join();
         assertThat(classPath(results, "module-", "compile"))
                 .containsExactlyInAnyOrder("org.example/x/1", "org.example/c/1");
@@ -518,7 +518,7 @@ public class MavenProjectTest {
 
     @Test
     public void as_one_graph_a_runtime_dependency_of_a_main_dependency_is_left_off_the_main_compile_class_path() throws IOException {
-        SequencedMap<String, Path> results = scopedProject(UNIFIED, "", "d:1:compile")
+        SequencedMap<String, Path> results = scopedProject(Environment.NONE, "", "d:1:compile")
                 .execute(Runnable::run).toCompletableFuture().join();
         assertThat(classPath(results, "module-", "compile")).containsExactly("org.example/d/1");
         assertThat(classPath(results, "module-", "runtime")).containsExactlyInAnyOrder("org.example/d/1", "org.example/e/1");
@@ -544,7 +544,7 @@ public class MavenProjectTest {
                     </dependencies>
                 </project>
                 """);
-        SequencedMap<String, Path> results = scopedProject(UNIFIED, """
+        SequencedMap<String, Path> results = scopedProject(Environment.NONE, """
                         <parent>
                             <groupId>org.example</groupId>
                             <artifactId>parent</artifactId>
@@ -610,7 +610,9 @@ public class MavenProjectTest {
             Files.writeString(Files.createDirectories(folder.resolve("src/main/java/" + module.getKey())).resolve("Sample.java"),
                     "package " + module.getKey() + "; public class Sample { }");
         }
-        SequencedMap<String, Path> results = scopedBuild(UNIFIED).execute(Runnable::run).toCompletableFuture().join();
+        SequencedMap<String, Path> results = scopedBuild(Environment.NONE).execute(Runnable::run)
+                .toCompletableFuture()
+                .join();
         assertThat(classPath(results, "module-lib", "compile"))
                 .as("the sibling's own main class path is decided with its test dependencies")
                 .containsExactlyInAnyOrder("org.example/a/1", "org.example/b/1", "org.example/c/2");
