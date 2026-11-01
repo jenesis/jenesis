@@ -1689,6 +1689,9 @@ public record Project(
                           goal's bundle rules / jacocoTestCoverageVerification -> minimum.<counter>
                           (a covered ratio) and maximum.missed.<counter> in it,
                           which fail the build
+                      async-profiler as an -agentpath of surefire's argLine / a test task's
+                          jvmArgs -> asyncprofiler.properties, its options one per line, as
+                          event=cpu or threads, profiling the tests' JVM (41)
                       pitest-maven / info.solidsoft.pitest -> pitest.properties (42)
                       jmh-maven-plugin / me.champeau.jmh -> @jenesis.plugin and @jenesis.main (43)
                       jcstress (a shaded jar run by org.openjdk.jcstress.Main) -> jcstress-core as a
