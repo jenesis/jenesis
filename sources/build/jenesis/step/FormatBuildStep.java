@@ -46,14 +46,6 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
     }
 
     @Override
-    public boolean acceptableExitCode(int code,
-                                      Executor executor,
-                                      BuildStepContext context,
-                                      SequencedMap<String, BuildStepArgument> arguments) {
-        return !verify || code == 0;
-    }
-
-    @Override
     protected CompletionStage<List<String>> process(Executor executor,
                                                     BuildStepContext context,
                                                     SequencedMap<String, BuildStepArgument> arguments,
