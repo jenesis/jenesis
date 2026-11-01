@@ -12,11 +12,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Route Maven Central through the repository variable MAVEN_REPOSITORY_URI when set
-# (the Google Cloud mirror of Central, to avoid Central rate-limiting the runners),
-# falling back to Central itself so an unset variable never becomes an empty URI.
+# Fetch Maven Central from its Google Cloud mirror, which spares the runners Central's rate limit,
+# and from Central itself for what the mirror has not synced yet: a remote is asked only where
+# the one before it answers 404.
 env:
-  MAVEN_REPOSITORY_URI: ${{ vars.MAVEN_REPOSITORY_URI || 'https://repo1.maven.org/maven2/' }}
+  MAVEN_REPOSITORY_URI: https://maven-central.storage-download.googleapis.com/maven2/,https://repo1.maven.org/maven2/
 
 jobs:
   # The demos run on every operating system, one call of demos.yml each - see the note there.

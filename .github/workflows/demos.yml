@@ -12,9 +12,9 @@ on:
         required: true
         type: string
 
-# A called workflow does not inherit the caller's environment, so the mirror is routed here as well.
+# A called workflow does not inherit the caller's environment, so the remotes are named here as well.
 env:
-  MAVEN_REPOSITORY_URI: ${{ vars.MAVEN_REPOSITORY_URI || 'https://repo1.maven.org/maven2/' }}
+  MAVEN_REPOSITORY_URI: https://maven-central.storage-download.googleapis.com/maven2/,https://repo1.maven.org/maven2/
 
 jobs:
   demo:
