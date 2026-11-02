@@ -43,6 +43,16 @@ public final class Jdk {
         return ModuleLayer.boot();
     }
 
+    public static boolean unregistered(Throwable throwable) {
+        String name = throwable.getClass().getName();
+        return Make.image() && (name.startsWith("org.graalvm.nativeimage.Missing")
+                || name.equals("com.oracle.svm.core.jdk.UnsupportedFeatureError"));
+    }
+
+    public static Properties compiled() {
+        return Compiled.PLUGINS;
+    }
+
     public static Runtime.Version version(Path home) {
         Map<String, String> release = release(home);
         String value = release.getOrDefault("JAVA_RUNTIME_VERSION", release.get("JAVA_VERSION"));
@@ -91,6 +101,21 @@ public final class Jdk {
         private static final Runtime.Version VERSION = version(home());
         private static final String JAVA_VERSION = value(RELEASE, "JAVA_VERSION");
         private static final Set<String> MODULES = Set.of(value(RELEASE, "MODULES").split("\\s+"));
+    }
+
+    private static final class Compiled {
+
+        private static final Properties PLUGINS = new Properties();
+
+        static {
+            try (InputStream input = Jdk.class.getClassLoader().getResourceAsStream(Make.PLUGINS)) {
+                if (input != null) {
+                    PLUGINS.load(new InputStreamReader(input, StandardCharsets.UTF_8));
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
     }
 
     private static final class Running {
