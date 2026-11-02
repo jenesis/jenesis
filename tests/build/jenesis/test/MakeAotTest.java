@@ -180,7 +180,7 @@ public class MakeAotTest {
         assertThatThrownBy(() -> new Make("build.jenesis.Project", settings("make.mode", "cached")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("jenesis.make.mode")
-                .hasMessageContaining("source, compiled, aot or daemon");
+                .hasMessageContaining("source, compiled, aot, native or daemon");
     }
 
     @Test
