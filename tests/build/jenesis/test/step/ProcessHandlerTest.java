@@ -14,6 +14,28 @@ public class ProcessHandlerTest {
     private Path root;
 
     @Test
+    public void hands_a_forked_jdk_tool_the_trust_and_proxy_settings_it_would_see_in_process() {
+        String trustStore = System.getProperty("javax.net.ssl.trustStore"),
+                password = System.getProperty("javax.net.ssl.trustStorePassword");
+        System.setProperty("javax.net.ssl.trustStore", root.resolve("cacerts").toString());
+        System.setProperty("javax.net.ssl.trustStorePassword", "secret");
+        try {
+            List<String> commands = ProcessHandler.Factory.FORK.apply("javadoc", "bin/javadoc")
+                    .apply(List.of("-version"))
+                    .commands();
+            assertThat(commands)
+                    .as("a JDK tool running in process reads the trust store of the JVM, so a forked one is handed it")
+                    .contains("-J-Djavax.net.ssl.trustStore=" + root.resolve("cacerts"))
+                    .as("a password would be written to the command line the build records")
+                    .noneMatch(command -> command.contains("secret"))
+                    .endsWith("-version");
+        } finally {
+            restore("javax.net.ssl.trustStore", trustStore);
+            restore("javax.net.ssl.trustStorePassword", password);
+        }
+    }
+
+    @Test
     public void interrupting_a_forked_process_destroys_it_and_restores_the_interrupt_flag() throws Exception {
         Path source = root.resolve("Sleeper.java");
         Files.writeString(source, """
@@ -416,5 +438,13 @@ public class ProcessHandlerTest {
             }
         }
         assertThat(codes).containsOnly(0);
+    }
+
+    private static void restore(String name, String value) {
+        if (value == null) {
+            System.clearProperty(name);
+        } else {
+            System.setProperty(name, value);
+        }
     }
 }
