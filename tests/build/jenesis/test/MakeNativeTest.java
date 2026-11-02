@@ -168,6 +168,22 @@ public class MakeNativeTest {
     }
 
     @Test
+    public void refuses_the_native_mode_on_a_jdk_of_another_build_than_its_graalvm() throws IOException {
+        Runtime.Version running = Runtime.version();
+        String other = running.version().stream().map(String::valueOf).collect(Collectors.joining("."))
+                + "+" + (running.build().orElse(0) + 1);
+        Files.writeString(graalvm.resolve("release"), "JAVA_RUNTIME_VERSION=\"" + other + "\"\n");
+
+        assertThatThrownBy(() -> new Make("build.jenesis.Project", Map.of("make.root", root.toString(),
+                "make.global", "",
+                "make.mode", "native",
+                "make.graalvm", graalvm.toString())).run("build"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(other)
+                .hasMessageContaining("javac");
+    }
+
+    @Test
     public void reads_the_native_mode() {
         assertThat(new Make("build.jenesis.Project", Map.of("make.root", root.toString(),
                 "make.global", "",
