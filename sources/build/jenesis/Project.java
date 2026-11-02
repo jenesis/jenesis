@@ -4755,7 +4755,9 @@ public record Project(
                 make.home||The folder holding ~/.jenesis/jenesis.properties, derived by Make and settable in no file
                 make.ambient||Settings that the command line supplied, likewise, so that a path named there is relative to make.directory
                 make.directory||The working directory of the command line, which a relative path named there resolves against; set by the command and the tools, kept by a daemon or container they hand the build to, and settable in no file
-                make.mode|daemon|How the engine runs: source runs it from the build sources, compiled compiles them once and runs from those classes, aot runs those classes in a JVM that loads them from an ahead-of-time cache in aot.folder, trained on the first build that finds none and reused by every later one, and daemon hands the build to a reused JVM, which --stop as the only selector shuts down, every daemon of daemon.folder with it; unset, it is daemon, or compiled where process.mode names fork or aot, project.docker is set or release.publish publishes, so that a release runs in a JVM no earlier build ran in; aot applies where the engine runs compiled, as the installed CLI runs it, and in source mode caches only the tools, whose JVM is running before it could be handed a cache; aot and daemon set process.mode to the same unless it is set; the [STARTED] line and the started event of the events file name the mode the build ran in
+                make.mode|daemon|How the engine runs: source runs it from the build sources, compiled compiles them once and runs from those classes, aot runs those classes in a JVM that loads them from an ahead-of-time cache in aot.folder, trained on the first build that finds none and reused by every later one, native runs a native image of the engine and of the plugins the project loads, compiled with make.graalvm once per engine, plugins and what earlier builds recorded and kept in aot.folder, the first build and any it hands over running in a JVM that records what the next image needs, and daemon hands the build to a reused JVM, which --stop as the only selector shuts down, every daemon of daemon.folder with it; unset, it is daemon, or compiled where process.mode names fork or aot, project.docker is set or release.publish publishes, so that a release runs in a JVM no earlier build ran in; aot applies where the engine runs compiled, as the installed CLI runs it, and in source mode caches only the tools, whose JVM is running before it could be handed a cache; aot and daemon set process.mode to the same unless it is set; the [STARTED] line and the started event of the events file name the mode the build ran in
+                make.graalvm||The GraalVM whose native-image compiles the engine in native mode, and whose JDK the build then runs its tools from; default: the JDK running Make, where it is one; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                make.plugins||File the build records the plugins it loaded to, which native mode compiles into its image; set by Make for the build it records, and only settable on the command line
                 make.classes|.jenesis/classes|Where those classes land, relative to the working directory on the command line and to the project root in a file; a file a project provides names only a folder inside the project
                 daemon.idle|10800|Seconds an idle daemon waits before exiting; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 daemon.options||JVM options for the daemon process itself, whitespace separated; unset, the daemon starts with the -D, -X and -ea options of the JVM that hands it the build, and a JVM started with others gets a daemon of its own; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
@@ -5109,6 +5111,13 @@ public record Project(
                 for (Throwable cause = t; cause != null; cause = cause.getCause()) {
                     if (cause instanceof Jdk.Unavailable unavailable) {
                         environment.err().accept(unavailable.getMessage() + ", so the build continues on a JVM.");
+                        return Make.JVM;
+                    }
+                    if (Jdk.unregistered(cause)) {
+                        environment.err().accept("The native image of Jenesis was compiled without what the build"
+                                + " asked for (" + cause.getClass().getSimpleName() + ": "
+                                + String.valueOf(cause.getMessage()).lines().findFirst().orElse("") + "), so the build"
+                                + " continues on a JVM, which records it for the next image.");
                         return Make.JVM;
                     }
                 }
