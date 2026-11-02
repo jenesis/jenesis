@@ -15,14 +15,6 @@ public final class Jdk {
         return Make.home();
     }
 
-    public static Runtime.Version version() {
-        return Make.image() ? Installed.VERSION : Runtime.version();
-    }
-
-    public static String javaVersion() {
-        return Make.image() ? Installed.JAVA_VERSION : System.getProperty("java.version");
-    }
-
     public static Set<String> modules() {
         return Make.image() ? Installed.MODULES : Running.MODULES;
     }
@@ -55,28 +47,13 @@ public final class Jdk {
         return Compiled.PLUGINS;
     }
 
-    public static Runtime.Version version(Path home) {
-        Map<String, String> release = release(home);
-        String value = release.getOrDefault("JAVA_RUNTIME_VERSION", release.get("JAVA_VERSION"));
-        if (value == null) {
-            throw new IllegalStateException("The release file of the JDK at " + home + " names no"
-                    + " JAVA_RUNTIME_VERSION or JAVA_VERSION: point JAVA_HOME at a JDK 25 or newer");
-        }
-        try {
-            return Runtime.Version.parse(value);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalStateException("The release file of the JDK at " + home + " names the malformed version '"
-                    + value + "': point JAVA_HOME at a JDK 25 or newer", e);
-        }
-    }
-
     public static Map<String, String> release(Path home) {
         Properties properties = new Properties();
         try (Reader reader = Files.newBufferedReader(home.resolve("release"), StandardCharsets.UTF_8)) {
             properties.load(reader);
         } catch (IOException e) {
             throw new IllegalStateException("The JDK at " + home + " has no readable release file that names its"
-                    + " version: point JAVA_HOME at a JDK 25 or newer", e);
+                    + " modules: point JAVA_HOME at a JDK 25 or newer", e);
         }
         Map<String, String> release = new TreeMap<>();
         for (String key : properties.stringPropertyNames()) {
@@ -88,21 +65,18 @@ public final class Jdk {
         return release;
     }
 
-    private static String value(Map<String, String> release, String key) {
-        String value = release.get(key);
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException("The release file of the JDK at " + home() + " names no " + key
-                    + ": point JAVA_HOME at a JDK 25 or newer");
-        }
-        return value;
-    }
-
     private static final class Installed {
 
-        private static final Map<String, String> RELEASE = release(home());
-        private static final Runtime.Version VERSION = version(home());
-        private static final String JAVA_VERSION = value(RELEASE, "JAVA_VERSION");
-        private static final Set<String> MODULES = Set.of(value(RELEASE, "MODULES").split("\\s+"));
+        private static final Set<String> MODULES;
+
+        static {
+            String modules = release(home()).get("MODULES");
+            if (modules == null || modules.isBlank()) {
+                throw new IllegalStateException("The release file of the JDK at " + home() + " names no MODULES:"
+                        + " point JAVA_HOME at a JDK 25 or newer");
+            }
+            MODULES = Set.of(modules.split("\\s+"));
+        }
     }
 
     private static final class Compiled {

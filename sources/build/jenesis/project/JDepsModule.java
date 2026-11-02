@@ -8,7 +8,6 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Environment;
 import build.jenesis.Environment.Setting;
-import build.jenesis.Jdk;
 import build.jenesis.PathPlacement;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Findings;
@@ -169,7 +168,7 @@ public class JDepsModule implements BuildExecutorModule {
                 (modular && PathPlacement.INFERRED.test(jar) ? modulePath : classPath).add(jar.toString());
             }
             List<String> commands = new ArrayList<>(List.of("--jdk-internals",
-                    "--multi-release", Integer.toString(Jdk.version().feature())));
+                    "--multi-release", Integer.toString(Runtime.version().feature())));
             if (!modulePath.isEmpty()) {
                 commands.add("--module-path");
                 commands.add(String.join(File.pathSeparator, modulePath));
