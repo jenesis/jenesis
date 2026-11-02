@@ -145,9 +145,12 @@ public class ExternalModuleTest {
                                 return this;
                             }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
+                                String proxied = String.valueOf(
+                                        java.lang.reflect.Proxy.isProxyClass(executor.getClass()));
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"),
                                             String.valueOf(Plugin.class.getModule().isNamed()));
+                                    Files.writeString(context.next().resolve("proxied.txt"), proxied);
                                     return CompletableFuture.completedStage(new BuildStepResult(true));
                                 });
                             }
@@ -184,8 +187,12 @@ public class ExternalModuleTest {
                 Map.of("maven", new MavenDefaultRepository(maven.toUri(), null, Map.of(), null)),
                 Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))));
 
-        assertThat(buildExecutor.execute().get("external/marker").resolve("out.txt"))
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps.get("external/marker").resolve("out.txt"))
                 .as("a plugin named by a Maven coordinate runs from a class path")
+                .hasContent("false");
+        assertThat(steps.get("external/marker").resolve("proxied.txt"))
+                .as("a plugin linked against the engine's own classes is handed the build without a reflective proxy")
                 .hasContent("false");
         assertThat(ProcessHandler.nest(() -> { }))
                 .as("a plugin linked against the engine's own classes leaves no process scope of the build open")

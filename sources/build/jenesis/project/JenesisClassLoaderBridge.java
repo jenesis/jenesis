@@ -625,10 +625,11 @@ class JenesisClassLoaderBridge {
                 BuildExecutor hostExecutor,
                 SequencedMap<String, Path> inherited,
                 String group) throws IOException {
-        Object foreignProxy = Proxy.newProxyInstance(
-                loader,
-                new Class<?>[]{foreignBuildExecutor},
-                new BuildExecutorBridge(hostExecutor, group));
+        Object foreignProxy = foreignBuildExecutor == BuildExecutor.class
+                ? new HostedBuildExecutor(hostExecutor, group)
+                : Proxy.newProxyInstance(loader,
+                        new Class<?>[]{foreignBuildExecutor},
+                        new BuildExecutorBridge(hostExecutor, group));
         try {
             foreignAccept.invoke(foreignModule, foreignProxy, inherited);
         } catch (IOException | RuntimeException | Error e) {
@@ -782,6 +783,95 @@ class JenesisClassLoaderBridge {
                 }
             }
         };
+    }
+
+    private class HostedBuildExecutor implements BuildExecutor {
+
+        private final BuildExecutor host;
+        private final String group;
+
+        HostedBuildExecutor(BuildExecutor host, String group) {
+            this.host = host;
+            this.group = group;
+        }
+
+        @Override
+        public void addSource(String identity, Path path) {
+            host.addSource(identity, path);
+        }
+
+        @Override
+        public void addSource(String identity, BuildStep step, SequencedSet<Path> paths) {
+            host.addSource(identity, wrapStep(step, group), paths);
+        }
+
+        @Override
+        public void replaceSource(String identity, Path path) {
+            host.replaceSource(identity, path);
+        }
+
+        @Override
+        public void replaceSource(String identity, BuildStep step, SequencedSet<Path> paths) {
+            host.replaceSource(identity, wrapStep(step, group), paths);
+        }
+
+        @Override
+        public void addStep(String identity, BuildStep step, SequencedMap<String, String> dependencies) {
+            host.addStep(identity, wrapStep(step, group), dependencies);
+        }
+
+        @Override
+        public void replaceStep(String identity, BuildStep step) {
+            host.replaceStep(identity, wrapStep(step, group));
+        }
+
+        @Override
+        public void prependStep(String identity, String prepended, BuildStep step) {
+            host.prependStep(identity, prepended, wrapStep(step, group));
+        }
+
+        @Override
+        public void appendStep(String identity, String original, BuildStep step) {
+            host.appendStep(identity, original, wrapStep(step, group));
+        }
+
+        @Override
+        public void addModule(String identity,
+                              BuildExecutorModule module,
+                              Function<String, Optional<String>> resolver,
+                              SequencedMap<String, String> dependencies) {
+            host.addModule(identity, wrapModule(module, group), resolver, dependencies);
+        }
+
+        @Override
+        public void replaceModule(String identity,
+                                  BuildExecutorModule module,
+                                  Function<String, Optional<String>> resolver) {
+            host.replaceModule(identity, wrapModule(module, group), resolver);
+        }
+
+        @Override
+        public void prependModule(String identity,
+                                  String prepended,
+                                  BuildExecutorModule module,
+                                  Function<String, Optional<String>> resolver) {
+            host.prependModule(identity, prepended, wrapModule(module, group), resolver);
+        }
+
+        @Override
+        public void appendModule(String identity,
+                                 String appended,
+                                 BuildExecutorModule module,
+                                 Function<String, Optional<String>> resolver) {
+            host.appendModule(identity, appended, wrapModule(module, group), resolver);
+        }
+
+        @Override
+        public CompletionStage<SequencedMap<String, Path>> execute(Executor executor,
+                                                                   List<String> selectors,
+                                                                   List<String> optional) {
+            return host.execute(executor, selectors, optional);
+        }
     }
 
     private class BuildExecutorBridge implements InvocationHandler {
