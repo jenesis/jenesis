@@ -76,10 +76,8 @@ class JenesisClassLoaderBridge {
         return new TreeMap<>(LOADED);
     }
 
-    static JenesisClassLoaderBridge of(String group,
-                                       List<Path> artifacts,
-                                       PathPlacement pathPlacement,
-                                       boolean compilable) throws ReflectiveOperationException, IOException {
+    static JenesisClassLoaderBridge of(String group, List<Path> artifacts, PathPlacement pathPlacement)
+            throws ReflectiveOperationException, IOException {
         MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("SHA-256");
@@ -100,12 +98,10 @@ class JenesisClassLoaderBridge {
             }
         }
         byte[] origin = digest.digest();
-        if (compilable) {
-            List<String> loaded = new ArrayList<>();
-            loaded.add(HexFormat.of().formatHex(origin));
-            artifacts.forEach(artifact -> loaded.add(artifact.toAbsolutePath().toString()));
-            LOADED.put(group, List.copyOf(loaded));
-        }
+        List<String> loaded = new ArrayList<>();
+        loaded.add(HexFormat.of().formatHex(origin));
+        artifacts.forEach(artifact -> loaded.add(artifact.toAbsolutePath().toString()));
+        LOADED.put(group, List.copyOf(loaded));
         Warmed warmed = WARMED.get(group);
         JenesisClassLoaderBridge kept = warmed == null || !Arrays.equals(warmed.origin(), origin) ? null : warmed.bridge().get();
         if (kept != null) {
@@ -449,10 +445,38 @@ class JenesisClassLoaderBridge {
     private ServiceLoader.Provider<?> provider(Class<?> service, String name) {
         String kind = service.getSimpleName();
         ServiceLoader.Provider<?> factory = null;
-        for (ServiceLoader.Provider<?> provider : ServiceLoader.load(service, loader).stream().toList()) {
-            if (providers != null && !providers.contains(provider.type().getName())) {
-                continue;
+        List<ServiceLoader.Provider<?>> candidates = new ArrayList<>();
+        if (providers == null) {
+            candidates.addAll(ServiceLoader.load(service, loader).stream().toList());
+        } else {
+            for (String provider : providers) {
+                Class<?> type;
+                try {
+                    type = Class.forName(provider, false, loader);
+                } catch (ClassNotFoundException e) {
+                    throw new IllegalStateException("The native image of Jenesis names " + provider + " as a factory"
+                            + " of the plugin, but holds no such class", e);
+                }
+                if (service.isAssignableFrom(type)) {
+                    candidates.add(new ServiceLoader.Provider<Object>() {
+                        @Override
+                        public Class<?> type() {
+                            return type;
+                        }
+
+                        @Override
+                        public Object get() {
+                            try {
+                                return type.getConstructor().newInstance();
+                            } catch (ReflectiveOperationException e) {
+                                throw new IllegalStateException("Cannot create the factory " + provider, e);
+                            }
+                        }
+                    });
+                }
             }
+        }
+        for (ServiceLoader.Provider<?> provider : candidates) {
             Annotation annotation = provider.type().getAnnotation(foreignBuildModuleName);
             String providerName;
             if (annotation == null) {

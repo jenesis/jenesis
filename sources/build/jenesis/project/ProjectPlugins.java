@@ -81,6 +81,10 @@ public record ProjectPlugins(Path pins,
         return Collections.unmodifiableMap(merged);
     }
 
+    public static SequencedMap<String, List<String>> loaded() {
+        return JenesisClassLoaderBridge.loaded();
+    }
+
     public static String declared(String name) {
         return PLUGIN + "." + name;
     }
