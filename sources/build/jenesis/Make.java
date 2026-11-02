@@ -838,6 +838,11 @@ public final class Make {
                 resources = Files.createDirectories(staging.resolve("resources"));
         SequencedSet<Path> path = new LinkedHashSet<>(List.of(engine));
         Map<String, Path> modules = new HashMap<>();
+        Map<String, ClassModel> api = new HashMap<>();
+        for (byte[] bytes : classFiles(engine).values()) {
+            ClassModel model = ClassFile.of().parse(bytes);
+            api.put(model.thisClass().asInternalName(), model);
+        }
         Properties compiled = new Properties();
         SequencedSet<String> factories = new TreeSet<>();
         for (String group : new TreeSet<>(plugins.stringPropertyNames())) {
@@ -867,6 +872,13 @@ public final class Make {
             if (conflict != null) {
                 System.err.println("The plugin " + group + " needs another " + conflict + " than a plugin the native"
                         + " image of Jenesis holds already, so it is left out and its builds run on a JVM.");
+                continue;
+            }
+            String unlinked = unlinked(api, named.values());
+            if (unlinked != null) {
+                System.err.println("The plugin " + group + " was built against another release of Jenesis, as it uses "
+                        + unlinked + ", which this engine lacks, so it is left out of the native image and its builds"
+                        + " run on a JVM.");
                 continue;
             }
             SequencedSet<String> providers = new TreeSet<>();
@@ -948,6 +960,92 @@ public final class Make {
         }
         Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE);
         return true;
+    }
+
+    private static Map<String, byte[]> classFiles(Path entry) throws IOException {
+        Map<String, byte[]> classes = new TreeMap<>();
+        if (Files.isDirectory(entry)) {
+            try (Stream<Path> walk = Files.walk(entry)) {
+                for (Path file : walk.filter(file -> file.toString().endsWith(".class")).toList()) {
+                    classes.put(entry.relativize(file).toString().replace(File.separatorChar, '/'),
+                            Files.readAllBytes(file));
+                }
+            }
+        } else {
+            try (JarFile jar = new JarFile(entry.toFile())) {
+                for (JarEntry file : Collections.list(jar.entries())) {
+                    if (file.getName().endsWith(".class") && !file.getName().startsWith("META-INF/")) {
+                        try (InputStream input = jar.getInputStream(file)) {
+                            classes.put(file.getName(), input.readAllBytes());
+                        }
+                    }
+                }
+            }
+        }
+        classes.remove("module-info.class");
+        return classes;
+    }
+
+    private static String unlinked(Map<String, ClassModel> api, Collection<Path> jars) throws IOException {
+        List<ClassModel> models = new ArrayList<>();
+        Set<String> own = new HashSet<>();
+        for (Path jar : jars) {
+            for (byte[] bytes : classFiles(jar).values()) {
+                ClassModel model = ClassFile.of().parse(bytes);
+                models.add(model);
+                own.add(model.thisClass().asInternalName());
+            }
+        }
+        for (ClassModel model : models) {
+            for (PoolEntry entry : model.constantPool()) {
+                String owner = switch (entry) {
+                    case MemberRefEntry reference -> reference.owner().asInternalName();
+                    case ClassEntry type -> type.asInternalName();
+                    default -> null;
+                };
+                if (owner == null || own.contains(owner) || !owner.startsWith("build/jenesis/")) {
+                    continue;
+                }
+                if (!api.containsKey(owner)) {
+                    return owner.replace('/', '.');
+                }
+                if (entry instanceof MemberRefEntry reference && !declared(api,
+                        owner,
+                        reference.name().stringValue(),
+                        reference.type().stringValue())) {
+                    return owner.replace('/', '.') + "." + reference.name().stringValue()
+                            + reference.type().stringValue();
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean declared(Map<String, ClassModel> api, String owner, String name, String type) {
+        ClassModel model = api.get(owner);
+        if (model == null) {
+            try {
+                Class<?> outside = Class.forName(owner.replace('/', '.'), false, ClassLoader.getPlatformClassLoader());
+                for (Class<?> current = outside; current != null; current = current.getSuperclass()) {
+                    if (Stream.of(current.getDeclaredMethods()).anyMatch(method -> method.getName().equals(name))
+                            || Stream.of(current.getDeclaredFields()).anyMatch(field -> field.getName().equals(name))) {
+                        return true;
+                    }
+                }
+                return Stream.of(outside.getMethods()).anyMatch(method -> method.getName().equals(name));
+            } catch (ClassNotFoundException | LinkageError _) {
+                return false;
+            }
+        }
+        if (model.methods().stream().anyMatch(method -> method.methodName().equalsString(name)
+                && method.methodType().equalsString(type))
+                || model.fields().stream().anyMatch(field -> field.fieldName().equalsString(name)
+                && field.fieldType().equalsString(type))) {
+            return true;
+        }
+        return Stream.concat(model.superclass().stream(), model.interfaces().stream())
+                .map(ClassEntry::asInternalName)
+                .anyMatch(parent -> declared(api, parent, name, type));
     }
 
     static void described(Path configuration,
