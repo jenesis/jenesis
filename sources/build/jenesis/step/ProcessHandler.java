@@ -50,9 +50,20 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         TOOL {
             @Override
             public Function<List<String>, ? extends ProcessHandler> apply(String tool, String fork) {
-                return Jdk.image() && !IMAGE_TOOLS.contains(tool)
-                        ? ProcessHandler.OfProcess.ofJavaHome(fork)
-                        : ProcessHandler.OfTool.of(tool);
+                if (!Jdk.image() || IMAGE_TOOLS.contains(tool)) {
+                    return ProcessHandler.OfTool.of(tool);
+                }
+                Function<List<String>, OfProcess> forked = ProcessHandler.OfProcess.ofJavaHome(fork);
+                List<String> inherited = new ArrayList<>();
+                for (String name : new TreeSet<>(System.getProperties().stringPropertyNames())) {
+                    if (name.startsWith("javax.net.ssl.")
+                            || name.startsWith("http.")
+                            || name.startsWith("https.")
+                            || name.startsWith("socksProxy")) {
+                        inherited.add("-J-D" + name + "=" + System.getProperty(name));
+                    }
+                }
+                return arguments -> forked.apply(Stream.concat(inherited.stream(), arguments.stream()).toList());
             }
         },
         FORK {
