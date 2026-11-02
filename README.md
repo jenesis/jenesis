@@ -100,10 +100,10 @@ Google's mirror of Central first and Central itself second, the pair the workflo
 export MAVEN_REPOSITORY_URI=https://maven-central.storage-download.googleapis.com/maven2/,https://repo1.maven.org/maven2/
 ```
 
-The mirror syncs some hours behind Central, so Central still serves a release the mirror lacks. Two things stay
-with the first remote that answers: a `maven-metadata.xml`, so a version range or a `pin` proposal sees the
-mirror's list of versions, and an official plugin or other `module/` name, which the module index redirects to
-the first remote alone.
+The mirror syncs some hours behind Central, so Central still serves a release the mirror lacks, also for an
+official plugin or other `module/` name: where the remote the module index redirects to answers 404, the build
+asks the index again, naming the next remote. A `maven-metadata.xml` stays with the first remote that has one,
+so a version range or a `pin` proposal sees the mirror's list of versions.
 
 Build performance
 -----------------
