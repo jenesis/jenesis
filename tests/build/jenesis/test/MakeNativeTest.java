@@ -91,7 +91,7 @@ public class MakeNativeTest {
         assertThat(Files.readAllLines(records.resolve("binary.calls")))
                 .singleElement(InstanceOfAssertFactories.STRING)
                 .contains("-Djenesis.make.mode=native")
-                .contains("-Djava.home=" + graalvm)
+                .contains("-Djava.home=" + System.getProperty("java.home"))
                 .endsWith("build");
     }
 
@@ -151,6 +151,20 @@ public class MakeNativeTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(elsewhere.toString())
                 .hasMessageContaining("jenesis.make.graalvm");
+    }
+
+    @Test
+    public void refuses_the_native_mode_on_a_jdk_of_another_release_than_its_graalvm() throws IOException {
+        Files.writeString(graalvm.resolve("release"), "JAVA_VERSION=\"24.0.2\"\n");
+
+        assertThatThrownBy(() -> new Make("build.jenesis.Project", Map.of("make.root", root.toString(),
+                "make.global", "",
+                "make.mode", "native",
+                "make.graalvm", graalvm.toString())).run("build"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(graalvm.toString())
+                .hasMessageContaining("24.0.2")
+                .hasMessageContaining(System.getProperty("java.home"));
     }
 
     @Test

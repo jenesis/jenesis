@@ -727,6 +727,14 @@ public final class Make {
                     + " GraalVM, which " + home + " does not hold: name a GraalVM 25 or newer as jenesis.make.graalvm"
                     + " on the command line or in your own ~/.jenesis/jenesis.properties, or run the build on one");
         }
+        Path running = Path.of(System.getProperty("java.home"));
+        Runtime.Version required = released(home), found = released(running);
+        if (!found.version().equals(required.version())) {
+            throw new IllegalStateException("jenesis.make.mode=native runs the build on the JDK at " + running + " ("
+                    + found + "), which must be the release of the GraalVM at " + home + " (" + required
+                    + ") that compiles its image: run the build on that GraalVM, or name a GraalVM of the same"
+                    + " release as jenesis.make.graalvm");
+        }
         sweep(engine);
         Path folder = Files.createDirectories(aotFolder.resolve("native"));
         MessageDigest digest;
@@ -754,7 +762,7 @@ public final class Make {
                     command.add("-D" + name + "=" + System.getProperty(name));
                 }
             }
-            command.add("-Djava.home=" + home);
+            command.add("-Djava.home=" + running);
             new TreeMap<>(ambient).forEach((key, value) -> {
                 if (!key.startsWith("toolchain.")) {
                     command.add("-Djenesis." + key + "=" + value);
@@ -818,6 +826,22 @@ public final class Make {
             return code;
         } finally {
             Files.deleteIfExists(loaded);
+        }
+    }
+
+    private static Runtime.Version released(Path home) throws IOException {
+        Properties release = new Properties();
+        try (Reader reader = Files.newBufferedReader(home.resolve("release"), StandardCharsets.UTF_8)) {
+            release.load(reader);
+        }
+        String value = release.getProperty("JAVA_RUNTIME_VERSION", release.getProperty("JAVA_VERSION", ""))
+                .replace("\"", "")
+                .strip();
+        try {
+            return Runtime.Version.parse(value);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("The release file of the JDK at " + home + " names no version Java can"
+                    + " read, but '" + value + "'", e);
         }
     }
 
