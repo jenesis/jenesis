@@ -23,10 +23,6 @@ public class ExternalModule extends PluginModule<ExternalModule> {
     private final Dependencies dependencyModule;
     private final SequencedSet<String> additionalDependencies;
 
-    public static SequencedMap<String, List<String>> loaded() {
-        return JenesisClassLoaderBridge.loaded();
-    }
-
     public static ExternalModule ofEnvironment(Environment environment,
                                                String coordinate,
                                                String group,

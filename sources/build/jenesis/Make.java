@@ -839,6 +839,7 @@ public final class Make {
         SequencedSet<Path> path = new LinkedHashSet<>(List.of(engine));
         Map<String, Path> modules = new HashMap<>();
         Properties compiled = new Properties();
+        SequencedSet<String> factories = new TreeSet<>();
         for (String group : new TreeSet<>(plugins.stringPropertyNames())) {
             if (group.endsWith(".artifacts")) {
                 continue;
@@ -872,6 +873,9 @@ public final class Make {
             for (Path jar : named.values()) {
                 modules.putIfAbsent(jar.getFileName().toString(), jar);
                 path.add(jar);
+                ModuleFinder.of(jar).findAll().forEach(reference -> reference.descriptor().provides().stream()
+                        .filter(provides -> FACTORIES.contains(provides.service()))
+                        .forEach(provides -> providers.addAll(provides.providers())));
                 if (Files.isRegularFile(jar)) {
                     try (JarFile file = new JarFile(jar.toFile())) {
                         for (String factory : FACTORIES) {
@@ -892,13 +896,14 @@ public final class Make {
             named.forEach(modules::putIfAbsent);
             compiled.setProperty(group, plugins.getProperty(group));
             compiled.setProperty(group + ".providers", String.join(",", providers));
+            factories.addAll(providers);
         }
         Path registry = Files.createDirectories(resources.resolve(PLUGINS).getParent()).resolve(Path.of(PLUGINS)
                 .getFileName().toString());
         try (Writer writer = Files.newBufferedWriter(registry, StandardCharsets.UTF_8)) {
             compiled.store(writer, null);
         }
-        described(configuration, engine, path);
+        described(configuration, engine, path, factories);
         List<String> command = new ArrayList<>(List.of(compiler.toString(),
                 "--no-fallback",
                 "--enable-url-protocols=http,https",
@@ -945,7 +950,10 @@ public final class Make {
         return true;
     }
 
-    static void described(Path configuration, Path engine, SequencedSet<Path> path) throws IOException {
+    static void described(Path configuration,
+                          Path engine,
+                          SequencedSet<Path> path,
+                          SequencedSet<String> factories) throws IOException {
         record Shape(String parent, List<String> interfaces, boolean type, boolean lambdas) {
         }
         SequencedMap<String, Shape> shapes = new TreeMap<>();
@@ -1026,7 +1034,7 @@ public final class Make {
         StringBuilder reflection = new StringBuilder(), lambdas = new StringBuilder();
         shapes.forEach((internal, shape) -> {
             String name = internal.replace('/', '.');
-            boolean owned = origins.get(internal).equals(engine);
+            boolean owned = origins.get(internal).equals(engine) || factories.contains(name);
             boolean serialized = shape.type() && serializing.apply(internal);
             if (owned || serialized) {
                 reflection.append(reflection.isEmpty() ? "" : ",\n")
@@ -1188,7 +1196,7 @@ public final class Make {
                     .invoke(null, settled(), mainClass, root, settings.profiles(), selectors);
             if (command(settings.keys(), "make.plugins") != null) {
                 Properties loaded = new Properties();
-                ((Map<?, ?>) Class.forName("build.jenesis.project.ExternalModule", true, loader)
+                ((Map<?, ?>) Class.forName("build.jenesis.project.ProjectPlugins", true, loader)
                         .getMethod("loaded")
                         .invoke(null)).forEach((group, artifacts) -> {
                     List<?> values = (List<?>) artifacts;
