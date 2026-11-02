@@ -117,8 +117,9 @@ java -Djenesis.make.mode=native -Djenesis.make.graalvm=/path/to/graalvm build/je
 The first build runs on that GraalVM's JVM under its tracing agent, which records what the image needs, and the
 build records the plugins it loaded. `Make` then compiles an image of the engine and those plugins into
 `jenesis.aot.folder`, once per engine, plugins and recorded metadata, which takes some minutes. Every later build
-runs the image: `javac` and `jar` inside it, every other tool forked from the GraalVM, with steps keyed on the
-version its `release` file names.
+runs the image: `javac` and `jar` inside it, every other tool forked from the JDK running `Make`, with steps
+keyed on the version its `release` file names. That JDK must be of the GraalVM's release, as the image compiles
+against its classes, so a build keys and forks alike in either mode.
 
 A plugin is compiled in with the classes it ships, linked against the engine rather than the release of
 `build.jenesis` it was built against, so its steps can run once more when a build moves between the image and a
@@ -129,7 +130,7 @@ module layers - run on the JVM instead. When the image meets one of them, or
 something its metadata lacks, it hands the build back to `Make`, which runs it on the JVM under the agent again
 and compiles a new image if that taught it anything; a project whose image can learn nothing more keeps building
 on the JVM until its engine or plugins change. The image reads no `JAVA_TOOL_OPTIONS`; `Make` hands it the trust
-store and proxy settings of its own JVM.
+store and proxy settings of its own JVM, which the image hands every tool it forks in turn.
 
 Build performance
 -----------------
