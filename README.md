@@ -124,9 +124,10 @@ against its classes, so a build keys and forks alike in either mode.
 A plugin is compiled in with the classes it ships, linked against the engine rather than the release of
 `build.jenesis` it was built against, so its steps can run once more when a build moves between the image and a
 JVM. A plugin a project compiles itself is compiled in as well, so an edit to its sources compiles another image.
-A plugin that needs another version of a library than a plugin compiled in already, and a build that reads the
-modules of the JDK - an annotation processor on the module path, a dependency it modularises, an image holding
-module layers - run on the JVM instead. When the image meets one of them, or
+A plugin that needs another version of a library than a plugin compiled in already, one calling a part of
+`build.jenesis` this engine lacks, as one built against another release may, one loading classes by name at run
+time, and a build that reads the modules of the JDK - an annotation processor on the module path, a dependency it
+modularises, an image holding module layers - run on the JVM instead. When the image meets one of them, or
 something its metadata lacks, it hands the build back to `Make`, which runs it on the JVM under the agent again
 and compiles a new image if that taught it anything; a project whose image can learn nothing more keeps building
 on the JVM until its engine or plugins change. The image reads no `JAVA_TOOL_OPTIONS`; `Make` hands it the trust
