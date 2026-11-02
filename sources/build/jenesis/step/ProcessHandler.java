@@ -55,7 +55,22 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         FORK {
             @Override
             public Function<List<String>, ? extends ProcessHandler> apply(String tool, String fork) {
-                return ProcessHandler.OfProcess.ofJavaHome(fork);
+                Function<List<String>, OfProcess> forked = ProcessHandler.OfProcess.ofJavaHome(fork);
+                String option = fork.equals("bin/java") ? "-D" : "-J-D";
+                return arguments -> {
+                    List<String> commands = new ArrayList<>();
+                    for (String name : new TreeSet<>(System.getProperties().stringPropertyNames())) {
+                        if ((name.startsWith("javax.net.ssl.")
+                                || name.startsWith("http.")
+                                || name.startsWith("https.")
+                                || name.startsWith("socksProxy"))
+                                && !name.endsWith("Password")) {
+                            commands.add(option + name + "=" + System.getProperty(name));
+                        }
+                    }
+                    commands.addAll(arguments);
+                    return forked.apply(commands);
+                };
             }
         };
 
