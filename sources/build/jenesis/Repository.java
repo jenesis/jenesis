@@ -186,6 +186,13 @@ public interface Repository {
                             continue;
                         }
                     }
+                    if (status == HttpURLConnection.HTTP_NOT_FOUND || status == HttpURLConnection.HTTP_GONE) {
+                        InputStream error = http.getErrorStream();
+                        if (error != null) {
+                            error.close();
+                        }
+                        throw new Missing(current);
+                    }
                     if ((status == 429 || status >= 500) && attempt < settings.retries()) {
                         long delay = retryAfterMillis(http.getHeaderField("Retry-After"),
                                 settings.backoff().toMillis() << Math.min(attempt, 20));
@@ -310,6 +317,20 @@ public interface Repository {
     interface Observer {
 
         void fetched(String coordinate, String extension, RepositoryItem item) throws IOException;
+    }
+
+    final class Missing extends FileNotFoundException {
+
+        private final URI location;
+
+        Missing(URI location) {
+            super(location.toString());
+            this.location = location;
+        }
+
+        public URI location() {
+            return location;
+        }
     }
 
     record Credential(String token, Origin origin) {
