@@ -5,6 +5,7 @@ import module java.xml;
 import build.jenesis.BuildExecutor;
 import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
+import build.jenesis.Jdk;
 import build.jenesis.License;
 import build.jenesis.LruCache;
 import build.jenesis.Environment.Setting;
@@ -63,7 +64,7 @@ public class MavenPomResolver implements MavenResolver {
 
     public <S extends Supplier<MavenVersionNegotiator> & Serializable> MavenPomResolver(S negotiatorSupplier) {
         this(negotiatorSupplier,
-                System.getProperty("java.version"),
+                Jdk.javaVersion(),
                 System.getProperty("os.name"),
                 System.getProperty("os.arch"),
                 System.getProperty("os.version"),
@@ -807,7 +808,7 @@ public class MavenPomResolver implements MavenResolver {
                     .orElse(null),
                     testRelease = property(pom.properties().get("maven.compiler.testRelease"), pom.properties());
             if (Boolean.parseBoolean(property(pom.properties().get("maven.compiler.enablePreview"), pom.properties()))) {
-                release = (release == null ? Integer.toString(Runtime.version().feature()) : release) + "-preview";
+                release = (release == null ? Integer.toString(Jdk.version().feature()) : release) + "-preview";
                 testRelease = testRelease == null ? null : testRelease + "-preview";
             }
             Map<String, String> modelled = new HashMap<>();

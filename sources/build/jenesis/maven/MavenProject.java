@@ -2,6 +2,7 @@ package build.jenesis.maven;
 
 import module java.base;
 import build.jenesis.Environment.Setting;
+import build.jenesis.Jdk;
 import build.jenesis.Pinning;
 import module java.xml;
 import build.jenesis.BuildExecutor;
@@ -462,7 +463,7 @@ public class MavenProject implements BuildExecutorModule {
                                         "[RELEASE]",
                                         palette.reset(),
                                         properties.getProperty("groupId") + ":" + properties.getProperty("artifactId"),
-                                        Runtime.version().feature(),
+                                        Jdk.version().feature(),
                                         Path.of(properties.getProperty("path")).resolve("pom.xml")));
                     }
                     if (active) {
@@ -482,7 +483,7 @@ public class MavenProject implements BuildExecutorModule {
                             coordinates.store(context.next().resolve(IDENTITY));
                             return CompletableFuture.completedStage(new BuildStepResult(true));
                         });
-                        int feature = Runtime.version().feature();
+                        int feature = Jdk.version().feature();
                         module.addStep(MANIFESTS, (_, context, manifestArgs) -> {
                             String[] coordinateParts = properties.getProperty("coordinate").split("/");
                             String testsOf = coordinateParts.length == 6 && "tests".equals(coordinateParts[4])

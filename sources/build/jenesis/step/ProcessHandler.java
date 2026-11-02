@@ -3,6 +3,7 @@ package build.jenesis.step;
 import module java.base;
 import build.jenesis.Environment;
 import build.jenesis.Environment.Setting;
+import build.jenesis.Jdk;
 import build.jenesis.SequencedProperties;
 import build.jenesis.daemon.Worker;
 
@@ -49,7 +50,9 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         TOOL {
             @Override
             public Function<List<String>, ? extends ProcessHandler> apply(String tool, String fork) {
-                return ProcessHandler.OfTool.of(tool);
+                return Jdk.image() && !IMAGE_TOOLS.contains(tool)
+                        ? ProcessHandler.OfProcess.ofJavaHome(fork)
+                        : ProcessHandler.OfTool.of(tool);
             }
         },
         FORK {
@@ -59,6 +62,8 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             }
         };
 
+        private static final Set<String> IMAGE_TOOLS = Set.of("javac", "jar");
+
         public static Factory of() {
             return ofEnvironment(Environment.NONE);
         }
@@ -66,7 +71,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         public static Factory ofEnvironment(Environment environment) {
             String factory = environment.getProperty("process.factory", Setting.PROJECT);
             if (factory == null) {
-                if (System.getProperty("org.graalvm.nativeimage.imagecode") == null) {
+                if (!Jdk.image()) {
                     return TOOL;
                 }
                 return ToolProvider.findFirst("javac").isPresent() ? TOOL : FORK;

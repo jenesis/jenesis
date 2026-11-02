@@ -105,6 +105,29 @@ with the first remote that answers: a `maven-metadata.xml`, so a version range o
 mirror's list of versions, and an official plugin or other `module/` name, which the module index redirects to
 the first remote alone.
 
+### A native image of the engine
+
+With `GRAALVM_HOME` naming a GraalVM 25 or newer, the `native` profile compiles the engine with `native-image`,
+from the metadata under `sources/META-INF/native-image/`, into `target/stage/native/output/build.jenesis`:
+
+```bash
+java -Djenesis.make.profiles=native build/jenesis/Make.java stage
+```
+
+Run from a project's root, the binary builds it as `java build/jenesis/Make.java` would, without starting a JVM:
+`javac` and `jar` run inside it, and every other tool is forked from the JDK that `JAVA_HOME` names, or the one
+whose `java` is on the `PATH`. Steps are keyed on the version that JDK's `release` file names, so a native build
+and a JVM build of one project reuse each other's work. The binary reads no `JAVA_TOOL_OPTIONS`; a trust store or
+a proxy is handed to it as `-D` arguments.
+
+What a native image cannot do, it hands to a JVM: a build that loads a plugin, or reads the modules of the JDK
+itself - an annotation processor on the module path, a dependency it modularises, an image holding module
+layers - prints why and continues as
+`java build/jenesis/Make.java` in the project, which skips every step the native run completed. So does a build
+naming `jenesis.toolchain.version` or a `jenesis.make.mode` other than `compiled`. Every step is serialised to key
+its cache entry, and a native image deserialises only what its metadata names, so `NativeImageMetadataTest` fails
+on a serialisable class of the engine the metadata leaves out.
+
 Build performance
 -----------------
 
