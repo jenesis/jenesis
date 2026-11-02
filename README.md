@@ -118,8 +118,8 @@ The first build runs on that GraalVM's JVM under its tracing agent, which record
 build records the plugins it loaded. `Make` then compiles an image of the engine and those plugins into
 `jenesis.aot.folder`, once per engine, plugins and recorded metadata, which takes some minutes. Every later build
 runs the image: `javac` and `jar` inside it, every other tool forked from the JDK running `Make`, with steps
-keyed on the version its `release` file names. That JDK must be of the GraalVM's release, as the image compiles
-against its classes, so a build keys and forks alike in either mode.
+keyed on the version its `release` file names. That JDK must be of the GraalVM's version and build, as the javac
+compiled into the image is the GraalVM's, so a build compiles, keys and forks alike in either mode.
 
 A plugin is compiled in with the classes it ships, linked against the engine rather than the release of
 `build.jenesis` it was built against, so its steps can run once more when a build moves between the image and a

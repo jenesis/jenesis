@@ -729,11 +729,11 @@ public final class Make {
         }
         Path running = Path.of(System.getProperty("java.home"));
         Runtime.Version required = released(home), found = released(running);
-        if (!found.version().equals(required.version())) {
-            throw new IllegalStateException("jenesis.make.mode=native runs the build on the JDK at " + running + " ("
-                    + found + "), which must be the release of the GraalVM at " + home + " (" + required
-                    + ") that compiles its image: run the build on that GraalVM, or name a GraalVM of the same"
-                    + " release as jenesis.make.graalvm");
+        if (!found.version().equals(required.version()) || !found.build().equals(required.build())) {
+            throw new IllegalStateException("jenesis.make.mode=native compiles javac into its image from the GraalVM"
+                    + " at " + home + " (" + required + "), which must be the build of the JDK running Make at "
+                    + running + " (" + found + "), so that the image compiles as that JDK does: run the build on"
+                    + " that GraalVM, or name a GraalVM of the same version and build as jenesis.make.graalvm");
         }
         sweep(engine);
         Path folder = Files.createDirectories(aotFolder.resolve("native"));
