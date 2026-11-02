@@ -3,6 +3,7 @@ package build.jenesis.module;
 import module java.base;
 import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
+import build.jenesis.Jdk;
 import build.jenesis.License;
 import build.jenesis.Environment.Setting;
 import build.jenesis.ModuleGraph;
@@ -94,7 +95,7 @@ public class ModularJarResolver implements Resolver {
             declaredModules.add(split < 0 ? coordinate : coordinate.substring(0, split));
         }
         Queue<String> queue = new ArrayDeque<>(coordinates.sequencedKeySet());
-        int runtime = Runtime.version().feature();
+        int runtime = Jdk.version().feature();
         while (!queue.isEmpty()) {
             String raw = queue.remove();
             int versionSplit = raw.indexOf('/');

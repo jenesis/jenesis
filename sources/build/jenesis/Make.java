@@ -11,6 +11,7 @@ public final class Make {
             DIRECTORY = "make.directory";
     private static final List<String> RECORDED = List.of(PROVIDED, PERSONAL, HOME, AMBIENT, DIRECTORY);
     private static final Set<String> PRINTING = Set.of("help", "skill", "prompt", "configuration", "properties", "--stop");
+    static final int JVM = 3;
     static final List<String> CONTAINED = List.of("jenesis.project.docker",
             "jenesis.project.image",
             "jenesis.project.readable",
@@ -80,7 +81,7 @@ public final class Make {
                     || Objects.equals(parsed("jenesis.release.publish",
                             command(keys, "release.publish")), true)
                     ? COMPILED
-                    : DAEMON;
+                    : image() ? COMPILED : DAEMON;
         }
 
         static Mode of(String value) {
@@ -268,9 +269,60 @@ public final class Make {
         String[] selectors = partitioned(arguments, named);
         List<String> options = options(named);
         Map<String, String> ambient = ambient(named);
+        if (image() && System.getProperty("java.home") == null) {
+            System.setProperty("java.home", home().toString());
+        }
         Make make = new Make("build.jenesis.Project", ambient);
+        if (image() && (make.mode != Mode.COMPILED || ambient.get("toolchain.version") != null)) {
+            System.exit(make.jvm(selectors));
+        }
         Integer code = relaunched(Make.class, ambient, options, selectors);
-        System.exit(code == null ? make.run(selectors) : code);
+        int result = code == null ? make.run(selectors) : code;
+        System.exit(image() && result == JVM ? make.jvm(selectors) : result);
+    }
+
+    static boolean image() {
+        return "runtime".equals(System.getProperty("org.graalvm.nativeimage.imagecode"));
+    }
+
+    static Path home() {
+        String home = System.getProperty("java.home");
+        if (home == null) {
+            home = System.getenv("JAVA_HOME");
+        }
+        if (home != null && !home.isBlank()) {
+            return Path.of(home);
+        }
+        String path = System.getenv("PATH");
+        for (String entry : path == null ? new String[0] : path.split(File.pathSeparator)) {
+            Path java = Path.of(entry, File.separatorChar == '\\' ? "java.exe" : "java");
+            if (!entry.isBlank() && Files.isExecutable(java)) {
+                try {
+                    return java.toRealPath().getParent().getParent();
+                } catch (IOException _) {
+                }
+            }
+        }
+        throw new IllegalStateException("No JDK is found to compile and test with: set JAVA_HOME to a JDK 25 or newer,"
+                + " or put its bin/java on the PATH");
+    }
+
+    int jvm(String... selectors) throws IOException, InterruptedException {
+        Path script = root.resolve("build").resolve("jenesis").resolve("Make.java");
+        if (!Files.isRegularFile(script)) {
+            throw new IllegalStateException("This build needs a JVM, which a native image of Jenesis hands it to by"
+                    + " running build/jenesis/Make.java, but " + root + " holds no such file: run the build with the"
+                    + " engine the project carries, as java build/jenesis/Make.java");
+        }
+        List<String> command = new ArrayList<>();
+        command.add(home().resolve("bin").resolve(File.separatorChar == '\\' ? "java.exe" : "java").toString());
+        new TreeMap<>(ambient).forEach((key, value) -> command.add("-Djenesis." + key + "=" + value));
+        command.add("-Djenesis.make.root=" + root);
+        command.add(script.toString());
+        for (String selector : selectors) {
+            command.add(selector.startsWith("@") ? "@" + selector : selector);
+        }
+        return awaited(command);
     }
 
     static Map<String, String> ambient(Map<String, String> named) {
@@ -563,6 +615,10 @@ public final class Make {
         for (String selector : selectors) {
             command.add(selector.startsWith("@") ? "@" + selector : selector);
         }
+        return awaited(command);
+    }
+
+    private static int awaited(List<String> command) throws IOException, InterruptedException {
         Process process = new ProcessBuilder(command).inheritIO().start();
         Thread hook = new Thread(process::destroy);
         Runtime.getRuntime().addShutdownHook(hook);

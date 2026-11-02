@@ -8,6 +8,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.Environment;
+import build.jenesis.Jdk;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.module.ModuleInfoParser;
@@ -86,12 +87,29 @@ public class Javac extends ProcessBuildStep {
 
     @Override
     protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
-        return commands.stream().anyMatch(option -> option.startsWith("-J"))
+        return commands.stream().anyMatch(option -> option.startsWith("-J")) || Jdk.image() && processing(commands)
                 ? ProcessHandler.OfProcess.ofJavaHome("bin/javac").apply(commands)
                         .daemon(terms.daemon())
                         .scoped(terms.shared())
                         .directory(terms.directory())
                 : super.handler(context, commands);
+    }
+
+    private static boolean processing(List<String> commands) throws IOException {
+        for (String command : commands) {
+            List<String> options = command.startsWith("@")
+                    ? Files.readAllLines(Path.of(command.substring(1)), StandardCharsets.UTF_8)
+                    : List.of(command);
+            if (options.stream()
+                    .map(option -> option.startsWith("\"") ? option.substring(1) : option)
+                    .anyMatch(option -> option.startsWith("--processor-path\"")
+                            || option.startsWith("--processor-module-path\"")
+                            || option.equals("--processor-path")
+                            || option.equals("--processor-module-path"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public Javac factory(ProcessHandler.Factory factory) {
@@ -425,7 +443,7 @@ public class Javac extends ProcessBuildStep {
                 String value = option.equals(name) && index + 1 < options.size()
                         ? options.get(index + 1)
                         : option.startsWith(name + "=") ? option.substring(name.length() + 1) : null;
-                if (value != null && ModuleFinder.ofSystem().find(value.split("[/=]", 2)[0]).isPresent()) {
+                if (value != null && Jdk.modules().contains(value.split("[/=]", 2)[0])) {
                     return true;
                 }
             }
@@ -444,7 +462,7 @@ public class Javac extends ProcessBuildStep {
             try {
                 ModuleFinder finder = ModuleFinder.of(processorPath.stream().map(Path::of).toArray(Path[]::new));
                 references = finder.findAll();
-                Set<String> resolved = ModuleLayer.boot().configuration()
+                Set<String> resolved = Jdk.boot().configuration()
                         .resolveAndBind(ModuleFinder.of(), finder, Set.of())
                         .modules()
                         .stream()
