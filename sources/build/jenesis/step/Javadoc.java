@@ -19,6 +19,19 @@ import javax.tools.ToolProvider;
 public class Javadoc extends ProcessBuildStep {
 
     public static final String JAVADOC = "javadoc/";
+    static final List<String> TAGS = List.of("jenesis.release:a:Release:",
+            "jenesis.main:a:Main class:",
+            "jenesis.test:a:Tests the module:",
+            "jenesis.pin:a:Pinned dependencies:",
+            "jenesis.alias:a:Module aliases:",
+            "jenesis.exclude:a:Excluded dependencies:",
+            "jenesis.override:a:Overridden modules:",
+            "jenesis.attach:a:Attached agents:",
+            "jenesis.native:a:Native access:",
+            "jenesis.bom:a:Imported bills of materials:",
+            "jenesis.plugin:a:Compiler plugins:",
+            "jenesis.layer:a:Isolated layers:",
+            "jenesis.signature:a:Signing keys:");
 
     private final String within;
     private final String group;
@@ -86,20 +99,11 @@ public class Javadoc extends ProcessBuildStep {
                 binaries = new ArrayList<>(),
                 commands = new ArrayList<>(List.of(
                         "-d", documentation.toString(),
-                        "-quiet",
-                        "-tag", "jenesis.release:a:Release:",
-                        "-tag", "jenesis.main:a:Main class:",
-                        "-tag", "jenesis.test:a:Tests the module:",
-                        "-tag", "jenesis.pin:a:Pinned dependencies:",
-                        "-tag", "jenesis.alias:a:Module aliases:",
-                        "-tag", "jenesis.exclude:a:Excluded dependencies:",
-                        "-tag", "jenesis.override:a:Overridden modules:",
-                        "-tag", "jenesis.attach:a:Attached agents:",
-                        "-tag", "jenesis.native:a:Native access:",
-                        "-tag", "jenesis.bom:a:Imported bills of materials:",
-                        "-tag", "jenesis.plugin:a:Compiler plugins:",
-                        "-tag", "jenesis.layer:a:Isolated layers:",
-                        "-tag", "jenesis.signature:a:Signing keys:"));
+                        "-quiet"));
+        for (String tag : TAGS) {
+            commands.add("-tag");
+            commands.add(tag);
+        }
         if (!timestamped) {
             commands.add("-notimestamp");
         }
