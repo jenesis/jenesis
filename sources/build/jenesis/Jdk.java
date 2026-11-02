@@ -46,6 +46,7 @@ public final class Jdk {
     public static boolean unregistered(Throwable throwable) {
         String name = throwable.getClass().getName();
         return Make.image() && (throwable instanceof LinkageError
+                || throwable instanceof ClassNotFoundException
                 || name.startsWith("org.graalvm.nativeimage.Missing")
                 || name.equals("com.oracle.svm.core.jdk.UnsupportedFeatureError"));
     }
