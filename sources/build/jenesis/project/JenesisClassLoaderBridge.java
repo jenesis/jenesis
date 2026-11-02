@@ -34,6 +34,7 @@ import java.lang.reflect.Proxy;
 class JenesisClassLoaderBridge {
 
     private static final Map<String, Warmed> WARMED = new ConcurrentHashMap<>();
+    private static final Map<String, List<String>> LOADED = new ConcurrentSkipListMap<>();
 
     private final ModuleLayer layer;
     private final ModuleLayer.Controller controller;
@@ -69,8 +70,16 @@ class JenesisClassLoaderBridge {
 
     private final byte[] origin;
 
-    static JenesisClassLoaderBridge of(String group, List<Path> artifacts, PathPlacement pathPlacement)
-            throws ReflectiveOperationException, IOException {
+    private final Set<String> providers;
+
+    static SequencedMap<String, List<String>> loaded() {
+        return new TreeMap<>(LOADED);
+    }
+
+    static JenesisClassLoaderBridge of(String group,
+                                       List<Path> artifacts,
+                                       PathPlacement pathPlacement,
+                                       boolean compilable) throws ReflectiveOperationException, IOException {
         MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("SHA-256");
@@ -91,6 +100,12 @@ class JenesisClassLoaderBridge {
             }
         }
         byte[] origin = digest.digest();
+        if (compilable) {
+            List<String> loaded = new ArrayList<>();
+            loaded.add(HexFormat.of().formatHex(origin));
+            artifacts.forEach(artifact -> loaded.add(artifact.toAbsolutePath().toString()));
+            LOADED.put(group, List.copyOf(loaded));
+        }
         Warmed warmed = WARMED.get(group);
         JenesisClassLoaderBridge kept = warmed == null || !Arrays.equals(warmed.origin(), origin) ? null : warmed.bridge().get();
         if (kept != null) {
@@ -107,58 +122,70 @@ class JenesisClassLoaderBridge {
     private JenesisClassLoaderBridge(String group, List<Path> artifacts, PathPlacement pathPlacement, byte[] origin)
             throws ReflectiveOperationException, IOException {
         if (Jdk.image()) {
-            throw new Jdk.Unavailable("The plugin " + group + " is loaded into the build, which a native image of"
-                    + " Jenesis cannot do");
-        }
-        List<Path> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
-        Path copies = ProcessHandler.OfProcess.temporary("jenesis-plugin");
-        for (Path artifact : artifacts) {
-            Path copy = Files.createDirectory(copies.resolve(Integer.toString(modulePath.size() + classPath.size())))
-                    .resolve(artifact.getFileName().toString());
-            try (Stream<Path> walk = Files.walk(artifact)) {
-                for (Path file : walk.toList()) {
-                    Path target = copy.resolve(artifact.relativize(file).toString());
-                    if (Files.isDirectory(file)) {
-                        Files.createDirectories(target);
-                    } else {
-                        Files.copy(file, target);
-                    }
-                }
+            Properties compiled = Jdk.compiled();
+            if (!HexFormat.of().formatHex(origin).equals(compiled.getProperty(group))) {
+                throw new Jdk.Unavailable("The plugin " + group + " is not compiled into this native image of"
+                        + " Jenesis");
             }
-            (pathPlacement.test(copy) ? modulePath : classPath).add(copy);
-        }
-        Module hostModule = JenesisClassLoaderBridge.class.getModule();
-        ClassLoader parent = ClassLoader.getPlatformClassLoader();
-        if (!classPath.isEmpty()) {
-            List<URL> urls = new ArrayList<>(classPath.size());
-            for (Path artifact : classPath) {
-                urls.add(artifact.toUri().toURL());
-            }
-            parent = new URLClassLoader("jenesis-plugin." + group, urls.toArray(URL[]::new), parent);
-            hostModule.addReads(parent.getUnnamedModule());
-        }
-        if (modulePath.isEmpty()) {
             controller = null;
             layer = null;
-            loader = parent;
+            loader = JenesisClassLoaderBridge.class.getClassLoader();
+            providers = Set.of(compiled.getProperty(group + ".providers", "").split(","));
         } else {
-            ModuleFinder finder = ModuleFinder.of(modulePath.toArray(Path[]::new));
-            Set<String> roots = finder.findAll().stream()
-                    .map(ref -> ref.descriptor().name())
-                    .collect(Collectors.toUnmodifiableSet());
-            Configuration config = ModuleLayer.boot().configuration()
-                    .resolveAndBind(finder, ModuleFinder.of(), roots);
-            controller = ModuleLayer.defineModulesWithOneLoader(config, List.of(ModuleLayer.boot()), parent);
-            layer = controller.layer();
-            loader = layer.findLoader(roots.iterator().next());
-            for (Module foreignModule : layer.modules()) {
-                hostModule.addReads(foreignModule);
+            providers = null;
+            List<Path> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
+            Path copies = ProcessHandler.OfProcess.temporary("jenesis-plugin");
+            for (Path artifact : artifacts) {
+                Path copy = Files.createDirectory(copies.resolve(Integer.toString(modulePath.size()
+                                + classPath.size())))
+                        .resolve(artifact.getFileName().toString());
+                try (Stream<Path> walk = Files.walk(artifact)) {
+                    for (Path file : walk.toList()) {
+                        Path target = copy.resolve(artifact.relativize(file).toString());
+                        if (Files.isDirectory(file)) {
+                            Files.createDirectories(target);
+                        } else {
+                            Files.copy(file, target);
+                        }
+                    }
+                }
+                (pathPlacement.test(copy) ? modulePath : classPath).add(copy);
+            }
+            Module hostModule = JenesisClassLoaderBridge.class.getModule();
+            ClassLoader parent = ClassLoader.getPlatformClassLoader();
+            if (!classPath.isEmpty()) {
+                List<URL> urls = new ArrayList<>(classPath.size());
+                for (Path artifact : classPath) {
+                    urls.add(artifact.toUri().toURL());
+                }
+                parent = new URLClassLoader("jenesis-plugin." + group, urls.toArray(URL[]::new), parent);
+                hostModule.addReads(parent.getUnnamedModule());
+            }
+            if (modulePath.isEmpty()) {
+                controller = null;
+                layer = null;
+                loader = parent;
+            } else {
+                ModuleFinder finder = ModuleFinder.of(modulePath.toArray(Path[]::new));
+                Set<String> roots = finder.findAll().stream()
+                        .map(ref -> ref.descriptor().name())
+                        .collect(Collectors.toUnmodifiableSet());
+                Configuration config = ModuleLayer.boot().configuration()
+                        .resolveAndBind(finder, ModuleFinder.of(), roots);
+                controller = ModuleLayer.defineModulesWithOneLoader(config, List.of(ModuleLayer.boot()), parent);
+                layer = controller.layer();
+                loader = layer.findLoader(roots.iterator().next());
+                for (Module foreignModule : layer.modules()) {
+                    hostModule.addReads(foreignModule);
+                }
             }
         }
         foreignBuildExecutor = Class.forName(BuildExecutor.class.getName(), false, loader);
         foreignBuildExecutorModule = Class.forName(BuildExecutorModule.class.getName(), false, loader);
         if (layer != null && foreignBuildExecutor.getModule().getLayer() == layer) {
-            controller.addOpens(foreignBuildExecutor.getModule(), BuildExecutor.class.getPackageName(), hostModule);
+            controller.addOpens(foreignBuildExecutor.getModule(),
+                    BuildExecutor.class.getPackageName(),
+                    JenesisClassLoaderBridge.class.getModule());
         }
         Class<?> foreignBuildStep = Class.forName(BuildStep.class.getName(), false, loader);
         Class<?> foreignBuildStepContext = Class.forName(BuildStepContext.class.getName(), false, loader);
@@ -423,6 +450,9 @@ class JenesisClassLoaderBridge {
         String kind = service.getSimpleName();
         ServiceLoader.Provider<?> factory = null;
         for (ServiceLoader.Provider<?> provider : ServiceLoader.load(service, loader).stream().toList()) {
+            if (providers != null && !providers.contains(provider.type().getName())) {
+                continue;
+            }
             Annotation annotation = provider.type().getAnnotation(foreignBuildModuleName);
             String providerName;
             if (annotation == null) {
@@ -455,6 +485,9 @@ class JenesisClassLoaderBridge {
     }
 
     private static Object convert(Object value, ClassLoader source, ClassLoader target) {
+        if (source == target) {
+            return value;
+        }
         return switch (value) {
             case null -> null;
             case Proxy proxy when Proxy.getInvocationHandler(proxy) instanceof Adapter adapter
@@ -630,10 +663,11 @@ class JenesisClassLoaderBridge {
                 BuildExecutor hostExecutor,
                 SequencedMap<String, Path> inherited,
                 String group) throws IOException {
-        Object foreignProxy = Proxy.newProxyInstance(
-                loader,
-                new Class<?>[]{foreignBuildExecutor},
-                new BuildExecutorBridge(hostExecutor, group));
+        Object foreignProxy = foreignBuildExecutor == BuildExecutor.class
+                ? new HostedBuildExecutor(hostExecutor, group)
+                : Proxy.newProxyInstance(loader,
+                        new Class<?>[]{foreignBuildExecutor},
+                        new BuildExecutorBridge(hostExecutor, group));
         try {
             foreignAccept.invoke(foreignModule, foreignProxy, inherited);
         } catch (IOException | RuntimeException | Error e) {
@@ -787,6 +821,95 @@ class JenesisClassLoaderBridge {
                 }
             }
         };
+    }
+
+    private class HostedBuildExecutor implements BuildExecutor {
+
+        private final BuildExecutor host;
+        private final String group;
+
+        HostedBuildExecutor(BuildExecutor host, String group) {
+            this.host = host;
+            this.group = group;
+        }
+
+        @Override
+        public void addSource(String identity, Path path) {
+            host.addSource(identity, path);
+        }
+
+        @Override
+        public void addSource(String identity, BuildStep step, SequencedSet<Path> paths) {
+            host.addSource(identity, wrapStep(step, group), paths);
+        }
+
+        @Override
+        public void replaceSource(String identity, Path path) {
+            host.replaceSource(identity, path);
+        }
+
+        @Override
+        public void replaceSource(String identity, BuildStep step, SequencedSet<Path> paths) {
+            host.replaceSource(identity, wrapStep(step, group), paths);
+        }
+
+        @Override
+        public void addStep(String identity, BuildStep step, SequencedMap<String, String> dependencies) {
+            host.addStep(identity, wrapStep(step, group), dependencies);
+        }
+
+        @Override
+        public void replaceStep(String identity, BuildStep step) {
+            host.replaceStep(identity, wrapStep(step, group));
+        }
+
+        @Override
+        public void prependStep(String identity, String prepended, BuildStep step) {
+            host.prependStep(identity, prepended, wrapStep(step, group));
+        }
+
+        @Override
+        public void appendStep(String identity, String original, BuildStep step) {
+            host.appendStep(identity, original, wrapStep(step, group));
+        }
+
+        @Override
+        public void addModule(String identity,
+                              BuildExecutorModule module,
+                              Function<String, Optional<String>> resolver,
+                              SequencedMap<String, String> dependencies) {
+            host.addModule(identity, wrapModule(module, group), resolver, dependencies);
+        }
+
+        @Override
+        public void replaceModule(String identity,
+                                  BuildExecutorModule module,
+                                  Function<String, Optional<String>> resolver) {
+            host.replaceModule(identity, wrapModule(module, group), resolver);
+        }
+
+        @Override
+        public void prependModule(String identity,
+                                  String prepended,
+                                  BuildExecutorModule module,
+                                  Function<String, Optional<String>> resolver) {
+            host.prependModule(identity, prepended, wrapModule(module, group), resolver);
+        }
+
+        @Override
+        public void appendModule(String identity,
+                                 String appended,
+                                 BuildExecutorModule module,
+                                 Function<String, Optional<String>> resolver) {
+            host.appendModule(identity, appended, wrapModule(module, group), resolver);
+        }
+
+        @Override
+        public CompletionStage<SequencedMap<String, Path>> execute(Executor executor,
+                                                                   List<String> selectors,
+                                                                   List<String> optional) {
+            return host.execute(executor, selectors, optional);
+        }
     }
 
     private class BuildExecutorBridge implements InvocationHandler {

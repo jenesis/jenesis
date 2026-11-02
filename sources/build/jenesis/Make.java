@@ -12,6 +12,85 @@ public final class Make {
     private static final List<String> RECORDED = List.of(PROVIDED, PERSONAL, HOME, AMBIENT, DIRECTORY);
     private static final Set<String> PRINTING = Set.of("help", "skill", "prompt", "configuration", "properties", "--stop");
     static final int JVM = 3;
+    static final String PLUGINS = "META-INF/jenesis/plugins.properties";
+    static final List<String> FACTORIES = List.of("build.jenesis.BuildModuleFactory",
+            "build.jenesis.ObservabilityFactory",
+            "build.jenesis.TestFrameworkFactory",
+            "build.jenesis.LanguageFactory");
+    private static final List<String> SERIALIZED = List.of("byte[]",
+            "java.lang.Boolean",
+            "java.lang.Character",
+            "java.lang.Double",
+            "java.lang.Enum",
+            "java.lang.Integer",
+            "java.lang.Long",
+            "java.lang.Number",
+            "java.lang.Object[]",
+            "java.lang.String",
+            "java.lang.String[]",
+            "java.lang.invoke.SerializedLambda",
+            "java.lang.reflect.Proxy",
+            "java.net.URI",
+            "java.time.Duration",
+            "java.time.Instant",
+            "java.time.OffsetDateTime",
+            "java.time.Ser",
+            "java.util.ArrayDeque",
+            "java.util.ArrayList",
+            "java.util.CollSer",
+            "java.util.HashMap",
+            "java.util.HashSet",
+            "java.util.Hashtable",
+            "java.util.LinkedHashMap",
+            "java.util.LinkedHashSet",
+            "java.util.LinkedList",
+            "java.util.Properties",
+            "java.util.TreeMap",
+            "java.util.TreeSet",
+            "java.util.regex.Pattern");
+    private static final String REFLECTED = """
+            ,
+                {"type": "com.sun.org.apache.xalan.internal.xsltc.trax.TransformerFactoryImpl", "methods": [{"name": "<init>", "parameterTypes": []}]},
+                {"type": "com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl", "methods": [{"name": "<init>", "parameterTypes": []}]},
+                {"type": "com.sun.tools.javac.api.JavacTrees", "methods": [{"name": "instance", "parameterTypes": ["javax.tools.JavaCompiler$CompilationTask"]}]},
+                {"type": "com.sun.tools.javac.jvm.ClassWriter$StackMapTableFrame[]"},
+                {"type": "com.sun.tools.javac.jvm.PoolConstant$LoadableConstant[]"},
+                {"type": "java.lang.ClassLoader", "fields": [{"name": "classLoaderValueMap"}]},
+                {"type": "javax.tools.JavaCompiler$CompilationTask"},
+                {"type": "jdk.internal.jrtfs.JrtFileSystemProvider"},
+                {"type": "jdk.internal.misc.Unsafe"},
+                {"type": "sun.security.provider.MD5", "methods": [{"name": "<init>", "parameterTypes": []}]},
+                {"type": "sun.security.provider.NativePRNG", "methods": [{"name": "<init>", "parameterTypes": ["java.security.SecureRandomParameters"]}]},
+                {"type": "sun.security.provider.SHA", "methods": [{"name": "<init>", "parameterTypes": []}]},
+                {"type": "sun.security.provider.SHA2$SHA256", "methods": [{"name": "<init>", "parameterTypes": []}]},
+                {"type": "sun.security.provider.SHA5$SHA512", "methods": [{"name": "<init>", "parameterTypes": []}]},
+                {"type": "sun.text.resources.cldr.FormatData"},
+                {"type": "sun.text.resources.cldr.FormatData_en"},
+                {"type": "sun.text.resources.cldr.FormatData_en_US"},
+                {"type": "sun.util.resources.cldr.TimeZoneNames"},
+                {"type": "sun.util.resources.cldr.TimeZoneNames_en"},
+                {"type": "sun.util.resources.cldr.TimeZoneNames_en_US"},
+                {"type": {"proxy": ["build.jenesis.BuildExecutor"]}, "methods": [{"name": "proxyClassLookup", "parameterTypes": ["java.lang.invoke.MethodHandles$Lookup"]}]},
+                {"type": {"proxy": ["build.jenesis.Repository"]}, "methods": [{"name": "proxyClassLookup", "parameterTypes": ["java.lang.invoke.MethodHandles$Lookup"]}]},
+                {"type": {"proxy": ["build.jenesis.Repository$Observer"]}, "methods": [{"name": "proxyClassLookup", "parameterTypes": ["java.lang.invoke.MethodHandles$Lookup"]}]},
+                {"type": {"proxy": ["build.jenesis.RepositoryItem"]}, "methods": [{"name": "proxyClassLookup", "parameterTypes": ["java.lang.invoke.MethodHandles$Lookup"]}]},
+                {"type": {"proxy": ["build.jenesis.Resolver"]}, "methods": [{"name": "proxyClassLookup", "parameterTypes": ["java.lang.invoke.MethodHandles$Lookup"]}]},
+                {"type": {"proxy": ["build.jenesis.maven.MavenRepository", "build.jenesis.Repository"]}, "methods": [{"name": "proxyClassLookup", "parameterTypes": ["java.lang.invoke.MethodHandles$Lookup"]}]},
+                {"type": {"proxy": ["build.jenesis.maven.MavenResolver", "build.jenesis.Resolver"]}, "methods": [{"name": "proxyClassLookup", "parameterTypes": ["java.lang.invoke.MethodHandles$Lookup"]}]},
+                {"type": {"proxy": ["build.jenesis.module.JenesisRepository", "build.jenesis.Repository"]}, "methods": [{"name": "proxyClassLookup", "parameterTypes": ["java.lang.invoke.MethodHandles$Lookup"]}]}""";
+    private static final String RESOURCES = """
+            ,
+                {"glob": "META-INF/services/com.sun.source.util.Plugin"},
+                {"glob": "META-INF/services/java.nio.charset.spi.CharsetProvider"},
+                {"glob": "META-INF/services/java.nio.file.spi.FileSystemProvider"},
+                {"glob": "META-INF/services/java.time.zone.ZoneRulesProvider"},
+                {"glob": "META-INF/services/javax.annotation.processing.Processor"},
+                {"glob": "META-INF/services/javax.xml.parsers.DocumentBuilderFactory"},
+                {"glob": "META-INF/services/javax.xml.transform.TransformerFactory"},
+                {"module": "java.base", "glob": "java/lang/Object.class"},
+                {"module": "java.xml", "glob": "com/sun/org/apache/xml/internal/serializer/*.properties"},
+                {"module": "jdk.compiler", "glob": "com/sun/tools/javac/resources/*.properties"},
+                {"module": "jdk.jartool", "glob": "sun/tools/jar/resources/*.properties"}""";
     static final List<String> CONTAINED = List.of("jenesis.project.docker",
             "jenesis.project.image",
             "jenesis.project.readable",
@@ -25,6 +104,7 @@ public final class Make {
     private final Mode mode;
     private final Path aotFolder;
     private final Duration aotLifetime;
+    private final Path graalvm;
     private final Settings settings;
 
     public record Settings(Map<String, String> keys,
@@ -52,6 +132,7 @@ public final class Make {
         classes = path(settings.keys(), root, "make.classes", ".jenesis/classes", true, false);
         mode = Mode.of(settings.keys());
         aotFolder = path(settings.keys(), root, "aot.folder", ".jenesis/aot", true, false);
+        graalvm = path(settings.keys(), root, "make.graalvm", null, false, true);
         String lifetime = settings.keys().get("aot.lifetime");
         if (lifetime == null || lifetime.isBlank()) {
             aotLifetime = Duration.ZERO;
@@ -68,7 +149,7 @@ public final class Make {
 
     public enum Mode {
 
-        SOURCE, COMPILED, AOT, DAEMON;
+        SOURCE, COMPILED, AOT, NATIVE, DAEMON;
 
         static Mode of(Map<String, String> keys) {
             String value = keys.get("make.mode"), process = keys.get("process.mode");
@@ -92,7 +173,7 @@ public final class Make {
             }
             throw new IllegalArgumentException("Malformed value for jenesis.make.mode: '"
                     + value
-                    + "' (expected source, compiled, aot or daemon)");
+                    + "' (expected source, compiled, aot, native or daemon)");
         }
     }
 
@@ -215,6 +296,7 @@ public final class Make {
                  Mode mode,
                  Path aotFolder,
                  Duration aotLifetime,
+                 Path graalvm,
                  Settings settings) {
         this.mainClass = mainClass;
         this.ambient = ambient;
@@ -223,6 +305,7 @@ public final class Make {
         this.mode = mode;
         this.aotFolder = aotFolder;
         this.aotLifetime = aotLifetime;
+        this.graalvm = graalvm;
         this.settings = settings;
     }
 
@@ -235,6 +318,7 @@ public final class Make {
                     mode,
                     aotFolder,
                     aotLifetime,
+                    graalvm,
                     settings(root, ambient));
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot read the properties that configure this build", e);
@@ -242,7 +326,7 @@ public final class Make {
     }
 
     public Make classes(Path classes) {
-        return new Make(mainClass, ambient, root, classes, mode, aotFolder, aotLifetime, settings);
+        return new Make(mainClass, ambient, root, classes, mode, aotFolder, aotLifetime, graalvm, settings);
     }
 
     public Mode mode() {
@@ -250,15 +334,19 @@ public final class Make {
     }
 
     public Make mode(Mode mode) {
-        return new Make(mainClass, ambient, root, classes, mode, aotFolder, aotLifetime, settings);
+        return new Make(mainClass, ambient, root, classes, mode, aotFolder, aotLifetime, graalvm, settings);
     }
 
     public Make aotFolder(Path aotFolder) {
-        return new Make(mainClass, ambient, root, classes, mode, aotFolder, aotLifetime, settings);
+        return new Make(mainClass, ambient, root, classes, mode, aotFolder, aotLifetime, graalvm, settings);
     }
 
     public Make aotLifetime(Duration aotLifetime) {
-        return new Make(mainClass, ambient, root, classes, mode, aotFolder, aotLifetime, settings);
+        return new Make(mainClass, ambient, root, classes, mode, aotFolder, aotLifetime, graalvm, settings);
+    }
+
+    public Make graalvm(Path graalvm) {
+        return new Make(mainClass, ambient, root, classes, mode, aotFolder, aotLifetime, graalvm, settings);
     }
 
     public record Result(int code, SequencedMap<String, Path> outputs) {
@@ -273,12 +361,13 @@ public final class Make {
             System.setProperty("java.home", home().toString());
         }
         Make make = new Make("build.jenesis.Project", ambient);
-        if (image() && (make.mode != Mode.COMPILED || ambient.get("toolchain.version") != null)) {
+        if (image() && (make.mode != Mode.COMPILED && make.mode != Mode.NATIVE
+                || ambient.get("toolchain.version") != null)) {
             System.exit(make.jvm(selectors));
         }
         Integer code = relaunched(Make.class, ambient, options, selectors);
         int result = code == null ? make.run(selectors) : code;
-        System.exit(image() && result == JVM ? make.jvm(selectors) : result);
+        System.exit(image() && result == JVM && make.mode != Mode.NATIVE ? make.jvm(selectors) : result);
     }
 
     static boolean image() {
@@ -510,7 +599,16 @@ public final class Make {
         boolean stop = selectors.length == 1 && selectors[0].equals("--stop"),
                 building = mainClass.equals("build.jenesis.Project") && (selectors.length == 0 || !Stream.of(selectors)
                         .allMatch(selector -> PRINTING.contains(selector.split("/", 2)[0])));
+        boolean natively = mode == Mode.NATIVE && collected == null && building && !image();
         if (location == null || !location.getFileName().toString().endsWith(".java")) {
+            if (natively) {
+                if (location == null) {
+                    throw new IllegalStateException("jenesis.make.mode=native compiles the engine from its classes,"
+                            + " but this JVM loaded them from no location it can name - run the engine from a folder"
+                            + " or a jar, or as java build/jenesis/Make.java");
+                }
+                return natively(location, selectors);
+            }
             if (mode != Mode.DAEMON) {
                 if (mode == Mode.AOT && collected == null && location != null && building) {
                     return cached(location, selectors);
@@ -541,6 +639,9 @@ public final class Make {
         List<Path> sources = files(build, ".java");
         String seed = fingerprint(build, sources, classes.toString());
         Path folder = precompiled(build, sources, seed);
+        if (natively) {
+            return natively(folder, selectors);
+        }
         try (URLClassLoader loader = new URLClassLoader(
                 new URL[] { folder.toUri().toURL() },
                 ClassLoader.getPlatformClassLoader())) {
@@ -616,6 +717,369 @@ public final class Make {
             command.add(selector.startsWith("@") ? "@" + selector : selector);
         }
         return awaited(command);
+    }
+
+    private int natively(Path engine, String... selectors) throws IOException, InterruptedException {
+        Path home = graalvm == null ? Path.of(System.getProperty("java.home")) : graalvm;
+        Path compiler = home.resolve("bin").resolve(File.separatorChar == '\\' ? "native-image.cmd" : "native-image");
+        if (!Files.isExecutable(compiler)) {
+            throw new IllegalStateException("jenesis.make.mode=native compiles the engine with the native-image of a"
+                    + " GraalVM, which " + home + " does not hold: name a GraalVM 25 or newer as jenesis.make.graalvm"
+                    + " on the command line or in your own ~/.jenesis/jenesis.properties, or run the build on one");
+        }
+        sweep(engine);
+        Path folder = Files.createDirectories(aotFolder.resolve("native"));
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        Path record = folder.resolve("project-" + HexFormat.of()
+                .formatHex(digest.digest(root.toString().getBytes(StandardCharsets.UTF_8)))
+                .substring(0, 12) + ".properties");
+        Properties recorded = Objects.requireNonNullElseGet(read(record), Properties::new);
+        String image = recorded.getProperty("image"), executable = File.separatorChar == '\\'
+                ? "build.jenesis.exe"
+                : "build.jenesis";
+        boolean stuck = Boolean.parseBoolean(recorded.getProperty("stuck")), handed = false;
+        if (image != null && !stuck && Files.isExecutable(folder.resolve(image).resolve(executable))) {
+            List<String> command = new ArrayList<>();
+            command.add(folder.resolve(image).resolve(executable).toString());
+            for (String name : new TreeSet<>(System.getProperties().stringPropertyNames())) {
+                if (name.startsWith("javax.net.ssl.")
+                        || name.startsWith("http.")
+                        || name.startsWith("https.")
+                        || name.startsWith("socksProxy")) {
+                    command.add("-D" + name + "=" + System.getProperty(name));
+                }
+            }
+            command.add("-Djava.home=" + home);
+            new TreeMap<>(ambient).forEach((key, value) -> {
+                if (!key.startsWith("toolchain.")) {
+                    command.add("-Djenesis." + key + "=" + value);
+                }
+            });
+            command.add("-Djenesis.make.root=" + root);
+            command.add("-Djenesis.make.mode=native");
+            for (String selector : selectors) {
+                command.add(selector.startsWith("@") ? "@" + selector : selector);
+            }
+            int code = awaited(command);
+            if (code != JVM) {
+                return code;
+            }
+            handed = true;
+        }
+        Path metadata = Files.createDirectories(folder.resolve("metadata"));
+        Path loaded = Files.createTempFile(folder, "plugins", ".properties");
+        try {
+            List<String> command = new ArrayList<>();
+            command.add(home.resolve("bin").resolve(File.separatorChar == '\\' ? "java.exe" : "java").toString());
+            if (!stuck) {
+                command.add("-agentlib:native-image-agent=config-merge-dir=" + metadata);
+            }
+            new TreeMap<>(ambient).forEach((key, value) -> {
+                if (!key.startsWith("toolchain.") && !key.equals("make.mode")) {
+                    command.add("-Djenesis." + key + "=" + value);
+                }
+            });
+            command.add("-Djenesis.make.root=" + root);
+            command.add("-Djenesis.make.classes=" + classes);
+            command.add("-Djenesis.make.mode=compiled");
+            command.add("-Djenesis.make.plugins=" + loaded);
+            command.addAll(List.of("-cp", engine.toString(), Make.class.getName()));
+            for (String selector : selectors) {
+                command.add(selector.startsWith("@") ? "@" + selector : selector);
+            }
+            int code = awaited(command);
+            Properties plugins = Objects.requireNonNullElseGet(read(loaded), Properties::new);
+            StringBuilder setup = new StringBuilder(Files.readString(home.resolve("release")));
+            for (String group : new TreeSet<>(plugins.stringPropertyNames())) {
+                if (!group.endsWith(".artifacts")) {
+                    setup.append('\n').append(group).append('=').append(plugins.getProperty(group));
+                }
+            }
+            setup.append('\n').append(fingerprint(metadata, files(metadata, ""), ""));
+            String key = fingerprint(engine, files(engine, ""), setup.toString()).substring(0, 16);
+            if (!key.equals(image)) {
+                Path target = folder.resolve(key);
+                recorded.setProperty("image", key);
+                recorded.setProperty("stuck", Boolean.toString(!Files.isExecutable(target.resolve(executable))
+                        && !compiled(compiler, engine, plugins, metadata, target)));
+            } else if (handed) {
+                recorded.setProperty("stuck", "true");
+            }
+            Path temporary = Files.createTempFile(folder, "project", ".properties");
+            try (Writer writer = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8)) {
+                recorded.store(writer, null);
+            }
+            Files.move(temporary, record, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            return code;
+        } finally {
+            Files.deleteIfExists(loaded);
+        }
+    }
+
+    private static boolean compiled(Path compiler,
+                                    Path engine,
+                                    Properties plugins,
+                                    Path metadata,
+                                    Path target) throws IOException, InterruptedException {
+        Path staging = target.resolveSibling(target.getFileName() + "~");
+        if (Files.exists(staging)) {
+            try (Stream<Path> files = Files.walk(staging)) {
+                for (Path file : files.sorted(Comparator.reverseOrder()).toList()) {
+                    Files.delete(file);
+                }
+            }
+        }
+        Path configuration = Files.createDirectories(staging.resolve("configuration")),
+                resources = Files.createDirectories(staging.resolve("resources"));
+        SequencedSet<Path> path = new LinkedHashSet<>(List.of(engine));
+        Map<String, Path> modules = new HashMap<>();
+        Properties compiled = new Properties();
+        for (String group : new TreeSet<>(plugins.stringPropertyNames())) {
+            if (group.endsWith(".artifacts")) {
+                continue;
+            }
+            SequencedMap<String, Path> named = new LinkedHashMap<>();
+            String conflict = null;
+            for (String artifact : plugins.getProperty(group + ".artifacts", "").split(File.pathSeparator)) {
+                if (artifact.isEmpty()) {
+                    continue;
+                }
+                Path jar = Path.of(artifact);
+                String name = ModuleFinder.of(jar).findAll().stream()
+                        .map(reference -> reference.descriptor().name())
+                        .findFirst()
+                        .orElse(jar.getFileName().toString());
+                if (name.equals("build.jenesis")) {
+                    continue;
+                }
+                Path known = modules.get(name);
+                if (known != null && Files.mismatch(known, jar) != -1) {
+                    conflict = name;
+                }
+                named.put(name, jar);
+            }
+            if (conflict != null) {
+                System.err.println("The plugin " + group + " needs another " + conflict + " than a plugin the native"
+                        + " image of Jenesis holds already, so it is left out and its builds run on a JVM.");
+                continue;
+            }
+            SequencedSet<String> providers = new TreeSet<>();
+            for (Path jar : named.values()) {
+                modules.putIfAbsent(jar.getFileName().toString(), jar);
+                path.add(jar);
+                if (Files.isRegularFile(jar)) {
+                    try (JarFile file = new JarFile(jar.toFile())) {
+                        for (String factory : FACTORIES) {
+                            JarEntry entry = file.getJarEntry("META-INF/services/" + factory);
+                            if (entry != null) {
+                                try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                                        file.getInputStream(entry), StandardCharsets.UTF_8))) {
+                                    reader.lines()
+                                            .map(line -> line.replaceFirst("#.*", "").strip())
+                                            .filter(line -> !line.isEmpty())
+                                            .forEach(providers::add);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            named.forEach(modules::putIfAbsent);
+            compiled.setProperty(group, plugins.getProperty(group));
+            compiled.setProperty(group + ".providers", String.join(",", providers));
+        }
+        Path registry = Files.createDirectories(resources.resolve(PLUGINS).getParent()).resolve(Path.of(PLUGINS)
+                .getFileName().toString());
+        try (Writer writer = Files.newBufferedWriter(registry, StandardCharsets.UTF_8)) {
+            compiled.store(writer, null);
+        }
+        described(configuration, engine, path);
+        List<String> command = new ArrayList<>(List.of(compiler.toString(),
+                "--no-fallback",
+                "--enable-url-protocols=http,https",
+                "--add-modules=jdk.compiler,jdk.jartool",
+                "--exact-reachability-metadata-path=" + path.stream()
+                        .map(Path::toString)
+                        .collect(Collectors.joining(File.pathSeparator)),
+                "-H:+UnlockExperimentalVMOptions",
+                "-H:IncludeResourceBundles=com.sun.tools.javac.resources.compiler,com.sun.tools.javac.resources.javac,"
+                        + "com.sun.tools.javac.resources.ct,sun.tools.jar.resources.jar,"
+                        + "com.sun.org.apache.xml.internal.serializer.XMLEntities",
+                "-H:ConfigurationFileDirectories=" + configuration
+                        + (files(metadata, "").isEmpty() ? "" : "," + metadata),
+                "-o", staging.resolve("build.jenesis").toString(),
+                "-cp", Stream.concat(Stream.of(resources), path.stream())
+                        .map(Path::toString)
+                        .collect(Collectors.joining(File.pathSeparator)),
+                Make.class.getName()));
+        System.err.println("Compiling a native image of Jenesis for this build with " + compiler
+                + ", once for this engine, these plugins and what earlier builds recorded; the build ran on a JVM.");
+        Path log = staging.resolve("native-image.log");
+        Process process = new ProcessBuilder(command)
+                .redirectErrorStream(true)
+                .redirectOutput(log.toFile())
+                .start();
+        Thread hook = new Thread(process::destroy);
+        Runtime.getRuntime().addShutdownHook(hook);
+        int code;
+        try {
+            code = process.waitFor();
+        } finally {
+            try {
+                Runtime.getRuntime().removeShutdownHook(hook);
+            } catch (IllegalStateException _) {
+                process.destroy();
+            }
+        }
+        if (code != 0) {
+            System.err.println("native-image failed with exit code " + code + ", so builds of this setup keep running"
+                    + " on a JVM - its output is in " + log);
+            return false;
+        }
+        Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE);
+        return true;
+    }
+
+    static void described(Path configuration, Path engine, SequencedSet<Path> path) throws IOException {
+        record Shape(String parent, List<String> interfaces, boolean type, boolean lambdas) {
+        }
+        SequencedMap<String, Shape> shapes = new TreeMap<>();
+        Map<String, Path> origins = new HashMap<>();
+        SequencedSet<String> resources = new TreeSet<>(Set.of(PLUGINS));
+        for (Path entry : path) {
+            Map<String, byte[]> files = new TreeMap<>();
+            if (Files.isDirectory(entry)) {
+                try (Stream<Path> walk = Files.walk(entry)) {
+                    for (Path file : walk.filter(Files::isRegularFile).toList()) {
+                        files.put(entry.relativize(file).toString().replace(File.separatorChar, '/'),
+                                Files.readAllBytes(file));
+                    }
+                }
+            } else {
+                try (JarFile jar = new JarFile(entry.toFile())) {
+                    for (JarEntry file : Collections.list(jar.entries())) {
+                        if (!file.isDirectory()) {
+                            try (InputStream input = jar.getInputStream(file)) {
+                                files.put(file.getName(), input.readAllBytes());
+                            }
+                        }
+                    }
+                }
+            }
+            files.forEach((name, bytes) -> {
+                if (!name.startsWith("META-INF/") || name.startsWith("META-INF/services/")) {
+                    resources.add(name);
+                }
+                if (!name.endsWith(".class") || name.endsWith("module-info.class") || name.startsWith("META-INF/")) {
+                    return;
+                }
+                ClassModel model;
+                try {
+                    model = ClassFile.of().parse(bytes);
+                } catch (IllegalArgumentException _) {
+                    return;
+                }
+                String internal = model.thisClass().asInternalName();
+                shapes.putIfAbsent(internal, new Shape(model.superclass().map(ClassEntry::asInternalName).orElse(null),
+                        model.interfaces().stream().map(ClassEntry::asInternalName).toList(),
+                        !model.flags().has(AccessFlag.INTERFACE),
+                        model.methods().stream()
+                                .anyMatch(method -> method.methodName().equalsString("$deserializeLambda$"))));
+                origins.putIfAbsent(internal, entry);
+            });
+        }
+        Map<String, Boolean> serializable = new HashMap<>();
+        Function<String, Boolean> serializing = new Function<>() {
+            @Override
+            public Boolean apply(String name) {
+                Boolean known = serializable.get(name);
+                if (known != null) {
+                    return known;
+                }
+                Shape shape = shapes.get(name);
+                boolean result;
+                if (name.equals("java/io/Serializable")) {
+                    result = true;
+                } else if (shape == null) {
+                    boolean found;
+                    try {
+                        found = Serializable.class.isAssignableFrom(Class.forName(name.replace('/', '.'),
+                                false,
+                                ClassLoader.getPlatformClassLoader()));
+                    } catch (ClassNotFoundException | LinkageError _) {
+                        found = false;
+                    }
+                    result = found;
+                } else {
+                    result = shape.parent() != null && apply(shape.parent())
+                            || shape.interfaces().stream().anyMatch(this::apply);
+                }
+                serializable.put(name, result);
+                return result;
+            }
+        };
+        StringBuilder reflection = new StringBuilder(), lambdas = new StringBuilder();
+        shapes.forEach((internal, shape) -> {
+            String name = internal.replace('/', '.');
+            boolean owned = origins.get(internal).equals(engine);
+            boolean serialized = shape.type() && serializing.apply(internal);
+            if (owned || serialized) {
+                reflection.append(reflection.isEmpty() ? "" : ",\n")
+                        .append("    {\"type\": \"")
+                        .append(name)
+                        .append('"');
+                if (owned) {
+                    reflection.append(", \"allDeclaredConstructors\": true, \"allDeclaredMethods\": true,"
+                            + " \"allDeclaredFields\": true");
+                }
+                if (serialized) {
+                    reflection.append(", \"serializable\": true");
+                }
+                reflection.append('}');
+            }
+            if (shape.lambdas()) {
+                lambdas.append(lambdas.isEmpty() ? "" : ",\n").append("    {\"name\": \"").append(name).append("\"}");
+            }
+        });
+        for (String name : SERIALIZED) {
+            reflection.append(",\n    {\"type\": \"").append(name).append("\", \"serializable\": true}");
+        }
+        for (String type : List.of("java.util.Collections", "java.util.ImmutableCollections", "java.util.Arrays")) {
+            Deque<Class<?>> pending;
+            try {
+                pending = new ArrayDeque<>(List.of(Class.forName(type)));
+            } catch (ClassNotFoundException e) {
+                throw new IllegalStateException(e);
+            }
+            while (!pending.isEmpty()) {
+                for (Class<?> nested : pending.pop().getDeclaredClasses()) {
+                    if (Serializable.class.isAssignableFrom(nested) && !nested.isInterface()) {
+                        reflection.append(",\n    {\"type\": \"")
+                                .append(nested.getName())
+                                .append("\", \"serializable\": true}");
+                    }
+                    pending.add(nested);
+                }
+            }
+        }
+        reflection.append(REFLECTED);
+        StringBuilder globs = new StringBuilder();
+        for (String resource : resources) {
+            globs.append(globs.isEmpty() ? "" : ",\n").append("    {\"glob\": \"")
+                    .append(resource.replace("\\", "\\\\").replace("\"", "\\\"").replace("*", "\\*")
+                            .replace("?", "\\?").replace("{", "\\{").replace("[", "\\["))
+                    .append("\"}");
+        }
+        globs.append(RESOURCES);
+        Files.writeString(configuration.resolve("reachability-metadata.json"), "{\n  \"reflection\": [\n" + reflection
+                + "\n  ],\n  \"resources\": [\n" + globs + "\n  ]\n}\n");
+        Files.writeString(configuration.resolve("serialization-config.json"),
+                "{\n  \"types\": [],\n  \"lambdaCapturingTypes\": [\n" + lambdas + "\n  ],\n  \"proxies\": []\n}\n");
     }
 
     private static int awaited(List<String> command) throws IOException, InterruptedException {
@@ -719,9 +1183,30 @@ public final class Make {
             throws Exception {
         Class<?> project = Class.forName("build.jenesis.Project", true, loader);
         if (collected == null || !mainClass.equals("build.jenesis.Project")) {
-            return (int) project
+            int code = (int) project
                     .getMethod("run", Map.class, String.class, Path.class, SequencedSet.class, String[].class)
                     .invoke(null, settled(), mainClass, root, settings.profiles(), selectors);
+            if (command(settings.keys(), "make.plugins") != null) {
+                Properties loaded = new Properties();
+                ((Map<?, ?>) Class.forName("build.jenesis.project.ExternalModule", true, loader)
+                        .getMethod("loaded")
+                        .invoke(null)).forEach((group, artifacts) -> {
+                    List<?> values = (List<?>) artifacts;
+                    loaded.setProperty(group.toString(), values.getFirst().toString());
+                    loaded.setProperty(group + ".artifacts", values.subList(1, values.size()).stream()
+                            .map(Object::toString)
+                            .collect(Collectors.joining(File.pathSeparator)));
+                });
+                try (Writer writer = Files.newBufferedWriter(path(settings.keys(),
+                        root,
+                        "make.plugins",
+                        null,
+                        false,
+                        false), StandardCharsets.UTF_8)) {
+                    loaded.store(writer, null);
+                }
+            }
+            return code;
         }
         Object produced = project
                 .getMethod("perform", Map.class, Path.class, SequencedSet.class, String[].class)

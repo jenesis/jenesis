@@ -107,26 +107,28 @@ so a version range or a `pin` proposal sees the mirror's list of versions.
 
 ### A native image of the engine
 
-With `GRAALVM_HOME` naming a GraalVM 25 or newer, the `native` profile compiles the engine with `native-image`,
-from the metadata under `sources/META-INF/native-image/`, into `target/stage/native/output/build.jenesis`:
+`jenesis.make.mode=native` runs the build as a native image of the engine, compiled by the `native-image` of the
+GraalVM that `jenesis.make.graalvm` names - by default the JDK running `Make`, where that is a GraalVM:
 
 ```bash
-java -Djenesis.make.profiles=native build/jenesis/Make.java stage
+java -Djenesis.make.mode=native -Djenesis.make.graalvm=/path/to/graalvm build/jenesis/Make.java
 ```
 
-Run from a project's root, the binary builds it as `java build/jenesis/Make.java` would, without starting a JVM:
-`javac` and `jar` run inside it, and every other tool is forked from the JDK that `JAVA_HOME` names, or the one
-whose `java` is on the `PATH`. Steps are keyed on the version that JDK's `release` file names, so a native build
-and a JVM build of one project reuse each other's work. The binary reads no `JAVA_TOOL_OPTIONS`; a trust store or
-a proxy is handed to it as `-D` arguments.
+The first build runs on that GraalVM's JVM under its tracing agent, which records what the image needs, and the
+build records the plugins it loaded. `Make` then compiles an image of the engine and those plugins into
+`jenesis.aot.folder`, once per engine, plugins and recorded metadata, which takes some minutes. Every later build
+runs the image: `javac` and `jar` inside it, every other tool forked from the GraalVM, with steps keyed on the
+version its `release` file names.
 
-What a native image cannot do, it hands to a JVM: a build that loads a plugin, or reads the modules of the JDK
-itself - an annotation processor on the module path, a dependency it modularises, an image holding module
-layers - prints why and continues as
-`java build/jenesis/Make.java` in the project, which skips every step the native run completed. So does a build
-naming `jenesis.toolchain.version` or a `jenesis.make.mode` other than `compiled`. Every step is serialised to key
-its cache entry, and a native image deserialises only what its metadata names, so `NativeImageMetadataTest` fails
-on a serialisable class of the engine the metadata leaves out.
+A plugin is compiled in with the classes it ships, linked against the engine rather than the release of
+`build.jenesis` it was built against, so its steps can run once more when a build moves between the image and a
+JVM. A plugin a project compiles itself, one that needs another version of a library than a plugin compiled in
+already, and a build that reads the modules of the JDK - an annotation processor on the module path, a dependency
+it modularises, an image holding module layers - run on the JVM instead. When the image meets one of them, or
+something its metadata lacks, it hands the build back to `Make`, which runs it on the JVM under the agent again
+and compiles a new image if that taught it anything; a project whose image can learn nothing more keeps building
+on the JVM until its engine or plugins change. The image reads no `JAVA_TOOL_OPTIONS`; `Make` hands it the trust
+store and proxy settings of its own JVM.
 
 Build performance
 -----------------
