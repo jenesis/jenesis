@@ -9,7 +9,6 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.Environment.Setting;
-import build.jenesis.Jdk;
 import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
@@ -192,7 +191,7 @@ public class ModularProject implements BuildExecutorModule {
                                                     "[RELEASE]",
                                                     palette.reset(),
                                                     properties.getProperty("module"),
-                                                    Jdk.version().feature(),
+                                                    Runtime.version().feature(),
                                                     Path.of(properties.getProperty("path")).resolve("module-info.java")));
                                 }
                             }
@@ -282,7 +281,7 @@ public class ModularProject implements BuildExecutorModule {
                 "",
                 true,
                 platform,
-                Jdk.version().feature(),
+                Runtime.version().feature(),
                 MavenModuleRepository.segments(),
                 true);
     }
@@ -834,7 +833,7 @@ public class ModularProject implements BuildExecutorModule {
                             relative,
                             modular,
                             platform,
-                            Jdk.version().feature(),
+                            Runtime.version().feature(),
                             segments,
                             maven), manifestDeps);
                     module.addStep(COORDINATES, new Coordinates(prefix), MANIFESTS);

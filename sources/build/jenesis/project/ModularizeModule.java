@@ -91,7 +91,7 @@ public class ModularizeModule implements BuildExecutorModule {
     private static class Prepare implements BuildStep {
 
         @SuppressWarnings("unused")
-        private final String version = Jdk.version().toString();
+        private final String version = Runtime.version().version() + "+" + Runtime.version().build().orElse(0);
 
         private final Mode mode;
 
@@ -184,7 +184,7 @@ public class ModularizeModule implements BuildExecutorModule {
             staged.store(context.next().resolve(STAGED));
             identity.store(context.next().resolve(IDENTITY));
             SequencedProperties options = new SequencedProperties();
-            options.setProperty("--multi-release", String.valueOf(Jdk.version().feature()));
+            options.setProperty("--multi-release", String.valueOf(Runtime.version().feature()));
             options.setProperty("--ignore-missing-deps", "");
             ProcessBuildStep.store(context.next(), ProcessBuildStep.PROCESS, "jdeps", options);
             return CompletableFuture.completedStage(new BuildStepResult(true));

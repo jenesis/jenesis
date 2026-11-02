@@ -8,7 +8,6 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Jdk;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
 
@@ -235,7 +234,7 @@ public class Ide implements BuildExecutorModule {
                 .map(Module::release)
                 .filter(Objects::nonNull)
                 .max(Integer::compareTo)
-                .orElseGet(() -> Jdk.version().feature());
+                .orElseGet(() -> Runtime.version().feature());
         List<String> entries = new ArrayList<>();
         for (Module module : modules) {
             Path file = module.content().resolve(module.name() + ".iml");
