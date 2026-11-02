@@ -5102,7 +5102,19 @@ public record Project(
                           SequencedSet<Path> profiles,
                           String... selectors) {
         if (mainClass.equals(Project.class.getName())) {
-            return perform(environment, root, profiles, selectors) == null ? 1 : 0;
+            try {
+                ofEnvironment(environment, root).profiles(profiles.toArray(Path[]::new)).doMain(selectors);
+                return 0;
+            } catch (Throwable t) {
+                for (Throwable cause = t; cause != null; cause = cause.getCause()) {
+                    if (cause instanceof Jdk.Unavailable unavailable) {
+                        environment.err().accept(unavailable.getMessage() + ", so the build continues on a JVM.");
+                        return Make.JVM;
+                    }
+                }
+                report(t, environment);
+                return 1;
+            }
         }
         try {
             if (mainClass.equals(Execution.class.getName())) {
