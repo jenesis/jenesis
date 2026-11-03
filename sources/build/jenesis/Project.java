@@ -4852,7 +4852,7 @@ public record Project(
                 test.concurrency|0|Run at most this many test runs at once across the build, each a forked JVM, while every other step keeps running; 1 runs one module's tests at a time, as Maven does, and 0 leaves them bounded by process.concurrency alone
                 test.reporting|false|Write a test run's reports into the module's reports/tests folder - the legacy JUnit XML and the open-test-reporting XML - and name that folder when the run fails; without it the JUnit Platform writes none
                 stage.tests|false|Stage test modules alongside the main ones; a test module is otherwise unstaged, as stage=false leaves a module
-                tree.format|full|full|compact: what the dependencies selector prints
+                tree.format|full|full|compact|java: what the dependencies selector prints; java prints, for every module but the test modules, the options, module path, class path and main class java runs it with, as the lines of an argument file
                 tree.merge|true|One tree per module whose every node names the scopes it applies to; false prints one tree per module and scope
                 tree.internal|false|List the project's own modules among the resolved dependencies and count them in the license summary
                 tree.tests|true|Include test-variant modules in that output

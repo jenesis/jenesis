@@ -17,34 +17,35 @@ public class Tree implements BuildStep {
 
     private final transient Consumer<String> out;
     private final transient Palette palette;
-    private final transient boolean compact, merged, internal, tests, tools;
+    private final transient Format format;
+    private final transient boolean merged, internal, tests, tools;
     private final transient String group;
 
     public Tree() {
-        this(null, Palette.NONE, false, true, false, true, false, "main");
+        this(null, Palette.NONE, Format.FULL, true, false, true, false, "main");
     }
 
     public static Tree ofEnvironment(Environment environment) {
-        Tree tree = new Tree(environment.out(),
+        String format = environment.value("tree.format", "full", Setting.PROJECT);
+        return new Tree(environment.out(),
                 Palette.ofEnvironment(environment),
-                false,
+                switch (format) {
+                    case "full" -> Format.FULL;
+                    case "compact" -> Format.COMPACT;
+                    case "java" -> Format.JAVA;
+                    default -> throw new IllegalArgumentException(
+                            "Unknown jenesis.tree.format '" + format + "', expected 'full', 'compact' or 'java'");
+                },
                 environment.flag("tree.merge", true, Setting.PROJECT),
                 environment.flag("tree.internal", false, Setting.PROJECT),
                 environment.flag("tree.tests", true, Setting.PROJECT),
                 environment.flag("tree.tools", false, Setting.PROJECT),
                 "main");
-        String format = environment.getProperty("tree.format", Setting.PROJECT);
-        return format == null ? tree : tree.compact(switch (format) {
-            case "full" -> false;
-            case "compact" -> true;
-            default -> throw new IllegalArgumentException(
-                    "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
-        });
     }
 
     private Tree(Consumer<String> out,
                  Palette palette,
-                 boolean compact,
+                 Format format,
                  boolean merged,
                  boolean internal,
                  boolean tests,
@@ -52,7 +53,7 @@ public class Tree implements BuildStep {
                  String group) {
         this.out = out;
         this.palette = palette;
-        this.compact = compact;
+        this.format = format;
         this.merged = merged;
         this.internal = internal;
         this.tests = tests;
@@ -61,31 +62,31 @@ public class Tree implements BuildStep {
     }
 
     public Tree printing(Consumer<String> out, Palette palette) {
-        return new Tree(out, palette, compact, merged, internal, tests, tools, group);
+        return new Tree(out, palette, format, merged, internal, tests, tools, group);
     }
 
-    public Tree compact(boolean compact) {
-        return new Tree(out, palette, compact, merged, internal, tests, tools, group);
+    public Tree format(Format format) {
+        return new Tree(out, palette, format, merged, internal, tests, tools, group);
     }
 
     public Tree merged(boolean merged) {
-        return new Tree(out, palette, compact, merged, internal, tests, tools, group);
+        return new Tree(out, palette, format, merged, internal, tests, tools, group);
     }
 
     public Tree internal(boolean internal) {
-        return new Tree(out, palette, compact, merged, internal, tests, tools, group);
+        return new Tree(out, palette, format, merged, internal, tests, tools, group);
     }
 
     public Tree tests(boolean tests) {
-        return new Tree(out, palette, compact, merged, internal, tests, tools, group);
+        return new Tree(out, palette, format, merged, internal, tests, tools, group);
     }
 
     public Tree tools(boolean tools) {
-        return new Tree(out, palette, compact, merged, internal, tests, tools, group);
+        return new Tree(out, palette, format, merged, internal, tests, tools, group);
     }
 
     public Tree group(String group) {
-        return new Tree(out, palette, compact, merged, internal, tests, tools, group);
+        return new Tree(out, palette, format, merged, internal, tests, tools, group);
     }
 
     @Override
@@ -99,6 +100,37 @@ public class Tree implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         if (out == null) {
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+        if (format == Format.JAVA) {
+            for (BuildStepArgument argument : arguments.values()) {
+                Path inventoryFile = argument.removed() ? null : argument.folder().resolve(Inventory.INVENTORY);
+                if (inventoryFile == null || !Files.isRegularFile(inventoryFile)) {
+                    continue;
+                }
+                SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
+                for (String prefix : Inventory.prefixes(inventory)) {
+                    if (inventory.getProperty(prefix + ".test") != null
+                            || Inventory.paths(inventory, argument.folder(), prefix + ".runtime").isEmpty()) {
+                        continue;
+                    }
+                    String mainClass = inventory.value(prefix + ".mainClass"),
+                            path = inventory.value(prefix + ".path", "");
+                    JavaLaunch launch = JavaLaunch.of(inventory, argument.folder(), prefix, mainClass);
+                    out.accept("# ./" + path + (mainClass == null ? " names no main class" : " runs " + mainClass));
+                    Stream.of(launch.options(), launch.attached()).flatMap(List::stream).map(Tree::token).forEach(out);
+                    launch.paths().forEach((option, value) -> {
+                        if (!value.isEmpty()) {
+                            out.accept(option + " " + token(value));
+                        }
+                    });
+                    launch.relaxations().stream().map(Tree::token).forEach(out);
+                    if (!launch.main().isEmpty()) {
+                        out.accept(launch.main().stream().map(Tree::token).collect(Collectors.joining(" ")));
+                    }
+                    out.accept("");
+                }
+            }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         Map<Path, SequencedProperties> inventories = new HashMap<>();
@@ -129,7 +161,7 @@ public class Tree implements BuildStep {
             }
         }
         DependencyTreeReport report = new DependencyTreeReport(out, palette)
-                .compact(compact)
+                .compact(format == Format.COMPACT)
                 .merged(merged)
                 .internal(internal)
                 .locations(locations);
@@ -194,5 +226,16 @@ public class Tree implements BuildStep {
         }
         report.summary(aggregated);
         return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    private static String token(String value) {
+        return value.isEmpty() || value.chars().anyMatch(character -> Character.isWhitespace(character)
+                || character == '"' || character == '\'' || character == '#' || character == '\\')
+                ? "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+                : value;
+    }
+
+    public enum Format {
+        FULL, COMPACT, JAVA
     }
 }

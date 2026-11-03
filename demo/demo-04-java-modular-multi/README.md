@@ -407,7 +407,8 @@ declares `@jenesis.test abstract`, so with the flag their trees are gone and the
 JUnit closure only they reached goes with them: the license and module summary
 below the trees now counts `org.slf4j`, the one dependency the project ships,
 rather than the twelve a test run resolves. Passed on its own, the flag prunes the same
-modules from the full graph. The default `full` format prints the whole graph;
+modules from the full graph. The default `full` format prints the whole graph,
+and `java` prints, instead of a graph, the arguments `java` runs each module with;
 any other value is rejected.
 
 The ABI of each module

@@ -37,7 +37,49 @@ public class TreeTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown jenesis.tree.format 'fancy'")
                 .hasMessageContaining("full")
-                .hasMessageContaining("compact");
+                .hasMessageContaining("compact")
+                .hasMessageContaining("java");
+    }
+
+    @Test
+    public void java_format_prints_the_arguments_java_runs_a_module_with() throws IOException {
+        Path jar = Files.writeString(argument.resolve("app.jar"), ""),
+                library = Files.writeString(argument.resolve("lib with space.jar"), "");
+        Files.writeString(argument.resolve("java.properties"), "--add-opens=java.base/java.lang=ALL-UNNAMED\n");
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-app.path", "app");
+        inventory.setProperty("module-app.mainClass", "sample.App");
+        inventory.setProperty("module-app.runtime.0", "app.jar");
+        inventory.setProperty("module-app.runtime.1", "lib with space.jar");
+        inventory.setProperty("module-app.process.0", "java.properties");
+        inventory.setProperty("module-library.path", "library");
+        inventory.setProperty("module-library.runtime.0", "app.jar");
+        inventory.setProperty("module-library-test.path", "library-test");
+        inventory.setProperty("module-library-test.test", "library");
+        inventory.setProperty("module-library-test.runtime.0", "app.jar");
+        inventory.store(argument.resolve(Inventory.INVENTORY));
+
+        List<String> printed = new ArrayList<>();
+        Tree.ofEnvironment(new Environment(Map.of("tree.format", "java")).out(printed::add)).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement, persistent),
+                new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(argument, Map.of()))))
+                .toCompletableFuture().join();
+
+        UnaryOperator<String> token = value -> value.contains(" ") || value.contains("\\")
+                ? "\"" + value.replace("\\", "\\\\") + "\""
+                : value;
+        assertThat(printed)
+                .as("a test module is left out, and a value with a space is quoted as java reads an argument file")
+                .containsExactly("# ./app runs sample.App",
+                        "--add-opens",
+                        "java.base/java.lang=ALL-UNNAMED",
+                        "-cp " + token.apply(jar + File.pathSeparator + library),
+                        "sample.App",
+                        "",
+                        "# ./library names no main class",
+                        "-cp " + token.apply(jar.toString()),
+                        "");
     }
 
     @Test
