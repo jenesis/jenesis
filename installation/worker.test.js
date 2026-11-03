@@ -25,7 +25,7 @@ const SCRIPT = "#!/usr/bin/env bash\necho jenesis\n";
  * returned `calls` records every upstream request, so a test can assert what was asked for
  * and with which Cloudflare cache options.
  */
-async function call({ method = "GET", upstream = SCRIPT } = {}) {
+async function call({ method = "GET", upstream = SCRIPT, url = "https://get.jenesis.build/" } = {}) {
   const calls = [];
   const saved = globalThis.fetch;
   globalThis.fetch = async (url, options) => {
@@ -35,7 +35,7 @@ async function call({ method = "GET", upstream = SCRIPT } = {}) {
       : new Response(upstream.body ?? "", { status: upstream.status });
   };
   try {
-    const response = await worker.fetch(new Request("https://get.jenesis.build/", { method }));
+    const response = await worker.fetch(new Request(url, { method }));
     return { response, calls };
   } finally {
     globalThis.fetch = saved;
@@ -56,6 +56,27 @@ test("the response is typed as a shell script, so curl | bash is not fed HTML", 
 test("the response is cacheable for five minutes", async () => {
   const { response } = await call();
   assert.equal(response.headers.get("cache-control"), "public, max-age=300");
+});
+
+test("a request over plain HTTP is refused before anything is fetched", async () => {
+  for (const method of ["GET", "HEAD", "POST"]) {
+    const { response, calls } = await call({ method, url: "http://get.jenesis.build/" });
+    assert.equal(response.status, 403, method);
+    assert.equal(calls.length, 0, method);
+  }
+});
+
+test("the refusal is a script that names HTTPS and fails, so curl without -f piped to bash stops", async () => {
+  const { response } = await call({ url: "http://get.jenesis.build/" });
+  const body = await response.text();
+  assert.match(body, /https:\/\/get\.jenesis\.build/);
+  assert.match(body, /^exit 1$/m);
+  assert.equal(response.headers.get("strict-transport-security"), null);
+});
+
+test("a script served over HTTPS tells browsers to keep to HTTPS for a year", async () => {
+  const { response } = await call();
+  assert.equal(response.headers.get("strict-transport-security"), "max-age=31536000");
 });
 
 test("the response names the source it proxied", async () => {
