@@ -128,11 +128,13 @@ public class AggregateJavadocTest {
 
         run(aggregate());
 
+        Function<Path, String> escaped = path -> path.toString().replace("\\", "\\\\");
         assertThat(supplement.resolve("javadoc.args"))
                 .content()
-                .contains(library.toString())
-                .doesNotContain(sibling.toString())
-                .doesNotContain(runtime.toString());
+                .as("an argument file escapes a backslash, as on Windows a path holds one")
+                .contains(escaped.apply(library))
+                .doesNotContain(escaped.apply(sibling))
+                .doesNotContain(escaped.apply(runtime));
     }
 
     @Test
