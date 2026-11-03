@@ -49,6 +49,30 @@ Either way the build records `main=sample.Sample` in the module's
 `module.properties`. That single field is what both the `Execute` launcher and
 the `package` step key off to treat the module as runnable.
 
+Running it with java yourself
+-----------------------------
+
+`Execute.java` runs that main class on the module's run paths. To run it another
+way - from a script, an IDE or under a debugger - ask the `dependencies` selector
+for the arguments `java` needs rather than for the dependency graph:
+
+    java -Djenesis.print.progress=false -Djenesis.tree.format=java \
+        build/jenesis/Make.java dependencies > target/run.args
+    java @target/run.args ada lovelace
+
+    # ./ runs sample.Sample
+    -cp <project>/target/build/maven/compose/module/build-module-/.../build.jenesis.demo~java-pom-executable~1.0.0.jar:<project>/target/build/.../org.apache.commons.lang3-3.14.0.jar
+    sample.Sample
+
+Each module prints as a comment naming it, followed by the lines `java` reads
+from an argument file: the options of its `process-java.properties`, its attached
+agents, its module path and class path, its grants of native access, and its
+main class, as `-m <module>/<class>` for a module declared by a
+`module-info.java`. A module without a main class prints its paths alone, and a
+test module is left out. The paths are absolute and point into `target/`, so they
+hold until the next clean build. The build prints its own messages to the same
+output, and `jenesis.print.progress=false` keeps its progress lines out of it.
+
 Layout
 ------
 

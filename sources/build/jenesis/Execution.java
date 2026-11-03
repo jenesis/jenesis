@@ -4,7 +4,7 @@ import module java.base;
 import build.jenesis.Environment.Setting;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.step.Inventory;
-import build.jenesis.step.Layers;
+import build.jenesis.step.JavaLaunch;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -111,11 +111,7 @@ public record Execution(Project project, String mainClass, String module, Contai
                 continue;
             }
             String userPath = "module".equals(prefix) ? "" : prefix.substring("module-".length());
-            candidates.put(prefix, new Candidate(userPath,
-                    resolvedMainClass,
-                    merged.getProperty(prefixDot + "module"),
-                    Inventory.paths(merged, entry.getValue(), prefixDot + "runtime"),
-                    entry.getValue()));
+            candidates.put(prefix, new Candidate(userPath, resolvedMainClass, entry.getValue()));
         }
         if (candidates.isEmpty()) {
             throw new IllegalStateException(module != null
@@ -135,124 +131,15 @@ public record Execution(Project project, String mainClass, String module, Contai
         }
         Map.Entry<String, Candidate> selected = candidates.firstEntry();
         Candidate candidate = selected.getValue();
-        if (candidate.runtime == null || candidate.runtime.isEmpty()) {
-            throw new IllegalStateException("No runtime artifacts for module: "
-                    + (candidate.path.isEmpty() ? "<root>" : candidate.path));
-        }
-        List<String> jars = new ArrayList<>();
-        for (Path resolved : candidate.runtime) {
-            if (!Files.isRegularFile(resolved)) {
-                throw new IllegalStateException("Missing runtime artifact for module "
-                        + (candidate.path.isEmpty() ? "<root>" : candidate.path)
-                        + ": " + resolved);
-            }
-            jars.add(resolved.toString());
-        }
-        List<String> javaArgs = new ArrayList<>();
-        for (Path file : Inventory.paths(merged, candidate.folder, selected.getKey() + ".process")) {
-            SequencedProperties.ofFiles(file).forEachProperty((option, values) -> {
-                for (String value : values.split("\n")) {
-                    javaArgs.add(option);
-                    if (!value.isEmpty()) {
-                        javaArgs.addAll(List.of(value.split("\t")));
-                    }
-                }
-            });
-        }
+        JavaLaunch launch = JavaLaunch.of(merged, candidate.folder, selected.getKey(), candidate.mainClass);
+        List<String> javaArgs = new ArrayList<>(launch.options());
         for (int index = 0; index < jvmOptions; index++) {
             javaArgs.add(arguments[index].substring(2));
         }
-        for (int index = 0; ; index++) {
-            String agent = merged.getProperty(selected.getKey() + ".agent." + index);
-            if (agent == null) {
-                break;
-            }
-            String coordinate = merged.getProperty(selected.getKey() + ".agent." + index + ".coordinate");
-            Path jar = candidate.folder.resolve(agent).normalize();
-            if (!Files.isRegularFile(jar)) {
-                throw new IllegalStateException("Missing agent artifact " + coordinate + ": " + jar);
-            }
-            try (JarFile file = new JarFile(jar.toFile())) {
-                Manifest manifest = file.getManifest();
-                if (manifest == null || manifest.getMainAttributes().getValue("Premain-Class") == null) {
-                    throw new IllegalStateException("Attached agent "
-                            + coordinate
-                            + " does not declare Premain-Class: "
-                            + jar);
-                }
-            }
-            String options = merged.getProperty(selected.getKey() + ".agent." + index + ".arguments");
-            javaArgs.add("-javaagent:" + jar.toAbsolutePath() + (options == null ? "" : "=" + options));
-        }
-        List<Path> granted = Inventory.paths(merged, candidate.folder, selected.getKey() + ".nativeAccess");
-        ModuleGraph graph = new ModuleGraph();
-        String layered = merged.getProperty(selected.getKey() + ".layers");
-        SequencedMap<String, Layers.Membership> layers = layered == null
-                ? Collections.emptyNavigableMap()
-                : Layers.membership(candidate.folder.resolve(layered).getParent());
-        if (!layers.isEmpty()) {
-            SequencedMap<String, Path> resolved = new LinkedHashMap<>();
-            for (int index = 0; ; index++) {
-                String dependency = merged.getProperty(selected.getKey() + ".dependency." + index);
-                if (dependency == null) {
-                    break;
-                }
-                int space = dependency.indexOf(' '), end = dependency.indexOf(' ', space + 1);
-                Path jar = candidate.folder.resolve(dependency.substring(space + 1, end < 0 ? dependency.length() : end))
-                        .toAbsolutePath()
-                        .normalize();
-                resolved.putIfAbsent(jar.getFileName().toString(), jar);
-            }
-            Set<Path> absolute = granted.stream().map(file -> file.toAbsolutePath().normalize()).collect(Collectors.toSet());
-            for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
-                for (String name : layer.getValue().all()) {
-                    if (!resolved.containsKey(name)) {
-                        throw new IllegalStateException("Layer " + layer.getKey() + " names " + name
-                                + ", which was not resolved for this application");
-                    }
-                }
-                javaArgs.add("-Djlayer.modulepath." + layer.getKey() + "=" + layer.getValue().modulepath().stream()
-                        .map(name -> resolved.get(name).toString())
-                        .collect(Collectors.joining(File.pathSeparator)));
-                if (!layer.getValue().classpath().isEmpty()) {
-                    javaArgs.add("-Djlayer.classpath." + layer.getKey() + "=" + layer.getValue().classpath().stream()
-                            .map(name -> resolved.get(name).toString())
-                            .collect(Collectors.joining(File.pathSeparator)));
-                    graph.unnamed();
-                }
-                layer.getValue().nativeAccess(resolved, absolute)
-                        .forEach((jar, module) -> graph.enableNativeAccess(layer.getKey(), jar, module));
-            }
-        }
-        if (candidate.module != null) {
-            List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
-            for (String jar : jars) {
-                Path file = Path.of(jar);
-                boolean placed = graph.place(PathPlacement.INFERRED, file);
-                (placed ? modulePath : classPath).add(jar);
-                if (granted.contains(file)) {
-                    graph.enableNativeAccess(file, placed);
-                }
-            }
-            SequencedMap<String, String> options = new LinkedHashMap<>();
-            options.put("--module-path", String.join(File.pathSeparator, modulePath));
-            options.put("--class-path", String.join(File.pathSeparator, classPath));
-            javaArgs.addAll(ProcessBuildStep.argumentFile(argumentFile, options));
-            javaArgs.addAll(graph.arguments());
-            javaArgs.add("-m");
-            javaArgs.add(candidate.module + "/" + candidate.mainClass);
-        } else {
-            for (String jar : jars) {
-                graph.place(PathPlacement.CLASS_PATH, Path.of(jar));
-            }
-            for (Path file : granted) {
-                graph.enableNativeAccess(file, false);
-            }
-            javaArgs.addAll(ProcessBuildStep.argumentFile(argumentFile,
-                    new LinkedHashMap<>(Map.of("-cp", String.join(File.pathSeparator, jars)))));
-            javaArgs.addAll(graph.arguments());
-            javaArgs.add(candidate.mainClass);
-        }
+        javaArgs.addAll(launch.attached());
+        javaArgs.addAll(ProcessBuildStep.argumentFile(argumentFile, launch.paths()));
+        javaArgs.addAll(launch.relaxations());
+        javaArgs.addAll(launch.main());
         javaArgs.addAll(List.of(arguments).subList(jvmOptions, arguments.length));
         if (container != null) {
             Path root = project.root().toAbsolutePath().normalize();
@@ -306,10 +193,6 @@ public record Execution(Project project, String mainClass, String module, Contai
         return ofEnvironment(environment, project).execute(outputs, arguments);
     }
 
-    private record Candidate(String path,
-                             String mainClass,
-                             String module,
-                             List<Path> runtime,
-                             Path folder) {
+    private record Candidate(String path, String mainClass, Path folder) {
     }
 }
