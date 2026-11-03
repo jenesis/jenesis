@@ -32,6 +32,7 @@ import build.jenesis.project.ProjectModuleDescriptor;
 import build.jenesis.project.ProjectPlugins;
 import build.jenesis.project.ProjectWatch;
 import build.jenesis.project.ReleaseModule;
+import build.jenesis.step.AggregateJavadoc;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Bom;
 import build.jenesis.step.Dependencies;
@@ -197,6 +198,8 @@ public record Project(
             trees.put("native", new ImageStaging("native").noFolder(true));
             trees.put("docker", new ImageStaging("docker"));
             trees.put("reports", new ReportStaging());
+            trees.put("javadoc", AggregateJavadoc.ofEnvironment(project.environment(),
+                    ProcessHandler.Factory.ofEnvironment(project.environment())));
             trees.put(ProjectPlugins.PROJECT, new ProjectFiles());
             executor.addModule(STAGE, project.toolPlugins().stage(project.profiles(), trees), BUILD);
             executor.addModule(EXPORT, (export, _) -> export.addStep("maven", MavenRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/maven"), STAGE);
@@ -296,6 +299,8 @@ public record Project(
             trees.put("native", new ImageStaging("native").noFolder(true));
             trees.put("docker", new ImageStaging("docker"));
             trees.put("reports", new ReportStaging());
+            trees.put("javadoc", AggregateJavadoc.ofEnvironment(project.environment(),
+                    ProcessHandler.Factory.ofEnvironment(project.environment())));
             trees.put(ProjectPlugins.PROJECT, new ProjectFiles());
             executor.addModule(STAGE, project.toolPlugins().stage(project.profiles(), trees), BUILD);
             executor.addModule(EXPORT, (export, _) -> export.addStep("modular", JenesisModuleRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/modular"), STAGE);
@@ -400,6 +405,8 @@ public record Project(
             trees.put("native", new ImageStaging("native").noFolder(true));
             trees.put("docker", new ImageStaging("docker"));
             trees.put("reports", new ReportStaging());
+            trees.put("javadoc", AggregateJavadoc.ofEnvironment(project.environment(),
+                    ProcessHandler.Factory.ofEnvironment(project.environment())));
             trees.put(ProjectPlugins.PROJECT, new ProjectFiles());
             executor.addModule(STAGE, project.toolPlugins().stage(project.profiles(), trees), BUILD);
             executor.addModule(EXPORT, (export, _) -> {
@@ -1768,6 +1775,12 @@ public record Project(
                           excludePackageNames -> -exclude=<package>[:<package>...] there, which
                           leaves those packages and their subpackages undocumented; the language
                           plugins document their sources beside it, the Kotlin plugin with Dokka
+                      maven-javadoc-plugin javadoc:aggregate / aggregate-jar
+                          -> -Djenesis.documentation.aggregate=true beside
+                          -Djenesis.project.sources=true (3): one javadoc run over the sources jars of
+                          every staged module but the test modules, as modules where each declares
+                          one, staged as target/stage/javadoc/output/javadoc/ and javadoc.jar,
+                          attached to no coordinate; it takes no process-javadoc.properties
                       maven-jar-plugin <classifier> executions, build-helper attach-artifact of a
                           prepared file -> classifiers.properties, one <classifier>=<folder>[,...]
                           line per variant: the module's jar plus each folder's files, staged
@@ -4723,6 +4736,7 @@ public record Project(
                 project.sources|false|Assemble a sources jar for every staged module
                 project.documentation|false|Assemble a javadoc jar for every staged module
                 documentation.empty|false|Archive that javadoc jar holding nothing but an INTENTIONALLY_EMPTY file instead of rendering the documentation, for a repository such as Maven Central that requires the jar but not its content
+                documentation.aggregate|false|Document every staged module in one javadoc run, staged as a site and a javadoc.jar under stage/javadoc; requires jenesis.project.sources, as it reads each module's sources jar
                 project.version||Version stamped onto every produced artifact, a module version that starts with a digit; unset leaves modules unversioned and POMs at 0-SNAPSHOT, and an empty value is refused
                 project.tag||SCM tag recorded in the generated POM and SBOM; empty for none
                 project.revision||Source revision, such as a commit id, recorded in the SBOM; empty for none

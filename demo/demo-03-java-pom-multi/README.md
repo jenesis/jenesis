@@ -85,6 +85,31 @@ What the relocation leaves out - here the group and the version - stays that of
 `hello`. A module that relocates its artifact and holds sources fails the build,
 since nothing would compile them.
 
+Documenting every module at once
+--------------------------------
+
+With `jenesis.project.documentation`, every staged module carries a javadoc jar
+of its own. A project published as several modules often wants one site as well,
+with one index and one search over all of them, where a type of one module links
+to the types of another it names. `jenesis.documentation.aggregate` runs javadoc
+once over every staged module and stages that site beside the Maven tree:
+
+    java -Djenesis.project.sources=true -Djenesis.documentation.aggregate=true \
+        -Djenesis.test.skip=true build/jenesis/Make.java stage
+
+    target/stage/javadoc/output/javadoc/index.html
+    target/stage/javadoc/output/javadoc.jar
+
+The site documents the packages of `greeter` and `app` together, and the jar holds
+the same site. Javadoc reads each module's sources jar, so the aggregate needs
+`jenesis.project.sources`; without it, the stage fails naming that setting. The
+test variant, the BOM and the relocated coordinate hold no sources to document
+and are left out, as is a module staged with `stage=false`. Only the compile
+dependencies of the modules are handed to javadoc, never the modules themselves,
+whose types it reads from their sources. When every module declares a
+`module-info.java`, javadoc documents them as modules, each with a summary page.
+The site belongs to no Maven coordinate, so `stage/maven` stays as it was.
+
 Tests
 -----
 
