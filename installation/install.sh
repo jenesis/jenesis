@@ -37,7 +37,8 @@
 # Environment variables:
 #   JENESIS_REF           Git ref to install (tag, commit, or branch); same as
 #                         the positional argument, for when passing one is awkward
-#   JENESIS_VERSION       Release version to install (default: latest GitHub release);
+#   JENESIS_VERSION       Release version to install (default: the <release> of the
+#                         maven-metadata.xml JENESIS_MAVEN_URI holds for build.jenesis);
 #                         ignored when a ref is given
 #   JENESIS_TARGET        Target project directory (default: current working directory)
 #   JENESIS_GITHUB_REPO   Source repository, owner/name (default: jenesis/jenesis)
@@ -98,11 +99,12 @@ elif [ -n "${JENESIS_VERSION:-}" ]; then
     say "using pinned version ${VERSION}"
 else
     RELEASE=1
-    say "resolving latest release from github.com/${GITHUB_REPO}"
-    META="$(fetch_stdout "https://api.github.com/repos/${GITHUB_REPO}/releases/latest")" \
-        || die "failed to query GitHub API - set JENESIS_VERSION or pass a ref to bypass version lookup"
-    VERSION="$(printf '%s' "$META" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"v\{0,1\}\([^"]*\)".*/\1/p' | head -n1)"
-    [ -n "$VERSION" ] || die "could not parse latest version from GitHub API response"
+    METADATA_URL="${MAVEN_URI%/}/build/jenesis/build.jenesis/maven-metadata.xml"
+    say "resolving the latest release from ${METADATA_URL}"
+    META="$(fetch_stdout "$METADATA_URL")" \
+        || die "failed to download ${METADATA_URL} - set JENESIS_VERSION or pass a ref to bypass version lookup"
+    VERSION="$(printf '%s' "$META" | tr -d '\r' | sed -n 's/.*<release>[[:space:]]*\([^<[:space:]]*\)[[:space:]]*<\/release>.*/\1/p' | head -n1)"
+    [ -n "$VERSION" ] || die "${METADATA_URL} names no <release> - set JENESIS_VERSION or pass a ref to bypass version lookup"
     REF="v${VERSION}"
     say "latest version is ${VERSION}"
 fi

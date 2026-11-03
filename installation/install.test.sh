@@ -100,6 +100,20 @@ grep -q "SHA-256 checksum" "$TMP/corrupt.log" || fail "refusing the jar did not 
 [ ! -e "$TMP/corrupt/build/jenesis" ] || fail "a sources jar that does not match its checksum was installed"
 pass "refuses a sources jar that does not match its checksum"
 
+# --- the latest release, read from the repository's metadata ----------------
+
+printf '<metadata>\n  <versioning>\n    <latest>9.9.9</latest>\n    <release>9.9.9</release>\n  </versioning>\n</metadata>\n' \
+    > "$TMP/repository/build/jenesis/build.jenesis/maven-metadata.xml"
+mkdir -p "$TMP/latest"
+if env JENESIS_TARGET="$TMP/latest" JENESIS_MAVEN_URI="file://$REPOSITORY/" \
+    bash "$SCRIPT" >"$TMP/latest.log" 2>&1; then
+    fail "installed the latest release, whose sources jar does not match its checksum"
+fi
+grep -q "latest version is 9.9.9" "$TMP/latest.log" \
+    || fail "the latest release was not read from maven-metadata.xml: $(cat "$TMP/latest.log")"
+grep -q "api.github.com" "$TMP/latest.log" && fail "the latest release was looked up on the GitHub API"
+pass "reads the latest release from the repository's maven-metadata.xml, asking no GitHub API"
+
 # --- auto does not reach for a submodule ------------------------------------
 
 scaffold auto
