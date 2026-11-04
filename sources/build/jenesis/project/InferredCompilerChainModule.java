@@ -26,8 +26,11 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
             SCAN_FILE = "scan.properties",
             EXTENSIONS = "extensions",
             LANGUAGES = "languages";
-    public static final String KOTLIN = "kotlin", SCALA = "scala", GROOVY = "groovy";
-    private static final Map<String, String> EXTENSIONS_OF = Map.of(KOTLIN, ".kt", SCALA, ".scala", GROOVY, ".groovy");
+    public static final String KOTLIN = "kotlin", SCALA = "scala", GROOVY = "groovy", CLOJURE = "clojure";
+    private static final Map<String, String> EXTENSIONS_OF = Map.of(KOTLIN, ".kt",
+            SCALA, ".scala",
+            GROOVY, ".groovy",
+            CLOJURE, ".clj");
 
     private final PathPlacement pathPlacement;
     private final boolean includeResources;
@@ -41,6 +44,8 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
     private final boolean scala;
     private final ExternalModule groovyModule;
     private final boolean groovy;
+    private final ExternalModule clojureModule;
+    private final boolean clojure;
 
     public InferredCompilerChainModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
         this(PathPlacement.INFERRED,
@@ -54,6 +59,8 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 ExternalModule.official(Environment.NONE, SCALA, null, repositories, resolvers),
                 true,
                 ExternalModule.official(Environment.NONE, GROOVY, null, repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, CLOJURE, null, repositories, resolvers),
                 true);
     }
 
@@ -71,7 +78,9 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 ExternalModule.official(environment, SCALA, null, repositories, resolvers),
                 environment.flag("language.scala", true, Setting.PROJECT),
                 ExternalModule.official(environment, GROOVY, null, repositories, resolvers),
-                environment.flag("language.groovy", true, Setting.PROJECT));
+                environment.flag("language.groovy", true, Setting.PROJECT),
+                ExternalModule.official(environment, CLOJURE, null, repositories, resolvers),
+                environment.flag("language.clojure", true, Setting.PROJECT));
     }
 
     private InferredCompilerChainModule(PathPlacement pathPlacement,
@@ -85,7 +94,9 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                                         ExternalModule scalaModule,
                                         boolean scala,
                                         ExternalModule groovyModule,
-                                        boolean groovy) {
+                                        boolean groovy,
+                                        ExternalModule clojureModule,
+                                        boolean clojure) {
         this.pathPlacement = pathPlacement;
         this.includeResources = includeResources;
         this.javacStep = javacStep;
@@ -98,6 +109,8 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
         this.scala = scala;
         this.groovyModule = groovyModule;
         this.groovy = groovy;
+        this.clojureModule = clojureModule;
+        this.clojure = clojure;
     }
 
     public InferredCompilerChainModule pathPlacement(PathPlacement pathPlacement) {
@@ -112,7 +125,9 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 scalaModule,
                 scala,
                 groovyModule,
-                groovy);
+                groovy,
+                clojureModule,
+                clojure);
     }
 
     public InferredCompilerChainModule includeResources(boolean includeResources) {
@@ -127,7 +142,9 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 scalaModule,
                 scala,
                 groovyModule,
-                groovy);
+                groovy,
+                clojureModule,
+                clojure);
     }
 
     public InferredCompilerChainModule javac(Function<Javac, BuildStep> javac) {
@@ -142,7 +159,9 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 scalaModule,
                 scala,
                 groovyModule,
-                groovy);
+                groovy,
+                clojureModule,
+                clojure);
     }
 
     public InferredCompilerChainModule custom(SequencedMap<String, BuildExecutorModule> custom) {
@@ -157,7 +176,9 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 scalaModule,
                 scala,
                 groovyModule,
-                groovy);
+                groovy,
+                clojureModule,
+                clojure);
     }
 
     public InferredCompilerChainModule languages(SequencedMap<String, ? extends BuildExecutorModule> languages) {
@@ -172,7 +193,9 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 scalaModule,
                 scala,
                 groovyModule,
-                groovy);
+                groovy,
+                clojureModule,
+                clojure);
     }
 
     public InferredCompilerChainModule kotlin(boolean kotlin) {
@@ -187,7 +210,9 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 scalaModule,
                 scala,
                 groovyModule,
-                groovy);
+                groovy,
+                clojureModule,
+                clojure);
     }
 
     public InferredCompilerChainModule scala(boolean scala) {
@@ -202,7 +227,9 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 scalaModule,
                 scala,
                 groovyModule,
-                groovy);
+                groovy,
+                clojureModule,
+                clojure);
     }
 
     public InferredCompilerChainModule groovy(boolean groovy) {
@@ -217,7 +244,26 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 scalaModule,
                 scala,
                 groovyModule,
-                groovy);
+                groovy,
+                clojureModule,
+                clojure);
+    }
+
+    public InferredCompilerChainModule clojure(boolean clojure) {
+        return new InferredCompilerChainModule(pathPlacement,
+                includeResources,
+                javacStep,
+                javac,
+                custom,
+                languages,
+                kotlinModule,
+                kotlin,
+                scalaModule,
+                scala,
+                groovyModule,
+                groovy,
+                clojureModule,
+                clojure);
     }
 
     public InferredCompilerChainModule custom(String name, BuildExecutorModule module) {
@@ -250,6 +296,9 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
         }
         if (groovy) {
             configured.put(GROOVY, groovyModule);
+        }
+        if (clojure) {
+            configured.put(CLOJURE, clojureModule);
         }
         configured.forEach((name, module) -> {
             prepared.put(name, module);

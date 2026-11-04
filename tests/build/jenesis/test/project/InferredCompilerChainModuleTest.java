@@ -197,6 +197,24 @@ public class InferredCompilerChainModuleTest {
     }
 
     @Test
+    public void compiles_clojure_sources_with_the_official_clojure_plugin_unless_switched_off() throws IOException {
+        Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("core.clj"),
+                "(ns sample.core)\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("chain", InferredCompilerChainModule.ofEnvironment(new Environment(Map.of("language.clojure", "false")),
+                Map.of(),
+                Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .rootCause()
+                .hasMessageContaining(".clj")
+                .hasMessageContaining("plugin clojure")
+                .hasMessageContaining("jenesis.language.clojure=false");
+    }
+
+    @Test
     public void resolves_no_language_plugin_for_a_module_without_its_sources() throws IOException {
         Files.writeString(Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
                 "package sample; public class Sample {}");

@@ -14,10 +14,20 @@ import build.jenesis.step.Inventory;
 public class Ide implements BuildExecutorModule {
 
     public static final String IDEA = "idea", VSCODE = "vscode", ECLIPSE = "eclipse";
-    private static final List<String> MAIN_SOURCES = List.of(
-            "src/main/java", "src/main/kotlin", "src/main/scala", "src/main/groovy", "sources", "src");
-    private static final List<String> TEST_SOURCES = List.of(
-            "src/test/java", "src/test/kotlin", "src/test/scala", "src/test/groovy", "tests", "test");
+    private static final List<String> MAIN_SOURCES = List.of("src/main/java",
+            "src/main/kotlin",
+            "src/main/scala",
+            "src/main/groovy",
+            "src/main/clojure",
+            "sources",
+            "src");
+    private static final List<String> TEST_SOURCES = List.of("src/test/java",
+            "src/test/kotlin",
+            "src/test/scala",
+            "src/test/groovy",
+            "src/test/clojure",
+            "tests",
+            "test");
 
     private final Path root;
 
