@@ -1529,6 +1529,10 @@ public record Project(
                           build resolves where a module holds one, with Groovy 4 or newer after javac, so Groovy uses Java types and Java no Groovy type:
                           gmavenplus stubs for a joint compilation have no counterpart, and Java code
                           that uses Groovy moves to a module that requires the Groovy one
+                      clojure-maven-plugin / clojure -> .clj sources in src/main/clojure, named by
+                          jenesis.maven.sources=clojure and compiled by the Clojure plugin the build
+                          resolves where a module holds one, after javac and with the
+                          org.clojure:clojure the pom.xml declares (82)
                       jaxb2-maven-plugin / a JAXB plugin -> xjc.properties, binding the schemas
                           as @schemas/xjc=<folder> (17)
                       protobuf-maven-plugin / com.google.protobuf -> protoc.properties, binding
@@ -2691,8 +2695,8 @@ public record Project(
                     The plugins of jenesis/jenesis-plugins need no line: the build resolves each by its
                     module name where its <name>.properties is found in a configuration folder -
                     checkstyle.properties, xjc.properties, jacoco.properties, asciidoctor.properties,
-                    jreleaser.properties and the like - or, for a language, where a .kt, .scala or
-                    .groovy source is. The properties name the tool's own file as
+                    jreleaser.properties and the like - or, for a language, where a .kt, .scala,
+                    .groovy or .clj source is. The properties name the tool's own file as
                     configuration=<path, relative to them>, and fail the build naming the key where
                     they leave it out; only where no properties are found does the tool's one
                     conventional file in a configuration folder - checkstyle.xml, pmd.xml, rewrite.yml,
@@ -2939,7 +2943,7 @@ public record Project(
                 case "demos" -> """
                     # Jenesis - Copy a demo
 
-                    81 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    82 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -2985,7 +2989,8 @@ public record Project(
                                          45 api-compatibility (japicmp, revapi)
                       Other languages    46 kotlin, 47 kotlin-quality, 48 kotlin-plugin,
                                          49 ksp (a Kotlin symbol processor), 50 scala,
-                                         51 scala-quality, 52 groovy, 53 groovy-quality
+                                         51 scala-quality, 52 groovy, 53 groovy-quality,
+                                         82 clojure (a pom.xml module beside src/main/clojure)
                       At run time        54 agents (@jenesis.attach),
                                          55 native-access (@jenesis.native),
                                          56 native-access-layer (passed on to a layer),
@@ -4938,6 +4943,7 @@ public record Project(
                 language.kotlin|true|Kotlin, the official plugin build.jenesis.plugin.kotlin, resolved where a module holds a .kt source; false leaves it out, and such a source then fails the build
                 language.scala|true|Scala, the official plugin build.jenesis.plugin.scala, resolved where a module holds a .scala source; false leaves it out, and such a source then fails the build
                 language.groovy|true|Groovy, the official plugin build.jenesis.plugin.groovy, resolved where a module holds a .groovy source; false leaves it out, and such a source then fails the build
+                language.clojure|true|Clojure, the official plugin build.jenesis.plugin.clojure, resolved where a module holds a .clj source, which compiles its namespaces with the Clojure the module depends on; false leaves it out, and such a source then fails the build
                 kotlin.incremental|false|Compile Kotlin incrementally through the Kotlin Build Tools API of Kotlin 2.3 or newer, resolved as org.jetbrains.kotlin:kotlin-build-tools-impl, which recompiles only what a change reaches, in a JVM of its own per compile or in one kept warm under process.mode=daemon; the -J and -D lines of process-kotlinc.properties configure that JVM
                 scala.incremental|false|Compile Scala incrementally with Zinc, resolved as org.scala-sbt:zinc_2.13 in the group scala:zinc and driving the compiler through org.scala-lang:scala3-sbt-bridge at the compiler's version, which recompiles only what a change reaches, in a JVM of its own per compile or in one kept warm under process.mode=daemon; the lines of process-scalac.properties configure that JVM
                 jarsigner.keystore||Key store jarsigner signs the produced jar with, in place of the unsigned one, relative to the working directory on the command line, to ~/.jenesis in its files and to the project root in a project's; a release machine supplies it, and a build that names any jarsigner setting without it fails rather than shipping unsigned; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides

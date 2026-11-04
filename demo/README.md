@@ -131,6 +131,7 @@ Quick index
 | 79 | [`discovery-maven`](demo-79-discovery-maven/README.md)            | The same for a Maven dependency, from a release or a Maven repository        | `java build/jenesis/Execute.java` |
 | 80 | [`jpx`](demo-80-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
 | 81 | [`tools-api`](demo-81-tools-api/README.md)                        | Run a build, or a published program, inside another program's JVM            | `java build/Demo.java`            |
+| 82 | [`clojure`](demo-82-clojure/README.md)                            | Java and a Clojure namespace in one `pom.xml` module, compiled ahead of time | `java build/jenesis/Execute.java` |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1315,3 +1316,14 @@ Three settings cannot be honoured in-process, because they replace the process a
 build runs in - naming another JDK with `jenesis.toolchain.version`, or a container
 with `jenesis.project.docker` or `jenesis.execute.docker` - and each is refused by
 name rather than ignored. Reach for the `jenesis` command there.
+
+## 64. Clojure - [`clojure`](demo-82-clojure/README.md)
+
+Clojure joins Kotlin, Scala and Groovy as an official plugin the build resolves by
+itself, as `module/build.jenesis.plugin.clojure`, in every module that holds a
+`.clj` source. The demo is a `pom.xml` project: `jenesis.maven.sources=clojure`
+adds `src/main/clojure` beside `src/main/java`, and the plugin compiles the
+namespace after `javac`, so it calls the module's Java type. It compiles with the
+`org.clojure:clojure` the `pom.xml` declares, as classes compiled ahead of time are
+tied to the Clojure that compiled them, and ships each source beside its classes.
+`-Djenesis.language.clojure=false` leaves the plugin out.

@@ -197,8 +197,8 @@ lies in a group `<group>:<purpose>`, its tool in `<group>:tool`; a step resolvin
 `TestFramework` prepared as `frameworks/<name>` and consulted before the built-in JUnit Platform, JUnit 4 and TestNG
 (`framework=<name>` in `test.properties` picks one); `LanguageFactory`, for `language`, a `Language` naming its
 extensions, its compiler before or after javac and its documentation tool, which runs wherever a module holds such a
-file, resolved as `languages/<name>`, its documentation joining the aggregate. Kotlin, Scala and Groovy are official
-plugins the chains resolve only where the scan finds their extension; a source of a switched-off language fails the
+file, resolved as `languages/<name>`, its documentation joining the aggregate. Kotlin, Scala, Groovy and Clojure are
+official plugins the chains resolve only where the scan finds their extension; a source of a switched-off language fails the
 build, and a `pom.xml` module reads a folder beside `src/main/java` only where `jenesis.maven.sources` names it.
 
 **Values and inputs.** A value is a string the host resolved (`@<key>` or `@<key>/<default>` is
