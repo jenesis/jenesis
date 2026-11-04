@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>build.jenesis.demo</groupId>
+    <artifactId>clojure-demo</artifactId>
+    <version>1.0.0</version>
+
+    <properties>
+        <mainClass>sample.welcome</mainClass>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.clojure</groupId>
+            <artifactId>clojure</artifactId>
+            <version>1.12.6</version>
+        </dependency>
+    </dependencies>
+    <!--jenesis.pin
+    clojure/module/build.jenesis 0.18.1 SHA-256/ec0151718921a0755d2461aec78cc58ef0e4bbaa4d69fc056507b28e3a98a5ac
+    org.clojure/clojure 1.12.6 SHA-256/21b578db389a8e74b286ce79c4a7f86ec641e26d88b12f18d69030916b0e18ca
+    maven/org.clojure/clojure/pom 1.12.6 SHA-256/6b85dea75a09f1eb08c8cc18a1b3120a3fd048a6343757a1b6be979ab6f910cf
+    org.clojure/core.specs.alpha 0.4.74 SHA-256/eb73ac08cf49ba840c88ba67beef11336ca554333d9408808d78946e0feb9ddb
+    maven/org.clojure/core.specs.alpha/pom 0.4.74 SHA-256/33410eb8aa73d52d957b3dc6e0a65f3998ac0623cbd813d90c33e6e689c42429
+    maven/org.clojure/pom.contrib/pom 1.2.0 SHA-256/0916d7a41558b9500a427c886fa29827ace5259206be3ad33e64e296fc1a6111
+    org.clojure/spec.alpha 0.5.238 SHA-256/94cd99b6ea639641f37af4860a643b6ed399ee5a8be5d717cff0b663c8d75077
+    maven/org.clojure/spec.alpha/pom 0.5.238 SHA-256/3cba7e0dcc085c4ce92dddffea226124ffac178be79bd0379b5b2e30a969cbea
+    -->
+</project>
