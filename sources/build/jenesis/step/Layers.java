@@ -5,6 +5,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Jdk;
 import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.SafeSegment;
@@ -158,7 +159,7 @@ public class Layers implements BuildStep {
 
         public SequencedSet<String> platform(Map<String, Path> jars) {
             SequencedMap<String, ModuleDescriptor> system = new TreeMap<>();
-            ModuleFinder.ofSystem().findAll().forEach(reference -> system.put(reference.descriptor().name(), reference.descriptor()));
+            Jdk.system().findAll().forEach(reference -> system.put(reference.descriptor().name(), reference.descriptor()));
             SequencedSet<String> platform = new TreeSet<>();
             boolean unnamed = !classpath.isEmpty();
             for (String name : modulepath) {

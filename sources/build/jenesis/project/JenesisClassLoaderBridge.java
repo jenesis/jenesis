@@ -13,6 +13,7 @@ import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
+import build.jenesis.Jdk;
 import build.jenesis.Language;
 import build.jenesis.LanguageFactory;
 import build.jenesis.ObservabilityEngine;
@@ -105,6 +106,10 @@ class JenesisClassLoaderBridge {
 
     private JenesisClassLoaderBridge(String group, List<Path> artifacts, PathPlacement pathPlacement, byte[] origin)
             throws ReflectiveOperationException, IOException {
+        if (Jdk.image()) {
+            throw new Jdk.Unavailable("The build loads the plugin " + group + ", which a native image of Jenesis"
+                    + " cannot load");
+        }
         List<Path> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
         Path copies = ProcessHandler.OfProcess.temporary("jenesis-plugin");
         for (Path artifact : artifacts) {

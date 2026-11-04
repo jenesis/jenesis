@@ -11,6 +11,7 @@ public final class Make {
             DIRECTORY = "make.directory";
     private static final List<String> RECORDED = List.of(PROVIDED, PERSONAL, HOME, AMBIENT, DIRECTORY);
     private static final Set<String> PRINTING = Set.of("help", "skill", "prompt", "configuration", "properties", "--stop");
+    static final int HANDED = 75, DECLINED = 76;
     static final List<String> CONTAINED = List.of("jenesis.project.docker",
             "jenesis.project.image",
             "jenesis.project.readable",
@@ -67,7 +68,7 @@ public final class Make {
 
     public enum Mode {
 
-        SOURCE, COMPILED, AOT, DAEMON;
+        SOURCE, COMPILED, AOT, NATIVE, DAEMON;
 
         static Mode of(Map<String, String> keys) {
             String value = keys.get("make.mode"), process = keys.get("process.mode");
@@ -91,7 +92,7 @@ public final class Make {
             }
             throw new IllegalArgumentException("Malformed value for jenesis.make.mode: '"
                     + value
-                    + "' (expected source, compiled, aot or daemon)");
+                    + "' (expected source, compiled, aot, native or daemon)");
         }
     }
 
@@ -271,6 +272,10 @@ public final class Make {
         Make make = new Make("build.jenesis.Project", ambient);
         Integer code = relaunched(Make.class, ambient, options, selectors);
         System.exit(code == null ? make.run(selectors) : code);
+    }
+
+    static boolean image() {
+        return "runtime".equals(System.getProperty("org.graalvm.nativeimage.imagecode"));
     }
 
     static Map<String, String> ambient(Map<String, String> named) {
@@ -458,7 +463,16 @@ public final class Make {
         boolean stop = selectors.length == 1 && selectors[0].equals("--stop"),
                 building = mainClass.equals("build.jenesis.Project") && (selectors.length == 0 || !Stream.of(selectors)
                         .allMatch(selector -> PRINTING.contains(selector.split("/", 2)[0])));
+        boolean natively = mode == Mode.NATIVE && collected == null && building && !image();
         if (location == null || !location.getFileName().toString().endsWith(".java")) {
+            if (natively) {
+                if (location == null) {
+                    throw new IllegalStateException("jenesis.make.mode=native compiles the engine from its classes,"
+                            + " but this JVM loaded them from no location it can name: run the engine from a folder"
+                            + " or a jar, or as java build/jenesis/Make.java");
+                }
+                return natively(location, selectors);
+            }
             if (mode != Mode.DAEMON) {
                 if (mode == Mode.AOT && collected == null && location != null && building) {
                     return cached(location, selectors);
@@ -489,6 +503,9 @@ public final class Make {
         List<Path> sources = files(build, ".java");
         String seed = fingerprint(build, sources, classes.toString());
         Path folder = precompiled(build, sources, seed);
+        if (natively) {
+            return natively(folder, selectors);
+        }
         try (URLClassLoader loader = new URLClassLoader(
                 new URL[] { folder.toUri().toURL() },
                 ClassLoader.getPlatformClassLoader())) {
@@ -563,7 +580,117 @@ public final class Make {
         for (String selector : selectors) {
             command.add(selector.startsWith("@") ? "@" + selector : selector);
         }
-        Process process = new ProcessBuilder(command).inheritIO().start();
+        return awaited(new ProcessBuilder(command).inheritIO());
+    }
+
+    private int natively(Path engine, String... selectors) throws IOException, InterruptedException {
+        Path home = Path.of(System.getProperty("java.home")), compiler = home.resolve("bin")
+                .resolve(File.separatorChar == '\\' ? "native-image.cmd" : "native-image");
+        if (!Files.isExecutable(compiler)) {
+            throw new IllegalStateException("jenesis.make.mode=native compiles the engine with the native-image of the"
+                    + " GraalVM that runs Make, but the JDK at " + home + " holds none: run the build with the java"
+                    + " of a GraalVM 25 or newer");
+        }
+        sweep(engine);
+        Path folder = Files.createDirectories(aotFolder.resolve("native")), metadata = folder.resolve("metadata");
+        String executable = File.separatorChar == '\\' ? "build.jenesis.exe" : "build.jenesis",
+                key = imaged(engine, metadata),
+                project = fingerprint(root, List.of(), root.toAbsolutePath().toString()).substring(0, 12);
+        Path image = folder.resolve(key).resolve(executable), declined = folder.resolve(key).resolve("jvm-" + project);
+        boolean handed = false;
+        if (Files.isExecutable(image) && !Files.exists(declined)) {
+            List<String> command = new ArrayList<>(List.of(image.toString(), "-Djava.home=" + home));
+            for (String name : new TreeSet<>(System.getProperties().stringPropertyNames())) {
+                if ((name.startsWith("javax.net.ssl.")
+                        || name.startsWith("http.")
+                        || name.startsWith("https.")
+                        || name.startsWith("socksProxy"))
+                        && !name.endsWith("Password")) {
+                    command.add("-D" + name + "=" + System.getProperty(name));
+                }
+            }
+            new TreeMap<>(ambient).forEach((name, value) -> {
+                if (!name.startsWith("toolchain.") && !name.equals("make.mode")) {
+                    command.add("-Djenesis." + name + "=" + value);
+                }
+            });
+            command.add("-Djenesis.make.root=" + root);
+            command.add("-Djenesis.make.mode=native");
+            for (String selector : selectors) {
+                command.add(selector.startsWith("@") ? "@" + selector : selector);
+            }
+            int code = awaited(new ProcessBuilder(command).inheritIO());
+            if (code == DECLINED) {
+                Files.writeString(declined, "");
+            } else if (code == HANDED) {
+                handed = true;
+            } else {
+                return code;
+            }
+        }
+        List<String> command = new ArrayList<>(List.of(home.resolve("bin")
+                .resolve(File.separatorChar == '\\' ? "java.exe" : "java")
+                .toString()));
+        if (!Files.exists(declined)) {
+            command.add("-agentlib:native-image-agent=config-merge-dir=" + metadata);
+        }
+        new TreeMap<>(ambient).forEach((name, value) -> {
+            if (!name.startsWith("toolchain.") && !name.equals("make.mode")) {
+                command.add("-Djenesis." + name + "=" + value);
+            }
+        });
+        command.add("-Djenesis.make.root=" + root);
+        command.add("-Djenesis.make.classes=" + classes);
+        command.add("-Djenesis.make.mode=compiled");
+        command.addAll(List.of("-cp", engine.toString(), Make.class.getName()));
+        for (String selector : selectors) {
+            command.add(selector.startsWith("@") ? "@" + selector : selector);
+        }
+        int code = awaited(new ProcessBuilder(command).inheritIO());
+        String trained = imaged(engine, metadata);
+        Path target = folder.resolve(trained), log = folder.resolve(trained + ".log");
+        if (trained.equals(key) && handed) {
+            Files.writeString(declined, "");
+        } else if (code == 0 && !Files.isExecutable(target.resolve(executable)) && !Files.exists(log)) {
+            Path staging = folder.resolve(trained + "~");
+            if (Files.exists(staging)) {
+                try (Stream<Path> files = Files.walk(staging)) {
+                    for (Path file : files.sorted(Comparator.reverseOrder()).toList()) {
+                        Files.delete(file);
+                    }
+                }
+            }
+            System.err.println("Compiling a native image of Jenesis for the next build, once for this engine and what"
+                    + " the builds on a JVM recorded, which takes some minutes...");
+            int compiled = awaited(new ProcessBuilder(compiler.toString(),
+                    "--no-fallback",
+                    "--exact-reachability-metadata",
+                    "--enable-url-protocols=http,https",
+                    "--add-modules=jdk.compiler",
+                    "--initialize-at-run-time=build.jenesis",
+                    "-H:ConfigurationFileDirectories=" + metadata,
+                    "-o", Files.createDirectories(staging).resolve("build.jenesis").toString(),
+                    "-cp", engine.toString(),
+                    Make.class.getName()).redirectErrorStream(true).redirectOutput(log.toFile()));
+            if (compiled == 0) {
+                Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE);
+                Files.delete(log);
+            } else {
+                System.err.println("native-image failed with exit code " + compiled + ", so builds keep running on a"
+                        + " JVM until the engine or what it records changes: its output is in " + log);
+            }
+        }
+        return code;
+    }
+
+    private static String imaged(Path engine, Path metadata) throws IOException {
+        return fingerprint(engine, files(engine, ""), Files.isDirectory(metadata)
+                ? fingerprint(metadata, files(metadata, ""), "")
+                : "").substring(0, 16);
+    }
+
+        private static int awaited(ProcessBuilder builder) throws IOException, InterruptedException {
+        Process process = builder.start();
         Thread hook = new Thread(process::destroy);
         Runtime.getRuntime().addShutdownHook(hook);
         try {

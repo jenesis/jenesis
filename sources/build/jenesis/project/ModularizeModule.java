@@ -10,6 +10,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Jdk;
 import build.jenesis.PathPlacement;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -272,7 +273,7 @@ public class ModularizeModule implements BuildExecutorModule {
                                                            SequencedProperties staging,
                                                            SequencedMap<String, Identity> identities) {
             SequencedMap<String, String> owners = new LinkedHashMap<>();
-            for (ModuleReference reference : ModuleFinder.ofSystem().findAll()) {
+            for (ModuleReference reference : Jdk.system().findAll()) {
                 for (String name : reference.descriptor().packages()) {
                     owners.putIfAbsent(name, reference.descriptor().name());
                 }

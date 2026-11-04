@@ -3,6 +3,7 @@ package build.jenesis.step;
 import module java.base;
 import build.jenesis.Environment;
 import build.jenesis.Environment.Setting;
+import build.jenesis.Jdk;
 import build.jenesis.SequencedProperties;
 import build.jenesis.daemon.Worker;
 
@@ -49,7 +50,9 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         TOOL {
             @Override
             public Function<List<String>, ? extends ProcessHandler> apply(String tool, String fork) {
-                return ProcessHandler.OfTool.of(tool);
+                return Jdk.image() && ToolProvider.findFirst(tool).isEmpty()
+                        ? FORK.apply(tool, fork)
+                        : ProcessHandler.OfTool.of(tool);
             }
         },
         FORK {

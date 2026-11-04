@@ -8,6 +8,8 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.Environment;
+import build.jenesis.Jdk;
+import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.module.ModuleInfoParser;
@@ -425,7 +427,7 @@ public class Javac extends ProcessBuildStep {
                 String value = option.equals(name) && index + 1 < options.size()
                         ? options.get(index + 1)
                         : option.startsWith(name + "=") ? option.substring(name.length() + 1) : null;
-                if (value != null && ModuleFinder.ofSystem().find(value.split("[/=]", 2)[0]).isPresent()) {
+                if (value != null && ModuleGraph.isSystemModule(value.split("[/=]", 2)[0])) {
                     return true;
                 }
             }
@@ -444,7 +446,7 @@ public class Javac extends ProcessBuildStep {
             try {
                 ModuleFinder finder = ModuleFinder.of(processorPath.stream().map(Path::of).toArray(Path[]::new));
                 references = finder.findAll();
-                Set<String> resolved = ModuleLayer.boot().configuration()
+                Set<String> resolved = Jdk.boot().configuration()
                         .resolveAndBind(ModuleFinder.of(), finder, Set.of())
                         .modules()
                         .stream()

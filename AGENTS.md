@@ -138,7 +138,11 @@ the project, the command line outranks both. `Toolchain`, which compiles alone, 
 path and installer itself.
 
 **Who reads what.** `jenesis.make.*` is read by `Make` and the main methods it launches, before a `Project` exists:
-`root`, `profiles`, `global`, `mode` (`source`, `compiled`, `aot` or `daemon`) and `classes`. Unset, the mode is
+`root`, `profiles`, `global`, `mode` (`source`, `compiled`, `aot`, `native` or `daemon`) and `classes`. `native` runs
+a native image of the engine that `Make` compiles with the `native-image` of the GraalVM running it, from what the
+tracing agent recorded on that GraalVM's JVM; inside the image `Jdk` names the JDK's modules from its `release` file,
+and what the image cannot do - load a plugin, read the JDK's module descriptors, reach what the agent never recorded -
+hands the build back to the JVM. Unset, the mode is
 `daemon`, or `compiled` where `jenesis.process.mode` names `fork` or `aot`, `jenesis.project.docker` is set or
 `jenesis.release.publish` publishes; `Make` hands the mode it resolved down as `make.mode`, which the executor prints
 in the `[STARTED]` line and the `started` event and nothing else reads. Everything `Project`

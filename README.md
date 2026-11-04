@@ -150,6 +150,25 @@ nothing measurable (13.35 s against 13.49 s cold).
 This is one project on one runner class. The run's summary holds the tables for all three runners, and
 [`benchmark/README.md`](benchmark/README.md) describes the method and what the figures do and do not support.
 
+### A native image of the engine
+
+`jenesis.make.mode=native` runs the build as a native image of the engine. It is kept to follow what GraalVM
+makes of the engine, not to make a build faster. `Make` has to run on the `java` of a GraalVM 25 or newer, whose
+`native-image` compiles the image:
+
+```bash
+$GRAALVM_HOME/bin/java -Djenesis.make.mode=native build/jenesis/Make.java
+```
+
+The first build runs on that GraalVM's JVM under its tracing agent, which records what the image needs in
+`jenesis.aot.folder`, and then compiles the image, which takes some minutes. Later builds run the image, with
+`javac` inside it and every tool the image does not hold forked from the GraalVM.
+
+A build the image cannot run stops, after it prints the step it stopped at as failed, and continues on the JVM.
+One that reaches something the agent never recorded runs under the agent again, and the next build compiles a
+new image from what it learned. One that loads a plugin or reads the module descriptors of the JDK cannot run in
+an image at all, so that project keeps building on the JVM until the engine or the recorded metadata changes.
+
 Demos
 -----
 
