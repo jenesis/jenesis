@@ -161,13 +161,18 @@ $GRAALVM_HOME/bin/java -Djenesis.make.mode=native build/jenesis/Make.java
 ```
 
 The first build runs on that GraalVM's JVM under its tracing agent, which records what the image needs in
-`jenesis.aot.folder`, and then compiles the image, which takes some minutes. Later builds run the image, with
-`javac` inside it and every tool the image does not hold forked from the GraalVM.
+`jenesis.aot.folder`, and the plugins the build loaded, and then compiles the image of the engine and those plugins,
+which takes some minutes. Later builds run the image, with `javac` inside it and every tool the image does not hold
+forked from the GraalVM.
+
+An image holds one class per name. A plugin's own copy of `build.jenesis` is therefore left out, and the plugin runs
+against the engine it is compiled into. A plugin whose classes differ from those of another plugin under the same
+name is left out as well, with a line naming it, and a build that loads it runs on the JVM.
 
 A build the image cannot run stops, after it prints the step it stopped at as failed, and continues on the JVM.
-One that reaches something the agent never recorded runs under the agent again, and the next build compiles a
-new image from what it learned. One that loads a plugin or reads the module descriptors of the JDK cannot run in
-an image at all, so that project keeps building on the JVM until the engine or the recorded metadata changes.
+One that reaches something the agent never recorded, or a plugin the image does not hold, runs under the agent
+again, and the next build compiles a new image from what it learned. Where that run teaches the image nothing, the
+project keeps building on the JVM until the engine, the recorded metadata or its plugins change.
 
 Demos
 -----

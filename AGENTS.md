@@ -140,9 +140,12 @@ path and installer itself.
 **Who reads what.** `jenesis.make.*` is read by `Make` and the main methods it launches, before a `Project` exists:
 `root`, `profiles`, `global`, `mode` (`source`, `compiled`, `aot`, `native` or `daemon`) and `classes`. `native` runs
 a native image of the engine that `Make` compiles with the `native-image` of the GraalVM running it, from what the
-tracing agent recorded on that GraalVM's JVM; inside the image `Jdk` names the JDK's modules from its `release` file,
-and what the image cannot do - load a plugin, read the JDK's module descriptors, reach what the agent never recorded -
-hands the build back to the JVM. Unset, the mode is
+tracing agent recorded on that GraalVM's JVM. In that run the plugin bridge copies the jars of every plugin it loads
+under `<make.classes>/plugins`, which `Make` compiles into the image beside the engine, leaving out a plugin's own copy of
+`build.jenesis` and a plugin holding a class another plugin holds with other bytes; the image holds one class per name, so a bridge
+takes only the providers its own jars declare. What the image cannot do - load a plugin it lacks, reach what the agent
+never recorded - hands the build back to the JVM, and a project whose retraining teaches the image nothing stays there.
+Unset, the mode is
 `daemon`, or `compiled` where `jenesis.process.mode` names `fork` or `aot`, `jenesis.project.docker` is set or
 `jenesis.release.publish` publishes; `Make` hands the mode it resolved down as `make.mode`, which the executor prints
 in the `[STARTED]` line and the `started` event and nothing else reads. Everything `Project`
