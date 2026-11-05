@@ -596,7 +596,12 @@ public final class Make {
                 marker = folder.resolve("plugins");
         String executable = File.separatorChar == '\\' ? "build.jenesis.exe" : "build.jenesis",
                 key = imaged(engine, metadata, Files.exists(marker));
-        Path image = folder.resolve(key).resolve(executable);
+        Path image = folder.resolve(key).resolve(executable), failed = folder.resolve(key + ".log");
+        if (Files.exists(failed)) {
+            throw new IllegalStateException("native-image could not compile an image of Jenesis for this engine and what"
+                    + " its builds recorded, as " + failed + " shows: delete that file to compile the image again, or"
+                    + " build with another jenesis.make.mode");
+        }
         if (Files.isExecutable(image)) {
             List<String> command = new ArrayList<>(List.of(image.toString(), "-Djava.home=" + home));
             for (String name : new TreeSet<>(System.getProperties().stringPropertyNames())) {
@@ -643,7 +648,7 @@ public final class Make {
         boolean loading = Files.exists(marker);
         String trained = imaged(engine, metadata, loading);
         Path target = folder.resolve(trained), log = folder.resolve(trained + ".log");
-        if (code == 0 && !Files.isExecutable(target.resolve(executable)) && !Files.exists(log)) {
+        if (code == 0 && !Files.isExecutable(target.resolve(executable))) {
             Path staging = folder.resolve(trained + "~");
             if (Files.exists(staging)) {
                 try (Stream<Path> files = Files.walk(staging)) {
@@ -680,8 +685,9 @@ public final class Make {
                 Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE);
                 Files.delete(log);
             } else {
-                System.err.println("native-image failed with exit code " + compiled + ", so builds keep running on a"
-                        + " JVM until the engine or what it records changes: its output is in " + log);
+                throw new IllegalStateException("native-image failed with exit code " + compiled + " to compile an image"
+                        + " of Jenesis, as " + log + " shows: delete that file to compile the image again, or build with"
+                        + " another jenesis.make.mode");
             }
         }
         return code;
