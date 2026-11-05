@@ -241,6 +241,7 @@ public class InternalModule extends PluginModule<InternalModule> {
     @Override
     public BuildExecutorModule preparation() {
         return (buildExecutor, inherited) -> {
+            mark();
             resolution().accept(buildExecutor, inherited);
             buildExecutor.addModule(JAVA,
                     new JavaToolchainModule().compiler(javacStep.group(group).asModule("javac")),

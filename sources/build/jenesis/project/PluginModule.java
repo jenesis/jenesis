@@ -136,6 +136,22 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
 
     abstract List<Path> artifacts(SequencedMap<String, Path> prepared) throws IOException;
 
+    void mark() throws IOException {
+        Path marker = environment.path("make.native", Environment.Setting.COMMAND);
+        if (marker != null) {
+            Files.createDirectories(marker.getParent());
+            try {
+                Files.createFile(marker);
+            } catch (FileAlreadyExistsException _) {
+            }
+            if (System.getProperty("org.graalvm.nativeimage.imagecode") != null) {
+                throw new IllegalStateException("The build loads the plugin " + identity() + ", but the native image"
+                        + " of Jenesis was compiled without loading classes at run time, as no build that trained it"
+                        + " loaded a plugin: the next build trains an image that loads plugins");
+            }
+        }
+    }
+
     abstract M properties(SequencedMap<String, String> properties);
 
     abstract M inputs(SequencedMap<String, SequencedMap<Path, Path>> inputs);
@@ -270,30 +286,13 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
                 resolvers);
     }
 
-    private JenesisClassLoaderBridge bridge(List<Path> artifacts) throws IOException, ReflectiveOperationException {
-        Path marker = environment.path("make.native", Environment.Setting.COMMAND);
-        if (marker != null) {
-            Files.createDirectories(marker.getParent());
-            try {
-                Files.createFile(marker);
-            } catch (FileAlreadyExistsException _) {
-            }
-            if (System.getProperty("org.graalvm.nativeimage.imagecode") != null) {
-                throw new IllegalStateException("The build loads the plugin " + identity() + ", but the native image"
-                        + " of Jenesis was compiled without loading classes at run time, as no build that trained it"
-                        + " loaded a plugin: the next build trains an image that loads plugins");
-            }
-        }
-        return JenesisClassLoaderBridge.of(group, artifacts, pathPlacement);
-    }
-
     private JenesisClassLoaderBridge loaded(SequencedMap<String, Path> prepared) throws IOException {
         if (!inputs.isEmpty()) {
             throw new IllegalArgumentException("The plugin " + identity() + " binds " + inputs.sequencedKeySet()
                     + ", but a plugin that observes or runs the tests is handed no input - remove its @<input> lines");
         }
         try {
-            return bridge(artifacts(prepared));
+            return JenesisClassLoaderBridge.of(group, artifacts(prepared), pathPlacement);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Failed to load the plugin " + identity(), e);
         }
@@ -314,7 +313,7 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
                 JenesisClassLoaderBridge bridge;
                 Object foreignModule;
                 try {
-                    bridge = bridge(artifacts(delegated));
+                    bridge = JenesisClassLoaderBridge.of(group, artifacts(delegated), pathPlacement);
                     foreignModule = bridge.create(buildModuleName,
                             environment,
                             properties,
