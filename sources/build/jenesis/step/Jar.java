@@ -235,7 +235,7 @@ public class Jar extends ProcessBuildStep {
             current.superclass().ifPresent(supertypes::add);
             supertypes.addAll(current.interfaces());
             for (ClassEntry supertype : supertypes) {
-                if (seen.add(supertype.asInternalName())) {
+                if (!supertype.asInternalName().equals("java/lang/Object") && seen.add(supertype.asInternalName())) {
                     ClassModel parent = find(folders, jars, supertype.asInternalName());
                     if (parent == null) {
                         return;

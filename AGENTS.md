@@ -143,7 +143,8 @@ a native image of the engine that `Make` compiles with the `native-image` of the
 tracing agent recorded on that GraalVM's JVM. In that run the plugin bridge copies the jars of every plugin it loads
 under `<make.classes>/plugins`, which `Make` compiles into the image beside the engine, leaving out a plugin's own copy of
 `build.jenesis` and a plugin holding a class another plugin holds with other bytes; the image holds one class per name, so a bridge
-takes only the providers its own jars declare. A build the image cannot run - one loading a plugin it lacks or reaching
+takes only the providers its own jars declare. `javac` runs in the image but forks where it runs annotation processors
+or compiler plugins, which it cannot load from their jars there. A build the image cannot run - one loading a plugin it lacks or reaching
 what the agent never recorded - fails; it is not handed back to a JVM. Unset, the mode is
 `daemon`, or `compiled` where `jenesis.process.mode` names `fork` or `aot`, `jenesis.project.docker` is set or
 `jenesis.release.publish` publishes; `Make` hands the mode it resolved down as `make.mode`, which the executor prints
