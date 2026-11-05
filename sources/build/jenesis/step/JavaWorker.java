@@ -2,6 +2,7 @@ package build.jenesis.step;
 
 import module java.base;
 import build.jenesis.daemon.Worker;
+import java.lang.classfile.Attributes;
 
 final class JavaWorker {
 
@@ -279,8 +280,21 @@ final class JavaWorker {
     private static synchronized Path classes() throws IOException {
         if (compiled == null) {
             Path copied = ProcessHandler.OfProcess.temporary("jenesis-java-worker");
-            for (Class<?> member : Worker.class.getNestMembers()) {
-                String name = member.getName().replace('.', '/') + ".class";
+            String host = Worker.class.getName().replace('.', '/');
+            List<String> members = new ArrayList<>(List.of(host));
+            try (InputStream input = Worker.class.getResourceAsStream("/" + host + ".class")) {
+                if (input == null) {
+                    throw new IllegalStateException("Cannot read " + host + ".class of the engine to run a tool's"
+                            + " main method in a JVM of its own");
+                }
+                ClassFile.of().parse(input.readAllBytes()).findAttribute(Attributes.nestMembers()).ifPresent(nest -> {
+                    for (ClassEntry member : nest.nestMembers()) {
+                        members.add(member.asInternalName());
+                    }
+                });
+            }
+            for (String member : members) {
+                String name = member + ".class";
                 try (InputStream input = Worker.class.getResourceAsStream("/" + name)) {
                     if (input == null) {
                         throw new IllegalStateException("Cannot read " + name + " of the engine to run a tool's main"
