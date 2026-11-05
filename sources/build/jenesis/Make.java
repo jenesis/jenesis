@@ -592,9 +592,10 @@ public final class Make {
         }
         sweep(engine);
         Path folder = Files.createDirectories(aotFolder.resolve("native")),
-                metadata = folder.resolve("metadata");
+                metadata = folder.resolve("metadata"),
+                marker = folder.resolve("plugins");
         String executable = File.separatorChar == '\\' ? "build.jenesis.exe" : "build.jenesis",
-                key = imaged(engine, metadata);
+                key = imaged(engine, metadata, Files.exists(marker));
         Path image = folder.resolve(key).resolve(executable);
         if (Files.isExecutable(image)) {
             List<String> command = new ArrayList<>(List.of(image.toString(), "-Djava.home=" + home));
@@ -614,6 +615,9 @@ public final class Make {
             });
             command.add("-Djenesis.make.root=" + root);
             command.add("-Djenesis.make.mode=native");
+            if (!Files.exists(marker)) {
+                command.add("-Djenesis.make.native=" + marker);
+            }
             for (String selector : selectors) {
                 command.add(selector.startsWith("@") ? "@" + selector : selector);
             }
@@ -630,12 +634,14 @@ public final class Make {
         command.add("-Djenesis.make.root=" + root);
         command.add("-Djenesis.make.classes=" + classes);
         command.add("-Djenesis.make.mode=compiled");
+        command.add("-Djenesis.make.native=" + marker);
         command.addAll(List.of("-cp", engine.toString(), Make.class.getName()));
         for (String selector : selectors) {
             command.add(selector.startsWith("@") ? "@" + selector : selector);
         }
         int code = awaited(new ProcessBuilder(command).inheritIO());
-        String trained = imaged(engine, metadata);
+        boolean loading = Files.exists(marker);
+        String trained = imaged(engine, metadata, loading);
         Path target = folder.resolve(trained), log = folder.resolve(trained + ".log");
         if (code == 0 && !Files.isExecutable(target.resolve(executable)) && !Files.exists(log)) {
             Path staging = folder.resolve(trained + "~");
@@ -648,22 +654,27 @@ public final class Make {
             }
             System.err.println("Compiling a native image of Jenesis for the next build, once for this engine and what"
                     + " the builds on a JVM recorded, which takes some minutes...");
-            int compiled = awaited(new ProcessBuilder(compiler.toString(),
+            List<String> arguments = new ArrayList<>(List.of(compiler.toString(),
                     "--no-fallback",
                     "--enable-url-protocols=http,https",
                     "--add-modules=jdk.compiler",
                     "--initialize-at-run-time=build.jenesis",
-                    "-H:+UnlockExperimentalVMOptions",
-                    "-H:+RuntimeClassLoading",
-                    "-H:+AllowJRTFileSystem",
-                    "-H:Preserve=module=java.base",
-                    "-H:Preserve=module=java.xml",
-                    "-H:Preserve=module=jdk.compiler",
-                    "-H:ConfigurationFileDirectories=" + metadata,
+                    "-H:+AllowJRTFileSystem"));
+            arguments.addAll(loading
+                    ? List.of("-H:+UnlockExperimentalVMOptions",
+                            "-H:+RuntimeClassLoading",
+                            "-H:Preserve=module=java.base",
+                            "-H:Preserve=module=java.xml",
+                            "-H:Preserve=module=jdk.compiler")
+                    : List.of("--exact-reachability-metadata"));
+            arguments.addAll(List.of("-H:ConfigurationFileDirectories=" + metadata,
                     "-H:IncludeResources=build/jenesis/daemon/Worker(\\$[^/]*)?\\.class",
                     "-o", Files.createDirectories(staging).resolve("build.jenesis").toString(),
                     "-cp", engine.toString(),
-                    Make.class.getName()).redirectErrorStream(true).redirectOutput(log.toFile()));
+                    Make.class.getName()));
+            int compiled = awaited(new ProcessBuilder(arguments)
+                    .redirectErrorStream(true)
+                    .redirectOutput(log.toFile()));
             if (compiled == 0) {
                 Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE);
                 Files.delete(log);
@@ -675,10 +686,10 @@ public final class Make {
         return code;
     }
 
-    private static String imaged(Path engine, Path metadata) throws IOException {
-        return fingerprint(engine, files(engine, ""), Files.isDirectory(metadata)
+    private static String imaged(Path engine, Path metadata, boolean loading) throws IOException {
+        return fingerprint(engine, files(engine, ""), (Files.isDirectory(metadata)
                 ? fingerprint(metadata, files(metadata, ""), "")
-                : "").substring(0, 16);
+                : "") + loading).substring(0, 16);
     }
 
     private static int awaited(ProcessBuilder builder) throws IOException, InterruptedException {
