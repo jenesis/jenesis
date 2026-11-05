@@ -671,7 +671,8 @@ public final class Make {
                             "-H:Preserve=module=java.base",
                             "-H:Preserve=module=java.xml",
                             "-H:Preserve=module=java.compiler",
-                            "-H:Preserve=module=jdk.compiler")
+                            "-H:Preserve=module=jdk.compiler",
+                            "--initialize-at-build-time=com.sun.tools.javac.api.JavacTool")
                     : List.of("--exact-reachability-metadata"));
             arguments.addAll(List.of("-H:ConfigurationFileDirectories=" + metadata,
                     "-H:IncludeResources=build/jenesis/daemon/Worker(\\$[^/]*)?\\.class",
