@@ -167,12 +167,11 @@ forked from the GraalVM.
 
 An image holds one class per name. A plugin's own copy of `build.jenesis` is therefore left out, and the plugin runs
 against the engine it is compiled into. A plugin whose classes differ from those of another plugin under the same
-name is left out as well, with a line naming it, and a build that loads it runs on the JVM.
+name is left out as well, with a line naming it.
 
-A build the image cannot run stops, after it prints the step it stopped at as failed, and continues on the JVM.
-One that reaches something the agent never recorded, or a plugin the image does not hold, runs under the agent
-again, and the next build compiles a new image from what it learned. Where that run teaches the image nothing, the
-project keeps building on the JVM until the engine, the recorded metadata or its plugins change.
+A build the image cannot run - one reaching what the agent never recorded, or a plugin the image does not hold -
+fails as any build does. The image is compiled again once the engine changes, or after the `native` folder of
+`jenesis.aot.folder` is deleted, from a build that runs on the JVM under the agent once more.
 
 Demos
 -----

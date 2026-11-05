@@ -11,7 +11,6 @@ public final class Make {
             DIRECTORY = "make.directory";
     private static final List<String> RECORDED = List.of(PROVIDED, PERSONAL, HOME, AMBIENT, DIRECTORY);
     private static final Set<String> PRINTING = Set.of("help", "skill", "prompt", "configuration", "properties", "--stop");
-    static final int HANDED = 75;
     private static final String PLUGINS = "plugins";
     static final List<String> CONTAINED = List.of("jenesis.project.docker",
             "jenesis.project.image",
@@ -597,11 +596,9 @@ public final class Make {
                 metadata = folder.resolve("metadata"),
                 plugins = classes.resolve(PLUGINS);
         String executable = File.separatorChar == '\\' ? "build.jenesis.exe" : "build.jenesis",
-                key = imaged(engine, metadata, plugins),
-                project = fingerprint(root, List.of(), root.toAbsolutePath().toString()).substring(0, 12);
-        Path image = folder.resolve(key).resolve(executable), declined = folder.resolve(key).resolve("jvm-" + project);
-        boolean handed = false;
-        if (Files.isExecutable(image) && !Files.exists(declined)) {
+                key = imaged(engine, metadata, plugins);
+        Path image = folder.resolve(key).resolve(executable);
+        if (Files.isExecutable(image)) {
             List<String> command = new ArrayList<>(List.of(image.toString(), "-Djava.home=" + home));
             for (String name : new TreeSet<>(System.getProperties().stringPropertyNames())) {
                 if ((name.startsWith("javax.net.ssl.")
@@ -622,20 +619,13 @@ public final class Make {
             for (String selector : selectors) {
                 command.add(selector.startsWith("@") ? "@" + selector : selector);
             }
-            int code = awaited(new ProcessBuilder(command).inheritIO());
-            if (code != HANDED) {
-                return code;
-            }
-            handed = true;
+            return awaited(new ProcessBuilder(command).inheritIO());
         }
         List<String> command = new ArrayList<>(List.of(home.resolve("bin")
                 .resolve(File.separatorChar == '\\' ? "java.exe" : "java")
-                .toString()));
-        if (!Files.exists(declined)) {
-            command.add("-agentlib:native-image-agent=config-merge-dir=" + metadata);
-            delete(plugins);
-            Files.createDirectories(plugins);
-        }
+                .toString(), "-agentlib:native-image-agent=config-merge-dir=" + metadata));
+        delete(plugins);
+        Files.createDirectories(plugins);
         new TreeMap<>(ambient).forEach((name, value) -> {
             if (!name.startsWith("toolchain.") && !name.equals("make.mode")) {
                 command.add("-Djenesis." + name + "=" + value);
@@ -651,9 +641,7 @@ public final class Make {
         int code = awaited(new ProcessBuilder(command).inheritIO());
         String trained = imaged(engine, metadata, plugins);
         Path target = folder.resolve(trained), log = folder.resolve(trained + ".log");
-        if (trained.equals(key) && handed) {
-            Files.writeString(declined, "");
-        } else if (code == 0 && !Files.isExecutable(target.resolve(executable)) && !Files.exists(log)) {
+        if (code == 0 && !Files.isExecutable(target.resolve(executable)) && !Files.exists(log)) {
             Path staging = folder.resolve(trained + "~");
             delete(staging);
             System.err.println("Compiling a native image of Jenesis for the next build, once for this engine and what"
