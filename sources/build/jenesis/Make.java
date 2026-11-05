@@ -665,6 +665,7 @@ public final class Make {
                             "-H:+RuntimeClassLoading",
                             "-H:Preserve=module=java.base",
                             "-H:Preserve=module=java.xml",
+                            "-H:Preserve=module=java.compiler",
                             "-H:Preserve=module=jdk.compiler")
                     : List.of("--exact-reachability-metadata"));
             arguments.addAll(List.of("-H:ConfigurationFileDirectories=" + metadata,

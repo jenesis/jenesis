@@ -142,9 +142,10 @@ path and installer itself.
 a native image of the engine that `Make` compiles with the `native-image` of the GraalVM running it, from what the
 tracing agent recorded on that GraalVM's JVM. Where a build it trained on loaded a plugin, which the bridge records
 in the file `make.native` names, the image loads classes at run time, so a plugin loads from its jars through the
-bridge as it does on a JVM, and keeps `java.base`, `java.xml` and `jdk.compiler` whole for the plugins it interprets;
-otherwise it holds the engine alone and a build loading a plugin there fails, after which the next build trains again.
-`javac` forks where it runs annotation processors or compiler plugins. A build reaching what the agent never recorded fails; it is not handed back to a JVM. Unset, the mode is
+bridge as it does on a JVM, and keeps `java.base`, `java.xml`, `java.compiler` and `jdk.compiler`, the modules it
+reads, whole for the plugins it interprets; otherwise it holds the engine alone and a build loading a plugin there
+fails, after which the next build trains again. `javac` forks where it runs annotation processors or compiler plugins.
+A build reaching what the agent never recorded fails; it is not handed back to a JVM. Unset, the mode is
 `daemon`, or `compiled` where `jenesis.process.mode` names `fork` or `aot`, `jenesis.project.docker` is set or
 `jenesis.release.publish` publishes; `Make` hands the mode it resolved down as `make.mode`, which the executor prints
 in the `[STARTED]` line and the `started` event and nothing else reads. Everything `Project`
