@@ -162,12 +162,14 @@ $GRAALVM_HOME/bin/java -Djenesis.make.mode=native build/jenesis/Make.java
 
 The first build runs on that GraalVM's JVM under its tracing agent, which records what the engine needs in
 `jenesis.aot.folder`, and then compiles the image, which takes some minutes. Later builds run the image, with `javac`
-inside it and every tool the image does not hold forked from the GraalVM.
+inside it and every tool the image does not hold forked from the GraalVM. A compilation with annotation processors or
+compiler plugins forks `javac` as well, so that they run on a JVM.
 
 The image is built with GraalVM's experimental runtime class loading, so it loads a plugin from its jars as a JVM
 does, each in a loader of its own and with its own copy of `build.jenesis`, and interprets it. A plugin therefore needs
 nothing recorded, and one added later loads without a new image. The image keeps the whole of `java.base`, `java.xml`
-and `jdk.compiler`, the modules a plugin can reach, which makes it about 320 MB.
+and `jdk.compiler`, the modules `build.jenesis` requires, which makes it about 320 MB; a plugin reaching another module
+of the JDK ends the image with a fatal error.
 
 A build reaching what the agent never recorded fails as any build does. The image is compiled again once the engine
 changes, or after the `native` folder of `jenesis.aot.folder` is deleted, from a build that runs on the JVM under the
