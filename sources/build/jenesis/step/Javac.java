@@ -86,17 +86,7 @@ public class Javac extends ProcessBuildStep {
 
     @Override
     protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
-        boolean forked = commands.stream().anyMatch(option -> option.startsWith("-J"));
-        if (!forked && System.getProperty("org.graalvm.nativeimage.imagecode") != null) {
-            for (String command : commands) {
-                if (command.startsWith("@") && Files.readAllLines(Path.of(command.substring(1))).stream()
-                        .anyMatch(line -> line.equals("\"--processor-path\"")
-                                || line.equals("\"--processor-module-path\""))) {
-                    forked = true;
-                }
-            }
-        }
-        return forked
+        return commands.stream().anyMatch(option -> option.startsWith("-J"))
                 ? ProcessHandler.OfProcess.ofJavaHome("bin/javac").apply(commands)
                         .daemon(terms.daemon())
                         .scoped(terms.shared())

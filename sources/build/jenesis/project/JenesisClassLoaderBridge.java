@@ -33,7 +33,6 @@ import java.lang.reflect.Proxy;
 class JenesisClassLoaderBridge {
 
     private static final Map<String, Warmed> WARMED = new ConcurrentHashMap<>();
-    private static final Object RECORDING = new Object();
 
     private final ModuleLayer layer;
     private final ModuleLayer.Controller controller;
@@ -69,9 +68,7 @@ class JenesisClassLoaderBridge {
 
     private final byte[] origin;
 
-    private final Map<String, Set<String>> declared;
-
-    static JenesisClassLoaderBridge of(String group, List<Path> artifacts, PathPlacement pathPlacement, Path recorded)
+    static JenesisClassLoaderBridge of(String group, List<Path> artifacts, PathPlacement pathPlacement)
             throws ReflectiveOperationException, IOException {
         MessageDigest digest;
         try {
@@ -98,7 +95,7 @@ class JenesisClassLoaderBridge {
         if (kept != null) {
             return kept;
         }
-        JenesisClassLoaderBridge bridge = new JenesisClassLoaderBridge(group, artifacts, pathPlacement, origin, recorded);
+        JenesisClassLoaderBridge bridge = new JenesisClassLoaderBridge(group, artifacts, pathPlacement, origin);
         WARMED.put(group, new Warmed(origin, new SoftReference<>(bridge)));
         return bridge;
     }
@@ -106,11 +103,8 @@ class JenesisClassLoaderBridge {
     private record Warmed(byte[] origin, SoftReference<JenesisClassLoaderBridge> bridge) {
     }
 
-    private JenesisClassLoaderBridge(String group,
-                                     List<Path> artifacts,
-                                     PathPlacement pathPlacement,
-                                     byte[] origin,
-                                     Path recorded) throws ReflectiveOperationException, IOException {
+    private JenesisClassLoaderBridge(String group, List<Path> artifacts, PathPlacement pathPlacement, byte[] origin)
+            throws ReflectiveOperationException, IOException {
         List<Path> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
         Path copies = ProcessHandler.OfProcess.temporary("jenesis-plugin");
         for (Path artifact : artifacts) {
@@ -128,25 +122,6 @@ class JenesisClassLoaderBridge {
             }
             (pathPlacement.test(copy) ? modulePath : classPath).add(copy);
         }
-        if (recorded != null) {
-            synchronized (RECORDING) {
-                if (!Files.exists(recorded)) {
-                    Path staging = Files.createDirectories(recorded.resolveSibling(recorded.getFileName() + "~"));
-                    try (Stream<Path> walk = Files.walk(copies)) {
-                        for (Path file : walk.toList()) {
-                            Path target = staging.resolve(copies.relativize(file).toString());
-                            if (Files.isDirectory(file)) {
-                                Files.createDirectories(target);
-                            } else {
-                                Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING);
-                            }
-                        }
-                    }
-                    Files.move(staging, recorded, StandardCopyOption.ATOMIC_MOVE);
-                }
-            }
-        }
-        declared = declared(modulePath, classPath);
         Module hostModule = JenesisClassLoaderBridge.class.getModule();
         ClassLoader parent = ClassLoader.getPlatformClassLoader();
         if (!classPath.isEmpty()) {
@@ -442,23 +417,7 @@ class JenesisClassLoaderBridge {
     private ServiceLoader.Provider<?> provider(Class<?> service, String name) {
         String kind = service.getSimpleName();
         ServiceLoader.Provider<?> factory = null;
-        Set<String> named = declared.getOrDefault(service.getName(), Set.of());
-        List<ServiceLoader.Provider<?>> providers = new ArrayList<>();
-        Set<String> found = new HashSet<>();
         for (ServiceLoader.Provider<?> provider : ServiceLoader.load(service, loader).stream().toList()) {
-            if (named.contains(provider.type().getName()) && found.add(provider.type().getName())) {
-                providers.add(provider);
-            }
-        }
-        for (String type : named) {
-            if (!found.contains(type)) {
-                try {
-                    providers.add(new DeclaredProvider(Class.forName(type, false, loader)));
-                } catch (ClassNotFoundException _) {
-                }
-            }
-        }
-        for (ServiceLoader.Provider<?> provider : providers) {
             Annotation annotation = provider.type().getAnnotation(foreignBuildModuleName);
             String providerName;
             if (annotation == null) {
@@ -488,70 +447,6 @@ class JenesisClassLoaderBridge {
                     : "No " + kind + " service provider named " + name + " found in the plugin");
         }
         return factory;
-    }
-
-    private static Map<String, Set<String>> declared(List<Path> modulePath, List<Path> classPath) throws IOException {
-        Map<String, Set<String>> declared = new HashMap<>();
-        for (ModuleReference reference : ModuleFinder.of(modulePath.toArray(Path[]::new)).findAll()) {
-            for (ModuleDescriptor.Provides provides : reference.descriptor().provides()) {
-                declared.computeIfAbsent(provides.service(), _ -> new LinkedHashSet<>()).addAll(provides.providers());
-            }
-        }
-        for (Path artifact : classPath) {
-            Map<String, List<String>> services = new LinkedHashMap<>();
-            if (Files.isDirectory(artifact)) {
-                Path folder = artifact.resolve("META-INF").resolve("services");
-                if (Files.isDirectory(folder)) {
-                    try (Stream<Path> files = Files.list(folder)) {
-                        for (Path file : files.filter(Files::isRegularFile).sorted().toList()) {
-                            services.put(file.getFileName().toString(), Files.readAllLines(file, StandardCharsets.UTF_8));
-                        }
-                    }
-                }
-            } else {
-                try (JarFile jar = new JarFile(artifact.toFile())) {
-                    for (JarEntry entry : Collections.list(jar.entries())) {
-                        if (!entry.isDirectory() && entry.getName().startsWith("META-INF/services/")) {
-                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                                    jar.getInputStream(entry),
-                                    StandardCharsets.UTF_8))) {
-                                services.put(entry.getName().substring("META-INF/services/".length()),
-                                        reader.lines().toList());
-                            }
-                        }
-                    }
-                }
-            }
-            services.forEach((service, lines) -> {
-                for (String line : lines) {
-                    String provider = line.split("#", 2)[0].strip();
-                    if (!provider.isEmpty()) {
-                        declared.computeIfAbsent(service, _ -> new LinkedHashSet<>()).add(provider);
-                    }
-                }
-            });
-        }
-        return declared;
-    }
-
-    private record DeclaredProvider(Class<?> type) implements ServiceLoader.Provider<Object> {
-
-        @Override
-        public Object get() {
-            try {
-                Method provider;
-                try {
-                    provider = type.getMethod("provider");
-                } catch (NoSuchMethodException _) {
-                    provider = null;
-                }
-                return provider != null && Modifier.isStatic(provider.getModifiers())
-                        ? provider.invoke(null)
-                        : type.getConstructor().newInstance();
-            } catch (ReflectiveOperationException e) {
-                throw new ServiceConfigurationError("Cannot create the provider " + type.getName() + " its plugin declares", e);
-            }
-        }
     }
 
     private static Object convert(Object value, ClassLoader source, ClassLoader target) {
@@ -641,7 +536,8 @@ class JenesisClassLoaderBridge {
             return false;
         }
         try {
-            return Class.forName(type.getName(), false, target) != type;
+            Class.forName(type.getName(), false, target);
+            return true;
         } catch (ClassNotFoundException _) {
             return false;
         }
@@ -729,11 +625,10 @@ class JenesisClassLoaderBridge {
                 BuildExecutor hostExecutor,
                 SequencedMap<String, Path> inherited,
                 String group) throws IOException {
-        Object foreignProxy = foreignBuildExecutor == BuildExecutor.class
-                ? new DelegatingBuildExecutor(new BuildExecutorBridge(hostExecutor, group))
-                : Proxy.newProxyInstance(loader,
-                        new Class<?>[]{foreignBuildExecutor},
-                        new BuildExecutorBridge(hostExecutor, group));
+        Object foreignProxy = Proxy.newProxyInstance(
+                loader,
+                new Class<?>[]{foreignBuildExecutor},
+                new BuildExecutorBridge(hostExecutor, group));
         try {
             foreignAccept.invoke(foreignModule, foreignProxy, inherited);
         } catch (IOException | RuntimeException | Error e) {
@@ -900,18 +795,14 @@ class JenesisClassLoaderBridge {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
             if (method.isDefault()) {
                 return InvocationHandler.invokeDefault(proxy, method, args);
             }
-            return dispatch(method.getName(), method.getParameterCount(), args);
-        }
-
-        @SuppressWarnings("unchecked")
-        Object dispatch(String name, int parameters, Object[] args) {
-            return switch (name) {
+            return switch (method.getName()) {
                 case "addSource" -> {
-                    if (parameters == 2) {
+                    if (method.getParameterCount() == 2) {
                         host.addSource((String) args[0], (Path) args[1]);
                     } else {
                         host.addSource((String) args[0], wrapStep(args[1], group), (SequencedSet<Path>) args[2]);
@@ -919,7 +810,7 @@ class JenesisClassLoaderBridge {
                     yield null;
                 }
                 case "replaceSource" -> {
-                    if (parameters == 2) {
+                    if (method.getParameterCount() == 2) {
                         host.replaceSource((String) args[0], (Path) args[1]);
                     } else {
                         host.replaceSource((String) args[0], wrapStep(args[1], group), (SequencedSet<Path>) args[2]);
@@ -969,97 +860,13 @@ class JenesisClassLoaderBridge {
                             (Function<String, Optional<String>>) args[3]);
                     yield null;
                 }
-                case "execute" -> host.execute((Executor) args[0], (List<String>) args[1], (List<String>) args[2]);
+                case "execute" -> host.execute((Executor) args[0], (String[]) args[1]);
                 default -> throw new UnsupportedOperationException(
-                        "This build module calls BuildExecutor." + name + " with " + parameters
-                                + " arguments, which the running version of Jenesis does not provide. The module was "
+                        "This build module calls BuildExecutor." + method.getName()
+                                + ", which the running version of Jenesis does not provide. The module was "
                                 + "built against a newer Jenesis API; upgrade Jenesis to a version that "
-                                + "supports it.");
+                                + "supports it (" + method + ").");
             };
-        }
-    }
-
-    private record DelegatingBuildExecutor(BuildExecutorBridge bridge) implements BuildExecutor {
-
-        @Override
-        public void addSource(String identity, Path path) {
-            bridge.dispatch("addSource", 2, new Object[]{identity, path});
-        }
-
-        @Override
-        public void addSource(String identity, BuildStep step, SequencedSet<Path> paths) {
-            bridge.dispatch("addSource", 3, new Object[]{identity, step, paths});
-        }
-
-        @Override
-        public void replaceSource(String identity, Path path) {
-            bridge.dispatch("replaceSource", 2, new Object[]{identity, path});
-        }
-
-        @Override
-        public void replaceSource(String identity, BuildStep step, SequencedSet<Path> paths) {
-            bridge.dispatch("replaceSource", 3, new Object[]{identity, step, paths});
-        }
-
-        @Override
-        public void addStep(String identity, BuildStep step, SequencedMap<String, String> dependencies) {
-            bridge.dispatch("addStep", 3, new Object[]{identity, step, dependencies});
-        }
-
-        @Override
-        public void replaceStep(String identity, BuildStep step) {
-            bridge.dispatch("replaceStep", 2, new Object[]{identity, step});
-        }
-
-        @Override
-        public void prependStep(String identity, String prepended, BuildStep step) {
-            bridge.dispatch("prependStep", 3, new Object[]{identity, prepended, step});
-        }
-
-        @Override
-        public void appendStep(String identity, String original, BuildStep step) {
-            bridge.dispatch("appendStep", 3, new Object[]{identity, original, step});
-        }
-
-        @Override
-        public void addModule(String identity,
-                              BuildExecutorModule module,
-                              Function<String, Optional<String>> resolver,
-                              SequencedMap<String, String> dependencies) {
-            bridge.dispatch("addModule", 4, new Object[]{identity, module, resolver, dependencies});
-        }
-
-        @Override
-        public void replaceModule(String identity,
-                                  BuildExecutorModule module,
-                                  Function<String, Optional<String>> resolver) {
-            bridge.dispatch("replaceModule", 3, new Object[]{identity, module, resolver});
-        }
-
-        @Override
-        public void prependModule(String identity,
-                                  String prepended,
-                                  BuildExecutorModule module,
-                                  Function<String, Optional<String>> resolver) {
-            bridge.dispatch("prependModule", 4, new Object[]{identity, prepended, module, resolver});
-        }
-
-        @Override
-        public void appendModule(String identity,
-                                 String appended,
-                                 BuildExecutorModule module,
-                                 Function<String, Optional<String>> resolver) {
-            bridge.dispatch("appendModule", 4, new Object[]{identity, appended, module, resolver});
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public CompletionStage<SequencedMap<String, Path>> execute(Executor executor,
-                                                                   List<String> selectors,
-                                                                   List<String> optional) {
-            return (CompletionStage<SequencedMap<String, Path>>) bridge.dispatch("execute",
-                    3,
-                    new Object[]{executor, selectors, optional});
         }
     }
 }

@@ -153,27 +153,25 @@ This is one project on one runner class. The run's summary holds the tables for 
 ### A native image of the engine
 
 `jenesis.make.mode=native` runs the build as a native image of the engine. It is kept to follow what GraalVM
-makes of the engine, not to make a build faster. `Make` has to run on the `java` of a GraalVM 25 or newer, whose
+makes of the engine, not to make a build faster. `Make` has to run on the `java` of a GraalVM 25.5 or newer, whose
 `native-image` compiles the image:
 
 ```bash
 $GRAALVM_HOME/bin/java -Djenesis.make.mode=native build/jenesis/Make.java
 ```
 
-The first build runs on that GraalVM's JVM under its tracing agent, which records what the image needs in
-`jenesis.aot.folder`, and the plugins the build loaded, and then compiles the image of the engine and those plugins,
-which takes some minutes. Later builds run the image, with `javac` inside it and every tool the image does not hold
-forked from the GraalVM. A compilation with annotation processors or compiler plugins forks `javac` as well, as `javac`
-inside an image cannot load them from their jars.
+The first build runs on that GraalVM's JVM under its tracing agent, which records what the engine needs in
+`jenesis.aot.folder`, and then compiles the image, which takes some minutes. Later builds run the image, with `javac`
+inside it and every tool the image does not hold forked from the GraalVM.
 
-An image holds one class per name. A plugin's own copy of `build.jenesis` is therefore left out, and the plugin runs
-against the engine it is compiled into, so a plugin built against another release fails where it calls what this
-engine lacks. A plugin whose classes differ from those of another plugin under the same
-name is left out as well, with a line naming it.
+The image is built with GraalVM's experimental runtime class loading, so it loads a plugin from its jars as a JVM
+does, each in a loader of its own and with its own copy of `build.jenesis`, and interprets it. A plugin therefore needs
+nothing recorded, and one added later loads without a new image. The image keeps the whole of `java.base`, `java.xml`
+and `jdk.compiler`, the modules a plugin can reach, which makes it about 320 MB.
 
-A build the image cannot run - one reaching what the agent never recorded, or a plugin the image does not hold -
-fails as any build does. The image is compiled again once the engine changes, or after the `native` folder of
-`jenesis.aot.folder` is deleted, from a build that runs on the JVM under the agent once more.
+A build reaching what the agent never recorded fails as any build does. The image is compiled again once the engine
+changes, or after the `native` folder of `jenesis.aot.folder` is deleted, from a build that runs on the JVM under the
+agent once more.
 
 Demos
 -----

@@ -36,7 +36,7 @@ public class MakeNativeTest {
                 .as("the build names what it needs rather than running on a JVM in place of the image")
                 .contains("native-image of the GraalVM that runs Make")
                 .contains(home.toString())
-                .contains("GraalVM 25 or newer");
+                .contains("GraalVM 25.5 or newer");
         assertThat(root.resolve(".jenesis").resolve("aot").resolve("native")).doesNotExist();
     }
 }

@@ -163,51 +163,6 @@ public class InternalModuleTest {
     }
 
     @Test
-    public void copies_the_jars_of_a_plugin_it_loads_where_make_keeps_the_plugins_of_a_native_image() throws IOException {
-        Path source = writeModuleSource(work.resolve("plugin"),
-                "module test.recorded { requires build.jenesis; provides build.jenesis.BuildModuleFactory with test.recorded.Plugin; }",
-                Map.of("test/recorded/Plugin.java", """
-                        package test.recorded;
-                        import build.jenesis.BuildExecutor;
-                        import build.jenesis.BuildExecutorModule;
-                        import java.nio.file.Path;
-                        import java.util.SequencedMap;
-                        public class Plugin implements build.jenesis.BuildModuleFactory, BuildExecutorModule {
-                            public BuildExecutorModule create(build.jenesis.Environment environment,
-                                                              java.util.SequencedMap<String, String> properties,
-                                                              build.jenesis.Permits permits,
-                                                              String group,
-                                                              java.util.Map<String, build.jenesis.Repository> repositories,
-                                                              java.util.Map<String, build.jenesis.Resolver> resolvers) {
-                                return this;
-                            }
-                            public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
-                            }
-                        }
-                        """));
-        Path classes = work.resolve("classes"), plugins = Files.createDirectories(classes.resolve("plugins"));
-
-        buildExecutor.addModule("internal", InternalModule.ofEnvironment(new Environment(Map.of("make.classes",
-                        classes.toString())).root(root),
-                "module",
-                "recorded",
-                source,
-                Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))),
-                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
-        buildExecutor.execute();
-
-        try (Stream<Path> recorded = Files.walk(plugins.resolve("recorded"), 2)) {
-            assertThat(recorded.filter(Files::isRegularFile).map(file -> file.getFileName().toString()))
-                    .as("the training run of a native image leaves Make every jar the plugin's layer was built from")
-                    .contains("test.recorded-0-SNAPSHOT.jar")
-                    .hasSize(2);
-        }
-        try (Stream<Path> staged = Files.list(plugins)) {
-            assertThat(staged.map(file -> file.getFileName().toString())).containsExactly("recorded");
-        }
-    }
-
-    @Test
     public void keeps_the_layer_of_a_plugin_warm_for_the_next_build_of_the_same_jars() throws Exception {
         assertThat(created("test.warm", List.of("first", "first"))).containsExactly("1", "2");
     }

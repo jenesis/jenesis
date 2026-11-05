@@ -136,13 +136,6 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
 
     abstract List<Path> artifacts(SequencedMap<String, Path> prepared) throws IOException;
 
-    private Path recorded() {
-        Path classes = environment.path("make.classes", Environment.Setting.CONFINED);
-        return classes != null && Files.isDirectory(classes.resolve("plugins"))
-                ? classes.resolve("plugins").resolve(group)
-                : null;
-    }
-
     abstract M properties(SequencedMap<String, String> properties);
 
     abstract M inputs(SequencedMap<String, SequencedMap<Path, Path>> inputs);
@@ -283,7 +276,7 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
                     + ", but a plugin that observes or runs the tests is handed no input - remove its @<input> lines");
         }
         try {
-            return JenesisClassLoaderBridge.of(group, artifacts(prepared), pathPlacement, recorded());
+            return JenesisClassLoaderBridge.of(group, artifacts(prepared), pathPlacement);
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Failed to load the plugin " + identity(), e);
         }
@@ -304,7 +297,7 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
                 JenesisClassLoaderBridge bridge;
                 Object foreignModule;
                 try {
-                    bridge = JenesisClassLoaderBridge.of(group, artifacts(delegated), pathPlacement, recorded());
+                    bridge = JenesisClassLoaderBridge.of(group, artifacts(delegated), pathPlacement);
                     foreignModule = bridge.create(buildModuleName,
                             environment,
                             properties,

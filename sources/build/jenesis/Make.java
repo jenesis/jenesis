@@ -11,7 +11,6 @@ public final class Make {
             DIRECTORY = "make.directory";
     private static final List<String> RECORDED = List.of(PROVIDED, PERSONAL, HOME, AMBIENT, DIRECTORY);
     private static final Set<String> PRINTING = Set.of("help", "skill", "prompt", "configuration", "properties", "--stop");
-    private static final String PLUGINS = "plugins";
     static final List<String> CONTAINED = List.of("jenesis.project.docker",
             "jenesis.project.image",
             "jenesis.project.readable",
@@ -589,14 +588,13 @@ public final class Make {
         if (!Files.isExecutable(compiler)) {
             throw new IllegalStateException("jenesis.make.mode=native compiles the engine with the native-image of the"
                     + " GraalVM that runs Make, but the JDK at " + home + " holds none: run the build with the java"
-                    + " of a GraalVM 25 or newer");
+                    + " of a GraalVM 25.5 or newer");
         }
         sweep(engine);
         Path folder = Files.createDirectories(aotFolder.resolve("native")),
-                metadata = folder.resolve("metadata"),
-                plugins = classes.resolve(PLUGINS);
+                metadata = folder.resolve("metadata");
         String executable = File.separatorChar == '\\' ? "build.jenesis.exe" : "build.jenesis",
-                key = imaged(engine, metadata, plugins);
+                key = imaged(engine, metadata);
         Path image = folder.resolve(key).resolve(executable);
         if (Files.isExecutable(image)) {
             List<String> command = new ArrayList<>(List.of(image.toString(), "-Djava.home=" + home));
@@ -624,8 +622,6 @@ public final class Make {
         List<String> command = new ArrayList<>(List.of(home.resolve("bin")
                 .resolve(File.separatorChar == '\\' ? "java.exe" : "java")
                 .toString(), "-agentlib:native-image-agent=config-merge-dir=" + metadata));
-        delete(plugins);
-        Files.createDirectories(plugins);
         new TreeMap<>(ambient).forEach((name, value) -> {
             if (!name.startsWith("toolchain.") && !name.equals("make.mode")) {
                 command.add("-Djenesis." + name + "=" + value);
@@ -639,49 +635,34 @@ public final class Make {
             command.add(selector.startsWith("@") ? "@" + selector : selector);
         }
         int code = awaited(new ProcessBuilder(command).inheritIO());
-        String trained = imaged(engine, metadata, plugins);
+        String trained = imaged(engine, metadata);
         Path target = folder.resolve(trained), log = folder.resolve(trained + ".log");
         if (code == 0 && !Files.isExecutable(target.resolve(executable)) && !Files.exists(log)) {
             Path staging = folder.resolve(trained + "~");
-            delete(staging);
-            System.err.println("Compiling a native image of Jenesis for the next build, once for this engine and what"
-                    + " the builds on a JVM recorded, which takes some minutes...");
-            List<Path> included = included(engine, plugins), path = new ArrayList<>(List.of(engine));
-            path.addAll(included);
-            Path providers = folder.resolve("providers");
-            delete(providers);
-            StringBuilder reflection = new StringBuilder();
-            for (Path entry : included) {
-                Set<ModuleReference> references;
-                try {
-                    references = ModuleFinder.of(entry).findAll();
-                } catch (FindException _) {
-                    references = Set.of();
-                }
-                for (ModuleReference reference : references) {
-                    for (ModuleDescriptor.Provides provides : reference.descriptor().provides()) {
-                        for (String provider : provides.providers()) {
-                            reflection.append(reflection.isEmpty() ? "" : ",\n").append("    {\"type\": \"")
-                                    .append(provider)
-                                    .append("\", \"methods\": [{\"name\": \"<init>\", \"parameterTypes\": []},")
-                                    .append(" {\"name\": \"provider\", \"parameterTypes\": []}]}");
-                        }
+            if (Files.exists(staging)) {
+                try (Stream<Path> files = Files.walk(staging)) {
+                    for (Path file : files.sorted(Comparator.reverseOrder()).toList()) {
+                        Files.delete(file);
                     }
                 }
             }
-            Files.writeString(Files.createDirectories(providers).resolve("reachability-metadata.json"),
-                    "{\n  \"reflection\": [\n" + reflection + "\n  ]\n}\n");
+            System.err.println("Compiling a native image of Jenesis for the next build, once for this engine and what"
+                    + " the builds on a JVM recorded, which takes some minutes...");
             int compiled = awaited(new ProcessBuilder(compiler.toString(),
                     "--no-fallback",
-                    "--exact-reachability-metadata",
                     "--enable-url-protocols=http,https",
                     "--add-modules=jdk.compiler",
                     "--initialize-at-run-time=build.jenesis",
-                    "-H:ConfigurationFileDirectories=" + metadata + "," + providers,
-                    "-H:IncludeResources=.*Driver(\\$[^/]*)?\\.class",
+                    "-H:+UnlockExperimentalVMOptions",
+                    "-H:+RuntimeClassLoading",
+                    "-H:+AllowJRTFileSystem",
+                    "-H:Preserve=module=java.base",
+                    "-H:Preserve=module=java.xml",
+                    "-H:Preserve=module=jdk.compiler",
+                    "-H:ConfigurationFileDirectories=" + metadata,
                     "-H:IncludeResources=build/jenesis/daemon/Worker(\\$[^/]*)?\\.class",
                     "-o", Files.createDirectories(staging).resolve("build.jenesis").toString(),
-                    "-cp", path.stream().map(Path::toString).collect(Collectors.joining(File.pathSeparator)),
+                    "-cp", engine.toString(),
                     Make.class.getName()).redirectErrorStream(true).redirectOutput(log.toFile()));
             if (compiled == 0) {
                 Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE);
@@ -694,106 +675,13 @@ public final class Make {
         return code;
     }
 
-    private static String imaged(Path engine, Path metadata, Path plugins) throws IOException {
-        List<Path> recorded;
-        if (Files.isDirectory(plugins)) {
-            try (Stream<Path> walk = Files.walk(plugins)) {
-                recorded = walk.filter(Files::isRegularFile).sorted().toList();
-            }
-        } else {
-            recorded = List.of();
-        }
-        return fingerprint(engine, files(engine, ""), (Files.isDirectory(metadata)
+    private static String imaged(Path engine, Path metadata) throws IOException {
+        return fingerprint(engine, files(engine, ""), Files.isDirectory(metadata)
                 ? fingerprint(metadata, files(metadata, ""), "")
-                : "") + fingerprint(plugins, recorded, "")).substring(0, 16);
+                : "").substring(0, 16);
     }
 
-    private static void delete(Path folder) throws IOException {
-        if (Files.exists(folder)) {
-            try (Stream<Path> files = Files.walk(folder)) {
-                for (Path file : files.sorted(Comparator.reverseOrder()).toList()) {
-                    Files.delete(file);
-                }
-            }
-        }
-    }
-
-    private static List<Path> included(Path engine, Path plugins) throws IOException {
-        List<Path> included = new ArrayList<>();
-        if (!Files.isDirectory(plugins)) {
-            return included;
-        }
-        Set<String> api = digests(engine).keySet();
-        Map<String, String> owners = new HashMap<>();
-        List<Path> groups;
-        try (Stream<Path> list = Files.list(plugins)) {
-            groups = list.filter(Files::isDirectory).filter(group -> !group.getFileName().toString().endsWith("~"))
-                    .sorted()
-                    .toList();
-        }
-        for (Path group : groups) {
-            List<Path> entries;
-            try (Stream<Path> walk = Files.walk(group, 2)) {
-                entries = walk.filter(entry -> group.relativize(entry).getNameCount() == 2).sorted().toList();
-            }
-            Map<String, String> held = new HashMap<>();
-            List<Path> kept = new ArrayList<>();
-            for (Path entry : entries) {
-                Map<String, String> found = digests(entry);
-                if (found.keySet().stream().noneMatch(api::contains)) {
-                    held.putAll(found);
-                    kept.add(entry);
-                }
-            }
-            String clash = held.entrySet().stream()
-                    .filter(entry -> owners.containsKey(entry.getKey())
-                            && !owners.get(entry.getKey()).equals(entry.getValue()))
-                    .map(Map.Entry::getKey)
-                    .findFirst()
-                    .orElse(null);
-            if (clash != null) {
-                System.err.println("The native image of Jenesis leaves out the plugin " + group.getFileName() + ", as its "
-                        + clash + " differs from the one another plugin brings, so builds that load it run on a JVM");
-                continue;
-            }
-            owners.putAll(held);
-            included.addAll(kept);
-        }
-        return included;
-    }
-
-    private static Map<String, String> digests(Path entry) throws IOException {
-        MessageDigest digest;
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
-        Map<String, String> classes = new HashMap<>();
-        if (Files.isDirectory(entry)) {
-            try (Stream<Path> walk = Files.walk(entry)) {
-                for (Path file : walk.filter(Files::isRegularFile).toList()) {
-                    String name = entry.relativize(file).toString().replace('\\', '/');
-                    if (name.endsWith(".class") && !name.endsWith("module-info.class")) {
-                        classes.put(name, HexFormat.of().formatHex(digest.digest(Files.readAllBytes(file))));
-                    }
-                }
-            }
-        } else {
-            try (JarFile jar = new JarFile(entry.toFile())) {
-                for (JarEntry file : Collections.list(jar.entries())) {
-                    if (file.getName().endsWith(".class") && !file.getName().endsWith("module-info.class")) {
-                        try (InputStream input = jar.getInputStream(file)) {
-                            classes.put(file.getName(), HexFormat.of().formatHex(digest.digest(input.readAllBytes())));
-                        }
-                    }
-                }
-            }
-        }
-        return classes;
-    }
-
-        private static int awaited(ProcessBuilder builder) throws IOException, InterruptedException {
+    private static int awaited(ProcessBuilder builder) throws IOException, InterruptedException {
         Process process = builder.start();
         Thread hook = new Thread(process::destroy);
         Runtime.getRuntime().addShutdownHook(hook);
@@ -931,10 +819,7 @@ public final class Make {
     private void sweep(Path engine) throws IOException {
         StringBuilder identity = new StringBuilder(Runtime.version().toString());
         try (Stream<Path> files = Files.walk(engine)) {
-            for (Path file : files.filter(Files::isRegularFile)
-                    .filter(file -> !file.startsWith(classes.resolve(PLUGINS)))
-                    .sorted()
-                    .toList()) {
+            for (Path file : files.filter(Files::isRegularFile).sorted().toList()) {
                 BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class);
                 identity.append('|').append(engine.relativize(file))
                         .append(':').append(attributes.size())
