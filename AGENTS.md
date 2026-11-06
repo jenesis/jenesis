@@ -303,7 +303,7 @@ A tool's main method runs through `ProcessHandler.OfProcess.ofJavaMain()`, by `j
   identity), environment and working directory, which compiles a `.java` launcher once, captures each call's
   output, is replaced after a `System.exit` and ends after ten idle minutes.
 
-`jenesis.make.mode=aot` and `=daemon` set the process mode alike unless it is set. The AOT folder holds every cache,
+`jenesis.make.mode=aot` and `=daemon` set the process mode alike unless it is set, and `=native` sets it to `aot`. The AOT folder holds every cache,
 the engine's and the tools', and `Make` clears it whole when `aot.properties` records another engine or JVM or the
 folder outlived `jenesis.aot.lifetime`. The build daemon is the same `Worker` on a loopback socket behind a token,
 running `DaemonBuild` per request, one at a time. Daemons announce themselves in `jenesis.daemon.folder`

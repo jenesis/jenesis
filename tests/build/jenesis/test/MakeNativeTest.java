@@ -39,4 +39,21 @@ public class MakeNativeTest {
                 .contains("GraalVM 25.5 or newer");
         assertThat(root.resolve(".jenesis").resolve("aot").resolve("native")).doesNotExist();
     }
+
+    @Test
+    public void starts_the_tools_of_a_native_build_from_ahead_of_time_caches() throws Exception {
+        List<String> command = List.of(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                "-cp", Path.of(Make.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toString(),
+                "build.jenesis.Make",
+                "-Djenesis.make.mode=native",
+                "-Djenesis.make.global=",
+                "configuration");
+        Process process = new ProcessBuilder(command).directory(root.toFile()).redirectErrorStream(true).start();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+
+        assertThat(process.waitFor()).as(output).isZero();
+        assertThat(output)
+                .as("a forked tool starts from a cache of its own, as the image cannot hold it")
+                .contains("jenesis.process.mode=aot ");
+    }
 }

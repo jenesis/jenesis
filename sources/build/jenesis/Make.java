@@ -640,6 +640,10 @@ public final class Make {
         command.add("-Djenesis.make.classes=" + classes);
         command.add("-Djenesis.make.mode=compiled");
         command.add("-Djenesis.make.native=" + marker);
+        if (tools()) {
+            command.add("-Djenesis.process.mode=aot");
+            command.add("-Djenesis.aot.folder=" + aotFolder);
+        }
         command.addAll(List.of("-cp", engine.toString(), Make.class.getName()));
         for (String selector : selectors) {
             command.add(selector.startsWith("@") ? "@" + selector : selector);
@@ -818,7 +822,9 @@ public final class Make {
 
     private boolean tools() {
         String process = settings.keys().get("process.mode");
-        return process == null || process.isBlank() ? mode == Mode.AOT : process.trim().equalsIgnoreCase("aot");
+        return process == null || process.isBlank()
+                ? mode == Mode.AOT || mode == Mode.NATIVE
+                : process.trim().equalsIgnoreCase("aot");
     }
 
     private Map<String, String> settled() {
