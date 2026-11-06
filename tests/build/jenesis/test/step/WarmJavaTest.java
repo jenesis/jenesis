@@ -199,6 +199,27 @@ public class WarmJavaTest {
     }
 
     @Test
+    public void runs_a_module_that_an_argument_file_names_from_a_native_image() throws IOException {
+        Assumptions.assumeTrue(Files.isExecutable(Path.of(System.getProperty("java.home"), "bin", "native-image")),
+                "only a GraalVM compiles native images");
+        Path module = modular(), image = run.resolve("image");
+        Path arguments = Files.writeString(run.resolve("java.args"), String.join("\n",
+                "-p", "\"" + module + "\"", "-Dgreeting=hello", "-m", "sample/sample.Main", "a"));
+        assertThat(java(image, "@" + arguments)).isEqualTo("0:hello a");
+        assertThat(tools(image)).as("the first run compiles the image that the next one runs").hasSize(1);
+        assertThat(java(image, "@" + arguments)).isEqualTo("0:hello a");
+    }
+
+    @Test
+    public void refuses_a_jvm_that_names_a_module_without_its_main_class() throws IOException {
+        Path module = modular(), image = run.resolve("image");
+        assertThatThrownBy(() -> java(image, "-p", module.toString(), "-m", "sample"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("<module>/<class>")
+                .hasMessageContaining("jenesis.process.mode=aot");
+    }
+
+    @Test
     public void reads_the_cache_of_a_jar_restored_as_another_file_and_trains_another_once_the_jar_changes()
             throws IOException {
         Path aot = run.resolve("aot"), jar = run.resolve("counter.jar"), restored = run.resolve("restored.jar");
@@ -500,6 +521,40 @@ public class WarmJavaTest {
                 .image(image)
                 .execute(output, error, new ProcessHandler.Tee(Thread.ofVirtual()::start, printed::add, _ -> { }));
         return code + ":" + String.join("|", printed);
+    }
+
+    private String java(Path image, String... arguments) throws IOException {
+        Path output = run.resolve("output-" + index + ".txt"), error = run.resolve("error-" + index + ".txt");
+        index++;
+        List<String> printed = new ArrayList<>();
+        int code = ProcessHandler.OfProcess.ofJavaHome("bin/java")
+                .apply(List.of(arguments))
+                .image(image)
+                .execute(output, error, new ProcessHandler.Tee(Thread.ofVirtual()::start, printed::add, _ -> { }));
+        return code + ":" + String.join("|", printed);
+    }
+
+    private Path modular() throws IOException {
+        Path sources = Files.createDirectories(run.resolve("modular-source").resolve("sample")),
+                target = Files.createDirectories(run.resolve("modular"));
+        Path descriptor = Files.writeString(sources.getParent().resolve("module-info.java"), "module sample { }\n"),
+                main = Files.writeString(sources.resolve("Main.java"), """
+                        package sample;
+
+                        public class Main {
+                            public static void main(String[] arguments) {
+                                System.out.println(System.getProperty("greeting") + " " + String.join(",", arguments));
+                            }
+                        }
+                        """);
+        assertThat(ToolProvider.getSystemJavaCompiler().run(null,
+                null,
+                null,
+                "-d",
+                target.toString(),
+                descriptor.toString(),
+                main.toString())).isZero();
+        return target;
     }
 
     private static List<Path> tools(Path image) throws IOException {

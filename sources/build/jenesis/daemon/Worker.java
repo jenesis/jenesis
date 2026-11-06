@@ -29,7 +29,10 @@ public final class Worker {
                 String[] property = arguments[index++].substring(2).split("=", 2);
                 System.setProperty(property[0], property.length == 2 ? property[1] : "");
             }
-            int code = call(List.of(arguments).subList(index, arguments.length), new HashMap<>());
+            List<String> request = List.of(arguments).subList(index, arguments.length);
+            int code = request.getFirst().equals(TOOL)
+                    ? tool(request, System.out, System.err)
+                    : call(request, new HashMap<>());
             System.out.flush();
             System.err.flush();
             System.exit(code);
@@ -153,15 +156,7 @@ public final class Worker {
                 err.calls.set(errored);
                 int code;
                 if (request.getFirst().equals(TOOL)) {
-                    try {
-                        code = java.util.spi.ToolProvider.findFirst(request.get(1))
-                                .orElseThrow(() -> new IllegalArgumentException("This JDK provides no tool named "
-                                        + request.get(1)))
-                                .run(printed, errored, request.subList(2, request.size()).toArray(String[]::new));
-                    } catch (Throwable t) {
-                        t.printStackTrace(errored);
-                        code = 1;
-                    }
+                    code = tool(request, printed, errored);
                 } else {
                     code = call(request.getFirst().equals(SHARED) ? request.subList(1, request.size()) : request, compiled);
                 }
@@ -355,6 +350,17 @@ public final class Worker {
             request.add(new String(bytes, StandardCharsets.UTF_8));
         }
         return request;
+    }
+
+    private static int tool(List<String> request, PrintStream out, PrintStream err) {
+        try {
+            return java.util.spi.ToolProvider.findFirst(request.get(1))
+                    .orElseThrow(() -> new IllegalArgumentException("This JDK provides no tool named " + request.get(1)))
+                    .run(out, err, request.subList(2, request.size()).toArray(String[]::new));
+        } catch (Throwable t) {
+            t.printStackTrace(err);
+            return 1;
+        }
     }
 
     private static int call(List<String> request, Map<String, Class<?>> compiled) {

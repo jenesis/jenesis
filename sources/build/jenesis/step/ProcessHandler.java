@@ -608,11 +608,13 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
         @Override
         public int execute(Path output, Path error, Tee tee) throws IOException {
-            JavaWorker.Call call = main || daemon || scoped ? JavaWorker.call(commands) : null;
-            if (call != null && (daemon || scoped && (shared || call.main().equals(Worker.TOOL)))) {
+            JavaWorker.Call call = image != null
+                    ? JavaWorker.imaged(commands)
+                    : main || daemon || scoped ? JavaWorker.call(commands) : null;
+            if (image == null && call != null && (daemon || scoped && (shared || call.main().equals(Worker.TOOL)))) {
                 return JavaWorker.execute(call, shared, daemon, environment, directory, output, error, tee);
             }
-            JavaWorker.Once once = call == null || !main || call.main().endsWith(".java")
+            JavaWorker.Once once = call == null || image == null && (!main || call.main().endsWith(".java"))
                     ? null
                     : JavaWorker.once(call, aot, image);
             try (once) {
