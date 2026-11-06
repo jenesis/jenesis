@@ -355,7 +355,8 @@ final class JavaWorker {
                     running.addAll(call.arguments());
                     return new Once(List.copyOf(running), null, null, imaged);
                 }
-                commands.add("-agentlib:native-image-agent=config-output-dir=" + folder.resolve("metadata"));
+                commands.add("-agentlib:native-image-agent=config-output-dir=" + folder.resolve("metadata")
+                        + ",experimental-class-define-support");
             } else if (Files.isRegularFile(cache = folder.resolve("cache.aot"))) {
                 commands.add("-XX:AOTCache=" + cache);
             } else {
@@ -439,6 +440,7 @@ final class JavaWorker {
                   Path folder,
                   List<String> properties,
                   List<String> compiler,
+                  String preserved,
                   Lock lock,
                   FileLock locked) implements Closeable {
 
@@ -476,7 +478,7 @@ final class JavaWorker {
                                 + " none: build with jenesis.process.mode=aot"))
                         .getName());
             }
-            Imaged imaged = new Imaged(call.main(), folder, List.copyOf(properties), null, null, null);
+            Imaged imaged = new Imaged(call.main(), folder, List.copyOf(properties), null, null, null, null);
             if (Files.isExecutable(imaged.executable())) {
                 return imaged;
             }
@@ -513,14 +515,28 @@ final class JavaWorker {
                     "--no-fallback",
                     "-H:-ParseRuntimeOptions",
                     "-H:MissingRegistrationReportingMode=Exit",
-                    "--exact-reachability-metadata",
                     "-H:ConfigurationFileDirectories=" + folder.resolve("metadata")));
             command.addAll(compiled);
             if (!modulepath.isEmpty()) {
                 command.addAll(List.of("-p", String.join(File.pathSeparator, modulepath)));
             }
             command.addAll(List.of("-cp", String.join(File.pathSeparator, classpath)));
-            return new Imaged(call.main(), folder, List.copyOf(properties), List.copyOf(command), lock, locked);
+            SortedSet<String> preserved = new TreeSet<>(List.of("java.base", "ALL-UNNAMED"));
+            ModuleFinder.of(modulepath.stream().map(Path::of).toArray(Path[]::new)).findAll()
+                    .forEach(reference -> preserved.add(reference.descriptor().name()));
+            compiled.stream()
+                    .filter(option -> option.startsWith("--add-modules="))
+                    .forEach(option -> preserved.addAll(List.of(option.substring("--add-modules=".length())
+                            .split(","))));
+            return new Imaged(call.main(),
+                    folder,
+                    List.copyOf(properties),
+                    List.copyOf(command),
+                    preserved.stream()
+                            .map(module -> "module=" + module)
+                            .collect(Collectors.joining(",", "-H:Preserve=", "")),
+                    lock,
+                    locked);
         }
 
         Path executable() {
@@ -538,7 +554,23 @@ final class JavaWorker {
                 return code;
             }
             Path staging = Files.createTempDirectory(folder, "native"), log = folder.resolve("native.log");
+            Path metadata = folder.resolve("metadata"), defined = metadata.resolve("agent-extracted-predefined-classes");
             List<String> command = new ArrayList<>(compiler);
+            boolean loading;
+            try (Stream<Path> files = Files.isDirectory(defined) ? Files.list(defined) : Stream.empty()) {
+                loading = files.findAny().isPresent();
+            }
+            if (loading) {
+                try (Stream<Path> files = Files.walk(defined)) {
+                    for (Path file : files.sorted(Comparator.reverseOrder()).toList()) {
+                        Files.delete(file);
+                    }
+                }
+                Files.deleteIfExists(metadata.resolve("predefined-classes-config.json"));
+                command.addAll(List.of("-H:+UnlockExperimentalVMOptions", "-H:+RuntimeClassLoading", preserved));
+            } else {
+                command.add("--exact-reachability-metadata");
+            }
             command.addAll(List.of("-o", staging.resolve("tool").toString(), Worker.class.getName()));
             COMPILING.acquireUninterruptibly();
             int compiled;

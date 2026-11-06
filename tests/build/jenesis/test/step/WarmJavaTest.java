@@ -220,6 +220,39 @@ public class WarmJavaTest {
     }
 
     @Test
+    public void loads_classes_at_run_time_in_the_native_image_of_a_tool_that_defined_classes_on_its_first_call()
+            throws IOException {
+        Assumptions.assumeTrue(Files.isExecutable(Path.of(System.getProperty("java.home"), "bin", "native-image")),
+                "only a GraalVM compiles native images");
+        Path generated = compiled("generated", "Gen", """
+                public class Gen {
+                    public static String get() {
+                        return "generated";
+                    }
+                }
+                """);
+        Path definer = compiled("definer", "Definer", """
+                public class Definer {
+                    public static void main(String[] arguments) throws Exception {
+                        byte[] bytes = java.nio.file.Files.readAllBytes(java.nio.file.Path.of(arguments[0]));
+                        Class<?> type = new ClassLoader(Definer.class.getClassLoader()) {
+                            Class<?> define() {
+                                return defineClass("Gen", bytes, 0, bytes.length);
+                            }
+                        }.define();
+                        System.out.println(type.getMethod("get").invoke(null));
+                    }
+                }
+                """);
+        Path image = run.resolve("image"), bytes = generated.resolve("Gen.class");
+        assertThat(imaged(image, "-cp", definer.toString(), "Definer", bytes.toString())).isEqualTo("0:generated");
+        assertThat(tools(image)).hasSize(1);
+        assertThat(imaged(image, "-cp", definer.toString(), "Definer", bytes.toString()))
+                .as("the image loads a class that the build defines at run time, as a JVM does")
+                .isEqualTo("0:generated");
+    }
+
+    @Test
     public void reads_the_cache_of_a_jar_restored_as_another_file_and_trains_another_once_the_jar_changes()
             throws IOException {
         Path aot = run.resolve("aot"), jar = run.resolve("counter.jar"), restored = run.resolve("restored.jar");
