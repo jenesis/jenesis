@@ -6,6 +6,7 @@ import build.jenesis.step.ProcessHandler;
 import javax.tools.ToolProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class WarmJavaTest {
 
@@ -156,6 +157,45 @@ public class WarmJavaTest {
         assertThat(forked(aot, "-cp", classes.toString(), "Counter", "exit"))
                 .as("a code a tool exits with is its code under a cache as well")
                 .isEqualTo("3:1 exit");
+    }
+
+    @Test
+    public void compiles_a_native_image_once_the_first_call_ended_and_runs_it_on_the_next() throws IOException {
+        Assumptions.assumeTrue(Files.isExecutable(Path.of(System.getProperty("java.home"), "bin", "native-image")),
+                "only a GraalVM compiles native images");
+        Path image = run.resolve("image");
+        assertThat(imaged(image, "-Xmx64m", "-cp", classes.toString(), "Counter", "a")).isEqualTo("0:1 a");
+        List<Path> tools = tools(image);
+        assertThat(tools).as("the first call trains the image that it compiles once it ended").hasSize(1);
+        FileTime compiled = Files.getLastModifiedTime(tools.getFirst());
+        assertThat(imaged(image, "-Xmx64m", "-cp", classes.toString(), "Counter", "b")).isEqualTo("0:1 b");
+        assertThat(imaged(image, "-Xmx64m", "-cp", classes.toString(), "Counter", "exit"))
+                .as("a code a tool exits with is its code in an image as well")
+                .isEqualTo("3:1 exit");
+        assertThat(tools(image))
+                .as("the later calls run the image the first one compiled")
+                .containsExactly(tools.getFirst());
+        assertThat(Files.getLastModifiedTime(tools.getFirst())).isEqualTo(compiled);
+    }
+
+    @Test
+    public void refuses_a_jvm_option_that_a_native_image_cannot_carry() {
+        Path image = run.resolve("image");
+        assertThatThrownBy(() -> imaged(image, "-XX:+UseSerialGC", "-cp", classes.toString(), "Counter", "a"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("-XX:+UseSerialGC")
+                .hasMessageContaining("jenesis.process.mode=aot");
+    }
+
+    @Test
+    public void refuses_native_images_on_a_jdk_without_native_image() {
+        Assumptions.assumeFalse(Files.exists(Path.of(System.getProperty("java.home"), "bin", "native-image")),
+                "a GraalVM compiles native images");
+        Path image = run.resolve("image");
+        assertThatThrownBy(() -> imaged(image, "-cp", classes.toString(), "Counter", "a"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("GraalVM 25.5 or newer")
+                .hasMessageContaining("jenesis.process.mode=aot");
     }
 
     @Test
@@ -448,6 +488,25 @@ public class WarmJavaTest {
                 .aot(aot)
                 .execute(output, error, new ProcessHandler.Tee(Thread.ofVirtual()::start, printed::add, _ -> { }));
         return code + ":" + String.join("|", printed);
+    }
+
+    private String imaged(Path image, String... arguments) throws IOException {
+        Path output = run.resolve("output-" + index + ".txt"), error = run.resolve("error-" + index + ".txt");
+        index++;
+        List<String> printed = new ArrayList<>();
+        int code = ProcessHandler.OfProcess.ofJavaMain()
+                .apply(List.of(arguments))
+                .daemon(false)
+                .image(image)
+                .execute(output, error, new ProcessHandler.Tee(Thread.ofVirtual()::start, printed::add, _ -> { }));
+        return code + ":" + String.join("|", printed);
+    }
+
+    private static List<Path> tools(Path image) throws IOException {
+        try (Stream<Path> files = Files.walk(image)) {
+            return files.filter(file -> file.getFileName().toString().matches("tool(\\.exe)?")
+                    && file.getParent().getFileName().toString().equals("native")).toList();
+        }
     }
 
     private static List<Path> caches(Path aot) throws IOException {

@@ -299,6 +299,9 @@ A tool's main method runs through `ProcessHandler.OfProcess.ofJavaMain()`, by `j
   code counts and a lingering thread ends with the JVM;
 - `aot` does so from an ahead-of-time cache of the tool in `jenesis.aot.folder`, trained by the first run with the
   JVM's messages off;
+- `native` does so from a native image of the tool in `jenesis.aot.folder`, keyed on the content of its jars, which
+  the `native-image` beside the JVM compiles once the first run, under the tracing agent, has ended; a run reaching
+  what the agent never recorded fails, as does a JVM option the image cannot carry;
 - `daemon`, set for every build the daemon runs, keeps a `Worker` JVM per JVM, options, class path (by file
   identity), environment and working directory, which compiles a `.java` launcher once, captures each call's
   output, is replaced after a `System.exit` and ends after ten idle minutes.

@@ -24,14 +24,19 @@ public final class Worker {
         } else if (arguments.length == 4 && arguments[0].equals("listen")) {
             listen(Path.of(arguments[1]), arguments[2], Duration.ofSeconds(Long.parseLong(arguments[3])));
         } else if (arguments.length > 1 && arguments[0].equals(ONCE)) {
-            int code = call(List.of(arguments).subList(1, arguments.length), new HashMap<>());
+            int index = 1;
+            while (index < arguments.length - 1 && arguments[index].startsWith("-D")) {
+                String[] property = arguments[index++].substring(2).split("=", 2);
+                System.setProperty(property[0], property.length == 2 ? property[1] : "");
+            }
+            int code = call(List.of(arguments).subList(index, arguments.length), new HashMap<>());
             System.out.flush();
             System.err.flush();
             System.exit(code);
         } else {
             throw new IllegalArgumentException("Expected no argument, to serve calls on the standard streams, "
-                    + ONCE + " <main class> <argument>..., to run one call, or listen <folder> <fingerprint>"
-                    + " <idle seconds>, but got " + List.of(arguments));
+                    + ONCE + " [-D<key>=<value>...] <main class> <argument>..., to run one call, or listen <folder>"
+                    + " <fingerprint> <idle seconds>, but got " + List.of(arguments));
         }
     }
 
