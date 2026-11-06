@@ -131,8 +131,12 @@ final class JavaWorker {
                             + " image, but " + module + " names none: name it as <module>/<class>, or build with"
                             + " jenesis.process.mode=aot");
                 }
-                options.add("--add-modules=" + module.substring(0, slash));
                 main = module.substring(slash + 1);
+                options.add("--add-modules=" + module.substring(0, slash));
+                if (main.lastIndexOf('.') > 0) {
+                    options.add("--add-opens=" + module.substring(0, slash) + "/"
+                            + main.substring(0, main.lastIndexOf('.')) + "=ALL-UNNAMED");
+                }
             } else if (VALUED.contains(option)) {
                 options.add(option + "=" + expanded.get(++index));
             } else if (TAKING.contains(option)) {
