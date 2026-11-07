@@ -150,6 +150,33 @@ nothing measurable (13.35 s against 13.49 s cold).
 This is one project on one runner class. The run's summary holds the tables for all three runners, and
 [`benchmark/README.md`](benchmark/README.md) describes the method and what the figures do and do not support.
 
+### A native image of the engine
+
+`jenesis.make.mode=native` runs the build as a native image of the engine. It is kept to follow what GraalVM
+makes of the engine, not to make a build faster. `Make` has to run on the `java` of a GraalVM 25.5 or newer, whose
+`native-image` compiles the image:
+
+```bash
+$GRAALVM_HOME/bin/java -Djenesis.make.mode=native build/jenesis/Make.java
+```
+
+The first build runs on that GraalVM's JVM under its tracing agent, which records what the engine needs in
+`jenesis.aot.folder`, and then compiles the image, which takes some minutes. Later builds run the image, with `javac`
+inside it and every tool the image does not hold forked from the GraalVM. A compilation with annotation processors or
+compiler plugins forks `javac` as well, so that they run on a JVM.
+
+A build that loads no plugin gets an image of the engine alone, of about 75 MB. Where a build the agent watched
+loaded one, the image is built with GraalVM's experimental runtime class loading instead, so it loads a plugin from its
+jars as a JVM does, each in a loader of its own and with its own copy of `build.jenesis`, and interprets it. A plugin
+then needs nothing recorded, and one added later loads without a new image. That image keeps the whole of `java.base`,
+`java.xml`, `java.compiler` and `jdk.compiler`, the modules `build.jenesis` reads, which makes it about 320 MB; a
+plugin reaching another module of the JDK ends it with a fatal error. A build loading a plugin in an image of the engine alone fails,
+and the next build trains an image that loads plugins.
+
+A build reaching what the agent never recorded fails as any build does. The image is compiled again once the engine
+changes, or after the `native` folder of `jenesis.aot.folder` is deleted, from a build that runs on the JVM under the
+agent once more.
+
 Demos
 -----
 

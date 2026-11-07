@@ -136,6 +136,22 @@ abstract class PluginModule<M extends PluginModule<M>> implements BuildExecutorM
 
     abstract List<Path> artifacts(SequencedMap<String, Path> prepared) throws IOException;
 
+    void mark() throws IOException {
+        Path marker = environment.path("make.native", Environment.Setting.COMMAND);
+        if (marker != null) {
+            Files.createDirectories(marker.getParent());
+            try {
+                Files.createFile(marker);
+            } catch (FileAlreadyExistsException _) {
+            }
+            if (System.getProperty("org.graalvm.nativeimage.imagecode") != null) {
+                throw new IllegalStateException("The build loads the plugin " + identity() + ", but the native image"
+                        + " of Jenesis was compiled without loading classes at run time, as no build that trained it"
+                        + " loaded a plugin: the next build trains an image that loads plugins");
+            }
+        }
+    }
+
     abstract M properties(SequencedMap<String, String> properties);
 
     abstract M inputs(SequencedMap<String, SequencedMap<Path, Path>> inputs);

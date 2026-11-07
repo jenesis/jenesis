@@ -391,7 +391,7 @@ public class ProcessBuildStepTest {
                 new Environment(Map.of("process.mode", "warm")), "gated"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("jenesis.process.mode")
-                .hasMessageContaining("fork, aot or daemon");
+                .hasMessageContaining("fork, aot, native or daemon");
     }
 
     @Test

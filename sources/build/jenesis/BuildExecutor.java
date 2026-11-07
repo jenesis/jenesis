@@ -469,7 +469,9 @@ public interface BuildExecutor {
     }
 
     default SequencedMap<String, Path> execute(List<String> selectors, List<String> optional) {
-        try (ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor()) {
+        try (ExecutorService executorService = "runtime".equals(System.getProperty("org.graalvm.nativeimage.imagecode"))
+                ? Executors.newThreadPerTaskExecutor(Thread.ofPlatform().factory())
+                : Executors.newVirtualThreadPerTaskExecutor()) {
             return execute(executorService, selectors, optional).toCompletableFuture().join();
         }
     }
