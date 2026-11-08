@@ -523,6 +523,48 @@ public class MultiProjectModuleTest {
     }
 
     @Test
+    public void a_test_module_builds_with_the_sources_of_the_modules_it_requires() throws IOException {
+        SequencedProperties tests = new SequencedProperties();
+        tests.setProperty("test", "foo/bar");
+        tests.store(module2.resolve(BuildStep.MODULE));
+        buildExecutor.addModule("project", new MultiProjectModule((buildExecutor, _) -> {
+            SequencedProperties coordinates1 = new SequencedProperties();
+            coordinates1.put("foo/bar", "");
+            coordinates1.store(module1.resolve(BuildStep.IDENTITY));
+            buildExecutor.addModule("1", (nested, _) -> {
+                nested.addSource(MultiProjectModule.MANIFESTS, module1);
+                nested.addSource(MultiProjectModule.SOURCES, source1);
+            });
+            SequencedProperties coordinates2 = new SequencedProperties();
+            coordinates2.put("foo/qux", "");
+            coordinates2.store(module2.resolve(BuildStep.IDENTITY));
+            SequencedProperties dependencies2 = new SequencedProperties();
+            dependencies2.put("main/compile/foo/bar", "");
+            dependencies2.store(module2.resolve(BuildStep.REQUIRES));
+            buildExecutor.addModule("2", (nested, _) -> {
+                nested.addSource(MultiProjectModule.MANIFESTS, module2);
+                nested.addSource(MultiProjectModule.SOURCES, source2);
+            });
+        },
+                identifier -> Optional.of(identifier.substring(0, identifier.indexOf('/'))),
+                _ -> (_, _, _) -> AssemblyDescriptor.of((module, inherited) -> module.addStep("step",
+                        (_, context, arguments) -> {
+                            Files.writeString(context.next().resolve("inherited"),
+                                    String.join(";", arguments.sequencedKeySet()));
+                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                        },
+                        inherited.sequencedKeySet().stream().filter(key -> key.endsWith("/" + MultiProjectModule.SOURCES))),
+                        AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD))));
+        SequencedMap<String, Path> paths = buildExecutor.execute();
+        assertThat(paths.get("project/build-2/step").resolve("inherited"))
+                .as("the module 2 tests the module 1, so it builds with the sources of 1 beside its own")
+                .hasContent("../../../identifier/2/sources;../../../identifier/1/sources");
+        assertThat(paths.get("project/build-1/step").resolve("inherited"))
+                .as("the module 1 is no test module, so it builds with its own sources alone")
+                .hasContent("../../../identifier/1/sources");
+    }
+
+    @Test
     public void rejects_cyclic_modules() {
         buildExecutor.addModule("project", new MultiProjectModule((buildExecutor, _) -> {
             SequencedProperties coordinates1 = new SequencedProperties();

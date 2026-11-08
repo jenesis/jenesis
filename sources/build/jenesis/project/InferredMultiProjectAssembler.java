@@ -321,6 +321,12 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 ? Sbom.configured(BuildStep.locate(descriptor.configuration(), "sbom.properties"))
                 : null;
         AssemblyDescriptor assembly = AssemblyDescriptor.of((sub, outerInherited) -> {
+            SequencedSet<String> upstreamSources = new LinkedHashSet<>(), inherited = new LinkedHashSet<>();
+            for (String key : outerInherited.sequencedKeySet()) {
+                (key.endsWith("/" + MultiProjectModule.SOURCES) && !descriptor.sources().contains(key)
+                        ? upstreamSources
+                        : inherited).add(key);
+            }
             SequencedSet<String> closure = new LinkedHashSet<>(descriptor.artifacts());
             if (modules != null) {
                 sub.addModule("modules", modules, descriptor.artifacts().stream());
@@ -334,7 +340,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             List.copyOf(descriptor.manifests()),
                             overrides,
                             environments),
-                    outerInherited.sequencedKeySet().stream());
+                    inherited.stream());
             if (sbom != null) {
                 sub.addStep("sbom",
                         sbom,
@@ -409,7 +415,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         Stream.of(descriptor.resources().stream(),
                                         resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"),
                                         Stream.of("prepare", "binary", "layers"),
-                                        inputs(descriptor, closure))
+                                        inputs(descriptor, closure),
+                                        upstreamSources.stream())
                                 .flatMap(Function.identity()));
             }
             if (packaging.jmod() || packaging.jlink() || packaging.jpackaged() || packaging.nativeImage()) {
@@ -428,7 +435,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             }
             if (!hooks.get("").isEmpty()) {
                 sub.addModule("custom", (nested, nestedInherited) -> hooks.get("").forEach((name, module) ->
-                        nested.addModule(name, module, nestedInherited.sequencedKeySet())), outerInherited.sequencedKeySet());
+                        nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited);
             }
         }, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
         SequencedSet<String> closed = modules == null ? descriptor.artifacts() : new LinkedHashSet<>(Set.of("modules"));
