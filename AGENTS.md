@@ -138,7 +138,14 @@ the project, the command line outranks both. `Toolchain`, which compiles alone, 
 path and installer itself.
 
 **Who reads what.** `jenesis.make.*` is read by `Make` and the main methods it launches, before a `Project` exists:
-`root`, `profiles`, `global`, `mode` (`source`, `compiled`, `aot` or `daemon`) and `classes`. Unset, the mode is
+`root`, `profiles`, `global`, `mode` (`source`, `compiled`, `aot`, `native` or `daemon`) and `classes`. `native` runs
+a native image of the engine that `Make` compiles with the `native-image` of the GraalVM running it, from what the
+tracing agent recorded on that GraalVM's JVM. Where a build it trained on loaded a plugin, which the bridge records
+in the file `make.native` names, the image loads classes at run time, so a plugin loads from its jars through the
+bridge as it does on a JVM, and keeps `java.base`, `java.xml`, `java.compiler` and `jdk.compiler`, the modules it
+reads, whole for the plugins it interprets; otherwise it holds the engine alone and a build loading a plugin there
+fails, after which the next build trains again. `javac` forks where it runs annotation processors or compiler plugins.
+A build reaching what the agent never recorded fails; it is not handed back to a JVM. Unset, the mode is
 `daemon`, or `compiled` where `jenesis.process.mode` names `fork` or `aot`, `jenesis.project.docker` is set or
 `jenesis.release.publish` publishes; `Make` hands the mode it resolved down as `make.mode`, which the executor prints
 in the `[STARTED]` line and the `started` event and nothing else reads. Everything `Project`
@@ -292,11 +299,14 @@ A tool's main method runs through `ProcessHandler.OfProcess.ofJavaMain()`, by `j
   code counts and a lingering thread ends with the JVM;
 - `aot` does so from an ahead-of-time cache of the tool in `jenesis.aot.folder`, trained by the first run with the
   JVM's messages off;
+- `native` does so from a native image of the tool in `jenesis.aot.folder`, keyed on the content of its jars, which
+  the `native-image` beside the JVM compiles once the first run, under the tracing agent, has ended; a run reaching
+  what the agent never recorded fails, as does a JVM option the image cannot carry;
 - `daemon`, set for every build the daemon runs, keeps a `Worker` JVM per JVM, options, class path (by file
   identity), environment and working directory, which compiles a `.java` launcher once, captures each call's
   output, is replaced after a `System.exit` and ends after ten idle minutes.
 
-`jenesis.make.mode=aot` and `=daemon` set the process mode alike unless it is set. The AOT folder holds every cache,
+`jenesis.make.mode=aot` and `=daemon` set the process mode alike unless it is set, and `=native` sets it to `aot`. The AOT folder holds every cache,
 the engine's and the tools', and `Make` clears it whole when `aot.properties` records another engine or JVM or the
 folder outlived `jenesis.aot.lifetime`. The build daemon is the same `Worker` on a loopback socket behind a token,
 running `DaemonBuild` per request, one at a time. Daemons announce themselves in `jenesis.daemon.folder`

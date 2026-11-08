@@ -1,7 +1,9 @@
 package build.jenesis.step;
 
 import module java.base;
+import build.jenesis.SequencedProperties;
 import build.jenesis.daemon.Worker;
+import java.lang.classfile.Attributes;
 
 final class JavaWorker {
 
@@ -21,7 +23,21 @@ final class JavaWorker {
             "-d",
             "--describe-module",
             "-jar");
-    private static final Set<String> CLASS_PATH = Set.of("-cp", "-classpath", "--class-path");
+    private static final Set<String> CLASS_PATH = Set.of("-cp", "-classpath", "--class-path"),
+            MODULE_PATH = Set.of("-p", "--module-path"),
+            MODULE = Set.of("-m", "--module"),
+            VALUED = Set.of("--add-modules", "--add-opens", "--add-exports", "--add-reads", "--enable-native-access");
+    private static final Set<String> COMPILED = Set.of("--add-modules=",
+            "--add-opens=",
+            "--add-exports=",
+            "--add-reads=",
+            "--enable-native-access=");
+    private static final Map<String, String> HEAP = Map.of("-Xmx", "-R:MaxHeapSize=",
+            "-Xms", "-R:MinHeapSize=",
+            "-Xss", "-R:StackSize=");
+    private static final Map<Path, Lock> TRAINING = new ConcurrentHashMap<>();
+    private static final Semaphore COMPILING = new Semaphore(1);
+    private static final int MISSING = 172;
     private static final Map<Key, Deque<Running>> IDLE = new ConcurrentHashMap<>();
     private static final Map<Key, Shared> SHARED = new HashMap<>();
     private static final List<Closeable> NESTED = new ArrayList<>();
@@ -44,7 +60,7 @@ final class JavaWorker {
                     arguments.add(command);
                 }
             }
-            return new Call(java.toString(), List.copyOf(options), "", Worker.TOOL, List.copyOf(arguments));
+            return new Call(java.toString(), List.copyOf(options), "", "", Worker.TOOL, List.copyOf(arguments));
         }
         List<String> options = new ArrayList<>();
         String classpath = null;
@@ -75,8 +91,72 @@ final class JavaWorker {
         return new Call(commands.getFirst(),
                 List.copyOf(options),
                 classpath,
+                "",
                 commands.get(index),
                 List.copyOf(commands.subList(index + 1, commands.size())));
+    }
+
+    static Call imaged(List<String> commands) throws IOException {
+        Path launcher = Path.of(commands.getFirst());
+        String name = launcher.getFileName().toString(), tool = name.replaceFirst("\\.exe$", "");
+        if (!tool.equals("java")) {
+            return launcher.getParent() != null
+                    && Files.isRegularFile(launcher.resolveSibling(name.endsWith(".exe") ? "java.exe" : "java"))
+                    && java.util.spi.ToolProvider.findFirst(tool).isPresent() ? call(commands) : null;
+        }
+        List<String> expanded = SequencedProperties.arguments(commands.subList(1, commands.size())
+                .toArray(String[]::new)), options = new ArrayList<>();
+        String classpath = "", modulepath = "", main = null;
+        int index = 0;
+        for (; index < expanded.size() && main == null; index++) {
+            String option = expanded.get(index), value = index + 1 < expanded.size() ? expanded.get(index + 1) : null;
+            if (!option.startsWith("-")) {
+                main = option;
+            } else if ((CLASS_PATH.contains(option) || MODULE_PATH.contains(option) || MODULE.contains(option)
+                    || VALUED.contains(option)) && value == null) {
+                throw new IllegalStateException("The JVM option " + option + " names no value in " + commands);
+            } else if (CLASS_PATH.contains(option)) {
+                classpath = expanded.get(++index);
+            } else if (option.startsWith("--class-path=")) {
+                classpath = option.substring("--class-path=".length());
+            } else if (MODULE_PATH.contains(option)) {
+                modulepath = expanded.get(++index);
+            } else if (option.startsWith("--module-path=")) {
+                modulepath = option.substring("--module-path=".length());
+            } else if (MODULE.contains(option) || option.startsWith("--module=")) {
+                String module = MODULE.contains(option) ? expanded.get(++index) : option.substring("--module=".length());
+                int slash = module.indexOf('/');
+                if (slash < 0) {
+                    throw new IllegalStateException("jenesis.process.mode=native runs a module's main class in a native"
+                            + " image, but " + module + " names none: name it as <module>/<class>, or build with"
+                            + " jenesis.process.mode=aot");
+                }
+                main = module.substring(slash + 1);
+                options.add("--add-modules=" + module.substring(0, slash));
+                if (main.lastIndexOf('.') > 0) {
+                    options.add("--add-opens=" + module.substring(0, slash) + "/"
+                            + main.substring(0, main.lastIndexOf('.')) + "=ALL-UNNAMED");
+                }
+            } else if (VALUED.contains(option)) {
+                options.add(option + "=" + expanded.get(++index));
+            } else if (TAKING.contains(option)) {
+                throw new IllegalStateException("jenesis.process.mode=native cannot carry the JVM option " + option
+                        + " into a native image: remove it, or build with jenesis.process.mode=aot");
+            } else {
+                options.add(option);
+            }
+        }
+        if (main == null || main.endsWith(".java")) {
+            throw new IllegalStateException("jenesis.process.mode=native runs a main class in a native image, but "
+                    + commands + " names " + (main == null ? "none" : "the source " + main) + ": build with"
+                    + " jenesis.process.mode=aot");
+        }
+        return new Call(commands.getFirst(),
+                List.copyOf(options),
+                classpath,
+                modulepath,
+                main,
+                List.copyOf(expanded.subList(index, expanded.size())));
     }
 
     static int execute(Call call,
@@ -173,19 +253,26 @@ final class JavaWorker {
         }
     }
 
-    static Once once(Call call, Path aot) throws IOException {
-        List<String> commands = new ArrayList<>(), classpath = new ArrayList<>();
+    static Once once(Call call, Path aot, Path image) throws IOException {
+        List<String> commands = new ArrayList<>(), classpath = new ArrayList<>(), modulepath = new ArrayList<>();
         commands.add(call.java());
         commands.addAll(call.options());
-        List<Path> entries = new ArrayList<>(List.of(classes()));
+        List<Path> entries = new ArrayList<>(List.of(classes())), modules = new ArrayList<>();
         if (!call.classpath().isEmpty()) {
             for (String entry : call.classpath().split(Pattern.quote(File.pathSeparator), -1)) {
                 entries.add(Path.of(entry).toAbsolutePath());
             }
         }
-        Path trained = null, cache = null;
-        if (aot == null) {
+        if (!call.modulepath().isEmpty()) {
+            for (String entry : call.modulepath().split(Pattern.quote(File.pathSeparator), -1)) {
+                modules.add(Path.of(entry).toAbsolutePath());
+            }
+        }
+        Path trained = null, cache = null, caches = aot == null ? image : aot;
+        Imaged imaged = null;
+        if (caches == null) {
             entries.forEach(entry -> classpath.add(entry.toString()));
+            modules.forEach(entry -> modulepath.add(entry.toString()));
         } else {
             MessageDigest digest;
             try {
@@ -193,17 +280,20 @@ final class JavaWorker {
             } catch (NoSuchAlgorithmException e) {
                 throw new IllegalStateException(e);
             }
-            for (String value : Stream.concat(Stream.of(call.java(), Runtime.version().toString(), call.main()),
-                    call.options().stream()).toList()) {
+            for (String value : Stream.concat(Stream.of(image == null ? "aot" : "native",
+                    call.java(),
+                    Runtime.version().toString(),
+                    call.main()), call.options().stream()).toList()) {
                 digest.update(value.getBytes(StandardCharsets.UTF_8));
                 digest.update((byte) 0);
             }
             SequencedMap<String, Path> named = new LinkedHashMap<>();
-            for (Path entry : entries) {
+            for (Path entry : Stream.concat(entries.stream(), modules.stream()).toList()) {
                 if (!Files.exists(entry)) {
                     continue;
                 }
-                String name = named.size() + (Files.isDirectory(entry) ? ".jar" : "-" + entry.getFileName());
+                String name = (modules.contains(entry) ? "module-" : "") + named.size()
+                        + (Files.isDirectory(entry) ? ".jar" : "-" + entry.getFileName());
                 named.put(name, entry);
                 digest.update(name.getBytes(StandardCharsets.UTF_8));
                 digest.update((byte) 0);
@@ -214,16 +304,20 @@ final class JavaWorker {
                             digest.update(Files.readAllBytes(file));
                         }
                     }
-                } else {
+                } else if (image == null) {
                     BasicFileAttributes attributes = Files.readAttributes(entry, BasicFileAttributes.class);
                     digest.update((entry
                             + ":" + attributes.size()
                             + ":" + attributes.lastModifiedTime().toMillis()).getBytes(StandardCharsets.UTF_8));
+                } else {
+                    try (InputStream input = Files.newInputStream(entry)) {
+                        input.transferTo(new DigestOutputStream(OutputStream.nullOutputStream(), digest));
+                    }
                 }
             }
-            Path folder = aot.resolve(HexFormat.of().formatHex(digest.digest()).substring(0, 32));
+            Path folder = caches.resolve(HexFormat.of().formatHex(digest.digest()).substring(0, 32));
             if (!Files.isDirectory(folder)) {
-                Path written = Files.createTempDirectory(Files.createDirectories(aot), "linked");
+                Path written = Files.createTempDirectory(Files.createDirectories(caches), "linked");
                 for (Map.Entry<String, Path> entry : named.entrySet()) {
                     Path target = written.resolve(entry.getKey());
                     if (Files.isDirectory(entry.getValue())) {
@@ -254,9 +348,20 @@ final class JavaWorker {
                     }
                 }
             }
-            named.sequencedKeySet().forEach(name -> classpath.add(folder.resolve(name).toString()));
-            cache = folder.resolve("cache.aot");
-            if (Files.isRegularFile(cache)) {
+            named.sequencedKeySet().forEach(name -> (name.startsWith("module-") ? modulepath : classpath)
+                    .add(folder.resolve(name).toString()));
+            if (image != null) {
+                imaged = Imaged.of(call, folder, classpath, modulepath);
+                if (imaged.compiler() == null) {
+                    List<String> running = new ArrayList<>(List.of(imaged.executable().toString(), Worker.ONCE));
+                    running.addAll(imaged.properties());
+                    running.add(call.main());
+                    running.addAll(call.arguments());
+                    return new Once(List.copyOf(running), null, null, imaged);
+                }
+                commands.add("-agentlib:native-image-agent=config-output-dir=" + folder.resolve("metadata")
+                        + ",experimental-class-define-support");
+            } else if (Files.isRegularFile(cache = folder.resolve("cache.aot"))) {
                 commands.add("-XX:AOTCache=" + cache);
             } else {
                 trained = folder.resolve("cache-" + UUID.randomUUID() + ".aot");
@@ -264,8 +369,14 @@ final class JavaWorker {
                 commands.add("-XX:+UnlockDiagnosticVMOptions");
                 commands.add("-XX:-DisplayVMOutput");
             }
-            commands.add("-Xlog:aot=off");
-            commands.add("-Xlog:cds=off");
+            if (image == null) {
+                commands.add("-Xlog:aot=off");
+                commands.add("-Xlog:cds=off");
+            }
+        }
+        if (!modulepath.isEmpty()) {
+            commands.add("-p");
+            commands.add(String.join(File.pathSeparator, modulepath));
         }
         commands.add("-cp");
         commands.add(String.join(File.pathSeparator, classpath));
@@ -273,14 +384,27 @@ final class JavaWorker {
         commands.add(Worker.ONCE);
         commands.add(call.main());
         commands.addAll(call.arguments());
-        return new Once(List.copyOf(commands), trained, cache);
+        return new Once(List.copyOf(commands), trained, cache, imaged);
     }
 
     private static synchronized Path classes() throws IOException {
         if (compiled == null) {
             Path copied = ProcessHandler.OfProcess.temporary("jenesis-java-worker");
-            for (Class<?> member : Worker.class.getNestMembers()) {
-                String name = member.getName().replace('.', '/') + ".class";
+            String host = Worker.class.getName().replace('.', '/');
+            List<String> members = new ArrayList<>(List.of(host));
+            try (InputStream input = Worker.class.getResourceAsStream("/" + host + ".class")) {
+                if (input == null) {
+                    throw new IllegalStateException("Cannot read " + host + ".class of the engine to run a tool's"
+                            + " main method in a JVM of its own");
+                }
+                ClassFile.of().parse(input.readAllBytes()).findAttribute(Attributes.nestMembers()).ifPresent(nest -> {
+                    for (ClassEntry member : nest.nestMembers()) {
+                        members.add(member.asInternalName());
+                    }
+                });
+            }
+            for (String member : members) {
+                String name = member + ".class";
                 try (InputStream input = Worker.class.getResourceAsStream("/" + name)) {
                     if (input == null) {
                         throw new IllegalStateException("Cannot read " + name + " of the engine to run a tool's main"
@@ -296,13 +420,192 @@ final class JavaWorker {
         return compiled;
     }
 
-    record Once(List<String> commands, Path trained, Path cache) {
+    record Once(List<String> commands, Path trained, Path cache, Imaged imaged) implements Closeable {
 
-        void complete() throws IOException {
+        int complete(int code, Path output, Path error) throws IOException {
             if (trained != null) {
                 Files.deleteIfExists(trained.resolveSibling(trained.getFileName() + ".config"));
                 if (Files.isRegularFile(trained)) {
                     Files.move(trained, cache, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                }
+            }
+            return imaged == null ? code : imaged.complete(code, output, error);
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (imaged != null) {
+                imaged.close();
+            }
+        }
+    }
+
+    record Imaged(String main,
+                  Path folder,
+                  List<String> properties,
+                  List<String> compiler,
+                  String preserved,
+                  Lock lock,
+                  FileLock locked) implements Closeable {
+
+        static Imaged of(Call call, Path folder, List<String> classpath, List<String> modulepath) throws IOException {
+            Path log = folder.resolve("native.log");
+            if (Files.exists(log)) {
+                throw new IllegalStateException("native-image could not compile an image of " + call.main() + ", as "
+                        + log + " shows: delete that file to compile the image again, or build with"
+                        + " jenesis.process.mode=aot");
+            }
+            List<String> properties = new ArrayList<>(), compiled = new ArrayList<>();
+            for (String option : call.options()) {
+                String heap = HEAP.keySet().stream().filter(option::startsWith).findFirst().orElse(null);
+                if (option.startsWith("-D")) {
+                    properties.add(option);
+                } else if (heap != null) {
+                    compiled.add(HEAP.get(heap) + option.substring(heap.length()));
+                } else if (COMPILED.stream().anyMatch(option::startsWith) || option.equals("--enable-preview")) {
+                    compiled.add(option);
+                } else if (option.equals("-ea") || option.equals("-enableassertions")) {
+                    compiled.add("-H:+RuntimeAssertions");
+                } else {
+                    throw new IllegalStateException("jenesis.process.mode=native cannot carry the JVM option " + option
+                            + " of " + call.main() + " into a native image: remove it, or build with"
+                            + " jenesis.process.mode=aot");
+                }
+            }
+            if (call.main().equals(Worker.TOOL)) {
+                String tool = call.arguments().getFirst();
+                compiled.add("--add-modules=" + java.util.spi.ToolProvider.findFirst(tool)
+                        .map(provider -> provider.getClass().getModule())
+                        .filter(Module::isNamed)
+                        .orElseThrow(() -> new IllegalStateException("jenesis.process.mode=native compiles " + tool
+                                + " into a native image from the module that provides it, but this JDK provides it from"
+                                + " none: build with jenesis.process.mode=aot"))
+                        .getName());
+            }
+            Imaged imaged = new Imaged(call.main(), folder, List.copyOf(properties), null, null, null, null);
+            if (Files.isExecutable(imaged.executable())) {
+                return imaged;
+            }
+            Path java = Path.of(call.java()), compiler = java.resolveSibling(
+                    java.getFileName().toString().endsWith(".exe") ? "native-image.cmd" : "native-image");
+            if (!Files.isExecutable(compiler)) {
+                throw new IllegalStateException("jenesis.process.mode=native compiles a tool with the native-image"
+                        + " beside " + java + ", but its JDK holds none: run the build on a GraalVM 25.5 or newer, or"
+                        + " build with jenesis.process.mode=aot");
+            }
+            Lock lock = TRAINING.computeIfAbsent(folder, _ -> new ReentrantLock());
+            lock.lock();
+            FileLock locked;
+            try {
+                FileChannel channel = FileChannel.open(folder.resolve("native.lock"),
+                        StandardOpenOption.CREATE,
+                        StandardOpenOption.WRITE);
+                try {
+                    locked = channel.lock();
+                } catch (IOException | RuntimeException e) {
+                    channel.close();
+                    throw e;
+                }
+            } catch (IOException | RuntimeException e) {
+                lock.unlock();
+                throw e;
+            }
+            if (Files.isExecutable(imaged.executable())) {
+                locked.channel().close();
+                lock.unlock();
+                return imaged;
+            }
+            List<String> command = new ArrayList<>(List.of(compiler.toString(),
+                    "--no-fallback",
+                    "-H:-ParseRuntimeOptions",
+                    "-H:MissingRegistrationReportingMode=Exit",
+                    "-H:ConfigurationFileDirectories=" + folder.resolve("metadata")));
+            command.addAll(compiled);
+            if (!modulepath.isEmpty()) {
+                command.addAll(List.of("-p", String.join(File.pathSeparator, modulepath)));
+            }
+            command.addAll(List.of("-cp", String.join(File.pathSeparator, classpath)));
+            SortedSet<String> preserved = new TreeSet<>(List.of("java.base", "ALL-UNNAMED"));
+            ModuleFinder.of(modulepath.stream().map(Path::of).toArray(Path[]::new)).findAll()
+                    .forEach(reference -> preserved.add(reference.descriptor().name()));
+            compiled.stream()
+                    .filter(option -> option.startsWith("--add-modules="))
+                    .forEach(option -> preserved.addAll(List.of(option.substring("--add-modules=".length())
+                            .split(","))));
+            return new Imaged(call.main(),
+                    folder,
+                    List.copyOf(properties),
+                    List.copyOf(command),
+                    preserved.stream()
+                            .map(module -> "module=" + module)
+                            .collect(Collectors.joining(",", "-H:Preserve=", "")),
+                    lock,
+                    locked);
+        }
+
+        Path executable() {
+            return folder.resolve("native").resolve(File.separatorChar == '\\' ? "tool.exe" : "tool");
+        }
+
+        int complete(int code, Path output, Path error) throws IOException {
+            if (compiler == null) {
+                if (code == MISSING && (Files.readString(output).contains("org.graalvm.nativeimage.Missing")
+                        || Files.readString(error).contains("org.graalvm.nativeimage.Missing"))) {
+                    throw new IllegalStateException(main + " reached what the tracing agent did not record on its first"
+                            + " run, in the native image of " + folder + ": delete that folder to train it again, or"
+                            + " build with jenesis.process.mode=aot");
+                }
+                return code;
+            }
+            Path staging = Files.createTempDirectory(folder, "native"), log = folder.resolve("native.log");
+            Path metadata = folder.resolve("metadata"), defined = metadata.resolve("agent-extracted-predefined-classes");
+            List<String> command = new ArrayList<>(compiler);
+            boolean loading;
+            try (Stream<Path> files = Files.isDirectory(defined) ? Files.list(defined) : Stream.empty()) {
+                loading = files.findAny().isPresent();
+            }
+            if (loading) {
+                try (Stream<Path> files = Files.walk(defined)) {
+                    for (Path file : files.sorted(Comparator.reverseOrder()).toList()) {
+                        Files.delete(file);
+                    }
+                }
+                Files.deleteIfExists(metadata.resolve("predefined-classes-config.json"));
+                command.addAll(List.of("-H:+UnlockExperimentalVMOptions", "-H:+RuntimeClassLoading", preserved));
+            } else {
+                command.add("--exact-reachability-metadata");
+            }
+            command.addAll(List.of("-o", staging.resolve("tool").toString(), Worker.class.getName()));
+            COMPILING.acquireUninterruptibly();
+            int compiled;
+            try {
+                Process process = ProcessHandler.OfProcess.start(new ProcessBuilder(command)
+                        .redirectErrorStream(true)
+                        .redirectOutput(log.toFile()));
+                compiled = process.waitFor();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            } finally {
+                COMPILING.release();
+            }
+            if (compiled != 0) {
+                throw new IllegalStateException("native-image failed with exit code " + compiled + " to compile an"
+                        + " image of " + main + ", as " + log + " shows: delete that file to compile the image again,"
+                        + " or build with jenesis.process.mode=aot");
+            }
+            Files.move(staging, executable().getParent(), StandardCopyOption.ATOMIC_MOVE);
+            Files.delete(log);
+            return code;
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (locked != null) {
+                try {
+                    locked.channel().close();
+                } finally {
+                    lock.unlock();
                 }
             }
         }
@@ -394,7 +697,12 @@ final class JavaWorker {
         return false;
     }
 
-    record Call(String java, List<String> options, String classpath, String main, List<String> arguments) {
+    record Call(String java,
+                List<String> options,
+                String classpath,
+                String modulepath,
+                String main,
+                List<String> arguments) {
     }
 
     private record Key(String java,

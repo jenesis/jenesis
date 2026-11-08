@@ -55,6 +55,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                         boolean daemon,
                         boolean shared,
                         Path aot,
+                        Path image,
                         Path directory) {
 
         public Terms() {
@@ -65,6 +66,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                     TAIL,
                     false,
                     true,
+                    null,
                     null,
                     null);
         }
@@ -85,10 +87,13 @@ public abstract class ProcessBuildStep implements BuildStep {
                     environment.flag("print.process", printing, Setting.PROJECT),
                     Setting.PROJECT);
             String mode = environment.value("process.mode", "fork", Setting.PROJECT).toLowerCase(Locale.ROOT);
-            if (!List.of("fork", "aot", "daemon").contains(mode)) {
+            if (!List.of("fork", "aot", "native", "daemon").contains(mode)) {
                 throw new IllegalArgumentException("Malformed value for jenesis.process.mode: '" + mode
-                        + "' (expected fork, aot or daemon)");
+                        + "' (expected fork, aot, native or daemon)");
             }
+            Path caches = mode.equals("aot") || mode.equals("native")
+                    ? environment.path("aot.folder", ".jenesis/aot", Setting.CONFINED).toAbsolutePath()
+                    : null;
             Path directory = environment.path("process.directory", Setting.CONFINED);
             if (directory == null) {
                 directory = environment.root();
@@ -111,46 +116,49 @@ public abstract class ProcessBuildStep implements BuildStep {
                     tail,
                     mode.equals("daemon"),
                     environment.flag("process.shared", true, Setting.PROJECT),
-                    mode.equals("aot")
-                            ? environment.path("aot.folder", ".jenesis/aot", Setting.CONFINED).toAbsolutePath()
-                            : null,
+                    mode.equals("aot") ? caches : null,
+                    mode.equals("native") ? caches : null,
                     directory == null ? null : directory.toAbsolutePath().normalize());
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, image, directory);
         }
 
         public Terms permits(Permits permits) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, image, directory);
         }
 
         public Terms announcing(Consumer<String> announcing) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, image, directory);
         }
 
         public Terms reporting(Consumer<String> reporting) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, image, directory);
         }
 
         public Terms tail(int tail) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, image, directory);
         }
 
         public Terms daemon(boolean daemon) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, image, directory);
         }
 
         public Terms shared(boolean shared) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, image, directory);
         }
 
         public Terms aot(Path aot) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, image, directory);
+        }
+
+        public Terms image(Path image) {
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, image, directory);
         }
 
         public Terms directory(Path directory) {
-            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, directory);
+            return new Terms(printing, permits, announcing, reporting, tail, daemon, shared, aot, image, directory);
         }
     }
 
@@ -161,7 +169,10 @@ public abstract class ProcessBuildStep implements BuildStep {
     protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
         ProcessHandler handler = factory.apply(commands);
         return handler instanceof ProcessHandler.OfProcess process
-                ? process.daemon(process.daemon() && terms.daemon()).aot(terms.aot()).directory(terms.directory())
+                ? process.daemon(process.daemon() && terms.daemon())
+                        .aot(terms.aot())
+                        .image(terms.image())
+                        .directory(terms.directory())
                 : handler;
     }
 

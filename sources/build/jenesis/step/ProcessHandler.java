@@ -49,7 +49,10 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         TOOL {
             @Override
             public Function<List<String>, ? extends ProcessHandler> apply(String tool, String fork) {
-                return ProcessHandler.OfTool.of(tool);
+                return System.getProperty("org.graalvm.nativeimage.imagecode") != null
+                        && ToolProvider.findFirst(tool).isEmpty()
+                        ? FORK.apply(tool, fork)
+                        : ProcessHandler.OfTool.of(tool);
             }
         },
         FORK {
@@ -247,7 +250,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         private final SortedMap<String, String> environment;
         private final Charset output, error;
         private final boolean main, daemon, scoped, shared;
-        private final Path aot, directory;
+        private final Path aot, image, directory;
 
         private OfProcess(List<String> commands) {
             this(commands, encoding(), encoding());
@@ -260,7 +263,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     environment.put(name, value);
                 }
             });
-            this(commands, environment, output, error, false, false, false, false, null, null);
+            this(commands, environment, output, error, false, false, false, false, null, null, null);
         }
 
         private OfProcess(List<String> commands,
@@ -272,6 +275,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                           boolean scoped,
                           boolean shared,
                           Path aot,
+                          Path image,
                           Path directory) {
             this.commands = commands;
             this.environment = environment;
@@ -282,6 +286,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             this.scoped = scoped;
             this.shared = shared;
             this.aot = aot;
+            this.image = image;
             this.directory = directory;
         }
 
@@ -321,6 +326,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                         true,
                         false,
                         false,
+                        null,
                         null,
                         null);
             };
@@ -483,6 +489,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     scoped,
                     shared,
                     aot,
+                    image,
                     directory);
         }
 
@@ -500,6 +507,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     scoped,
                     shared,
                     aot,
+                    image,
                     directory);
         }
 
@@ -517,6 +525,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     scoped,
                     shared,
                     aot,
+                    image,
                     directory);
         }
 
@@ -534,6 +543,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     scoped,
                     shared,
                     aot,
+                    image,
                     directory);
         }
 
@@ -551,6 +561,25 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     scoped,
                     shared,
                     aot,
+                    image,
+                    directory);
+        }
+
+        public Path image() {
+            return image;
+        }
+
+        public OfProcess image(Path image) {
+            return new OfProcess(commands,
+                    new TreeMap<>(environment),
+                    output,
+                    error,
+                    main,
+                    daemon,
+                    scoped,
+                    shared,
+                    aot,
+                    image,
                     directory);
         }
 
@@ -568,6 +597,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     scoped,
                     shared,
                     aot,
+                    image,
                     directory);
         }
 
@@ -578,13 +608,21 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
         @Override
         public int execute(Path output, Path error, Tee tee) throws IOException {
-            JavaWorker.Call call = main || daemon || scoped ? JavaWorker.call(commands) : null;
-            if (call != null && (daemon || scoped && (shared || call.main().equals(Worker.TOOL)))) {
+            JavaWorker.Call call = image != null
+                    ? JavaWorker.imaged(commands)
+                    : main || daemon || scoped ? JavaWorker.call(commands) : null;
+            if (image == null && call != null && (daemon || scoped && (shared || call.main().equals(Worker.TOOL)))) {
                 return JavaWorker.execute(call, shared, daemon, environment, directory, output, error, tee);
             }
-            JavaWorker.Once once = call == null || !main || call.main().endsWith(".java")
+            JavaWorker.Once once = call == null || image == null && (!main || call.main().endsWith(".java"))
                     ? null
-                    : JavaWorker.once(call, aot);
+                    : JavaWorker.once(call, aot, image);
+            try (once) {
+                return execute(once, output, error, tee);
+            }
+        }
+
+        private int execute(JavaWorker.Once once, Path output, Path error, Tee tee) throws IOException {
             ProcessBuilder builder = new ProcessBuilder(once == null ? commands : once.commands());
             if (directory != null) {
                 builder.directory(directory.toFile());
@@ -613,10 +651,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     printed.join();
                 }
                 errored.join();
-                if (once != null) {
-                    once.complete();
-                }
-                return code;
+                return once == null ? code : once.complete(code, output, error);
             } catch (InterruptedException e) {
                 process.destroyForcibly();
                 try {

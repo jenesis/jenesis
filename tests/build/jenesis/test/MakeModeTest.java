@@ -55,6 +55,12 @@ public class MakeModeTest {
     }
 
     @Test
+    public void runs_a_native_image_of_the_engine_where_it_is_named() {
+        assertThat(new Make("build.jenesis.Project", settings("make.mode", "native")).mode())
+                .isEqualTo(Make.Mode.NATIVE);
+    }
+
+    @Test
     public void reads_the_mode_a_file_of_the_project_names() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.mode=compiled\n");
         assertThat(new Make("build.jenesis.Project", settings()).mode()).isEqualTo(Make.Mode.COMPILED);

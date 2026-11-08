@@ -24,14 +24,22 @@ public final class Worker {
         } else if (arguments.length == 4 && arguments[0].equals("listen")) {
             listen(Path.of(arguments[1]), arguments[2], Duration.ofSeconds(Long.parseLong(arguments[3])));
         } else if (arguments.length > 1 && arguments[0].equals(ONCE)) {
-            int code = call(List.of(arguments).subList(1, arguments.length), new HashMap<>());
+            int index = 1;
+            while (index < arguments.length - 1 && arguments[index].startsWith("-D")) {
+                String[] property = arguments[index++].substring(2).split("=", 2);
+                System.setProperty(property[0], property.length == 2 ? property[1] : "");
+            }
+            List<String> request = List.of(arguments).subList(index, arguments.length);
+            int code = request.getFirst().equals(TOOL)
+                    ? tool(request, System.out, System.err)
+                    : call(request, new HashMap<>());
             System.out.flush();
             System.err.flush();
             System.exit(code);
         } else {
             throw new IllegalArgumentException("Expected no argument, to serve calls on the standard streams, "
-                    + ONCE + " <main class> <argument>..., to run one call, or listen <folder> <fingerprint>"
-                    + " <idle seconds>, but got " + List.of(arguments));
+                    + ONCE + " [-D<key>=<value>...] <main class> <argument>..., to run one call, or listen <folder>"
+                    + " <fingerprint> <idle seconds>, but got " + List.of(arguments));
         }
     }
 
@@ -148,15 +156,7 @@ public final class Worker {
                 err.calls.set(errored);
                 int code;
                 if (request.getFirst().equals(TOOL)) {
-                    try {
-                        code = java.util.spi.ToolProvider.findFirst(request.get(1))
-                                .orElseThrow(() -> new IllegalArgumentException("This JDK provides no tool named "
-                                        + request.get(1)))
-                                .run(printed, errored, request.subList(2, request.size()).toArray(String[]::new));
-                    } catch (Throwable t) {
-                        t.printStackTrace(errored);
-                        code = 1;
-                    }
+                    code = tool(request, printed, errored);
                 } else {
                     code = call(request.getFirst().equals(SHARED) ? request.subList(1, request.size()) : request, compiled);
                 }
@@ -350,6 +350,17 @@ public final class Worker {
             request.add(new String(bytes, StandardCharsets.UTF_8));
         }
         return request;
+    }
+
+    private static int tool(List<String> request, PrintStream out, PrintStream err) {
+        try {
+            return java.util.spi.ToolProvider.findFirst(request.get(1))
+                    .orElseThrow(() -> new IllegalArgumentException("This JDK provides no tool named " + request.get(1)))
+                    .run(out, err, request.subList(2, request.size()).toArray(String[]::new));
+        } catch (Throwable t) {
+            t.printStackTrace(err);
+            return 1;
+        }
     }
 
     private static int call(List<String> request, Map<String, Class<?>> compiled) {

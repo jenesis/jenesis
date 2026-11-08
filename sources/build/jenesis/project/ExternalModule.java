@@ -207,7 +207,10 @@ public class ExternalModule extends PluginModule<ExternalModule> {
 
     @Override
     public BuildExecutorModule preparation() {
-        return resolution();
+        return (buildExecutor, inherited) -> {
+            mark();
+            resolution().accept(buildExecutor, inherited);
+        };
     }
 
     @Override
