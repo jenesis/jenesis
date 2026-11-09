@@ -39,15 +39,19 @@ The configuration
 
 `pitest.properties` carries the options PIT needs:
 
-    targetClasses=calc.Calculator   # which classes to mutate
     targetTests=calctest.*          # which tests to run against the mutants
     outputFormats=XML,HTML          # report formats (an optional `mutators` key selects a mutator set)
 
 PIT runs in the test module's context, where the production module is on the
-classpath as a dependency and the test classes are local: `targetClasses` selects
-the production class to mutate and `targetTests` the tests that must catch it.
+classpath as a dependency and the test classes are local. It mutates the module the
+tests name by `@jenesis.test`, here `demo.mutation`, and never the tests
+themselves; `targetTests` selects the tests that must catch the mutants, and an
+optional `targetClasses` narrows the classes to mutate, such as `calc.Calculator`.
 
-Each of the two takes comma-separated globs and defaults to `*`. `outputFormats`
+Each of the two takes comma-separated globs. `targetTests` defaults to `*`, and
+`targetClasses` to every package of the tested module - PIT refuses `*` there, as
+it would select PIT itself. The HTML report shows the source of every mutated
+class, as the build hands PIT the sources of the module the tests test. `outputFormats`
 names some of `XML` (the default), `HTML` and `CSV`; an optional `mutators` key
 lists PIT's mutators or mutator groups, such as `STRONGER`, and
 `failWhenNoMutations` fails the run when PIT finds nothing to mutate. Any other
