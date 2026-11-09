@@ -280,6 +280,54 @@ public class InferredSourceFormattingModuleTest {
     }
 
     @Test
+    public void switches_open_java_format_on_by_its_properties() throws IOException {
+        Files.writeString(project.resolve("openjavaformat.properties"), "reflow=false\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+        executor.execute("format/" + InferredSourceFormattingModule.OPENJAVAFORMAT + "/coordinate");
+
+        assertThat(SequencedProperties.ofFiles(root.resolve("format/" + InferredSourceFormattingModule.OPENJAVAFORMAT
+                        + "/coordinate/output/" + BuildStep.REQUIRES)).stringPropertyNames())
+                .as("an openjavaformat.properties wires the official Open Java Format plugin, resolved by its module name")
+                .anyMatch(coordinate -> coordinate.contains("module/build.jenesis.plugin.openjavaformat"));
+    }
+
+    @Test
+    public void refuses_open_java_format_beside_palantir_naming_both() throws IOException {
+        Files.writeString(project.resolve("palantir.properties"), "");
+        Files.writeString(project.resolve("openjavaformat.properties"), "");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format", new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+
+        assertThatThrownBy(executor::execute)
+                .as("Open Java Format formats the Java sources Palantir would")
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("[palantir, openjavaformat]");
+    }
+
+    @Test
+    public void leaves_open_java_format_out_where_it_is_switched_off() throws IOException {
+        Files.writeString(project.resolve("palantir.properties"), "");
+        Files.writeString(project.resolve("openjavaformat.properties"), "");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("format",
+                new InferredSourceFormattingModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of())
+                        .openjavaformat(false),
+                "project");
+        executor.execute("format/" + InferredSourceFormattingModule.PALANTIR + "/coordinate");
+
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.PALANTIR + "/coordinate"))
+                .as("with Open Java Format switched off, Palantir formats alone")
+                .exists();
+        assertThat(root.resolve("format/" + InferredSourceFormattingModule.OPENJAVAFORMAT))
+                .doesNotExist();
+    }
+
+    @Test
     public void switches_spotless_on_by_its_properties_beside_a_java_formatter_where_no_set_formats_java()
             throws IOException {
         Files.writeString(project.resolve("googlejavaformat.properties"), "");

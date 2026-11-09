@@ -1627,6 +1627,8 @@ public record Project(
                           skipRemovingUnusedImports
                       com.palantir.java-format -> palantir.properties, which takes reflow and
                           imports alike
+                      dev.openjavaformat.java-format -> openjavaformat.properties, which takes
+                          reflow and imports as palantir.properties does
                       prince-of-space-cli -> princeofspace.properties, which takes wrap-style,
                           indent-style, indent-size, line-length, closing-paren-on-new-line,
                           trailing-commas and java-version as the CLI names them
@@ -2486,8 +2488,9 @@ public record Project(
 
                     The formatters verify a module's sources and resources and fail the build on a file
                     they would change; -Djenesis.format.rewrite=true lets them rewrite it instead. A
-                    googlejavaformat.properties, palantir.properties, princeofspace.properties or
-                    eclipse.properties switches on that Java formatter, refused beside another, a
+                    googlejavaformat.properties, palantir.properties, openjavaformat.properties,
+                    princeofspace.properties or eclipse.properties switches on that Java formatter,
+                    refused beside another, a
                     ktlint.properties ktlint, a ktfmt.properties ktfmt, a scalafmt.properties scalafmt,
                     a spotless.properties the Spotless steps each of its sets names for the files the set
                     selects, counted as the Java, Kotlin or Scala formatter or the license header check
@@ -4913,6 +4916,7 @@ public record Project(
                 format.openrewrite|true|OpenRewrite, activated by an openrewrite.properties naming a rewrite.yml as configuration=, whose recipes it runs, or recipes as recipes=, or, where none is found, by a rewrite.yml of a configuration folder; it runs before the Java formatter and reads the module's dependencies
                 format.googlejavaformat|true|google-java-format, activated by a googlejavaformat.properties whose lines are its options; refused beside another Java formatter
                 format.palantir|true|palantir-java-format, activated by a palantir.properties whose lines are its options; refused beside another Java formatter
+                format.openjavaformat|true|open-java-format, activated by an openjavaformat.properties whose lines are its options; refused beside another Java formatter
                 format.spotless|true|Spotless, activated by a spotless.properties naming sets of files of a module's sources and resources and the Spotless steps each set runs; a set running a Java, Kotlin or Scala formatter or licenseHeader is refused beside that tool's own file
                 format.princeofspace|true|The Prince of Space formatter, activated by a princeofspace.properties whose lines are its options; refused beside another Java formatter
                 format.eclipse|true|The Eclipse formatter, activated by an eclipse.properties, which may name the profile Eclipse exports as configuration=, or, where none is found, by an eclipse-formatter.xml of a configuration folder; refused beside another Java formatter

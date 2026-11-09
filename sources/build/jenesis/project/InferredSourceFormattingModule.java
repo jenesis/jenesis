@@ -16,6 +16,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     public static final String OPENREWRITE = "openrewrite",
             GOOGLEJAVAFORMAT = "googlejavaformat",
             PALANTIR = "palantir",
+            OPENJAVAFORMAT = "openjavaformat",
             PRINCEOFSPACE = "princeofspace",
             ECLIPSE = "eclipse",
             KTFMT = "ktfmt",
@@ -38,6 +39,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     private final boolean googlejavaformat;
     private final ExternalModule palantirJavaFormatModule;
     private final boolean palantir;
+    private final ExternalModule openJavaFormatModule;
+    private final boolean openjavaformat;
     private final ExternalModule princeOfSpaceModule;
     private final boolean princeofspace;
     private final ExternalModule eclipseJavaFormatModule;
@@ -65,6 +68,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ExternalModule.official(Environment.NONE, "googlejavaformat", null, repositories, resolvers),
                 true,
                 ExternalModule.official(Environment.NONE, "palantir", null, repositories, resolvers),
+                true,
+                ExternalModule.official(Environment.NONE, "openjavaformat", null, repositories, resolvers),
                 true,
                 ExternalModule.official(Environment.NONE, "princeofspace", null, repositories, resolvers),
                 true,
@@ -96,6 +101,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 environment.flag("format.googlejavaformat", true, Setting.PROJECT),
                 ExternalModule.official(environment, "palantir", null, repositories, resolvers),
                 environment.flag("format.palantir", true, Setting.PROJECT),
+                ExternalModule.official(environment, "openjavaformat", null, repositories, resolvers),
+                environment.flag("format.openjavaformat", true, Setting.PROJECT),
                 ExternalModule.official(environment, "princeofspace", null, repositories, resolvers),
                 environment.flag("format.princeofspace", true, Setting.PROJECT),
                 ExternalModule.official(environment, "eclipse", null, repositories, resolvers),
@@ -131,6 +138,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                                            boolean googlejavaformat,
                                            ExternalModule palantirJavaFormatModule,
                                            boolean palantir,
+                                           ExternalModule openJavaFormatModule,
+                                           boolean openjavaformat,
                                            ExternalModule princeOfSpaceModule,
                                            boolean princeofspace,
                                            ExternalModule eclipseJavaFormatModule,
@@ -155,6 +164,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         this.googlejavaformat = googlejavaformat;
         this.palantirJavaFormatModule = palantirJavaFormatModule;
         this.palantir = palantir;
+        this.openJavaFormatModule = openJavaFormatModule;
+        this.openjavaformat = openjavaformat;
         this.princeOfSpaceModule = princeOfSpaceModule;
         this.princeofspace = princeofspace;
         this.eclipseJavaFormatModule = eclipseJavaFormatModule;
@@ -182,6 +193,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 googlejavaformat,
                 palantirJavaFormatModule,
                 palantir,
+                openJavaFormatModule,
+                openjavaformat,
                 princeOfSpaceModule,
                 princeofspace,
                 eclipseJavaFormatModule,
@@ -209,6 +222,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 googlejavaformat,
                 palantirJavaFormatModule,
                 palantir,
+                openJavaFormatModule,
+                openjavaformat,
                 princeOfSpaceModule,
                 princeofspace,
                 eclipseJavaFormatModule,
@@ -236,6 +251,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 googlejavaformat,
                 palantirJavaFormatModule,
                 palantir,
+                openJavaFormatModule,
+                openjavaformat,
                 princeOfSpaceModule,
                 princeofspace,
                 eclipseJavaFormatModule,
@@ -263,6 +280,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 googlejavaformat,
                 palantirJavaFormatModule,
                 palantir,
+                openJavaFormatModule,
+                openjavaformat,
                 princeOfSpaceModule,
                 princeofspace,
                 eclipseJavaFormatModule,
@@ -290,6 +309,37 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 googlejavaformat,
                 palantirJavaFormatModule,
                 palantir,
+                openJavaFormatModule,
+                openjavaformat,
+                princeOfSpaceModule,
+                princeofspace,
+                eclipseJavaFormatModule,
+                eclipse,
+                ktfmtModule,
+                ktfmt,
+                ktlintModule,
+                ktlint,
+                scalafmtModule,
+                scalafmt,
+                spotlessModule,
+                spotless,
+                dependencies,
+                custom);
+    }
+
+    public InferredSourceFormattingModule openjavaformat(boolean openjavaformat) {
+        return new InferredSourceFormattingModule(configuration,
+                verify,
+                licenseModule,
+                license,
+                openRewriteModule,
+                openrewrite,
+                googleJavaFormatModule,
+                googlejavaformat,
+                palantirJavaFormatModule,
+                palantir,
+                openJavaFormatModule,
+                openjavaformat,
                 princeOfSpaceModule,
                 princeofspace,
                 eclipseJavaFormatModule,
@@ -317,6 +367,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 googlejavaformat,
                 palantirJavaFormatModule,
                 palantir,
+                openJavaFormatModule,
+                openjavaformat,
                 princeOfSpaceModule,
                 princeofspace,
                 eclipseJavaFormatModule,
@@ -344,6 +396,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 googlejavaformat,
                 palantirJavaFormatModule,
                 palantir,
+                openJavaFormatModule,
+                openjavaformat,
                 princeOfSpaceModule,
                 princeofspace,
                 eclipseJavaFormatModule,
@@ -371,6 +425,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 googlejavaformat,
                 palantirJavaFormatModule,
                 palantir,
+                openJavaFormatModule,
+                openjavaformat,
                 princeOfSpaceModule,
                 princeofspace,
                 eclipseJavaFormatModule,
@@ -398,6 +454,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 googlejavaformat,
                 palantirJavaFormatModule,
                 palantir,
+                openJavaFormatModule,
+                openjavaformat,
                 princeOfSpaceModule,
                 princeofspace,
                 eclipseJavaFormatModule,
@@ -425,6 +483,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 googlejavaformat,
                 palantirJavaFormatModule,
                 palantir,
+                openJavaFormatModule,
+                openjavaformat,
                 princeOfSpaceModule,
                 princeofspace,
                 eclipseJavaFormatModule,
@@ -452,6 +512,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 googlejavaformat,
                 palantirJavaFormatModule,
                 palantir,
+                openJavaFormatModule,
+                openjavaformat,
                 princeOfSpaceModule,
                 princeofspace,
                 eclipseJavaFormatModule,
@@ -479,6 +541,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 googlejavaformat,
                 palantirJavaFormatModule,
                 palantir,
+                openJavaFormatModule,
+                openjavaformat,
                 princeOfSpaceModule,
                 princeofspace,
                 eclipseJavaFormatModule,
@@ -506,6 +570,8 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 googlejavaformat,
                 palantirJavaFormatModule,
                 palantir,
+                openJavaFormatModule,
+                openjavaformat,
                 princeOfSpaceModule,
                 princeofspace,
                 eclipseJavaFormatModule,
@@ -598,6 +664,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
             SequencedMap<String, String> values = new LinkedHashMap<>();
             SequencedProperties.ofFiles(palantirFile).forEachProperty(values::put);
             formatters.put(PALANTIR, palantirJavaFormatModule.properties(values));
+        }
+        Path openJavaFormatFile = BuildStep.locate(configuration, OPENJAVAFORMAT + ".properties");
+        if (openJavaFormatFile != null && openjavaformat) {
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(openJavaFormatFile).forEachProperty(values::put);
+            formatters.put(OPENJAVAFORMAT, openJavaFormatModule.properties(values));
         }
         Path princeOfSpaceFile = BuildStep.locate(configuration, PRINCEOFSPACE + ".properties");
         if (princeOfSpaceFile != null && princeofspace) {
