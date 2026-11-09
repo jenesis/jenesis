@@ -2,7 +2,7 @@
  * @jenesis.release 25
  * @jenesis.plugin kotlin:tool maven/org.jetbrains.kotlin/kotlin-serialization-compiler-plugin
  * @jenesis.pin kotlin.stdlib 1.9.10 SHA-256/55e989c512b80907799f854309f3bc7782c5b3d13932442d0379d5c472711504
- * @jenesis.pin kotlin/module/build.jenesis 0.18.2
+ * @jenesis.pin kotlin/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin kotlin/module/build.jenesis.plugin.kotlin 0.2.0 SHA-256/5976a9349da491c1edbe526734ba8856316ca746124fc872c4ae574f76f909fc
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-build-tools-api 2.4.0-RC2 SHA-256/ca5f829936a739cb90146359159a8ecdfe2f1a0ae21f8e2da5868b6413320a1d
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-build-tools-api/pom 2.4.0-RC2 SHA-256/40f1954811bd0c6643a4fe959da42c881bf7f09a4fcd5107083995226e4378c9

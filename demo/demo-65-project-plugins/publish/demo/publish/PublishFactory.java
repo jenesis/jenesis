@@ -12,6 +12,8 @@ public class PublishFactory implements BuildModuleFactory {
                                       String group,
                                       Map<String, Repository> repositories,
                                       Map<String, Resolver> resolvers) {
-        return new PublishModule(properties, environment.flag("release.publish"), environment.out());
+        return new PublishModule(properties,
+                environment.flag("release.publish", Environment.Setting.COMMAND),
+                environment.out());
     }
 }

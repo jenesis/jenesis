@@ -3,7 +3,7 @@
  * @jenesis.pin maven/org.scala-lang/scala-library/pom 2.13.18 SHA-256/c3fb118214e12399857f4aeaa3033ab8b06f6edbeec9bfe4cb5f0101c034c21d
  * @jenesis.pin org.scala-lang/scala-library 2.13.18 SHA-256/4e85d96ff7bc7dc627985523c3541b9917aaa08e956391380c42db21a2c4e5a0
  * @jenesis.pin scala.library 2.13.18 SHA-256/4e85d96ff7bc7dc627985523c3541b9917aaa08e956391380c42db21a2c4e5a0
- * @jenesis.pin scala/module/build.jenesis 0.18.2
+ * @jenesis.pin scala/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin scala/module/build.jenesis.plugin.scala 0.2.0 SHA-256/64d03567d47c5d49b987ff41f02bb5caa81de522400dcb182bbeb6e8b2043a09
  * @jenesis.pin scala:scaladoc/maven/com.fasterxml.jackson.core/jackson-annotations 2.21 SHA-256/53ca085f4a150f703f49e1aabd935bd03b43e1ea3d55d135438292af22cef56b
  * @jenesis.pin scala:scaladoc/maven/com.fasterxml.jackson.core/jackson-annotations/pom 2.21 SHA-256/71cac5392151e2a528cc9a09179f0a334179f05c52f8e596cf58ddf12bb27f2b
@@ -116,23 +116,6 @@
  * @jenesis.pin scala:scaladoc/maven/tools.jackson/jackson-bom/pom 3.1.2 SHA-256/be0e5e45807f4de5514d1e7933facf7388121b3dd9bf31a3ab3f87a200650aa2
  * @jenesis.pin scala:scaladoc/maven/ua.co.k/strftime4j 1.0.6 SHA-256/d37cabad2f97a746fa811f04c01c9e4b5f6636fff05e294f4e5324c051dd7495
  * @jenesis.pin scala:scaladoc/maven/ua.co.k/strftime4j/pom 1.0.6 SHA-256/36a278683e868937f17b451943122e1239bbc1a9863e5cd3e1089ef94640fd87
- * @jenesis.pin scala:tool/maven/com.lihaoyi/fansi_3 0.5.1 SHA-256/df4b447704664563cb0fba9cf52d3fc7509654ab592824d5c2eb4647e6701ac4
- * @jenesis.pin scala:tool/maven/com.lihaoyi/fansi_3/pom 0.5.1 SHA-256/69efc6397199131b80d623943bf763666b1edd0dd042dea5dbb78f42f704db54
- * @jenesis.pin scala:tool/maven/com.lihaoyi/pprint_3 0.9.3 SHA-256/2c06448522447fc7fb5707f9c7d28151f5da50c078b0ed0895617b6789427bdb
- * @jenesis.pin scala:tool/maven/com.lihaoyi/pprint_3/pom 0.9.3 SHA-256/535f7b258ec919bdb6e7345b52db54356d9eabd73812a9da0acc03c13f9ddd8e
- * @jenesis.pin scala:tool/maven/com.lihaoyi/sourcecode_3 0.4.4 SHA-256/40cc148f8baab769de72892443476a05eed7471a9b5cd2cbc2a47bf22cad30d3
- * @jenesis.pin scala:tool/maven/com.lihaoyi/sourcecode_3/pom 0.4.4 SHA-256/778dcb915d9b543b7c6b734f6ea46c80f3c299af97916072bb0396593c86bd1b
- * @jenesis.pin scala:tool/maven/io.get-coursier/interface 1.0.28 SHA-256/7592fe49c789b55429483185ac22ac6da43680a39c53b818c50bca0fb7dd6a78
- * @jenesis.pin scala:tool/maven/io.get-coursier/interface/pom 1.0.28 SHA-256/1d3a10f9bc1728b822d331975545120491e26840deaeae837da9656a4e12bcdd
- * @jenesis.pin scala:tool/maven/org.jline/jline-native 3.29.0 SHA-256/19cfcc9d3c78a1c6cfe4c6c9599f16a657e4bf8da43940fc4b875373236dc258
- * @jenesis.pin scala:tool/maven/org.jline/jline-native/pom 3.29.0 SHA-256/5825548c79a919b6b1d8b7c0904be72a1de43e84ab5525923c2f91279f38dc83
- * @jenesis.pin scala:tool/maven/org.jline/jline-parent/pom 3.29.0 SHA-256/7922efd3d870a7d7ae03b196c300e35c5de0228e59a5b012aea641e36d79928e
- * @jenesis.pin scala:tool/maven/org.jline/jline-reader 3.29.0 SHA-256/a4cb0a5fde9289f2f1b614e04f94b202f6ff5c9c96476425837b1184c92ef81d
- * @jenesis.pin scala:tool/maven/org.jline/jline-reader/pom 3.29.0 SHA-256/d722f49a91292cfc69da0e33a61b788dd4253e8174161639f640b21d461cc429
- * @jenesis.pin scala:tool/maven/org.jline/jline-terminal 3.29.0 SHA-256/fd68a98b32b1132035c62102e5df0b0fdc358e7c87a9f876ce7071450b4d10da
- * @jenesis.pin scala:tool/maven/org.jline/jline-terminal-jni 3.29.0 SHA-256/13fef8bcc0e4788c8e192dc76c33758683c6bfdbaef6f67b41445eb8986773ad
- * @jenesis.pin scala:tool/maven/org.jline/jline-terminal-jni/pom 3.29.0 SHA-256/4dbec22363d2fa1c4e2c89212f2626bc37f8d52d4dc43e8d87df77ac64ffafa4
- * @jenesis.pin scala:tool/maven/org.jline/jline-terminal/pom 3.29.0 SHA-256/7bfa6055d005e2c8fe4a6efc692ae6efd7f543e3940fb55ecca09d58c78cb0fe
  * @jenesis.pin scala:tool/maven/org.scala-lang.modules/scala-asm 9.9.0-scala-1 SHA-256/75ac366e8ecb691e06a7e85041eed0f67919a646e5262fa0901225698c104375
  * @jenesis.pin scala:tool/maven/org.scala-lang.modules/scala-asm/pom 9.9.0-scala-1 SHA-256/959b6da9867fbf2e687976ad572052fee22c1dbb3da95fcb16228d05544dfdc1
  * @jenesis.pin scala:tool/maven/org.scala-lang/scala-library 3.8.4-RC3 SHA-256/f2052e9a932973699c9ef575da2ff780245a3f464dbfa28871a44fd27028fc35
@@ -143,21 +126,12 @@
  * @jenesis.pin scala:tool/maven/org.scala-lang/scala3-interfaces/pom 3.8.4-RC3 SHA-256/9f9f20449aa083faed246f5fe77688564e6244028bf103369a6eb5b6e94cc507
  * @jenesis.pin scala:tool/maven/org.scala-lang/scala3-library_3 3.8.4-RC3 SHA-256/a56d1dd4134af60db7d41a3005fb5e5ed59d77f8c381bb675d55ba2c60208f3d
  * @jenesis.pin scala:tool/maven/org.scala-lang/scala3-library_3/pom 3.8.4-RC3 SHA-256/972bd8a44f1beeadc95fb3332e38a202925430ddb7b80d928c6723f10067b067
- * @jenesis.pin scala:tool/maven/org.scala-lang/scala3-repl_3 3.8.4-RC3 SHA-256/e97efb73133e37207c2b9f6ac6ca461ec79ed8ed54e0286dd23dcbb17613c484
- * @jenesis.pin scala:tool/maven/org.scala-lang/scala3-repl_3/pom 3.8.4-RC3 SHA-256/195ce25e42f93116d6ac2dec785a7d407c1a436965d5ee68ae2131ed116e08a5
- * @jenesis.pin scala:tool/maven/org.scala-lang/scala3-sbt-bridge 3.8.4-RC3 SHA-256/365824969f0ab6ccab93a8fd85a17c9b6275638733e3fc7d8dffd689c8dfbef8
- * @jenesis.pin scala:tool/maven/org.scala-lang/scala3-sbt-bridge/pom 3.8.4-RC3 SHA-256/802060f7158d2818972a2e0efa77316b0c3c7587a90c6be64d5d4d4520965bda
  * @jenesis.pin scala:tool/maven/org.scala-lang/tasty-core_3 3.8.4-RC3 SHA-256/5fca75da0a575775dd468923fed00d8efb4f0c86ed05f7c86dc44cdf3aec6fc1
  * @jenesis.pin scala:tool/maven/org.scala-lang/tasty-core_3/pom 3.8.4-RC3 SHA-256/0dbcbbc6b7856ef4259256c3ddf070b62884d9e9c903a929269cfa544801a02c
  * @jenesis.pin scala:tool/maven/org.scala-sbt/compiler-interface 1.10.7 SHA-256/2bacc5761e03920a228e5c9d20b33d9c51d43aaf2f52e8f839ece630966eb880
  * @jenesis.pin scala:tool/maven/org.scala-sbt/compiler-interface/pom 1.10.7 SHA-256/3b7b0da8bf5820aa50f4448e19021de1183164f74a180bd0b68e7d92f3004e31
  * @jenesis.pin scala:tool/maven/org.scala-sbt/util-interface 1.10.7 SHA-256/1d6b91efa42b70fc064caed6d62962374e13b27737f885a87c84c667b30be625
  * @jenesis.pin scala:tool/maven/org.scala-sbt/util-interface/pom 1.10.7 SHA-256/d49470c815e070e44f9501116c83f35b179413f5aafe95e29ac293c67cc16297
- * @jenesis.pin scala:tool/maven/org.slf4j/slf4j-api 1.7.36 SHA-256/d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0
- * @jenesis.pin scala:tool/maven/org.slf4j/slf4j-api/pom 1.7.36 SHA-256/fb046a9c229437928bb11c2d27c8b5d773eb8a25e60cbd253d985210dedc2684
- * @jenesis.pin scala:tool/maven/org.slf4j/slf4j-parent/pom 1.7.36 SHA-256/bb388d37fbcdd3cde64c3cede21838693218dc451f04040c5df360a78ed7e812
- * @jenesis.pin scala:tool/maven/org.virtuslab/using_directives 1.1.4 SHA-256/f905fd8fd0d50e76bcaca3a9ef631a49587159f14cd5cc405fd3ade97c72c555
- * @jenesis.pin scala:tool/maven/org.virtuslab/using_directives/pom 1.1.4 SHA-256/773cdfeea87cd5a94cbcc6873d49d62e05150e5b9dafad2e4984a9150f64fed2
  * @jenesis.pin scala:zinc/maven/com.eed3si9n/shaded-jawn-parser_2.13 1.3.2 SHA-256/f3273384cb4b94d600187e72037b815ecdaa5b44528bb06ec8dc4704d4892884
  * @jenesis.pin scala:zinc/maven/com.eed3si9n/shaded-jawn-parser_2.13/pom 1.3.2 SHA-256/033c70528bf354c2432c453f479b35feaa891ba1df1b9d4823bf5c7e8e49201a
  * @jenesis.pin scala:zinc/maven/com.eed3si9n/shaded-scalajson_2.13 1.0.0-M4 SHA-256/7b6b6d85727bd8abab940b559de8e32aa5081add29f7531c855bb0761ae8de67
