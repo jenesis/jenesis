@@ -5,7 +5,7 @@
  *
  * @jenesis.release 25
  * @jenesis.main demo.legacy.app.Main
- * @jenesis.pin build.jenesis/build.jenesis.launcher 0.6.5
+ * @jenesis.pin build.jenesis/build.jenesis.launcher 0.6.5 SHA-256/f48c2fcc48025673fff614a826155ebb177ef2ca02c327eefef025b39fb0336a
  * @jenesis.pin layer:beans/maven/commons-beanutils/commons-beanutils 1.9.4 SHA-256/7d938c81789028045c08c065e94be75fc280527620d5bd62b519d5838532368a
  * @jenesis.pin layer:beans/maven/commons-beanutils/commons-beanutils/pom 1.9.4 SHA-256/c35cca7b61d4678d9578cbc0b901b8717b539abf9254441da78b8fe60de064d0
  * @jenesis.pin layer:beans/maven/commons-collections/commons-collections 3.2.2 SHA-256/eeeae917917144a68a741d4c0dff66aa5c5c5fd85593ff217bced3fc8ca783b8
@@ -18,7 +18,7 @@
  * @jenesis.pin layer:beans/maven/org.apache/apache/pom 13 SHA-256/ff513db0361fd41237bef4784968bc15aae478d4ec0a9496f811072ccaf3841d
  * @jenesis.pin layer:beans/maven/org.apache/apache/pom 16 SHA-256/9f85ff2fd7d6cb3097aa47fb419ee7f0ebe869109f98aba9f4eca3f49e74a40e
  * @jenesis.pin layer:beans/maven/org.apache/apache/pom 19 SHA-256/91f7a33096ea69bac2cbaf6d01feb934cac002c48d8c8cfa9c240b40f1ec21df
- * @jenesis.pin maven/build.jenesis/build.jenesis.launcher/pom 0.6.5
+ * @jenesis.pin maven/build.jenesis/build.jenesis.launcher/pom 0.6.5 SHA-256/efa781ecc8e769e31ed29039a0ca7a4891a4d8d10321114b086d3afab1183c3d
  */
 module demo.legacy.app {
     requires demo.legacy.library;
