@@ -121,7 +121,7 @@ skips the tool. It is named after the part of the build the tool runs in:
 
     jenesis.check.<tool>         the source checks: Checkstyle, PMD, ...
     jenesis.validate.<tool>      the checks of the classes: SpotBugs, forbiddenapis, jdeps, jdeprscan
-    jenesis.format.<tool>        the formatters: openrewrite, googlejavaformat, palantir, princeofspace, eclipse, spotless, license
+    jenesis.format.<tool>        the formatters: openrewrite, googlejavaformat, palantir, openjavaformat, princeofspace, eclipse, spotless, license
 
 A plugin of the project's own, which `jenesis.plugins.properties` names, is
 switched by `jenesis.plugin.<name>` instead, so it shares no setting with an
@@ -218,7 +218,7 @@ Formatting: verify, and how to reformat
 
 Each Java formatter is switched on by a file named after it, whose lines are
 its options: `googlejavaformat.properties`, `palantir.properties`,
-`princeofspace.properties` or `eclipse.properties`. This demo's `googlejavaformat.properties` switches
+`openjavaformat.properties`, `princeofspace.properties` or `eclipse.properties`. This demo's `googlejavaformat.properties` switches
 google-java-format on:
 
     reflow=false
@@ -239,7 +239,8 @@ google-java-format takes these options:
 
 A key the formatter does not take fails the build, naming the keys it does take,
 and a changed option verifies every source again. Palantir Java Format, switched
-on by a `palantir.properties`, takes `reflow` and `imports` alike. Prince of
+on by a `palantir.properties`, takes `reflow` and `imports` alike, as does Open
+Java Format, its fork, switched on by an `openjavaformat.properties`. Prince of
 Space, switched on by a `princeofspace.properties`, takes its own options as its
 command line names them: `wrap-style`, `indent-style`, `indent-size`,
 `line-length`, `closing-paren-on-new-line`, `trailing-commas` and
