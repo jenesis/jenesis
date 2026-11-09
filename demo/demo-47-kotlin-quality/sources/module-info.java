@@ -7,7 +7,7 @@
  * ships against, while the quality tools float their own {@code RELEASE}.
  *
  * @jenesis.release 25
- * @jenesis.pin detekt/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin detekt/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin detekt/module/build.jenesis.plugin.detekt 0.2.0 SHA-256/865654d33cf219672dcfa845d77d4394492777fa032709333adc7d81b259a067
  * @jenesis.pin detekt:tool/maven/dev.drewhamilton.poko/poko-annotations-jvm 0.17.1 SHA-256/940e6d50445bc6b0ae26ad414ec7b953a3e4e802dc7756cc14d56958bc97cc31
  * @jenesis.pin detekt:tool/maven/dev.drewhamilton.poko/poko-annotations-jvm/pom 0.17.1 SHA-256/1bb53afd8230ffde373b5b8b1711dca0c83d3ad561f3a50e39c4a8029d832392
@@ -95,7 +95,7 @@
  * @jenesis.pin detekt:tool/maven/org.snakeyaml/snakeyaml-engine 2.7 SHA-256/4053f878c171692aab8782f53a3974f43e55e2b6ed12c3682b36a46968c5ded1
  * @jenesis.pin detekt:tool/maven/org.snakeyaml/snakeyaml-engine/pom 2.7 SHA-256/a52a6243f8615856791d1297f97374076bf81348061af714ad0963d375ae5cb7
  * @jenesis.pin kotlin.stdlib 1.9.10 SHA-256/55e989c512b80907799f854309f3bc7782c5b3d13932442d0379d5c472711504
- * @jenesis.pin kotlin/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin kotlin/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin kotlin/module/build.jenesis.plugin.kotlin 0.2.0 SHA-256/5976a9349da491c1edbe526734ba8856316ca746124fc872c4ae574f76f909fc
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-build-tools-api 2.4.0-RC2 SHA-256/ca5f829936a739cb90146359159a8ecdfe2f1a0ae21f8e2da5868b6413320a1d
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlin/kotlin-build-tools-api/pom 2.4.0-RC2 SHA-256/40f1954811bd0c6643a4fe959da42c881bf7f09a4fcd5107083995226e4378c9
@@ -114,7 +114,7 @@
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/pom 1.8.0 SHA-256/a5633abd53467ceb91622d81f2e982080877145e0b76e1b75788715434885d0b
  * @jenesis.pin kotlin:tool/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
  * @jenesis.pin kotlin:tool/maven/org.jetbrains/annotations/pom 13.0 SHA-256/965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397
- * @jenesis.pin ktfmt/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin ktfmt/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin ktfmt/module/build.jenesis.plugin.ktfmt 0.2.0 SHA-256/acc0e92844856057fdae0874c2673b410bda0e88284bebbbb2e4fbb4ce949ce6
  * @jenesis.pin ktfmt:tool/maven/com.facebook/ktfmt 0.64 SHA-256/7e4dbb5392b99fba5b5ccbe24a2eb4a6d88e419b97887520380c1f2550779b62
  * @jenesis.pin ktfmt:tool/maven/com.facebook/ktfmt/pom 0.64 SHA-256/6797627da300dd341ffea2aab489e47d1b8aa4afbc20b0bba225f63bfded7d17
@@ -158,7 +158,7 @@
  * @jenesis.pin ktfmt:tool/maven/org.jspecify/jspecify 1.0.0 SHA-256/1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab
  * @jenesis.pin ktfmt:tool/maven/org.jspecify/jspecify/pom 1.0.0 SHA-256/cdab929a3b95211f43d2090c5e2d0dfe8465960e378bc32b35841dab324433a6
  * @jenesis.pin ktfmt:tool/maven/org.sonatype.oss/oss-parent/pom 9 SHA-256/fb40265f982548212ff82e362e59732b2187ec6f0d80182885c14ef1f982827a
- * @jenesis.pin ktlint/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin ktlint/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin ktlint/module/build.jenesis.plugin.ktlint 0.2.0 SHA-256/a9514b8d42f304cd9e36085f3a23bdfe7a0c31aa50bd0c281c972e5467046bde
  * @jenesis.pin ktlint:tool/maven/ch.qos.logback/logback-classic 1.3.16 SHA-256/3f63cbc593b91670f75890ab256aa47c123a9b125185939a272c720ca1417c2c
  * @jenesis.pin ktlint:tool/maven/ch.qos.logback/logback-classic/pom 1.3.16 SHA-256/ce1b4f5896e3e5cc747e1673a6efc937544d429cf264ac445ea2ca89d76fb32c

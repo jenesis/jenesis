@@ -22,8 +22,8 @@
         </dependency>
     </dependencies>
     <!--jenesis.pin
-    launcher/maven/build.jenesis/build.jenesis.launcher 0.6.0 SHA-256/38a0381e95f6980b965b11bc05958482d0550f3050f901a574bf30b26536539b
-    launcher/maven/build.jenesis/build.jenesis.launcher/pom 0.6.0 SHA-256/62237345fd053bdd3b0c4681f6b65d79d856eb07bb761b9cd9520626f6ba12ce
+    launcher/maven/build.jenesis/build.jenesis.launcher 0.6.5 SHA-256/f48c2fcc48025673fff614a826155ebb177ef2ca02c327eefef025b39fb0336a
+    launcher/maven/build.jenesis/build.jenesis.launcher/pom 0.6.5 SHA-256/efa781ecc8e769e31ed29039a0ca7a4891a4d8d10321114b086d3afab1183c3d
     org.apache.commons/commons-lang3 3.14.0 SHA-256/7b96bf3ee68949abb5bc465559ac270e0551596fa34523fddf890ec418dde13c
     maven/org.apache.commons/commons-lang3/pom 3.14.0 SHA-256/110438863bad37c28f906bf87016e38c7a8c758ba321e09d11dc5a2363a8e79e
     maven/org.apache.commons/commons-parent/pom 64 SHA-256/6f19638994e8357b4ed734696f992057efaafa1235673998133299798e2ccddb

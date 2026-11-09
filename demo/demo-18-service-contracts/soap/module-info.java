@@ -10,7 +10,7 @@
  * @jenesis.pin maven/jakarta.xml.soap/jakarta.xml.soap-api/pom 3.0.2 SHA-256/28a46919604b9d0e84a057463579f3e81779c866da2e6feedff51f76c9785f09
  * @jenesis.pin maven/jakarta.xml.ws/jakarta.xml.ws-api/pom 4.0.3 SHA-256/40578a6b6317792e5665c3b135686279511b4bdb1e7759a4f5e9ccc90a2077bd
  * @jenesis.pin maven/org.eclipse.ee4j/project/pom 1.0.9 SHA-256/825379934a1cf29249f349f2d18adaf79a7b2cb2dbe231518974e1ee70941c17
- * @jenesis.pin wsimport/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin wsimport/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin wsimport/module/build.jenesis.plugin.wsimport 0.2.0 SHA-256/103a51649d65362feb634ace0290f891391d7fed910cf772e00fdd734b538716
  * @jenesis.pin wsimport:tool/maven/com.fasterxml.woodstox/woodstox-core 7.2.0 SHA-256/689f5be95f9bb369d6c0e8db99a99f930b0c48d6a69b46151782b5816c7ea820
  * @jenesis.pin wsimport:tool/maven/com.fasterxml.woodstox/woodstox-core/pom 7.2.0 SHA-256/24a55f1439060131dfd62943245bfdf79c536ae4372fef5f9446b8a0121a3945

@@ -28,7 +28,7 @@
     maven/jakarta.xml.bind/jakarta.xml.bind-api-parent/pom 4.0.2 SHA-256/482cdb46d4dd2f5af7dc884c8a6de73ddffe6daf549ef36a6c077fd6e41eed08
     maven/jakarta.xml.bind/jakarta.xml.bind-api/pom 4.0.2 SHA-256/ab7273e26a54824b3b7333d4956e6ecd26de13a5eb3d90ee63023193a92d72be
     maven/org.eclipse.ee4j/project/pom 1.0.9 SHA-256/825379934a1cf29249f349f2d18adaf79a7b2cb2dbe231518974e1ee70941c17
-    xjc/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    xjc/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
     xjc/module/build.jenesis.plugin.xjc 0.2.0 SHA-256/9f3371ec70b6792d963356647534c7043cd9c88300c347014adec8402af7746a
     xjc:tool/maven/com.sun.istack/istack-commons-runtime 4.1.2 SHA-256/7fd6792361f4dd00f8c56af4a20cecc0066deea4a8f3dec38348af23fc2296ee
     xjc:tool/maven/com.sun.istack/istack-commons-runtime/pom 4.1.2 SHA-256/1222a290beddb6f6e92bc999bcebc3696fcd6d72215856d224727a7bc2dc3aca

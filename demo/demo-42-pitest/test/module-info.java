@@ -26,7 +26,7 @@
  * @jenesis.pin org.junit.platform/junit-platform-launcher 1.11.3 SHA-256/b4727459201b0011beb0742bd807421a1fc8426b116193031ed87825bc2d4f04
  * @jenesis.pin org.junit.platform/junit-platform-reporting 1.11.3 SHA-256/b8e19dbebcae7d1ff30b9d767047fbf3694027c33dfa423b371693b7f6679ed1
  * @jenesis.pin org.opentest4j/opentest4j 1.3.0 SHA-256/48e2df636cab6563ced64dcdff8abb2355627cb236ef0bf37598682ddf742f1b
- * @jenesis.pin pitest/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin pitest/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin pitest/module/build.jenesis.plugin.pitest 0.2.1 SHA-256/d9475d0d01756848050a53f4a0d366e9a1803e0f1f761e010bae74c0d2337c48
  * @jenesis.pin pitest:tool/maven/antlr/antlr 2.7.7 SHA-256/88fbda4b912596b9f56e8e12e580cc954bacfb51776ecfddd3e18fc1cf56dc4c
  * @jenesis.pin pitest:tool/maven/antlr/antlr/pom 2.7.7 SHA-256/100f793ba27f8b4e4204edb46171ebf36e54e0f94cfc02527fea07a0bb1fceb7

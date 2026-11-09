@@ -7,7 +7,7 @@
  *
  * @jenesis.release 25
  * @jenesis.main demo.antlr.Calculator
- * @jenesis.pin antlr/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin antlr/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin antlr/module/build.jenesis.plugin.antlr 0.2.0 SHA-256/d3fda8ad8bb2a2313b462c287cf0e3bb34cd25cf3dc710045fc816d5ba05e5df
  * @jenesis.pin antlr:tool/maven/com.ibm.icu/icu4j 72.1 SHA-256/3df572b240a68d13b5cd778ad2393e885d26411434cd8f098ac5987ea2e64ce3
  * @jenesis.pin antlr:tool/maven/com.ibm.icu/icu4j/pom 72.1 SHA-256/3def2b29af4a19ad805cb153056925a89a903f92fbee1adee12ed2fc14c44ee8

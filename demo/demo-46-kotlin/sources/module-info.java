@@ -1,7 +1,7 @@
 /**
  * @jenesis.release 21
  * @jenesis.pin kotlin.stdlib 1.9.10 SHA-256/55e989c512b80907799f854309f3bc7782c5b3d13932442d0379d5c472711504
- * @jenesis.pin kotlin/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin kotlin/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin kotlin/module/build.jenesis.plugin.kotlin 0.2.0 SHA-256/5976a9349da491c1edbe526734ba8856316ca746124fc872c4ae574f76f909fc
  * @jenesis.pin kotlin:dokka/maven/com.fasterxml.jackson.core/jackson-annotations 2.15.3 SHA-256/aae865c3d88256d61b11523cb1e88bd48d5b9ad5855fa1fc859504fd2204708a
  * @jenesis.pin kotlin:dokka/maven/com.fasterxml.jackson.core/jackson-annotations/pom 2.15.3 SHA-256/ffa67166fbe4cff3497d0cc629c2019cd0e7cd5ed01bec683a7cbf213d030ec8

@@ -30,7 +30,7 @@
         </dependency>
     </dependencies>
     <!--jenesis.pin
-    kotlin/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    kotlin/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
     kotlin/module/build.jenesis.plugin.kotlin 0.2.0 SHA-256/5976a9349da491c1edbe526734ba8856316ca746124fc872c4ae574f76f909fc
     kotlin:tool/maven/org.jetbrains.kotlin/kotlin-build-tools-api 2.4.21 SHA-256/c5cd6a49bd072b529ae10809111c16a7aa0f92147e95d288354017fd65799461
     kotlin:tool/maven/org.jetbrains.kotlin/kotlin-build-tools-api/pom 2.4.21 SHA-256/4b909e42d55242520278d5397eca1edd58921fe128942eeff95a6da279c2eb27
@@ -49,7 +49,7 @@
     kotlin:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/pom 1.8.0 SHA-256/a5633abd53467ceb91622d81f2e982080877145e0b76e1b75788715434885d0b
     kotlin:tool/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
     kotlin:tool/maven/org.jetbrains/annotations/pom 13.0 SHA-256/965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397
-    ksp/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    ksp/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
     ksp/module/build.jenesis.plugin.ksp 0.2.0 SHA-256/2f1f03bd58b39f8c574d7c186dbbba9814a6450b2aa610a311cbea493baf2ae7
     ksp:processor/maven/com.google.auto.service/auto-service-aggregator/pom 1.0 SHA-256/c97acb57d385e70257643123aa824c7d343613fe93035529c0868e949cb60461
     ksp:processor/maven/com.google.auto.service/auto-service-annotations 1.0 SHA-256/44752893119fdaf01b4c5ee74e46e5dab86f2dcda18114c562f877355c6ed26e
