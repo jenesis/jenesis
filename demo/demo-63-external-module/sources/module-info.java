@@ -7,7 +7,7 @@
  * @jenesis.pin plugin.greeting/maven/demo.plugin/demo.plugin/pom 1.0.0 SHA-256/b3a57c5ef7215f8498c980eee95301491bdfce690a95077066400d0ade6e969d
  * @jenesis.pin plugin.greeting/maven/org.json/json 20260719 SHA-256/c243f45f9590c12694a4142ed3f07fc70dfb71e4daebd05ae234bf92a2da92a6
  * @jenesis.pin plugin.greeting/maven/org.json/json/pom 20260719 SHA-256/f1505d95d0416e2b2e239d19c278425f6cf8533e89958e8e0b4bcd7c79689771
- * @jenesis.pin plugin.greeting/module/build.jenesis 0.18.2
+ * @jenesis.pin plugin.greeting/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin plugin.greeting/module/demo.plugin 1.0.0 SHA-256/780fda592201ba5f0af0a5fa16493429c7326ad131ffee1881c0eb602317e410
  * @jenesis.pin plugin.greeting/module/org.json 20260522 SHA-256/d671b45e5954211f3566722aa614fbd3b5d46e95f4f9da4dc58c173280bb1799
  */

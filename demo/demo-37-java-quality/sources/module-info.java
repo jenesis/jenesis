@@ -115,7 +115,7 @@
  * @jenesis.pin checkstyle:tool/maven/org.xmlresolver/xmlresolver 5.3.3 SHA-256/1fe4d5b92f708dcdb82dbce12919e0171e6b5ca62c6dca6220483625098feb5f
  * @jenesis.pin checkstyle:tool/maven/org.xmlresolver/xmlresolver/jar/data 5.3.3 SHA-256/b0c487ad2f3e558be8d829c916d2458d10aca6a5bafa7a4d0524b70845e48a5c
  * @jenesis.pin checkstyle:tool/maven/org.xmlresolver/xmlresolver/pom 5.3.3 SHA-256/261ada76d9e6676008dcac377a4d4589749166b606559f59f2e45ea62d8b75ec
- * @jenesis.pin eclipse/module/build.jenesis 0.18.2
+ * @jenesis.pin eclipse/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin eclipse/module/build.jenesis.plugin.eclipse 0.2.0 SHA-256/47c99f01d4e5d16f9428e0c6313ba229f05eedad31b17268529fb1ba4a61e89e
  * @jenesis.pin eclipse:tool/maven/net.java.dev.jna/jna 5.19.1 SHA-256/4fb141dd8ef6b0585ffceea4bc49602fbc6312fa977e2c488794ea3e6aafecae
  * @jenesis.pin eclipse:tool/maven/net.java.dev.jna/jna-platform 5.19.1 SHA-256/3b3864f5b449e9c3c24b16861524b622b086563f44e0cd8384c8efc5a6052f82
@@ -183,7 +183,7 @@
  * @jenesis.pin googlejavaformat:tool/maven/org.checkerframework/checker-qual/pom 3.37.0 SHA-256/02392fbd4ce21901f945615472b1d4d4d3591b3aabdf013105f5c92ec32cb4f0
  * @jenesis.pin googlejavaformat:tool/maven/org.sonatype.oss/oss-parent/pom 7 SHA-256/b51f8867c92b6a722499557fc3a1fdea77bdf9ef574722fe90ce436a29559454
  * @jenesis.pin googlejavaformat:tool/maven/org.sonatype.oss/oss-parent/pom 9 SHA-256/fb40265f982548212ff82e362e59732b2187ec6f0d80182885c14ef1f982827a
- * @jenesis.pin openrewrite/module/build.jenesis 0.18.2
+ * @jenesis.pin openrewrite/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin openrewrite/module/build.jenesis.plugin.openrewrite 0.2.0 SHA-256/520971ff440e582e4a9e80024418189f62777aca4afd35a2657eed5220877e2e
  * @jenesis.pin openrewrite:tool/maven/com.fasterxml.jackson.core/jackson-annotations 2.21 SHA-256/53ca085f4a150f703f49e1aabd935bd03b43e1ea3d55d135438292af22cef56b
  * @jenesis.pin openrewrite:tool/maven/com.fasterxml.jackson.core/jackson-annotations/pom 2.21 SHA-256/71cac5392151e2a528cc9a09179f0a334179f05c52f8e596cf58ddf12bb27f2b
@@ -529,7 +529,7 @@
  * @jenesis.pin pmd:tool/maven/org.xmlresolver/xmlresolver 5.3.3 SHA-256/1fe4d5b92f708dcdb82dbce12919e0171e6b5ca62c6dca6220483625098feb5f
  * @jenesis.pin pmd:tool/maven/org.xmlresolver/xmlresolver/jar/data 5.3.3 SHA-256/b0c487ad2f3e558be8d829c916d2458d10aca6a5bafa7a4d0524b70845e48a5c
  * @jenesis.pin pmd:tool/maven/org.xmlresolver/xmlresolver/pom 5.3.3 SHA-256/261ada76d9e6676008dcac377a4d4589749166b606559f59f2e45ea62d8b75ec
- * @jenesis.pin princeofspace/module/build.jenesis 0.18.2
+ * @jenesis.pin princeofspace/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin princeofspace/module/build.jenesis.plugin.princeofspace 0.2.0 SHA-256/a48e3b87f7f7e7c47369915845cac015757190c1fac9186adbd6196ec2a3f43b
  * @jenesis.pin princeofspace:tool/maven/com.github.javaparser/javaparser-core 3.28.2 SHA-256/b5499a3b1c40b16c0671fabe478c9aafeab38160c6fde74a6c13f42d86716ecd
  * @jenesis.pin princeofspace:tool/maven/com.github.javaparser/javaparser-core/pom 3.28.2 SHA-256/87d2b333dfec96896d5a49e80a95b92ef572f610e848276b45eaa061e05b4132
@@ -617,7 +617,7 @@
  * @jenesis.pin spotbugs:tool/maven/org.xmlresolver/xmlresolver 5.3.3 SHA-256/1fe4d5b92f708dcdb82dbce12919e0171e6b5ca62c6dca6220483625098feb5f
  * @jenesis.pin spotbugs:tool/maven/org.xmlresolver/xmlresolver/jar/data 5.3.3 SHA-256/b0c487ad2f3e558be8d829c916d2458d10aca6a5bafa7a4d0524b70845e48a5c
  * @jenesis.pin spotbugs:tool/maven/org.xmlresolver/xmlresolver/pom 5.3.3 SHA-256/261ada76d9e6676008dcac377a4d4589749166b606559f59f2e45ea62d8b75ec
- * @jenesis.pin spotless/module/build.jenesis 0.18.2
+ * @jenesis.pin spotless/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin spotless:jacksonjson/maven/com.fasterxml.jackson.core/jackson-annotations 2.22 SHA-256/21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0
  * @jenesis.pin spotless:jacksonjson/maven/com.fasterxml.jackson.core/jackson-annotations/pom 2.22 SHA-256/38c3ba52a0eade3e3eacc5b13499d56e1038ccbad8ec4bb79426dc21432b46d0
  * @jenesis.pin spotless:jacksonjson/maven/com.fasterxml.jackson.core/jackson-core 2.22.4 SHA-256/2d30c375cddea9657a1e1ef97547a2694b663b355facb4de53a097782b312d1a

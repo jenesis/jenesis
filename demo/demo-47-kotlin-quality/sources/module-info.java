@@ -114,7 +114,7 @@
  * @jenesis.pin kotlin:tool/maven/org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/pom 1.8.0 SHA-256/a5633abd53467ceb91622d81f2e982080877145e0b76e1b75788715434885d0b
  * @jenesis.pin kotlin:tool/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
  * @jenesis.pin kotlin:tool/maven/org.jetbrains/annotations/pom 13.0 SHA-256/965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397
- * @jenesis.pin ktfmt/module/build.jenesis 0.18.2
+ * @jenesis.pin ktfmt/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
  * @jenesis.pin ktfmt/module/build.jenesis.plugin.ktfmt 0.2.0 SHA-256/acc0e92844856057fdae0874c2673b410bda0e88284bebbbb2e4fbb4ce949ce6
  * @jenesis.pin ktfmt:tool/maven/com.facebook/ktfmt 0.64 SHA-256/7e4dbb5392b99fba5b5ccbe24a2eb4a6d88e419b97887520380c1f2550779b62
  * @jenesis.pin ktfmt:tool/maven/com.facebook/ktfmt/pom 0.64 SHA-256/6797627da300dd341ffea2aab489e47d1b8aa4afbc20b0bba225f63bfded7d17

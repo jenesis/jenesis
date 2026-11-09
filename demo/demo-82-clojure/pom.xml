@@ -18,7 +18,7 @@
         </dependency>
     </dependencies>
     <!--jenesis.pin
-    clojure/module/build.jenesis 0.18.2
+    clojure/module/build.jenesis 0.18.2 SHA-256/18494e5406c1a6da0718318cc4037b98ba2c28ce1b1b250580e1b33afd6db7a9
     org.clojure/clojure 1.12.6 SHA-256/21b578db389a8e74b286ce79c4a7f86ec641e26d88b12f18d69030916b0e18ca
     maven/org.clojure/clojure/pom 1.12.6 SHA-256/6b85dea75a09f1eb08c8cc18a1b3120a3fd048a6343757a1b6be979ab6f910cf
     org.clojure/core.specs.alpha 0.4.74 SHA-256/eb73ac08cf49ba840c88ba67beef11336ca554333d9408808d78946e0feb9ddb
