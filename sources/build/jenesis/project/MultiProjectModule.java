@@ -102,6 +102,7 @@ public record MultiProjectModule(BuildExecutorModule identifier,
                 MultiProject project = factory.apply(projects);
                 SequencedMap<String, AssemblyDescriptor> assemblies = new LinkedHashMap<>();
                 SequencedMap<String, SequencedSet<String>> closures = new LinkedHashMap<>(), testers = new LinkedHashMap<>();
+                Set<String> tests = new HashSet<>();
                 SequencedMap<String, SequencedMap<String, Path>> arguments = new LinkedHashMap<>();
                 SequencedMap<String, SequencedSet<String>> pending = new LinkedHashMap<>(projects);
                 while (!pending.isEmpty()) {
@@ -128,6 +129,7 @@ public record MultiProjectModule(BuildExecutorModule identifier,
                             arguments.put(entry.getKey(), identifying);
                             closures.put(entry.getKey(), dependencies.sequencedKeySet());
                             if (test(identifying)) {
+                                tests.add(entry.getKey());
                                 entry.getValue().forEach(tested -> testers.computeIfAbsent(tested, _ -> new LinkedHashSet<>())
                                         .add(entry.getKey()));
                             }
@@ -150,6 +152,15 @@ public record MultiProjectModule(BuildExecutorModule identifier,
                         String identity = identifier.substring(PREVIOUS.repeat(2).length() + IDENTIFIER.length() + 1);
                         built.put(identifier, identifier);
                         followed.put(identifier, identity.startsWith(module + "/") ? identity.substring(module.length() + 1) : identity);
+                    }
+                    if (tests.contains(module)) {
+                        for (String dependency : closures.get(module)) {
+                            for (String identifier : arguments.get(dependency).sequencedKeySet()) {
+                                if (identifier.endsWith("/" + SOURCES)) {
+                                    built.put(identifier, identifier);
+                                }
+                            }
+                        }
                     }
                     registrations.putAll(assembly.getValue().toBuildModules(module,
                             built,

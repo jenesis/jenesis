@@ -976,6 +976,14 @@ public class InferredMultiProjectAssemblerTest {
                                            Map<String, Repository> repositories,
                                            Map<String, Resolver> resolvers,
                                            String... selectors) throws IOException {
+            return execute(assembler, repositories, resolvers, Collections.emptyNavigableMap(), selectors);
+        }
+
+        SequencedMap<String, Path> execute(InferredMultiProjectAssembler assembler,
+                                           Map<String, Repository> repositories,
+                                           Map<String, Resolver> resolvers,
+                                           SequencedMap<String, Path> upstream,
+                                           String... selectors) throws IOException {
             AssemblyDescriptor assembled = assembler.apply(descriptor, repositories, resolvers);
             BuildExecutor executor = BuildExecutor.of(build,
                     Duration.ZERO,
@@ -993,6 +1001,12 @@ public class InferredMultiProjectAssemblerTest {
             inputs.put("manifests", manifests);
             inputs.put("sources", sources);
             inputs.put("artifacts", artifacts);
+            for (Map.Entry<String, Path> entry : upstream.entrySet()) {
+                int slash = entry.getKey().indexOf('/');
+                executor.addModule(entry.getKey().substring(0, slash),
+                        (module, _) -> module.addSource(entry.getKey().substring(slash + 1), entry.getValue()));
+                inputs.put(entry.getKey(), entry.getValue());
+            }
             assembled.toPhasesModule().accept(executor, inputs);
             return executor.execute(Runnable::run, selectors).toCompletableFuture().join();
         }
@@ -1049,6 +1063,32 @@ public class InferredMultiProjectAssemblerTest {
         assertThat(Files.readAllLines(recorded.resolve("inputs.txt")))
                 .as("with jenesis.test.jars=false the tests run against the resources folders, so they read them")
                 .anyMatch(input -> input.endsWith("include/resources"));
+    }
+
+    @Test
+    public void hands_the_sources_of_a_required_module_to_what_observes_the_tests_but_not_to_the_test_run()
+            throws IOException {
+        Fixture fixture = setUp("path=\ntest=main_artifact\n", true, false, false);
+        SequencedMap<String, Path> upstream = new LinkedHashMap<>();
+        upstream.put("tested/sources", Files.createDirectory(root.resolve("tested")));
+        SequencedMap<String, Path> outputs = fixture.execute(new InferredMultiProjectAssembler()
+                        .observe(observe -> observe
+                                .test(_ -> (module, inherited) -> module.addStep("inputs",
+                                        new InputsStep(),
+                                        inherited.sequencedKeySet()))
+                                .custom("inputs", new InputsStep())),
+                Map.of(),
+                Map.of(),
+                upstream,
+                "build/observed/test/inputs",
+                "build/observed/custom/inputs");
+        assertThat(Files.readAllLines(outputs.get("build/observed/custom/inputs").resolve("inputs.txt")))
+                .as("a report over the tests reads the sources of the module they test")
+                .anyMatch(input -> input.endsWith("tested/sources"));
+        assertThat(Files.readAllLines(outputs.get("build/observed/test/inputs").resolve("inputs.txt")))
+                .as("the test run does not, so that an edit compiling to the same classes runs no test again")
+                .anyMatch(input -> input.endsWith("manifests"))
+                .noneMatch(input -> input.endsWith("tested/sources"));
     }
 
     private record InputsStep() implements BuildStep {
