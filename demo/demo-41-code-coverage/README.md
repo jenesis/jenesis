@@ -68,7 +68,7 @@ Where the report lands
 A `stage` build collects the report, like every other report kind, under
 `target/stage/reports/output/jacoco/<module>/`.
 
-Open `index.html` to browse coverage. Because `CalculatorTest` exercises
+Open `index.html` to browse coverage, beside the source of each class. Because `CalculatorTest` exercises
 `add(...)` but not `subtract(...)`, the report shows the project as partially
 covered - coverage is reported, not enforced, so the build stays green.
 
