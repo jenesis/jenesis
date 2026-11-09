@@ -20,7 +20,7 @@
         </dependency>
     </dependencies>
     <!--jenesis.pin
-    jacoco/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    jacoco/module/build.jenesis 0.18.2
     jacoco/module/build.jenesis.plugin.jacoco 0.2.1 SHA-256/59f21959abeff99df6223a56f31715671d53f1fff0b6f3500f4c93cd1a53b47d
     jacoco:agent/maven/org.jacoco/org.jacoco.agent/jar/runtime 0.8.15 SHA-256/fb5b0036a0899ea97edfa0fc2c7985b55f3f7c5695028163e5e60d4f3cf6075d
     jacoco:agent/maven/org.jacoco/org.jacoco.agent/pom 0.8.15 SHA-256/47eb24b1577e473cbba634399bc56fe7b366b18401bf911d0d8771f56f228966

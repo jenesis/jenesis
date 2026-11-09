@@ -22,7 +22,7 @@
  * @jenesis.pin maven/org.junit/junit-bom/pom 5.14.4 SHA-256/5706e8f29a0a07f56efbbea4a0670793414194bb8d24d8143ba1e787a2f32856
  * @jenesis.pin maven/org.openapitools/jackson-databind-nullable/pom 0.2.12 SHA-256/cb13594fd356c30aa8b76da2e2cdbdbe95e2f3dd52a9b698eec2510f152a8f4b
  * @jenesis.pin maven/tools.jackson/jackson-bom/pom 3.2.3 SHA-256/ad181b150b3f22bcf8ead7227d51ccc09e610c457c8bcc97d8958d2439ef16ec
- * @jenesis.pin openapi/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin openapi/module/build.jenesis 0.18.2
  * @jenesis.pin openapi/module/build.jenesis.plugin.openapi 0.2.0 SHA-256/171987edb6c8705fc5df8d3307588780793ac3595606053f807739f6543f3bbc
  * @jenesis.pin openapi:tool/maven/org.junit/junit-bom/pom 5.10.2 SHA-256/169dd904a4b0f6520cffe658cc62292bfe9f3c14a989fa92120724cde43a9968
  * @jenesis.pin openapi:tool/maven/org.openapitools/openapi-generator-cli 7.26.0 SHA-256/1760050094997b9cc790cc1350be095f15da8c08a996b184d3eadc4ccda5e35e

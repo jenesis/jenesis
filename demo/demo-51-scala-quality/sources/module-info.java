@@ -10,7 +10,7 @@
  * @jenesis.pin maven/org.scala-lang/scala-library/pom 2.13.18 SHA-256/c3fb118214e12399857f4aeaa3033ab8b06f6edbeec9bfe4cb5f0101c034c21d
  * @jenesis.pin org.scala-lang/scala-library 2.13.18 SHA-256/4e85d96ff7bc7dc627985523c3541b9917aaa08e956391380c42db21a2c4e5a0
  * @jenesis.pin scala.library 2.13.18 SHA-256/4e85d96ff7bc7dc627985523c3541b9917aaa08e956391380c42db21a2c4e5a0
- * @jenesis.pin scala/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin scala/module/build.jenesis 0.18.2
  * @jenesis.pin scala/module/build.jenesis.plugin.scala 0.2.0 SHA-256/64d03567d47c5d49b987ff41f02bb5caa81de522400dcb182bbeb6e8b2043a09
  * @jenesis.pin scala:tool/maven/org.scala-lang.modules/scala-asm 9.9.0-scala-1 SHA-256/75ac366e8ecb691e06a7e85041eed0f67919a646e5262fa0901225698c104375
  * @jenesis.pin scala:tool/maven/org.scala-lang.modules/scala-asm/pom 9.9.0-scala-1 SHA-256/959b6da9867fbf2e687976ad572052fee22c1dbb3da95fcb16228d05544dfdc1
@@ -28,7 +28,7 @@
  * @jenesis.pin scala:tool/maven/org.scala-sbt/compiler-interface/pom 1.10.7 SHA-256/3b7b0da8bf5820aa50f4448e19021de1183164f74a180bd0b68e7d92f3004e31
  * @jenesis.pin scala:tool/maven/org.scala-sbt/util-interface 1.10.7 SHA-256/1d6b91efa42b70fc064caed6d62962374e13b27737f885a87c84c667b30be625
  * @jenesis.pin scala:tool/maven/org.scala-sbt/util-interface/pom 1.10.7 SHA-256/d49470c815e070e44f9501116c83f35b179413f5aafe95e29ac293c67cc16297
- * @jenesis.pin scalafmt/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin scalafmt/module/build.jenesis 0.18.2
  * @jenesis.pin scalafmt/module/build.jenesis.plugin.scalafmt 0.2.0 SHA-256/1b55476fafeb7aec66157e53ef2030c0362aad4042040a3dc7ee32ebc5a6928f
  * @jenesis.pin scalafmt:tool/maven/com.facebook/nailgun-all/pom 1.0.1 SHA-256/ce6409dc79ea1a03d06e9b05a71b7c936954c781aa89d078068146c970a80e97
  * @jenesis.pin scalafmt:tool/maven/com.facebook/nailgun-server 1.0.1 SHA-256/c852b33463ce343d22f45686dad8e2a29f61a105bdfd95c87f22b0520a482f21
@@ -186,7 +186,7 @@
  * @jenesis.pin scalafmt:tool/maven/org.virtuslab.scala-cli/config_2.13/pom 1.1.3 SHA-256/7596e9313e71dd1296ebbf1d8a230c8aacad80747d963d0f0b64204e831d10e7
  * @jenesis.pin scalafmt:tool/maven/org.virtuslab.scala-cli/specification-level_2.13 1.1.3 SHA-256/2532f59b1e1fdbc00eb2a1ee0cdc5ce16d829e2fc48aef082384f4916ced2cbd
  * @jenesis.pin scalafmt:tool/maven/org.virtuslab.scala-cli/specification-level_2.13/pom 1.1.3 SHA-256/4ca54f75671284b87f0add586de82afb45a2911bc64596db2ce794ee6c0c1910
- * @jenesis.pin scalastyle/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin scalastyle/module/build.jenesis 0.18.2
  * @jenesis.pin scalastyle/module/build.jenesis.plugin.scalastyle 0.2.0 SHA-256/145a91b0c73550139b7300a81abcf40e55acd53231916f0215b62f7b0be859c4
  * @jenesis.pin scalastyle:tool/maven/com.beautiful-scala/scalastyle_2.13 1.5.1 SHA-256/469254118554648963ebeb2e8c0be0f4c093b8099ed05794b70de3c37e3ba7a1
  * @jenesis.pin scalastyle:tool/maven/com.beautiful-scala/scalastyle_2.13/pom 1.5.1 SHA-256/5ca54a97bea7a6e2172f594333e255fc710bd27733e30538fa82cd569977d022

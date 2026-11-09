@@ -57,7 +57,7 @@
     maven/org.junit/junit-bom/pom 5.11.4 SHA-256/19d4b747b204805325b6334553296f986562277a4ac1cb5e593a5e4c4f5e4115
     maven/org.junit/junit-bom/pom 5.12.2 SHA-256/cef80fec86454f6806bfb0df24669b5c6f32e2cb728539ea859f47dfdc9bbc17
     maven/org.junit/junit-bom/pom 5.13.1 SHA-256/fa68451ea830572ed43ffe51d75b6a05f7a5e665a602a51f49d6be02063a65f3
-    mavenplugin/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    mavenplugin/module/build.jenesis 0.18.2
     mavenplugin/module/build.jenesis.plugin.mavenplugin 0.2.0 SHA-256/583d2e4a0ea1ae61a0485008a9dcdf9629ed9a32a030e6d2a172c2d8e4699d95
     mavenplugin:tool/maven/aopalliance/aopalliance 1.0 SHA-256/0addec670fedcd3f113c5c8091d783280d23f75e3acb841b61a9cdb079376a08
     mavenplugin:tool/maven/aopalliance/aopalliance/pom 1.0 SHA-256/26e82330157d6b844b67a8064945e206581e772977183e3e31fec6058aa9a59b

@@ -1,6 +1,6 @@
 /**
  * @jenesis.release 25
- * @jenesis.pin groovy/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+ * @jenesis.pin groovy/module/build.jenesis 0.18.2
  * @jenesis.pin groovy/module/build.jenesis.plugin.groovy 0.2.0 SHA-256/25dd8f40a87d19e274e223d93b3c46b4752c7b009ff570fa63a02cb0dea2b00d
  * @jenesis.pin groovy:tool/maven/com.github.javaparser/javaparser-core 3.28.2 SHA-256/b5499a3b1c40b16c0671fabe478c9aafeab38160c6fde74a6c13f42d86716ecd
  * @jenesis.pin groovy:tool/maven/com.github.javaparser/javaparser-core/pom 3.28.2 SHA-256/87d2b333dfec96896d5a49e80a95b92ef572f610e848276b45eaa061e05b4132

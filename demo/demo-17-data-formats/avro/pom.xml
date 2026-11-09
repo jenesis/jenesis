@@ -22,7 +22,7 @@
         </dependency>
     </dependencies>
     <!--jenesis.pin
-    avro/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    avro/module/build.jenesis 0.18.2
     avro/module/build.jenesis.plugin.avro 0.2.0 SHA-256/6e9bbfeff675c817779b27d48431515df981b35db09652af0e20e1915765d7c4
     avro:tool/maven/com.fasterxml.jackson/jackson-bom/pom 2.22.1 SHA-256/b366aa5fd26958e2308a4807e5d42b14706b001b3ccbf138e31b8698dc0ac0ec
     avro:tool/maven/com.fasterxml.jackson/jackson-parent/pom 2.22 SHA-256/7d45a7efb69df207bed7cc54b87a0bb012f10952c095570a273b49485da0d129

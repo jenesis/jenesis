@@ -10,7 +10,7 @@
         <sourceDirectory>sources</sourceDirectory>
     </build>
     <!--jenesis.pin
-    japicmp/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    japicmp/module/build.jenesis 0.18.2
     japicmp/module/build.jenesis.plugin.japicmp 0.2.0 SHA-256/dfad1f7b95b7cfd63432422692305d20112b5bdbf3808c2496f916f5e5f5de3c
     japicmp:tool/maven/build.jenesis.demo/api-compatibility 1.0.0 SHA-256/b069b5880803e7f780ce7750727bba2b5b8a117dd8dc019234f23016cfb71b93
     japicmp:tool/maven/build.jenesis.demo/api-compatibility/pom 1.0.0 SHA-256/feae26bee142731bfbb7a881aa68338105f2866c446fc795ae14d8567c745165
@@ -61,7 +61,7 @@
     japicmp:tool/maven/org.jvnet.staxex/stax-ex 1.8.1 SHA-256/20522549056e9e50aa35ef0b445a2e47a53d06be0b0a9467d704e2483ffb049a
     japicmp:tool/maven/org.jvnet.staxex/stax-ex/pom 1.8.1 SHA-256/8fc84f36ce6da6ce8c893b6538199a7f69a69a0706d9b17a3ee6a3a09452eed6
     japicmp:tool/maven/org.sonatype.oss/oss-parent/pom 9 SHA-256/fb40265f982548212ff82e362e59732b2187ec6f0d80182885c14ef1f982827a
-    revapi/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
+    revapi/module/build.jenesis 0.18.2
     revapi/module/build.jenesis.plugin.revapi 0.2.0 SHA-256/1402a8122559b07d397eb2fd531c7d439939a54616ba73b2b655fb8d71c995b1
     revapi:tool/maven/build.jenesis.demo/api-compatibility 1.0.0 SHA-256/b069b5880803e7f780ce7750727bba2b5b8a117dd8dc019234f23016cfb71b93
     revapi:tool/maven/build.jenesis.demo/api-compatibility/pom 1.0.0 SHA-256/feae26bee142731bfbb7a881aa68338105f2866c446fc795ae14d8567c745165
