@@ -95,6 +95,11 @@ public class Tree implements BuildStep {
     }
 
     @Override
+    public boolean shouldCache() {
+        return false;
+    }
+
+    @Override
     public CompletionStage<BuildStepResult> apply(Executor executor,
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)

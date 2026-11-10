@@ -53,6 +53,11 @@ public class LicenseHeaderModule implements BuildExecutorModule {
         }
 
         @Override
+        public boolean shouldCache() {
+            return verify;
+        }
+
+        @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)

@@ -50,6 +50,10 @@ public interface BuildStep extends Serializable {
         return arguments.values().stream().anyMatch(BuildStepArgument::hasChanged);
     }
 
+    default boolean shouldCache() {
+        return true;
+    }
+
     default boolean shouldCacheRemotely() {
         return true;
     }

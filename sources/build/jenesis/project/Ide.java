@@ -50,6 +50,11 @@ public class Ide implements BuildExecutorModule {
         }
 
         @Override
+        public boolean shouldCache() {
+            return false;
+        }
+
+        @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
@@ -68,6 +73,11 @@ public class Ide implements BuildExecutorModule {
         }
 
         @Override
+        public boolean shouldCache() {
+            return false;
+        }
+
+        @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
@@ -83,6 +93,11 @@ public class Ide implements BuildExecutorModule {
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
             return true;
+        }
+
+        @Override
+        public boolean shouldCache() {
+            return false;
         }
 
         @Override

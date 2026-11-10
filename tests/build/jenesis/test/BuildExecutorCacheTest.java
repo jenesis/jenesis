@@ -125,6 +125,46 @@ public class BuildExecutorCacheTest {
         assertThat(remote.storeRemote).isTrue();
     }
 
+    @Test
+    public void runs_a_step_that_declines_the_cache_without_consulting_it() throws IOException {
+        Files.writeString(source.resolve("file"), "foo");
+        RecordingCache hit = new RecordingCache(true);
+        runStep(hit, new UncachedStep());
+        assertThat(root.resolve("step").resolve("output").resolve("file"))
+                .as("a step with an effect beyond its output runs although the cache holds an entry for it")
+                .content()
+                .isEqualTo("performed");
+        assertThat(hit.fetches).hasValue(0);
+        assertThat(hit.stores).hasValue(0);
+        RecordingCache again = new RecordingCache(true);
+        runStep(again, new UncachedStep());
+        assertThat(again.fetches).hasValue(0);
+        assertThat(again.stores).hasValue(0);
+        assertThat(again.touches).hasValue(0);
+    }
+
+    private static final class UncachedStep implements BuildStep {
+
+        @Override
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+            return true;
+        }
+
+        @Override
+        public boolean shouldCache() {
+            return false;
+        }
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Files.writeString(context.next().resolve("file"), "performed");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
     private static final class LocalOnlyStep implements BuildStep {
 
         @Override
