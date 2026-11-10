@@ -15,6 +15,7 @@ import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.Language;
 import build.jenesis.LanguageFactory;
+import build.jenesis.LruCache;
 import build.jenesis.ObservabilityEngine;
 import build.jenesis.ObservabilityFactory;
 import build.jenesis.Observation;
@@ -33,6 +34,7 @@ import java.lang.reflect.Proxy;
 class JenesisClassLoaderBridge {
 
     private static final Map<String, Warmed> WARMED = new ConcurrentHashMap<>();
+    private static final LruCache<List<Object>, byte[]> ORIGINS = new LruCache<>(1024);
 
     private final ModuleLayer layer;
     private final ModuleLayer.Controller controller;
@@ -70,26 +72,34 @@ class JenesisClassLoaderBridge {
 
     static JenesisClassLoaderBridge of(String group, List<Path> artifacts, PathPlacement pathPlacement)
             throws ReflectiveOperationException, IOException {
-        MessageDigest digest;
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
-        digest.update(pathPlacement.name().getBytes(StandardCharsets.UTF_8));
+        List<Object> identity = new ArrayList<>(List.of(pathPlacement));
+        List<Map.Entry<String, Path>> files = new ArrayList<>();
         for (Path artifact : artifacts) {
-            List<Path> files;
             try (Stream<Path> walk = Files.walk(artifact)) {
-                files = walk.filter(Files::isRegularFile).sorted().toList();
-            }
-            for (Path file : files) {
-                digest.update(artifact.relativize(file).toString().replace('\\', '/').getBytes(StandardCharsets.UTF_8));
-                try (InputStream in = new DigestInputStream(Files.newInputStream(file), digest)) {
-                    in.transferTo(OutputStream.nullOutputStream());
+                for (Path file : walk.filter(Files::isRegularFile).sorted().toList()) {
+                    String name = artifact.relativize(file).toString().replace('\\', '/');
+                    identity.add(name);
+                    identity.add(LruCache.FileKey.of(file));
+                    files.add(Map.entry(name, file));
                 }
             }
         }
-        byte[] origin = digest.digest();
+        byte[] origin = ORIGINS.get(identity, _ -> {
+            MessageDigest digest;
+            try {
+                digest = MessageDigest.getInstance("SHA-256");
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException(e);
+            }
+            digest.update(pathPlacement.name().getBytes(StandardCharsets.UTF_8));
+            for (Map.Entry<String, Path> file : files) {
+                digest.update(file.getKey().getBytes(StandardCharsets.UTF_8));
+                try (InputStream in = new DigestInputStream(Files.newInputStream(file.getValue()), digest)) {
+                    in.transferTo(OutputStream.nullOutputStream());
+                }
+            }
+            return digest.digest();
+        });
         Warmed warmed = WARMED.get(group);
         JenesisClassLoaderBridge kept = warmed == null || !Arrays.equals(warmed.origin(), origin) ? null : warmed.bridge().get();
         if (kept != null) {
