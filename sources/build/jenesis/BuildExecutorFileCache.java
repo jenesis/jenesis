@@ -15,6 +15,8 @@ public record BuildExecutorFileCache(Path root,
                                      boolean read,
                                      boolean write) implements BuildExecutorCache {
 
+    private static final String CHECKSUMS = ".checksums";
+
     public BuildExecutorFileCache(Path root) {
         Path file = root.resolve("cache.properties");
         SequencedProperties properties = new SequencedProperties();
@@ -54,6 +56,10 @@ public record BuildExecutorFileCache(Path root,
         }
         Path folder = root.resolve(HexFormat.of().formatHex(step));
         Path entry = folder.resolve(HexFormat.of().formatHex(fold(inputs)));
+        Path checksums = entry.resolveSibling(entry.getFileName() + CHECKSUMS);
+        if (!Files.isRegularFile(checksums)) {
+            return Optional.empty();
+        }
         try {
             if (Files.isDirectory(entry)) {
                 materialize(entry, target, links);
@@ -62,8 +68,20 @@ public record BuildExecutorFileCache(Path root,
             } else {
                 return Optional.empty();
             }
-        } catch (IOException _) {
+            if (!HashFunction.areConsistent(target,
+                    HashFunction.read(checksums),
+                    HashFunction.ofFileKeys(new HashDigestFunction(algorithm)),
+                    executor)) {
+                throw new IOException("The cache entry " + entry + " no longer holds what was stored");
+            }
+        } catch (IOException | RuntimeException _) {
             clean(target);
+            if (write) {
+                try {
+                    discard(entry);
+                } catch (IOException _) {
+                }
+            }
             return Optional.empty();
         }
         if (touch && write) {
@@ -83,7 +101,7 @@ public record BuildExecutorFileCache(Path root,
                       String digest,
                       Map<Path, byte[]> checksums) throws IOException {
         if (write) {
-            persist(step, inputs, output);
+            persist(executor, step, inputs, output);
             if (ttl != null && !ttl.isZero() && !ttl.isNegative()) {
                 executor.execute(() -> {
                     try {
@@ -117,15 +135,20 @@ public record BuildExecutorFileCache(Path root,
         }
     }
 
-    private void persist(byte[] step, SequencedMap<String, Map<Path, byte[]>> inputs, Path output) {
+    private void persist(Executor executor,
+                         byte[] step,
+                         SequencedMap<String, Map<Path, byte[]>> inputs,
+                         Path output) {
         Path folder = root.resolve(HexFormat.of().formatHex(step));
         Path entry = folder.resolve(HexFormat.of().formatHex(fold(inputs)));
-        if (Files.exists(entry)) {
+        Path checksums = entry.resolveSibling(entry.getFileName() + CHECKSUMS);
+        if (Files.exists(entry) && Files.isRegularFile(checksums)) {
             return;
         }
         Path temporary = null;
         try {
             Files.createDirectories(folder);
+            discard(entry);
             try {
                 Files.createFile(root.resolve(BuildExecutor.SKIP_MARKER));
             } catch (FileAlreadyExistsException _) {
@@ -138,6 +161,7 @@ public record BuildExecutorFileCache(Path root,
             } else {
                 materialize(output, temporary, false);
             }
+            HashFunction.write(checksums, HashFunction.read(output, new HashDigestFunction(algorithm), executor));
             try {
                 Files.move(temporary, entry, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException _) {
@@ -198,7 +222,7 @@ public record BuildExecutorFileCache(Path root,
         entries.sort(Comparator.comparing(BuildExecutorFileCache::lastModified));
         for (int index = 0; index < excess; index++) {
             try {
-                delete(lru ? entries.get(index) : entries.get(entries.size() - 1 - index));
+                discard(lru ? entries.get(index) : entries.get(entries.size() - 1 - index));
             } catch (IOException _) {
             }
         }
@@ -235,7 +259,7 @@ public record BuildExecutorFileCache(Path root,
         for (int index = 0; index < entries.size() && total > limit; index++) {
             Path entry = lru ? entries.get(index) : entries.get(entries.size() - 1 - index);
             try {
-                delete(entry);
+                discard(entry);
                 total -= sizes.get(entry);
                 Path folder = entry.getParent();
                 try (DirectoryStream<Path> remaining = Files.newDirectoryStream(folder)) {
@@ -268,7 +292,7 @@ public record BuildExecutorFileCache(Path root,
         }
         for (Path entry : expired) {
             try {
-                delete(entry);
+                discard(entry);
                 Path folder = entry.getParent();
                 try (DirectoryStream<Path> remaining = Files.newDirectoryStream(folder)) {
                     if (!remaining.iterator().hasNext()) {
@@ -388,6 +412,11 @@ public record BuildExecutorFileCache(Path root,
             }
         } catch (IOException _) {
         }
+    }
+
+    private static void discard(Path entry) throws IOException {
+        Files.deleteIfExists(entry.resolveSibling(entry.getFileName() + CHECKSUMS));
+        delete(entry);
     }
 
     private static void delete(Path path) throws IOException {

@@ -62,6 +62,10 @@ prints a `[LOADED]` line and each one written to it a `[STORED]` line. On this t
 project the saving is tiny; on a real module the compile that took seconds returns
 instantly. Delete `.jenesis/cache` to start over.
 
+Each entry is stored beside the checksums of its files, and a fetch compares what
+it laid out against them: an entry that was edited, or that lost a file, is a
+miss, is dropped, and is stored anew by the step that then runs.
+
 A shared cache (the `uri` one)
 ------------------------------
 
