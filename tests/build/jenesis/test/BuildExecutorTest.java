@@ -2098,4 +2098,71 @@ public class BuildExecutorTest implements Serializable {
                 .toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("module/source", "module/step1", "module/step2");
     }
+
+    private static final AtomicBoolean INTERRUPTED = new AtomicBoolean();
+    private static final AtomicReference<CompletableFuture<BuildStepResult>> PENDING = new AtomicReference<>();
+
+    private BuildExecutor timing(int concurrency) throws IOException {
+        return BuildExecutor.of(root2,
+                Duration.ofMillis(200),
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                concurrency);
+    }
+
+    @Test
+    public void a_step_working_past_the_timeout_within_its_call_is_interrupted_and_fails() throws IOException {
+        INTERRUPTED.set(false);
+        BuildExecutor timing = timing(0);
+        timing.addStep("step", (_, _, _) -> {
+            try {
+                Thread.sleep(30_000);
+            } catch (InterruptedException _) {
+                INTERRUPTED.set(true);
+            }
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        long started = System.nanoTime();
+        assertThatThrownBy(() -> timing.execute("step"))
+                .as("a step that does its work before it answers is held to the timeout as well")
+                .hasRootCauseInstanceOf(TimeoutException.class);
+        assertThat(INTERRUPTED).isTrue();
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(20));
+        assertThat(Thread.currentThread().isInterrupted()).isFalse();
+    }
+
+    @Test
+    public void a_step_whose_answer_is_pending_past_the_timeout_has_it_failed() throws IOException {
+        PENDING.set(null);
+        BuildExecutor timing = timing(1);
+        timing.addStep("step", (_, _, _) -> {
+            PENDING.set(new CompletableFuture<>());
+            return PENDING.get();
+        });
+        assertThatThrownBy(() -> timing.execute("step")).hasRootCauseInstanceOf(TimeoutException.class);
+        assertThat(PENDING.get())
+                .as("a step ending its process when its answer fails is told so, also where concurrency is limited")
+                .isCompletedExceptionally();
+    }
+
+    @Test
+    public void a_step_is_not_timed_while_it_waits_for_a_permit() throws IOException {
+        BuildExecutor timing = timing(1);
+        for (String identity : List.of("first", "second", "third")) {
+            timing.addStep(identity, (_, context, _) -> {
+                try {
+                    Thread.sleep(80);
+                } catch (InterruptedException e) {
+                    throw new IllegalStateException(e);
+                }
+                Files.writeString(context.next().resolve("file"), "done");
+                return CompletableFuture.completedStage(new BuildStepResult(true));
+            });
+        }
+        assertThat(timing.execute()).containsOnlyKeys("first", "second", "third");
+    }
 }
