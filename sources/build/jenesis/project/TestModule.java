@@ -1521,6 +1521,8 @@ public class TestModule implements BuildExecutorModule {
                     selection = new LinkedHashSet<>(failed);
                     if (mode == Mode.FAILED_FIRST) {
                         selection.addAll(matchedClasses);
+                    } else if (!failed.containsAll(matchedClasses)) {
+                        Files.deleteIfExists(context.next().resolve("testscope.properties"));
                     }
                 }
             }
