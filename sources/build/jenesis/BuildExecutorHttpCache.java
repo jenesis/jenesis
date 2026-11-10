@@ -282,7 +282,13 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
 
     private static void unzip(InputStream source, Path target) throws IOException {
         Path base = target.normalize();
-        ZipInputStream zip = new ZipInputStream(source);
+        PushbackInputStream archive = new PushbackInputStream(source, 2);
+        byte[] signature = archive.readNBytes(2);
+        if (signature.length < 2 || signature[0] != 'P' || signature[1] != 'K') {
+            throw new IOException("The cache answered with what is no archive of a step's output");
+        }
+        archive.unread(signature);
+        ZipInputStream zip = new ZipInputStream(archive);
         for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
             if (entry.isDirectory()) {
                 Files.createDirectories(BuildStep.resolveContained(base, trimmed(entry.getName())));

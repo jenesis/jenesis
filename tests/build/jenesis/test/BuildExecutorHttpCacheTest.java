@@ -210,6 +210,32 @@ public class BuildExecutorHttpCacheTest {
     }
 
     @Test
+    public void an_answer_that_is_no_archive_is_a_miss() throws IOException {
+        BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri).key("team-alpha").project("demo");
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("file"), "result");
+        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
+        String identifier = blobs.keySet().iterator().next();
+        blobs.put(identifier, "<html>Sign in to continue</html>".getBytes(StandardCharsets.UTF_8));
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target))
+                .as("a page a proxy answers in the cache's place must not pass for a step that wrote nothing")
+                .isEmpty();
+        blobs.put(identifier, new byte[0]);
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target)).isEmpty();
+    }
+
+    @Test
+    public void a_step_that_wrote_nothing_is_fetched_as_such() throws IOException {
+        BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri).key("team-alpha").project("demo");
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target)).isPresent();
+        assertThat(target).isEmptyDirectory();
+    }
+
+    @Test
     public void corrupt_cache_entry_leaves_the_target_empty() throws IOException {
         BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri).key("team-alpha").project("demo");
         byte[] step = {1};
