@@ -40,7 +40,7 @@ public class BuildExecutorFileCacheTest {
         cache.store(Runnable::run, "step", step, inputs, true, output, "", Map.of());
         Path stepFolder = cacheRoot.resolve(HexFormat.of().formatHex(step));
         assertThat(stepFolder).isDirectory();
-        try (Stream<Path> entries = Files.list(stepFolder)) {
+        try (Stream<Path> entries = entries(stepFolder)) {
             List<Path> list = entries.toList();
             assertThat(list).hasSize(1);
             assertThat(list.getFirst().resolve("file")).content().isEqualTo("result");
@@ -77,7 +77,7 @@ public class BuildExecutorFileCacheTest {
         cache.store(Runnable::run, "step", step, inputs, true, output, "", Map.of());
         cache.fetch(Runnable::run, "step", step, inputs, true, target);
         Path cached;
-        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
+        try (Stream<Path> entries = entries(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
             cached = entries.findFirst().orElseThrow().resolve("file");
         }
         Object targetKey = Files.readAttributes(target.resolve("file"), BasicFileAttributes.class).fileKey();
@@ -93,7 +93,7 @@ public class BuildExecutorFileCacheTest {
         byte[] step = {1};
         Files.writeString(output.resolve("file"), "result");
         cache.store(Runnable::run, "step", step, inputs("source", "file", new byte[]{9}), true, output, "", Map.of());
-        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
+        try (Stream<Path> entries = entries(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
             String name = entries.findFirst().orElseThrow().getFileName().toString();
             assertThat(name).hasSize(32);
         }
@@ -227,7 +227,7 @@ public class BuildExecutorFileCacheTest {
         Files.writeString(output.resolve("file"), "result");
         cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
         Path entry;
-        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
+        try (Stream<Path> entries = entries(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
             entry = entries.findFirst().orElseThrow();
         }
         ByteArrayOutputStream malicious = new ByteArrayOutputStream();
@@ -245,20 +245,20 @@ public class BuildExecutorFileCacheTest {
     }
 
     @Test
-    public void serves_a_tampered_entry_without_verifying_its_checksum() throws IOException {
+    public void a_tampered_entry_is_a_miss() throws IOException {
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
         cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
         Path cached;
-        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
+        try (Stream<Path> entries = entries(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
             cached = entries.findFirst().orElseThrow().resolve("file");
         }
         Files.writeString(cached, "tampered");
         Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", step, in, true, target);
-        assertThat(result).isPresent();
-        assertThat(target.resolve("file")).content().isEqualTo("tampered");
+        assertThat(result).as("an entry is checked against the checksums stored beside it").isEmpty();
+        assertThat(target).isEmptyDirectory();
     }
 
     @Test
@@ -270,7 +270,7 @@ public class BuildExecutorFileCacheTest {
         cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
         Files.writeString(output.resolve("file"), "second");
         cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
-        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
+        try (Stream<Path> entries = entries(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
             assertThat(entries.toList()).hasSize(1);
         }
         Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", step, in, true, target);
@@ -300,7 +300,7 @@ public class BuildExecutorFileCacheTest {
             future.get();
         }
         service.shutdown();
-        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
+        try (Stream<Path> entries = entries(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
             List<Path> list = entries.toList();
             assertThat(list).hasSize(1);
             assertThat(list.getFirst().getFileName().toString()).hasSize(64);
@@ -323,6 +323,35 @@ public class BuildExecutorFileCacheTest {
         assertThat(a).doesNotExist();
         assertThat(b).isDirectory();
         assertThat(cacheRoot.resolve(HexFormat.of().formatHex(new byte[]{3}))).isDirectory();
+    }
+
+    @Test
+    public void an_entry_changed_since_it_was_stored_is_a_miss_and_is_stored_anew() throws IOException {
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Path entry = store(cache, step, new byte[]{9});
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target)).isPresent();
+        Files.writeString(target.resolve("file"), "tampered");
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, firstTarget))
+                .as("an output linked from the cache and then edited in place must not reach the next build")
+                .isEmpty();
+        assertThat(firstTarget).isEmptyDirectory();
+        assertThat(entry).doesNotExist();
+        assertThat(store(cache, step, new byte[]{9})).isNotNull();
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, firstTarget)).isPresent();
+        assertThat(firstTarget.resolve("file")).content().isEqualTo("x");
+    }
+
+    @Test
+    public void an_entry_missing_a_file_is_a_miss() throws IOException {
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        byte[] step = {1};
+        Path entry = store(cache, step, new byte[]{9});
+        Files.delete(entry.resolve("file"));
+        assertThat(cache.fetch(Runnable::run, "step", step, inputs("source", "file", new byte[]{9}), true, target))
+                .as("an entry another process is evicting must not pass for a complete output")
+                .isEmpty();
     }
 
     @Test
@@ -494,7 +523,7 @@ public class BuildExecutorFileCacheTest {
         Files.writeString(output.resolve("file"), "result");
         cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
         Path entry;
-        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
+        try (Stream<Path> entries = entries(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
             entry = entries.findFirst().orElseThrow();
         }
         assertThat(entry).isRegularFile();
@@ -597,9 +626,13 @@ public class BuildExecutorFileCacheTest {
         if (!Files.isDirectory(folder)) {
             return new HashSet<>();
         }
-        try (Stream<Path> entries = Files.list(folder)) {
+        try (Stream<Path> entries = entries(folder)) {
             return entries.collect(Collectors.toCollection(HashSet::new));
         }
+    }
+
+    private static Stream<Path> entries(Path folder) throws IOException {
+        return Files.list(folder).filter(entry -> !entry.getFileName().toString().endsWith(".checksums"));
     }
 
     private static SequencedMap<String, Map<Path, byte[]>> inputs(String argument, String file, byte[] hash) {
