@@ -11,6 +11,7 @@ import build.jenesis.HashDigestFunction;
 import build.jenesis.Palette;
 import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
+import build.jenesis.module.ModuleInfoParser;
 import build.jenesis.module.PinModuleInfo;
 import build.jenesis.step.Inventory;
 
@@ -983,6 +984,31 @@ public class PinModuleInfoTest {
         assertThat(result).contains("@jenesis.bom acme.platform 2.0 SHA-256/aaaa (windows)");
         assertThat(result).contains("@jenesis.bom acme.platform 1.0 "
                 + new HashDigestFunction("SHA-256").encodedHash(bom));
+    }
+
+    @Test
+    public void guarded_bom_reference_that_matches_is_refreshed_with_its_guard() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.bom acme.platform 2.0 (windows)
+                 * @jenesis.bom acme.platform 1.0
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        Path bom = writeBomReference("main/module/acme.platform", "2.0", "bar = 2.0\n");
+        String result = run(file, Platform.of("windows"));
+        assertThat(result)
+                .as("the guard is written back as the parser reads it")
+                .contains("@jenesis.bom acme.platform 2.0 "
+                        + new HashDigestFunction("SHA-256").encodedHash(bom)
+                        + " (windows)\n");
+        assertThat(result).contains("@jenesis.bom acme.platform 1.0\n");
+        assertThat(new ModuleInfoParser().identify(Files.writeString(file, result)))
+                .as("what a pin writes is parsed again by the next build")
+                .isNotNull();
     }
 
     @Test
