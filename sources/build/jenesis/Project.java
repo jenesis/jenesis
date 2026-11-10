@@ -2523,7 +2523,7 @@ public record Project(
                     under your own
                     ~/.jenesis/jenesis.properties and a -D, and refuses the keys the catalogue marks
                     as the command line's or that file's; `properties` prints only the ones that
-                    are set.
+                    are set. Both print a token or the cache's key as `***`, never its value.
 
                     Two namespaces, split by who reads them. `jenesis.make.*` belongs to the entry
                     point: where the project is (root), which profiles to layer (profiles), where
@@ -4972,12 +4972,16 @@ public record Project(
         return settings;
     }
 
+    private static String printable(String name, String value) {
+        return name.endsWith(".token") || name.endsWith(".cache.key") ? "***" : value;
+    }
+
     private static void printConfiguration(Environment environment) {
         for (String line : CATALOGUE.lines().toList()) {
             String[] entry = line.split("\\|", 3);
             String name = "jenesis." + entry[0];
             String value = environment.getProperty(entry[0], Setting.PROJECT);
-            String assignment = name + "=" + (value == null ? entry[1] : value);
+            String assignment = name + "=" + (value == null ? entry[1] : printable(name, value));
             String state = value != null ? "[set]" : entry[1].isEmpty() ? "[unset]" : "[default]";
             String prefix = assignment + " ".repeat(Math.max(1, 46 - assignment.length())) + state;
             environment.out().accept(prefix + " ".repeat(Math.max(1, 56 - prefix.length())) + entry[2]);
@@ -4990,7 +4994,9 @@ public record Project(
             return Collections.emptyNavigableMap();
         }
         if (selectors.length == 1 && selectors[0].equals(PROPERTIES)) {
-            settings(environment).forEach((name, value) -> environment.out().accept(name + "=" + value));
+            settings(environment).forEach((name, value) -> environment.out().accept(name
+                    + "="
+                    + printable(name, value)));
             return Collections.emptyNavigableMap();
         }
         if (environment.flag("project.docker", Setting.MACHINE)) {
