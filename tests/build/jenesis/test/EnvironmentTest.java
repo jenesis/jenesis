@@ -156,6 +156,26 @@ public class EnvironmentTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
+    public void a_confined_path_a_project_s_file_supplied_stays_inside_the_project_through_a_link(
+            @TempDir Path root,
+            @TempDir Path elsewhere) throws IOException {
+        Files.createSymbolicLink(root.resolve("link"), elsewhere);
+        Files.createSymbolicLink(root.resolve("own"), Files.createDirectory(root.resolve("folder")));
+        Environment outside = new Environment(Map.of("sample.folder", "link/out", "make.provided", "sample.folder"))
+                .root(root);
+        assertThatThrownBy(() -> outside.path("sample.folder", Setting.CONFINED))
+                .as("a link the project carries leads the build to write and delete outside the project")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("jenesis.sample.folder cannot name 'link/out' in a file the project provides");
+        Environment inside = new Environment(Map.of("sample.folder", "own/out", "make.provided", "sample.folder"))
+                .root(root);
+        assertThat(inside.path("sample.folder", Setting.CONFINED))
+                .as("a link to a folder of the project stays inside it")
+                .isEqualTo(root.resolve("own/out"));
+    }
+
+    @Test
     public void a_path_is_resolved_against_where_it_was_written(@TempDir Path root,
                                                                @TempDir Path home,
                                                                @TempDir Path directory) {
