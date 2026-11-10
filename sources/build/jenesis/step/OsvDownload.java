@@ -68,6 +68,12 @@ public class OsvDownload implements BuildStep {
                         + " (unset -Djenesis.repository.offline, or set -Djenesis.compliance.vulnerability=false)");
             }
             List<List<String>> identifiers = identifiers(request(endpoint.resolve("/v1/querybatch"), queryBatch(coordinates), insecure));
+            if (identifiers.size() != coordinates.size()) {
+                throw new IllegalStateException(endpoint + " answered the query for the advisories of "
+                        + coordinates.size() + " dependencies with " + identifiers.size() + " results, so it is not"
+                        + " known which of them are affected: check that no proxy answers in its place, or set"
+                        + " -Djenesis.compliance.vulnerability=false");
+            }
             SequencedSet<String> distinct = new LinkedHashSet<>();
             for (List<String> ids : identifiers) {
                 distinct.addAll(ids);

@@ -40,6 +40,42 @@ public class OsvDownloadTest {
     }
 
     @Test
+    public void an_answer_that_does_not_cover_every_dependency_fails_the_lookup() throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/v1/querybatch", exchange -> {
+            byte[] body = "<html>Sign in to continue</html>".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+        server.start();
+        try {
+            Path next = Files.createDirectory(root.resolve("unreadable-next"));
+            Path argument = Files.createDirectory(root.resolve("unreadable-argument"));
+            SequencedProperties dependencies = new SequencedProperties();
+            dependencies.setProperty("main/compile/maven/org.example/lib/1.2.3", "resolved/lib.jar");
+            dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+            OsvDownload step = OsvDownload.ofEnvironment(new Environment(Map.of("repository.insecure", "true")))
+                    .endpoint(URI.create("http://localhost:" + server.getAddress().getPort()));
+            assertThatThrownBy(() -> step.apply(Runnable::run,
+                    new BuildStepContext(root.resolve("unreadable-previous"),
+                            next,
+                            root.resolve("unreadable-supplement"),
+                            root.resolve("unreadable-persistent")),
+                    new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                            argument,
+                            Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED)))))))
+                    .as("an answer that names no result for a dependency must not read as no advisory for it")
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("with 0 results");
+            assertThat(next.resolve("advisories.properties")).doesNotExist();
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     public void retries_a_transient_server_error_and_drains_the_error_stream() throws IOException {
         AtomicInteger hits = new AtomicInteger();
         HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
