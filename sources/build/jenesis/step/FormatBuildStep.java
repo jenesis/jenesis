@@ -46,6 +46,11 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
     }
 
     @Override
+    public boolean shouldCache() {
+        return verify;
+    }
+
+    @Override
     protected CompletionStage<List<String>> process(Executor executor,
                                                     BuildStepContext context,
                                                     SequencedMap<String, BuildStepArgument> arguments,

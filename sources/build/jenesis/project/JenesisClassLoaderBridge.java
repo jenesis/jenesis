@@ -45,6 +45,7 @@ class JenesisClassLoaderBridge {
     private final MethodHandle foreignScope;
     private final AtomicBoolean scoped = new AtomicBoolean();
     private final MethodHandle foreignShouldRun;
+    private final MethodHandle foreignShouldCache;
     private final MethodHandle foreignShouldCacheRemotely;
 
     private final MethodHandle foreignContextCtor;
@@ -185,6 +186,13 @@ class JenesisClassLoaderBridge {
         foreignShouldRun = lookup.findVirtual(foreignBuildStep,
                 "shouldRun",
                 MethodType.methodType(boolean.class, SequencedMap.class));
+        MethodHandle shouldCache;
+        try {
+            shouldCache = lookup.findVirtual(foreignBuildStep, "shouldCache", MethodType.methodType(boolean.class));
+        } catch (NoSuchMethodException _) {
+            shouldCache = null;
+        }
+        foreignShouldCache = shouldCache;
         foreignShouldCacheRemotely = lookup.findVirtual(foreignBuildStep,
                 "shouldCacheRemotely",
                 MethodType.methodType(boolean.class));
@@ -698,6 +706,20 @@ class JenesisClassLoaderBridge {
             try {
                 return (boolean) bridge.foreignShouldRun.invoke(foreignStep, bridge.toForeignArguments(arguments));
             } catch (IOException | RuntimeException | Error e) {
+                throw e;
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+
+        @Override
+        public boolean shouldCache() {
+            if (bridge.foreignShouldCache == null) {
+                return true;
+            }
+            try {
+                return (boolean) bridge.foreignShouldCache.invoke(foreignStep);
+            } catch (RuntimeException | Error e) {
                 throw e;
             } catch (Throwable t) {
                 throw new RuntimeException(t);

@@ -155,7 +155,7 @@ class BuildExecutorDefault implements BuildExecutor {
                 BiConsumer<Boolean, Throwable> completion = callback.step(
                         location + identity,
                         new LinkedHashSet<>(summaries.keySet()));
-                boolean cacheRemotely = step.shouldCacheRemotely();
+                boolean cacheable = step.shouldCache(), cacheRemotely = cacheable && step.shouldCacheRemotely();
                 Path next = target.resolve(identity + BuildExecutor.NEXT),
                         salvaged = target.resolve(identity + BuildExecutor.NEXT + PERSISTENT);
                 if (Files.exists(salvaged)) {
@@ -175,12 +175,14 @@ class BuildExecutorDefault implements BuildExecutor {
                     Path nextOutput = Files.createDirectory(next.resolve("output"));
                     Path nextSupplement = Files.createDirectory(next.resolve("supplement"));
                     long fetchStarted = System.nanoTime();
-                    Optional<BuildStepResult> cached = cache.fetch(executor,
-                            location + identity,
-                            currentStepHash,
-                            inputs,
-                            cacheRemotely,
-                            nextOutput);
+                    Optional<BuildStepResult> cached = cacheable
+                            ? cache.fetch(executor,
+                                    location + identity,
+                                    currentStepHash,
+                                    inputs,
+                                    cacheRemotely,
+                                    nextOutput)
+                            : Optional.empty();
                     boolean fromCache = cached.isPresent();
                     if (fromCache) {
                         callback.loaded(location + identity, System.nanoTime() - fetchStarted);
@@ -262,7 +264,7 @@ class BuildExecutorDefault implements BuildExecutor {
                             SequencedProperties stepProperties = new SequencedProperties();
                             stepProperties.setProperty("serialization", HexFormat.of().formatHex(currentStepHash));
                             stepProperties.storeAtomically(previous.step());
-                            if (cache.stores() && !fromCache && result.next()) {
+                            if (cacheable && cache.stores() && !fromCache && result.next()) {
                                 String stored = location + identity;
                                 try {
                                     executor.execute(() -> {
@@ -315,9 +317,11 @@ class BuildExecutorDefault implements BuildExecutor {
                         previous.forget(recorded, vanished.keySet());
                     }
                     completion.accept(false, null);
-                    try {
-                        cache.touch(executor, location + identity, currentStepHash, inputs, cacheRemotely);
-                    } catch (IOException _) {
+                    if (cacheable) {
+                        try {
+                            cache.touch(executor, location + identity, currentStepHash, inputs, cacheRemotely);
+                        } catch (IOException _) {
+                        }
                     }
                     return CompletableFuture.completedStage(Map.of(identity, Map.of(
                             identity,

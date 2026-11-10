@@ -2918,7 +2918,7 @@ public record Project(
                     under -Djenesis.process.mode=daemon, in one kept warm for the next call with the
                     same jars, wherever each module resolved them, and the same working directory. Write nothing
                     outside context.next(): a step that must, as the export step does, overrides
-                    shouldRun to say it always runs. context.next() is a temporary folder, renamed
+                    shouldRun to say it always runs and shouldCache to say no build cache stands in for it. context.next() is a temporary folder, renamed
                     when the step succeeds or filled from the cache, so never write its absolute
                     path into a file: write a path relative to the folder that reads it.
 
@@ -3170,6 +3170,11 @@ public record Project(
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
             return true;
+        }
+
+        @Override
+        public boolean shouldCache() {
+            return false;
         }
 
         @Override

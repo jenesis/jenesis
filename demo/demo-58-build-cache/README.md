@@ -128,6 +128,32 @@ rebuild on this machine still skips the work, and it is neither fetched from,
 stored in nor announced to a cache server. The default is `true`, so a step that
 says nothing is cached in both tiers as before.
 
+A step that is never cached
+---------------------------
+
+A step whose work is an effect beyond its output folder - publishing a release,
+installing into a local repository, rewriting a pin in a source file - must run
+whenever it is asked to, as a cached output would stand in for an effect that
+never happened on this machine. Such a step declines every cache:
+
+    public class Publish implements BuildStep {
+
+        @Override
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+            return true;
+        }
+
+        @Override
+        public boolean shouldCache() {
+            return false;
+        }
+
+        ...
+    }
+
+It is neither fetched from, stored in nor announced to either tier. The release,
+export, pin and IDE steps of Jenesis itself decline the cache this way.
+
 Layout
 ------
 

@@ -885,6 +885,11 @@ public class MavenProject implements BuildExecutorModule {
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
             return true;
         }
+
+        @Override
+        public boolean shouldCache() {
+            return false;
+        }
     }
 
     private static class Prepare implements BuildStep {
