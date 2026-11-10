@@ -152,7 +152,8 @@ public final class Make {
             if (root != null) {
                 Path resolved = root.resolve(path).normalize();
                 if (confined
-                        && !resolved.toAbsolutePath().normalize().startsWith(root.toAbsolutePath().normalize())) {
+                        && !(resolved.toAbsolutePath().normalize().startsWith(root.toAbsolutePath().normalize())
+                        && real(resolved).startsWith(real(root)))) {
                     throw new IllegalStateException("jenesis." + key + " cannot name '" + location.strip() + "' in a"
                             + " file the project provides: such a file names only a location inside the project, which"
                             + " the build writes to and may delete (pass -Djenesis." + key + " on the command line for"
@@ -177,6 +178,18 @@ public final class Make {
                     + " absolute path, or hand the environment the root with root(...)");
         }
         return root.resolve(path).normalize();
+    }
+
+    private static Path real(Path path) {
+        Path absolute = path.toAbsolutePath().normalize(), existing = absolute;
+        while (existing != null && !Files.exists(existing)) {
+            existing = existing.getParent();
+        }
+        try {
+            return existing == null ? absolute : existing.toRealPath().resolve(existing.relativize(absolute));
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot resolve the links on the way to " + absolute, e);
+        }
     }
 
     static boolean listed(Map<String, String> keys, String list, String key) {
