@@ -11,7 +11,7 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
     }
 
     public Environment(Map<String, String> keys) {
-        this(keys, System.out::println, System.err::println, null);
+        this(keys, line -> System.out.println(line), line -> System.err.println(line), null);
     }
 
     public Environment keys(Map<String, String> keys) {
