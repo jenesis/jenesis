@@ -36,6 +36,29 @@ public class MakeToolTest {
     }
 
     @Test
+    public void prints_no_credential_among_its_settings() throws IOException {
+        Files.writeString(root.resolve("module-info.java"), "module foo {}");
+        for (String selector : List.of("configuration", "properties")) {
+            StringWriter out = new StringWriter(), err = new StringWriter();
+            int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out), new PrintWriter(err),
+                    "-Djenesis.make.root=" + root,
+                    "-Djenesis.release.token=Bearer s3cret",
+                    "-Djenesis.cache.key=k3y",
+                    "-Djenesis.project.version=1.2.3",
+                    "-Djenesis.print.progress=false",
+                    selector);
+            assertThat(code).isEqualTo(0);
+            assertThat(out.toString())
+                    .as("the output of " + selector + " ends up in a build log, where a credential must not")
+                    .doesNotContain("s3cret")
+                    .doesNotContain("k3y")
+                    .contains("jenesis.release.token=***")
+                    .contains("jenesis.cache.key=***")
+                    .contains("jenesis.project.version=1.2.3");
+        }
+    }
+
+    @Test
     public void resolves_a_relative_path_of_its_command_line_against_the_working_directory() throws IOException {
         Files.writeString(root.resolve("module-info.java"), "module foo {}");
         StringWriter out = new StringWriter(), err = new StringWriter();
