@@ -632,6 +632,62 @@ public class TestModuleTest {
     }
 
     @Test
+    public void failed_mode_does_not_count_the_classes_it_left_out_as_run() throws IOException {
+        settings.put("test.mode", "failed");
+        Path sampleClasses = classes.resolve(Javac.CLASSES + "sample");
+        Files.delete(sampleClasses.resolve("TestSample.class"));
+        compileSource(sampleClasses, "AlphaTestSample", """
+                package sample;
+                public class AlphaTestSample {
+                    @org.junit.jupiter.api.Test
+                    public void test() { System.out.println("Alpha ran"); }
+                }
+                """, bootModuleJars());
+        for (String value : List.of("fails", "passes", "unchanged")) {
+            if (!value.equals("unchanged")) {
+                compileSource(sampleClasses, "ZetaTestSample", """
+                        package sample;
+                        public class ZetaTestSample {
+                            @org.junit.jupiter.api.Test
+                            public void test() {
+                                System.out.println("Zeta %s");
+                                if ("%s".equals("fails")) {
+                                    throw new AssertionError("Zeta fails");
+                                }
+                            }
+                        }
+                        """.formatted(value, value), bootModuleJars());
+            }
+            BuildExecutor executor = newExecutor();
+            executor.addSource("dependencies", dependencies);
+            executor.addSource("classes", classes);
+            executor.addModule(
+                    "test",
+                    TestModule.ofEnvironment(new Environment(settings),
+                            Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                            Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                            .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
+                    "dependencies", "classes");
+            if (value.equals("fails")) {
+                assertThatThrownBy(executor::execute).hasStackTraceContaining("Unexpected exit code");
+                continue;
+            }
+            executor.execute();
+            String output = Files.readString(root.resolve("test").resolve("executed").resolve("supplement").resolve("output"));
+            if (value.equals("passes")) {
+                assertThat(output)
+                        .as("only the class that failed in the run before runs again")
+                        .contains("Zeta passes")
+                        .doesNotContain("Alpha ran");
+            } else {
+                assertThat(output)
+                        .as("the run of the failed class alone does not stand for a run of every test")
+                        .contains("Alpha ran");
+            }
+        }
+    }
+
+    @Test
     public void refuses_a_test_mode_it_does_not_know() {
         assertThatThrownBy(() -> TestModule.ofEnvironment(new Environment(Map.of("test.mode", "yes")),
                 Map.of(),
