@@ -11,7 +11,7 @@ public final class Execute {
         Map<String, String> ambient = Make.ambient(named);
         Make configured = new Make("build.jenesis.Execution", ambient),
                 make = configured.mode() == Make.Mode.DAEMON ? configured.mode(Make.Mode.COMPILED) : configured;
-        Integer code = Make.relaunched(Execute.class, ambient, options, remaining);
+        Integer code = configured.relaunched(Execute.class, options, remaining);
         System.exit(code == null ? make.run(remaining) : code);
     }
 }

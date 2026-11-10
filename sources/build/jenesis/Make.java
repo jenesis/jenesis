@@ -269,7 +269,7 @@ public final class Make {
         List<String> options = options(named);
         Map<String, String> ambient = ambient(named);
         Make make = new Make("build.jenesis.Project", ambient);
-        Integer code = relaunched(Make.class, ambient, options, selectors);
+        Integer code = make.relaunched(Make.class, options, selectors);
         System.exit(code == null ? make.run(selectors) : code);
     }
 
@@ -414,18 +414,15 @@ public final class Make {
         return arguments;
     }
 
-    static Integer relaunched(Class<?> main,
-                              Map<String, String> keys,
-                              List<String> options,
-                              String... arguments) throws Exception {
-        String version = keys.get("toolchain.version");
+    Integer relaunched(Class<?> main, List<String> options, String... arguments) throws Exception {
+        String version = settings.keys().get("toolchain.version");
         if (version == null || version.isBlank()) {
             return null;
         }
         Class<?> type = Class.forName("build.jenesis.Toolchain", true, Make.class.getClassLoader());
         try {
             Object toolchain = type.getMethod("ofKeys", Map.class)
-                    .invoke(null, keys);
+                    .invoke(null, settings.keys());
             if (type.getMethod("home").invoke(toolchain).equals(Path.of(System.getProperty("java.home")))) {
                 return null;
             }
