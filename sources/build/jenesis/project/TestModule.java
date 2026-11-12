@@ -1352,6 +1352,9 @@ public class TestModule implements BuildExecutorModule {
             } else {
                 commands.add(resolved.runnerClass());
             }
+            if (resolved instanceof MainMethod) {
+                return CompletableFuture.completedFuture(commands);
+            }
             SequencedSet<String> matchedClasses = new TreeSet<>(), excludedClasses = new TreeSet<>();
             SequencedMap<String, SequencedSet<String>> matchedMethods = new TreeMap<>();
             ClassFile classFile = ClassFile.of();
