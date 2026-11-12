@@ -2129,7 +2129,9 @@ public record Project(
                       @jenesis.release <V>   Java release target (default: the running JDK's, which a
                                              [RELEASE] line names); <V>-preview also
                                              enables its preview features, to compile and to run
-                      @jenesis.main <class>  main class
+                      @jenesis.main <class>  main class; in a module tagged @jenesis.test, the class
+                                             whose main method is the tests, run without a test
+                                             framework and judged by its exit code
                       @jenesis.plugin [<group>] <token>
                           Resolve a compiler plugin or a tool apart from this module's paths, in the
                           group named first: plugin, the default, is javac's annotation processor

@@ -26,11 +26,14 @@ Layout
     |-- greeter/
     |   |-- module-info.java     module demo.greeter; ships pinned
     |   `-- sample/greeter/Greeter.java
-    `-- greeter-test/
-        |-- module-info.java     @jenesis.test demo.greeter; one requires, no engine
-        |-- greetertest/GreeterTest.java         package-private, @org.junit.jupiter.api.Test
-        |-- greetertest/LegacyGreeterTest.java   public, @org.junit.Test, @Category(Legacy.class)
-        `-- greetertest/Legacy.java              the category, an empty interface
+    |-- greeter-test/
+    |   |-- module-info.java     @jenesis.test demo.greeter; one requires, no engine
+    |   |-- greetertest/GreeterTest.java         package-private, @org.junit.jupiter.api.Test
+    |   |-- greetertest/LegacyGreeterTest.java   public, @org.junit.Test, @Category(Legacy.class)
+    |   `-- greetertest/Legacy.java              the category, an empty interface
+    `-- greeter-check/
+        |-- module-info.java     @jenesis.test demo.greeter, @jenesis.main; no framework at all
+        `-- greetercheck/GreeterCheck.java       a main method that checks and exits
 
 There is no `pom.xml`, so the MODULAR_TO_MAVEN layout is detected and every
 `requires` resolves through the module repository.
@@ -144,3 +147,35 @@ profile declares `framework=junit4`, and `LegacyGreeterTest` is annotated
 
 The Jupiter `GreeterTest` carries no category, so it is left out. A category
 class that does not exist, or a selection that matches no test, fails the run.
+
+A main method as the tests
+--------------------------
+
+A test module needs no framework at all. Where a module tagged `@jenesis.test`
+also names a main class, that class is what the tests are: the build runs its
+main method on the module's test path and reads the exit code, without looking
+for a framework among the dependencies and without resolving a runner.
+`greeter-check/module-info.java` declares exactly that:
+
+    /**
+     * @jenesis.test demo.greeter
+     * @jenesis.main greetercheck.GreeterCheck
+     */
+    module demo.greeter.check {
+
+        requires demo.greeter;
+    }
+
+and `GreeterCheck` checks what it wants to and exits with a code other than zero
+where a check fails:
+
+    -m demo.greeter.check/greetercheck.GreeterCheck
+    GreeterCheck passed
+
+The main method is handed no arguments, so `jenesis.test.filter` and
+`jenesis.test.tag` select nothing within it: the module's tests run whole, or,
+where a filter names another module, not at all. Whatever else a test step does
+applies as before - the JVM options of `process-test.properties`, an observer
+such as JaCoCo, and a result kept until an input changes. The main class also
+stands where a `test.properties` names a framework, as the profiles of this demo
+do for every module: the module said what its tests are.
