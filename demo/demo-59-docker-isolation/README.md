@@ -132,7 +132,7 @@ one, as the last section of this page explains.
 
 The project also cannot undo the isolation. Its `jenesis.properties` and its
 profiles are refused if they set `jenesis.project.docker` or `jenesis.execute.docker`,
-or the `image`, `readable`, `writable` or `env` of either, so a project can neither switch Docker off nor
+or the `image`, `runtime`, `readable`, `writable` or `env` of either, or `jenesis.project.repositories`, so a project can neither switch Docker off nor
 widen the container with a mount or an environment variable. Only your command
 line or your own `~/.jenesis/jenesis.properties` configures Docker. Put
 `jenesis.project.docker=true` in that file to isolate every build you run.
@@ -165,6 +165,62 @@ twin) add **read-write** bind mounts, the counterpart to the read-only `.mount`
 above. Reach for it sparingly: every writable mount is a hole in the very
 confinement this demo is about, so widen the sandbox only for the exact path that
 needs it.
+
+No token, and the public repositories alone
+-------------------------------------------
+
+The code a build runs can read whatever the build was handed, and it can send
+what it read anywhere. So the build in the container is handed none of the
+credentials this machine holds: not the tokens of the Maven and the module
+remotes, not those of a release, and not the key of a build cache, whether a
+setting names them or an environment variable does. It is not handed the remotes
+this machine resolves from either, and resolves from Maven Central and the public
+Jenesis repository, as a machine that was never set up would. For a bug
+reproducer of an open source project, which is what a container is mostly asked
+for, that is all it needs.
+
+A project that resolves from a repository of your own needs that repository in
+the container. `jenesis.project.repositories` hands the build the Maven and
+module remotes, the module index, the key servers and the tokens sent to the
+remotes, as the settings or their environment variables name them:
+
+    java -Djenesis.project.docker=true \
+         -Djenesis.project.repositories=true \
+         build/jenesis/Make.java
+
+Hand them only to a project you would hand the token itself. The tokens of a
+release and the key of a build cache are handed to no container, so a release is
+published from the host. The local repositories stay mounted read-only either
+way, as the next section but one describes.
+
+A virtual machine around the container
+--------------------------------------
+
+A container shares the kernel of the host, so code that breaks out of the
+container's confinement through a flaw of that kernel is on the host. Where that
+is not enough, the container engine can run the same container in a virtual
+machine of its own, with a kernel of its own, by a runtime such as
+[Kata Containers](https://katacontainers.io). `jenesis.project.runtime` names the
+runtime the build's container runs with, and `jenesis.execute.runtime` the one of
+the launched program, exactly as `docker run --runtime` names one:
+
+    java -Djenesis.project.docker=true \
+         -Djenesis.project.runtime=io.containerd.kata.v2 \
+         -Djenesis.project.readable=../../sources \
+         build/jenesis/Make.java
+
+    java -Djenesis.execute.docker=true \
+         -Djenesis.execute.runtime=io.containerd.kata.v2 \
+         build/jenesis/Execute.java
+
+Nothing else changes: the image, the mounts and the environment are what they
+were, and the actors print the same `out of reach`. The runtime has to be
+installed and registered with the engine, which Jenesis does not do: an engine
+that does not know the name refuses to start the container, and the build fails
+with what it said. Unset, the engine's default runtime runs the container, as
+before. Like every other setting of the container, only your command line or
+your own `~/.jenesis/jenesis.properties` names the runtime; `jpx` takes it as
+`--runtime=<name>` beside `--docker`.
 
 Read-only repositories: `export` does not work in Docker
 --------------------------------------------------------
