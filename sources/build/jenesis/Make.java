@@ -14,6 +14,7 @@ public final class Make {
     static final List<String> CONTAINED = List.of("jenesis.project.docker",
             "jenesis.project.image",
             "jenesis.project.runtime",
+            "jenesis.project.repositories",
             "jenesis.project.readable",
             "jenesis.project.writable",
             "jenesis.project.env");
