@@ -13,6 +13,7 @@ public final class Make {
     private static final Set<String> PRINTING = Set.of("help", "skill", "prompt", "configuration", "properties", "--stop");
     static final List<String> CONTAINED = List.of("jenesis.project.docker",
             "jenesis.project.image",
+            "jenesis.project.runtime",
             "jenesis.project.readable",
             "jenesis.project.writable",
             "jenesis.project.env");

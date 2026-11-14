@@ -132,7 +132,7 @@ one, as the last section of this page explains.
 
 The project also cannot undo the isolation. Its `jenesis.properties` and its
 profiles are refused if they set `jenesis.project.docker` or `jenesis.execute.docker`,
-or the `image`, `readable`, `writable` or `env` of either, so a project can neither switch Docker off nor
+or the `image`, `runtime`, `readable`, `writable` or `env` of either, so a project can neither switch Docker off nor
 widen the container with a mount or an environment variable. Only your command
 line or your own `~/.jenesis/jenesis.properties` configures Docker. Put
 `jenesis.project.docker=true` in that file to isolate every build you run.
@@ -165,6 +165,35 @@ twin) add **read-write** bind mounts, the counterpart to the read-only `.mount`
 above. Reach for it sparingly: every writable mount is a hole in the very
 confinement this demo is about, so widen the sandbox only for the exact path that
 needs it.
+
+A virtual machine around the container
+--------------------------------------
+
+A container shares the kernel of the host, so code that breaks out of the
+container's confinement through a flaw of that kernel is on the host. Where that
+is not enough, the container engine can run the same container in a virtual
+machine of its own, with a kernel of its own, by a runtime such as
+[Kata Containers](https://katacontainers.io). `jenesis.project.runtime` names the
+runtime the build's container runs with, and `jenesis.execute.runtime` the one of
+the launched program, exactly as `docker run --runtime` names one:
+
+    java -Djenesis.project.docker=true \
+         -Djenesis.project.runtime=io.containerd.kata.v2 \
+         -Djenesis.project.readable=../../sources \
+         build/jenesis/Make.java
+
+    java -Djenesis.execute.docker=true \
+         -Djenesis.execute.runtime=io.containerd.kata.v2 \
+         build/jenesis/Execute.java
+
+Nothing else changes: the image, the mounts and the environment are what they
+were, and the actors print the same `out of reach`. The runtime has to be
+installed and registered with the engine, which Jenesis does not do: an engine
+that does not know the name refuses to start the container, and the build fails
+with what it said. Unset, the engine's default runtime runs the container, as
+before. Like every other setting of the container, only your command line or
+your own `~/.jenesis/jenesis.properties` names the runtime; `jpx` takes it as
+`--runtime=<name>` beside `--docker`.
 
 Read-only repositories: `export` does not work in Docker
 --------------------------------------------------------

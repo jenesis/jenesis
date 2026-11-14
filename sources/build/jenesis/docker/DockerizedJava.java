@@ -17,6 +17,7 @@ public class DockerizedJava {
     private final Boolean windowsDaemon;
     private final boolean hardened;
     private final Path home;
+    private final String runtime;
 
     public DockerizedJava(Path workingDirectory) throws IOException, InterruptedException {
         boolean windows = isWindowsDaemon();
@@ -57,10 +58,11 @@ public class DockerizedJava {
         this.environment = Map.of();
         this.hardened = true;
         this.home = javaHome();
+        this.runtime = null;
     }
 
     public DockerizedJava(Path workingDirectory, String image) {
-        this(workingDirectory, image, null, Map.of(), Map.of(), false, javaHome());
+        this(workingDirectory, image, null, Map.of(), Map.of(), false, javaHome(), null);
     }
 
     private DockerizedJava(Path workingDirectory,
@@ -69,7 +71,8 @@ public class DockerizedJava {
                            Map<Path, String> mounts,
                            Map<String, String> environment,
                            boolean hardened,
-                           Path home) {
+                           Path home,
+                           String runtime) {
         this.image = image;
         this.workingDirectory = workingDirectory;
         this.windowsDaemon = windowsDaemon;
@@ -77,6 +80,7 @@ public class DockerizedJava {
         this.environment = environment;
         this.hardened = hardened;
         this.home = home;
+        this.runtime = runtime;
     }
 
     private static Path javaHome() {
@@ -100,17 +104,32 @@ public class DockerizedJava {
     }
 
     public DockerizedJava home(Path home) {
-        return new DockerizedJava(workingDirectory, image, windowsDaemon, mounts, environment, hardened, home);
+        return new DockerizedJava(workingDirectory, image, windowsDaemon, mounts, environment, hardened, home, runtime);
     }
 
     public DockerizedJava harden(boolean hardened) {
-        return new DockerizedJava(workingDirectory, image, windowsDaemon, mounts, environment, hardened, home);
+        return new DockerizedJava(workingDirectory, image, windowsDaemon, mounts, environment, hardened, home, runtime);
+    }
+
+    public String runtime() {
+        return runtime;
+    }
+
+    public DockerizedJava runtime(String runtime) {
+        return new DockerizedJava(workingDirectory,
+                image,
+                windowsDaemon,
+                mounts,
+                environment,
+                hardened,
+                home,
+                runtime == null || runtime.isBlank() ? null : runtime.strip());
     }
 
     public DockerizedJava mount(Path host, String container, boolean readOnly) {
         SequencedMap<Path, String> copy = new LinkedHashMap<>(mounts);
         copy.put(host.toAbsolutePath(), container + (readOnly ? ":ro" : ""));
-        return new DockerizedJava(workingDirectory, image, windowsDaemon, copy, environment, hardened, home);
+        return new DockerizedJava(workingDirectory, image, windowsDaemon, copy, environment, hardened, home, runtime);
     }
 
     public DockerizedJava mounts(String specification, Path base, boolean readOnly) {
@@ -135,7 +154,7 @@ public class DockerizedJava {
     public DockerizedJava env(String name, String value) {
         SequencedMap<String, String> copy = new LinkedHashMap<>(environment);
         copy.put(name, value);
-        return new DockerizedJava(workingDirectory, image, windowsDaemon, mounts, copy, hardened, home);
+        return new DockerizedJava(workingDirectory, image, windowsDaemon, mounts, copy, hardened, home, runtime);
     }
 
     public int execute(String main, Map<String, String> properties, String... args) throws IOException, InterruptedException {
@@ -169,6 +188,10 @@ public class DockerizedJava {
             docker.add("ALL");
             docker.add("--security-opt");
             docker.add("no-new-privileges");
+        }
+        if (runtime != null) {
+            docker.add("--runtime");
+            docker.add(runtime);
         }
         if (!windows) {
             try {

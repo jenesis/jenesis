@@ -245,7 +245,7 @@ public record Jpx(Path storage,
     }
 
     public static final String HELP = """
-            Usage: jpx [--modular] [--java=<version>] [--docker[=<image>]] [--hash=<checksum>] [--pin]
+            Usage: jpx [--modular] [--java=<version>] [--docker[=<image>]] [--runtime=<name>] [--hash=<checksum>] [--pin]
                        [-J<option>...] <target> [argument...]
 
             Runs the main entry point of a published module, resolving and installing
@@ -286,6 +286,9 @@ public record Jpx(Path storage,
                                   installation still happen on the host, the installation
                                   and the host's Java home are mounted read-only. Without
                                   an image, a minimal hardened image is used
+              --runtime=<name>    run that container with the runtime the container engine
+                                  knows by this name, as io.containerd.kata.v2 for a
+                                  virtual machine of its own under Kata Containers
               --hash=<checksum>   verify the installed jars against a SHA-256 digest
                                   prefix (at least 32 hex characters) before launching
               --pin               print two commands instead of launching the program:
@@ -309,7 +312,7 @@ public record Jpx(Path storage,
             throws IOException, InterruptedException {
         PathPlacement placement = PathPlacement.INFERRED;
         boolean dockerized = false, pin = false;
-        String image = null, checksum = null, java = null;
+        String image = null, runtime = null, checksum = null, java = null;
         int target = 0;
         List<String> jvm = new ArrayList<>();
         while (target < arguments.length && (arguments[target].startsWith("--") || arguments[target].startsWith("-J"))) {
@@ -326,6 +329,9 @@ public record Jpx(Path storage,
                         dockerized = true;
                         String value = arguments[target].substring("--docker=".length());
                         image = value.isBlank() ? null : value;
+                    } else if (arguments[target].startsWith("--runtime=")) {
+                        String value = arguments[target].substring("--runtime=".length());
+                        runtime = value.isBlank() ? null : value;
                     } else if (arguments[target].startsWith("--java=")) {
                         String value = arguments[target].substring("--java=".length());
                         java = value.isBlank() ? null : value;
@@ -375,10 +381,13 @@ public record Jpx(Path storage,
         DockerizedJava docker = null;
         if (dockerized) {
             Path workingDirectory = Path.of("").toAbsolutePath();
-            docker = image == null
+            docker = (image == null
                     ? new DockerizedJava(workingDirectory)
-                    : new DockerizedJava(workingDirectory, image);
+                    : new DockerizedJava(workingDirectory, image)).runtime(runtime);
             options.add(image == null ? "--docker" : "--docker=" + image);
+            if (runtime != null) {
+                options.add("--runtime=" + runtime);
+            }
         }
         if (pin) {
             environment.out().accept(String.join(" ", installation.pinned(options, command.mainClass(), remaining)));

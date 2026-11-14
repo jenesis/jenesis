@@ -21,11 +21,17 @@ public record Execution(Project project, String mainClass, String module, Contai
                 Container.ofEnvironment(environment));
     }
 
-    public record Container(String image, String readable, String writable, String env, boolean announcing) {
+    public record Container(String image,
+                            String runtime,
+                            String readable,
+                            String writable,
+                            String env,
+                            boolean announcing) {
 
         public static Container ofEnvironment(Environment environment) {
             return environment.flag("execute.docker", Setting.MACHINE)
                     ? new Container(environment.getProperty("execute.image", Setting.MACHINE),
+                                    environment.value("execute.runtime", Setting.MACHINE),
                                     environment.getProperty("execute.readable", Setting.MACHINE),
                                     environment.getProperty("execute.writable", Setting.MACHINE),
                                     environment.getProperty("execute.env", Setting.MACHINE),
@@ -143,9 +149,9 @@ public record Execution(Project project, String mainClass, String module, Contai
         javaArgs.addAll(List.of(arguments).subList(jvmOptions, arguments.length));
         if (container != null) {
             Path root = project.root().toAbsolutePath().normalize();
-            DockerizedJava docker = container.image() == null
+            DockerizedJava docker = (container.image() == null
                     ? new DockerizedJava(root)
-                    : new DockerizedJava(root, container.image());
+                    : new DockerizedJava(root, container.image())).runtime(container.runtime());
             for (Path path : List.of(project.target(), project.artifacts())) {
                 Path absolute = (path.isAbsolute() ? path : root.resolve(path)).normalize();
                 if (!absolute.startsWith(root)) {
