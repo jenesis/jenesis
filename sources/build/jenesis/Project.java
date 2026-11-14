@@ -2570,8 +2570,8 @@ public record Project(
                     program's own. Where more than one declares a main, name it with
                     -Djenesis.execute.module=<source folder> (nested: server/ui or server+ui) and
                     -Djenesis.execute.main=<fqcn>. Wrap the program alone in Docker with
-                    -Djenesis.execute.docker=true, plus .docker.image, .docker.readable,
-                    .docker.writable and .docker.env. Execute is its own entry point: build
+                    -Djenesis.execute.docker=true, plus jenesis.execute.image, .runtime, .readable,
+                    .writable and .env. Execute is its own entry point: build
                     selectors do not apply to it, nor its properties to a plain build.
 
                     ## When the JVM will not start
@@ -4766,6 +4766,7 @@ public record Project(
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache; a file a project provides names only a folder inside the project
                 project.docker|false|Run the whole build inside a container
                 project.image||Image for that container
+                project.runtime||Runtime the container engine runs that container with, as docker run --runtime names one: io.containerd.kata.v2 runs it in a virtual machine of its own under Kata Containers, where the engine has that runtime installed; unset, the engine's default; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 project.readable||Extra read-only container mounts, host[:container],...
                 project.writable||Extra writable container mounts
                 project.env||Host environment variables to forward, name[=value],...
@@ -4884,6 +4885,7 @@ public record Project(
                 execute.main||Main class to run, overriding the module's @jenesis.main
                 execute.docker|false|Run the launched program in a container, independently of the build
                 execute.image||Image for that container
+                execute.runtime||Runtime the container engine runs that container with, as jenesis.project.runtime names one for the build; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 execute.readable||Extra read-only container mounts
                 execute.writable||Extra writable container mounts
                 execute.env||Host environment variables to forward
@@ -4998,7 +5000,8 @@ public record Project(
             properties.keySet().removeAll(Make.CONTAINED);
             String image = environment.getProperty("project.image", Setting.MACHINE);
             Path root = this.root().toAbsolutePath().normalize();
-            DockerizedJava docker = image == null ? new DockerizedJava(root) : new DockerizedJava(root, image);
+            DockerizedJava docker = (image == null ? new DockerizedJava(root) : new DockerizedJava(root, image))
+                    .runtime(environment.value("project.runtime", Setting.MACHINE));
             for (Path path : Stream.of(this.target(), this.reproduce(), this.artifacts())
                     .filter(Objects::nonNull)
                     .toList()) {

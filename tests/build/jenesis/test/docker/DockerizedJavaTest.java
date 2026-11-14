@@ -74,6 +74,27 @@ public class DockerizedJavaTest {
     }
 
     @Test
+    public void runtime_is_none_by_default_and_named_in_a_new_instance() {
+        DockerizedJava original = new DockerizedJava(tmp, "dummy");
+        DockerizedJava kata = original.runtime(" io.containerd.kata.v2 ");
+        assertThat(original.runtime()).isNull();
+        assertThat(kata).isNotSameAs(original);
+        assertThat(kata.runtime()).isEqualTo("io.containerd.kata.v2");
+        assertThat(kata.runtime(" ").runtime()).as("a blank name leaves the choice to the engine").isNull();
+        assertThat(kata.mount(tmp, tmp.toString(), true).harden(true).env("NAME", "value").runtime())
+                .as("the runtime is kept through every other change")
+                .isEqualTo("io.containerd.kata.v2");
+    }
+
+    @Test
+    @EnabledIf("dockerAvailable")
+    public void a_named_runtime_is_handed_to_the_engine_and_none_is_by_default() throws IOException, InterruptedException {
+        assertThat(new DockerizedJava(tmp, "dummy").runtime("io.containerd.kata.v2").command(List.of("Main.java")))
+                .containsSubsequence("run", "--runtime", "io.containerd.kata.v2", "dummy");
+        assertThat(new DockerizedJava(tmp, "dummy").command(List.of("Main.java"))).doesNotContain("--runtime");
+    }
+
+    @Test
     @EnabledIf("dockerAvailable")
     public void implicit_image_command_drops_capabilities_and_new_privileges() throws IOException, InterruptedException {
         List<String> command = new DockerizedJava(tmp).command(List.of("Main.java"));
