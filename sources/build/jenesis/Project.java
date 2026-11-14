@@ -87,6 +87,13 @@ public record Project(
             PROMPT = "prompt",
             PROPERTIES = "properties",
             CONFIGURATION = "configuration";
+    private static final Set<String> CREDENTIALS = Set.of("release.token", "deploy.token", "cache.key");
+    private static final Map<String, String> REPOSITORIES = Map.of("maven.uri", "MAVEN_REPOSITORY_URI",
+            "maven.token", "MAVEN_REPOSITORY_TOKEN",
+            "module.uri", "JENESIS_REPOSITORY_URI",
+            "module.token", "JENESIS_REPOSITORY_TOKEN",
+            "module.index", "JENESIS_INDEX_URI",
+            "openpgp.uri", "OPENPGP_REPOSITORY_URI");
 
     @FunctionalInterface
     public interface Layout {
@@ -4770,6 +4777,7 @@ public record Project(
                 project.readable||Extra read-only container mounts, host[:container],...
                 project.writable||Extra writable container mounts
                 project.env||Host environment variables to forward, name[=value],...
+                project.repositories|false|Hand the build in that container the repositories this machine is set up with: the Maven and module remotes, the module index, the key servers and the tokens sent to the remotes, as the settings or their environment variables name them; without it, the build in the container resolves from Maven Central and the public Jenesis repository alone and is handed no token; the release and deploy tokens and the cache key are never handed to a container; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 make.root|.|Folder Make looks for the project in; only settable on the command line
                 make.profiles||Comma-separated profiles layered over jenesis.properties
                 make.global||Folder holding the user-global .jenesis/jenesis.properties, relative to the working directory; default: the home folder; only settable on the command line
@@ -4998,6 +5006,11 @@ public record Project(
         if (environment.flag("project.docker", Setting.MACHINE)) {
             SortedMap<String, String> properties = new TreeMap<>(settings(environment));
             properties.keySet().removeAll(Make.CONTAINED);
+            CREDENTIALS.forEach(key -> properties.remove("jenesis." + key));
+            boolean repositories = environment.flag("project.repositories", Setting.MACHINE);
+            if (!repositories) {
+                REPOSITORIES.keySet().forEach(key -> properties.remove("jenesis." + key));
+            }
             String image = environment.getProperty("project.image", Setting.MACHINE);
             Path root = this.root().toAbsolutePath().normalize();
             DockerizedJava docker = (image == null ? new DockerizedJava(root) : new DockerizedJava(root, image))
@@ -5043,25 +5056,19 @@ public record Project(
             docker = docker.mounts(environment.getProperty("project.readable", Setting.MACHINE), root, true);
             docker = docker.mounts(environment.getProperty("project.writable", Setting.MACHINE), root, false);
             docker = docker.envs(environment.getProperty("project.env", Setting.MACHINE));
-            String mavenRepositoryUri = environment.getProperty("maven.uri",
-                    System.getenv("MAVEN_REPOSITORY_URI"),
-                    Setting.PROJECT);
-            if (mavenRepositoryUri != null) {
-                docker = docker.env("MAVEN_REPOSITORY_URI", mavenRepositoryUri);
-            }
-            String jenesisRepositoryUri = environment.getProperty("module.uri", System.getenv("JENESIS_REPOSITORY_URI"), Setting.PROJECT);
-            if (jenesisRepositoryUri != null) {
-                docker = docker.env("JENESIS_REPOSITORY_URI", jenesisRepositoryUri);
+            if (repositories) {
+                for (Map.Entry<String, String> repository : new TreeMap<>(REPOSITORIES).entrySet()) {
+                    String value = System.getenv(repository.getValue());
+                    if (value != null && !properties.containsKey("jenesis." + repository.getKey())) {
+                        docker = docker.env(repository.getValue(), value);
+                    }
+                }
             }
             Path mavenLocal = MavenDefaultRepository.localRepository(environment);
             if (mavenLocal != null) {
                 mavenLocal = mavenLocal.toAbsolutePath().normalize();
                 docker = docker.mount(mavenLocal, mavenLocal.toString(), true);
                 docker = docker.env("MAVEN_REPOSITORY_LOCAL", mavenLocal.toString());
-            }
-            String openPgpRepositoryUri = environment.getProperty("openpgp.uri", System.getenv("OPENPGP_REPOSITORY_URI"), Setting.PROJECT);
-            if (openPgpRepositoryUri != null) {
-                docker = docker.env("OPENPGP_REPOSITORY_URI", openPgpRepositoryUri);
             }
             Path openPgpRepositoryLocal = environment.path("openpgp.local",
                     System.getenv("OPENPGP_REPOSITORY_LOCAL"),
