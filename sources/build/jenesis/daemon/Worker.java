@@ -276,6 +276,7 @@ public final class Worker {
                 out.flush();
                 return;
             }
+            int code;
             try {
                 Files.setLastModifiedTime(port, FileTime.from(Instant.now()));
                 out.writeByte(ACCEPTED);
@@ -288,7 +289,6 @@ public final class Worker {
                 SequencedMap<String, Object> global = global();
                 System.setOut(printed);
                 System.setErr(errored);
-                int code;
                 try {
                     code = call(request, compiled);
                     List<String> changed = global.entrySet().stream()
@@ -309,14 +309,14 @@ public final class Worker {
                     Locale.setDefault(locale);
                     TimeZone.setDefault(zone);
                 }
-                synchronized (out) {
-                    out.writeByte(EXIT);
-                    out.writeInt(call);
-                    out.writeInt(code);
-                    out.flush();
-                }
             } finally {
                 building.unlock();
+            }
+            synchronized (out) {
+                out.writeByte(EXIT);
+                out.writeInt(call);
+                out.writeInt(code);
+                out.flush();
             }
         }
     }
