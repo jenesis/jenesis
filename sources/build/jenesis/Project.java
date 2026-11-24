@@ -2382,6 +2382,16 @@ public record Project(
                                                 assemble no sources, documentation or packages for
                                                 it, so neither export nor release ships them; a test
                                                 module is unstaged unless jenesis.stage.tests is set
+                      aot.properties            arguments=<words> runs the module's main method once on
+                                                the runtime image jlink links, which this file has
+                                                the build link, and keeps the ahead-of-time cache the
+                                                JVM records: in the image as lib/<module>.aot, used
+                                                where -XX:AOTCache names it, and in every jpackage
+                                                package, whose launcher names it; main=<class> runs
+                                                another main class of the module, timeout=<duration>
+                                                ends a run that has not returned by then and keeps
+                                                its cache; a modular application alone, and never
+                                                the same bytes twice
                       classifiers.properties    <classifier>=<folder>[,<folder>...] per line, each a
                                                 variant of the module's jar holding its files and
                                                 the files of the folders, named from the module's
@@ -4798,6 +4808,7 @@ public record Project(
                 daemon.folder||Folder the build daemons announce themselves in, each with its log, and where a daemon keeps its copy of an engine compiled from source, relative to the working directory on the command line, to ~/.jenesis in its files and to the project root in a project's; default: ~/.jenesis/daemons; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 aot.folder|.jenesis/aot|The folder of every ahead-of-time cache, the engine's and the tools', relative to the working directory on the command line and to the project root in a file; aot.properties in it records the engine and the JVM the folder was started for and when, and a build that finds either changed or the folder older than aot.lifetime clears it at once; a file the project provides names only a location inside the project
                 aot.lifetime||ISO-8601 age after which the folder of caches is cleared and every cache in it trained again, as PT12H or P7D; empty keeps it until the engine or the JVM changes
+                package.aot|true|Train an ahead-of-time cache for the application where a configuration folder holds aot.properties, by running its main method on the runtime image jlink links; false links and packages without one
                 toolchain.version||JDK the build runs on, as 25, 25.0.3 or 25-temurin: the numbers match as a prefix, every word must be one of the vendor and version words in the JDK's release file, and a pre-release matches only when its word is named; Make and Execute relaunch on a match when the running JVM is none
                 toolchain.searchpath|@|Comma-separated JDK folders searched for toolchain.version, absolute or under ~, * standing for any one folder name; @ splices this system's usual JDK locations and empty only checks the running JVM; settable only on the command line or in ~/.jenesis/jenesis.properties
                 toolchain.installer||Program run with the requested version as its last argument when no JDK under toolchain.searchpath matches, such as jenesis-jdk from the SDK; a name is looked up on the absolute folders of the PATH, a path must be absolute or start with ~; settable only on the command line or in ~/.jenesis/jenesis.properties, and an empty value names none (env JENESIS_TOOLCHAIN_INSTALLER, which the jenesis command sets to its own jenesis-jdk for the run it starts where SDKMAN, mise or Scoop installed it)

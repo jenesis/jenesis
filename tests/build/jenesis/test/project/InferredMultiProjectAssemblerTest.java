@@ -461,6 +461,46 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void aot_properties_links_a_runtime_image_and_trains_on_it() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("aot.properties"), "arguments=--port 0\n");
+        SequencedMap<String, Path> executed = fixture.execute(new InferredMultiProjectAssembler(),
+                "package/jlink",
+                "package/aot");
+        assertThat(executed).containsKeys("package/jlink", "package/aot");
+        assertThat(executed.get("package/aot"))
+                .as("a module without a main class is linked no image and trained no cache")
+                .isEmptyDirectory();
+    }
+
+    @Test
+    public void the_package_aot_setting_trains_no_cache_where_aot_properties_is_present() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false, "app-image");
+        Files.writeString(fixture.configuration().resolve("aot.properties"), "arguments=\n");
+        assertThatThrownBy(() -> fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
+                new Environment(Map.of("package.aot", "false"))), "package/aot"))
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: aot - ");
+    }
+
+    @Test
+    public void refuses_an_aot_properties_with_an_unknown_key_or_a_timeout_that_is_no_duration() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("aot.properties"), "argument=--port 0\n");
+        assertThatThrownBy(() -> fixture.execute("package/aot"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names argument, but takes arguments=");
+        Files.writeString(fixture.configuration().resolve("aot.properties"), "timeout=30\n");
+        assertThatThrownBy(() -> fixture.execute("package/aot"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("sets timeout=30, which is no duration");
+        Files.writeString(fixture.configuration().resolve("aot.properties"), "timeout=PT0S\n");
+        assertThatThrownBy(() -> fixture.execute("package/aot"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("name a duration above zero");
+    }
+
+    @Test
     public void native_image_flag_disabled_omits_native_image_step() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         assertThatThrownBy(() -> fixture.execute("build/native-image"))
