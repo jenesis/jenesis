@@ -134,7 +134,7 @@ effect out. Such a step says so on the result it returns:
 
 Its output is stored in no cache, neither under `.jenesis/cache` nor on a server,
 so no later build finds an entry to restore in its place. A result that says
-nothing, `new BuildStepResult()`, is stored in every tier as before.
+nothing, `new BuildStepResult()`, is stored in every tier.
 
 Layout
 ------
