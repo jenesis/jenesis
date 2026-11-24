@@ -75,7 +75,7 @@ a `file://` location on a local or shared (NFS, network drive) file system:
 
 A `file://` URI resolves a `BuildExecutorFileCache` (the same on-disk format as the
 local cache); an `http(s)://` URL selects `BuildExecutorHttpCache`, which GETs and
-PUTs the same zip entries to the server, naming the cache project with
+PUTs each step's output as one zip to the server, naming the cache project with
 `-Djenesis.cache.project=<project>` and authenticating with
 `-Djenesis.cache.token=<token>` (both sent as headers, never in the URL). A non-URI
 value is rejected - use `file://` for an on-disk location.
@@ -141,6 +141,35 @@ There is nothing build-cache-specific in the project itself: the cache is an
 engine capability you switch on from the command line, so any project gains it
 for free.
 
+What the cache keeps
+--------------------
+
+A cache folder holds every file once, under the checksum of its content, and one
+small manifest per step result that names the files the step wrote:
+
+    .jenesis/cache
+    |-- cache.properties                 optional, see below
+    `-- sha-256                          one store per jenesis.executor.digest
+        |-- blobs/<2 hex>/<62 hex>       a file, named by its SHA-256
+        `-- steps/<step>/<inputs>        a manifest: <checksum> <size> <path> per line
+
+Storing a step links each of its files into `blobs/` unless a file of that content
+is there already, so a jar that five steps hand on, or a class file that did not
+change between two builds, costs its bytes once. Restoring a step links the files
+its manifest names into the step's folder, and no bytes are copied where the cache
+and `target/` share a file system. An empty folder of the output is a line
+`- 0 <path>`.
+
+Every file is checked against its name as it is restored, with the pass that would
+hash the restored output anyway. A file that is no longer what its name says - a
+tool wrote into a linked file, a disk lost a block - is deleted with the manifest
+that named it, and the step runs again instead of handing the damage on. A manifest
+naming a file the cache no longer holds is dropped the same way.
+
+The checksums are those of `jenesis.executor.digest`, SHA-256 by default. A build
+under another digest keeps a store of its own beside this one, as it could verify
+no file of this one.
+
 Tuning with `cache.properties`
 ------------------------------
 
@@ -151,27 +180,27 @@ omitted entirely:
 
 | key          | default   | effect                                                                 |
 | ------------ | --------- | ---------------------------------------------------------------------- |
-| `digest`     | `SHA-256` | algorithm folding the inputs into the entry-folder name                |
-| `steps`      | `250`     | maximum number of step folders kept                                    |
-| `versions`   | `10`      | maximum input-variants kept per step                                   |
-| `size`       | unset     | maximum total bytes kept; over it, whole entries are evicted by `lru` until under (unset = no size cap) |
-| `lru`        | `true`    | evict the least-recently-updated entry when over a limit (`false` = most-recently) |
-| `touch`      | `true`    | bump an entry's timestamp on read, so reads keep hot entries alive     |
-| `ttl`        | unset     | ISO-8601 duration (e.g. `P30D`); entries not touched within it are evicted on a background sweep (unset = no age eviction) |
-| `compressed` | `false`   | store each entry as a single zip file rather than a folder of files    |
+| `digest`     | `SHA-256` | algorithm folding a step's inputs into the name of its manifest        |
+| `steps`      | `250`     | maximum number of steps that keep manifests                            |
+| `versions`   | `10`      | maximum number of manifests kept per step, one per variant of its inputs |
+| `size`       | unset     | maximum total bytes of files kept; over it, the files no output folder links are evicted by `lru` until under (unset = no size cap) |
+| `lru`        | `true`    | evict the least recently used when over a limit (`false` = most recently) |
+| `touch`      | `true`    | bump a manifest's timestamp on read, so reads keep hot steps alive     |
+| `ttl`        | unset     | ISO-8601 duration (e.g. `P30D`); manifests not touched within it are evicted on a background sweep (unset = no age eviction) |
 | `read`       | `true`    | serve cache reads; `read=false` makes every lookup a miss              |
 | `write`      | `true`    | populate the cache; `write=false` serves reads but never writes, evicts, or touches |
 
-Eviction is by file timestamp and happens as entries are written; `touch` keeps
-recently-read entries fresh, so the count caps (`steps`, `versions`) and the byte
-cap (`size`) behave like an LRU. `ttl` adds an age dimension: an entry whose last
-touch is older than the duration leaves even while the caps have room.
-`compressed` trades the hard-linked reads of the folder format
-for a packed, transport-friendly layout, approaching the shape a remote cache
-server would store. `read` and `write` are the typical CI split: a privileged job
-builds with the defaults (both `true`) to populate the cache, while everyone else
-sets `write=false` to consume it read-only without mutating it. Setting both to
-`false` turns the cache off entirely.
+Eviction happens as steps are stored. The count caps (`steps`, `versions`) and
+`ttl` evict manifests by their timestamp, which `touch` keeps fresh, and a file
+that no remaining manifest names leaves with them. The byte cap (`size`) evicts
+files instead: a file that an output folder still links costs no space of its own
+and stays, and of the others the one linked least recently goes first, by the
+change time a file system records for it; a manifest naming an evicted file is
+dropped the next time it is asked for. On a file system without link counts every
+file is a candidate, oldest first. `read` and `write` are the typical CI split: a
+privileged job builds with the defaults (both `true`) to populate the cache, while
+everyone else sets `write=false` to consume it read-only without mutating it.
+Setting both to `false` turns the cache off entirely.
 
 Where this fits
 ---------------

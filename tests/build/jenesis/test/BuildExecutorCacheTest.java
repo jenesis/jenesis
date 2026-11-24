@@ -11,6 +11,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.HashFunction;
 import build.jenesis.Palette;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -308,7 +309,8 @@ public class BuildExecutorCacheTest {
                           String identity,
                           byte[] step,
                           SequencedMap<String, Map<Path, byte[]>> inputs,
-                          boolean remote) {
+                          boolean remote,
+                          String digest) {
             touches.incrementAndGet();
             touchIdentity = identity;
             touchStep = step;
@@ -317,12 +319,13 @@ public class BuildExecutorCacheTest {
         }
 
         @Override
-        public Optional<BuildStepResult> fetch(Executor executor,
+        public Optional<Map<Path, byte[]>> fetch(Executor executor,
                                                String identity,
                                                byte[] step,
                                                SequencedMap<String, Map<Path, byte[]>> inputs,
                                                boolean remote,
-                                               Path target) throws IOException {
+                                               Path target,
+                                               String digest) throws IOException {
             fetches.incrementAndGet();
             fetchIdentity = identity;
             fetchStep = step;
@@ -332,7 +335,7 @@ public class BuildExecutorCacheTest {
                 return Optional.empty();
             }
             Files.writeString(target.resolve("file"), "cached");
-            return Optional.of(new BuildStepResult(true));
+            return Optional.of(HashFunction.read(target, new HashDigestFunction(digest), executor));
         }
 
         @Override
@@ -390,12 +393,13 @@ public class BuildExecutorCacheTest {
         }
 
         @Override
-        public Optional<BuildStepResult> fetch(Executor executor,
+        public Optional<Map<Path, byte[]>> fetch(Executor executor,
                                                String identity,
                                                byte[] step,
                                                SequencedMap<String, Map<Path, byte[]>> inputs,
                                                boolean remote,
-                                               Path target) {
+                                               Path target,
+                                               String digest) {
             return Optional.empty();
         }
 

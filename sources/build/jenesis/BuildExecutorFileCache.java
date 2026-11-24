@@ -11,9 +11,10 @@ public record BuildExecutorFileCache(Path root,
                                      Duration ttl,
                                      boolean touch,
                                      boolean lru,
-                                     boolean compressed,
                                      boolean read,
                                      boolean write) implements BuildExecutorCache {
+
+    public static final String BLOBS = "blobs", STEPS = "steps", DIRECTORY = "-";
 
     public BuildExecutorFileCache(Path root) {
         Path file = root.resolve("cache.properties");
@@ -37,40 +38,72 @@ public record BuildExecutorFileCache(Path root,
                 ttl == null ? null : Duration.parse(ttl),
                 properties.flag("touch", true),
                 properties.flag("lru", true),
-                properties.flag("compressed"),
                 properties.flag("read", true),
                 properties.flag("write", true));
     }
 
     @Override
-    public Optional<BuildStepResult> fetch(Executor executor,
-                                           String identity,
-                                           byte[] step,
-                                           SequencedMap<String, Map<Path, byte[]>> inputs,
-                                           boolean remote,
-                                           Path target) throws IOException {
+    public Optional<Map<Path, byte[]>> fetch(Executor executor,
+                                             String identity,
+                                             byte[] step,
+                                             SequencedMap<String, Map<Path, byte[]>> inputs,
+                                             boolean remote,
+                                             Path target,
+                                             String digest) throws IOException {
         if (!read) {
             return Optional.empty();
         }
-        Path folder = root.resolve(HexFormat.of().formatHex(step));
-        Path entry = folder.resolve(HexFormat.of().formatHex(fold(inputs)));
+        Path store = root.resolve(digest.toLowerCase(Locale.ROOT)),
+                folder = store.resolve(STEPS).resolve(HexFormat.of().formatHex(step)),
+                manifest = folder.resolve(HexFormat.of().formatHex(fold(inputs)));
+        if (!Files.isRegularFile(manifest)) {
+            return Optional.empty();
+        }
+        Map<Path, byte[]> checksums;
         try {
-            if (Files.isDirectory(entry)) {
-                materialize(entry, target, links);
-            } else if (Files.isRegularFile(entry)) {
-                unzip(entry, target);
-            } else {
-                return Optional.empty();
+            Path base = target.normalize();
+            Map<Path, String> expected = new LinkedHashMap<>();
+            for (String line : Files.readAllLines(manifest)) {
+                String[] entry = line.split(" ", 3);
+                Path destination = BuildStep.resolveContained(base, entry[2]);
+                if (entry[0].equals(DIRECTORY)) {
+                    Files.createDirectories(destination);
+                    continue;
+                }
+                Files.createDirectories(destination.getParent());
+                if (links) {
+                    BuildStep.linkOrCopy(destination, blob(store, entry[0]));
+                } else {
+                    Files.copy(blob(store, entry[0]), destination);
+                }
+                expected.put(Path.of(entry[2]), entry[0]);
             }
-        } catch (IOException _) {
+            checksums = HashFunction.read(target, new HashDigestFunction(digest), executor);
+            boolean intact = checksums.keySet().equals(expected.keySet());
+            for (Map.Entry<Path, String> entry : expected.entrySet()) {
+                byte[] checksum = checksums.get(entry.getKey());
+                if (checksum == null || !HexFormat.of().formatHex(checksum).equals(entry.getValue())) {
+                    intact = false;
+                    if (write) {
+                        Files.deleteIfExists(blob(store, entry.getValue()));
+                    }
+                }
+            }
+            if (!intact) {
+                throw new IOException("A file of " + manifest + " is not what its checksum names");
+            }
+        } catch (IOException | RuntimeException _) {
             clean(target);
+            if (write) {
+                Files.deleteIfExists(manifest);
+            }
             return Optional.empty();
         }
         if (touch && write) {
-            touch(entry);
+            touch(manifest);
             touch(folder);
         }
-        return Optional.of(new BuildStepResult(true));
+        return Optional.of(checksums);
     }
 
     @Override
@@ -82,16 +115,128 @@ public record BuildExecutorFileCache(Path root,
                       Path output,
                       String digest,
                       Map<Path, byte[]> checksums) throws IOException {
-        if (write) {
-            persist(step, inputs, output);
-            if (ttl != null && !ttl.isZero() && !ttl.isNegative()) {
-                executor.execute(() -> {
-                    try {
-                        evictByAge(ttl);
-                    } catch (IOException _) {
-                    }
-                });
+        if (!write) {
+            return;
+        }
+        Path store = root.resolve(digest.toLowerCase(Locale.ROOT)),
+                folder = store.resolve(STEPS).resolve(HexFormat.of().formatHex(step)),
+                manifest = folder.resolve(HexFormat.of().formatHex(fold(inputs)));
+        if (Files.exists(manifest)) {
+            return;
+        }
+        Path temporary = null;
+        try {
+            Files.createDirectories(folder);
+            try {
+                Files.createFile(root.resolve(BuildExecutor.SKIP_MARKER));
+            } catch (FileAlreadyExistsException _) {
             }
+            HashFunction hash = new HashDigestFunction(digest);
+            SequencedMap<String, String> lines = new TreeMap<>();
+            Files.walkFileTree(output, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes)
+                        throws IOException {
+                    try (DirectoryStream<Path> children = Files.newDirectoryStream(directory)) {
+                        if (!directory.equals(output) && !children.iterator().hasNext()) {
+                            String name = output.relativize(directory).toString().replace(File.separatorChar, '/');
+                            lines.put(name, DIRECTORY + " 0 " + name);
+                        }
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                    byte[] checksum = checksums.get(output.relativize(file));
+                    String name = output.relativize(file).toString().replace(File.separatorChar, '/'),
+                            hex = HexFormat.of().formatHex(checksum == null ? hash.hash(file) : checksum);
+                    if (name.indexOf('\n') >= 0 || name.indexOf('\r') >= 0) {
+                        throw new IOException("A cache holds no file named across lines: " + file);
+                    }
+                    Path blob = blob(store, hex);
+                    if (!Files.exists(blob)) {
+                        Files.createDirectories(blob.getParent());
+                        boolean linked = false;
+                        if (links && !Files.isSymbolicLink(file)) {
+                            try {
+                                Files.createLink(blob, file);
+                                linked = true;
+                            } catch (FileAlreadyExistsException _) {
+                                linked = true;
+                            } catch (UnsupportedOperationException | FileSystemException _) {
+                            }
+                        }
+                        if (!linked) {
+                            Path copy = Files.createTempFile(blob.getParent(), "tmp", null);
+                            try {
+                                Files.copy(file, copy, StandardCopyOption.REPLACE_EXISTING);
+                                Files.move(copy, blob, StandardCopyOption.REPLACE_EXISTING);
+                            } finally {
+                                Files.deleteIfExists(copy);
+                            }
+                        }
+                    }
+                    lines.put(name, hex + " " + attributes.size() + " " + name);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+            temporary = Files.createTempFile(folder, "tmp", null);
+            Files.write(temporary, lines.values());
+            try {
+                Files.move(temporary, manifest, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException _) {
+                Files.move(temporary, manifest);
+            }
+            temporary = null;
+            if (evict(folder, versions) | evict(store.resolve(STEPS), steps)) {
+                sweep(store);
+            }
+            if (size > 0) {
+                evictBySize(store.resolve(BLOBS));
+            }
+        } catch (IOException | RuntimeException _) {
+        } finally {
+            if (temporary != null) {
+                try {
+                    Files.deleteIfExists(temporary);
+                } catch (IOException _) {
+                }
+            }
+        }
+        if (ttl != null && !ttl.isZero() && !ttl.isNegative()) {
+            executor.execute(() -> {
+                try {
+                    Instant threshold = Instant.now().minus(ttl);
+                    boolean evicted = false;
+                    try (DirectoryStream<Path> folders = Files.newDirectoryStream(store.resolve(STEPS))) {
+                        for (Path candidate : folders) {
+                            if (!isHex(candidate.getFileName().toString()) || !Files.isDirectory(candidate)) {
+                                continue;
+                            }
+                            boolean remaining = false;
+                            try (DirectoryStream<Path> manifests = Files.newDirectoryStream(candidate)) {
+                                for (Path entry : manifests) {
+                                    if (isHex(entry.getFileName().toString())
+                                            && lastModified(entry).toInstant().isBefore(threshold)) {
+                                        Files.deleteIfExists(entry);
+                                        evicted = true;
+                                    } else {
+                                        remaining = true;
+                                    }
+                                }
+                            }
+                            if (!remaining) {
+                                Files.deleteIfExists(candidate);
+                            }
+                        }
+                    }
+                    if (evicted) {
+                        sweep(store);
+                    }
+                } catch (IOException _) {
+                }
+            });
         }
     }
 
@@ -105,57 +250,23 @@ public record BuildExecutorFileCache(Path root,
                       String identity,
                       byte[] step,
                       SequencedMap<String, Map<Path, byte[]>> inputs,
-                      boolean remote) {
+                      boolean remote,
+                      String digest) {
         if (!touch || !write) {
             return;
         }
-        Path folder = root.resolve(HexFormat.of().formatHex(step));
-        Path entry = folder.resolve(HexFormat.of().formatHex(fold(inputs)));
-        if (Files.exists(entry)) {
-            touch(entry);
+        Path folder = root.resolve(digest.toLowerCase(Locale.ROOT))
+                .resolve(STEPS)
+                .resolve(HexFormat.of().formatHex(step));
+        Path manifest = folder.resolve(HexFormat.of().formatHex(fold(inputs)));
+        if (Files.exists(manifest)) {
+            touch(manifest);
             touch(folder);
         }
     }
 
-    private void persist(byte[] step, SequencedMap<String, Map<Path, byte[]>> inputs, Path output) {
-        Path folder = root.resolve(HexFormat.of().formatHex(step));
-        Path entry = folder.resolve(HexFormat.of().formatHex(fold(inputs)));
-        if (Files.exists(entry)) {
-            return;
-        }
-        Path temporary = null;
-        try {
-            Files.createDirectories(folder);
-            try {
-                Files.createFile(root.resolve(BuildExecutor.SKIP_MARKER));
-            } catch (FileAlreadyExistsException _) {
-            }
-            temporary = compressed
-                    ? Files.createTempFile(folder, "tmp", null)
-                    : Files.createTempDirectory(folder, "tmp");
-            if (compressed) {
-                zip(output, temporary);
-            } else {
-                materialize(output, temporary, false);
-            }
-            try {
-                Files.move(temporary, entry, StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException _) {
-                Files.move(temporary, entry);
-            }
-            temporary = null;
-            evict(folder, versions);
-            evict(root, steps);
-            evictBySize(size);
-        } catch (IOException | RuntimeException _) {
-        } finally {
-            if (temporary != null) {
-                try {
-                    delete(temporary);
-                } catch (IOException _) {
-                }
-            }
-        }
+    private static Path blob(Path store, String hex) {
+        return store.resolve(BLOBS).resolve(hex.substring(0, 2)).resolve(hex.substring(2));
     }
 
     private byte[] fold(SequencedMap<String, Map<Path, byte[]>> inputs) {
@@ -179,9 +290,9 @@ public record BuildExecutorFileCache(Path root,
         return message.digest();
     }
 
-    private void evict(Path parent, int limit) throws IOException {
+    private boolean evict(Path parent, int limit) throws IOException {
         if (limit <= 0) {
-            return;
+            return false;
         }
         List<Path> entries = new ArrayList<>();
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(parent)) {
@@ -193,113 +304,100 @@ public record BuildExecutorFileCache(Path root,
         }
         int excess = entries.size() - limit;
         if (excess <= 0) {
-            return;
+            return false;
         }
         entries.sort(Comparator.comparing(BuildExecutorFileCache::lastModified));
         for (int index = 0; index < excess; index++) {
             try {
-                delete(lru ? entries.get(index) : entries.get(entries.size() - 1 - index));
+                Files.walkFileTree(lru ? entries.get(index) : entries.get(entries.size() - 1 - index),
+                        new SimpleFileVisitor<>() {
+                            @Override
+                            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes)
+                                    throws IOException {
+                                Files.deleteIfExists(file);
+                                return FileVisitResult.CONTINUE;
+                            }
+
+                            @Override
+                            public FileVisitResult postVisitDirectory(Path directory, IOException exception)
+                                    throws IOException {
+                                Files.deleteIfExists(directory);
+                                return FileVisitResult.CONTINUE;
+                            }
+                        });
             } catch (IOException _) {
             }
         }
+        return true;
     }
 
-    private void evictBySize(long limit) throws IOException {
-        if (limit <= 0) {
-            return;
+    private void evictBySize(Path blobs) throws IOException {
+        record Blob(Path path, long size, FileTime used) {
         }
-        Map<Path, Long> sizes = new LinkedHashMap<>();
+        List<Blob> unused = new ArrayList<>();
         long total = 0;
-        try (DirectoryStream<Path> folders = Files.newDirectoryStream(root)) {
+        try (DirectoryStream<Path> folders = Files.newDirectoryStream(blobs)) {
             for (Path folder : folders) {
-                if (!isHex(folder.getFileName().toString()) || !Files.isDirectory(folder)) {
-                    continue;
-                }
-                try (DirectoryStream<Path> entries = Files.newDirectoryStream(folder)) {
-                    for (Path entry : entries) {
-                        if (!isHex(entry.getFileName().toString())) {
+                try (DirectoryStream<Path> files = Files.newDirectoryStream(folder)) {
+                    for (Path file : files) {
+                        if (!isHex(file.getFileName().toString())) {
                             continue;
                         }
-                        long bytes = sizeOf(entry);
-                        sizes.put(entry, bytes);
-                        total += bytes;
-                    }
-                }
-            }
-        }
-        if (total <= limit) {
-            return;
-        }
-        List<Path> entries = new ArrayList<>(sizes.keySet());
-        entries.sort(Comparator.comparing(BuildExecutorFileCache::lastModified));
-        for (int index = 0; index < entries.size() && total > limit; index++) {
-            Path entry = lru ? entries.get(index) : entries.get(entries.size() - 1 - index);
-            try {
-                delete(entry);
-                total -= sizes.get(entry);
-                Path folder = entry.getParent();
-                try (DirectoryStream<Path> remaining = Files.newDirectoryStream(folder)) {
-                    if (!remaining.iterator().hasNext()) {
-                        Files.deleteIfExists(folder);
-                    }
-                }
-            } catch (IOException _) {
-            }
-        }
-    }
-
-    private void evictByAge(Duration ttl) throws IOException {
-        Instant threshold = Instant.now().minus(ttl);
-        List<Path> expired = new ArrayList<>();
-        try (DirectoryStream<Path> folders = Files.newDirectoryStream(root)) {
-            for (Path folder : folders) {
-                if (!isHex(folder.getFileName().toString()) || !Files.isDirectory(folder)) {
-                    continue;
-                }
-                try (DirectoryStream<Path> entries = Files.newDirectoryStream(folder)) {
-                    for (Path entry : entries) {
-                        if (isHex(entry.getFileName().toString())
-                                && lastModified(entry).toInstant().isBefore(threshold)) {
-                            expired.add(entry);
+                        BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class);
+                        total += attributes.size();
+                        try {
+                            Map<String, Object> unix = Files.readAttributes(file, "unix:nlink,ctime");
+                            if ((Integer) unix.get("nlink") < 2) {
+                                unused.add(new Blob(file, attributes.size(), (FileTime) unix.get("ctime")));
+                            }
+                        } catch (UnsupportedOperationException | IllegalArgumentException _) {
+                            unused.add(new Blob(file, attributes.size(), attributes.lastModifiedTime()));
                         }
                     }
                 }
             }
         }
-        for (Path entry : expired) {
+        unused.sort(Comparator.comparing(Blob::used));
+        for (int index = 0; index < unused.size() && total > size; index++) {
+            Blob blob = lru ? unused.get(index) : unused.get(unused.size() - 1 - index);
             try {
-                delete(entry);
-                Path folder = entry.getParent();
-                try (DirectoryStream<Path> remaining = Files.newDirectoryStream(folder)) {
-                    if (!remaining.iterator().hasNext()) {
-                        Files.deleteIfExists(folder);
-                    }
-                }
+                Files.deleteIfExists(blob.path());
+                total -= blob.size();
             } catch (IOException _) {
             }
         }
     }
 
-    private static long sizeOf(Path path) {
-        if (Files.isRegularFile(path)) {
-            try {
-                return Files.size(path);
-            } catch (IOException _) {
-                return 0;
+    private static void sweep(Path store) throws IOException {
+        Set<String> referenced = new HashSet<>();
+        try (DirectoryStream<Path> folders = Files.newDirectoryStream(store.resolve(STEPS))) {
+            for (Path folder : folders) {
+                if (!isHex(folder.getFileName().toString()) || !Files.isDirectory(folder)) {
+                    continue;
+                }
+                try (DirectoryStream<Path> manifests = Files.newDirectoryStream(folder)) {
+                    for (Path manifest : manifests) {
+                        for (String line : Files.readAllLines(manifest)) {
+                            referenced.add(line.substring(0, Math.max(0, line.indexOf(' '))));
+                        }
+                    }
+                }
             }
         }
-        long[] total = {0};
-        try {
-            Files.walkFileTree(path, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
-                    total[0] += attributes.size();
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-        } catch (IOException _) {
+        if (!Files.isDirectory(store.resolve(BLOBS))) {
+            return;
         }
-        return total[0];
+        try (DirectoryStream<Path> folders = Files.newDirectoryStream(store.resolve(BLOBS))) {
+            for (Path folder : folders) {
+                try (DirectoryStream<Path> files = Files.newDirectoryStream(folder)) {
+                    for (Path file : files) {
+                        if (!referenced.contains(folder.getFileName().toString() + file.getFileName())) {
+                            Files.deleteIfExists(file);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private static void touch(Path path) {
@@ -329,83 +427,25 @@ public record BuildExecutorFileCache(Path root,
         return true;
     }
 
-    private static void materialize(Path source, Path target, boolean links) throws IOException {
-        Files.walkFileTree(source, new SimpleFileVisitor<>() {
-            @Override
-            public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) throws IOException {
-                Files.createDirectories(target.resolve(source.relativize(directory)));
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                Path destination = target.resolve(source.relativize(file));
-                if (links) {
-                    try {
-                        Files.createLink(destination, file);
-                        return FileVisitResult.CONTINUE;
-                    } catch (UnsupportedOperationException | FileSystemException _) {
-                    }
-                }
-                Files.copy(file, destination, StandardCopyOption.REPLACE_EXISTING);
-                return FileVisitResult.CONTINUE;
-            }
-        });
-    }
-
-    private static void zip(Path source, Path target) throws IOException {
-        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(target))) {
-            Files.walkFileTree(source, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                    zip.putNextEntry(new ZipEntry(source.relativize(file).toString().replace('\\', '/')));
-                    Files.copy(file, zip);
-                    zip.closeEntry();
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-        }
-    }
-
-    private static void unzip(Path source, Path target) throws IOException {
-        Path base = target.normalize();
-        try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(source))) {
-            for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
-                if (entry.isDirectory()) {
-                    continue;
-                }
-                Path destination = BuildStep.resolveContained(base, entry.getName());
-                Files.createDirectories(destination.getParent());
-                Files.copy(zip, destination, StandardCopyOption.REPLACE_EXISTING);
-            }
-        }
-    }
-
     private static void clean(Path target) {
         try (DirectoryStream<Path> children = Files.newDirectoryStream(target)) {
             for (Path child : children) {
-                delete(child);
+                Files.walkFileTree(child, new SimpleFileVisitor<>() {
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                        Files.deleteIfExists(file);
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult postVisitDirectory(Path directory, IOException exception)
+                            throws IOException {
+                        Files.deleteIfExists(directory);
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
             }
         } catch (IOException _) {
         }
-    }
-
-    private static void delete(Path path) throws IOException {
-        if (Files.notExists(path)) {
-            return;
-        }
-        Files.walkFileTree(path, new SimpleFileVisitor<>() {
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                Files.deleteIfExists(file);
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult postVisitDirectory(Path directory, IOException exception) throws IOException {
-                Files.deleteIfExists(directory);
-                return FileVisitResult.CONTINUE;
-            }
-        });
     }
 }

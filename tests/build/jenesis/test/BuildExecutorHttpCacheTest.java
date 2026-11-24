@@ -73,9 +73,9 @@ public class BuildExecutorHttpCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, in, false, output, "", Map.of());
-        assertThat(cache.fetch(Runnable::run, "step", step, in, false, target)).isEmpty();
-        cache.touch(Runnable::run, "step", step, in, false);
+        cache.store(Runnable::run, "step", step, in, false, output, "SHA-256", Map.of());
+        assertThat(cache.fetch(Runnable::run, "step", step, in, false, target, "SHA-256")).isEmpty();
+        cache.touch(Runnable::run, "step", step, in, false, "SHA-256");
         assertThat(blobs).as("nothing was uploaded").isEmpty();
         assertThat(heads).as("and nothing was asked for").isEmpty();
         assertThat(keys).isEmpty();
@@ -98,8 +98,8 @@ public class BuildExecutorHttpCacheTest {
         Files.writeString(output.resolve("file"), "result");
         Files.createDirectory(output.resolve("nested"));
         Files.writeString(output.resolve("nested").resolve("inner"), "deep");
-        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
-        Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", step, in, true, target);
+        cache.store(Runnable::run, "step", step, in, true, output, "SHA-256", Map.of());
+        Optional<Map<Path, byte[]>> result = cache.fetch(Runnable::run, "step", step, in, true, target, "SHA-256");
         assertThat(result).isPresent();
         assertThat(target.resolve("file")).content().isEqualTo("result");
         assertThat(target.resolve("nested").resolve("inner")).content().isEqualTo("deep");
@@ -112,7 +112,7 @@ public class BuildExecutorHttpCacheTest {
         BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(
                 new Environment(Map.of("cache.token", "team-alpha")),
                 uri);
-        cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, target);
+        cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, target, "SHA-256");
         assertThat(keys).containsExactly("team-alpha");
         assertThatThrownBy(() -> BuildExecutorHttpCache.ofEnvironment(new Environment(Map.of("cache.key", "team-alpha")), uri))
                 .as("a setting under its former name would leave the cache server without a credential")
@@ -123,7 +123,7 @@ public class BuildExecutorHttpCacheTest {
     @Test
     public void fetch_returns_empty_on_miss() throws IOException {
         BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri).token("team-alpha").project("demo");
-        Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, target);
+        Optional<Map<Path, byte[]>> result = cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, target, "SHA-256");
         assertThat(result).isEmpty();
     }
 
@@ -133,9 +133,9 @@ public class BuildExecutorHttpCacheTest {
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
         BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri).token("team-alpha").project("demo").write(false)
-                .store(Runnable::run, "step", step, in, true, output, "", Map.of());
+                .store(Runnable::run, "step", step, in, true, output, "SHA-256", Map.of());
         assertThat(blobs).isEmpty();
-        assertThat(BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri).token("team-alpha").project("demo").fetch(Runnable::run, "step", step, in, true, target)).isEmpty();
+        assertThat(BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri).token("team-alpha").project("demo").fetch(Runnable::run, "step", step, in, true, target, "SHA-256")).isEmpty();
     }
 
     @Test
@@ -144,9 +144,9 @@ public class BuildExecutorHttpCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
+        cache.store(Runnable::run, "step", step, in, true, output, "SHA-256", Map.of());
         assertThat(blobs).isNotEmpty();
-        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target)).isEmpty();
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target, "SHA-256")).isEmpty();
     }
 
     @Test
@@ -154,7 +154,7 @@ public class BuildExecutorHttpCacheTest {
         Files.createDirectory(output.resolve("nested"));
         Files.writeString(output.resolve("nested").resolve("inner"), "deep");
         BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri).token("team-alpha").project("demo")
-                .store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, output, "", Map.of());
+                .store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, output, "SHA-256", Map.of());
         List<String> names = new ArrayList<>();
         try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(blobs.values().iterator().next()))) {
             for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
@@ -173,10 +173,10 @@ public class BuildExecutorHttpCacheTest {
         BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri).token("team-alpha").project("demo");
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
-        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
+        cache.store(Runnable::run, "step", step, in, true, output, "SHA-256", Map.of());
 
         Path restored = Files.createTempDirectory("restored");
-        assertThat(cache.fetch(Runnable::run, "step", step, in, true, restored)).isPresent();
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, restored, "SHA-256")).isPresent();
         assertThat(restored.resolve("empty-dir")).isDirectory();
         assertThat(restored.resolve("nested").resolve("deeper").resolve("leaf")).content().isEqualTo("leaf");
     }
@@ -187,7 +187,7 @@ public class BuildExecutorHttpCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
+        cache.store(Runnable::run, "step", step, in, true, output, "SHA-256", Map.of());
         String identifier = blobs.keySet().iterator().next();
         ByteArrayOutputStream malicious = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(malicious)) {
@@ -197,7 +197,7 @@ public class BuildExecutorHttpCacheTest {
         blobs.put(identifier, malicious.toByteArray());
 
         Path restored = Files.createTempDirectory("restored");
-        assertThat(cache.fetch(Runnable::run, "step", step, in, true, restored)).isEmpty();
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, restored, "SHA-256")).isEmpty();
         assertThat(restored.getParent().resolve("escaped-dir")).doesNotExist();
     }
 
@@ -216,7 +216,7 @@ public class BuildExecutorHttpCacheTest {
                     URI.create("http://localhost:" + hanging.getLocalPort() + "/cache"))
                     .token("team-alpha").project("demo");
             long started = System.nanoTime();
-            assertThat(cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, Files.createTempDirectory("hung"))).isEmpty();
+            assertThat(cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, Files.createTempDirectory("hung"), "SHA-256")).isEmpty();
             assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(20));
             accepting.interrupt();
         } finally {
@@ -229,14 +229,14 @@ public class BuildExecutorHttpCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
+        cache.store(Runnable::run, "step", step, in, true, output, "SHA-256", Map.of());
         String identifier = blobs.keySet().iterator().next();
         blobs.put(identifier, "<html>Sign in to continue</html>".getBytes(StandardCharsets.UTF_8));
-        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target))
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target, "SHA-256"))
                 .as("a page a proxy answers in the cache's place must not pass for a step that wrote nothing")
                 .isEmpty();
         blobs.put(identifier, new byte[0]);
-        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target)).isEmpty();
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target, "SHA-256")).isEmpty();
     }
 
     @Test
@@ -244,8 +244,8 @@ public class BuildExecutorHttpCacheTest {
         BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri).token("team-alpha").project("demo");
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
-        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
-        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target)).isPresent();
+        cache.store(Runnable::run, "step", step, in, true, output, "SHA-256", Map.of());
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target, "SHA-256")).isPresent();
         assertThat(target).isEmptyDirectory();
     }
 
@@ -255,7 +255,7 @@ public class BuildExecutorHttpCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
+        cache.store(Runnable::run, "step", step, in, true, output, "SHA-256", Map.of());
         String identifier = blobs.keySet().iterator().next();
         ByteArrayOutputStream malicious = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(malicious)) {
@@ -265,7 +265,7 @@ public class BuildExecutorHttpCacheTest {
         }
         blobs.put(identifier, malicious.toByteArray());
         Files.writeString(target.resolve("stale"), "leftover");
-        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target)).isEmpty();
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target, "SHA-256")).isEmpty();
         try (Stream<Path> contents = Files.list(target)) {
             assertThat(contents.findAny()).isEmpty();
         }
@@ -274,7 +274,7 @@ public class BuildExecutorHttpCacheTest {
     @Test
     public void omits_headers_when_key_and_project_are_unset() throws IOException {
         BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri)
-                .fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, target);
+                .fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, target, "SHA-256");
         assertThat(keys).containsExactly("null");
         assertThat(projects).containsExactly("null");
     }
@@ -308,7 +308,7 @@ public class BuildExecutorHttpCacheTest {
 
         Files.writeString(output.resolve("file"), "x".repeat(100_000));
         BuildExecutorHttpCache.ofEnvironment(Environment.NONE, URI.create("http://localhost:" + rejecting.getLocalPort())).token("team-alpha").project("demo")
-                .store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, output, "", Map.of());
+                .store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, output, "SHA-256", Map.of());
         responder.join(2_000);
         rejecting.close();
         assertThat(bodySeen).isFalse();
@@ -320,9 +320,9 @@ public class BuildExecutorHttpCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
+        cache.store(Runnable::run, "step", step, in, true, output, "SHA-256", Map.of());
         String identifier = blobs.keySet().iterator().next();
-        cache.touch(Runnable::run, "step", step, in, true);
+        cache.touch(Runnable::run, "step", step, in, true, "SHA-256");
         assertThat(heads).containsExactly(identifier);
         assertThat(keys).contains("team-alpha");
         assertThat(projects).contains("demo");
@@ -331,7 +331,7 @@ public class BuildExecutorHttpCacheTest {
     @Test
     public void touch_is_skipped_when_reading_is_disabled() throws IOException {
         BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri).token("team-alpha").project("demo").read(false)
-                .touch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true);
+                .touch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, "SHA-256");
         assertThat(heads).isEmpty();
     }
 

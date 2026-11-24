@@ -32,7 +32,7 @@ public interface BuildExecutor {
                          Palette palette) {
 
         public Configuration() {
-            this(Duration.ZERO, "MD5", false, true, true, false, false, false, 0, null, null, null, null, Palette.NONE);
+            this(Duration.ZERO, "SHA-256", false, true, true, false, false, false, 0, null, null, null, null, Palette.NONE);
         }
 
         public static Configuration ofEnvironment(Environment environment) {
@@ -57,7 +57,7 @@ public interface BuildExecutor {
                     Duration.parse(environment.getProperty("executor.timeout",
                             Duration.ZERO.toString(),
                             Setting.PROJECT)),
-                    environment.getProperty("executor.digest", "MD5", Setting.PROJECT),
+                    environment.getProperty("executor.digest", "SHA-256", Setting.PROJECT),
                     environment.flag("print.checksum", Setting.PROJECT),
                     environment.flag("print.progress", true, Setting.PROJECT),
                     environment.flag("executor.events", true, Setting.PROJECT),

@@ -4803,7 +4803,7 @@ public record Project(
                 toolchain.installer||Program run with the requested version as its last argument when no JDK under toolchain.searchpath matches, such as jenesis-jdk from the SDK; a name is looked up on the absolute folders of the PATH, a path must be absolute or start with ~; settable only on the command line or in ~/.jenesis/jenesis.properties, and an empty value names none (env JENESIS_TOOLCHAIN_INSTALLER, which the jenesis command sets to its own jenesis-jdk for the run it starts where SDKMAN, mise or Scoop installed it)
                 executor.concurrency|0|Run at most this many build steps at once; 0 is unbounded, while process.concurrency still bounds the tools they run
                 executor.timeout|PT0S|ISO-8601 timeout per step; PT0S is no timeout
-                executor.digest|MD5|Algorithm behind the content and step hashes that drive the cache
+                executor.digest|SHA-256|Algorithm behind the content and step hashes that drive the cache
                 executor.rebuild|false|Wipe target/ before building; prefer letting the cache decide
                 executor.aggregate|false|Collect independent step failures into one report
                 executor.events|true|Write each step's outcome of the latest build as one JSON object per line to .jenesis.events.jsonl in the target folder, replaced by every build
