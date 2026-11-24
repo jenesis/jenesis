@@ -438,6 +438,7 @@ public class BuildExecutorFileCacheTest {
 
     @Test
     public void evicts_the_files_no_output_folder_links_oldest_first_until_under_size() throws Exception {
+        Assumptions.assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
         Files.writeString(cacheRoot.resolve("cache.properties"), "size=2500\nsteps=0\nversions=0\n");
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         Path linked = storeSized(cache, new byte[]{1}, 1000);

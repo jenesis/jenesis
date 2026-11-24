@@ -182,7 +182,7 @@ public record BuildExecutorFileCache(Path root,
                 }
             });
             temporary = Files.createTempFile(folder, "tmp", null);
-            Files.write(temporary, lines.values());
+            Files.writeString(temporary, lines.values().stream().map(line -> line + "\n").collect(Collectors.joining()));
             try {
                 Files.move(temporary, manifest, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException _) {
