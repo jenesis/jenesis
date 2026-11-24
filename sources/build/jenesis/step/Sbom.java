@@ -273,7 +273,7 @@ public class Sbom implements BuildStep {
         }
         Path standalone = Files.createDirectories(context.next().resolve(REPORTS + "sbom"));
         Files.writeString(standalone.resolve(base + (version == null ? "" : "-" + version) + "." + format.extension()), document);
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     private static CycloneDx.Component component(String coordinate, String sha256, List<License> licenses) {

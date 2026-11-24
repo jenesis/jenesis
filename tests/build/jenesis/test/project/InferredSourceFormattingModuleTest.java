@@ -452,7 +452,7 @@ public class InferredSourceFormattingModuleTest {
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
             Files.writeString(context.next().resolve("seen.txt"), Files.readString(Path.of(file)));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 

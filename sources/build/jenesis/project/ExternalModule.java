@@ -256,7 +256,7 @@ public class ExternalModule extends PluginModule<ExternalModule> {
             if (!versions.isEmpty()) {
                 versions.store(context.next().resolve(BuildStep.VERSIONS));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 }

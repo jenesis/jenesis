@@ -45,7 +45,7 @@ public class ReportStaging implements BuildStep {
                 }
             }
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     private static void copyTree(Path source, Path target) throws IOException {

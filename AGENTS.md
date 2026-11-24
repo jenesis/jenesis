@@ -295,6 +295,9 @@ serialised form is part of the cache key: a value that should trigger a re-run i
 step holds (a `Resolver`, a lambda typed as a serialisable functional interface) is `Serializable`, its scaffolding
 `transient`; a module never reaches a key. Steps compose by folders (`sources/`, `classes/`, `artifacts/`), never by
 names. Two builds of the same inputs write the same bytes, which `jenesis.project.reproduce` reports step by step.
+A step is a function of its result too: `new BuildStepResult()` hands the output on and lets a build cache store it,
+`next(false)` keeps the previous output, and a step with an effect outside `context.next()` - a release, an export, a
+pin, a file of the IDE - returns `cached(false)`, so that no cache holds an entry that would stand in for the effect.
 What a step keeps for its next run - an incremental compiler's state, the tests that failed - goes to
 `context.persistent()`: the folder of the step's last run, kept whether that run succeeded or failed, empty when the
 step changed or the build cache supplied its output, kept when a run reports nothing new. A step therefore reads what a

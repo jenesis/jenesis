@@ -108,9 +108,8 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                                            String identity,
                                            byte[] step,
                                            SequencedMap<String, Map<Path, byte[]>> inputs,
-                                           boolean remote,
                                            Path target) throws IOException {
-        if (!read || !remote) {
+        if (!read) {
             return Optional.empty();
         }
         HttpURLConnection connection = connect("GET", step, inputs);
@@ -121,7 +120,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
             try (InputStream stream = connection.getInputStream()) {
                 unzip(stream, target);
             }
-            return Optional.of(new BuildStepResult(true));
+            return Optional.of(new BuildStepResult());
         } catch (IOException _) {
             clean(target);
             return Optional.empty();
@@ -135,11 +134,10 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                       String identity,
                       byte[] step,
                       SequencedMap<String, Map<Path, byte[]>> inputs,
-                      boolean remote,
                       Path output,
                       String digest,
                       Map<Path, byte[]> checksums) throws IOException {
-        if (write && remote) {
+        if (write) {
             upload(step, inputs, output);
         }
     }
@@ -153,9 +151,8 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     public void touch(Executor executor,
                       String identity,
                       byte[] step,
-                      SequencedMap<String, Map<Path, byte[]>> inputs,
-                      boolean remote) {
-        if (!read || !remote) {
+                      SequencedMap<String, Map<Path, byte[]>> inputs) {
+        if (!read) {
             return;
         }
         try {

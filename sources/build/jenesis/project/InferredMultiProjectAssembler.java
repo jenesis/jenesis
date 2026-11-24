@@ -722,7 +722,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     }
                 }
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -750,7 +750,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
             }
             if (!Files.isDirectory(image)) {
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
@@ -773,7 +773,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     }
                 }
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -1168,7 +1168,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             if (!staged || tests && !stagesTests) {
                 Files.createFile(context.next().resolve(Inventory.UNSTAGED));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
 
     }

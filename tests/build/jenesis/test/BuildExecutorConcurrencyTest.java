@@ -48,7 +48,7 @@ public class BuildExecutorConcurrencyTest {
             } finally {
                 running.decrementAndGet();
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         };
     }
 
@@ -100,7 +100,7 @@ public class BuildExecutorConcurrencyTest {
                 } catch (InterruptedException e) {
                     throw new IllegalStateException(e);
                 }
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
         }
         assertThat(buildExecutor.execute()).containsKeys("step0", "step1", "step2", "step3");

@@ -230,6 +230,6 @@ public class Bind implements BuildStep {
                 }
             }
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 }

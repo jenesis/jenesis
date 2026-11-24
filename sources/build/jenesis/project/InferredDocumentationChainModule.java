@@ -286,7 +286,7 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
             properties.setProperty(JAVADOC, Boolean.toString(java[0]));
             properties.setProperty(EXTENSIONS, String.join(",", extensions));
             properties.store(context.next().resolve(SCAN_FILE));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -410,7 +410,7 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                 body.append("</body></html>\n");
                 Files.writeString(combined.resolve("index.html"), body.toString());
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 }

@@ -32,7 +32,7 @@ public class Planted {
                         }
                         Files.writeString(Files.createDirectories(target.resolve("demo/reproducible")).resolve("built.txt"),
                                 Instant.now().toString());
-                        return CompletableFuture.completedStage(new BuildStepResult(true));
+                        return CompletableFuture.completedStage(new BuildStepResult());
                     }, descriptor.sources().stream());
                     build.accept(sub, inherited);
                 }));

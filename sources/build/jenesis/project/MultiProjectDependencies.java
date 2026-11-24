@@ -183,7 +183,7 @@ public class MultiProjectDependencies implements BuildStep {
                 mergedProperties.store(context.next().resolve(merged.getKey()));
             }
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     private static String fingerprint(Collection<BuildStepArgument> arguments, Path artifact) {

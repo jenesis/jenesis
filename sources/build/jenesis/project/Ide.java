@@ -56,7 +56,7 @@ public class Ide implements BuildExecutorModule {
                 throws IOException {
             Path base = root.toAbsolutePath().normalize();
             idea(read(arguments.values(), base), base);
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult().cached(false));
         }
     }
 
@@ -74,7 +74,7 @@ public class Ide implements BuildExecutorModule {
                 throws IOException {
             Path base = root.toAbsolutePath().normalize();
             vscode(read(arguments.values(), base), base);
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult().cached(false));
         }
     }
 
@@ -91,7 +91,7 @@ public class Ide implements BuildExecutorModule {
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
             eclipse(read(arguments.values(), root.toAbsolutePath().normalize()));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult().cached(false));
         }
     }
 

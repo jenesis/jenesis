@@ -560,7 +560,7 @@ public record Project(
             SequencedProperties properties = new SequencedProperties();
             values.forEach(properties::setProperty);
             properties.store(context.next().resolve(BuildStep.METADATA));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -2955,7 +2955,8 @@ public record Project(
                     under -Djenesis.process.mode=daemon, in one kept warm for the next call with the
                     same jars, wherever each module resolved them, and the same working directory. Write nothing
                     outside context.next(): a step that must, as the export step does, overrides
-                    shouldRun to say it always runs. context.next() is a temporary folder, renamed
+                    shouldRun to say it always runs and returns new BuildStepResult().cached(false),
+                    so that no build cache stands in for it. context.next() is a temporary folder, renamed
                     when the step succeeds or filled from the cache, so never write its absolute
                     path into a file: write a path relative to the folder that reads it.
 
@@ -3275,7 +3276,7 @@ public record Project(
             SequencedProperties written = new SequencedProperties();
             pins.forEach(written::setProperty);
             written.store(file);
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult().cached(false));
         }
     }
 
@@ -3329,7 +3330,7 @@ public record Project(
                         String.join(", ", rendered)));
             });
             diverged.store(context.next().resolve("divergence.properties"));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -3424,7 +3425,7 @@ public record Project(
             identity.setProperty("maven/" + groupId + "/" + artifactId + "/pom/" + version, pom);
             identity.setProperty(prefix + "/" + module + ":pom", pom);
             identity.store(context.next().resolve(BuildStep.IDENTITY));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 

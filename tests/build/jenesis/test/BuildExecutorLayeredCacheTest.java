@@ -18,7 +18,7 @@ public class BuildExecutorLayeredCacheTest {
         RecordingCache front = new RecordingCache(true, true, false);
         RecordingCache back = new RecordingCache(true, true, false);
         Optional<BuildStepResult> result = new BuildExecutorLayeredCache(front, back)
-                .fetch(Runnable::run, "step", new byte[]{1}, inputs(), true, target);
+                .fetch(Runnable::run, "step", new byte[]{1}, inputs(), target);
         assertThat(result).isPresent();
         assertThat(front.fetches).hasValue(1);
         assertThat(back.fetches).hasValue(0);
@@ -32,7 +32,7 @@ public class BuildExecutorLayeredCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs();
         Optional<BuildStepResult> result = new BuildExecutorLayeredCache(front, back)
-                .fetch(Runnable::run, "step", step, in, true, target);
+                .fetch(Runnable::run, "step", step, in, target);
         assertThat(result).isPresent();
         assertThat(front.fetches).hasValue(1);
         assertThat(back.fetches).hasValue(1);
@@ -47,7 +47,7 @@ public class BuildExecutorLayeredCacheTest {
         RecordingCache front = new RecordingCache(false, true, false);
         RecordingCache back = new RecordingCache(false, true, false);
         assertThat(new BuildExecutorLayeredCache(front, back)
-                .fetch(Runnable::run, "step", new byte[]{1}, inputs(), true, target)).isEmpty();
+                .fetch(Runnable::run, "step", new byte[]{1}, inputs(), target)).isEmpty();
         assertThat(front.stores).hasValue(0);
     }
 
@@ -60,7 +60,6 @@ public class BuildExecutorLayeredCacheTest {
                 "step",
                 step,
                 inputs(),
-                true,
                 target,
                 "",
                 Map.of());
@@ -73,7 +72,7 @@ public class BuildExecutorLayeredCacheTest {
     public void touch_fans_out_to_both() throws IOException {
         RecordingCache front = new RecordingCache(false, true, false);
         RecordingCache back = new RecordingCache(false, true, false);
-        new BuildExecutorLayeredCache(front, back).touch(Runnable::run, "step", new byte[]{1}, inputs(), true);
+        new BuildExecutorLayeredCache(front, back).touch(Runnable::run, "step", new byte[]{1}, inputs());
         assertThat(front.touches).hasValue(1);
         assertThat(back.touches).hasValue(1);
     }
@@ -93,7 +92,7 @@ public class BuildExecutorLayeredCacheTest {
         RecordingCache front = new RecordingCache(false, true, true);
         RecordingCache back = new RecordingCache(true, true, false);
         Optional<BuildStepResult> result = new BuildExecutorLayeredCache(front, back)
-                .fetch(Runnable::run, "step", new byte[]{1}, inputs(), true, target);
+                .fetch(Runnable::run, "step", new byte[]{1}, inputs(), target);
         assertThat(result).isPresent();
         assertThat(front.stores).hasValue(1);
     }
@@ -127,14 +126,13 @@ public class BuildExecutorLayeredCacheTest {
                                                String identity,
                                                byte[] step,
                                                SequencedMap<String, Map<Path, byte[]>> inputs,
-                                               boolean remote,
                                                Path target) throws IOException {
             fetches.incrementAndGet();
             if (!hit) {
                 return Optional.empty();
             }
             Files.writeString(target.resolve("cached"), "cached");
-            return Optional.of(new BuildStepResult(true));
+            return Optional.of(new BuildStepResult());
         }
 
         @Override
@@ -142,7 +140,6 @@ public class BuildExecutorLayeredCacheTest {
                           String identity,
                           byte[] step,
                           SequencedMap<String, Map<Path, byte[]>> inputs,
-                          boolean remote,
                           Path output,
                           String digest,
                           Map<Path, byte[]> checksums) throws IOException {
@@ -164,8 +161,7 @@ public class BuildExecutorLayeredCacheTest {
         public void touch(Executor executor,
                           String identity,
                           byte[] step,
-                          SequencedMap<String, Map<Path, byte[]>> inputs,
-                          boolean remote) {
+                          SequencedMap<String, Map<Path, byte[]>> inputs) {
             touches.incrementAndGet();
         }
     }

@@ -153,7 +153,7 @@ public record JavaToolchainModule(BuildExecutorModule generator,
                     }
                 }
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 }

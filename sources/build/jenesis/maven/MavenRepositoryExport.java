@@ -82,7 +82,7 @@ public class MavenRepositoryExport implements BuildStep {
             });
         }
         if (stagedByVersionDir.isEmpty()) {
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult().cached(false));
         }
         Files.createDirectories(target);
         String timestamp = TIMESTAMP.format(Instant.now());
@@ -144,7 +144,7 @@ public class MavenRepositoryExport implements BuildStep {
                     entry.getValue(),
                     timestamp);
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult().cached(false));
     }
 
     private static void writeArtifactMetadata(Path artifactDir,

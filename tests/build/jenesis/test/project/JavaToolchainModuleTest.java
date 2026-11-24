@@ -79,7 +79,7 @@ public class JavaToolchainModuleTest {
             Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.SOURCES)).resolve(name + ".java"),
                     "class " + name + " { }");
             Files.createDirectories(context.next().resolve(BuildStep.CLASSES));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -407,7 +407,7 @@ public class JavaToolchainModuleTest {
             }
         }
         Files.writeString(classes.resolve("transformed.marker"), "transformed");
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }).asModule("transform");
 
     private static final BuildExecutorModule GENERATOR = ((BuildStep) (_, context, _) -> {
@@ -415,7 +415,7 @@ public class JavaToolchainModuleTest {
                 .resolve("Generated.java"), "package generated; public class Generated { }\n");
         Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.RESOURCES + "META-INF/services"))
                 .resolve("generated.Service"), "generated.Generated\n");
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }).asModule("generate");
 
     private static final BuildExecutorModule VALIDATOR = ((BuildStep) (_, context, arguments) -> {
@@ -435,7 +435,7 @@ public class JavaToolchainModuleTest {
         }
         Path report = Files.createDirectories(context.next().resolve("validated"));
         Files.writeString(report.resolve("classes.txt"), String.join("\n", names));
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }).asModule("validate");
 
     private static List<Path> bootModuleJars() throws IOException {

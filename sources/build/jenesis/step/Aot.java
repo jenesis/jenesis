@@ -122,7 +122,7 @@ public class Aot implements BuildStep {
         }
         String launched = main == null ? declared : main;
         if (runtime == null || module == null || launched == null) {
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
         Path java = runtime.toAbsolutePath().resolve("bin").resolve("java.exe"),
                 cache = Files.createDirectory(context.next().resolve(AOT)).toAbsolutePath().resolve(module + ".aot"),
@@ -204,7 +204,7 @@ public class Aot implements BuildStep {
                     });
                     BuildStep.linkOrCopy(target.resolve("lib").resolve(cache.getFileName().toString()), cache);
                 }
-                return new BuildStepResult(true);
+                return new BuildStepResult();
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }

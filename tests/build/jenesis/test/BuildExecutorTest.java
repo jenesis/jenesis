@@ -101,7 +101,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("source", "step");
@@ -118,7 +118,7 @@ public class BuildExecutorTest implements Serializable {
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")));
             Files.setAttribute(written, "dos:readonly", true);
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         Files.writeString(source.resolve("file"), "bar");
@@ -164,7 +164,7 @@ public class BuildExecutorTest implements Serializable {
     public void a_step_is_written_to_the_folder_named_like_it_and_selected_by_that_name() throws IOException {
         buildExecutor.addStep("module-api+client%20v2", (_, context, _) -> {
             Files.writeString(context.next().resolve("file"), "foo");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         buildExecutor.addStep("other", (_, _, _) -> {
             throw new AssertionError("Not selected");
@@ -189,7 +189,7 @@ public class BuildExecutorTest implements Serializable {
         second.addSource("source", source);
         second.addStep("step", (_, context, _) -> {
             Files.writeString(context.next().resolve("file"), "again");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         second.execute(Runnable::run).toCompletableFuture().join();
         assertThat(root.resolve("step").resolve("output").resolve("file")).content().isEqualTo("again");
@@ -266,7 +266,7 @@ public class BuildExecutorTest implements Serializable {
         buildExecutor.addSource("source", source);
         buildExecutor.addStep("step", (_, context, _) -> {
             Files.writeString(context.next().resolve("file"), "fresh");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(root.resolve("step").resolve("output").resolve("file")).content().isEqualTo("fresh");
@@ -355,7 +355,7 @@ public class BuildExecutorTest implements Serializable {
             int run = RUNS.incrementAndGet();
             Files.writeString(context.next().resolve("file"), "value" + run);
             Files.writeString(context.next().resolve("companion"), "companion" + run);
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         };
     }
 
@@ -419,7 +419,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(false));
+            return CompletableFuture.completedStage(new BuildStepResult().next(false));
         }, "source");
         assertThatThrownBy(() -> buildExecutor.execute(Runnable::run).toCompletableFuture().join())
                 .isInstanceOf(BuildExecutorException.class)
@@ -461,7 +461,7 @@ public class BuildExecutorTest implements Serializable {
             executor.addSource("source", source);
             executor.addStep("step", (_, context, arguments) -> {
                 Files.copy(arguments.get("source").folder().resolve("file"), context.next().resolve("file"));
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
             executor.execute(Runnable::run).toCompletableFuture().join();
             assertThat(SequencedProperties.ofFiles(root.resolve("step").resolve(BuildExecutor.LOCAL)).value("run"))
@@ -523,7 +523,7 @@ public class BuildExecutorTest implements Serializable {
         repaired.addSource("source", source);
         repaired.addStep("step", (_, context, _) -> {
             Files.writeString(context.next().resolve("file"), "complete");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         repaired.execute(Runnable::run).toCompletableFuture().join();
         assertThat(root.resolve("step").resolve("output").resolve("file")).content().isEqualTo("complete");
@@ -585,8 +585,8 @@ public class BuildExecutorTest implements Serializable {
         executor.addStep("step1", (_, _, _) -> {
             throw new RuntimeException("one");
         });
-        executor.addStep("step2", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)), "step1");
-        executor.addStep("step3", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)), "step1");
+        executor.addStep("step2", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()), "step1");
+        executor.addStep("step3", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()), "step1");
         Throwable thrown = catchThrowable(() -> executor.execute(Runnable::run).toCompletableFuture().join());
         assertThat(thrown).isInstanceOf(BuildExecutorException.class).hasMessage("Failed to execute step1");
         assertThat(thrown.getSuppressed()).as("the one failure is reported once rather than suppressed by itself").isEmpty();
@@ -682,7 +682,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         };
         SequencedProperties stepProperties = new SequencedProperties();
         stepProperties.setProperty("serialization",
@@ -723,7 +723,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }
         };
         SequencedProperties stepProperties = new SequencedProperties();
@@ -755,7 +755,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(false));
+            return CompletableFuture.completedStage(new BuildStepResult().next(false));
         };
         SequencedProperties stepProperties = new SequencedProperties();
         stepProperties.setProperty("serialization",
@@ -787,7 +787,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("source", "step");
@@ -807,7 +807,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         buildExecutor.addStep("step2", (_, context, arguments) -> {
             assertThat(context.previous()).isNull();
@@ -818,7 +818,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("step1").folder().resolve("file")) + "qux");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "step1");
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("source", "step1", "step2");
@@ -843,7 +843,7 @@ public class BuildExecutorTest implements Serializable {
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source1").folder().resolve("file"))
                             + Files.readString(arguments.get("source2").folder().resolve("file")));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source1", "source2");
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("source1", "source2", "step");
@@ -858,7 +858,7 @@ public class BuildExecutorTest implements Serializable {
         BuildStep step = (_, context, arguments) -> {
             APPLIED.set(new LinkedHashMap<>(arguments));
             Files.writeString(context.next().resolve("file"), live(arguments));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         };
         buildExecutor.addSource("source1", source);
         buildExecutor.addSource("source2", source2);
@@ -918,7 +918,7 @@ public class BuildExecutorTest implements Serializable {
                                                           SequencedMap<String, BuildStepArgument> arguments)
                     throws IOException {
                 Files.writeString(context.next().resolve("file"), live(arguments));
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }
         };
         buildExecutor.addSource("source1", source);
@@ -985,7 +985,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         buildExecutor.addStep("step2", (_, context, arguments) -> {
             assertThat(context.previous()).isNull();
@@ -996,7 +996,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "qux");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         buildExecutor.addStep("step3", (_, context, arguments) -> {
             assertThat(context.previous()).isNull();
@@ -1010,7 +1010,7 @@ public class BuildExecutorTest implements Serializable {
                     context.next().resolve("file"),
                     Files.readString(arguments.get("step1").folder().resolve("file"))
                             + Files.readString(arguments.get("step2").folder().resolve("file")));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "step1", "step2");
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("source", "step1", "step2", "step3");
@@ -1032,7 +1032,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
             buildExecutor.addStep("step2", (_, context, arguments) -> {
                 assertThat(context.previous()).isNull();
@@ -1043,7 +1043,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("step1").folder().resolve("file")) + "qux");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "step1");
         });
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
@@ -1068,7 +1068,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
             buildExecutor.addStep("step2", (_, context, arguments) -> {
                 assertThat(context.previous()).isNull();
@@ -1079,7 +1079,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("step1").folder().resolve("file")) + "qux");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "step1");
         }, identity -> switch (identity) {
             case "source" -> Optional.of("renamed/source");
@@ -1109,7 +1109,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
             buildExecutor.addStep("step2", (_, context, arguments) -> {
                 assertThat(context.previous()).isNull();
@@ -1120,7 +1120,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("step1").folder().resolve("file")) + "qux");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "step1");
         }, _ -> Optional.of("duplicate"), Collections.emptyNavigableMap());
         assertThatThrownBy(() -> buildExecutor.execute(Runnable::run).toCompletableFuture().join())
@@ -1147,7 +1147,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("../source").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "../source");
             buildExecutor.addStep("step2", (_, context, arguments) -> {
                 assertThat(context.previous()).isNull();
@@ -1158,7 +1158,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("step1").folder().resolve("file")) + "qux");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "step1");
         }, "source");
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
@@ -1184,7 +1184,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source/source1").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("source/source1", "step");
@@ -1279,7 +1279,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("../source/source1").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "../source/source1");
             buildExecutor.addStep("step2", (_, context, arguments) -> {
                 assertThat(context.previous()).isNull();
@@ -1290,7 +1290,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("step1").folder().resolve("file")) + "qux");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "step1");
         }, "source");
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
@@ -1319,7 +1319,7 @@ public class BuildExecutorTest implements Serializable {
                     Files.writeString(
                             context.next().resolve("file"),
                             Files.readString(arguments.get("../../source").folder().resolve("file")) + "bar");
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 }, "../../source");
             }, "../source");
         }, "source");
@@ -1346,7 +1346,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("source", "step");
@@ -1368,7 +1368,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         buildExecutor.addStep("step2", (_, context, arguments) -> {
             assertThat(context.previous()).isNull();
@@ -1379,7 +1379,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("step1").folder().resolve("file")) + "qux");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "step0");
         buildExecutor.prependStep("step2", "step1", (_, context, arguments) -> {
             assertThat(context.previous()).isNull();
@@ -1390,7 +1390,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("step0").folder().resolve("file")) + "baz");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("source", "step0", "step2", "step1");
@@ -1412,7 +1412,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         buildExecutor.addStep("step2", (_, context, arguments) -> {
             assertThat(context.previous()).isNull();
@@ -1423,7 +1423,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("step1").folder().resolve("file")) + "qux");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "step1");
         buildExecutor.appendStep("step1", "step0", (_, context, arguments) -> {
             assertThat(context.previous()).isNull();
@@ -1434,7 +1434,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("step0").folder().resolve("file")) + "baz");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("source", "step1", "step2", "step0");
@@ -1458,7 +1458,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
         });
         buildExecutor.addStep("step3", (_, context, arguments) -> {
@@ -1470,7 +1470,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("step1/step2").folder().resolve("file")) + "qux");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "step1/step2");
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("step1/source", "step1/step2", "step3");
@@ -1492,7 +1492,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
             module.addStep("step3", (_, context, arguments) -> {
                 assertThat(context.previous()).isNull();
@@ -1503,7 +1503,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "qux");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
         });
         buildExecutor.addStep("step4", (_, context, arguments) -> {
@@ -1518,7 +1518,7 @@ public class BuildExecutorTest implements Serializable {
                     context.next().resolve("file"),
                     Files.readString(arguments.get("step1/step2").folder().resolve("file"))
                             + Files.readString(arguments.get("step1/step3").folder().resolve("file")));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "step1/step2", "step1/step3");
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("step1/source", "step1/step2", "step1/step3", "step4");
@@ -1540,7 +1540,7 @@ public class BuildExecutorTest implements Serializable {
                     Files.writeString(
                             context.next().resolve("file"),
                             Files.readString(arguments.get("../../source").folder().resolve("file")) + "bar");
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 }, "../../source");
             }, "../source");
         }, "source");
@@ -1551,7 +1551,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("step1/step2/step3").folder().resolve("file")) + "qux");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "step1/step2/step3");
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("source", "step1/step2/step3", "step4");
@@ -1573,7 +1573,7 @@ public class BuildExecutorTest implements Serializable {
     public void rejects_nonexistent_sub_dependency() {
         buildExecutor.addModule("step1", (module, inherited) -> {
             assertThat(inherited).isEmpty();
-            module.addStep("step2", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+            module.addStep("step2", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()));
         });
         buildExecutor.addStep("step2", (_, _, _) -> {
             throw new AssertionError();
@@ -1590,7 +1590,7 @@ public class BuildExecutorTest implements Serializable {
     public void rejects_redundant_root_dependency() {
         buildExecutor.addModule("step1", (module, inherited) -> {
             assertThat(inherited).isEmpty();
-            module.addStep("step2", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+            module.addStep("step2", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()));
         });
         assertThatThrownBy(() -> buildExecutor.addStep("step2", (_, _, _) -> {
             throw new AssertionError();
@@ -1605,7 +1605,7 @@ public class BuildExecutorTest implements Serializable {
             assertThat(inherited).isEmpty();
             module.addModule("step2", (nested, nestedInherited) -> {
                 assertThat(nestedInherited).isEmpty();
-                nested.addStep("step3", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+                nested.addStep("step3", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()));
             });
         });
         assertThatThrownBy(() -> buildExecutor.addStep("step4", (_, _, _) -> {
@@ -1628,7 +1628,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("other").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, new LinkedHashMap<>(Map.of("source", "other")));
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("source", "step1");
@@ -1650,7 +1650,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("../other").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, new LinkedHashMap<>(Map.of("../intermediate", "../other")));
         }, new LinkedHashMap<>(Map.of("source", "intermediate")));
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
@@ -1673,7 +1673,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("../source").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "../source");
         }, "source");
         buildExecutor.addStep("step3", (_, context, arguments) -> {
@@ -1685,7 +1685,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("other1/step2").folder().resolve("file")) + "qux");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, new LinkedHashMap<>(Map.of("step1", "other1")));
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("source", "step1/step2", "step3");
@@ -1715,7 +1715,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         buildExecutor.addStep("step2", (_, _, _) -> {
             throw new AssertionError("step2 should not run");
@@ -1734,13 +1734,13 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         buildExecutor.addStep("step2", (_, context, arguments) -> {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "qux");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         buildExecutor.addStep("step3", (_, _, _) -> {
             throw new AssertionError("step3 should not run");
@@ -1760,7 +1760,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source1").folder().resolve("file")) + "A");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source1");
         buildExecutor.addStep("branchB", (_, _, _) -> {
             throw new AssertionError("branchB should not run");
@@ -1788,7 +1788,7 @@ public class BuildExecutorTest implements Serializable {
             module.addSource("source", source);
             module.addStep("tests", (_, context, _) -> {
                 Files.writeString(context.next().resolve("file"), "tested");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
         });
         buildExecutor.addStep("other", (_, _, _) -> {
@@ -1828,7 +1828,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
             module.addStep("step2", (_, _, _) -> {
                 throw new AssertionError("step2 should not run");
@@ -1848,13 +1848,13 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
             module.addStep("step2", (_, context, arguments) -> {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("step1").folder().resolve("file")) + "qux");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "step1");
         });
         buildExecutor.addStep("other", (_, _, _) -> {
@@ -1875,7 +1875,7 @@ public class BuildExecutorTest implements Serializable {
                     Files.writeString(
                             context.next().resolve("file"),
                             Files.readString(arguments.get("../../source").folder().resolve("file")) + "bar");
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 }, "../../source");
                 inner.addStep("sibling", (_, _, _) -> {
                     throw new AssertionError("sibling should not run");
@@ -1910,7 +1910,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "A");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
             module.addStep("other", (_, _, _) -> {
                 throw new AssertionError("modA/other should not run");
@@ -1922,7 +1922,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "B");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
         });
         buildExecutor.addModule("modC", (module, _) -> module.addStep("different", (_, _, _) -> {
@@ -1941,7 +1941,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
             inner.addStep("other", (_, _, _) -> {
                 throw new AssertionError("other should not run");
@@ -1959,7 +1959,7 @@ public class BuildExecutorTest implements Serializable {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("rootSource").folder().resolve("file")) + "0");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "rootSource");
         buildExecutor.addModule("modA", (module, _) -> {
             module.addSource("sourceA", source);
@@ -1967,7 +1967,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("sourceA").folder().resolve("file")) + "A");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "sourceA");
         });
         buildExecutor.addModule("modB", (module, _) -> module.addModule("nested", (nested, _) -> {
@@ -1976,7 +1976,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("sourceB").folder().resolve("file")) + "B");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "sourceB");
         }));
         Map<String, ?> build = buildExecutor.execute(Runnable::run, "::/leaf").toCompletableFuture().join();
@@ -1999,7 +1999,7 @@ public class BuildExecutorTest implements Serializable {
                     Files.writeString(
                             context.next().resolve("file"),
                             Files.readString(arguments.get("source").folder().resolve("file")) + "A");
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 }, "source");
             });
             outer.addModule("childB", (child, _) -> {
@@ -2008,7 +2008,7 @@ public class BuildExecutorTest implements Serializable {
                     Files.writeString(
                             context.next().resolve("file"),
                             Files.readString(arguments.get("source").folder().resolve("file")) + "B");
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 }, "source");
             });
         });
@@ -2030,7 +2030,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "A");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
         });
         buildExecutor.addModule("modB", (module, _) -> module.addStep("different", (_, _, _) -> {
@@ -2062,7 +2062,7 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
         });
         Map<String, ?> build = buildExecutor.execute(Runnable::run, ":/step").toCompletableFuture().join();
@@ -2103,13 +2103,13 @@ public class BuildExecutorTest implements Serializable {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "source");
             module.addStep("step2", (_, context, arguments) -> {
                 Files.writeString(
                         context.next().resolve("file"),
                         Files.readString(arguments.get("step1").folder().resolve("file")) + "qux");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, "step1");
         });
         Map<String, ?> build = buildExecutor.execute(Runnable::run, "module/step1", "module")
@@ -2142,7 +2142,7 @@ public class BuildExecutorTest implements Serializable {
             } catch (InterruptedException _) {
                 INTERRUPTED.set(true);
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         long started = System.nanoTime();
         assertThatThrownBy(() -> timing.execute("step"))
@@ -2178,7 +2178,7 @@ public class BuildExecutorTest implements Serializable {
                     throw new IllegalStateException(e);
                 }
                 Files.writeString(context.next().resolve("file"), "done");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             });
         }
         assertThat(timing.execute()).containsOnlyKeys("first", "second", "third");

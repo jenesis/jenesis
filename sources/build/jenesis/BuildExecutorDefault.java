@@ -155,7 +155,6 @@ class BuildExecutorDefault implements BuildExecutor {
                 BiConsumer<Boolean, Throwable> completion = callback.step(
                         location + identity,
                         new LinkedHashSet<>(summaries.keySet()));
-                boolean cacheRemotely = step.shouldCacheRemotely();
                 Path next = target.resolve(identity + BuildExecutor.NEXT),
                         salvaged = target.resolve(identity + BuildExecutor.NEXT + PERSISTENT);
                 if (Files.exists(salvaged)) {
@@ -179,7 +178,6 @@ class BuildExecutorDefault implements BuildExecutor {
                             location + identity,
                             currentStepHash,
                             inputs,
-                            cacheRemotely,
                             nextOutput);
                     boolean fromCache = cached.isPresent();
                     if (fromCache) {
@@ -249,7 +247,7 @@ class BuildExecutorDefault implements BuildExecutor {
                             SequencedProperties stepProperties = new SequencedProperties();
                             stepProperties.setProperty("serialization", HexFormat.of().formatHex(currentStepHash));
                             stepProperties.storeAtomically(previous.step());
-                            if (cache.stores() && !fromCache && result.next()) {
+                            if (cache.stores() && !fromCache && result.next() && result.cached()) {
                                 String stored = location + identity;
                                 try {
                                     executor.execute(() -> {
@@ -259,7 +257,6 @@ class BuildExecutorDefault implements BuildExecutor {
                                                     location + identity,
                                                     currentStepHash,
                                                     inputs,
-                                                    cacheRemotely,
                                                     previous.output(),
                                                     algorithm,
                                                     checksums);
@@ -303,7 +300,7 @@ class BuildExecutorDefault implements BuildExecutor {
                     }
                     completion.accept(false, null);
                     try {
-                        cache.touch(executor, location + identity, currentStepHash, inputs, cacheRemotely);
+                        cache.touch(executor, location + identity, currentStepHash, inputs);
                     } catch (IOException _) {
                     }
                     return CompletableFuture.completedStage(Map.of(identity, Map.of(
