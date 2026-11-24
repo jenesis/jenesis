@@ -185,7 +185,7 @@ public class InferredCompilerChainModuleTest {
                 "package sample\nclass Sample\n");
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("chain", InferredCompilerChainModule.ofEnvironment(new Environment(Map.of("language.kotlin", "false")),
+        executor.addModule("chain", InferredCompilerChainModule.ofEnvironment(new Environment(Map.of("kotlin.language", "false")),
                 Map.of(),
                 Map.of()), "project");
 
@@ -193,7 +193,7 @@ public class InferredCompilerChainModuleTest {
                 .hasRootCauseInstanceOf(IllegalStateException.class)
                 .rootCause()
                 .hasMessageContaining(".kt")
-                .hasMessageContaining("jenesis.language.kotlin=false");
+                .hasMessageContaining("jenesis.kotlin.language=false");
     }
 
     @Test
@@ -202,7 +202,7 @@ public class InferredCompilerChainModuleTest {
                 "(ns sample.core)\n");
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("chain", InferredCompilerChainModule.ofEnvironment(new Environment(Map.of("language.clojure", "false")),
+        executor.addModule("chain", InferredCompilerChainModule.ofEnvironment(new Environment(Map.of("clojure.language", "false")),
                 Map.of(),
                 Map.of()), "project");
 
@@ -211,7 +211,7 @@ public class InferredCompilerChainModuleTest {
                 .rootCause()
                 .hasMessageContaining(".clj")
                 .hasMessageContaining("plugin clojure")
-                .hasMessageContaining("jenesis.language.clojure=false");
+                .hasMessageContaining("jenesis.clojure.language=false");
     }
 
     @Test

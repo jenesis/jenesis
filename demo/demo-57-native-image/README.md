@@ -62,7 +62,7 @@ The result is a ~15 MB ELF executable (`.exe` on Windows, a Mach-O binary on mac
 that links `java.base` statically and starts without a runtime. The greeting comes
 back through reflection - which only works because the test capture told native-image
 to keep `sample.Greeter`. Keep `native=true` in `packaging.properties` but suppress the
-capture with `-Djenesis.observe.native=false` (so nothing records the reflection) and
+capture with `-Djenesis.native.observe=false` (so nothing records the reflection) and
 the binary fails at run time with `ClassNotFoundException: sample.Greeter`: the closed-world
 analysis dropped the class it never saw referenced.
 

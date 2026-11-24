@@ -56,9 +56,9 @@ detekt runs with `--config detekt.yml`; ktlint receives `.editorconfig` as
 editorconfig layering). Both lint the `.kt` sources in the module's `verify`
 phase, which no other module waits for, and write an XML report under their
 step's output folder. By default they are report-only;
-`-Djenesis.strict.detekt=true` and `-Djenesis.strict.ktlint=true` fail the
-build on their violations instead, and `-Djenesis.check.detekt=false` and
-`-Djenesis.check.ktlint=false` skip them, as in the Java code-quality demo.
+`-Djenesis.detekt.strict=true` and `-Djenesis.ktlint.strict=true` fail the
+build on their violations instead, and `-Djenesis.detekt.check=false` and
+`-Djenesis.ktlint.check=false` skip them, as in the Java code-quality demo.
 
 Formatting: verify, and how to reformat
 ---------------------------------------
@@ -70,7 +70,7 @@ rewrite the sources in place, run the build with the rewrite switch:
     java -Djenesis.format.rewrite=true build/jenesis/Make.java
 
 This is the Kotlin equivalent of the google-java-format rewrite shown in
-`../demo-37-java-quality`. `-Djenesis.format.ktlint=false` switches ktlint's
+`../demo-37-java-quality`. `-Djenesis.ktlint.format=false` switches ktlint's
 formatting off, while ktlint still lints.
 
 Formatting with ktfmt instead
@@ -87,14 +87,14 @@ default Meta style, or name ktfmt's options:
 The demo's `ktfmt.properties` holds `style=kotlinlang` and sits in the profile
 folder `build.jenesis/ktfmt/`. Two formatters would fight over the same
 sources, so a `ktfmt.properties` found where ktlint formats fails the build,
-asking for `jenesis.format.ktlint=false`. The profile's
+asking for `jenesis.ktlint.format=false`. The profile's
 `jenesis-ktfmt.properties` sets exactly that, so ktfmt formats while ktlint
 still lints:
 
     java -Djenesis.make.profiles=ktfmt build/jenesis/Make.java
 
 ktfmt verifies like the other formatters, rewrites under the same switch, and
-is switched off by `-Djenesis.format.ktfmt=false`.
+is switched off by `-Djenesis.ktfmt.format=false`.
 
 Pinning
 -------

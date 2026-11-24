@@ -44,7 +44,7 @@ JaCoCo is an official plugin of the hook point `observe`, which attaches an engi
 to the JVM the tests run in and reports over what it recorded. A `jacoco.properties`
 in a configuration folder switches it on: the build resolves the plugin by itself
 as `module/build.jenesis.plugin.jacoco`, with no line in `jenesis.plugins.properties`,
-in every module where it finds the file, and `-Djenesis.observe.jacoco=false` leaves
+in every module where it finds the file, and `-Djenesis.jacoco.observe=false` leaves
 it out:
 
 - With no engine enabled (the default for most projects), it is a plain test run.
@@ -123,7 +123,7 @@ reports. The demo ships the file under a profile, so a plain build does not reco
 
 `settings=profile` samples more often than the JDK's default settings. Open the
 recording in JDK Mission Control, or summarise it with `jfr summary`. Changing the
-file runs the tests again, and `-Djenesis.observe.jfr=false` switches the recording
+file runs the tests again, and `-Djenesis.jfr.observe=false` switches the recording
 off.
 
 Profiling the tests with async-profiler
@@ -144,4 +144,4 @@ profiler's native library, in the group `asyncprofiler:agent`, attaches it to th
 test JVM with native access, and names the file itself. The report is a flame
 graph you open in a browser; an option selecting another format, such as `jfr` or
 `collapsed`, writes `tests.jfr` or `tests.collapsed` instead. async-profiler runs
-on Linux and macOS, and `-Djenesis.observe.asyncprofiler=false` switches it off.
+on Linux and macOS, and `-Djenesis.asyncprofiler.observe=false` switches it off.

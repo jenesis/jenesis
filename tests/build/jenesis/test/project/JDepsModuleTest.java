@@ -36,7 +36,7 @@ public class JDepsModuleTest {
                 .rootCause()
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jdeps found 1 finding")
-                .hasMessageContaining("jenesis.strict.jdeps is true");
+                .hasMessageContaining("jenesis.jdeps.strict is true");
     }
 
     @Test

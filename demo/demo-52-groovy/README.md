@@ -21,7 +21,7 @@ with `groovyc`, and packages a modular jar plus a generated POM.
 Groovy is an official plugin of the hook point `language`, as Kotlin and Scala
 are in the demos before it. The build resolves it by itself, as
 `module/build.jenesis.plugin.groovy`, in every module that holds a `.groovy`
-source, and `-Djenesis.language.groovy=false` leaves it out.
+source, and `-Djenesis.groovy.language=false` leaves it out.
 
 Layout
 ------
