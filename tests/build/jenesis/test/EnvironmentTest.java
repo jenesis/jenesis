@@ -141,6 +141,22 @@ public class EnvironmentTest {
     }
 
     @Test
+    public void an_environment_without_writers_writes_to_the_streams_the_jvm_holds_when_it_prints() {
+        Environment environment = new Environment(Map.of());
+        PrintStream original = System.out;
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(bytes, true, StandardCharsets.UTF_8));
+        try {
+            environment.out().accept("printed");
+        } finally {
+            System.setOut(original);
+        }
+        assertThat(bytes.toString(StandardCharsets.UTF_8))
+                .as("a daemon hands each build a stream of its own, which an environment built before must reach")
+                .contains("printed");
+    }
+
+    @Test
     public void a_confined_path_a_project_s_file_supplied_stays_inside_the_project(@TempDir Path root) {
         Environment inside = new Environment(Map.of("sample.folder", "out", "make.provided", "sample.folder")).root(root);
         assertThat(inside.path("sample.folder", Setting.CONFINED)).isEqualTo(root.resolve("out"));
