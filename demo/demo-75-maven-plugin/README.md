@@ -62,4 +62,4 @@ The module keeps the packaging `jar`, as Maven reads a plugin from its descripto
 | `maven` | the release of Maven whose API the descriptor is generated with, `3.9.11` by default |
 | `tools` | the release of Maven's plugin tools, `3.15.1` by default |
 
-`-Djenesis.artifact.mavenplugin=false` switches the descriptor off.
+`-Djenesis.mavenplugin.artifact=false` switches the descriptor off.

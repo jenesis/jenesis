@@ -111,7 +111,7 @@ compiled against 1.0.0, so the build stops and names the change:
 Switching it off
 ----------------
 
-`-Djenesis.artifact.japicmp=false` keeps `japicmp.properties` in place and skips the comparison,
+`-Djenesis.japicmp.artifact=false` keeps `japicmp.properties` in place and skips the comparison,
 the same opt-out every plugin has.
 
 revapi beside japicmp
@@ -137,8 +137,8 @@ revapi's own configuration, as a `revapi.differences` list of the differences a 
 revapi's JSON: a `configuration=<path>` line of `revapi.properties`, resolved against its folder, names such a file, an array of
 `{"extension": ..., "configuration": ...}` objects as revapi documents it. Any other key fails the build.
 
-Like a linter, revapi reports and keeps the build green; `-Djenesis.strict.revapi=true` fails it on
-any difference reported, and `-Djenesis.artifact.revapi=false` skips it. revapi resolves in its tool group, `revapi:tool`: `revapi-java`,
+Like a linter, revapi reports and keeps the build green; `-Djenesis.revapi.strict=true` fails it on
+any difference reported, and `-Djenesis.revapi.artifact=false` skips it. revapi resolves in its tool group, `revapi:tool`: `revapi-java`,
 `revapi-basic-features` and `revapi-reporter-json` with what they depend on, beside the baseline.
 
 Pinning

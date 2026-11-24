@@ -96,32 +96,32 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 new LicenseHeaderModule(),
                 value -> value,
                 ExternalModule.official(environment, "openrewrite", null, repositories, resolvers),
-                environment.flag("format.openrewrite", true, Setting.PROJECT),
+                environment.flag("openrewrite.format", true, Setting.PROJECT),
                 ExternalModule.official(environment, "googlejavaformat", null, repositories, resolvers),
-                environment.flag("format.googlejavaformat", true, Setting.PROJECT),
+                environment.flag("googlejavaformat.format", true, Setting.PROJECT),
                 ExternalModule.official(environment, "palantir", null, repositories, resolvers),
-                environment.flag("format.palantir", true, Setting.PROJECT),
+                environment.flag("palantir.format", true, Setting.PROJECT),
                 ExternalModule.official(environment, "openjavaformat", null, repositories, resolvers),
-                environment.flag("format.openjavaformat", true, Setting.PROJECT),
+                environment.flag("openjavaformat.format", true, Setting.PROJECT),
                 ExternalModule.official(environment, "princeofspace", null, repositories, resolvers),
-                environment.flag("format.princeofspace", true, Setting.PROJECT),
+                environment.flag("princeofspace.format", true, Setting.PROJECT),
                 ExternalModule.official(environment, "eclipse", null, repositories, resolvers),
-                environment.flag("format.eclipse", true, Setting.PROJECT),
+                environment.flag("eclipse.format", true, Setting.PROJECT),
                 ExternalModule.official(environment, "ktfmt", null, repositories, resolvers),
-                environment.flag("format.ktfmt", true, Setting.PROJECT),
+                environment.flag("ktfmt.format", true, Setting.PROJECT),
                 ExternalModule.official(environment, "ktlint", "format", repositories, resolvers),
-                environment.flag("format.ktlint", true, Setting.PROJECT),
+                environment.flag("ktlint.format", true, Setting.PROJECT),
                 ExternalModule.official(environment, "scalafmt", "format", repositories, resolvers),
-                environment.flag("format.scalafmt", true, Setting.PROJECT),
+                environment.flag("scalafmt.format", true, Setting.PROJECT),
                 ExternalModule.official(environment, "spotless", null, repositories, resolvers),
-                environment.flag("format.spotless", true, Setting.PROJECT),
+                environment.flag("spotless.format", true, Setting.PROJECT),
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap());
         Boolean rewrite = environment.flagOrNull("format.rewrite", Setting.PROJECT);
         if (rewrite != null) {
             module = module.verify(!rewrite);
         }
-        Boolean license = environment.flagOrNull("format.license", Setting.PROJECT);
+        Boolean license = environment.flagOrNull("license.format", Setting.PROJECT);
         if (license != null) {
             module = module.license(license ? value -> value : null);
         }
@@ -709,7 +709,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
             if (spotlessSteps.contains("licenseHeader") && inputs.contains(LICENSE)) {
                 throw new IllegalArgumentException(spotlessFile + " runs Spotless's licenseHeader step while a "
                         + LicenseHeaderModule.CONFIGURATION + " checks the same header - keep one, or switch the"
-                        + " check off with jenesis.format.license=false");
+                        + " check off with jenesis.license.format=false");
             }
             if (!Collections.disjoint(spotlessSteps, SPOTLESS_JAVA)) {
                 formatters.put(SPOTLESS, spotlessModule.properties(spotlessValues));
@@ -718,7 +718,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         if (formatters.size() > 1) {
             throw new IllegalArgumentException("A configuration folder switches on " + formatters.sequencedKeySet()
                     + ", which would each format the same Java sources - keep the <name>.properties of one, or"
-                    + " switch the others off with jenesis.format.<name>=false");
+                    + " switch the others off with jenesis.<name>.format=false");
         }
         formatters.forEach((name, module) -> buildExecutor.addModule(name, module, inputs));
         if (spotlessFile != null && !formatters.containsKey(SPOTLESS)) {
@@ -729,13 +729,13 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         if (ktfmtFile != null && ktlintDiscovered != null) {
             throw new IllegalArgumentException(ktfmtFile + " selects ktfmt while ktlint formats the same Kotlin sources,"
                     + " as a configuration folder holds a ktlint.properties or an .editorconfig - set"
-                    + " jenesis.format.ktlint=false to format with ktfmt alone, or remove ktfmt.properties");
+                    + " jenesis.ktlint.format=false to format with ktfmt alone, or remove ktfmt.properties");
         }
         if ((ktfmtFile != null || ktlintDiscovered != null) && !Collections.disjoint(spotlessSteps, SPOTLESS_KOTLIN)) {
             throw new IllegalArgumentException(spotlessFile + " runs a Kotlin formatter of Spotless while "
                     + (ktfmtFile != null ? "ktfmt" : "ktlint") + " formats the same Kotlin sources - keep the Spotless"
-                    + " step, or switch the other off with jenesis.format." + (ktfmtFile != null ? KTFMT : KTLINT)
-                    + "=false");
+                    + " step, or switch the other off with jenesis." + (ktfmtFile != null ? KTFMT : KTLINT)
+                    + ".format=false");
         }
         if (ktfmtFile != null) {
             SequencedMap<String, String> values = new LinkedHashMap<>();
@@ -749,7 +749,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         if (scalafmtDiscovered != null && spotlessSteps.contains("scalafmt")) {
             throw new IllegalArgumentException(spotlessFile + " runs Spotless's scalafmt step while scalafmt formats the"
                     + " same Scala sources - keep the Spotless step, or switch the other off with"
-                    + " jenesis.format.scalafmt=false");
+                    + " jenesis.scalafmt.format=false");
         }
         if (scalafmtDiscovered != null) {
             buildExecutor.addModule(SCALAFMT, scalafmtDiscovered, inputs);

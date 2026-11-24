@@ -87,16 +87,16 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableSet(),
                 ExternalModule.official(environment, JACOCO, null, repositories, resolvers),
-                environment.flag("observe.jacoco", true, Setting.PROJECT),
+                environment.flag("jacoco.observe", true, Setting.PROJECT),
                 ExternalModule.official(environment, ASYNCPROFILER, null, repositories, resolvers),
-                environment.flag("observe.asyncprofiler", true, Setting.PROJECT),
+                environment.flag("asyncprofiler.observe", true, Setting.PROJECT),
                 ExternalModule.official(environment, PITEST, null, repositories, resolvers),
-                environment.flag("observe.pitest", true, Setting.PROJECT));
-        Boolean nativeImage = environment.flagOrNull("observe.native", Setting.PROJECT);
+                environment.flag("pitest.observe", true, Setting.PROJECT));
+        Boolean nativeImage = environment.flagOrNull("native.observe", Setting.PROJECT);
         if (nativeImage != null) {
             module = module.nativeImage(nativeImage ? value -> value : null);
         }
-        Boolean jfr = environment.flagOrNull("observe.jfr", Setting.PROJECT);
+        Boolean jfr = environment.flagOrNull("jfr.observe", Setting.PROJECT);
         if (jfr != null) {
             module = module.jfr(jfr ? value -> value : null);
         }

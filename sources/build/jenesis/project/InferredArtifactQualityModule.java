@@ -39,9 +39,9 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
                                                               Map<String, Resolver> resolvers) {
         return new InferredArtifactQualityModule(configuration,
                 ExternalModule.official(environment, "japicmp", null, repositories, resolvers),
-                environment.flag("artifact.japicmp", true, Setting.PROJECT),
+                environment.flag("japicmp.artifact", true, Setting.PROJECT),
                 ExternalModule.official(environment, "revapi", null, repositories, resolvers),
-                environment.flag("artifact.revapi", true, Setting.PROJECT),
+                environment.flag("revapi.artifact", true, Setting.PROJECT),
                 Collections.emptyNavigableMap());
     }
 

@@ -16,7 +16,7 @@ import build.jenesis.step.ProcessHandler;
 public class JDeprScanModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
-    private static final String STRICT = "strict.jdeprscan", REPORT = BuildStep.REPORTS + "jdeprscan/jdeprscan.txt";
+    private static final String STRICT = "jdeprscan.strict", REPORT = BuildStep.REPORTS + "jdeprscan/jdeprscan.txt";
 
     private final String group;
     private final boolean strict;
