@@ -206,24 +206,11 @@ class BuildExecutorDefault implements BuildExecutor {
                                 nextSupplement,
                                 nextPersistent);
                         if (permits == null) {
-                            try {
-                                stepStage = step.apply(executor, context, arguments);
-                            } catch (Throwable t) {
-                                stepStage = CompletableFuture.failedStage(t);
-                            }
+                            stepStage = timed(step, executor, context, arguments);
                         } else {
-                            stepStage = permits.acquire().thenComposeAsync(_ -> {
-                                try {
-                                    return step.apply(executor, context, arguments);
-                                } catch (Throwable t) {
-                                    return CompletableFuture.failedStage(t);
-                                }
-                            }, executor).whenCompleteAsync((_, _) -> permits.release(), executor);
-                        }
-                        if (!timeout.isZero()) {
-                            stepStage = stepStage.toCompletableFuture().orTimeout(
-                                    timeout.toNanos(),
-                                    TimeUnit.NANOSECONDS);
+                            stepStage = permits.acquire()
+                                    .thenComposeAsync(_ -> timed(step, executor, context, arguments), executor)
+                                    .whenCompleteAsync((_, _) -> permits.release(), executor);
                         }
                     }
                     return stepStage.thenComposeAsync(result -> {
@@ -327,6 +314,61 @@ class BuildExecutorDefault implements BuildExecutor {
                 return CompletableFuture.failedFuture(new BuildExecutorException(location + identity, t));
             }
         };
+    }
+
+    private CompletionStage<BuildStepResult> timed(BuildStep step,
+                                                   Executor executor,
+                                                   BuildStepContext context,
+                                                   SequencedMap<String, BuildStepArgument> arguments) {
+        if (timeout.isZero()) {
+            try {
+                return step.apply(executor, context, arguments);
+            } catch (Throwable t) {
+                return CompletableFuture.failedStage(t);
+            }
+        }
+        CompletableFuture<BuildStepResult> timed = new CompletableFuture<BuildStepResult>().orTimeout(
+                timeout.toNanos(),
+                TimeUnit.NANOSECONDS);
+        AtomicReference<Thread> applying = new AtomicReference<>(Thread.currentThread());
+        AtomicReference<CompletableFuture<BuildStepResult>> applied = new AtomicReference<>();
+        timed.whenComplete((_, throwable) -> {
+            if (throwable instanceof TimeoutException) {
+                synchronized (applying) {
+                    Thread thread = applying.getAndSet(null);
+                    if (thread != null) {
+                        thread.interrupt();
+                    }
+                }
+                CompletableFuture<BuildStepResult> stage = applied.get();
+                if (stage != null) {
+                    stage.completeExceptionally(throwable);
+                }
+            }
+        });
+        try {
+            CompletableFuture<BuildStepResult> stage = step.apply(executor, context, arguments).toCompletableFuture();
+            applied.set(stage);
+            stage.whenComplete((result, throwable) -> {
+                if (throwable == null) {
+                    timed.complete(result);
+                } else {
+                    timed.completeExceptionally(throwable);
+                }
+            });
+            if (timed.isCompletedExceptionally()) {
+                stage.completeExceptionally(new TimeoutException());
+            }
+        } catch (Throwable t) {
+            timed.completeExceptionally(t);
+        } finally {
+            synchronized (applying) {
+                if (applying.getAndSet(null) == null) {
+                    Thread.interrupted();
+                }
+            }
+        }
+        return timed;
     }
 
     @Override
