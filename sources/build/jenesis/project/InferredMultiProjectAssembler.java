@@ -281,40 +281,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                     Map<String, Resolver> resolvers) throws IOException {
         Packaging packaging = Packaging.configured(
                 BuildStep.locate(descriptor.configuration(), "packaging.properties"));
-        Path training = environment.flag("package.aot", true, Setting.PROJECT)
-                ? BuildStep.locate(descriptor.configuration(), "aot.properties")
-                : null;
-        Aot aot;
-        if (training == null) {
-            aot = null;
-        } else {
-            SequencedProperties trained = SequencedProperties.ofFiles(training);
-            for (String key : trained.stringPropertyNames()) {
-                if (!List.of("arguments", "main", "timeout").contains(key)) {
-                    throw new IllegalArgumentException(training + " names " + key + ", but takes arguments=<the"
-                            + " words handed to the main method>, main=<a main class other than the module's> and"
-                            + " timeout=<a duration such as PT30S after which a run that has not ended is stopped>"
-                            + " alone");
-                }
-            }
-            String timeout = trained.value("timeout");
-            Duration limit;
-            try {
-                limit = timeout == null ? null : Duration.parse(timeout);
-            } catch (DateTimeParseException e) {
-                throw new IllegalArgumentException(training + " sets timeout=" + timeout + ", which is no duration:"
-                        + " name one as PT30S or PT2M", e);
-            }
-            if (limit != null && (limit.isZero() || limit.isNegative())) {
-                throw new IllegalArgumentException(training + " sets timeout=" + timeout + ", but a training run"
-                        + " needs time to record: name a duration above zero such as PT30S, or remove the line to"
-                        + " wait for the main method to end");
-            }
-            aot = new Aot().arguments(trained.words("arguments"))
-                    .main(trained.value("main"))
-                    .timeout(limit)
-                    .image(packaging.jlink());
-        }
+        Aot aot = Aot.ofEnvironment(environment, descriptor.configuration());
         SequencedMap<String, SequencedMap<String, String>> overrides = perTool(descriptor.configuration(), "process-"),
                 environments = perTool(descriptor.configuration(), "environment-");
         ProcessHandler.Factory factory = ProcessHandler.Factory.ofEnvironment(environment);
@@ -609,7 +576,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     sub.addStep("jlink", JLink.ofEnvironment(environment, factory), linked);
                 }
                 if (aot != null) {
-                    sub.addStep("aot", aot, Stream.concat(Stream.of("jlink"), linked.stream()));
+                    sub.addStep("aot", aot.image(packaging.jlink()), Stream.concat(Stream.of("jlink"), linked.stream()));
                 }
                 if (packaging.jlink()) {
                     images.add(aot == null ? "jlink" : "aot");

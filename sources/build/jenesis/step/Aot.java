@@ -5,6 +5,8 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.SequencedProperties;
 
 public class Aot implements BuildStep {
@@ -19,6 +21,38 @@ public class Aot implements BuildStep {
 
     public Aot() {
         this(List.of(), null, null, false);
+    }
+
+    public static Aot ofEnvironment(Environment environment, SequencedSet<Path> configuration) throws IOException {
+        Path file = environment.flag("package.aot", true, Setting.PROJECT)
+                ? BuildStep.locate(configuration, "aot.properties")
+                : null;
+        if (file == null) {
+            return null;
+        }
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        for (String key : properties.stringPropertyNames()) {
+            if (!List.of("arguments", "main", "timeout").contains(key)) {
+                throw new IllegalArgumentException(file + " names " + key + ", but takes arguments=<the"
+                        + " words handed to the main method>, main=<a main class other than the module's> and"
+                        + " timeout=<a duration such as PT30S after which a run that has not ended is stopped>"
+                        + " alone");
+            }
+        }
+        String timeout = properties.value("timeout");
+        Duration limit;
+        try {
+            limit = timeout == null ? null : Duration.parse(timeout);
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException(file + " sets timeout=" + timeout + ", which is no duration:"
+                    + " name one as PT30S or PT2M", e);
+        }
+        if (limit != null && (limit.isZero() || limit.isNegative())) {
+            throw new IllegalArgumentException(file + " sets timeout=" + timeout + ", but a training run"
+                    + " needs time to record: name a duration above zero such as PT30S, or remove the line to"
+                    + " wait for the main method to end");
+        }
+        return new Aot(properties.words("arguments"), properties.value("main"), limit, false);
     }
 
     private Aot(List<String> arguments, String main, Duration timeout, boolean image) {
