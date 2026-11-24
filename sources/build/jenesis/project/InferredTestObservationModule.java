@@ -125,9 +125,10 @@ public class InferredTestObservationModule implements BuildExecutorModule {
 
     private static TestModule declared(TestModule module,
                                        Path file,
-                                       SequencedMap<String, TestFramework> frameworks) throws IOException {
+                                       SequencedMap<String, TestFramework> frameworks,
+                                       TestFramework main) throws IOException {
         if (file == null) {
-            return module;
+            return main == null ? module : module.framework(main);
         }
         SequencedProperties properties = SequencedProperties.ofFiles(file);
         for (String key : properties.stringPropertyNames()) {
@@ -142,7 +143,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 : frameworks.containsKey(named) ? frameworks.get(named) == null ? module : module.framework(frameworks.get(named))
                 : module.framework(TestFrameworks.named(framework));
         declared = scan == null ? declared : declared.scan(scan);
-        return engines == null ? declared : declared.engines(engines);
+        declared = engines == null ? declared : declared.engines(engines);
+        return main == null ? declared : declared.framework(main);
     }
 
     private static Observation observation(Map<String, Observation> observations,
@@ -529,13 +531,16 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         }
         if (test != null) {
             Path declaration = BuildStep.locate(configuration, "test.properties");
+            String named = moduleName == null && description != null ? description.getProperty("module") : moduleName,
+                    main = description == null ? null : description.value("main");
+            TestFramework runner = main == null ? null : new MainMethod(named, main);
             TestModule module = testModule.observe(engines)
                     .pinning(pinning)
                     .pathPlacement(pathPlacement)
-                    .moduleName(moduleName == null && description != null ? description.getProperty("module") : moduleName);
+                    .moduleName(named);
             SequencedMap<String, TestFramework> unloaded = new LinkedHashMap<>();
             frameworks.keySet().forEach(name -> unloaded.put(name, null));
-            BuildExecutorModule executed = test.apply(declared(module, declaration, unloaded));
+            BuildExecutorModule executed = test.apply(declared(module, declaration, unloaded, runner));
             if (executed != null) {
                 SequencedSet<String> testInputs = inherited.sequencedKeySet().stream()
                         .filter(identity -> untested.stream().noneMatch(input -> identity.equals(PREVIOUS + input)
@@ -571,7 +576,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                                     framework.getValue().framework(PluginModule.prepared(FRAMEWORKS, framework.getKey(), testInherited)));
                         }
                         BuildExecutorModule observing = test.apply(declared(module.observe(observed)
-                                .frameworks(List.copyOf(loaded.values())), declaration, loaded));
+                                .frameworks(List.copyOf(loaded.values())), declaration, loaded, runner));
                         if (observing != null) {
                             observing.accept(tested, PluginModule.unprepared(Set.of(OBSERVERS, FRAMEWORKS), testInherited));
                         }

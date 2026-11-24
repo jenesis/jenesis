@@ -24,6 +24,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.JUnit4;
 import build.jenesis.project.JUnitPlatform;
 import build.jenesis.project.Jfr;
+import build.jenesis.project.MainMethod;
 import build.jenesis.project.TestModule;
 import build.jenesis.project.TestNG;
 import build.jenesis.step.Javac;
@@ -1589,6 +1590,46 @@ public class TestModuleTest {
                 .content()
                 .contains("Alpha second!")
                 .doesNotContain("Beta beta!", "Hello world!");
+    }
+
+    @Test
+    public void runs_a_main_method_as_the_tests_without_a_framework() throws IOException {
+        Path sampleClasses = classes.resolve(Javac.CLASSES + "sample");
+        for (String outcome : List.of("passes", "fails")) {
+            compileSource(sampleClasses, "MainSample", """
+                    package sample;
+                    public class MainSample {
+                        public static void main(String[] args) {
+                            System.out.println("Main %s with " + args.length + " arguments");
+                            if ("%s".equals("fails")) {
+                                System.exit(3);
+                            }
+                        }
+                    }
+                    """.formatted(outcome, outcome), List.of());
+            BuildExecutor executor = newExecutor();
+            executor.addSource("dependencies", emptyDependencies);
+            executor.addSource("classes", classes);
+            executor.addModule(
+                    "test",
+                    TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of())
+                            .framework(new MainMethod(null, "sample.MainSample"))
+                            .jarsOnly(false)
+                            .requireFramework(true),
+                    "dependencies", "classes");
+            if (outcome.equals("fails")) {
+                assertThatThrownBy(executor::execute)
+                        .as("the exit code of the main method decides the tests")
+                        .hasStackTraceContaining("Unexpected exit code: 3");
+            } else {
+                executor.execute();
+                assertThat(root.resolve("test").resolve("executed").resolve("supplement").resolve("output"))
+                        .as("no class is selected and no framework resolved, as the main method is the test")
+                        .content()
+                        .contains("Main passes with 0 arguments")
+                        .doesNotContain("Hello world!");
+            }
+        }
     }
 
     @Test
