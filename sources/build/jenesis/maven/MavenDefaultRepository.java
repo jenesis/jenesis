@@ -448,8 +448,15 @@ public class MavenDefaultRepository implements MavenRepository {
         try {
             for (int attempt = 0; ; attempt++) {
                 try (InputStream stream = Repository.open(connection, uri, token)) {
-                    Files.copy(stream, temporary, StandardCopyOption.REPLACE_EXISTING);
-                    break;
+                    try {
+                        Files.copy(stream, temporary, StandardCopyOption.REPLACE_EXISTING);
+                        break;
+                    } catch (IOException e) {
+                        if (attempt >= connection.retries()) {
+                            throw new IOException("The transfer of " + uri + " broke off " + (attempt + 1)
+                                    + " time(s): " + e, e);
+                        }
+                    }
                 } catch (FileNotFoundException _) {
                     Files.deleteIfExists(temporary);
                     return Optional.empty();
@@ -457,8 +464,8 @@ public class MavenDefaultRepository implements MavenRepository {
                     if (attempt >= connection.retries()) {
                         throw e;
                     }
-                    Thread.sleep(connection.backoff().toMillis() << attempt);
                 }
+                Thread.sleep(connection.backoff().toMillis() << attempt);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

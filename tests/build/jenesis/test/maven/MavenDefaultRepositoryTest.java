@@ -291,6 +291,42 @@ public class MavenDefaultRepositoryTest {
     }
 
     @Test
+    public void fetches_again_a_file_whose_transfer_ended_before_its_length() throws IOException {
+        byte[] body = "a jar that arrives whole only the second time".getBytes(StandardCharsets.UTF_8);
+        AtomicInteger hits = new AtomicInteger();
+        try (ServerSocket server = new ServerSocket(0, 0, InetAddress.getLoopbackAddress())) {
+            Thread.ofVirtual().start(() -> {
+                while (!server.isClosed()) {
+                    try (Socket socket = server.accept()) {
+                        BufferedReader request = new BufferedReader(new InputStreamReader(
+                                socket.getInputStream(),
+                                StandardCharsets.ISO_8859_1));
+                        for (String line = request.readLine(); line != null && !line.isEmpty(); line = request.readLine()) {
+                        }
+                        OutputStream out = socket.getOutputStream();
+                        out.write(("HTTP/1.1 200 OK\r\nContent-Length: " + body.length + "\r\nConnection: close\r\n\r\n")
+                                .getBytes(StandardCharsets.ISO_8859_1));
+                        out.write(body, 0, hits.incrementAndGet() == 1 ? body.length / 2 : body.length);
+                        out.flush();
+                    } catch (IOException _) {
+                    }
+                }
+            });
+            URI remote = URI.create("http://localhost:" + server.getLocalPort() + "/");
+            try (InputStream inputStream = new MavenDefaultRepository(remote, local, Map.of(), null)
+                    .connection(new Repository.Connection().insecure(true).backoff(Duration.ofMillis(1)))
+                    .fetch(Runnable::run, "group", "artifact", "1", "jar", null, null)
+                    .orElseThrow()
+                    .toInputStream()) {
+                assertThat(inputStream.readAllBytes())
+                        .as("a server that ended the answer before the length it announced is asked again")
+                        .isEqualTo(body);
+            }
+            assertThat(hits.get()).isEqualTo(2);
+        }
+    }
+
+    @Test
     public void resolves_metadata_offline_from_the_copy_an_earlier_resolution_stored() throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         server.createContext("/", exchange -> {
