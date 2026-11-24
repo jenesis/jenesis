@@ -153,12 +153,25 @@ public final class Make {
             }
             if (root != null) {
                 Path resolved = root.resolve(path).normalize();
-                if (confined
-                        && !resolved.toAbsolutePath().normalize().startsWith(root.toAbsolutePath().normalize())) {
-                    throw new IllegalStateException("jenesis." + key + " cannot name '" + location.strip() + "' in a"
-                            + " file the project provides: such a file names only a location inside the project, which"
-                            + " the build writes to and may delete (pass -Djenesis." + key + " on the command line for"
-                            + " one outside it)");
+                if (confined) {
+                    Path base = root.toAbsolutePath().normalize(), existing = resolved.toAbsolutePath().normalize();
+                    boolean inside = existing.startsWith(base);
+                    if (inside && Files.exists(base)) {
+                        while (!Files.exists(existing)) {
+                            existing = existing.getParent();
+                        }
+                        try {
+                            inside = existing.toRealPath().startsWith(base.toRealPath());
+                        } catch (IOException e) {
+                            throw new UncheckedIOException("Cannot resolve the links on the way to " + existing, e);
+                        }
+                    }
+                    if (!inside) {
+                        throw new IllegalStateException("jenesis." + key + " cannot name '" + location.strip()
+                                + "' in a file the project provides: such a file names only a location inside the"
+                                + " project, which the build writes to and may delete (pass -Djenesis." + key
+                                + " on the command line for one outside it)");
+                    }
                 }
                 return resolved;
             }
