@@ -520,15 +520,18 @@ public class MavenProject implements BuildExecutorModule {
                             String attach = properties.getProperty("attachments", "");
                             SequencedProperties attachments = new SequencedProperties();
                             for (String entry : attach.isEmpty() ? new String[0] : attach.split("\t")) {
-                                int space = entry.indexOf(' ');
-                                String key = space < 0 ? entry : entry.substring(0, space);
-                                String version = space < 0 ? null : entry.substring(space + 1);
+                                int split = entry.indexOf('=');
+                                String left = entry.substring(0, split), arguments = entry.substring(split + 1);
+                                int space = left.indexOf(' ');
+                                String key = space < 0 ? left : left.substring(0, space);
+                                String version = space < 0 ? null : left.substring(space + 1);
                                 int slash = key.indexOf('/');
+                                String seeded = key.substring(0, slash) + "/agent/" + key.substring(slash + 1);
                                 String coordinate = key.substring(slash + 1) + (version == null ? "" : "/" + version);
                                 if (requires.getProperty(key.substring(0, slash) + "/runtime/" + coordinate) == null) {
                                     requires.setProperty(key.substring(0, slash) + "/agent/" + coordinate, "");
                                 }
-                                attachments.setProperty(key.substring(0, slash) + "/agent/" + key.substring(slash + 1), "");
+                                attachments.setProperty(seeded, arguments);
                             }
                             String declared = properties.getProperty("plugins", "");
                             for (String entry : declared.isEmpty() ? new String[0] : declared.split("\t")) {
@@ -1118,7 +1121,8 @@ public class MavenProject implements BuildExecutorModule {
                 return "";
             }
             List<String> entries = new ArrayList<>();
-            for (String key : value.attachments()) {
+            for (Map.Entry<String, String> attachment : value.attachments().entrySet()) {
+                String key = attachment.getKey();
                 String spec = key.substring(key.indexOf('/') + 1);
                 String version = null;
                 MavenDependencyScope scope = null;
@@ -1149,7 +1153,7 @@ public class MavenProject implements BuildExecutorModule {
                             + key
                             + ": declare it as a dependency or manage its version");
                 }
-                entries.add(key + (version == null ? "" : " " + version));
+                entries.add(key + (version == null ? "" : " " + version) + "=" + attachment.getValue());
             }
             return String.join("\t", entries);
         }

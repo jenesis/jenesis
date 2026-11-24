@@ -455,7 +455,7 @@ public class ModularProject implements BuildExecutorModule {
                             + (coordinate.startsWith("module/")
                                     ? ""
                                     : version(versions, "layer:" + layer + "/" + coordinate)), "")));
-            info.attachments().forEach(key -> {
+            info.attachments().forEach((key, _) -> {
                 int slash = key.indexOf('/');
                 int second = key.indexOf('/', slash + 1);
                 String repository = key.substring(slash + 1, second);
@@ -477,9 +477,9 @@ public class ModularProject implements BuildExecutorModule {
             }
             if (!info.attachments().isEmpty()) {
                 SequencedProperties attachments = new SequencedProperties();
-                info.attachments().forEach(key -> {
+                info.attachments().forEach((key, options) -> {
                     int slash = key.indexOf('/');
-                    attachments.setProperty(key.substring(0, slash) + "/agent/" + key.substring(slash + 1), "");
+                    attachments.setProperty(key.substring(0, slash) + "/agent/" + key.substring(slash + 1), options);
                 });
                 attachments.store(context.next().resolve(BuildStep.ATTACHMENTS));
             }

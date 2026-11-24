@@ -307,7 +307,7 @@ public class InventoryTest {
         module.setProperty("path", "foo");
         module.store(manifests.resolve(BuildStep.MODULE));
         SequencedProperties attachments = new SequencedProperties();
-        attachments.setProperty("main/agent/maven/org.example/agent", "");
+        attachments.setProperty("main/agent/maven/org.example/agent", "x=declared");
         attachments.store(manifests.resolve(BuildStep.ATTACHMENTS));
         Path prepare = Files.createDirectory(root.resolve("prepare"));
         SequencedProperties configured = new SequencedProperties();
@@ -322,7 +322,7 @@ public class InventoryTest {
         run(args("manifests", manifests, "prepare", prepare, "runtime", runtime));
 
         assertThat(read(next.resolve(Inventory.INVENTORY)).getProperty("module-foo.agent.0.arguments"))
-                .as("the declaration names the agent and agents.properties, handed on by a later input, its options")
+                .as("the options the module's configuration settled on replace those of the declaration")
                 .isEqualTo("x=two  words");
     }
 

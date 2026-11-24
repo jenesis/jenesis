@@ -297,48 +297,61 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
-    public void an_agents_file_in_configuration_yields_the_options_of_the_agents_the_module_attaches() throws IOException {
+    public void an_attached_agent_keeps_the_options_of_its_declaration_without_an_agents_file() throws IOException {
         Fixture fixture = setUp("main=\n", false, false, false);
         Files.writeString(fixture.manifests().resolve(BuildStep.ATTACHMENTS), """
-                main/agent/maven/org.example/agent=
-                main/agent/module/sample.agent=
-                other/agent/maven/org.example/typed/jar/all=
+                main/agent/module/sample.agent=mode=two  words
                 main/agent/module/plain.agent=
                 """);
+        Path prepareOutput = fixture.execute("build/prepare").get("build/prepare");
+        assertThat(readProperties(prepareOutput.resolve(BuildStep.AGENTS)))
+                .as("every agent is named, one without options too, so that no other module supplies them")
+                .containsOnly(Map.entry("main/agent/module/sample.agent", "mode=two  words"),
+                        Map.entry("main/agent/module/plain.agent", ""));
+    }
+
+    @Test
+    public void a_line_of_an_agents_file_replaces_the_options_of_the_declaration() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.manifests().resolve(BuildStep.ATTACHMENTS), """
+                main/agent/maven/org.example/agent=first=1,second=2
+                main/agent/module/sample.agent=mode=declared
+                main/agent/module/emptied.agent=mode=declared
+                other/agent/maven/org.example/typed/jar/all=declared
+                main/agent/module/kept.agent=mode=declared
+                """);
         Files.writeString(fixture.configuration().resolve("agents.properties"), """
-                org.example/agent=first=1,second=two  words,third=[x]--y
+                org.example/agent=third=two  words,fourth=[x]--y
                 sample.agent=@endpoint
+                emptied.agent=
                 other/maven/org.example/typed/jar/all=typed
                 not.attached=ignored
                 """);
         Path prepareOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
                 new Environment(Map.of("variable.endpoint", "endpoint=http://localhost:4317"))), "build/prepare").get("build/prepare");
         assertThat(readProperties(prepareOutput.resolve(BuildStep.AGENTS)))
-                .as("options are handed on as written, for the agents the module attaches alone")
-                .containsOnly(Map.entry("main/agent/maven/org.example/agent", "first=1,second=two  words,third=[x]--y"),
+                .as("a line replaces the declared options whole, an empty one with none, and an agent without a line keeps them")
+                .containsOnly(Map.entry("main/agent/maven/org.example/agent", "third=two  words,fourth=[x]--y"),
                         Map.entry("main/agent/module/sample.agent", "endpoint=http://localhost:4317"),
+                        Map.entry("main/agent/module/emptied.agent", ""),
                         Map.entry("other/agent/maven/org.example/typed/jar/all", "typed"),
-                        Map.entry("main/agent/module/plain.agent", ""));
+                        Map.entry("main/agent/module/kept.agent", "mode=declared"));
     }
 
     @Test
     public void an_agents_file_of_a_profile_replaces_the_one_of_the_configuration() throws IOException {
         Fixture fixture = setUp("main=\n", false, false, false);
-        Files.writeString(fixture.manifests().resolve(BuildStep.ATTACHMENTS), "main/agent/module/sample.agent=\n");
-        Files.writeString(fixture.configuration().resolve("agents.properties"), "sample.agent=mode=default\n");
+        Files.writeString(fixture.manifests().resolve(BuildStep.ATTACHMENTS), """
+                main/agent/module/sample.agent=mode=declared
+                main/agent/module/other.agent=mode=declared
+                """);
+        Files.writeString(fixture.configuration().resolve("agents.properties"), "sample.agent=mode=default\nother.agent=mode=default\n");
         Files.writeString(fixture.profile().resolve("agents.properties"), "sample.agent=mode=profile\n");
         Path prepareOutput = fixture.execute("build/prepare").get("build/prepare");
         assertThat(readProperties(prepareOutput.resolve(BuildStep.AGENTS)))
-                .containsOnly(Map.entry("main/agent/module/sample.agent", "mode=profile"));
-    }
-
-    @Test
-    public void an_agent_without_options_is_named_so_that_no_other_module_supplies_them() throws IOException {
-        Fixture fixture = setUp("main=\n", false, false, false);
-        Files.writeString(fixture.manifests().resolve(BuildStep.ATTACHMENTS), "main/agent/module/sample.agent=\n");
-        Path prepareOutput = fixture.execute("build/prepare").get("build/prepare");
-        assertThat(readProperties(prepareOutput.resolve(BuildStep.AGENTS)))
-                .containsOnly(Map.entry("main/agent/module/sample.agent", ""));
+                .as("the first file found configures alone, so an agent the profile's file leaves out keeps its declaration")
+                .containsOnly(Map.entry("main/agent/module/sample.agent", "mode=profile"),
+                        Map.entry("main/agent/module/other.agent", "mode=declared"));
     }
 
     @Test

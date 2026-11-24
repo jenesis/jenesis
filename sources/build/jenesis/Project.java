@@ -2325,14 +2325,20 @@ public record Project(
                           without the repository the groupId is read as one. An entry manages a
                           version wherever a closure reaches that coordinate, including modules that
                           never name it, so give every entry the checksum its version resolves to.
-                      @jenesis.attach <token>
+                      @jenesis.attach <token> [<options>]
                           Attach a library as a -javaagent to this module's Execute run and its test
                           runs. The token carries no version: it comes from a declared dependency, a
-                          pin or a BOM, else floats latest. It carries no options either: what the
-                          agent is handed is a line <token>=<options> of an agents.properties in a
-                          configuration folder, so a profile can change it. MAVEN modules declare the
-                          same lines in a project-level <!--jenesis.attach ... --> comment, where a
-                          test-scoped match attaches to test runs only.
+                          pin or a BOM, else floats latest. What follows the token is the agent's
+                          options, taken as written: spaces within a line are kept, a following line
+                          continues them with the space around it dropped and nothing put in between,
+                          no markup of the comment is read, and &amp;, &lt;, &gt;, &quot;, &apos;
+                          and a numeric entity such as &#64; stand for their character. A line
+                          <token>=<options> of an agents.properties in a configuration folder
+                          replaces them, which is how a profile hands an agent other options.
+                          MAVEN modules declare the same in a project-level
+                          <!--jenesis.attach ... --> comment, a declaration per line, where a
+                          test-scoped match attaches to test runs only and &#45;&#45; writes the
+                          double dash an XML comment cannot hold.
                       @jenesis.native <token>...
                           Grant native access (--enable-native-access) to the modules named, this
                           one included only when it names itself, on this module's Execute run, its
@@ -2466,11 +2472,14 @@ public record Project(
                       agents.properties         <token>=<options> per line, the options an agent that
                                                 @jenesis.attach <token>, or a pom.xml's
                                                 <!--jenesis.attach--> comment, names is handed after
-                                                -javaagent:<jar>=, written as the declaration writes
-                                                the token and passed on as they stand, spaces
-                                                included; a line for an agent a module does not
-                                                attach configures nothing there, so one file at the
-                                                root serves every module
+                                                -javaagent:<jar>=, with the token written as the
+                                                declaration writes it and the options passed on as
+                                                they stand, spaces included; a line replaces the
+                                                options of the declaration whole, <token>= with
+                                                none, and an agent without a line keeps them; a
+                                                line for an agent a module does not attach
+                                                configures nothing there, so one file at the root
+                                                serves every module
                       environment-<tool>.properties
                                                 variables for a program the build forks (java, test,
                                                 pitest, native-image), which otherwise sees only

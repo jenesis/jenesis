@@ -15,6 +15,8 @@ public class ModuleInfoParser {
 
     private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
     private static final Pattern RELEASE = Pattern.compile("[1-9][0-9]*(-preview)?");
+    private static final Pattern MARGIN = Pattern.compile("^\\s*(\\*+|///)?");
+    private static final Pattern ENTITY = Pattern.compile("&(#[0-9]+|#[xX][0-9A-Fa-f]+|amp|lt|gt|quot|apos|nbsp);");
     private static final Set<String> BLOCKS = Set.of("p", "div", "pre", "ul", "ol", "dl", "table", "blockquote",
             "h1", "h2", "h3", "h4", "h5", "h6", "hr");
 
@@ -30,6 +32,7 @@ public class ModuleInfoParser {
     }
 
     public ModuleInfo identify(Path moduleInfo) throws IOException {
+        String source = Files.readString(moduleInfo);
         JavacTask javac = (JavacTask) compiler.getTask(new PrintWriter(Writer.nullWriter()),
                 compiler.getStandardFileManager(null, null, null),
                 null,
@@ -37,8 +40,8 @@ public class ModuleInfoParser {
                 null,
                 List.of(new SimpleJavaFileObject(moduleInfo.toUri(), JavaFileObject.Kind.SOURCE) {
                     @Override
-                    public CharSequence getCharContent(boolean ignoreEncodingErrors) throws IOException {
-                        return Files.readString(moduleInfo);
+                    public CharSequence getCharContent(boolean ignoreEncodingErrors) {
+                        return source;
                     }
                 }));
         DocTrees docTrees = DocTrees.instance(javac);
@@ -68,7 +71,7 @@ public class ModuleInfoParser {
             SequencedMap<String, String> plugins = new LinkedHashMap<>();
             SequencedMap<String, String> layerApis = new LinkedHashMap<>();
             SequencedMap<String, SequencedSet<String>> layers = new LinkedHashMap<>();
-            SequencedSet<String> attachments = new LinkedHashSet<>();
+            SequencedMap<String, String> attachments = new LinkedHashMap<>();
             SequencedSet<String> natives = new LinkedHashSet<>();
             String release = null;
             String name = null;
@@ -375,19 +378,38 @@ public class ModuleInfoParser {
                                 if (content.isEmpty()) {
                                     continue;
                                 }
-                                if (content.indexOf(' ') >= 0) {
-                                    throw new IllegalArgumentException("Malformed @jenesis.attach declaration '"
-                                            + content
-                                            + "': expected <token> alone - an agent's options are a line "
-                                            + content.substring(0, content.indexOf(' '))
-                                            + "=<options> of an agents.properties in a configuration folder");
-                                }
-                                if (ModuleGraph.isSystemModule(content)) {
+                                DocSourcePositions positions = docTrees.getSourcePositions();
+                                List<String> lines = source.substring(
+                                                (int) positions.getStartPosition(unit, docComment, unknown),
+                                                (int) positions.getEndPosition(unit, docComment, unknown))
+                                        .lines()
+                                        .map(line -> MARGIN.matcher(line).replaceFirst("").strip())
+                                        .toList();
+                                String declaration = lines.getFirst().substring("@jenesis.attach".length()).strip();
+                                int split = IntStream.range(0, declaration.length())
+                                        .filter(index -> Character.isWhitespace(declaration.charAt(index)))
+                                        .findFirst()
+                                        .orElse(declaration.length());
+                                String token = declaration.substring(0, split);
+                                String arguments = ENTITY.matcher(declaration.substring(split).strip()
+                                                + String.join("", lines.subList(1, lines.size())))
+                                        .replaceAll(match -> Matcher.quoteReplacement(entity(match.group(1))));
+                                if (ModuleGraph.isSystemModule(token)) {
                                     throw new IllegalArgumentException("Illegal @jenesis.attach token '"
-                                            + content
+                                            + token
                                             + "': platform modules cannot be attached");
                                 }
-                                attachments.add(expand("jenesis.attach", content));
+                                String key = expand("jenesis.attach", token);
+                                String previous = attachments.putIfAbsent(key, arguments);
+                                if (previous != null && !previous.equals(arguments)) {
+                                    throw new IllegalArgumentException("Duplicate @jenesis.attach for "
+                                            + key
+                                            + ": '"
+                                            + previous
+                                            + "' and '"
+                                            + arguments
+                                            + "'");
+                                }
                             }
                             case "jenesis.native" -> {
                                 if (content.isEmpty()) {
@@ -562,23 +584,27 @@ public class ModuleInfoParser {
                 case RawTextTree markdown -> markdown.getContent();
                 case LiteralTree literal -> literal.getBody().getBody();
                 case LinkTree link -> link.getLabel().isEmpty() ? link.getReference().getSignature() : text(link.getLabel());
-                case EntityTree entity -> switch (entity.getName().toString()) {
-                    case "amp" -> "&";
-                    case "lt" -> "<";
-                    case "gt" -> ">";
-                    case "quot" -> "\"";
-                    case "apos" -> "'";
-                    case "nbsp" -> " ";
-                    case String numeric when numeric.startsWith("#x") || numeric.startsWith("#X") ->
-                            Character.toString(Integer.parseInt(numeric.substring(2), 16));
-                    case String numeric when numeric.startsWith("#") -> Character.toString(Integer.parseInt(numeric.substring(1)));
-                    case String named -> "&" + named + ";";
-                };
+                case EntityTree entity -> entity(entity.getName().toString());
                 case StartElementTree element -> BLOCKS.contains(element.getName().toString().toLowerCase(Locale.ROOT)) ? "\n\n" : "";
                 default -> "";
             });
         }
         return text.toString();
+    }
+
+    private static String entity(String name) {
+        return switch (name) {
+            case "amp" -> "&";
+            case "lt" -> "<";
+            case "gt" -> ">";
+            case "quot" -> "\"";
+            case "apos" -> "'";
+            case "nbsp" -> " ";
+            case String numeric when numeric.startsWith("#x") || numeric.startsWith("#X") ->
+                    Character.toString(Integer.parseInt(numeric.substring(2), 16));
+            case String numeric when numeric.startsWith("#") -> Character.toString(Integer.parseInt(numeric.substring(1)));
+            case String named -> "&" + named + ";";
+        };
     }
 
     private static String layered(String kind, String token) {

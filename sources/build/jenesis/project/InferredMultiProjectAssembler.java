@@ -981,14 +981,15 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
                 Path attachmentsFile = argument.folder().resolve(BuildStep.ATTACHMENTS);
                 if (manifests.contains(entry.getKey()) && Files.isRegularFile(attachmentsFile)) {
-                    for (String key : SequencedProperties.ofFiles(attachmentsFile).stringPropertyNames()) {
+                    SequencedProperties declared = SequencedProperties.ofFiles(attachmentsFile);
+                    for (String key : declared.stringPropertyNames()) {
                         String[] segments = key.split("/", 4);
                         String options = agents.getOrDefault(segments[0] + "/" + segments[2] + "/" + segments[3],
                                 agents.getOrDefault(segments[2] + "/" + segments[3],
                                         segments[2].equals("module") || segments[3].indexOf('/') == segments[3].lastIndexOf('/')
                                                 ? agents.get(segments[3])
                                                 : null));
-                        attached.setProperty(key, options == null ? "" : options);
+                        attached.setProperty(key, options == null ? declared.getProperty(key) : options);
                     }
                 }
                 Path moduleFile = argument.folder().resolve(BuildStep.MODULE);

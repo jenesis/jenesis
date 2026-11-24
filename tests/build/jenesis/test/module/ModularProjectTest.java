@@ -150,9 +150,9 @@ public class ModularProjectTest {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
                  * @jenesis.attach org.mockito/mockito-core
-                 * @jenesis.attach io.opentelemetry.javaagent/opentelemetry-javaagent
+                 * @jenesis.attach io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=value
                  * @jenesis.pin org.mockito/mockito-core 5.11.0 SHA-256/cafebabe
-                 * @jenesis.attach some.agent.module
+                 * @jenesis.attach some.agent.module plain
                  * @jenesis.attach bar
                  */
                 module foo {
@@ -182,8 +182,8 @@ public class ModularProjectTest {
         assertThat(attachmentsFile).exists();
         assertThat(SequencedProperties.ofFiles(attachmentsFile)).containsOnly(
                 Map.entry("main/agent/maven/org.mockito/mockito-core", ""),
-                Map.entry("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", ""),
-                Map.entry("main/agent/module/some.agent.module", ""),
+                Map.entry("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=value"),
+                Map.entry("main/agent/module/some.agent.module", "plain"),
                 Map.entry("main/agent/module/bar", ""));
     }
 

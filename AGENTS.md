@@ -278,11 +278,13 @@ compiler.javac(javac -> …)))`); a new child is a configurator on its parent, n
 `custom(name, module)` or `custom(name, step)`, refusing a name taken.
 
 **A tag states what a module is, a file what a build does with it.** A `@jenesis.*` tag of `module-info.java`, and
-its `<!--jenesis.*-->` twin in a `pom.xml`, declares a static property of the module that holds in every build and
-profile: its release, its main class, what it requires, pins, attaches or grants. What a build or a profile may choose
-differently - the options of a tool, a plugin or an agent - is a file in a configuration folder, so `@jenesis.attach`
-names an agent and `agents.properties` what it is handed. A tag owns every line below it and its whitespace is
-collapsed, so its value is a token or a list of them, validated where it is parsed, never free text.
+its `<!--jenesis.*-->` twin in a `pom.xml`, is a language extension: it declares a static property of the module that
+holds in every build and profile - its release, its main class, what it requires, pins, attaches or grants. A file in
+a configuration folder is for a plugin and for any special treatment a build or a profile may vary. A file may replace
+the default arguments a tag carries, never what the tag declares: `@jenesis.attach <token> <options>` names an agent
+and its default options, and a line of `agents.properties` replaces those options whole. A tag owns every line below
+it, so its value is validated where it is parsed; the one tag that takes free text, `@jenesis.attach`, reads it from
+the source as written rather than from the comment's markup.
 
 **Configuration files are read through `SequencedProperties`**: `value`, `flag`, `flagOrNull`, `entries`, `words`
 trim and read a blank as absent, and a flag reads as a `jenesis.*` setting does. `getProperty` is for the readers

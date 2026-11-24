@@ -6324,15 +6324,16 @@ public class MavenPomResolverTest {
                     <version>1</version>
                     <!--jenesis.attach
                     org.mockito/mockito-core
-                    io.opentelemetry.javaagent/opentelemetry-javaagent
-                    some.module
+                    io.opentelemetry.javaagent/opentelemetry-javaagent   otel.option=two  words &#45;&#45;flag
+                    some.module plain arguments
                     -->
                 </project>
                 """);
         SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
-        assertThat(poms.get(Path.of("")).attachments()).containsExactly("main/maven/org.mockito/mockito-core",
-                "main/maven/io.opentelemetry.javaagent/opentelemetry-javaagent",
-                "main/module/some.module");
+        assertThat(poms.get(Path.of("")).attachments()).containsExactly(
+                Map.entry("main/maven/org.mockito/mockito-core", ""),
+                Map.entry("main/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=two  words --flag"),
+                Map.entry("main/module/some.module", "plain arguments"));
     }
 
     @Test
@@ -6393,7 +6394,7 @@ public class MavenPomResolverTest {
     }
 
     @Test
-    public void attach_block_refuses_options_naming_the_file_that_takes_them() throws IOException {
+    public void attach_block_conflicting_duplicates_throw() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -6402,18 +6403,18 @@ public class MavenPomResolverTest {
                     <artifactId>artifact</artifactId>
                     <version>1</version>
                     <!--jenesis.attach
-                    org.example/agent first=1
+                    org.example/agent first
+                    org.example/agent second
                     -->
                 </project>
                 """);
         assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Malformed jenesis.attach declaration 'org.example/agent first=1'")
-                .hasMessageContaining("<token>=<options> of an agents.properties");
+                .hasMessageContaining("Duplicate jenesis.attach for main/maven/org.example/agent");
     }
 
     @Test
-    public void attach_block_duplicates_collapse() throws IOException {
+    public void attach_block_identical_duplicates_collapse() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -6422,13 +6423,14 @@ public class MavenPomResolverTest {
                     <artifactId>artifact</artifactId>
                     <version>1</version>
                     <!--jenesis.attach
-                    org.example/agent
-                    org.example/agent
+                    org.example/agent option
+                    org.example/agent option
                     -->
                 </project>
                 """);
         SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
-        assertThat(poms.get(Path.of("")).attachments()).containsExactly("main/maven/org.example/agent");
+        assertThat(poms.get(Path.of("")).attachments()).containsExactly(
+                Map.entry("main/maven/org.example/agent", "option"));
     }
 
     @Test
