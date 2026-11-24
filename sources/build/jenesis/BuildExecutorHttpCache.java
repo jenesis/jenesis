@@ -104,11 +104,12 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     }
 
     @Override
-    public Optional<BuildStepResult> fetch(Executor executor,
-                                           String identity,
-                                           byte[] step,
-                                           SequencedMap<String, Map<Path, byte[]>> inputs,
-                                           Path target) throws IOException {
+    public Optional<Map<Path, byte[]>> fetch(Executor executor,
+                                             String identity,
+                                             byte[] step,
+                                             SequencedMap<String, Map<Path, byte[]>> inputs,
+                                             Path target,
+                                             String digest) throws IOException {
         if (!read) {
             return Optional.empty();
         }
@@ -120,7 +121,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
             try (InputStream stream = connection.getInputStream()) {
                 unzip(stream, target);
             }
-            return Optional.of(new BuildStepResult());
+            return Optional.of(HashFunction.read(target, new HashDigestFunction(digest), executor));
         } catch (IOException _) {
             clean(target);
             return Optional.empty();
@@ -151,7 +152,8 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     public void touch(Executor executor,
                       String identity,
                       byte[] step,
-                      SequencedMap<String, Map<Path, byte[]>> inputs) {
+                      SequencedMap<String, Map<Path, byte[]>> inputs,
+                      String digest) {
         if (!read) {
             return;
         }

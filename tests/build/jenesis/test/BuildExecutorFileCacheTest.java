@@ -28,7 +28,7 @@ public class BuildExecutorFileCacheTest {
 
     @BeforeEach
     public void setUp() {
-        hash = new HashDigestFunction("MD5");
+        hash = new HashDigestFunction("SHA-256");
     }
 
     @Test
@@ -37,16 +37,20 @@ public class BuildExecutorFileCacheTest {
         byte[] step = {1, 2, 3, 4};
         SequencedMap<String, Map<Path, byte[]>> inputs = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, inputs, output, "", Map.of());
-        Path stepFolder = cacheRoot.resolve(HexFormat.of().formatHex(step));
-        assertThat(stepFolder).isDirectory();
+        cache.store(Runnable::run, "step", step, inputs, output, "SHA-256", Map.of());
+        Path stepFolder = steps().resolve(HexFormat.of().formatHex(step));
+        assertThat(stepFolder).exists();
         try (Stream<Path> entries = Files.list(stepFolder)) {
             List<Path> list = entries.toList();
             assertThat(list).hasSize(1);
-            assertThat(list.getFirst().resolve("file")).content().isEqualTo("result");
+            assertThat(list.getFirst()).content().isEqualTo(hex("result") + " 6 file\n");
         }
-        Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", step, inputs, target);
+        assertThat(blob("result")).content().isEqualTo("result");
+        Optional<Map<Path, byte[]>> result = cache.fetch(Runnable::run, "step", step, inputs, target, "SHA-256");
         assertThat(result).isPresent();
+        assertThat(result.get()).as("the checksums of what was restored, which the executor hashes no second time")
+                .containsOnlyKeys(Path.of("file"));
+        assertThat(result.get().get(Path.of("file"))).asHexString().isEqualToIgnoringCase(hex("result"));
         assertThat(target.resolve("file")).content().isEqualTo("result");
     }
 
@@ -54,14 +58,14 @@ public class BuildExecutorFileCacheTest {
     public void marks_its_root_so_that_no_project_scan_reads_the_cached_sources() throws IOException {
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         Files.writeString(output.resolve("module-info.java"), "module sample {}");
-        cache.store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), output, "", Map.of());
+        cache.store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
         assertThat(cacheRoot.resolve(BuildExecutor.SKIP_MARKER)).isRegularFile();
     }
 
     @Test
     public void fetch_returns_empty_on_miss() throws IOException {
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
-        Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), target);
+        Optional<Map<Path, byte[]>> result = cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), target, "SHA-256");
         assertThat(result).isEmpty();
         try (Stream<Path> entries = Files.list(target)) {
             assertThat(entries.toList()).isEmpty();
@@ -74,12 +78,9 @@ public class BuildExecutorFileCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> inputs = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, inputs, output, "", Map.of());
-        cache.fetch(Runnable::run, "step", step, inputs, target);
-        Path cached;
-        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
-            cached = entries.findFirst().orElseThrow().resolve("file");
-        }
+        cache.store(Runnable::run, "step", step, inputs, output, "SHA-256", Map.of());
+        cache.fetch(Runnable::run, "step", step, inputs, target, "SHA-256");
+        Path cached = blob("result");
         Object targetKey = Files.readAttributes(target.resolve("file"), BasicFileAttributes.class).fileKey();
         Object cachedKey = Files.readAttributes(cached, BasicFileAttributes.class).fileKey();
         Assumptions.assumeTrue(targetKey != null && cachedKey != null);
@@ -92,8 +93,8 @@ public class BuildExecutorFileCacheTest {
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         byte[] step = {1};
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, inputs("source", "file", new byte[]{9}), output, "", Map.of());
-        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
+        cache.store(Runnable::run, "step", step, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+        try (Stream<Path> entries = Files.list(steps().resolve(HexFormat.of().formatHex(step)))) {
             String name = entries.findFirst().orElseThrow().getFileName().toString();
             assertThat(name).hasSize(32);
         }
@@ -131,7 +132,7 @@ public class BuildExecutorFileCacheTest {
         BuildExecutor first = BuildExecutor.of(firstTarget,
                 Duration.ZERO,
                 hash,
-                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("SHA-256"),
                 BuildExecutorCallback.nop(),
                 cache,
                 false,
@@ -146,7 +147,7 @@ public class BuildExecutorFileCacheTest {
         BuildExecutor second = BuildExecutor.of(secondTarget,
                 Duration.ZERO,
                 hash,
-                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("SHA-256"),
                 BuildExecutorCallback.nop(),
                 cache,
                 false,
@@ -164,8 +165,8 @@ public class BuildExecutorFileCacheTest {
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         byte[] step = {1};
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, inputs("source", "file", new byte[]{9}), output, "", Map.of());
-        Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", step, inputs("source", "file", new byte[]{8}), target);
+        cache.store(Runnable::run, "step", step, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+        Optional<Map<Path, byte[]>> result = cache.fetch(Runnable::run, "step", step, inputs("source", "file", new byte[]{8}), target, "SHA-256");
         assertThat(result).isEmpty();
         try (Stream<Path> entries = Files.list(target)) {
             assertThat(entries.toList()).isEmpty();
@@ -188,7 +189,7 @@ public class BuildExecutorFileCacheTest {
         BuildExecutor first = BuildExecutor.of(firstTarget,
                 Duration.ZERO,
                 hash,
-                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("SHA-256"),
                 BuildExecutorCallback.nop(),
                 cache,
                 false,
@@ -205,7 +206,7 @@ public class BuildExecutorFileCacheTest {
         BuildExecutor second = BuildExecutor.of(secondTarget,
                 Duration.ZERO,
                 hash,
-                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("SHA-256"),
                 BuildExecutorCallback.nop(),
                 cache,
                 false,
@@ -219,46 +220,110 @@ public class BuildExecutorFileCacheTest {
     }
 
     @Test
-    public void corrupt_cache_entry_leaves_the_target_empty() throws IOException {
-        Files.writeString(cacheRoot.resolve("cache.properties"), "compressed=true\n");
+    public void a_manifest_naming_a_path_outside_the_target_leaves_the_target_empty() throws IOException {
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, in, output, "", Map.of());
-        Path entry;
-        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
-            entry = entries.findFirst().orElseThrow();
+        cache.store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        Path manifest;
+        try (Stream<Path> entries = Files.list(steps().resolve(HexFormat.of().formatHex(step)))) {
+            manifest = entries.findFirst().orElseThrow();
         }
-        ByteArrayOutputStream malicious = new ByteArrayOutputStream();
-        try (ZipOutputStream zip = new ZipOutputStream(malicious)) {
-            zip.putNextEntry(new ZipEntry("../escape"));
-            zip.write(new byte[]{1});
-            zip.closeEntry();
-        }
-        Files.write(entry, malicious.toByteArray());
+        Files.writeString(manifest, hex("result") + " 6 file\n" + hex("result") + " 6 ../escape\n");
         Files.writeString(target.resolve("stale"), "leftover");
-        assertThat(cache.fetch(Runnable::run, "step", step, in, target)).isEmpty();
+        assertThat(cache.fetch(Runnable::run, "step", step, in, target, "SHA-256")).isEmpty();
         try (Stream<Path> contents = Files.list(target)) {
             assertThat(contents.findAny()).isEmpty();
+        }
+        assertThat(target.resolveSibling("escape")).doesNotExist();
+        assertThat(manifest).as("a manifest that cannot be restored is dropped").doesNotExist();
+    }
+
+    @Test
+    public void a_tampered_file_is_a_miss_that_drops_the_file_and_its_manifest() throws IOException {
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("file"), "result");
+        Files.writeString(output.resolve("other"), "untouched");
+        cache.store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        Files.writeString(blob("result"), "tampered");
+        assertThat(cache.fetch(Runnable::run, "step", step, in, target, "SHA-256")).isEmpty();
+        try (Stream<Path> contents = Files.list(target)) {
+            assertThat(contents.findAny()).as("nothing of a tampered entry is handed on").isEmpty();
+        }
+        assertThat(blob("result")).doesNotExist();
+        assertThat(blob("untouched")).as("a file that is what its name says stays for other steps").exists();
+        try (Stream<Path> entries = Files.list(steps().resolve(HexFormat.of().formatHex(step)))) {
+            assertThat(entries.toList()).isEmpty();
         }
     }
 
     @Test
-    public void serves_a_tampered_entry_without_verifying_its_checksum() throws IOException {
+    public void a_manifest_naming_a_file_the_store_lost_is_a_miss_that_drops_the_manifest() throws IOException {
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, in, output, "", Map.of());
-        Path cached;
-        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
-            cached = entries.findFirst().orElseThrow().resolve("file");
+        cache.store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        Files.delete(blob("result"));
+        assertThat(cache.fetch(Runnable::run, "step", step, in, target, "SHA-256")).isEmpty();
+        try (Stream<Path> entries = Files.list(steps().resolve(HexFormat.of().formatHex(step)))) {
+            assertThat(entries.toList()).isEmpty();
         }
-        Files.writeString(cached, "tampered");
-        Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", step, in, target);
+        cache.store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        assertThat(cache.fetch(Runnable::run, "step", step, in, target, "SHA-256"))
+                .as("the next run stores the step again")
+                .isPresent();
+    }
+
+    @Test
+    public void a_file_two_steps_wrote_is_kept_once() throws IOException {
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        Files.writeString(output.resolve("file"), "shared");
+        Files.writeString(source.resolve("copy"), "shared");
+        Files.writeString(source.resolve("own"), "apart");
+        cache.store(Runnable::run, "first", new byte[]{1}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+        cache.store(Runnable::run, "second", new byte[]{2}, inputs("source", "file", new byte[]{9}), source, "SHA-256", Map.of());
+        try (Stream<Path> files = Files.walk(cacheRoot.resolve("sha-256").resolve("blobs"))) {
+            assertThat(files.filter(Files::isRegularFile).toList())
+                    .containsExactlyInAnyOrder(blob("shared"), blob("apart"));
+        }
+        assertThat(cache.fetch(Runnable::run, "second", new byte[]{2}, inputs("source", "file", new byte[]{9}), target, "SHA-256")).isPresent();
+        assertThat(target.resolve("copy")).content().isEqualTo("shared");
+        assertThat(target.resolve("own")).content().isEqualTo("apart");
+    }
+
+    @Test
+    public void an_empty_folder_of_the_output_is_restored() throws IOException {
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.createDirectories(output.resolve("classes").resolve("empty"));
+        Files.writeString(output.resolve("classes").resolve("file"), "result");
+        cache.store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        assertThat(cache.fetch(Runnable::run, "step", step, in, target, "SHA-256")).isPresent();
+        assertThat(target.resolve("classes").resolve("empty")).isEmptyDirectory();
+        assertThat(target.resolve("classes").resolve("file")).content().isEqualTo("result");
+    }
+
+    @Test
+    public void a_store_written_under_one_digest_is_kept_apart_from_another() throws IOException {
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("file"), "result");
+        cache.store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        assertThat(cache.fetch(Runnable::run, "step", step, in, target, "SHA-1"))
+                .as("a build hashing with another digest finds nothing it could not verify")
+                .isEmpty();
+        cache.store(Runnable::run, "step", step, in, output, "SHA-1", Map.of());
+        assertThat(cacheRoot.resolve("sha-1").resolve("steps").resolve(HexFormat.of().formatHex(step))).exists();
+        Optional<Map<Path, byte[]>> result = cache.fetch(Runnable::run, "step", step, in, target, "SHA-1");
         assertThat(result).isPresent();
-        assertThat(target.resolve("file")).content().isEqualTo("tampered");
+        assertThat(result.get().get(Path.of("file"))).hasSize(20);
+        assertThat(blob("result")).as("the other digest's files are untouched").exists();
     }
 
     @Test
@@ -267,13 +332,14 @@ public class BuildExecutorFileCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "first");
-        cache.store(Runnable::run, "step", step, in, output, "", Map.of());
+        cache.store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        Files.delete(output.resolve("file"));
         Files.writeString(output.resolve("file"), "second");
-        cache.store(Runnable::run, "step", step, in, output, "", Map.of());
-        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
+        cache.store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        try (Stream<Path> entries = Files.list(steps().resolve(HexFormat.of().formatHex(step)))) {
             assertThat(entries.toList()).hasSize(1);
         }
-        Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", step, in, target);
+        Optional<Map<Path, byte[]>> result = cache.fetch(Runnable::run, "step", step, in, target, "SHA-256");
         assertThat(result).isPresent();
         assertThat(target.resolve("file")).content().isEqualTo("first");
     }
@@ -291,7 +357,7 @@ public class BuildExecutorFileCacheTest {
         for (int index = 0; index < threads; index++) {
             futures.add(service.submit(() -> {
                 latch.await();
-                cache.store(Runnable::run, "step", step, in, output, "", Map.of());
+                cache.store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
                 return null;
             }));
         }
@@ -300,12 +366,12 @@ public class BuildExecutorFileCacheTest {
             future.get();
         }
         service.shutdown();
-        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
+        try (Stream<Path> entries = Files.list(steps().resolve(HexFormat.of().formatHex(step)))) {
             List<Path> list = entries.toList();
             assertThat(list).hasSize(1);
             assertThat(list.getFirst().getFileName().toString()).hasSize(64);
         }
-        assertThat(cache.fetch(Runnable::run, "step", step, in, target)).isPresent();
+        assertThat(cache.fetch(Runnable::run, "step", step, in, target, "SHA-256")).isPresent();
         assertThat(target.resolve("file")).content().isEqualTo("result");
     }
 
@@ -315,14 +381,14 @@ public class BuildExecutorFileCacheTest {
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         store(cache, new byte[]{1}, new byte[]{9});
         store(cache, new byte[]{2}, new byte[]{9});
-        Path a = cacheRoot.resolve(HexFormat.of().formatHex(new byte[]{1}));
-        Path b = cacheRoot.resolve(HexFormat.of().formatHex(new byte[]{2}));
+        Path a = steps().resolve(HexFormat.of().formatHex(new byte[]{1}));
+        Path b = steps().resolve(HexFormat.of().formatHex(new byte[]{2}));
         Files.setLastModifiedTime(a, FileTime.from(Instant.now().minusSeconds(300)));
         Files.setLastModifiedTime(b, FileTime.from(Instant.now().minusSeconds(60)));
         store(cache, new byte[]{3}, new byte[]{9});
         assertThat(a).doesNotExist();
-        assertThat(b).isDirectory();
-        assertThat(cacheRoot.resolve(HexFormat.of().formatHex(new byte[]{3}))).isDirectory();
+        assertThat(b).exists();
+        assertThat(steps().resolve(HexFormat.of().formatHex(new byte[]{3}))).exists();
     }
 
     @Test
@@ -336,8 +402,8 @@ public class BuildExecutorFileCacheTest {
         Files.setLastModifiedTime(v2, FileTime.from(Instant.now().minusSeconds(60)));
         Path v3 = store(cache, step, new byte[]{3});
         assertThat(v1).doesNotExist();
-        assertThat(v2).isDirectory();
-        assertThat(v3).isDirectory();
+        assertThat(v2).exists();
+        assertThat(v3).exists();
     }
 
     @Test
@@ -348,10 +414,11 @@ public class BuildExecutorFileCacheTest {
         Path stale = store(cache, step, new byte[]{1});
         Path fresh = store(cache, step, new byte[]{2});
         Files.setLastModifiedTime(stale, FileTime.from(Instant.now().minusSeconds(300)));
-        Path latest = store(cache, step, new byte[]{3});
+        assertThat(stale).as("a build applies the age of its cache once, when it first stores a step").exists();
+        Path latest = store(new BuildExecutorFileCache(cacheRoot), step, new byte[]{3});
         assertThat(stale).doesNotExist();
-        assertThat(fresh).isDirectory();
-        assertThat(latest).isDirectory();
+        assertThat(fresh).exists();
+        assertThat(latest).exists();
     }
 
     @Test
@@ -360,28 +427,97 @@ public class BuildExecutorFileCacheTest {
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         store(cache, new byte[]{1}, new byte[]{9});
         store(cache, new byte[]{2}, new byte[]{9});
-        Path a = cacheRoot.resolve(HexFormat.of().formatHex(new byte[]{1}));
-        Path b = cacheRoot.resolve(HexFormat.of().formatHex(new byte[]{2}));
+        Path a = steps().resolve(HexFormat.of().formatHex(new byte[]{1}));
+        Path b = steps().resolve(HexFormat.of().formatHex(new byte[]{2}));
         Files.setLastModifiedTime(a, FileTime.from(Instant.now().minusSeconds(300)));
         Files.setLastModifiedTime(b, FileTime.from(Instant.now().minusSeconds(200)));
         store(cache, new byte[]{3}, new byte[]{9});
-        assertThat(cacheRoot.resolve(HexFormat.of().formatHex(new byte[]{3}))).doesNotExist();
-        assertThat(a).isDirectory();
-        assertThat(b).isDirectory();
+        assertThat(steps().resolve(HexFormat.of().formatHex(new byte[]{3}))).doesNotExist();
+        assertThat(a).exists();
+        assertThat(b).exists();
     }
 
     @Test
-    public void evicts_least_recently_updated_until_under_size() throws IOException {
+    public void evicts_the_files_no_output_folder_links_oldest_first_until_under_size() throws Exception {
+        Assumptions.assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("unix"));
         Files.writeString(cacheRoot.resolve("cache.properties"), "size=2500\nsteps=0\nversions=0\n");
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
-        Path a = storeSized(cache, new byte[]{1}, 1000);
-        Path b = storeSized(cache, new byte[]{2}, 1000);
-        Files.setLastModifiedTime(a, FileTime.from(Instant.now().minusSeconds(300)));
-        Files.setLastModifiedTime(b, FileTime.from(Instant.now().minusSeconds(60)));
-        Path c = storeSized(cache, new byte[]{3}, 1000);
-        assertThat(a).doesNotExist();
-        assertThat(b).isDirectory();
-        assertThat(c).isDirectory();
+        Path linked = storeSized(cache, new byte[]{1}, 1000);
+        Files.createLink(target.resolve("held"), linked);
+        Files.delete(output.resolve("file"));
+        Thread.sleep(20);
+        Path oldest = storeSized(cache, new byte[]{2}, 1001);
+        Files.delete(output.resolve("file"));
+        Thread.sleep(20);
+        Path newer = storeSized(cache, new byte[]{3}, 1002);
+        Files.delete(output.resolve("file"));
+        Thread.sleep(20);
+        assertThat(oldest).as("a build applies the size of its cache once, when it first stores a step").exists();
+        Path latest = storeSized(new BuildExecutorFileCache(cacheRoot), new byte[]{4}, 1003);
+        assertThat(linked).as("a file an output folder still links costs no space of its own").exists();
+        assertThat(oldest).doesNotExist();
+        assertThat(newer).doesNotExist();
+        assertThat(latest).as("the output that was just stored still links its file").exists();
+        assertThat(cache.fetch(Runnable::run, "step", new byte[]{2}, inputs("source", "file", new byte[]{9}), firstTarget, "SHA-256"))
+                .as("the manifest of an evicted file is dropped when it is next asked for")
+                .isEmpty();
+        try (Stream<Path> entries = Files.list(steps().resolve(HexFormat.of().formatHex(new byte[]{2})))) {
+            assertThat(entries.toList()).isEmpty();
+        }
+    }
+
+    @Test
+    public void a_build_that_stores_several_steps_applies_size_and_age_once_and_in_the_background() throws IOException {
+        Files.writeString(cacheRoot.resolve("cache.properties"), "size=1\nttl=PT60S\n");
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        List<Runnable> queued = new ArrayList<>();
+        List<Path> files = new ArrayList<>();
+        for (byte step = 1; step <= 3; step++) {
+            Files.write(output.resolve("file"), new byte[1000 + step]);
+            cache.store(queued::add, "step", new byte[]{step}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+            String hex = HexFormat.of().formatHex(hash.hash(output.resolve("file")));
+            files.add(cacheRoot.resolve("sha-256").resolve("blobs").resolve(hex.substring(0, 2)).resolve(hex.substring(2)));
+            Files.delete(output.resolve("file"));
+            Files.setLastModifiedTime(manifest(new byte[]{step}), FileTime.from(Instant.now().minusSeconds(300)));
+        }
+        assertThat(queued).as("three steps stored, one pass over the cache asked for").hasSize(1);
+        assertThat(files).as("no step waited for it").allSatisfy(file -> assertThat(file).exists());
+        queued.getFirst().run();
+        assertThat(files).allSatisfy(file -> assertThat(file).doesNotExist());
+        try (Stream<Path> manifests = Files.walk(steps())) {
+            assertThat(manifests.filter(Files::isRegularFile).toList()).isEmpty();
+        }
+    }
+
+    @Test
+    public void a_build_that_stores_nothing_evicts_nothing() throws IOException {
+        byte[] step = {1};
+        Path stored = storeSized(new BuildExecutorFileCache(cacheRoot), step, 1000);
+        Files.delete(output.resolve("file"));
+        Files.writeString(cacheRoot.resolve("cache.properties"), "size=1\nttl=PT60S\n");
+        Files.setLastModifiedTime(manifest(step), FileTime.from(Instant.now().minusSeconds(300)));
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        List<Runnable> queued = new ArrayList<>();
+        assertThat(cache.fetch(queued::add, "step", step, inputs("source", "file", new byte[]{9}), target, "SHA-256")).isPresent();
+        cache.touch(queued::add, "step", step, inputs("source", "file", new byte[]{9}), "SHA-256");
+        assertThat(queued).isEmpty();
+        assertThat(stored).exists();
+    }
+
+    @Test
+    public void an_evicted_manifest_takes_the_files_only_it_named() throws IOException {
+        Files.writeString(cacheRoot.resolve("cache.properties"), "steps=1\n");
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        Files.writeString(output.resolve("shared"), "shared");
+        Files.writeString(output.resolve("file"), "first");
+        cache.store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+        Files.setLastModifiedTime(steps().resolve(HexFormat.of().formatHex(new byte[]{1})), FileTime.from(Instant.now().minusSeconds(300)));
+        Files.delete(output.resolve("file"));
+        Files.writeString(output.resolve("file"), "second");
+        cache.store(Runnable::run, "step", new byte[]{2}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+        assertThat(blob("first")).doesNotExist();
+        assertThat(blob("shared")).exists();
+        assertThat(blob("second")).exists();
     }
 
     @Test
@@ -390,12 +526,12 @@ public class BuildExecutorFileCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Path entry = store(cache, step, new byte[]{9});
-        Path folder = cacheRoot.resolve(HexFormat.of().formatHex(step));
+        Path folder = steps().resolve(HexFormat.of().formatHex(step));
         Files.setLastModifiedTime(entry, FileTime.from(Instant.now().minusSeconds(300)));
         Files.setLastModifiedTime(folder, FileTime.from(Instant.now().minusSeconds(300)));
         FileTime entryBefore = Files.getLastModifiedTime(entry);
         FileTime folderBefore = Files.getLastModifiedTime(folder);
-        cache.fetch(Runnable::run, "step", step, in, target);
+        cache.fetch(Runnable::run, "step", step, in, target, "SHA-256");
         assertThat(Files.getLastModifiedTime(entry)).isGreaterThan(entryBefore);
         assertThat(Files.getLastModifiedTime(folder)).isGreaterThan(folderBefore);
     }
@@ -409,7 +545,7 @@ public class BuildExecutorFileCacheTest {
         Path entry = store(cache, step, new byte[]{9});
         Files.setLastModifiedTime(entry, FileTime.from(Instant.now().minusSeconds(300)));
         FileTime before = Files.getLastModifiedTime(entry);
-        cache.fetch(Runnable::run, "step", step, in, target);
+        cache.fetch(Runnable::run, "step", step, in, target, "SHA-256");
         assertThat(Files.getLastModifiedTime(entry)).isEqualTo(before);
     }
 
@@ -419,12 +555,12 @@ public class BuildExecutorFileCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Path entry = store(cache, step, new byte[]{9});
-        Path folder = cacheRoot.resolve(HexFormat.of().formatHex(step));
+        Path folder = steps().resolve(HexFormat.of().formatHex(step));
         Files.setLastModifiedTime(entry, FileTime.from(Instant.now().minusSeconds(300)));
         Files.setLastModifiedTime(folder, FileTime.from(Instant.now().minusSeconds(300)));
         FileTime entryBefore = Files.getLastModifiedTime(entry);
         FileTime folderBefore = Files.getLastModifiedTime(folder);
-        cache.touch(Runnable::run, "step", step, in);
+        cache.touch(Runnable::run, "step", step, in, "SHA-256");
         assertThat(Files.getLastModifiedTime(entry)).isGreaterThan(entryBefore);
         assertThat(Files.getLastModifiedTime(folder)).isGreaterThan(folderBefore);
     }
@@ -438,15 +574,15 @@ public class BuildExecutorFileCacheTest {
         Path entry = store(cache, step, new byte[]{9});
         Files.setLastModifiedTime(entry, FileTime.from(Instant.now().minusSeconds(300)));
         FileTime before = Files.getLastModifiedTime(entry);
-        cache.touch(Runnable::run, "step", step, in);
+        cache.touch(Runnable::run, "step", step, in, "SHA-256");
         assertThat(Files.getLastModifiedTime(entry)).isEqualTo(before);
     }
 
     @Test
     public void touch_on_a_missing_entry_does_nothing() throws IOException {
         new BuildExecutorFileCache(cacheRoot)
-                .touch(Runnable::run, "step", new byte[]{7}, inputs("source", "file", new byte[]{9}));
-        assertThat(cacheRoot.resolve(HexFormat.of().formatHex(new byte[]{7}))).doesNotExist();
+                .touch(Runnable::run, "step", new byte[]{7}, inputs("source", "file", new byte[]{9}), "SHA-256");
+        assertThat(steps().resolve(HexFormat.of().formatHex(new byte[]{7}))).doesNotExist();
     }
 
     @Test
@@ -454,11 +590,11 @@ public class BuildExecutorFileCacheTest {
         Files.writeString(cacheRoot.resolve("cache.properties"), "steps=1\n");
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         store(cache, new byte[]{1}, new byte[]{9});
-        Path a = cacheRoot.resolve(HexFormat.of().formatHex(new byte[]{1}));
+        Path a = steps().resolve(HexFormat.of().formatHex(new byte[]{1}));
         Files.setLastModifiedTime(a, FileTime.from(Instant.now().minusSeconds(300)));
         store(cache, new byte[]{2}, new byte[]{9});
         assertThat(a).doesNotExist();
-        assertThat(cacheRoot.resolve(HexFormat.of().formatHex(new byte[]{2}))).isDirectory();
+        assertThat(steps().resolve(HexFormat.of().formatHex(new byte[]{2}))).exists();
     }
 
     @Test
@@ -469,8 +605,8 @@ public class BuildExecutorFileCacheTest {
         Files.writeString(cacheRoot.resolve("cache.properties"), "write=false\n");
         Files.setLastModifiedTime(entry, FileTime.from(Instant.now().minusSeconds(300)));
         FileTime before = Files.getLastModifiedTime(entry);
-        Optional<BuildStepResult> result = new BuildExecutorFileCache(cacheRoot)
-                .fetch(Runnable::run, "step", step, in, target);
+        Optional<Map<Path, byte[]>> result = new BuildExecutorFileCache(cacheRoot)
+                .fetch(Runnable::run, "step", step, in, target, "SHA-256");
         assertThat(result).isPresent();
         assertThat(target.resolve("file")).content().isEqualTo("x");
         assertThat(Files.getLastModifiedTime(entry)).isEqualTo(before);
@@ -481,26 +617,8 @@ public class BuildExecutorFileCacheTest {
         Files.writeString(cacheRoot.resolve("cache.properties"), "write=false\n");
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), output, "", Map.of());
-        assertThat(cacheRoot.resolve(HexFormat.of().formatHex(new byte[]{1}))).doesNotExist();
-    }
-
-    @Test
-    public void compressed_stores_zip_and_serves_round_trip() throws IOException {
-        Files.writeString(cacheRoot.resolve("cache.properties"), "compressed=true\n");
-        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
-        byte[] step = {1};
-        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
-        Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, in, output, "", Map.of());
-        Path entry;
-        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
-            entry = entries.findFirst().orElseThrow();
-        }
-        assertThat(entry).isRegularFile();
-        Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", step, in, target);
-        assertThat(result).isPresent();
-        assertThat(target.resolve("file")).content().isEqualTo("result");
+        cache.store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+        assertThat(steps().resolve(HexFormat.of().formatHex(new byte[]{1}))).doesNotExist();
     }
 
     @Test
@@ -509,8 +627,8 @@ public class BuildExecutorFileCacheTest {
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         byte[] step = {1};
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, inputs("source", "file", new byte[]{9}), output, "", Map.of());
-        assertThat(cacheRoot.resolve(HexFormat.of().formatHex(step))).doesNotExist();
+        cache.store(Runnable::run, "step", step, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+        assertThat(steps().resolve(HexFormat.of().formatHex(step))).doesNotExist();
     }
 
     @Test
@@ -519,8 +637,8 @@ public class BuildExecutorFileCacheTest {
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         store(new BuildExecutorFileCache(cacheRoot), step, new byte[]{9});
         Files.writeString(cacheRoot.resolve("cache.properties"), "read=false\n");
-        Optional<BuildStepResult> result = new BuildExecutorFileCache(cacheRoot)
-                .fetch(Runnable::run, "step", step, in, target);
+        Optional<Map<Path, byte[]>> result = new BuildExecutorFileCache(cacheRoot)
+                .fetch(Runnable::run, "step", step, in, target, "SHA-256");
         assertThat(result).isEmpty();
     }
 
@@ -529,8 +647,8 @@ public class BuildExecutorFileCacheTest {
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         Files.writeString(output.resolve("file"), "x");
         byte[] step = {1};
-        cache.store(Runnable::run, "step", step, inputPath(Path.of("a", "b")), output, "", Map.of());
-        assertThat(cache.fetch(Runnable::run, "step", step, inputPath(Path.of("a\\b")), target)).isPresent();
+        cache.store(Runnable::run, "step", step, inputPath(Path.of("a", "b")), output, "SHA-256", Map.of());
+        assertThat(cache.fetch(Runnable::run, "step", step, inputPath(Path.of("a\\b")), target, "SHA-256")).isPresent();
     }
 
     @Test
@@ -543,14 +661,14 @@ public class BuildExecutorFileCacheTest {
         forward.put(Path.of("b"), new byte[]{2});
         SequencedMap<String, Map<Path, byte[]>> stored = new LinkedHashMap<>();
         stored.put("source", forward);
-        cache.store(Runnable::run, "step", step, stored, output, "", Map.of());
+        cache.store(Runnable::run, "step", step, stored, output, "SHA-256", Map.of());
 
         Map<Path, byte[]> reversed = new LinkedHashMap<>();
         reversed.put(Path.of("b"), new byte[]{2});
         reversed.put(Path.of("a"), new byte[]{1});
         SequencedMap<String, Map<Path, byte[]>> fetched = new LinkedHashMap<>();
         fetched.put("source", reversed);
-        assertThat(cache.fetch(Runnable::run, "step", step, fetched, target)).isPresent();
+        assertThat(cache.fetch(Runnable::run, "step", step, fetched, target, "SHA-256")).isPresent();
         assertThat(target.resolve("file")).content().isEqualTo("result");
     }
 
@@ -563,10 +681,11 @@ public class BuildExecutorFileCacheTest {
     }
 
     private Path store(BuildExecutorFileCache cache, byte[] step, byte[] inputHash) throws IOException {
+        Files.deleteIfExists(output.resolve("file"));
         Files.writeString(output.resolve("file"), "x");
-        Path folder = cacheRoot.resolve(HexFormat.of().formatHex(step));
+        Path folder = steps().resolve(HexFormat.of().formatHex(step));
         Set<Path> before = children(folder);
-        cache.store(Runnable::run, "step", step, inputs("source", "file", inputHash), output, "", Map.of());
+        cache.store(Runnable::run, "step", step, inputs("source", "file", inputHash), output, "SHA-256", Map.of());
         Set<Path> after = children(folder);
         after.removeAll(before);
         return after.isEmpty() ? null : after.iterator().next();
@@ -574,12 +693,32 @@ public class BuildExecutorFileCacheTest {
 
     private Path storeSized(BuildExecutorFileCache cache, byte[] step, int bytes) throws IOException {
         Files.write(output.resolve("file"), new byte[bytes]);
-        Path folder = cacheRoot.resolve(HexFormat.of().formatHex(step));
-        Set<Path> before = children(folder);
-        cache.store(Runnable::run, "step", step, inputs("source", "file", new byte[]{9}), output, "", Map.of());
-        Set<Path> after = children(folder);
-        after.removeAll(before);
-        return after.isEmpty() ? null : after.iterator().next();
+        cache.store(Runnable::run, "step", step, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+        String hex = HexFormat.of().formatHex(hash.hash(output.resolve("file")));
+        return cacheRoot.resolve("sha-256").resolve("blobs").resolve(hex.substring(0, 2)).resolve(hex.substring(2));
+    }
+
+    private Path manifest(byte[] step) throws IOException {
+        try (Stream<Path> entries = Files.list(steps().resolve(HexFormat.of().formatHex(step)))) {
+            return entries.findFirst().orElseThrow();
+        }
+    }
+
+    private Path steps() {
+        return cacheRoot.resolve("sha-256").resolve("steps");
+    }
+
+    private Path blob(String content) {
+        String hex = hex(content);
+        return cacheRoot.resolve("sha-256").resolve("blobs").resolve(hex.substring(0, 2)).resolve(hex.substring(2));
+    }
+
+    private static String hex(String content) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new AssertionError(e);
+        }
     }
 
     private static Set<Path> children(Path folder) throws IOException {

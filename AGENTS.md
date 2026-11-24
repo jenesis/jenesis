@@ -57,7 +57,7 @@ onboarding briefing from the same material, `skill/<page>` one page and `skill` 
 where the object is built:
 
 - `ofEnvironment(environment, …)` reads every setting from the `Environment` it is handed
-  (`environment.value("executor.digest", "MD5", Setting.PROJECT)`), with what the object cannot do without as
+  (`environment.value("executor.digest", "SHA-256", Setting.PROJECT)`), with what the object cannot do without as
   further arguments (`Project.ofEnvironment(environment, root)`);
 - the public short constructor reads nothing and takes every default, as `Environment.NONE` would;
 - the canonical constructor takes every value; a wither replaces one and calls it.

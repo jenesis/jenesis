@@ -139,11 +139,12 @@ public class ProjectReproductionTest {
     record Recording(List<Path> touched) implements BuildExecutorCache {
 
         @Override
-        public Optional<BuildStepResult> fetch(Executor executor,
+        public Optional<Map<Path, byte[]>> fetch(Executor executor,
                                                String identity,
                                                byte[] step,
                                                SequencedMap<String, Map<Path, byte[]>> inputs,
-                                               Path target) {
+                                               Path target,
+                                               String digest) {
             touched.add(target);
             return Optional.empty();
         }

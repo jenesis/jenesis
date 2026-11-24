@@ -13,23 +13,24 @@ public final class BuildExecutorLayeredCache implements BuildExecutorCache {
     }
 
     @Override
-    public Optional<BuildStepResult> fetch(Executor executor,
-                                           String identity,
-                                           byte[] step,
-                                           SequencedMap<String, Map<Path, byte[]>> inputs,
-                                           Path target) throws IOException {
-        Optional<BuildStepResult> local = front.fetch(executor, identity, step, inputs, target);
+    public Optional<Map<Path, byte[]>> fetch(Executor executor,
+                                             String identity,
+                                             byte[] step,
+                                             SequencedMap<String, Map<Path, byte[]>> inputs,
+                                             Path target,
+                                             String digest) throws IOException {
+        Optional<Map<Path, byte[]>> local = front.fetch(executor, identity, step, inputs, target, digest);
         if (local.isPresent()) {
             try {
-                back.touch(executor, identity, step, inputs);
+                back.touch(executor, identity, step, inputs, digest);
             } catch (IOException | RuntimeException _) {
             }
             return local;
         }
-        Optional<BuildStepResult> shared = back.fetch(executor, identity, step, inputs, target);
+        Optional<Map<Path, byte[]>> shared = back.fetch(executor, identity, step, inputs, target, digest);
         if (shared.isPresent()) {
             try {
-                front.store(executor, identity, step, inputs, target, "", Map.of());
+                front.store(executor, identity, step, inputs, target, digest, shared.get());
             } catch (IOException | RuntimeException _) {
             }
         }
@@ -60,13 +61,14 @@ public final class BuildExecutorLayeredCache implements BuildExecutorCache {
     public void touch(Executor executor,
                       String identity,
                       byte[] step,
-                      SequencedMap<String, Map<Path, byte[]>> inputs) {
+                      SequencedMap<String, Map<Path, byte[]>> inputs,
+                      String digest) {
         try {
-            front.touch(executor, identity, step, inputs);
+            front.touch(executor, identity, step, inputs, digest);
         } catch (IOException | RuntimeException _) {
         }
         try {
-            back.touch(executor, identity, step, inputs);
+            back.touch(executor, identity, step, inputs, digest);
         } catch (IOException | RuntimeException _) {
         }
     }

@@ -612,7 +612,7 @@ public class BuildExecutorTest implements Serializable {
             assertThat(new BuildExecutor.Configuration().aggregate())
                     .as("an embedder that builds its own configuration is never surprised by the environment")
                     .isFalse();
-            assertThat(new BuildExecutor.Configuration().digest()).isEqualTo("MD5");
+            assertThat(new BuildExecutor.Configuration().digest()).isEqualTo("SHA-256");
             assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings)).aggregate()).isTrue();
         } finally {
             settings.remove("executor.aggregate");

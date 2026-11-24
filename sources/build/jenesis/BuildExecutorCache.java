@@ -5,11 +5,12 @@ import module java.base;
 @FunctionalInterface
 public interface BuildExecutorCache {
 
-    Optional<BuildStepResult> fetch(Executor executor,
-                                    String identity,
-                                    byte[] step,
-                                    SequencedMap<String, Map<Path, byte[]>> inputs,
-                                    Path target) throws IOException;
+    Optional<Map<Path, byte[]>> fetch(Executor executor,
+                                      String identity,
+                                      byte[] step,
+                                      SequencedMap<String, Map<Path, byte[]>> inputs,
+                                      Path target,
+                                      String digest) throws IOException;
 
     default void store(Executor executor,
                        String identity,
@@ -27,10 +28,11 @@ public interface BuildExecutorCache {
     default void touch(Executor executor,
                        String identity,
                        byte[] step,
-                       SequencedMap<String, Map<Path, byte[]>> inputs) throws IOException {
+                       SequencedMap<String, Map<Path, byte[]>> inputs,
+                       String digest) throws IOException {
     }
 
     static BuildExecutorCache nop() {
-        return (_, _, _, _, _) -> Optional.empty();
+        return (_, _, _, _, _, _) -> Optional.empty();
     }
 }

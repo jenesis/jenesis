@@ -174,11 +174,12 @@ class BuildExecutorDefault implements BuildExecutor {
                     Path nextOutput = Files.createDirectory(next.resolve("output"));
                     Path nextSupplement = Files.createDirectory(next.resolve("supplement"));
                     long fetchStarted = System.nanoTime();
-                    Optional<BuildStepResult> cached = cache.fetch(executor,
+                    Optional<Map<Path, byte[]>> cached = cache.fetch(executor,
                             location + identity,
                             currentStepHash,
                             inputs,
-                            nextOutput);
+                            nextOutput,
+                            algorithm);
                     boolean fromCache = cached.isPresent();
                     if (fromCache) {
                         callback.loaded(location + identity, System.nanoTime() - fetchStarted);
@@ -196,7 +197,7 @@ class BuildExecutorDefault implements BuildExecutor {
                     }
                     CompletionStage<BuildStepResult> stepStage;
                     if (fromCache) {
-                        stepStage = CompletableFuture.completedStage(cached.get());
+                        stepStage = CompletableFuture.completedStage(new BuildStepResult());
                     } else {
                         BuildStepContext context = new BuildStepContext(
                                 consistent ? previous.output() : null,
@@ -242,7 +243,9 @@ class BuildExecutorDefault implements BuildExecutor {
                                 throw new IllegalStateException("Cannot reuse initial run for " + location + identity);
                             }
                             previous.record(summaries);
-                            Map<Path, byte[]> checksums = HashFunction.read(previous.output(), hash, executor);
+                            Map<Path, byte[]> checksums = fromCache
+                                    ? cached.get()
+                                    : HashFunction.read(previous.output(), hash, executor);
                             HashFunction.write(previous.checksums(), checksums);
                             SequencedProperties stepProperties = new SequencedProperties();
                             stepProperties.setProperty("serialization", HexFormat.of().formatHex(currentStepHash));
@@ -300,7 +303,7 @@ class BuildExecutorDefault implements BuildExecutor {
                     }
                     completion.accept(false, null);
                     try {
-                        cache.touch(executor, location + identity, currentStepHash, inputs);
+                        cache.touch(executor, location + identity, currentStepHash, inputs, algorithm);
                     } catch (IOException _) {
                     }
                     return CompletableFuture.completedStage(Map.of(identity, Map.of(
