@@ -27,6 +27,7 @@ public interface BuildStep extends Serializable {
             SCOPES = "scopes.properties",
             OVERRIDES = "overrides.properties",
             ATTACHMENTS = "attachments.properties",
+            AGENTS = "agents.properties",
             NATIVES = "natives.properties",
             LAYERS = "layers.properties",
             DEPENDENCIES = "dependencies.properties",

@@ -1944,13 +1944,16 @@ public class MavenPomResolver implements MavenResolver {
                 .filter(text -> text.startsWith("jenesis.attach"))
                 .forEach(text -> {
                     for (String line : text.substring("jenesis.attach".length()).replace("&#45;", "-").split("\n")) {
-                        String trimmed = line.trim().replaceAll("\\s+", " ");
+                        String trimmed = line.strip();
                         if (trimmed.isEmpty()) {
                             continue;
                         }
-                        int space = trimmed.indexOf(' ');
-                        String token = space < 0 ? trimmed : trimmed.substring(0, space);
-                        String arguments = space < 0 ? "" : trimmed.substring(space + 1).trim();
+                        int space = IntStream.range(0, trimmed.length())
+                                .filter(index -> Character.isWhitespace(trimmed.charAt(index)))
+                                .findFirst()
+                                .orElse(trimmed.length());
+                        String token = trimmed.substring(0, space);
+                        String arguments = trimmed.substring(space).strip();
                         if (ModuleGraph.isSystemModule(token)) {
                             throw new IllegalArgumentException("Illegal jenesis.attach token '"
                                     + token

@@ -414,6 +414,60 @@ the bundled `productbuild`/`hdiutil`). For that reason it is run locally rather 
 CI, where `Demo.java`'s app-image - which needs no native tooling - covers the packaging
 path.
 
+A faster start with an ahead-of-time cache
+------------------------------------------
+
+A JVM spends its first moments loading and linking classes. Since JDK 24 it can
+record that work once, in a training run, and start from the recording afterwards -
+an ahead-of-time (AOT) cache. Such a cache is valid only for the runtime image that
+recorded it and for the modules that image holds, which is exactly what a linked
+runtime pins down. So the build trains one where an `aot.properties` sits in the
+configuration folder, as this demo's `aot` profile commits it beside a
+`packaging.properties` with `jlink=true` and `jpackage=app-image`:
+
+    arguments=Ada
+
+    java -Djenesis.make.profiles=aot build/jenesis/Make.java stage
+
+The file has the build link the runtime image, even where `jlink=true` is not set,
+and run the module's `@jenesis.main` class once on that image's own `bin/java`, with
+the words of `arguments` and the options of `process-java.properties`, in an empty
+working directory. A run that ends with another exit code than 0 fails the build.
+The cache the JVM wrote is then part of both outputs:
+
+    target/stage/runtime/output/module-sources/lib/demo.modular.executable.aot
+    target/stage/packages/output/demo.modular.executable/lib/app/demo.modular.executable.aot
+
+The app-image uses it without further ado: its launcher is handed
+`-XX:AOTCache=$APPDIR/demo.modular.executable.aot`, the options the training run
+got, and `-Xlog:aot=off`, so that a JVM refusing the cache starts without it and
+says nothing. The bare runtime image has no launcher to carry an option, so there
+you name the cache yourself:
+
+    R=target/stage/runtime/output/module-sources
+    $R/bin/java -XX:AOTCache=$R/lib/demo.modular.executable.aot -m demo.modular.executable/sample.Sample Ada
+
+Two more keys shape the training run. `main=<class>` runs another main class of the
+module, for an application whose own would wait for input or needs exercising first:
+write one that starts the application, sends it typical work and returns.
+`timeout=<duration>`, as `PT30S`, is for an application that never returns, a server:
+when the time is up the build ends the recording, stops the process and keeps the
+cache, where a run that returns earlier is still judged by its exit code.
+
+What the cache cannot do follows from what it is tied to. It serves a JVM only with
+the module options it was recorded with, so an `--add-opens`, `--add-modules` or
+`--enable-native-access` belongs in `process-java.properties`, which training and
+launcher share, never in the launcher's options alone. It belongs to one operating
+system and architecture, like the image around it. It is not reproducible: two
+training runs write different bytes, so `jenesis.project.reproduce` reports the
+step and whatever packages its output. And it is no use to a JVM other than the one
+that trained it, which is why the `bundle.zip`, the launcher jar and a Dockerfile
+that starts the jars on its base image's JVM carry none; a container gets one only
+by shipping the app-image in place of the jars. An application of several module
+layers is refused, as is one launched from the class path, since the runtime image
+holds named modules alone. `-Djenesis.package.aot=false` builds everything without
+the training run.
+
 Where to go from here?
 ----------------------
 

@@ -769,7 +769,7 @@ four `error-on-*` keys turn a finding into a failure:
     error-on-binary-incompatibility=true
 
 The demo publishes its own previous release first, so it has something to compare
-against. `-Djenesis.artifact.japicmp=false` is the opt-out.
+against. `-Djenesis.japicmp.artifact=false` is the opt-out.
 
 A `revapi.properties` runs revapi against the same baseline, reporting every
 difference from the severity it names in `reports/revapi/revapi.json`; the demo
@@ -1326,4 +1326,4 @@ adds `src/main/clojure` beside `src/main/java`, and the plugin compiles the
 namespace after `javac`, so it calls the module's Java type. It compiles with the
 `org.clojure:clojure` the `pom.xml` declares, as classes compiled ahead of time are
 tied to the Clojure that compiled them, and ships each source beside its classes.
-`-Djenesis.language.clojure=false` leaves the plugin out.
+`-Djenesis.clojure.language=false` leaves the plugin out.

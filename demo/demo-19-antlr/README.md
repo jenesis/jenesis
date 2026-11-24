@@ -79,7 +79,7 @@ reach the jar:
     demo/antlr/calc/CalcBaseVisitor.class
     demo/antlr/Calculator.class
 
-Turn it off with `-Djenesis.generate.antlr=false`, the same way every other
+Turn it off with `-Djenesis.antlr.generate=false`, the same way every other
 plugin is left out.
 
 In the editor

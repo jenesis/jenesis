@@ -101,8 +101,8 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 location,
                 root,
                 ExternalModule.official(environment, MAVEN_PLUGIN, null, repositories, resolvers),
-                environment.flag("artifact." + MAVEN_PLUGIN, true, Setting.PROJECT));
-        return environment.flag("generate.classpath", true, Setting.PROJECT) ? module : module.classpath(null);
+                environment.flag(MAVEN_PLUGIN + ".artifact", true, Setting.PROJECT));
+        return environment.flag("classpath.generate", true, Setting.PROJECT) ? module : module.classpath(null);
     }
 
     private InferredJavaToolchainModule(SequencedSet<Path> configuration,
@@ -580,8 +580,8 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
             } else if (transformer != null) {
                 throw new IllegalStateException(described + " has the Maven plugin descriptor written into the"
                         + " compiled classes, which a transformer of its own replaces - hand the transforms as a"
-                        + " ClassTransformModule, or switch the descriptor off with -Djenesis.artifact."
-                        + MAVEN_PLUGIN + "=false");
+                        + " ClassTransformModule, or switch the descriptor off with -Djenesis."
+                        + MAVEN_PLUGIN + ".artifact=false");
             }
             transforms.put(MAVEN_PLUGIN, mavenPluginModule.configured(location, root, values));
             transforming = new ClassTransformModule(transforms);

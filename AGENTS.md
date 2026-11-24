@@ -244,13 +244,16 @@ for that next build.
 
 **Official plugins are discovered.** A module under `project/` (`JDepsModule`, `LicenseHeaderModule`, …) runs what
 the JDK ships and activates when its file is in a configuration folder. Every tool the build discovers, shipped or
-downloaded, is switched off by `jenesis.<part>.<tool>=false`, named after the part of the build it belongs to -
+downloaded, is switched off by `jenesis.<tool>.<part>=false`, named after the tool and the part of the build it
+belongs to -
 `check`, `format`, `validate`, `artifact`, `generate`, `language`, `observe`, `compliance`, `documentation`, `release` -
 and read by the `ofEnvironment` of the inferred module that wires it, as the boolean beside its child; a tool wired in
-two namespaces, as ktlint lints in `check` and formats in `format`, is switched in each apart. A checker's findings
-fail the build only under `jenesis.strict.<name>=true` and are reported otherwise. A plugin `jenesis.plugins.properties`
+two namespaces, as ktlint lints in `check` and formats in `format`, is switched in each apart, and every setting of
+a tool shares its group (`jenesis.pmd.check`, `jenesis.pmd.strict`, `jenesis.pmd.priority`). A checker's findings
+fail the build only under `jenesis.<name>.strict=true` and are reported otherwise. A plugin `jenesis.plugins.properties`
 names is switched off by `jenesis.plugin.<name>=false` instead, so the two never share a setting and no name is
-reserved. A tool the build would download is an official plugin of `jenesis/jenesis-plugins`: the inferred module that
+reserved for a plugin a project declares, while an official tool takes no name of a group of settings. A tool the
+build would download is an official plugin of `jenesis/jenesis-plugins`: the inferred module that
 ran it holds it as `ExternalModule.official`, resolved as `module/build.jenesis.plugin.<name>` in the group `<name>`,
 and wires it where a
 configuration folder holds its `<name>.properties` (a language plugin where the scan finds a `.kt`, `.scala` or
@@ -273,6 +276,15 @@ as a result, skips it). The child is built by its own `ofEnvironment` and kept b
 compiler.javac(javac -> …)))`); a new child is a configurator on its parent, never on the assembler. Every
 `Inferred*Module` and the module build also hold `custom`, extra children wired in a sub-module `custom`, added by
 `custom(name, module)` or `custom(name, step)`, refusing a name taken.
+
+**A tag states what a module is, a file what a build does with it.** A `@jenesis.*` tag of `module-info.java`, and
+its `<!--jenesis.*-->` twin in a `pom.xml`, is a language extension: it declares a static property of the module that
+holds in every build and profile - its release, its main class, what it requires, pins, attaches or grants. A file in
+a configuration folder is for a plugin and for any special treatment a build or a profile may vary. A file may replace
+the default arguments a tag carries, never what the tag declares: `@jenesis.attach <token> <options>` names an agent
+and its default options, and a line of `agents.properties` replaces those options whole. A tag owns every line below
+it, so its value is validated where it is parsed; the one tag that takes free text, `@jenesis.attach`, reads it from
+the source as written rather than from the comment's markup.
 
 **Configuration files are read through `SequencedProperties`**: `value`, `flag`, `flagOrNull`, `entries`, `words`
 trim and read a blank as absent, and a flag reads as a `jenesis.*` setting does. `getProperty` is for the readers

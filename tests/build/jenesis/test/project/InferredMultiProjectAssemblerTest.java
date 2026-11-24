@@ -297,6 +297,64 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void an_attached_agent_keeps_the_options_of_its_declaration_without_an_agents_file() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.manifests().resolve(BuildStep.ATTACHMENTS), """
+                main/agent/module/sample.agent=mode=two  words
+                main/agent/module/plain.agent=
+                """);
+        Path prepareOutput = fixture.execute("build/prepare").get("build/prepare");
+        assertThat(readProperties(prepareOutput.resolve(BuildStep.AGENTS)))
+                .as("every agent is named, one without options too, so that no other module supplies them")
+                .containsOnly(Map.entry("main/agent/module/sample.agent", "mode=two  words"),
+                        Map.entry("main/agent/module/plain.agent", ""));
+    }
+
+    @Test
+    public void a_line_of_an_agents_file_replaces_the_options_of_the_declaration() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.manifests().resolve(BuildStep.ATTACHMENTS), """
+                main/agent/maven/org.example/agent=first=1,second=2
+                main/agent/module/sample.agent=mode=declared
+                main/agent/module/emptied.agent=mode=declared
+                other/agent/maven/org.example/typed/jar/all=declared
+                main/agent/module/kept.agent=mode=declared
+                """);
+        Files.writeString(fixture.configuration().resolve("agents.properties"), """
+                org.example/agent=third=two  words,fourth=[x]--y
+                sample.agent=@endpoint
+                emptied.agent=
+                other/maven/org.example/typed/jar/all=typed
+                not.attached=ignored
+                """);
+        Path prepareOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
+                new Environment(Map.of("variable.endpoint", "endpoint=http://localhost:4317"))), "build/prepare").get("build/prepare");
+        assertThat(readProperties(prepareOutput.resolve(BuildStep.AGENTS)))
+                .as("a line replaces the declared options whole, an empty one with none, and an agent without a line keeps them")
+                .containsOnly(Map.entry("main/agent/maven/org.example/agent", "third=two  words,fourth=[x]--y"),
+                        Map.entry("main/agent/module/sample.agent", "endpoint=http://localhost:4317"),
+                        Map.entry("main/agent/module/emptied.agent", ""),
+                        Map.entry("other/agent/maven/org.example/typed/jar/all", "typed"),
+                        Map.entry("main/agent/module/kept.agent", "mode=declared"));
+    }
+
+    @Test
+    public void an_agents_file_of_a_profile_replaces_the_one_of_the_configuration() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.manifests().resolve(BuildStep.ATTACHMENTS), """
+                main/agent/module/sample.agent=mode=declared
+                main/agent/module/other.agent=mode=declared
+                """);
+        Files.writeString(fixture.configuration().resolve("agents.properties"), "sample.agent=mode=default\nother.agent=mode=default\n");
+        Files.writeString(fixture.profile().resolve("agents.properties"), "sample.agent=mode=profile\n");
+        Path prepareOutput = fixture.execute("build/prepare").get("build/prepare");
+        assertThat(readProperties(prepareOutput.resolve(BuildStep.AGENTS)))
+                .as("the first file found configures alone, so an agent the profile's file leaves out keeps its declaration")
+                .containsOnly(Map.entry("main/agent/module/sample.agent", "mode=profile"),
+                        Map.entry("main/agent/module/other.agent", "mode=declared"));
+    }
+
+    @Test
     public void an_environment_file_in_configuration_yields_the_variables_of_a_tool() throws IOException {
         Fixture fixture = setUp("main=\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("environment-test.properties"), "SAMPLE=value\nINHERITED\n");
@@ -458,6 +516,46 @@ public class InferredMultiProjectAssemblerTest {
         assertThatThrownBy(() -> fixture.execute("build/jlink"))
                 .rootCause()
                 .hasMessageStartingWith("Unknown selector: jlink - ");
+    }
+
+    @Test
+    public void aot_properties_links_a_runtime_image_and_trains_on_it() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("aot.properties"), "arguments=--port 0\n");
+        SequencedMap<String, Path> executed = fixture.execute(new InferredMultiProjectAssembler(),
+                "package/jlink",
+                "package/aot");
+        assertThat(executed).containsKeys("package/jlink", "package/aot");
+        assertThat(executed.get("package/aot"))
+                .as("a module without a main class is linked no image and trained no cache")
+                .isEmptyDirectory();
+    }
+
+    @Test
+    public void the_package_aot_setting_trains_no_cache_where_aot_properties_is_present() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false, "app-image");
+        Files.writeString(fixture.configuration().resolve("aot.properties"), "arguments=\n");
+        assertThatThrownBy(() -> fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
+                new Environment(Map.of("package.aot", "false"))), "package/aot"))
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: aot - ");
+    }
+
+    @Test
+    public void refuses_an_aot_properties_with_an_unknown_key_or_a_timeout_that_is_no_duration() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("aot.properties"), "argument=--port 0\n");
+        assertThatThrownBy(() -> fixture.execute("package/aot"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names argument, but takes arguments=");
+        Files.writeString(fixture.configuration().resolve("aot.properties"), "timeout=30\n");
+        assertThatThrownBy(() -> fixture.execute("package/aot"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("sets timeout=30, which is no duration");
+        Files.writeString(fixture.configuration().resolve("aot.properties"), "timeout=PT0S\n");
+        assertThatThrownBy(() -> fixture.execute("package/aot"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("name a duration above zero");
     }
 
     @Test
