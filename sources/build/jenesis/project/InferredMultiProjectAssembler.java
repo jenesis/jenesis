@@ -13,6 +13,7 @@ import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Aot;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Bundle;
 import build.jenesis.step.Classifiers;
@@ -280,6 +281,40 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                     Map<String, Resolver> resolvers) throws IOException {
         Packaging packaging = Packaging.configured(
                 BuildStep.locate(descriptor.configuration(), "packaging.properties"));
+        Path training = environment.flag("package.aot", true, Setting.PROJECT)
+                ? BuildStep.locate(descriptor.configuration(), "aot.properties")
+                : null;
+        Aot aot;
+        if (training == null) {
+            aot = null;
+        } else {
+            SequencedProperties trained = SequencedProperties.ofFiles(training);
+            for (String key : trained.stringPropertyNames()) {
+                if (!List.of("arguments", "main", "timeout").contains(key)) {
+                    throw new IllegalArgumentException(training + " names " + key + ", but takes arguments=<the"
+                            + " words handed to the main method>, main=<a main class other than the module's> and"
+                            + " timeout=<a duration such as PT30S after which a run that has not ended is stopped>"
+                            + " alone");
+                }
+            }
+            String timeout = trained.value("timeout");
+            Duration limit;
+            try {
+                limit = timeout == null ? null : Duration.parse(timeout);
+            } catch (DateTimeParseException e) {
+                throw new IllegalArgumentException(training + " sets timeout=" + timeout + ", which is no duration:"
+                        + " name one as PT30S or PT2M", e);
+            }
+            if (limit != null && (limit.isZero() || limit.isNegative())) {
+                throw new IllegalArgumentException(training + " sets timeout=" + timeout + ", but a training run"
+                        + " needs time to record: name a duration above zero such as PT30S, or remove the line to"
+                        + " wait for the main method to end");
+            }
+            aot = new Aot().arguments(trained.words("arguments"))
+                    .main(trained.value("main"))
+                    .timeout(limit)
+                    .image(packaging.jlink());
+        }
         SequencedMap<String, SequencedMap<String, String>> overrides = perTool(descriptor.configuration(), "process-"),
                 environments = perTool(descriptor.configuration(), "environment-");
         ProcessHandler.Factory factory = ProcessHandler.Factory.ofEnvironment(environment);
@@ -421,7 +456,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                         upstreamSources.stream())
                                 .flatMap(Function.identity()));
             }
-            if (packaging.jmod() || packaging.jlink() || packaging.jpackaged() || packaging.nativeImage()) {
+            if (aot != null || packaging.jmod() || packaging.jlink() || packaging.jpackaged() || packaging.nativeImage()) {
                 sub.addStep("legal", Legal.ofEnvironment(environment), Stream.concat(Stream.of("binary"), closure.stream()));
             }
             if (packaging.jmod()) {
@@ -539,7 +574,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             }, AssemblyRequirement.of().after(AssemblyDescriptor.BUILD));
         }
         SequencedMap<String, BuildExecutorModule> packagers = hooks.getOrDefault("package", none);
-        if (packaging.jlink() || packaging.jpackaged() || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null
+        if (aot != null || packaging.jlink() || packaging.jpackaged() || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null
                 || !packagers.isEmpty()) {
             assembly = assembly.andThen("package", (sub, inherited) -> {
                 if (unstaged(inherited)) {
@@ -562,7 +597,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     inputs.removeIf(key -> replaced.contains(phased(key)));
                 }
                 SequencedSet<String> linked = new LinkedHashSet<>(inputs);
-                if (!packaging.jmod() && (packaging.jlink() || packaging.jpackaged())) {
+                if (!packaging.jmod() && (aot != null || packaging.jlink() || packaging.jpackaged())) {
                     SequencedSet<String> packed = descriptor.resources().stream()
                             .map(InferredMultiProjectAssembler::local)
                             .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -570,12 +605,19 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             inherited.sequencedKeySet().stream().filter(key -> packed.contains(phased(key)))));
                     linked.add("jmod");
                 }
-                if (packaging.jlink()) {
+                if (aot != null || packaging.jlink()) {
                     sub.addStep("jlink", JLink.ofEnvironment(environment, factory), linked);
-                    images.add("jlink");
+                }
+                if (aot != null) {
+                    sub.addStep("aot", aot, Stream.concat(Stream.of("jlink"), linked.stream()));
+                }
+                if (packaging.jlink()) {
+                    images.add(aot == null ? "jlink" : "aot");
                 }
                 for (String format : packaging.formats()) {
-                    sub.addStep(packaging.step(format), JPackage.ofEnvironment(environment, factory).type(format), packaging.jlink()
+                    sub.addStep(packaging.step(format), JPackage.ofEnvironment(environment, factory).type(format), aot != null
+                                ? Stream.concat(Stream.of("jlink", "aot"), linked.stream())
+                                : packaging.jlink()
                                 ? Stream.concat(Stream.of("jlink"), linked.stream())
                                 : linked.stream());
                 }
