@@ -98,6 +98,13 @@ public class BuildExecutorHttpCacheTest {
     }
 
     @Test
+    public void a_build_told_not_to_write_sends_a_cache_server_nothing_to_store() {
+        assertThat(BuildExecutorHttpCache.ofEnvironment(new Environment(Map.of("cache.write", "false")), uri).stores())
+                .isFalse();
+        assertThat(BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri).stores()).isTrue();
+    }
+
+    @Test
     public void fetch_returns_empty_on_miss() throws IOException {
         BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri).token("team-alpha").project("demo");
         Optional<Map<Path, byte[]>> result = cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), target, "SHA-256");

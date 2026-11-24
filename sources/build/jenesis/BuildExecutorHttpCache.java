@@ -47,6 +47,9 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         if (read != null) {
             cache = cache.readTimeout(Duration.parse(read));
         }
+        if (!environment.flag("cache.write", true, Setting.PROJECT)) {
+            cache = cache.write(false);
+        }
         Boolean insecure = environment.flagOrNull("cache.insecure", Setting.MACHINE);
         return insecure == null ? cache : cache.insecure(insecure);
     }

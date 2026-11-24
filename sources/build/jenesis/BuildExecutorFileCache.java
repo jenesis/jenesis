@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Environment.Setting;
 
 public final class BuildExecutorFileCache implements BuildExecutorCache {
 
@@ -68,6 +69,15 @@ public final class BuildExecutorFileCache implements BuildExecutorCache {
                 properties.flag("lru", true),
                 properties.flag("read", true),
                 properties.flag("write", true));
+    }
+
+    public static BuildExecutorFileCache ofEnvironment(Environment environment, Path root) {
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(root);
+        return environment.flag("cache.write", true, Setting.PROJECT) ? cache : cache.write(false);
+    }
+
+    public BuildExecutorFileCache write(boolean write) {
+        return new BuildExecutorFileCache(root, algorithm, links, steps, versions, size, ttl, touch, lru, read, write);
     }
 
     public Path root() {
@@ -166,7 +176,10 @@ public final class BuildExecutorFileCache implements BuildExecutorCache {
         } catch (IOException | RuntimeException _) {
             clean(target);
             if (write) {
-                Files.deleteIfExists(manifest);
+                try {
+                    Files.deleteIfExists(manifest);
+                } catch (IOException _) {
+                }
             }
             return Optional.empty();
         }
