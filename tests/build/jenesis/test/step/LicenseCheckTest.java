@@ -98,6 +98,27 @@ public class LicenseCheckTest {
     }
 
     @Test
+    public void an_abbreviation_is_read_as_a_word_and_not_within_another() throws Exception {
+        resolve("org.example/lib/1.2.3", "Simplified BSD License");
+        assertThat(run(new LicenseCheck().denied(new LinkedHashSet<>(List.of("weak-copyleft")))).next())
+                .as("Simplified holds the letters mpl without naming the Mozilla Public License")
+                .isTrue();
+        assertThat(run(new LicenseCheck().allowed(new LinkedHashSet<>(List.of("BSD")))).next()).isTrue();
+        resolve("org.example/lib/1.2.3", "Miscellaneous terms");
+        assertThatThrownBy(() -> run(new LicenseCheck().allowed(new LinkedHashSet<>(List.of("permissive")))))
+                .as("Miscellaneous holds the letters isc without naming the ISC license")
+                .isInstanceOf(IllegalStateException.class);
+        resolve("org.example/lib/1.2.3", "MPL 2.0");
+        assertThatThrownBy(() -> run(new LicenseCheck().denied(new LinkedHashSet<>(List.of("weak-copyleft")))))
+                .isInstanceOf(IllegalStateException.class);
+        resolveLicensed("org.example/lib/1.2.3", List.of(new License(null, null, "LICENSE", "https://www.mozilla.org/MPL/2.0/")));
+        assertThatThrownBy(() -> run(new LicenseCheck().denied(new LinkedHashSet<>(List.of("weak-copyleft")))))
+                .isInstanceOf(IllegalStateException.class);
+        resolve("org.example/lib/1.2.3", "ISC License");
+        assertThat(run(new LicenseCheck().allowed(new LinkedHashSet<>(List.of("permissive")))).next()).isTrue();
+    }
+
+    @Test
     public void accepts_any_allowed_license_under_or_semantics() throws Exception {
         resolve("org.example/lib/1.2.3", "GNU General Public License v3.0", "The MIT License");
         assertThat(run(new LicenseCheck().allowed(new LinkedHashSet<>(List.of("MIT")))).next()).isTrue();

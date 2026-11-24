@@ -239,7 +239,7 @@ public class LicenseCheck implements BuildStep {
         if (text.contains("eclipse public") || text.contains("/epl")) {
             return new License("EPL-2.0", "weak-copyleft", null, null);
         }
-        if (text.contains("mozilla public") || text.contains("mpl")) {
+        if (text.contains("mozilla public") || abbreviated(text, "mpl")) {
             return new License("MPL-2.0", "weak-copyleft", null, null);
         }
         if (text.contains("common development and distribution") || text.contains("cddl")) {
@@ -260,10 +260,21 @@ public class LicenseCheck implements BuildStep {
         if (text.contains("cc0") || text.contains("public domain")) {
             return new License("CC0-1.0", "permissive", null, null);
         }
-        if (text.contains("isc")) {
+        if (abbreviated(text, "isc")) {
             return new License("ISC", "permissive", null, null);
         }
         return null;
+    }
+
+    private static boolean abbreviated(String text, String abbreviation) {
+        for (int index = text.indexOf(abbreviation); index != -1; index = text.indexOf(abbreviation, index + 1)) {
+            int end = index + abbreviation.length();
+            if ((index == 0 || !Character.isLetter(text.charAt(index - 1)))
+                    && (end == text.length() || !Character.isLetter(text.charAt(end)))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static List<License> jarLicenses(Path jar) {
