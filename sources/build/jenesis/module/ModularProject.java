@@ -299,7 +299,7 @@ public class ModularProject implements BuildExecutorModule {
             SequencedProperties coordinates = new SequencedProperties();
             coordinates.setProperty(prefix + "/" + module.getProperty("module"), "");
             coordinates.store(context.next().resolve(BuildStep.IDENTITY));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -736,7 +736,7 @@ public class ModularProject implements BuildExecutorModule {
                 SequencedProperties.ofFiles(own).forEach(metadata::put);
             }
             metadata.store(context.next().resolve(BuildStep.METADATA));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
 
         private static String version(SequencedMap<String, String> versions, String key) {

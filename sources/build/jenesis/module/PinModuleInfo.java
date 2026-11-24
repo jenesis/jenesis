@@ -247,7 +247,7 @@ public class PinModuleInfo implements BuildStep {
                                 + String.join(", ", carried)));
             }
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult().cached(false));
     }
 
     private static boolean covers(String supplied, String pin) {

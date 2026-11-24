@@ -47,11 +47,11 @@ class JenesisClassLoaderBridge {
     private final MethodHandle foreignScope;
     private final AtomicBoolean scoped = new AtomicBoolean();
     private final MethodHandle foreignShouldRun;
-    private final MethodHandle foreignShouldCacheRemotely;
 
     private final MethodHandle foreignContextCtor;
     private final MethodHandle foreignArgumentCtor;
     private final MethodHandle foreignResultNext;
+    private final MethodHandle foreignResultCached;
 
     private final Class<?> foreignBuildExecutor;
     private final Class<?> foreignBuildModuleFactory;
@@ -195,9 +195,6 @@ class JenesisClassLoaderBridge {
         foreignShouldRun = lookup.findVirtual(foreignBuildStep,
                 "shouldRun",
                 MethodType.methodType(boolean.class, SequencedMap.class));
-        foreignShouldCacheRemotely = lookup.findVirtual(foreignBuildStep,
-                "shouldCacheRemotely",
-                MethodType.methodType(boolean.class));
         foreignContextCtor = lookup.findConstructor(foreignBuildStepContext,
                 MethodType.methodType(void.class, Path.class, Path.class, Path.class, Path.class));
         foreignArgumentCtor = lookup.findConstructor(foreignBuildStepArgument,
@@ -205,6 +202,13 @@ class JenesisClassLoaderBridge {
         foreignResultNext = lookup.findVirtual(foreignBuildStepResult,
                 "next",
                 MethodType.methodType(boolean.class));
+        MethodHandle cached;
+        try {
+            cached = lookup.findVirtual(foreignBuildStepResult, "cached", MethodType.methodType(boolean.class));
+        } catch (NoSuchMethodException _) {
+            cached = null;
+        }
+        foreignResultCached = cached;
         Class<?> factory;
         MethodHandle create;
         try {
@@ -677,7 +681,9 @@ class JenesisClassLoaderBridge {
 
     private BuildStepResult fromForeignResult(Object foreignResult) {
         try {
-            return new BuildStepResult((boolean) foreignResultNext.invoke(foreignResult));
+            return new BuildStepResult(
+                    (boolean) foreignResultNext.invoke(foreignResult),
+                    foreignResultCached == null || (boolean) foreignResultCached.invoke(foreignResult));
         } catch (RuntimeException | Error e) {
             throw e;
         } catch (Throwable t) {
@@ -708,17 +714,6 @@ class JenesisClassLoaderBridge {
             try {
                 return (boolean) bridge.foreignShouldRun.invoke(foreignStep, bridge.toForeignArguments(arguments));
             } catch (IOException | RuntimeException | Error e) {
-                throw e;
-            } catch (Throwable t) {
-                throw new RuntimeException(t);
-            }
-        }
-
-        @Override
-        public boolean shouldCacheRemotely() {
-            try {
-                return (boolean) bridge.foreignShouldCacheRemotely.invoke(foreignStep);
-            } catch (RuntimeException | Error e) {
                 throw e;
             } catch (Throwable t) {
                 throw new RuntimeException(t);

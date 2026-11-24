@@ -131,10 +131,9 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                                              String identity,
                                              byte[] step,
                                              SequencedMap<String, Map<Path, byte[]>> inputs,
-                                             boolean remote,
                                              Path target,
                                              String digest) throws IOException {
-        if (!read || !remote) {
+        if (!read) {
             return Optional.empty();
         }
         List<String> lines;
@@ -201,11 +200,10 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                       String identity,
                       byte[] step,
                       SequencedMap<String, Map<Path, byte[]>> inputs,
-                      boolean remote,
                       Path output,
                       String digest,
                       Map<Path, byte[]> checksums) throws IOException {
-        if (!write || !remote) {
+        if (!write) {
             return;
         }
         Path temporary = null;
@@ -293,9 +291,8 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                       String identity,
                       byte[] step,
                       SequencedMap<String, Map<Path, byte[]>> inputs,
-                      boolean remote,
                       String digest) {
-        if (!read || !remote) {
+        if (!read) {
             return;
         }
         try {

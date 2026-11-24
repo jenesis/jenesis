@@ -127,7 +127,7 @@ public class JPackage extends ProcessBuildStep {
         if (!modular && properties.values().stream().noneMatch(folder -> folder.containsKey("--main-jar"))) {
             return CompletableFuture.completedStage(null);
         }
-        Path runtime = null;
+        Path runtime = null, cache = null;
         ModuleGraph graph = new ModuleGraph();
         SequencedSet<Path> granted = new LinkedHashSet<>();
         SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
@@ -139,6 +139,12 @@ public class JPackage extends ProcessBuildStep {
             Path candidate = argument.folder().resolve(JLink.RUNTIME);
             if (runtime == null && Files.isDirectory(candidate)) {
                 runtime = candidate;
+            }
+            Path trained = argument.folder().resolve(Aot.AOT);
+            if (cache == null && Files.isDirectory(trained)) {
+                try (Stream<Path> files = Files.list(trained)) {
+                    cache = files.findFirst().orElse(null);
+                }
             }
             granted.addAll(Inventory.nativeAccess(argument.folder()));
             layers.putAll(Layers.membership(argument.folder()));
@@ -184,6 +190,18 @@ public class JPackage extends ProcessBuildStep {
             }
             commands.add("--runtime-image");
             commands.add(runtime.toString());
+            if (cache != null) {
+                commands.add("--input");
+                commands.add(cache.getParent().toString());
+                for (String option : Bundle.javaOptions(arguments)) {
+                    commands.add("--java-options");
+                    commands.add(option);
+                }
+                commands.add("--java-options");
+                commands.add("-XX:AOTCache=$APPDIR" + File.separator + cache.getFileName());
+                commands.add("--java-options");
+                commands.add("-Xlog:aot=off");
+            }
             commands.addAll(layered);
             for (String option : graph.options()) {
                 commands.add("--java-options");

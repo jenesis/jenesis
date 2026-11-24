@@ -111,6 +111,6 @@ public class Bom implements BuildStep {
             bom.store(Files.createDirectories(context.next().resolve(BOM))
                     .resolve("pin-" + module + ".properties"));
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 }

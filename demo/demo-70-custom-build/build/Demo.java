@@ -64,7 +64,7 @@ public class Demo {
                         static final String MESSAGE = "%s";
                     }
                     """.formatted(message));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 }

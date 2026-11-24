@@ -37,7 +37,7 @@ public class Layers implements BuildStep {
             throws IOException {
         SequencedMap<String, Declaration> declared = declared(arguments);
         if (declared.isEmpty()) {
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
         SequencedMap<String, ModuleDescriptor> host = descriptors(arguments);
         SequencedProperties membership = new SequencedProperties();
@@ -53,7 +53,7 @@ public class Layers implements BuildStep {
             }
         }
         membership.store(context.next().resolve(MEMBERSHIP));
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     public static SequencedMap<String, Declaration> declared(SequencedMap<String, BuildStepArgument> arguments)

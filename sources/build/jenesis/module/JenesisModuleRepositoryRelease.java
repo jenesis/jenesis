@@ -151,7 +151,7 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
                         target));
             }
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult().cached(false));
     }
 
     private void upload(URI target, Path file) throws IOException {

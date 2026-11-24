@@ -42,7 +42,7 @@ public class ClassPathCompatibility implements BuildStep {
             }
         }
         if (descriptor == null) {
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
         for (ModuleDescriptor.Provides provides : descriptor.provides()) {
             for (BuildStepArgument argument : arguments.values()) {
@@ -81,6 +81,6 @@ public class ClassPathCompatibility implements BuildStep {
                 manifest.write(outputStream);
             }
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 }

@@ -172,7 +172,7 @@ public class Inventory implements BuildStep {
         SequencedMap<String, String> pomChecksums = new LinkedHashMap<>();
         SequencedMap<String, Path> bomFiles = new LinkedHashMap<>();
         SequencedMap<String, String> bomValues = new LinkedHashMap<>();
-        SequencedMap<String, String> attachments = new LinkedHashMap<>();
+        SequencedMap<String, String> attachments = new LinkedHashMap<>(), agents = new LinkedHashMap<>();
         SequencedSet<String> natives = new LinkedHashSet<>();
         boolean self = false;
         SequencedMap<String, String> licenses = new LinkedHashMap<>();
@@ -298,6 +298,10 @@ public class Inventory implements BuildStep {
             if (Files.isRegularFile(attachmentsFile)) {
                 SequencedProperties.ofFiles(attachmentsFile).forEachProperty(attachments::putIfAbsent);
             }
+            Path agentsFile = folder.resolve(AGENTS);
+            if (Files.isRegularFile(agentsFile)) {
+                SequencedProperties.ofFiles(agentsFile).forEachProperty(agents::putIfAbsent);
+            }
             Path nativesFile = folder.resolve(NATIVES);
             if (Files.isRegularFile(nativesFile)) {
                 natives.addAll(SequencedProperties.ofFiles(nativesFile).stringPropertyNames());
@@ -339,7 +343,7 @@ public class Inventory implements BuildStep {
             if (!inventory.isEmpty()) {
                 inventory.store(context.next().resolve(INVENTORY));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
         SequencedSet<Path> runtime = new LinkedHashSet<>(artifacts);
         for (Map.Entry<String, Path> entry : closureJars.entrySet()) {
@@ -356,6 +360,7 @@ public class Inventory implements BuildStep {
         writeClosure(inventory, context, prefix + "dependency.", closureJars, closureScopes, closureChecksums);
         writeClosure(inventory, context, prefix + "pom.", pomFiles, Collections.emptyNavigableMap(), pomChecksums);
         int agentIndex = 0;
+        agents.forEach((key, options) -> attachments.computeIfPresent(key, (_, _) -> options));
         for (Map.Entry<String, String> attachment : attachments.entrySet()) {
             String key = attachment.getKey();
             int slash = key.indexOf('/');
@@ -562,7 +567,7 @@ public class Inventory implements BuildStep {
         if (!inventory.isEmpty()) {
             inventory.store(context.next().resolve(INVENTORY));
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     private String key(String token) {

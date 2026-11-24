@@ -92,7 +92,7 @@ public record ClassTransformModule(SequencedMap<String, BuildExecutorModule> tra
                     }
                 });
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 }

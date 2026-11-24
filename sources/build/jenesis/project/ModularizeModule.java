@@ -186,7 +186,7 @@ public class ModularizeModule implements BuildExecutorModule {
             options.setProperty("--multi-release", String.valueOf(Runtime.version().feature()));
             options.setProperty("--ignore-missing-deps", "");
             ProcessBuildStep.store(context.next(), ProcessBuildStep.PROCESS, "jdeps", options);
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
 
         private static SequencedMap<String, String> versions(Path folder) throws IOException {
@@ -253,7 +253,7 @@ public class ModularizeModule implements BuildExecutorModule {
                         .replace(File.separatorChar, '/'));
             }
             index.store(context.next().resolve(Dependencies.MODULAR));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
 
         private static SequencedMap<String, Identity> identities(Path staged) throws IOException {

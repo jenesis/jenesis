@@ -360,7 +360,7 @@ public abstract class ProcessBuildStep implements BuildStep {
         AtomicReference<Thread> worker = new AtomicReference<>();
         CompletableFuture<BuildStepResult> result = process(executor, context, arguments, properties).thenComposeAsync(processed -> {
             if (processed == null) {
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }
             CompletableFuture<BuildStepResult> future = new CompletableFuture<>();
             try {
@@ -380,7 +380,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                     try {
                         int exitCode = execute(handler, output, error, tee);
                         if (acceptableExitCode(exitCode, executor, context, arguments)) {
-                            future.complete(new BuildStepResult(true));
+                            future.complete(new BuildStepResult());
                         } else {
                             throw new IllegalStateException("Unexpected exit code: " + exitCode + "\n"
                                     + (exitCode == KILLED && handler.external()

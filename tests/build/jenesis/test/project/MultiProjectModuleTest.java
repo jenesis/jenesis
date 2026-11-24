@@ -77,7 +77,7 @@ public class MultiProjectModuleTest {
                                 "../../../identifier/1-source");
                         module1.addStep("step", (_, context, _) -> {
                             Files.writeString(context.next().resolve("file"), "foo");
-                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                            return CompletableFuture.completedStage(new BuildStepResult());
                         });
                     }, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
                 }
@@ -95,7 +95,7 @@ public class MultiProjectModuleTest {
                             Files.writeString(
                                     context.next().resolve("file"),
                                     Files.readString(arguments.get("../build-1/step").folder().resolve("file")) + "bar");
-                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                            return CompletableFuture.completedStage(new BuildStepResult());
                         }, "../build-1/step");
                     }, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
                 }
@@ -132,12 +132,12 @@ public class MultiProjectModuleTest {
             return (name, _, _) -> switch (name) {
                 case "g%2F1" -> AssemblyDescriptor.of((module1, _) -> module1.addStep("step", (_, context, _) -> {
                     Files.writeString(context.next().resolve("file"), "foo");
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 }), AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
                 case "g%2F2" -> AssemblyDescriptor.of((module2, _) -> module2.addStep("step", (_, context, arguments) -> {
                     Files.writeString(context.next().resolve("file"),
                             Files.readString(arguments.get("../build-g%2F1/step").folder().resolve("file")) + "bar");
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 }, "../build-g%2F1/step"), AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
                 default -> throw new AssertionError();
             };
@@ -191,7 +191,7 @@ public class MultiProjectModuleTest {
                                 "../../../identifier/1-source");
                         module1.addStep("step", (_, context, _) -> {
                             Files.writeString(context.next().resolve("file"), "foo");
-                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                            return CompletableFuture.completedStage(new BuildStepResult());
                         });
                     }, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
                 }
@@ -209,7 +209,7 @@ public class MultiProjectModuleTest {
                             Files.writeString(
                                     context.next().resolve("file"),
                                     Files.readString(arguments.get("../build-1/step").folder().resolve("file")) + "bar");
-                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                            return CompletableFuture.completedStage(new BuildStepResult());
                         }, "../build-1/step");
                     }, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
                 }
@@ -230,7 +230,7 @@ public class MultiProjectModuleTest {
                             Files.writeString(
                                     context.next().resolve("file"),
                                     Files.readString(arguments.get("../build-2/step").folder().resolve("file")) + "qux");
-                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                            return CompletableFuture.completedStage(new BuildStepResult());
                         }, "../build-2/step");
                     }, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
                 }
@@ -272,17 +272,17 @@ public class MultiProjectModuleTest {
         }, identifier -> Optional.of(identifier.substring(0, identifier.indexOf('-')).replace('-', '/')), _ -> (name, _, _) -> switch (name) {
             case "1" -> AssemblyDescriptor.of((module, _) -> module.addStep("step", (_, context, _) -> {
                 Files.writeString(context.next().resolve("file"), "1");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }), AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
             case "2" -> AssemblyDescriptor.of((module, _) -> module.addStep("step", (_, context, _) -> {
                 Files.writeString(context.next().resolve("file"), "2");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }), AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
             case "3" -> AssemblyDescriptor.of((module, inherited) -> {
                 assertThat(inherited).containsKeys("../build-1/step", "../build-2/step");
                 module.addStep("step", (_, context, _) -> {
                     Files.writeString(context.next().resolve("file"), "3");
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 });
             }, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
             default -> throw new AssertionError("Unexpected module: " + name);
@@ -320,20 +320,20 @@ public class MultiProjectModuleTest {
         }, identifier -> Optional.of(identifier.substring(0, identifier.indexOf('-')).replace('-', '/')), _ -> (name, _, _) -> switch (name) {
             case "1" -> AssemblyDescriptor.of((module, _) -> module.addStep("step", (_, context, _) -> {
                 Files.writeString(context.next().resolve("file"), "1");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }), AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
             case "2" -> AssemblyDescriptor.of((module, inherited) -> {
                 assertThat(inherited).containsKey("../build-1/step");
                 module.addStep("step", (_, context, _) -> {
                     Files.writeString(context.next().resolve("file"), "2");
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 });
             }, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
             case "3" -> AssemblyDescriptor.of((module, inherited) -> {
                 assertThat(inherited).containsKeys("../build-1/step", "../build-2/step");
                 module.addStep("step", (_, context, _) -> {
                     Files.writeString(context.next().resolve("file"), "3");
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 });
             }, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD));
             default -> throw new AssertionError("Unexpected module: " + name);
@@ -393,7 +393,7 @@ public class MultiProjectModuleTest {
             built.add(name);
             module.addStep("step", (_, context, _) -> {
                 Files.writeString(context.next().resolve("file"), name);
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             });
         }, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD))));
         buildExecutor.execute("project/compose/module/build-1", "project/compose/module/build-5");
@@ -419,11 +419,11 @@ public class MultiProjectModuleTest {
                 _ -> (name, _, _) -> {
             BuildExecutorModule build = (module, _) -> module.addStep(MultiProjectModule.INVENTORY, (_, context, _) -> {
                 Files.writeString(context.next().resolve(Inventory.INVENTORY), name);
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             });
             BuildExecutorModule pack = (module, inherited) -> module.addStep("bundle", (_, context, arguments) -> {
                 Files.writeString(context.next().resolve("bundle"), String.join(";", arguments.sequencedKeySet()));
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, inherited.sequencedKeySet());
             return AssemblyDescriptor.of(build, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD))
                     .andThen("package", pack, AssemblyRequirement.of().after(AssemblyDescriptor.BUILD));
@@ -460,7 +460,7 @@ public class MultiProjectModuleTest {
                     if (name.equals("2")) {
                         BUILT.get().countDown();
                     }
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 }), AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD)).andThen("verify", (module, _) -> module.addStep("check", (_, context, _) -> {
                     try {
                         if (name.equals("1") && !BUILT.get().await(10, TimeUnit.SECONDS)) {
@@ -471,7 +471,7 @@ public class MultiProjectModuleTest {
                         throw new IllegalStateException(e);
                     }
                     Files.writeString(context.next().resolve("file"), name);
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 }), AssemblyRequirement.of().after(AssemblyDescriptor.BUILD))));
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             SequencedMap<String, Path> paths = buildExecutor.execute(executor).toCompletableFuture().join();
@@ -504,11 +504,11 @@ public class MultiProjectModuleTest {
                 _ -> (name, _, _) -> {
             BuildExecutorModule build = (module, _) -> module.addStep(MultiProjectModule.INVENTORY, (_, context, _) -> {
                 Files.writeString(context.next().resolve(Inventory.INVENTORY), name);
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             });
             BuildExecutorModule pack = (module, inherited) -> module.addStep("bundle", (_, context, arguments) -> {
                 Files.writeString(context.next().resolve("bundle"), String.join(";", arguments.sequencedKeySet()));
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }, inherited.sequencedKeySet());
             return AssemblyDescriptor.of(build, AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD))
                     .andThen("package", pack, AssemblyRequirement.of().after(AssemblyDescriptor.BUILD).tested(AssemblyDescriptor.BUILD));
@@ -551,7 +551,7 @@ public class MultiProjectModuleTest {
                         (_, context, arguments) -> {
                             Files.writeString(context.next().resolve("inherited"),
                                     String.join(";", arguments.sequencedKeySet()));
-                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                            return CompletableFuture.completedStage(new BuildStepResult());
                         },
                         inherited.sequencedKeySet().stream().filter(key -> key.endsWith("/" + MultiProjectModule.SOURCES))),
                         AssemblyRequirement.of().upstream(AssemblyDescriptor.BUILD))));

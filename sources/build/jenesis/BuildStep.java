@@ -27,6 +27,7 @@ public interface BuildStep extends Serializable {
             SCOPES = "scopes.properties",
             OVERRIDES = "overrides.properties",
             ATTACHMENTS = "attachments.properties",
+            AGENTS = "agents.properties",
             NATIVES = "natives.properties",
             LAYERS = "layers.properties",
             DEPENDENCIES = "dependencies.properties",
@@ -48,10 +49,6 @@ public interface BuildStep extends Serializable {
 
     default boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
         return arguments.values().stream().anyMatch(BuildStepArgument::hasChanged);
-    }
-
-    default boolean shouldCacheRemotely() {
-        return true;
     }
 
     CompletionStage<BuildStepResult> apply(Executor executor,

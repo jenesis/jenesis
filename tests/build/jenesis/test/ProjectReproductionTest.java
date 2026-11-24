@@ -114,7 +114,7 @@ public class ProjectReproductionTest {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Files.writeString(context.next().resolve("value.txt"), random ? UUID.randomUUID().toString() : "value");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -132,7 +132,7 @@ public class ProjectReproductionTest {
                     }
                 }
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -143,7 +143,6 @@ public class ProjectReproductionTest {
                                                String identity,
                                                byte[] step,
                                                SequencedMap<String, Map<Path, byte[]>> inputs,
-                                               boolean remote,
                                                Path target,
                                                String digest) {
             touched.add(target);
@@ -155,7 +154,6 @@ public class ProjectReproductionTest {
                           String identity,
                           byte[] step,
                           SequencedMap<String, Map<Path, byte[]>> inputs,
-                          boolean remote,
                           Path output,
                           String digest,
                           Map<Path, byte[]> checksums) {

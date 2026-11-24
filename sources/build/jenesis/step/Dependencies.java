@@ -638,7 +638,7 @@ public class Dependencies implements BuildExecutorModule {
                         }
                     }
                     companions(arguments, refreshedInternals);
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 }
                 fetched.clear();
             }
@@ -1299,7 +1299,7 @@ public class Dependencies implements BuildExecutorModule {
             index.store(context.next().resolve(DEPENDENCIES));
             graph.store(context.next().resolve(GRAPH));
             licenses.store(context.next().resolve(LICENSES));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
 
         private static String key(SequencedProperties resolution,
@@ -1454,7 +1454,7 @@ public class Dependencies implements BuildExecutorModule {
                             + unpinned.getProperty(dependency.get()));
                 }
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 

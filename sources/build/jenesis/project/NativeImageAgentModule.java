@@ -49,7 +49,7 @@ public class NativeImageAgentModule implements BuildExecutorModule {
                     }
                 });
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 }

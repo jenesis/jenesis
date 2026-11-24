@@ -115,7 +115,7 @@ public record Abi(Mode mode) implements BuildStep {
         written.setProperty("format", FORMAT);
         entries.forEach((key, entry) -> written.setProperty(key, entry.toString()));
         written.store(state);
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     private static SequencedProperties view(Mode mode, SortedMap<String, Entry> entries, Map<String, List<Entry>> named) {

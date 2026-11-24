@@ -968,7 +968,7 @@ public class TestModule implements BuildExecutorModule {
             if (!versions.isEmpty()) {
                 versions.store(context.next().resolve(BuildStep.VERSIONS));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
 
         private static String released(SequencedMap<String, String> pinned,
@@ -1149,7 +1149,7 @@ public class TestModule implements BuildExecutorModule {
             TestTags requested = TestTags.parse(tag);
             List<TestTags> ran = ran(context, arguments);
             if (requested.coveredBy(ran)) {
-                return CompletableFuture.completedStage(new BuildStepResult(false));
+                return CompletableFuture.completedStage(new BuildStepResult().next(false));
             }
             List<TestTags> covered = new ArrayList<>(ran);
             covered.add(requested);
@@ -1680,17 +1680,21 @@ public class TestModule implements BuildExecutorModule {
 
         private static SequencedMap<String, String> attachments(SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            SequencedMap<String, String> attachments = new LinkedHashMap<>();
+            SequencedMap<String, String> attachments = new LinkedHashMap<>(), agents = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
                 }
-                Path file = argument.folder().resolve(BuildStep.ATTACHMENTS);
-                if (!Files.isRegularFile(file)) {
-                    continue;
+                Path file = argument.folder().resolve(BuildStep.ATTACHMENTS),
+                        configured = argument.folder().resolve(BuildStep.AGENTS);
+                if (Files.isRegularFile(file)) {
+                    SequencedProperties.ofFiles(file).forEachProperty(attachments::putIfAbsent);
                 }
-                SequencedProperties.ofFiles(file).forEachProperty(attachments::putIfAbsent);
+                if (Files.isRegularFile(configured)) {
+                    SequencedProperties.ofFiles(configured).forEachProperty(agents::putIfAbsent);
+                }
             }
+            agents.forEach((key, options) -> attachments.computeIfPresent(key, (_, _) -> options));
             return attachments;
         }
 

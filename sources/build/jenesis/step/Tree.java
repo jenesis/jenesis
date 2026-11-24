@@ -100,7 +100,7 @@ public class Tree implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         if (out == null) {
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult().cached(false));
         }
         if (format == Format.JAVA) {
             for (BuildStepArgument argument : arguments.values()) {
@@ -131,7 +131,7 @@ public class Tree implements BuildStep {
                     out.accept("");
                 }
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult().cached(false));
         }
         Map<Path, SequencedProperties> inventories = new HashMap<>();
         SequencedMap<Path, String> prefixes = new LinkedHashMap<>();
@@ -225,7 +225,7 @@ public class Tree implements BuildStep {
             });
         }
         report.summary(aggregated);
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult().cached(false));
     }
 
     private static String token(String value) {

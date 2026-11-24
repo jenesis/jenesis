@@ -171,7 +171,7 @@ public class Assign implements BuildStep {
         if (!inactive.isEmpty()) {
             inactive.store(context.next().resolve(INACTIVE));
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     public static String classified(String coordinate, String classifier) {

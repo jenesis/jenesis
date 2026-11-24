@@ -66,4 +66,4 @@ plugins, a descriptor naming a class its jar does not hold, and an ID two jars
 declare each fail the build. Publishing to the Gradle Plugin Portal takes the
 portal's own tooling.
 
-`-Djenesis.artifact.gradleplugin=false` switches the markers off.
+`-Djenesis.gradleplugin.artifact=false` switches the markers off.

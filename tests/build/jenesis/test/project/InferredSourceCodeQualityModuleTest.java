@@ -34,7 +34,7 @@ public class InferredSourceCodeQualityModuleTest {
         executor.addSource("project", project);
         executor.addModule("quality", new InferredSourceCodeQualityModule(new LinkedHashSet<>(), Map.of(), Map.of()).custom("lines", (_, context, arguments) -> {
             Files.writeString(context.next().resolve("checked.txt"), String.valueOf(arguments.size()));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }), "project");
 
         assertThat(executor.execute().get("quality/custom/lines").resolve("checked.txt")).hasContent("1");
@@ -43,9 +43,9 @@ public class InferredSourceCodeQualityModuleTest {
     @Test
     public void refuses_a_check_whose_name_is_taken() {
         InferredSourceCodeQualityModule module = new InferredSourceCodeQualityModule(new LinkedHashSet<>(), Map.of(), Map.of())
-                .custom("lines", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+                .custom("lines", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()));
 
-        assertThatThrownBy(() -> module.custom("lines", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true))))
+        assertThatThrownBy(() -> module.custom("lines", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult())))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("is added already");
     }
@@ -68,7 +68,7 @@ public class InferredSourceCodeQualityModuleTest {
         Files.writeString(project.resolve("pmd.xml"), "<ruleset/>");
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("quality", InferredSourceCodeQualityModule.ofEnvironment(new Environment(Map.of("check.pmd", "false")),
+        executor.addModule("quality", InferredSourceCodeQualityModule.ofEnvironment(new Environment(Map.of("pmd.check", "false")),
                 new LinkedHashSet<>(List.of(project)),
                 Map.of(),
                 Map.of()), "project");
@@ -81,12 +81,12 @@ public class InferredSourceCodeQualityModuleTest {
 
     @Test
     public void refuses_a_plugin_setting_that_is_no_boolean_naming_the_valid_values() throws IOException {
-        assertThatThrownBy(() -> InferredSourceCodeQualityModule.ofEnvironment(new Environment(Map.of("check.pmd", "ignore")),
+        assertThatThrownBy(() -> InferredSourceCodeQualityModule.ofEnvironment(new Environment(Map.of("pmd.check", "ignore")),
                 new LinkedHashSet<>(List.of(project)),
                 Map.of(),
                 Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("jenesis.check.pmd")
+                .hasMessageContaining("jenesis.pmd.check")
                 .hasMessageContaining("expected true, false");
     }
 

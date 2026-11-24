@@ -92,7 +92,7 @@ public class InferredJavaToolchainModuleTest {
         BuildExecutor executor = newExecutor();
         executor.addSource("input", input);
         executor.addModule("output", InferredJavaToolchainModule.ofEnvironment(
-                new Environment(Map.of("artifact.mavenplugin", "false")),
+                new Environment(Map.of("mavenplugin.artifact", "false")),
                 new LinkedHashSet<>(List.of(input)),
                 input,
                 input,
@@ -101,7 +101,7 @@ public class InferredJavaToolchainModuleTest {
         executor.execute();
 
         assertThat(root.resolve("output/transform"))
-                .as("jenesis.artifact.mavenplugin=false wires no transform")
+                .as("jenesis.mavenplugin.artifact=false wires no transform")
                 .doesNotExist();
         assertThat(root.resolve("output/artifacts")).exists();
     }
@@ -255,7 +255,7 @@ public class InferredJavaToolchainModuleTest {
         public CompletionStage<BuildStepResult> apply(Executor executor,
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments) {
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 

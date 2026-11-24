@@ -288,9 +288,9 @@ public class ProjectTest {
                 .containsKey("gradleplugin");
 
         Map<String, String> switchedOff = new HashMap<>(settings);
-        switchedOff.put("artifact.gradleplugin", "false");
+        switchedOff.put("gradleplugin.artifact", "false");
         assertThat(Project.ofEnvironment(new Environment(switchedOff), root).plugins().supplements())
-                .as("jenesis.artifact.gradleplugin switches the markers off")
+                .as("jenesis.gradleplugin.artifact switches the markers off")
                 .doesNotContainKey("gradleplugin");
     }
 
@@ -314,10 +314,10 @@ public class ProjectTest {
         Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("jreleaser.yml"),
                 "project:\n  name: example\n");
         Map<String, String> switchedOff = new HashMap<>(settings);
-        switchedOff.put("release.jreleaser", "false");
+        switchedOff.put("jreleaser.release", "false");
 
         assertThat(Project.ofEnvironment(new Environment(switchedOff), root).plugins().releasers())
-                .as("an official plugin is switched off by jenesis.<part>.<name>")
+                .as("an official plugin is switched off by jenesis.<name>.<part>")
                 .doesNotContainKey("jreleaser");
     }
 
@@ -326,7 +326,7 @@ public class ProjectTest {
         Files.writeString(root.resolve("jenesis.plugins.properties"), "pmd+postprocess/transform=./linter\n");
         Files.createDirectories(root.resolve("linter"));
         Map<String, String> official = new HashMap<>(settings), declared = new HashMap<>(settings);
-        official.put("check.pmd", "false");
+        official.put("pmd.check", "false");
         declared.put("plugin.pmd", "false");
 
         assertThat(Project.ofEnvironment(new Environment(official), root).plugins().transforms())
@@ -368,7 +368,7 @@ public class ProjectTest {
     public void reads_no_asciidoctor_properties_once_asciidoctor_is_switched_off() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("asciidoctor.properties"), "");
         Map<String, String> switched = new HashMap<>(settings);
-        switched.put("documentation.asciidoctor", "false");
+        switched.put("asciidoctor.documentation", "false");
 
         assertThat(Project.ofEnvironment(new Environment(switched), root)).isNotNull();
     }
@@ -382,7 +382,7 @@ public class ProjectTest {
             SequencedProperties dependencies = new SequencedProperties();
             dependencies.setProperty(dependency, "missing.jar SHA-256/xyz");
             dependencies.store(context.next().resolve(BuildStep.DEPENDENCIES));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -601,26 +601,26 @@ public class ProjectTest {
                     .rootCause()
                     .hasMessage("the gate refuses");
             assertThat(project.plugins(new ProjectPlugins().release("announce", (_, _, _) ->
-                    CompletableFuture.completedStage(new BuildStepResult(true)))).build(Project.RELEASE).keySet())
+                    CompletableFuture.completedStage(new BuildStepResult()))).build(Project.RELEASE).keySet())
                     .as("a releaser runs within release")
                     .anyMatch(key -> key.startsWith(Project.RELEASE + "/" + ProjectPlugins.CUSTOM + "/announce"));
             SequencedMap<String, Path> staged = project.plugins(new ProjectPlugins().transform("site", (_, context, _) -> {
                 Path page = context.next().resolve("project/site/index.html");
                 Files.createDirectories(page.getParent());
                 Files.writeString(page, "site");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             })).build(Project.STAGE);
             assertThat(staged.get(Project.STAGE + "/" + ProjectPlugins.PROJECT).resolve("site/index.html"))
                     .as("what a transform places in the project is staged as it stands")
                     .hasContent("site");
             Project benched = project.plugins(new ProjectPlugins().goal("bench", (_, _, _) ->
-                    CompletableFuture.completedStage(new BuildStepResult(true))));
+                    CompletableFuture.completedStage(new BuildStepResult())));
             assertThat(benched.build().keySet())
                     .as("a goal runs only when it is named")
                     .noneMatch(key -> key.startsWith(Project.PLUGIN + "/"));
             SequencedMap<String, Path> summed = project.plugins(new ProjectPlugins().supplement("checksums", (_, context, _) -> {
                 Files.writeString(Files.createDirectories(context.next().resolve("project")).resolve("SHA256SUMS"), "sums");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             })).build(Project.STAGE);
             assertThat(summed.get(Project.STAGE + "/" + ProjectPlugins.PROJECT).resolve("SHA256SUMS"))
                     .as("what a transform of stage adds joins the staged tree it names")

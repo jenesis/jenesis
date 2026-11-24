@@ -9,7 +9,6 @@ public interface BuildExecutorCache {
                                       String identity,
                                       byte[] step,
                                       SequencedMap<String, Map<Path, byte[]>> inputs,
-                                      boolean remote,
                                       Path target,
                                       String digest) throws IOException;
 
@@ -17,7 +16,6 @@ public interface BuildExecutorCache {
                        String identity,
                        byte[] step,
                        SequencedMap<String, Map<Path, byte[]>> inputs,
-                       boolean remote,
                        Path output,
                        String digest,
                        Map<Path, byte[]> checksums) throws IOException {
@@ -31,11 +29,10 @@ public interface BuildExecutorCache {
                        String identity,
                        byte[] step,
                        SequencedMap<String, Map<Path, byte[]>> inputs,
-                       boolean remote,
                        String digest) throws IOException {
     }
 
     static BuildExecutorCache nop() {
-        return (_, _, _, _, _, _, _) -> Optional.empty();
+        return (_, _, _, _, _, _) -> Optional.empty();
     }
 }

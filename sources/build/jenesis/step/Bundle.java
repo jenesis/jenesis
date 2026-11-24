@@ -87,7 +87,7 @@ public class Bundle implements BuildStep {
                                 palette.reset(),
                                 artifact == null ? "The module" : artifact));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
         SequencedMap<String, Path> jars = new TreeMap<>();
         SequencedSet<Path> granted = new LinkedHashSet<>();
@@ -111,7 +111,7 @@ public class Bundle implements BuildStep {
             granted.addAll(Inventory.nativeAccess(argument.folder()));
         }
         if (jars.isEmpty()) {
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
         SequencedMap<String, Path> classpath = new LinkedHashMap<>(), modulepath = new LinkedHashMap<>();
         ModuleGraph graph = new ModuleGraph();
@@ -188,7 +188,7 @@ public class Bundle implements BuildStep {
                 writeEntry(out, "jars/" + entry.getKey(), entry.getValue());
             }
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     static List<String> javaOptions(SequencedMap<String, BuildStepArgument> arguments) throws IOException {

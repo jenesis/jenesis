@@ -47,7 +47,7 @@ public class ProjectPluginsTest {
             inventory.setProperty("module-app.path", "app");
             inventory.setProperty("module-app.artifacts.0", "app.jar");
             inventory.store(context.next().resolve(Inventory.INVENTORY));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }));
     }
 
@@ -72,7 +72,7 @@ public class ProjectPluginsTest {
                     SequencedProperties inventory = new SequencedProperties();
                     inventory.setProperty("module-" + path + ".path", path);
                     inventory.store(context.next().resolve(Inventory.INVENTORY));
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 });
             }
         });
@@ -96,7 +96,7 @@ public class ProjectPluginsTest {
     public void exports_nothing_but_the_additions() {
         wire(new ProjectPlugins()
                 .transform("licenses", new Attach("licenses", "module-app"))
-                .inspect("audit", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true))));
+                .inspect("audit", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult())));
 
         SequencedMap<String, Path> result = buildExecutor.execute("postprocess");
 
@@ -133,7 +133,7 @@ public class ProjectPluginsTest {
             SequencedProperties inventory = new SequencedProperties();
             inventory.setProperty("module-app.runtime.1", "extra.jar");
             inventory.store(context.next().resolve(Inventory.INVENTORY));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }));
 
         Path additions = buildExecutor.execute("postprocess").get("postprocess/additions/module-app");
@@ -149,7 +149,7 @@ public class ProjectPluginsTest {
             SequencedProperties inventory = new SequencedProperties();
             inventory.setProperty("module-app.", "extra.jar");
             inventory.store(context.next().resolve(Inventory.INVENTORY));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }));
 
         assertThatThrownBy(() -> buildExecutor.execute("postprocess"))
@@ -212,7 +212,7 @@ public class ProjectPluginsTest {
                     Files.writeString(jar, "changed", StandardOpenOption.APPEND);
                 }
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }));
 
         assertThatThrownBy(() -> buildExecutor.execute("postprocess"))
@@ -291,11 +291,11 @@ public class ProjectPluginsTest {
     public void runs_a_preprocessor_before_what_depends_on_it() {
         buildExecutor.addModule("preprocess", new ProjectPlugins().preprocess("headers", (_, _, _) -> {
             RAN.add("headers");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }).preprocess(new LinkedHashSet<>()));
         buildExecutor.addStep("compile", (_, _, _) -> {
             RAN.add("compile");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "preprocess");
 
         buildExecutor.execute("compile");
@@ -310,7 +310,7 @@ public class ProjectPluginsTest {
         }).preprocess(new LinkedHashSet<>()));
         buildExecutor.addStep("compile", (_, _, _) -> {
             RAN.add("compile");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "preprocess");
 
         assertThatThrownBy(() -> buildExecutor.execute("compile"))
@@ -323,7 +323,7 @@ public class ProjectPluginsTest {
     public void hands_nothing_a_preprocessor_writes_to_what_depends_on_it() {
         buildExecutor.addModule("preprocess", new ProjectPlugins().preprocess("headers", (_, context, _) -> {
             Files.writeString(context.next().resolve("headers.txt"), "checked");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }).preprocess(new LinkedHashSet<>()));
 
         assertThat(buildExecutor.execute("preprocess").keySet()).noneMatch(key -> key.startsWith("preprocess/"));
@@ -370,7 +370,7 @@ public class ProjectPluginsTest {
     public void hands_a_releaser_the_root_the_staged_trees_and_the_metadata_the_build_resolved() throws IOException {
         buildExecutor.addModule("stage", (stage, _) -> stage.addStep("maven", (_, context, _) -> {
             Files.writeString(context.next().resolve("app.jar"), "jar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }));
         buildExecutor.addModule("metadata", (metadata, _) -> {
             metadata.addStep("file", new Metadata(Map.of("name", "Example", "version", "1.0")));
@@ -427,7 +427,7 @@ public class ProjectPluginsTest {
     public void lets_a_plugin_take_the_name_of_the_pins_it_resolves_with() throws IOException {
         Path pins = Files.writeString(root.resolve("jenesis.plugins.pin.properties"), "");
         buildExecutor.addModule("resolved", new ProjectPlugins().pins(pins).resolutions(new LinkedHashMap<>(Map.of("pins",
-                ((BuildStep) (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true))).asModule("pins"))))
+                ((BuildStep) (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult())).asModule("pins"))))
                 .resolution());
 
         assertThat(buildExecutor.execute("resolved").keySet()).anyMatch(key -> key.startsWith("resolved/custom/pins"));
@@ -445,7 +445,7 @@ public class ProjectPluginsTest {
         buildExecutor.addModule("stage", new ProjectPlugins().supplement("checksums", (_, context, _) -> {
             Path sum = Files.createDirectories(context.next().resolve("maven/demo")).resolve("app.jar.sha256");
             Files.writeString(sum, "sum");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }).stage(new LinkedHashSet<>(), trees()), "build");
 
         Path maven = buildExecutor.execute("stage").get("stage/maven");
@@ -458,7 +458,7 @@ public class ProjectPluginsTest {
     public void refuses_a_supplement_that_adds_a_file_staged_already() {
         buildExecutor.addModule("stage", new ProjectPlugins().supplement("replace", (_, context, _) -> {
             Files.writeString(Files.createDirectories(context.next().resolve("maven/demo")).resolve("app.jar"), "other");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }).stage(new LinkedHashSet<>(), trees()), "build");
 
         assertThatThrownBy(() -> buildExecutor.execute("stage"))
@@ -480,10 +480,10 @@ public class ProjectPluginsTest {
 
     @Test
     public void stages_again_once_a_supplement_is_left_out() throws Exception {
-        BuildStep pass = (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true));
+        BuildStep pass = (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult());
         buildExecutor.addModule("stage", new ProjectPlugins().supplement("checksums", (_, context, _) -> {
             Files.writeString(Files.createDirectories(context.next().resolve("maven/demo")).resolve("app.jar.sha256"), "sum");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }).audit("complete", pass).stage(new LinkedHashSet<>(), trees()), "build");
         buildExecutor.execute("stage");
         setUp();
@@ -499,7 +499,7 @@ public class ProjectPluginsTest {
         SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
         trees.put("maven", (_, context, _) -> {
             Files.writeString(Files.createDirectories(context.next().resolve("demo")).resolve("app.jar"), "jar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         return trees;
     }
@@ -519,7 +519,7 @@ public class ProjectPluginsTest {
             SequencedProperties inventory = new SequencedProperties();
             inventory.setProperty(prefix + ".attachment." + classifier, classifier + ".txt");
             inventory.store(context.next().resolve(Inventory.INVENTORY));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -533,7 +533,7 @@ public class ProjectPluginsTest {
             Path file = context.next().resolve("project").resolve(path);
             Files.createDirectories(file.getParent());
             Files.writeString(file, path);
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -559,7 +559,7 @@ public class ProjectPluginsTest {
             SequencedProperties properties = new SequencedProperties();
             new TreeMap<>(values).forEach(properties::setProperty);
             properties.store(context.next().resolve(BuildStep.METADATA));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -579,7 +579,7 @@ public class ProjectPluginsTest {
                     }
                 }
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -593,7 +593,7 @@ public class ProjectPluginsTest {
             for (BuildStepArgument argument : arguments.values()) {
                 try (Stream<Path> files = Files.walk(argument.folder())) {
                     if (files.anyMatch(file -> file.getFileName().toString().equals(name))) {
-                        return CompletableFuture.completedStage(new BuildStepResult(true));
+                        return CompletableFuture.completedStage(new BuildStepResult());
                     }
                 }
             }

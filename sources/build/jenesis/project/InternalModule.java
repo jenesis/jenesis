@@ -307,7 +307,7 @@ public class InternalModule extends PluginModule<InternalModule> {
             if (!versions.isEmpty()) {
                 versions.store(context.next().resolve(BuildStep.VERSIONS));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 }
