@@ -648,7 +648,7 @@ public class PinModuleInfo implements BuildStep {
                         + winner.token()
                         + " "
                         + resolved
-                        + (winner.guard() == null ? "" : " [" + winner.guard() + "]"));
+                        + (winner.guard() == null ? "" : " (" + winner.guard() + ")"));
             }
         }
     }
