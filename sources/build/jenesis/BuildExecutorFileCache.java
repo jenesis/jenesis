@@ -142,7 +142,7 @@ public record BuildExecutorFileCache(Path root,
             List<String> lines = persist(output, digest, checksums);
             Files.createDirectories(folder);
             temporary = Files.createTempFile(folder, "tmp", null);
-            Files.write(temporary, lines);
+            Files.writeString(temporary, lines.stream().map(line -> line + "\n").collect(Collectors.joining()));
             try {
                 Files.move(temporary, manifest, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException _) {
