@@ -2,19 +2,47 @@ package build.jenesis;
 
 import module java.base;
 
-public record BuildExecutorFileCache(Path root,
-                                     String algorithm,
-                                     boolean links,
-                                     int steps,
-                                     int versions,
-                                     long size,
-                                     Duration ttl,
-                                     boolean touch,
-                                     boolean lru,
-                                     boolean read,
-                                     boolean write) implements BuildExecutorCache {
+public final class BuildExecutorFileCache implements BuildExecutorCache {
 
     public static final String BLOBS = "blobs", STEPS = "steps", DIRECTORY = "-";
+    private static final LruCache<Path, Lock> TRIMMING = new LruCache<>(256);
+
+    private final Path root;
+    private final String algorithm;
+    private final boolean links;
+    private final int steps;
+    private final int versions;
+    private final long size;
+    private final Duration ttl;
+    private final boolean touch;
+    private final boolean lru;
+    private final boolean read;
+    private final boolean write;
+    private final AtomicBoolean trimmed = new AtomicBoolean();
+
+    public BuildExecutorFileCache(Path root,
+                                  String algorithm,
+                                  boolean links,
+                                  int steps,
+                                  int versions,
+                                  long size,
+                                  Duration ttl,
+                                  boolean touch,
+                                  boolean lru,
+                                  boolean read,
+                                  boolean write) {
+        this.root = root;
+        this.algorithm = algorithm;
+        this.links = links;
+        this.steps = steps;
+        this.versions = versions;
+        this.size = size;
+        this.ttl = ttl;
+        this.touch = touch;
+        this.lru = lru;
+        this.read = read;
+        this.write = write;
+    }
 
     public BuildExecutorFileCache(Path root) {
         Path file = root.resolve("cache.properties");
@@ -40,6 +68,50 @@ public record BuildExecutorFileCache(Path root,
                 properties.flag("lru", true),
                 properties.flag("read", true),
                 properties.flag("write", true));
+    }
+
+    public Path root() {
+        return root;
+    }
+
+    public String algorithm() {
+        return algorithm;
+    }
+
+    public boolean links() {
+        return links;
+    }
+
+    public int steps() {
+        return steps;
+    }
+
+    public int versions() {
+        return versions;
+    }
+
+    public long size() {
+        return size;
+    }
+
+    public Duration ttl() {
+        return ttl;
+    }
+
+    public boolean touch() {
+        return touch;
+    }
+
+    public boolean lru() {
+        return lru;
+    }
+
+    public boolean read() {
+        return read;
+    }
+
+    public boolean write() {
+        return write;
     }
 
     @Override
@@ -190,9 +262,7 @@ public record BuildExecutorFileCache(Path root,
             if (evict(folder, versions) | evict(store.resolve(STEPS), steps)) {
                 sweep(store);
             }
-            if (size > 0) {
-                evictBySize(store.resolve(BLOBS));
-            }
+            trim(executor, digest);
         } catch (IOException | RuntimeException _) {
         } finally {
             if (temporary != null) {
@@ -202,39 +272,60 @@ public record BuildExecutorFileCache(Path root,
                 }
             }
         }
-        if (ttl != null && !ttl.isZero() && !ttl.isNegative()) {
+    }
+
+    void trim(Executor executor, String digest) {
+        boolean aged = ttl != null && !ttl.isZero() && !ttl.isNegative();
+        if (!write || size <= 0 && !aged || !trimmed.compareAndSet(false, true)) {
+            return;
+        }
+        Path store = root.resolve(digest.toLowerCase(Locale.ROOT)), folder = root.toAbsolutePath().normalize();
+        try {
             executor.execute(() -> {
+                Lock created = new ReentrantLock(), running = TRIMMING.putIfAbsent(folder, created);
+                Lock lock = running == null ? created : running;
+                if (!lock.tryLock()) {
+                    return;
+                }
                 try {
-                    Instant threshold = Instant.now().minus(ttl);
-                    boolean evicted = false;
-                    try (DirectoryStream<Path> folders = Files.newDirectoryStream(store.resolve(STEPS))) {
-                        for (Path candidate : folders) {
-                            if (!isHex(candidate.getFileName().toString()) || !Files.isDirectory(candidate)) {
-                                continue;
-                            }
-                            boolean remaining = false;
-                            try (DirectoryStream<Path> manifests = Files.newDirectoryStream(candidate)) {
-                                for (Path entry : manifests) {
-                                    if (isHex(entry.getFileName().toString())
-                                            && lastModified(entry).toInstant().isBefore(threshold)) {
-                                        Files.deleteIfExists(entry);
-                                        evicted = true;
-                                    } else {
-                                        remaining = true;
+                    if (aged && Files.isDirectory(store.resolve(STEPS))) {
+                        Instant threshold = Instant.now().minus(ttl);
+                        boolean evicted = false;
+                        try (DirectoryStream<Path> folders = Files.newDirectoryStream(store.resolve(STEPS))) {
+                            for (Path candidate : folders) {
+                                if (!isHex(candidate.getFileName().toString()) || !Files.isDirectory(candidate)) {
+                                    continue;
+                                }
+                                boolean remaining = false;
+                                try (DirectoryStream<Path> manifests = Files.newDirectoryStream(candidate)) {
+                                    for (Path entry : manifests) {
+                                        if (isHex(entry.getFileName().toString())
+                                                && lastModified(entry).toInstant().isBefore(threshold)) {
+                                            Files.deleteIfExists(entry);
+                                            evicted = true;
+                                        } else {
+                                            remaining = true;
+                                        }
                                     }
                                 }
-                            }
-                            if (!remaining) {
-                                Files.deleteIfExists(candidate);
+                                if (!remaining) {
+                                    Files.deleteIfExists(candidate);
+                                }
                             }
                         }
+                        if (evicted) {
+                            sweep(store);
+                        }
                     }
-                    if (evicted) {
-                        sweep(store);
+                    if (size > 0 && Files.isDirectory(store.resolve(BLOBS))) {
+                        evictBySize(store.resolve(BLOBS));
                     }
                 } catch (IOException _) {
+                } finally {
+                    lock.unlock();
                 }
             });
+        } catch (RejectedExecutionException _) {
         }
     }
 

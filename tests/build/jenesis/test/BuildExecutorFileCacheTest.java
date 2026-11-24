@@ -414,7 +414,8 @@ public class BuildExecutorFileCacheTest {
         Path stale = store(cache, step, new byte[]{1});
         Path fresh = store(cache, step, new byte[]{2});
         Files.setLastModifiedTime(stale, FileTime.from(Instant.now().minusSeconds(300)));
-        Path latest = store(cache, step, new byte[]{3});
+        assertThat(stale).as("a build applies the age of its cache once, when it first stores a step").exists();
+        Path latest = store(new BuildExecutorFileCache(cacheRoot), step, new byte[]{3});
         assertThat(stale).doesNotExist();
         assertThat(fresh).exists();
         assertThat(latest).exists();
@@ -451,7 +452,8 @@ public class BuildExecutorFileCacheTest {
         Path newer = storeSized(cache, new byte[]{3}, 1002);
         Files.delete(output.resolve("file"));
         Thread.sleep(20);
-        Path latest = storeSized(cache, new byte[]{4}, 1003);
+        assertThat(oldest).as("a build applies the size of its cache once, when it first stores a step").exists();
+        Path latest = storeSized(new BuildExecutorFileCache(cacheRoot), new byte[]{4}, 1003);
         assertThat(linked).as("a file an output folder still links costs no space of its own").exists();
         assertThat(oldest).doesNotExist();
         assertThat(newer).doesNotExist();
@@ -462,6 +464,44 @@ public class BuildExecutorFileCacheTest {
         try (Stream<Path> entries = Files.list(steps().resolve(HexFormat.of().formatHex(new byte[]{2})))) {
             assertThat(entries.toList()).isEmpty();
         }
+    }
+
+    @Test
+    public void a_build_that_stores_several_steps_applies_size_and_age_once_and_in_the_background() throws IOException {
+        Files.writeString(cacheRoot.resolve("cache.properties"), "size=1\nttl=PT60S\n");
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        List<Runnable> queued = new ArrayList<>();
+        List<Path> files = new ArrayList<>();
+        for (byte step = 1; step <= 3; step++) {
+            Files.write(output.resolve("file"), new byte[1000 + step]);
+            cache.store(queued::add, "step", new byte[]{step}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+            String hex = HexFormat.of().formatHex(hash.hash(output.resolve("file")));
+            files.add(cacheRoot.resolve("sha-256").resolve("blobs").resolve(hex.substring(0, 2)).resolve(hex.substring(2)));
+            Files.delete(output.resolve("file"));
+            Files.setLastModifiedTime(manifest(new byte[]{step}), FileTime.from(Instant.now().minusSeconds(300)));
+        }
+        assertThat(queued).as("three steps stored, one pass over the cache asked for").hasSize(1);
+        assertThat(files).as("no step waited for it").allSatisfy(file -> assertThat(file).exists());
+        queued.getFirst().run();
+        assertThat(files).allSatisfy(file -> assertThat(file).doesNotExist());
+        try (Stream<Path> manifests = Files.walk(steps())) {
+            assertThat(manifests.filter(Files::isRegularFile).toList()).isEmpty();
+        }
+    }
+
+    @Test
+    public void a_build_that_stores_nothing_evicts_nothing() throws IOException {
+        byte[] step = {1};
+        Path stored = storeSized(new BuildExecutorFileCache(cacheRoot), step, 1000);
+        Files.delete(output.resolve("file"));
+        Files.writeString(cacheRoot.resolve("cache.properties"), "size=1\nttl=PT60S\n");
+        Files.setLastModifiedTime(manifest(step), FileTime.from(Instant.now().minusSeconds(300)));
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        List<Runnable> queued = new ArrayList<>();
+        assertThat(cache.fetch(queued::add, "step", step, inputs("source", "file", new byte[]{9}), target, "SHA-256")).isPresent();
+        cache.touch(queued::add, "step", step, inputs("source", "file", new byte[]{9}), "SHA-256");
+        assertThat(queued).isEmpty();
+        assertThat(stored).exists();
     }
 
     @Test
@@ -656,6 +696,12 @@ public class BuildExecutorFileCacheTest {
         cache.store(Runnable::run, "step", step, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
         String hex = HexFormat.of().formatHex(hash.hash(output.resolve("file")));
         return cacheRoot.resolve("sha-256").resolve("blobs").resolve(hex.substring(0, 2)).resolve(hex.substring(2));
+    }
+
+    private Path manifest(byte[] step) throws IOException {
+        try (Stream<Path> entries = Files.list(steps().resolve(HexFormat.of().formatHex(step)))) {
+            return entries.findFirst().orElseThrow();
+        }
     }
 
     private Path steps() {
