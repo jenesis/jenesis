@@ -40,6 +40,53 @@ public class OsvDownloadTest {
     }
 
     @Test
+    public void an_answer_that_does_not_cover_every_dependency_is_recorded_and_fails_the_lookup_when_strict() throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/v1/querybatch", exchange -> {
+            byte[] body = "<html>Sign in to continue</html>".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+        server.start();
+        try {
+            Path next = Files.createDirectory(root.resolve("unreadable-next"));
+            Path argument = Files.createDirectory(root.resolve("unreadable-argument"));
+            SequencedProperties dependencies = new SequencedProperties();
+            dependencies.setProperty("main/compile/maven/org.example/lib/1.2.3", "resolved/lib.jar");
+            dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+            URI endpoint = URI.create("http://localhost:" + server.getAddress().getPort());
+            BuildStepContext context = new BuildStepContext(root.resolve("unreadable-previous"),
+                    next,
+                    root.resolve("unreadable-supplement"),
+                    root.resolve("unreadable-persistent"));
+            SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>(Map.of(
+                    "argument",
+                    new BuildStepArgument(argument, Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED)))));
+            assertThatThrownBy(() -> OsvDownload.ofEnvironment(new Environment(Map.of(
+                    "repository.insecure", "true",
+                    "strict.vulnerability", "true"))).endpoint(endpoint).apply(Runnable::run, context, arguments))
+                    .as("under jenesis.strict.vulnerability an answer that covers no dependency fails the build")
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("with 0 results");
+            assertThat(next.resolve("advisories.properties")).doesNotExist();
+            OsvDownload.ofEnvironment(new Environment(Map.of("repository.insecure", "true")))
+                    .endpoint(endpoint)
+                    .apply(Runnable::run, context, arguments)
+                    .toCompletableFuture()
+                    .join();
+            assertThat(next.resolve("reports/compliance/advisories.txt"))
+                    .as("without it the answer is recorded as what it is, and never read as no advisory found")
+                    .content()
+                    .contains("with 0 results");
+            assertThat(next.resolve("advisories.properties")).isEmptyFile();
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     public void retries_a_transient_server_error_and_drains_the_error_stream() throws IOException {
         AtomicInteger hits = new AtomicInteger();
         HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);

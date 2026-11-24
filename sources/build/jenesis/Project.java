@@ -4904,6 +4904,7 @@ public record Project(
                 compliance.license|true|Run the license check a licensing.properties activates
                 compliance.vulnerability|true|Run the vulnerability check a vulnerability.properties activates
                 check.checkstyle|true|Checkstyle, activated by a checkstyle.properties naming its checkstyle.xml as configuration= or, where none is found, by a checkstyle.xml of a configuration folder; false leaves it out
+                strict.vulnerability|false|The vulnerability check fails the build where the advisory service's answer does not cover every dependency asked about, where it otherwise records that under reports/compliance/advisories.txt and reports no advisory for them
                 strict.checkstyle|false|Checkstyle fails the build when it exits reporting a violation, where it otherwise records its findings
                 check.pmd|true|PMD, activated by a pmd.properties naming its pmd.xml as configuration= or, where none is found, by a pmd.xml of a configuration folder; false leaves it out
                 strict.pmd|false|PMD fails the build when it exits reporting a violation, where it otherwise records its findings

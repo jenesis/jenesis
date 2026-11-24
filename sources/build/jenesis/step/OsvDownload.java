@@ -15,26 +15,33 @@ import build.jenesis.maven.MavenDependencyKey;
 public class OsvDownload implements BuildStep {
 
     private final URI endpoint;
+    private final boolean strict;
     private final transient boolean insecure, offline;
 
     public OsvDownload() {
-        this(URI.create("https://api.osv.dev"), false, false);
+        this(URI.create("https://api.osv.dev"), false, false, false);
     }
 
     public static OsvDownload ofEnvironment(Environment environment) {
         return new OsvDownload(URI.create("https://api.osv.dev"),
+                environment.flag("strict.vulnerability", false, Setting.PROJECT),
                 environment.flag("repository.insecure", Setting.MACHINE),
                 environment.flag("repository.offline", Setting.PROJECT));
     }
 
-    private OsvDownload(URI endpoint, boolean insecure, boolean offline) {
+    private OsvDownload(URI endpoint, boolean strict, boolean insecure, boolean offline) {
         this.endpoint = endpoint;
+        this.strict = strict;
         this.insecure = insecure;
         this.offline = offline;
     }
 
     public OsvDownload endpoint(URI endpoint) {
-        return new OsvDownload(endpoint, insecure, offline);
+        return new OsvDownload(endpoint, strict, insecure, offline);
+    }
+
+    public OsvDownload strict(boolean strict) {
+        return new OsvDownload(endpoint, strict, insecure, offline);
     }
 
     @Override
@@ -68,6 +75,19 @@ public class OsvDownload implements BuildStep {
                         + " (unset -Djenesis.repository.offline, or set -Djenesis.compliance.vulnerability=false)");
             }
             List<List<String>> identifiers = identifiers(request(endpoint.resolve("/v1/querybatch"), queryBatch(coordinates), insecure));
+            if (identifiers.size() != coordinates.size()) {
+                String unknown = endpoint + " answered the query for the advisories of " + coordinates.size()
+                        + " dependencies with " + identifiers.size() + " results, so it is not known which of them"
+                        + " are affected: check that no proxy answers in its place";
+                if (strict) {
+                    throw new IllegalStateException(unknown + ", or leave out -Djenesis.strict.vulnerability to"
+                            + " record this and build on");
+                }
+                Files.writeString(Files.createDirectories(context.next().resolve(REPORTS + "compliance"))
+                        .resolve("advisories.txt"), unknown + "\n");
+                identifiers = List.of();
+                coordinates = List.of();
+            }
             SequencedSet<String> distinct = new LinkedHashSet<>();
             for (List<String> ids : identifiers) {
                 distinct.addAll(ids);

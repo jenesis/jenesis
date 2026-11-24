@@ -57,6 +57,12 @@ file's keys:
 The OSV fetch runs only when this file is present; remove it to keep the build
 offline.
 
+An answer that does not cover every dependency asked about - a page a proxy
+serves in the service's place, say - is never read as "no advisory found". The
+build records it in `reports/compliance/advisories.txt` and reports no advisory
+for those dependencies, and under `-Djenesis.strict.vulnerability=true` it fails
+instead.
+
 How it works
 ------------
 
