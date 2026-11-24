@@ -144,7 +144,7 @@ URL it would travel to.
 Two rules decide that. A URL that a file the project provides supplied - its
 `jenesis.properties`, or a profile beside it - is never sent a credential at all,
 and such a file may not name one either: `jenesis.maven.token`,
-`jenesis.module.token` and `jenesis.cache.key` are refused there, the way
+`jenesis.module.token` and `jenesis.cache.token` are refused there, the way
 `jenesis.toolchain.searchpath` already is, because a credential is yours to hand
 out and not a project's. A token the environment provides is sent only to the
 remotes the environment names, so a URL on the command line does not receive it,

@@ -87,7 +87,7 @@ public record Project(
             PROMPT = "prompt",
             PROPERTIES = "properties",
             CONFIGURATION = "configuration";
-    private static final Set<String> CREDENTIALS = Set.of("release.token", "deploy.token", "cache.key");
+    private static final Set<String> CREDENTIALS = Set.of("release.token", "deploy.token", "cache.token");
     private static final Map<String, String> REPOSITORIES = Map.of("maven.uri", "MAVEN_REPOSITORY_URI",
             "maven.token", "MAVEN_REPOSITORY_TOKEN",
             "module.uri", "JENESIS_REPOSITORY_URI",
@@ -4779,7 +4779,7 @@ public record Project(
                 project.readable||Extra read-only container mounts, host[:container],...
                 project.writable||Extra writable container mounts
                 project.env||Host environment variables to forward, name[=value],...
-                project.repositories|false|Hand the build in that container the repositories this machine is set up with: the Maven and module remotes, the module index, the key servers and the tokens sent to the remotes, as the settings or their environment variables name them; without it, the build in the container resolves from Maven Central and the public Jenesis repository alone and is handed no token; the release and deploy tokens and the cache key are never handed to a container; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                project.repositories|false|Hand the build in that container the repositories this machine is set up with: the Maven and module remotes, the module index, the key servers and the tokens sent to the remotes, as the settings or their environment variables name them; without it, the build in the container resolves from Maven Central and the public Jenesis repository alone and is handed no token; the release and deploy tokens and the cache token are never handed to a container; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 make.root|.|Folder Make looks for the project in; only settable on the command line
                 make.profiles||Comma-separated profiles layered over jenesis.properties
                 make.global||Folder holding the user-global .jenesis/jenesis.properties, relative to the working directory; default: the home folder; only settable on the command line
@@ -4871,10 +4871,10 @@ public record Project(
                 openpgp.local|.jenesis/keys|Local key cache folder, one file per fingerprint (env OPENPGP_REPOSITORY_LOCAL), relative to the working directory on the command line and to the project root in a file; a file a project provides names only a folder inside the project
                 cache.uri||Build cache: a file:// folder, or an http(s):// cache server; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 cache.project||Project name sent to a cache server (env JENESIS_CACHE_PROJECT)
-                cache.key||Access key sent to a cache server (env JENESIS_CACHE_KEY); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and a cache server a project's own files named is not sent it
+                cache.token||Token sent to a cache server (env JENESIS_CACHE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and a cache server a project's own files named is not sent it
                 cache.connect|PT1S|Connect timeout for a cache server
                 cache.read|PT10S|Read timeout for a cache server
-                cache.insecure|false|Permit the cache key over plaintext http off loopback, and over https accept a certificate that does not verify; likewise yours alone to allow
+                cache.insecure|false|Permit the cache token over plaintext http off loopback, and over https accept a certificate that does not verify; likewise yours alone to allow
                 test.skip|false|Skip executing tests, still resolving what running them needs
                 test.filter||Comma-separated [<module>/]<classRegex>[#<method>] entries restricting which tests run, in place of the default naming and of its JUnit 4 check that a class holds tests; an entry naming a module applies to its tests alone, and a test module no entry reaches runs none
                 test.exclude||Comma-separated [<module>/]<classRegex> entries, each matched against the whole class name, leaving out of a run the test classes they match among those the default naming or jenesis.test.filter selects; an entry naming a module applies to its tests alone, and a test module whose every selected class is left out runs none

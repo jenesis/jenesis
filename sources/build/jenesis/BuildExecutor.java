@@ -46,7 +46,7 @@ public interface BuildExecutor {
                     case "http", "https" -> environment.flag("repository.offline", Setting.PROJECT)
                             ? null
                             : Repository.Origin.of(environment, "cache.uri") == Repository.Origin.PROJECT
-                            ? BuildExecutorHttpCache.ofEnvironment(environment, uri).key(null)
+                            ? BuildExecutorHttpCache.ofEnvironment(environment, uri).token(null)
                             : BuildExecutorHttpCache.ofEnvironment(environment, uri);
                     case "file" -> new BuildExecutorFileCache(Path.of(uri));
                     default -> throw new IllegalArgumentException(
