@@ -6324,7 +6324,7 @@ public class MavenPomResolverTest {
                     <version>1</version>
                     <!--jenesis.attach
                     org.mockito/mockito-core
-                    io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=value &#45;&#45;flag
+                    io.opentelemetry.javaagent/opentelemetry-javaagent   otel.option=two  words &#45;&#45;flag
                     some.module plain arguments
                     -->
                 </project>
@@ -6332,7 +6332,7 @@ public class MavenPomResolverTest {
         SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
         assertThat(poms.get(Path.of("")).attachments()).containsExactly(
                 Map.entry("main/maven/org.mockito/mockito-core", ""),
-                Map.entry("main/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=value --flag"),
+                Map.entry("main/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=two  words --flag"),
                 Map.entry("main/module/some.module", "plain arguments"));
     }
 

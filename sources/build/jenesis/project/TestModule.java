@@ -1680,17 +1680,21 @@ public class TestModule implements BuildExecutorModule {
 
         private static SequencedMap<String, String> attachments(SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            SequencedMap<String, String> attachments = new LinkedHashMap<>();
+            SequencedMap<String, String> attachments = new LinkedHashMap<>(), agents = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
                 }
-                Path file = argument.folder().resolve(BuildStep.ATTACHMENTS);
-                if (!Files.isRegularFile(file)) {
-                    continue;
+                Path file = argument.folder().resolve(BuildStep.ATTACHMENTS),
+                        configured = argument.folder().resolve(BuildStep.AGENTS);
+                if (Files.isRegularFile(file)) {
+                    SequencedProperties.ofFiles(file).forEachProperty(attachments::putIfAbsent);
                 }
-                SequencedProperties.ofFiles(file).forEachProperty(attachments::putIfAbsent);
+                if (Files.isRegularFile(configured)) {
+                    SequencedProperties.ofFiles(configured).forEachProperty(agents::putIfAbsent);
+                }
             }
+            agents.forEach((key, options) -> attachments.computeIfPresent(key, (_, _) -> options));
             return attachments;
         }
 

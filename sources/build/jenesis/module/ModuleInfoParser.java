@@ -14,6 +14,9 @@ import static java.util.Objects.requireNonNull;
 public class ModuleInfoParser {
 
     private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
+    private static final Pattern RELEASE = Pattern.compile("[1-9][0-9]*(-preview)?");
+    private static final Pattern MARGIN = Pattern.compile("^\\s*(\\*+|///)?");
+    private static final Pattern ENTITY = Pattern.compile("&(#[0-9]+|#[xX][0-9A-Fa-f]+|amp|lt|gt|quot|apos|nbsp);");
     private static final Set<String> BLOCKS = Set.of("p", "div", "pre", "ul", "ol", "dl", "table", "blockquote",
             "h1", "h2", "h3", "h4", "h5", "h6", "hr");
 
@@ -29,6 +32,7 @@ public class ModuleInfoParser {
     }
 
     public ModuleInfo identify(Path moduleInfo) throws IOException {
+        String source = Files.readString(moduleInfo);
         JavacTask javac = (JavacTask) compiler.getTask(new PrintWriter(Writer.nullWriter()),
                 compiler.getStandardFileManager(null, null, null),
                 null,
@@ -36,8 +40,8 @@ public class ModuleInfoParser {
                 null,
                 List.of(new SimpleJavaFileObject(moduleInfo.toUri(), JavaFileObject.Kind.SOURCE) {
                     @Override
-                    public CharSequence getCharContent(boolean ignoreEncodingErrors) throws IOException {
-                        return Files.readString(moduleInfo);
+                    public CharSequence getCharContent(boolean ignoreEncodingErrors) {
+                        return source;
                     }
                 }));
         DocTrees docTrees = DocTrees.instance(javac);
@@ -374,9 +378,22 @@ public class ModuleInfoParser {
                                 if (content.isEmpty()) {
                                     continue;
                                 }
-                                int split = content.indexOf(' ');
-                                String token = split < 0 ? content : content.substring(0, split);
-                                String arguments = split < 0 ? "" : content.substring(split + 1).trim();
+                                DocSourcePositions positions = docTrees.getSourcePositions();
+                                List<String> lines = source.substring(
+                                                (int) positions.getStartPosition(unit, docComment, unknown),
+                                                (int) positions.getEndPosition(unit, docComment, unknown))
+                                        .lines()
+                                        .map(line -> MARGIN.matcher(line).replaceFirst("").strip())
+                                        .toList();
+                                String declaration = lines.getFirst().substring("@jenesis.attach".length()).strip();
+                                int split = IntStream.range(0, declaration.length())
+                                        .filter(index -> Character.isWhitespace(declaration.charAt(index)))
+                                        .findFirst()
+                                        .orElse(declaration.length());
+                                String token = declaration.substring(0, split);
+                                String arguments = ENTITY.matcher(declaration.substring(split).strip()
+                                                + String.join("", lines.subList(1, lines.size())))
+                                        .replaceAll(match -> Matcher.quoteReplacement(entity(match.group(1))));
                                 if (ModuleGraph.isSystemModule(token)) {
                                     throw new IllegalArgumentException("Illegal @jenesis.attach token '"
                                             + token
@@ -417,9 +434,17 @@ public class ModuleInfoParser {
                                 }
                             }
                             case "jenesis.release" -> {
-                                if (!content.isEmpty()) {
-                                    release = content;
+                                if (content.isEmpty()) {
+                                    continue;
                                 }
+                                if (!RELEASE.matcher(content).matches()) {
+                                    throw new IllegalArgumentException("Malformed @jenesis.release value '"
+                                            + content
+                                            + "': expected <release> or <release>-preview, as 25 or 25-preview."
+                                            + " A tag owns every line below it until the next tag, so prose written"
+                                            + " under it becomes part of its value; move it above the tag block");
+                                }
+                                release = content;
                             }
                             case "jenesis.test" -> {
                                 if (testOf != null) {
@@ -509,9 +534,17 @@ public class ModuleInfoParser {
                                 signatures.put(fingerprint, String.join(" ", tokens));
                             }
                             case "jenesis.main" -> {
-                                if (!content.isEmpty()) {
-                                    main = content;
+                                if (content.isEmpty()) {
+                                    continue;
                                 }
+                                if (!SourceVersion.isName(content)) {
+                                    throw new IllegalArgumentException("Malformed @jenesis.main value '"
+                                            + content
+                                            + "': expected the name of a class, as sample.Main."
+                                            + " A tag owns every line below it until the next tag, so prose written"
+                                            + " under it becomes part of its value; move it above the tag block");
+                                }
+                                main = content;
                             }
                         }
                     }
@@ -551,23 +584,27 @@ public class ModuleInfoParser {
                 case RawTextTree markdown -> markdown.getContent();
                 case LiteralTree literal -> literal.getBody().getBody();
                 case LinkTree link -> link.getLabel().isEmpty() ? link.getReference().getSignature() : text(link.getLabel());
-                case EntityTree entity -> switch (entity.getName().toString()) {
-                    case "amp" -> "&";
-                    case "lt" -> "<";
-                    case "gt" -> ">";
-                    case "quot" -> "\"";
-                    case "apos" -> "'";
-                    case "nbsp" -> " ";
-                    case String numeric when numeric.startsWith("#x") || numeric.startsWith("#X") ->
-                            Character.toString(Integer.parseInt(numeric.substring(2), 16));
-                    case String numeric when numeric.startsWith("#") -> Character.toString(Integer.parseInt(numeric.substring(1)));
-                    case String named -> "&" + named + ";";
-                };
+                case EntityTree entity -> entity(entity.getName().toString());
                 case StartElementTree element -> BLOCKS.contains(element.getName().toString().toLowerCase(Locale.ROOT)) ? "\n\n" : "";
                 default -> "";
             });
         }
         return text.toString();
+    }
+
+    private static String entity(String name) {
+        return switch (name) {
+            case "amp" -> "&";
+            case "lt" -> "<";
+            case "gt" -> ">";
+            case "quot" -> "\"";
+            case "apos" -> "'";
+            case "nbsp" -> " ";
+            case String numeric when numeric.startsWith("#x") || numeric.startsWith("#X") ->
+                    Character.toString(Integer.parseInt(numeric.substring(2), 16));
+            case String numeric when numeric.startsWith("#") -> Character.toString(Integer.parseInt(numeric.substring(1)));
+            case String named -> "&" + named + ";";
+        };
     }
 
     private static String layered(String kind, String token) {

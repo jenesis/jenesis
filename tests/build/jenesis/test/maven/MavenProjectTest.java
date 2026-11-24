@@ -1165,7 +1165,7 @@ public class MavenProjectTest {
                     <artifactId>artifact</artifactId>
                     <version>1</version>
                     <!--jenesis.attach
-                    io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=value
+                    io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=two  words
                     -->
                 </project>
                 """);
@@ -1190,7 +1190,7 @@ public class MavenProjectTest {
                     .as("an agent is resolved for the runs it joins, never published as a dependency of the module")
                     .noneMatch(key -> key.startsWith("main/runtime/maven/io.opentelemetry.javaagent/"));
             assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.ATTACHMENTS))).containsOnly(
-                    Map.entry("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=value"));
+                    Map.entry("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=two  words"));
         }
     }
 
