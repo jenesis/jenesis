@@ -4914,6 +4914,7 @@ public record Project(
                 graalvm.license||Licence the SBOM beside a native image records for the GraalVM that compiled it, as an SPDX identifier or a name; empty records none
                 license.compliance|true|Run the license check a licensing.properties activates
                 vulnerability.compliance|true|Run the vulnerability check a vulnerability.properties activates
+                vulnerability.strict|false|The vulnerability check fails the build where the advisory service's answer does not cover every dependency asked about, where it otherwise records that under reports/compliance/advisories.txt and reports no advisory for them
                 checkstyle.check|true|Checkstyle, activated by a checkstyle.properties naming its checkstyle.xml as configuration= or, where none is found, by a checkstyle.xml of a configuration folder; false leaves it out
                 checkstyle.strict|false|Checkstyle fails the build when it exits reporting a violation, where it otherwise records its findings
                 pmd.check|true|PMD, activated by a pmd.properties naming its pmd.xml as configuration= or, where none is found, by a pmd.xml of a configuration folder; false leaves it out
