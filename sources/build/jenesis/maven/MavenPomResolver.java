@@ -1219,7 +1219,7 @@ public class MavenPomResolver implements MavenResolver {
                                 : Collections.emptyNavigableMap(),
                         extended
                                 ? toAttachments(document.getDocumentElement())
-                                : Collections.emptyNavigableMap(),
+                                : Collections.emptyNavigableSet(),
                         extended
                                 ? toNatives(document.getDocumentElement())
                                 : Collections.emptyNavigableSet(),
@@ -1289,7 +1289,7 @@ public class MavenPomResolver implements MavenResolver {
                             Map.of(),
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
-                            Collections.emptyNavigableMap(),
+                            Collections.emptyNavigableSet(),
                             Collections.emptyNavigableSet(),
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
@@ -1934,8 +1934,8 @@ public class MavenPomResolver implements MavenResolver {
         return entries;
     }
 
-    private static SequencedMap<String, String> toAttachments(Node node) {
-        SequencedMap<String, String> entries = new LinkedHashMap<>();
+    private static SequencedSet<String> toAttachments(Node node) {
+        SequencedSet<String> entries = new LinkedHashSet<>();
         toChildren(node)
                 .filter(child -> child.getNodeType() == Node.COMMENT_NODE)
                 .map(Node::getNodeValue)
@@ -1943,14 +1943,17 @@ public class MavenPomResolver implements MavenResolver {
                 .map(String::trim)
                 .filter(text -> text.startsWith("jenesis.attach"))
                 .forEach(text -> {
-                    for (String line : text.substring("jenesis.attach".length()).replace("&#45;", "-").split("\n")) {
-                        String trimmed = line.trim().replaceAll("\\s+", " ");
-                        if (trimmed.isEmpty()) {
+                    for (String line : text.substring("jenesis.attach".length()).split("\n")) {
+                        String token = line.trim();
+                        if (token.isEmpty()) {
                             continue;
                         }
-                        int space = trimmed.indexOf(' ');
-                        String token = space < 0 ? trimmed : trimmed.substring(0, space);
-                        String arguments = space < 0 ? "" : trimmed.substring(space + 1).trim();
+                        if (token.chars().anyMatch(Character::isWhitespace)) {
+                            throw new IllegalArgumentException("Malformed jenesis.attach declaration '"
+                                    + token
+                                    + "': expected <token> alone, a line each - an agent's options are a line"
+                                    + " <token>=<options> of an agents.properties in a configuration folder");
+                        }
                         if (ModuleGraph.isSystemModule(token)) {
                             throw new IllegalArgumentException("Illegal jenesis.attach token '"
                                     + token
@@ -1978,16 +1981,7 @@ public class MavenPomResolver implements MavenResolver {
                             }
                             key = token;
                         }
-                        String previous = entries.putIfAbsent(key, arguments);
-                        if (previous != null && !previous.equals(arguments)) {
-                            throw new IllegalArgumentException("Duplicate jenesis.attach for "
-                                    + key
-                                    + ": '"
-                                    + previous
-                                    + "' and '"
-                                    + arguments
-                                    + "'");
-                        }
+                        entries.add(key);
                     }
                 });
         return entries;
@@ -2169,7 +2163,7 @@ public class MavenPomResolver implements MavenResolver {
                                  Map<DependencyKey, DependencyValue> managedDependencies,
                                  SequencedMap<DependencyKey, DependencyValue> dependencies,
                                  SequencedMap<String, String> qualifiedDependencies,
-                                 SequencedMap<String, String> attachments,
+                                 SequencedSet<String> attachments,
                                  SequencedSet<String> natives,
                                  SequencedMap<String, String> plugins,
                                  SequencedMap<String, String> aliases,

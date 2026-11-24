@@ -14,6 +14,7 @@ import static java.util.Objects.requireNonNull;
 public class ModuleInfoParser {
 
     private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
+    private static final Pattern RELEASE = Pattern.compile("[1-9][0-9]*(-preview)?");
     private static final Set<String> BLOCKS = Set.of("p", "div", "pre", "ul", "ol", "dl", "table", "blockquote",
             "h1", "h2", "h3", "h4", "h5", "h6", "hr");
 
@@ -67,7 +68,7 @@ public class ModuleInfoParser {
             SequencedMap<String, String> plugins = new LinkedHashMap<>();
             SequencedMap<String, String> layerApis = new LinkedHashMap<>();
             SequencedMap<String, SequencedSet<String>> layers = new LinkedHashMap<>();
-            SequencedMap<String, String> attachments = new LinkedHashMap<>();
+            SequencedSet<String> attachments = new LinkedHashSet<>();
             SequencedSet<String> natives = new LinkedHashSet<>();
             String release = null;
             String name = null;
@@ -374,25 +375,19 @@ public class ModuleInfoParser {
                                 if (content.isEmpty()) {
                                     continue;
                                 }
-                                int split = content.indexOf(' ');
-                                String token = split < 0 ? content : content.substring(0, split);
-                                String arguments = split < 0 ? "" : content.substring(split + 1).trim();
-                                if (ModuleGraph.isSystemModule(token)) {
+                                if (content.indexOf(' ') >= 0) {
+                                    throw new IllegalArgumentException("Malformed @jenesis.attach declaration '"
+                                            + content
+                                            + "': expected <token> alone - an agent's options are a line "
+                                            + content.substring(0, content.indexOf(' '))
+                                            + "=<options> of an agents.properties in a configuration folder");
+                                }
+                                if (ModuleGraph.isSystemModule(content)) {
                                     throw new IllegalArgumentException("Illegal @jenesis.attach token '"
-                                            + token
+                                            + content
                                             + "': platform modules cannot be attached");
                                 }
-                                String key = expand("jenesis.attach", token);
-                                String previous = attachments.putIfAbsent(key, arguments);
-                                if (previous != null && !previous.equals(arguments)) {
-                                    throw new IllegalArgumentException("Duplicate @jenesis.attach for "
-                                            + key
-                                            + ": '"
-                                            + previous
-                                            + "' and '"
-                                            + arguments
-                                            + "'");
-                                }
+                                attachments.add(expand("jenesis.attach", content));
                             }
                             case "jenesis.native" -> {
                                 if (content.isEmpty()) {
@@ -417,9 +412,17 @@ public class ModuleInfoParser {
                                 }
                             }
                             case "jenesis.release" -> {
-                                if (!content.isEmpty()) {
-                                    release = content;
+                                if (content.isEmpty()) {
+                                    continue;
                                 }
+                                if (!RELEASE.matcher(content).matches()) {
+                                    throw new IllegalArgumentException("Malformed @jenesis.release value '"
+                                            + content
+                                            + "': expected <release> or <release>-preview, as 25 or 25-preview."
+                                            + " A tag owns every line below it until the next tag, so prose written"
+                                            + " under it becomes part of its value; move it above the tag block");
+                                }
+                                release = content;
                             }
                             case "jenesis.test" -> {
                                 if (testOf != null) {
@@ -509,9 +512,17 @@ public class ModuleInfoParser {
                                 signatures.put(fingerprint, String.join(" ", tokens));
                             }
                             case "jenesis.main" -> {
-                                if (!content.isEmpty()) {
-                                    main = content;
+                                if (content.isEmpty()) {
+                                    continue;
                                 }
+                                if (!SourceVersion.isName(content)) {
+                                    throw new IllegalArgumentException("Malformed @jenesis.main value '"
+                                            + content
+                                            + "': expected the name of a class, as sample.Main."
+                                            + " A tag owns every line below it until the next tag, so prose written"
+                                            + " under it becomes part of its value; move it above the tag block");
+                                }
+                                main = content;
                             }
                         }
                     }

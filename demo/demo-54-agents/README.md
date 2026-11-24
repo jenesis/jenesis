@@ -2,7 +2,7 @@ Java agents demo
 ================
 
 Attach libraries as Java agents (`-javaagent`) to a module's own executions with
-the `@jenesis.attach` tag. An agent is declared once, next to the thing it
+the `@jenesis.attach` tag, and hand them their options in `agents.properties`. An agent is declared once, next to the thing it
 instruments, and Jenesis adds it to the right `java` command: the test JVM for a
 test module, or the application launch for a module with an entry point. This
 demo shows both, and the two shapes an agent can take:
@@ -51,6 +51,9 @@ Layout
     demo/demo-54-agents
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
     |-- build/Demo.java            runs the build (Mockito) then the app (OpenTelemetry)
+    |-- build.jenesis
+    |   |-- agents.properties      the options the OpenTelemetry agent is handed
+    |   `-- packaging.properties   bundle=true
     |-- sources
     |   |-- module-info.java       @jenesis.main + @jenesis.attach OpenTelemetry (agent-only)
     |   `-- demo/agents
@@ -108,9 +111,25 @@ a Java agent needs. Mockito is attached here by its **module name**,
 it: the attachment and the dependency then resolve through the same repository at
 the same coordinate, so the agent jar and the module-path jar are literally the
 same file. (OpenTelemetry, having no `requires`, is named by its Maven coordinate
-instead.) Anything after the token is passed to the agent verbatim as its option
-string, appended after `=` on the `-javaagent` argument (for example JaCoCo's
-`destfile=...`); Mockito and the OpenTelemetry agent take none here.
+instead.) The tag names the agent and nothing else.
+
+What an agent is handed
+-----------------------
+
+An agent's options are configuration rather than a property of the module, so
+they are a line of `agents.properties` in a configuration folder, here
+`build.jenesis/` at the project root:
+
+    io.opentelemetry.javaagent/opentelemetry-javaagent=otel.service.name=demo-agents
+
+The key is the token as the tag writes it, and everything after the first `=` is
+appended after `=` on the `-javaagent` argument as it stands, spaces included
+(JaCoCo's `destfile=...` is written the same way). A value `@<key>` is the
+setting `-Djenesis.variable.<key>`. Like every configuration file it can sit in
+a folder named after a profile, which then replaces this one, so an endpoint or
+a sampling rate changes with `-Djenesis.make.profiles=<profile>` and the module's
+declaration stays as it is. A line for an agent a module does not attach
+configures nothing there: Mockito takes no options and has no line.
 
 What Jenesis does with it
 -------------------------
@@ -127,9 +146,10 @@ resolve in the same pass to the identical artifact, so the jar on the test modul
 path and the jar passed as `-javaagent` are one and the same file.
 
 The attachments reach the launched JVM through the module's build state: the
-test step reads `attachments.properties` and prepends a `-javaagent:` argument
-(after any observability agents such as JaCoCo), and for a main run `Execute`
-reads the `agent.*` entries that `Inventory` records and does the same.
+test step reads `attachments.properties`, and the options beside it, and
+prepends a `-javaagent:` argument (after any observability agents such as
+JaCoCo), and for a main run `Execute` reads the `agent.*` entries that
+`Inventory` records and does the same.
 
 Maven projects
 --------------
@@ -145,8 +165,9 @@ declaration per line, read only from the project's own POM:
 
 There a declaration that matches a `test`-scoped dependency attaches to the test
 run only; any other match, and an agent-only line, attach to both the main and
-the test module. Because an XML comment cannot contain a double dash, write
-`&#45;&#45;` for one inside an agent's options.
+the test module. The options are lines of the same `agents.properties`, keyed
+by the token as the comment writes it; `src/test/build.jenesis/` holds a file
+for the tests alone.
 
 Packaged as well as executed
 ----------------------------
@@ -156,7 +177,7 @@ deployment. A `packaging.properties` with `bundle=true` therefore ships this mod
 `bundle.zip`, and the launch it carries hands the agent to the JVM exactly as `Execute`
 does:
 
-    "-javaagent:jars/io.opentelemetry.javaagent-2.30.0.jar"
+    "-javaagent:jars/io.opentelemetry.javaagent-2.30.0.jar=otel.service.name=demo-agents"
     "--module-path"
     "jars/demo.agents-0-SNAPSHOT.jar:jars/io.opentelemetry.javaagent-2.30.0.jar"
     "--module"

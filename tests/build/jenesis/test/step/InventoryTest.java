@@ -301,6 +301,32 @@ public class InventoryTest {
     }
 
     @Test
+    public void takes_the_options_of_an_agent_from_the_input_that_names_them() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        SequencedProperties attachments = new SequencedProperties();
+        attachments.setProperty("main/agent/maven/org.example/agent", "");
+        attachments.store(manifests.resolve(BuildStep.ATTACHMENTS));
+        Path prepare = Files.createDirectory(root.resolve("prepare"));
+        SequencedProperties configured = new SequencedProperties();
+        configured.setProperty("main/agent/maven/org.example/agent", "x=two  words");
+        configured.store(prepare.resolve(BuildStep.AGENTS));
+        Path runtime = Files.createDirectory(root.resolve("runtime"));
+        Files.writeString(Files.createDirectory(runtime.resolve("dependencies")).resolve("maven-org.example-agent-1.0.jar"), "agent");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/agent/maven/org.example/agent/1.0", "dependencies/maven-org.example-agent-1.0.jar");
+        index.store(runtime.resolve(BuildStep.DEPENDENCIES));
+
+        run(args("manifests", manifests, "prepare", prepare, "runtime", runtime));
+
+        assertThat(read(next.resolve(Inventory.INVENTORY)).getProperty("module-foo.agent.0.arguments"))
+                .as("the declaration names the agent and agents.properties, handed on by a later input, its options")
+                .isEqualTo("x=two  words");
+    }
+
+    @Test
     public void agent_join_rejects_multi_segment_remainders() throws IOException {
         Path manifests = Files.createDirectory(root.resolve("manifests"));
         SequencedProperties module = new SequencedProperties();

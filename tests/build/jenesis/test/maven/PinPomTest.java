@@ -145,7 +145,7 @@ public class PinPomTest {
                     <version>1</version>
                     <!--jenesis.attach
                     org.mockito/mockito-core
-                    io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=value
+                    io.opentelemetry.javaagent/opentelemetry-javaagent
                     -->
                 </project>
                 """);
@@ -154,7 +154,7 @@ public class PinPomTest {
         assertThat(result).contains("""
                 <!--jenesis.attach
                     org.mockito/mockito-core
-                    io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=value
+                    io.opentelemetry.javaagent/opentelemetry-javaagent
                     -->""");
     }
 

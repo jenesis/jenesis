@@ -297,6 +297,51 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void an_agents_file_in_configuration_yields_the_options_of_the_agents_the_module_attaches() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.manifests().resolve(BuildStep.ATTACHMENTS), """
+                main/agent/maven/org.example/agent=
+                main/agent/module/sample.agent=
+                other/agent/maven/org.example/typed/jar/all=
+                main/agent/module/plain.agent=
+                """);
+        Files.writeString(fixture.configuration().resolve("agents.properties"), """
+                org.example/agent=first=1,second=two  words,third=[x]--y
+                sample.agent=@endpoint
+                other/maven/org.example/typed/jar/all=typed
+                not.attached=ignored
+                """);
+        Path prepareOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
+                new Environment(Map.of("variable.endpoint", "endpoint=http://localhost:4317"))), "build/prepare").get("build/prepare");
+        assertThat(readProperties(prepareOutput.resolve(BuildStep.AGENTS)))
+                .as("options are handed on as written, for the agents the module attaches alone")
+                .containsOnly(Map.entry("main/agent/maven/org.example/agent", "first=1,second=two  words,third=[x]--y"),
+                        Map.entry("main/agent/module/sample.agent", "endpoint=http://localhost:4317"),
+                        Map.entry("other/agent/maven/org.example/typed/jar/all", "typed"),
+                        Map.entry("main/agent/module/plain.agent", ""));
+    }
+
+    @Test
+    public void an_agents_file_of_a_profile_replaces_the_one_of_the_configuration() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.manifests().resolve(BuildStep.ATTACHMENTS), "main/agent/module/sample.agent=\n");
+        Files.writeString(fixture.configuration().resolve("agents.properties"), "sample.agent=mode=default\n");
+        Files.writeString(fixture.profile().resolve("agents.properties"), "sample.agent=mode=profile\n");
+        Path prepareOutput = fixture.execute("build/prepare").get("build/prepare");
+        assertThat(readProperties(prepareOutput.resolve(BuildStep.AGENTS)))
+                .containsOnly(Map.entry("main/agent/module/sample.agent", "mode=profile"));
+    }
+
+    @Test
+    public void an_agent_without_options_is_named_so_that_no_other_module_supplies_them() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.manifests().resolve(BuildStep.ATTACHMENTS), "main/agent/module/sample.agent=\n");
+        Path prepareOutput = fixture.execute("build/prepare").get("build/prepare");
+        assertThat(readProperties(prepareOutput.resolve(BuildStep.AGENTS)))
+                .containsOnly(Map.entry("main/agent/module/sample.agent", ""));
+    }
+
+    @Test
     public void an_environment_file_in_configuration_yields_the_variables_of_a_tool() throws IOException {
         Fixture fixture = setUp("main=\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("environment-test.properties"), "SAMPLE=value\nINHERITED\n");

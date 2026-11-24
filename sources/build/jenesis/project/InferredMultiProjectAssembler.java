@@ -282,6 +282,12 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 BuildStep.locate(descriptor.configuration(), "packaging.properties"));
         SequencedMap<String, SequencedMap<String, String>> overrides = perTool(descriptor.configuration(), "process-"),
                 environments = perTool(descriptor.configuration(), "environment-");
+        SequencedMap<String, String> agents = new LinkedHashMap<>();
+        Path attached = BuildStep.locate(descriptor.configuration(), BuildStep.AGENTS);
+        if (attached != null) {
+            SequencedProperties.ofFiles(attached).forEachProperty((token, options) ->
+                    agents.put(token, environment.variable(attached + " sets " + token, options)));
+        }
         ProcessHandler.Factory factory = ProcessHandler.Factory.ofEnvironment(environment);
         ModularizeModule modules = descriptor.pathPlacement() == PathPlacement.MODULE_PATH
                 ? null
@@ -339,7 +345,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             List.copyOf(packaging.formats()),
                             List.copyOf(descriptor.manifests()),
                             overrides,
-                            environments),
+                            environments,
+                            agents),
                     inherited.stream());
             if (sbom != null) {
                 sub.addStep("sbom",
@@ -943,7 +950,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                            List<String> packageTypes,
                            List<String> manifests,
                            SequencedMap<String, SequencedMap<String, String>> overrides,
-                           SequencedMap<String, SequencedMap<String, String>> environments) implements BuildStep {
+                           SequencedMap<String, SequencedMap<String, String>> environments,
+                           SequencedMap<String, String> agents) implements BuildStep {
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -955,11 +963,24 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             String artifact = null;
             String moduleName = null;
             SequencedProperties described = null;
+            SequencedProperties attached = new SequencedProperties();
             boolean tests = false;
             for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
                 BuildStepArgument argument = entry.getValue();
                 if (argument.removed()) {
                     continue;
+                }
+                Path attachmentsFile = argument.folder().resolve(BuildStep.ATTACHMENTS);
+                if (manifests.contains(entry.getKey()) && Files.isRegularFile(attachmentsFile)) {
+                    for (String key : SequencedProperties.ofFiles(attachmentsFile).stringPropertyNames()) {
+                        String[] segments = key.split("/", 4);
+                        String options = agents.getOrDefault(segments[0] + "/" + segments[2] + "/" + segments[3],
+                                agents.getOrDefault(segments[2] + "/" + segments[3],
+                                        segments[2].equals("module") || segments[3].indexOf('/') == segments[3].lastIndexOf('/')
+                                                ? agents.get(segments[3])
+                                                : null));
+                        attached.setProperty(key, options == null ? "" : options);
+                    }
                 }
                 Path moduleFile = argument.folder().resolve(BuildStep.MODULE);
                 if (Files.isRegularFile(moduleFile)) {
@@ -1109,6 +1130,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     launcher.setProperty("name", artifact);
                 }
                 launcher.store(context.next().resolve("launcher.properties"));
+            }
+            if (!attached.isEmpty()) {
+                attached.store(context.next().resolve(BuildStep.AGENTS));
             }
             if (moduleName != null) {
                 SequencedProperties jlink = new SequencedProperties();

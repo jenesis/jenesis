@@ -523,38 +523,25 @@ public class ModuleInfoParserTest {
     }
 
     @Test
-    public void jenesis_attach_expands_tokens_and_captures_arguments() throws IOException {
+    public void jenesis_attach_expands_tokens() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
                  * @jenesis.attach org.mockito/mockito-core
-                 * @jenesis.attach other/maven/io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=value second option
+                 * @jenesis.attach other/maven/io.opentelemetry.javaagent/opentelemetry-javaagent
+                 * @jenesis.attach net.bytebuddy.agent
                  */
                 module foo {
                     requires org.mockito;
                 }
                 """);
         ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
-        assertThat(info.attachments()).containsExactly(
-                Map.entry("main/maven/org.mockito/mockito-core", ""),
-                Map.entry("other/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=value second option"));
+        assertThat(info.attachments()).containsExactly("main/maven/org.mockito/mockito-core",
+                "other/maven/io.opentelemetry.javaagent/opentelemetry-javaagent",
+                "main/module/net.bytebuddy.agent");
     }
 
     @Test
-    public void jenesis_attach_bare_token_expands_to_module_repository() throws IOException {
-        Files.writeString(folder.resolve("module-info.java"), """
-                /**
-                 * @jenesis.attach net.bytebuddy.agent experimental
-                 */
-                module foo {
-                }
-                """);
-        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
-        assertThat(info.attachments()).containsExactly(
-                Map.entry("main/module/net.bytebuddy.agent", "experimental"));
-    }
-
-    @Test
-    public void jenesis_attach_normalizes_argument_whitespace() throws IOException {
+    public void jenesis_attach_refuses_options_naming_the_file_that_takes_them() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
                  * @jenesis.attach org.example/agent   first=1
@@ -563,9 +550,10 @@ public class ModuleInfoParserTest {
                 module foo {
                 }
                 """);
-        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
-        assertThat(info.attachments()).containsExactly(
-                Map.entry("main/maven/org.example/agent", "first=1 second=2"));
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.attach declaration 'org.example/agent first=1 second=2'")
+                .hasMessageContaining("org.example/agent=<options> of an agents.properties");
     }
 
     @Test
@@ -597,32 +585,17 @@ public class ModuleInfoParserTest {
     }
 
     @Test
-    public void jenesis_attach_rejects_conflicting_duplicates() throws IOException {
+    public void jenesis_attach_collapses_duplicates() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
-                 * @jenesis.attach org.example/agent first
-                 * @jenesis.attach org.example/agent second
-                 */
-                module foo {
-                }
-                """);
-        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Duplicate @jenesis.attach for main/maven/org.example/agent");
-    }
-
-    @Test
-    public void jenesis_attach_collapses_identical_duplicates() throws IOException {
-        Files.writeString(folder.resolve("module-info.java"), """
-                /**
-                 * @jenesis.attach org.example/agent option
-                 * @jenesis.attach org.example/agent option
+                 * @jenesis.attach org.example/agent
+                 * @jenesis.attach org.example/agent
                  */
                 module foo {
                 }
                 """);
         ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
-        assertThat(info.attachments()).containsExactly(Map.entry("main/maven/org.example/agent", "option"));
+        assertThat(info.attachments()).containsExactly("main/maven/org.example/agent");
     }
 
     @Test
@@ -636,6 +609,37 @@ public class ModuleInfoParserTest {
                 """);
         ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
         assertThat(info.attachments()).isEmpty();
+    }
+
+    @Test
+    public void jenesis_main_refuses_what_is_no_class_name() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.main sample.Main
+                 * starts the application.
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.main value 'sample.Main starts the application.'")
+                .hasMessageContaining("expected the name of a class");
+    }
+
+    @Test
+    public void jenesis_release_refuses_what_is_no_release() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.release 25 preview
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.release value '25 preview'")
+                .hasMessageContaining("expected <release> or <release>-preview");
     }
 
     @Test

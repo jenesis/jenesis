@@ -2325,13 +2325,14 @@ public record Project(
                           without the repository the groupId is read as one. An entry manages a
                           version wherever a closure reaches that coordinate, including modules that
                           never name it, so give every entry the checksum its version resolves to.
-                      @jenesis.attach <token> [<arguments...>]
+                      @jenesis.attach <token>
                           Attach a library as a -javaagent to this module's Execute run and its test
                           runs. The token carries no version: it comes from a declared dependency, a
-                          pin or a BOM, else floats latest. Everything after the token is passed
-                          verbatim as agent options. MAVEN modules declare the same lines in a
-                          project-level <!--jenesis.attach ... --> comment, where a test-scoped match
-                          attaches to test runs only and &#45;&#45; escapes a double dash.
+                          pin or a BOM, else floats latest. It carries no options either: what the
+                          agent is handed is a line <token>=<options> of an agents.properties in a
+                          configuration folder, so a profile can change it. MAVEN modules declare the
+                          same lines in a project-level <!--jenesis.attach ... --> comment, where a
+                          test-scoped match attaches to test runs only.
                       @jenesis.native <token>...
                           Grant native access (--enable-native-access) to the modules named, this
                           one included only when it names itself, on this module's Execute run, its
@@ -2452,6 +2453,14 @@ public record Project(
                                                 a plugin reads only what its plugin-<name>.properties
                                                 binds, the lines of its process-<tool>.properties
                                                 being options of the JVM it runs in
+                      agents.properties         <token>=<options> per line, the options an agent that
+                                                @jenesis.attach <token>, or a pom.xml's
+                                                <!--jenesis.attach--> comment, names is handed after
+                                                -javaagent:<jar>=, written as the declaration writes
+                                                the token and passed on as they stand, spaces
+                                                included; a line for an agent a module does not
+                                                attach configures nothing there, so one file at the
+                                                root serves every module
                       environment-<tool>.properties
                                                 variables for a program the build forks (java, test,
                                                 pitest, native-image), which otherwise sees only
@@ -2460,8 +2469,8 @@ public record Project(
                                                 standard input closed; NAME=value sets one, a bare
                                                 NAME passes on the build's own
 
-                    In both files a value @<key> or @<key>/<default> is the setting
-                    -Djenesis.variable.<key>, part of the key of every step it reaches. What a tool
+                    In both files and in agents.properties a value @<key> or @<key>/<default> is the
+                    setting -Djenesis.variable.<key>, part of the key of every step it reaches. What a tool
                     prints is kept in supplement/ as UTF-8, and a forked JVM is told to print in it
                     (-Dstdout.encoding and -Dstderr.encoding) unless process-<tool>.properties names
                     another.
