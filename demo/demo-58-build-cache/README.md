@@ -228,9 +228,12 @@ omitted entirely:
 | `read`       | `true`    | serve cache reads; `read=false` makes every lookup a miss              |
 | `write`      | `true`    | populate the cache; `write=false` serves reads but never writes, evicts, or touches |
 
-Eviction happens as steps are stored. The count caps (`steps`, `versions`) and
-`ttl` evict manifests by their timestamp, which `touch` keeps fresh, and a file
-that no remaining manifest names leaves with them. The byte cap (`size`) evicts
+The count caps (`steps`, `versions`) are applied as each step is stored. The byte
+cap (`size`) and `ttl` are applied once per build, in the background, when the
+build first stores a step, so a build that stores nothing evicts nothing and no
+step waits for a pass over the cache. The count caps and `ttl` evict manifests by
+their timestamp, which `touch` keeps fresh, and a file that no remaining manifest
+names leaves with them. The byte cap evicts
 files instead: a file that an output folder still links costs no space of its own
 and stays, and of the others the one linked least recently goes first, by the
 change time a file system records for it; a manifest naming an evicted file is

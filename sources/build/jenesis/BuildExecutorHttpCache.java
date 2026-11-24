@@ -20,7 +20,6 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     private final boolean read;
     private final boolean write;
     private final boolean insecure;
-    private final AtomicBoolean trimmed = new AtomicBoolean();
 
     public BuildExecutorHttpCache(URI uri) {
         this(uri,
@@ -187,7 +186,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
             } finally {
                 blobs.disconnect();
             }
-            trim(executor, digest);
+            local.trim(executor, digest);
             if (!missing.isEmpty()) {
                 return Optional.empty();
             }
@@ -209,7 +208,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         Path temporary = null;
         try {
             List<String> lines = local.persist(output, digest, checksums);
-            trim(executor, digest);
+            local.trim(executor, digest);
             byte[] manifest = lines.stream()
                     .map(line -> line + "\n")
                     .collect(Collectors.joining())
@@ -308,15 +307,6 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                 }
             });
         } catch (RejectedExecutionException _) {
-        }
-    }
-
-    private void trim(Executor executor, String digest) {
-        if (trimmed.compareAndSet(false, true)) {
-            try {
-                executor.execute(() -> local.trim(digest));
-            } catch (RejectedExecutionException _) {
-            }
         }
     }
 
