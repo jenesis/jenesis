@@ -702,6 +702,45 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void a_consumed_dependency_without_a_version_fails_naming_it() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>other</groupId>
+                            <artifactId>artifact</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.project(
+                Runnable::run, mavenRepository, "group", "artifact", "1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("The dependency other:artifact names no version");
+        addToRepository("group", "consumer", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.project(
+                Runnable::run, mavenRepository, "group", "consumer", "1"))
+                .as("a dependency of a dependency names the artifact to exclude it from")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("The dependency other:artifact of group:artifact:1 names no version")
+                .hasMessageContaining("exclude other:artifact from group:artifact");
+    }
+
+    @Test
     public void rejects_a_module_classifier_pin_on_the_maven_path() {
         SequencedMap<String, String> versions = new LinkedHashMap<>();
         versions.put("other/artifact", ":sources");

@@ -590,6 +590,18 @@ public class MavenPomResolver implements MavenResolver {
                                     + dependencyKey.artifactId() + " from " + origin.groupId() + ":"
                                     + origin.artifactId() + " and declare the artifact it stands for yourself"));
                 }
+                if (value.version() == null) {
+                    MavenDependencyKey origin = current.origin();
+                    throw new IllegalStateException("The dependency " + dependencyKey.groupId() + ":"
+                            + dependencyKey.artifactId()
+                            + (origin == null
+                                    ? " names no version, and nothing manages one for it: declare its version"
+                                    : " of " + origin.groupId() + ":" + origin.artifactId() + ":" + current.originVersion()
+                                    + " names no version, and neither that POM, its parents nor a BOM it imports"
+                                    + " manages one: exclude " + dependencyKey.groupId() + ":"
+                                    + dependencyKey.artifactId() + " from " + origin.groupId() + ":"
+                                    + origin.artifactId() + " and declare the artifact with a version yourself"));
+                }
                 DependencyResolution resolution = resolutions.computeIfAbsent(
                         entry.getKey(),
                         _ -> new DependencyResolution());
