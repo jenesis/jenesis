@@ -47,9 +47,9 @@ Scalastyle runs with `--config scalastyle-config.xml`; scalafmt runs against
 phase and write a report under their step's output folder. The
 `.scalafmt.conf` pins the formatter's own `version`, so the formatting is
 reproducible no matter which scalafmt release resolves. Both linters are
-report-only by default; `-Djenesis.strict.scalastyle=true` and
-`-Djenesis.strict.scalafmt=true` fail the build on their findings instead,
-and `-Djenesis.check.scalastyle=false` and `-Djenesis.check.scalafmt=false`
+report-only by default; `-Djenesis.scalastyle.strict=true` and
+`-Djenesis.scalafmt.strict=true` fail the build on their findings instead,
+and `-Djenesis.scalastyle.check=false` and `-Djenesis.scalafmt.check=false`
 skip them, as in the Java code-quality demo.
 
 Formatting: verify, and how to reformat
@@ -63,7 +63,7 @@ and rewrite the sources in place, run the build with the rewrite switch:
 
 This mirrors the google-java-format and ktlint rewrites in
 `../demo-37-java-quality` and `../demo-47-kotlin-quality`.
-`-Djenesis.format.scalafmt=false` switches scalafmt's formatting off, while
+`-Djenesis.scalafmt.format=false` switches scalafmt's formatting off, while
 scalafmt still checks.
 
 Pinning

@@ -117,17 +117,17 @@ with no filter at all.
 A discovered tool can be switched off without deleting its file through its
 setting, so the file alone decides until the setting says
 otherwise. Every such setting is a boolean, `true` by default, and `false`
-skips the tool. It is named after the part of the build the tool runs in:
+skips the tool. It is named after the tool and the part of the build the tool runs in:
 
-    jenesis.check.<tool>         the source checks: Checkstyle, PMD, ...
-    jenesis.validate.<tool>      the checks of the classes: SpotBugs, forbiddenapis, jdeps, jdeprscan
-    jenesis.format.<tool>        the formatters: openrewrite, googlejavaformat, palantir, openjavaformat, princeofspace, eclipse, spotless, license
+    jenesis.<tool>.check         the source checks: Checkstyle, PMD, ...
+    jenesis.<tool>.validate      the checks of the classes: SpotBugs, forbiddenapis, jdeps, jdeprscan
+    jenesis.<tool>.format        the formatters: openrewrite, googlejavaformat, palantir, openjavaformat, princeofspace, eclipse, spotless, license
 
 A plugin of the project's own, which `jenesis.plugins.properties` names, is
 switched by `jenesis.plugin.<name>` instead, so it shares no setting with an
 official plugin, whatever it is named.
 
-For example `-Djenesis.check.checkstyle=false` keeps `checkstyle.properties`
+For example `-Djenesis.checkstyle.check=false` keeps `checkstyle.properties`
 in place but skips Checkstyle, while PMD and SpotBugs still run.
 
 Per-module configuration
@@ -176,8 +176,8 @@ with the number of findings and where its report is:
     [FINDINGS] checkstyle found 2 findings, reported in target/build/.../checkstyle/delegate/check/output/reports/checkstyle/checkstyle-report.xml
 
 `-Djenesis.print.findings=false` leaves that line out. To turn findings into a
-build failure, set the tool's `jenesis.strict.<tool>` to `true`, on the command
-line or in `jenesis.properties`. For example `-Djenesis.strict.checkstyle=true` fails the
+build failure, set the tool's `jenesis.<tool>.strict` to `true`, on the command
+line or in `jenesis.properties`. For example `-Djenesis.checkstyle.strict=true` fails the
 build when Checkstyle reports a violation, naming the number of findings and the
 report.
 Checkstyle, PMD, detekt, ktlint, Scalastyle and scalafmt fail as their own exit
@@ -269,7 +269,7 @@ configuration folder switches the Eclipse formatter on alone as well, where no
 `jenesis-eclipse.properties` switches google-java-format off, so the two never
 fight over the same sources:
 
-    jenesis.format.googlejavaformat=false
+    jenesis.googlejavaformat.format=false
 
 The same source passes the Eclipse formatter:
 
@@ -304,7 +304,7 @@ comment either way. A plain build under the profile then passes:
 
 The build resolves Prince of Space from Maven Central as a library, so there is
 nothing to install. Like the other formatters, it is switched off by
-`-Djenesis.format.princeofspace=false`.
+`-Djenesis.princeofspace.format=false`.
 
 Formatting other files with Spotless
 ------------------------------------
@@ -335,7 +335,7 @@ and the rewrite switch formats it:
 
 A set that formats JSON runs beside google-java-format. A set running
 `googleJavaFormat` or `palantirJavaFormat` makes Spotless a Java formatter,
-refused beside another one. `-Djenesis.format.spotless=false` switches it off.
+refused beside another one. `-Djenesis.spotless.format=false` switches it off.
 
 Rewriting with recipes
 ----------------------
@@ -379,7 +379,7 @@ the library and OpenRewrite ask for two versions of one module, the build fails
 naming the `@jenesis.pin openrewrite:tool/...` line that settles it. The module's
 dependencies are OpenRewrite's class path, so a recipe that matches a type of a
 library the module uses finds it. A recipe that would add, delete or move a file
-fails the build, and `-Djenesis.format.openrewrite=false` switches OpenRewrite off.
+fails the build, and `-Djenesis.openrewrite.format=false` switches OpenRewrite off.
 
 Forbidden APIs
 --------------
@@ -477,8 +477,8 @@ the same sources on every day it runs:
 
     java -Djenesis.format.rewrite=true build/jenesis/Make.java
 
-`-Djenesis.format.license=false` skips the check, as
-`-Djenesis.format.googlejavaformat=false` skips google-java-format.
+`-Djenesis.license.format=false` skips the check, as
+`-Djenesis.googlejavaformat.format=false` skips google-java-format.
 
 Pinning
 -------

@@ -74,13 +74,13 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 ExternalModule.official(environment, KOTLIN, null, repositories, resolvers),
-                environment.flag("language.kotlin", true, Setting.PROJECT),
+                environment.flag("kotlin.language", true, Setting.PROJECT),
                 ExternalModule.official(environment, SCALA, null, repositories, resolvers),
-                environment.flag("language.scala", true, Setting.PROJECT),
+                environment.flag("scala.language", true, Setting.PROJECT),
                 ExternalModule.official(environment, GROOVY, null, repositories, resolvers),
-                environment.flag("language.groovy", true, Setting.PROJECT),
+                environment.flag("groovy.language", true, Setting.PROJECT),
                 ExternalModule.official(environment, CLOJURE, null, repositories, resolvers),
-                environment.flag("language.clojure", true, Setting.PROJECT));
+                environment.flag("clojure.language", true, Setting.PROJECT));
     }
 
     private InferredCompilerChainModule(PathPlacement pathPlacement,
@@ -420,7 +420,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 if (found.contains(language.getValue()) && !compiled.contains(language.getValue())) {
                     throw new IllegalStateException("The module holds " + language.getValue() + " sources, which no"
                             + " language compiles - the build compiles them with its plugin " + language.getKey()
-                            + " unless jenesis.language." + language.getKey() + "=false switches it off");
+                            + " unless jenesis." + language.getKey() + ".language=false switches it off");
                 }
             }
             boolean hasJava = scan.flag(JAVAC) && javac != null;
