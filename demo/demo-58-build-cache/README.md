@@ -77,7 +77,7 @@ A `file://` URI resolves a `BuildExecutorFileCache` (the same on-disk format as 
 local cache); an `http(s)://` URL selects `BuildExecutorHttpCache`, which GETs and
 PUTs the same zip entries to the server, naming the cache project with
 `-Djenesis.cache.project=<project>` and authenticating with
-`-Djenesis.cache.key=<key>` (both sent as headers, never in the URL). A non-URI
+`-Djenesis.cache.token=<token>` (both sent as headers, never in the URL). A non-URI
 value is rejected - use `file://` for an on-disk location.
 
 The shared cache can be used **two ways**.
@@ -96,7 +96,7 @@ checkout never re-downloads what the first already fetched:
 
     java -Djenesis.project.cache \
          -Djenesis.cache.uri=https://cache.example.com \
-         -Djenesis.cache.project=acme -Djenesis.cache.key=alice \
+         -Djenesis.cache.project=acme -Djenesis.cache.token=alice \
          build/jenesis/Make.java
 
 Serving a step from the local tier means no `GET` reaches the server - which would

@@ -8,7 +8,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     public static final String KEY = "Jenesis-Cache-Key", PROJECT = "Jenesis-Cache-Project";
 
     private final URI uri;
-    private final String key;
+    private final String token;
     private final String project;
     private final String algorithm;
     private final Duration connectTimeout;
@@ -23,9 +23,15 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
 
     public static BuildExecutorHttpCache ofEnvironment(Environment environment, URI uri) {
         BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri);
-        String key = environment.getProperty("cache.key", System.getenv("JENESIS_CACHE_KEY"), Setting.MACHINE);
-        if (key != null) {
-            cache = cache.key(key);
+        if (environment.getProperty("cache.key", Setting.MACHINE) != null
+                || System.getenv("JENESIS_CACHE_KEY") != null) {
+            throw new IllegalArgumentException("jenesis.cache.key and JENESIS_CACHE_KEY are named jenesis.cache.token"
+                    + " and JENESIS_CACHE_TOKEN now: rename the one that is set, as the cache server would be sent"
+                    + " no credential otherwise");
+        }
+        String token = environment.getProperty("cache.token", System.getenv("JENESIS_CACHE_TOKEN"), Setting.MACHINE);
+        if (token != null) {
+            cache = cache.token(token);
         }
         String project = environment.getProperty("cache.project",
                 System.getenv("JENESIS_CACHE_PROJECT"),
@@ -46,7 +52,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     }
 
     private BuildExecutorHttpCache(URI uri,
-                                   String key,
+                                   String token,
                                    String project,
                                    String algorithm,
                                    Duration connectTimeout,
@@ -55,7 +61,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                                    boolean write,
                                    boolean insecure) {
         this.uri = uri;
-        this.key = key;
+        this.token = token;
         this.project = project;
         this.algorithm = algorithm;
         this.connectTimeout = connectTimeout;
@@ -66,35 +72,35 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     }
 
     public BuildExecutorHttpCache insecure(boolean insecure) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
-    public BuildExecutorHttpCache key(String key) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+    public BuildExecutorHttpCache token(String token) {
+        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache project(String project) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache algorithm(String algorithm) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache connectTimeout(Duration connectTimeout) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache read(boolean read) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache write(boolean write) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache readTimeout(Duration readTimeout) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     @Override
@@ -206,7 +212,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         String scheme = target.getScheme(), host = target.getHost();
         boolean loopback = "localhost".equals(host) || "127.0.0.1".equals(host) || "::1".equals(host);
         if (!"https".equals(scheme) && !loopback && !insecure) {
-            throw new IllegalStateException("Refusing to send the cache key over insecure scheme '"
+            throw new IllegalStateException("Refusing to send the cache token over insecure scheme '"
                     + scheme
                     + "': "
                     + target
@@ -218,8 +224,8 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         connection.setReadTimeout((int) Math.min(readTimeout.toMillis(), Integer.MAX_VALUE));
         connection.setInstanceFollowRedirects(false);
         connection.setRequestProperty("User-Agent", "Jenesis");
-        if (key != null) {
-            connection.setRequestProperty(KEY, key);
+        if (token != null) {
+            connection.setRequestProperty(KEY, token);
         }
         if (project != null) {
             connection.setRequestProperty(PROJECT, project);
