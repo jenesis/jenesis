@@ -277,7 +277,7 @@ itself; nothing names it. A `jreleaser.yml` at the project root, where JReleaser
 command reads it, switches nothing on. A `jreleaser.properties` in the configuration
 folder takes the file's place where it holds values: it names the file as
 `configuration=<path>`, relative to it, which it then requires, and
-`-Djenesis.release.jreleaser=false` leaves JReleaser out:
+`-Djenesis.jreleaser.release=false` leaves JReleaser out:
 
     java -Djenesis.project.version=1.0.0 -Djenesis.release.publish=true build/jenesis/Make.java release
 

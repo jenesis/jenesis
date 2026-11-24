@@ -51,7 +51,7 @@ How Clojure fits the compiler chain
 Clojure is an official plugin of the hook point `language`, as Kotlin, Scala
 and Groovy are in the demos before it. The build resolves it by itself, as
 `module/build.jenesis.plugin.clojure`, in every module that holds a `.clj`
-source, and `-Djenesis.language.clojure=false` leaves it out, after which such
+source, and `-Djenesis.clojure.language=false` leaves it out, after which such
 a source fails the build.
 
 The plugin runs after `javac`, as Groovy's does, so a namespace reaches the

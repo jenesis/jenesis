@@ -68,11 +68,11 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 ExternalModule.official(environment, InferredCompilerChainModule.KOTLIN, null, repositories, resolvers),
-                environment.flag("language.kotlin", true, Setting.PROJECT),
+                environment.flag("kotlin.language", true, Setting.PROJECT),
                 ExternalModule.official(environment, InferredCompilerChainModule.SCALA, null, repositories, resolvers),
-                environment.flag("language.scala", true, Setting.PROJECT),
+                environment.flag("scala.language", true, Setting.PROJECT),
                 ExternalModule.official(environment, InferredCompilerChainModule.GROOVY, null, repositories, resolvers),
-                environment.flag("language.groovy", true, Setting.PROJECT));
+                environment.flag("groovy.language", true, Setting.PROJECT));
     }
 
     private InferredDocumentationChainModule(SequencedSet<Path> configuration,

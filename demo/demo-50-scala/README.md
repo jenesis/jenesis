@@ -23,7 +23,7 @@ standard library.
 Scala is an official plugin of the hook point `language`, as Kotlin is in
 `../demo-46-kotlin`. The build resolves it by itself, as
 `module/build.jenesis.plugin.scala`, in every module that holds a `.scala`
-source, and `-Djenesis.language.scala=false` leaves it out.
+source, and `-Djenesis.scala.language=false` leaves it out.
 
 Layout
 ------

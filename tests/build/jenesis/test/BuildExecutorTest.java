@@ -109,6 +109,24 @@ public class BuildExecutorTest implements Serializable {
     }
 
     @Test
+    public void replaces_an_output_that_a_step_left_read_only() throws IOException {
+        Assumptions.assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("dos"));
+        Files.writeString(source.resolve("file"), "foo");
+        buildExecutor.addSource("source", source);
+        buildExecutor.addStep("step", (_, context, arguments) -> {
+            Path written = Files.writeString(
+                    context.next().resolve("file"),
+                    Files.readString(arguments.get("source").folder().resolve("file")));
+            Files.setAttribute(written, "dos:readonly", true);
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }, "source");
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        Files.writeString(source.resolve("file"), "bar");
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(root.resolve("step").resolve("output").resolve("file")).content().isEqualTo("bar");
+    }
+
+    @Test
     public void a_source_bound_by_a_step_is_not_rerun_when_its_folder_moves_with_the_target() throws IOException {
         RUNS.set(0);
         Path input = Files.createDirectory(source.resolve("input")),
