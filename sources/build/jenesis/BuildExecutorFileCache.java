@@ -119,6 +119,7 @@ public final class BuildExecutorFileCache implements BuildExecutorCache {
                                              String identity,
                                              byte[] step,
                                              SequencedMap<String, Map<Path, byte[]>> inputs,
+                                             SequencedMap<String, Path> folders,
                                              Path target,
                                              String digest) throws IOException {
         if (!read) {
@@ -372,6 +373,31 @@ public final class BuildExecutorFileCache implements BuildExecutorCache {
             }
             Files.move(copy, blob, StandardCopyOption.REPLACE_EXISTING);
             return true;
+        } finally {
+            Files.deleteIfExists(copy);
+        }
+    }
+
+    void adopt(String digest, String hex, Path file) throws IOException {
+        Path blob = blob(root.resolve(digest.toLowerCase(Locale.ROOT)), hex);
+        Files.createDirectories(blob.getParent());
+        try {
+            Files.createFile(root.resolve(BuildExecutor.SKIP_MARKER));
+        } catch (FileAlreadyExistsException _) {
+        }
+        if (links && !Files.isSymbolicLink(file)) {
+            try {
+                Files.createLink(blob, file);
+                return;
+            } catch (FileAlreadyExistsException _) {
+                return;
+            } catch (UnsupportedOperationException | FileSystemException _) {
+            }
+        }
+        Path copy = Files.createTempFile(blob.getParent(), "tmp", null);
+        try {
+            Files.copy(file, copy, StandardCopyOption.REPLACE_EXISTING);
+            Files.move(copy, blob, StandardCopyOption.REPLACE_EXISTING);
         } finally {
             Files.deleteIfExists(copy);
         }

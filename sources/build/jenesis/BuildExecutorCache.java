@@ -9,6 +9,7 @@ public interface BuildExecutorCache {
                                       String identity,
                                       byte[] step,
                                       SequencedMap<String, Map<Path, byte[]>> inputs,
+                                      SequencedMap<String, Path> folders,
                                       Path target,
                                       String digest) throws IOException;
 
@@ -33,6 +34,6 @@ public interface BuildExecutorCache {
     }
 
     static BuildExecutorCache nop() {
-        return (_, _, _, _, _, _) -> Optional.empty();
+        return (_, _, _, _, _, _, _) -> Optional.empty();
     }
 }

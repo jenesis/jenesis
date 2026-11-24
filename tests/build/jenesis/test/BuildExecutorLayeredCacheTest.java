@@ -20,7 +20,7 @@ public class BuildExecutorLayeredCacheTest {
         RecordingCache front = new RecordingCache(true, true, false);
         RecordingCache back = new RecordingCache(true, true, false);
         Optional<Map<Path, byte[]>> result = new BuildExecutorLayeredCache(front, back)
-                .fetch(Runnable::run, "step", new byte[]{1}, inputs(), target, "SHA-256");
+                .fetch(Runnable::run, "step", new byte[]{1}, inputs(), new LinkedHashMap<>(), target, "SHA-256");
         assertThat(result).isPresent();
         assertThat(front.fetches).hasValue(1);
         assertThat(back.fetches).hasValue(0);
@@ -34,7 +34,7 @@ public class BuildExecutorLayeredCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs();
         Optional<Map<Path, byte[]>> result = new BuildExecutorLayeredCache(front, back)
-                .fetch(Runnable::run, "step", step, in, target, "SHA-256");
+                .fetch(Runnable::run, "step", step, in, new LinkedHashMap<>(), target, "SHA-256");
         assertThat(result).isPresent();
         assertThat(front.fetches).hasValue(1);
         assertThat(back.fetches).hasValue(1);
@@ -49,7 +49,7 @@ public class BuildExecutorLayeredCacheTest {
         RecordingCache front = new RecordingCache(false, true, false);
         RecordingCache back = new RecordingCache(false, true, false);
         assertThat(new BuildExecutorLayeredCache(front, back)
-                .fetch(Runnable::run, "step", new byte[]{1}, inputs(), target, "SHA-256")).isEmpty();
+                .fetch(Runnable::run, "step", new byte[]{1}, inputs(), new LinkedHashMap<>(), target, "SHA-256")).isEmpty();
         assertThat(front.stores).hasValue(0);
     }
 
@@ -94,7 +94,7 @@ public class BuildExecutorLayeredCacheTest {
         RecordingCache front = new RecordingCache(false, true, true);
         RecordingCache back = new RecordingCache(true, true, false);
         Optional<Map<Path, byte[]>> result = new BuildExecutorLayeredCache(front, back)
-                .fetch(Runnable::run, "step", new byte[]{1}, inputs(), target, "SHA-256");
+                .fetch(Runnable::run, "step", new byte[]{1}, inputs(), new LinkedHashMap<>(), target, "SHA-256");
         assertThat(result).isPresent();
         assertThat(front.stores).hasValue(1);
     }
@@ -128,6 +128,7 @@ public class BuildExecutorLayeredCacheTest {
                                                String identity,
                                                byte[] step,
                                                SequencedMap<String, Map<Path, byte[]>> inputs,
+                                               SequencedMap<String, Path> folders,
                                                Path target,
                                                String digest) throws IOException {
             fetches.incrementAndGet();

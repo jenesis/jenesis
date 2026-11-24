@@ -135,11 +135,13 @@ class BuildExecutorDefault implements BuildExecutor {
                 boolean consistent = record.consistent();
                 SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
                 SequencedMap<String, Map<Path, byte[]>> inputs = new LinkedHashMap<>();
+                SequencedMap<String, Path> folders = new LinkedHashMap<>();
                 SequencedMap<String, Path> recorded = exists ? previous.arguments() : Collections.emptyNavigableMap();
                 for (Map.Entry<String, StepSummary> entry : summaries.entrySet()) {
                     Path checksums = recorded.get(entry.getKey());
                     Map<Path, byte[]> argumentChecksums = entry.getValue().checksums();
                     inputs.put(entry.getKey(), argumentChecksums);
+                    folders.put(entry.getKey(), entry.getValue().folder());
                     arguments.put(entry.getKey(), new BuildStepArgument(
                             entry.getValue().folder(),
                             consistent && checksums != null && Files.exists(checksums)
@@ -178,6 +180,7 @@ class BuildExecutorDefault implements BuildExecutor {
                             location + identity,
                             currentStepHash,
                             inputs,
+                            folders,
                             nextOutput,
                             algorithm);
                     boolean fromCache = cached.isPresent();

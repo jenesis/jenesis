@@ -301,6 +301,7 @@ public class BuildExecutorCacheTest {
                                                String identity,
                                                byte[] step,
                                                SequencedMap<String, Map<Path, byte[]>> inputs,
+                                               SequencedMap<String, Path> folders,
                                                Path target,
                                                String digest) throws IOException {
             fetches.incrementAndGet();
@@ -371,6 +372,7 @@ public class BuildExecutorCacheTest {
                                                String identity,
                                                byte[] step,
                                                SequencedMap<String, Map<Path, byte[]>> inputs,
+                                               SequencedMap<String, Path> folders,
                                                Path target,
                                                String digest) {
             return Optional.empty();

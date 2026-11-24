@@ -3,6 +3,7 @@ package build.jenesis.test;
 import module java.base;
 import module jdk.httpserver;
 import module org.junit.jupiter.api;
+import java.lang.management.ManagementFactory;
 import build.jenesis.BuildExecutorFileCache;
 import build.jenesis.BuildExecutorHttpCache;
 import build.jenesis.Environment;
@@ -12,79 +13,57 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class BuildExecutorHttpCacheTest {
 
+    private static final String BLOBS = "/626c6f623a7368612d323536/";
+
     @TempDir
-    private Path output, target, local, elsewhere;
+    private Path output, target, local, elsewhere, argument, served;
     private HttpServer server;
     private URI uri;
-    private final Map<String, byte[]> manifests = new ConcurrentHashMap<>(), blobs = new ConcurrentHashMap<>();
+    private final Map<String, Path> stored = new ConcurrentHashMap<>();
+    private final Map<String, Integer> refused = new ConcurrentHashMap<>();
     private final List<String> keys = new CopyOnWriteArrayList<>(),
             projects = new CopyOnWriteArrayList<>(),
-            digests = new CopyOnWriteArrayList<>(),
-            requests = new CopyOnWriteArrayList<>(),
-            uploaded = new CopyOnWriteArrayList<>();
+            requests = new CopyOnWriteArrayList<>();
 
     @BeforeEach
     public void setUp() throws IOException {
         server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         server.createContext("/", exchange -> {
+            String project = String.valueOf(exchange.getRequestHeaders().getFirst(BuildExecutorHttpCache.PROJECT)),
+                    path = exchange.getRequestURI().getPath(),
+                    method = exchange.getRequestMethod();
             keys.add(String.valueOf(exchange.getRequestHeaders().getFirst(BuildExecutorHttpCache.KEY)));
-            projects.add(String.valueOf(exchange.getRequestHeaders().getFirst(BuildExecutorHttpCache.PROJECT)));
-            digests.add(String.valueOf(exchange.getRequestHeaders().getFirst(BuildExecutorHttpCache.DIGEST)));
-            String path = exchange.getRequestURI().getPath();
-            requests.add(exchange.getRequestMethod() + " " + path);
+            projects.add(project);
+            requests.add(method + " " + path);
             try {
-                switch (exchange.getRequestMethod() + (path.equals("/blobs") ? " blobs" : " step")) {
-                    case "GET step" -> {
-                        byte[] manifest = manifests.get(path);
-                        if (manifest == null) {
-                            exchange.sendResponseHeaders(404, -1);
-                        } else {
-                            exchange.sendResponseHeaders(200, manifest.length == 0 ? -1 : manifest.length);
-                            exchange.getResponseBody().write(manifest);
-                        }
+                Path entry = stored.get(project + path);
+                Integer refusal = refused.entrySet().stream()
+                        .filter(candidate -> (method + " " + path).startsWith(candidate.getKey()))
+                        .map(Map.Entry::getValue)
+                        .findFirst()
+                        .orElse(null);
+                if (refusal != null) {
+                    exchange.sendResponseHeaders(refusal, -1);
+                } else if (method.equals("PUT") && exchange.getRequestHeaders().getFirst("Content-Length") == null) {
+                    exchange.sendResponseHeaders(411, -1);
+                } else if (method.equals("PUT") && entry != null) {
+                    exchange.sendResponseHeaders(204, -1);
+                } else if (method.equals("PUT")) {
+                    Path body = Files.createTempFile(served, "entry", null);
+                    try (InputStream in = exchange.getRequestBody()) {
+                        Files.copy(in, body, StandardCopyOption.REPLACE_EXISTING);
                     }
-                    case "HEAD step" -> exchange.sendResponseHeaders(manifests.containsKey(path) ? 200 : 404, -1);
-                    case "PUT step" -> {
-                        byte[] manifest = exchange.getRequestBody().readAllBytes();
-                        String missing = new String(manifest, StandardCharsets.UTF_8).lines()
-                                .map(line -> line.substring(0, line.indexOf(' ')))
-                                .filter(hex -> !hex.equals("-") && !blobs.containsKey(hex))
-                                .distinct()
-                                .collect(Collectors.joining("\n"));
-                        if (missing.isEmpty()) {
-                            manifests.put(path, manifest);
-                            exchange.sendResponseHeaders(201, -1);
-                        } else {
-                            byte[] answer = missing.getBytes(StandardCharsets.UTF_8);
-                            exchange.sendResponseHeaders(409, answer.length);
-                            exchange.getResponseBody().write(answer);
-                        }
+                    stored.put(project + path, body);
+                    exchange.sendResponseHeaders(201, -1);
+                } else if (entry == null) {
+                    exchange.sendResponseHeaders(404, -1);
+                } else if (method.equals("HEAD")) {
+                    exchange.sendResponseHeaders(200, -1);
+                } else {
+                    exchange.sendResponseHeaders(200, 0);
+                    try (OutputStream out = exchange.getResponseBody()) {
+                        Files.copy(entry, out);
                     }
-                    case "POST blobs" -> {
-                        List<String> wanted = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)
-                                .lines()
-                                .toList();
-                        exchange.sendResponseHeaders(200, 0);
-                        try (ZipOutputStream zip = new ZipOutputStream(exchange.getResponseBody())) {
-                            for (String hex : wanted) {
-                                if (blobs.containsKey(hex)) {
-                                    zip.putNextEntry(new ZipEntry(hex));
-                                    zip.write(blobs.get(hex));
-                                    zip.closeEntry();
-                                }
-                            }
-                        }
-                    }
-                    case "PUT blobs" -> {
-                        try (ZipInputStream zip = new ZipInputStream(exchange.getRequestBody())) {
-                            for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
-                                blobs.put(entry.getName(), zip.readAllBytes());
-                                uploaded.add(entry.getName());
-                            }
-                        }
-                        exchange.sendResponseHeaders(204, -1);
-                    }
-                    default -> exchange.sendResponseHeaders(405, -1);
                 }
             } finally {
                 exchange.close();
@@ -100,120 +79,38 @@ public class BuildExecutorHttpCacheTest {
     }
 
     @Test
-    public void stores_and_fetches_round_trip() throws IOException {
+    public void restores_a_file_of_every_kind_and_an_empty_folder() throws IOException {
         byte[] step = {1};
-        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
-        Files.writeString(output.resolve("file"), "result");
+        Files.writeString(argument.resolve("handed"), "handed on");
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "handed", sha256("handed on"));
+        Files.writeString(output.resolve("small"), "small");
+        Files.writeString(output.resolve("copy"), "handed on");
+        Files.writeString(output.resolve("large.jar"), "x".repeat(100));
         Files.createDirectories(output.resolve("nested").resolve("empty"));
-        Files.writeString(output.resolve("nested").resolve("inner"), "deep");
-        cache(local).store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
-        assertThat(manifests).hasSize(1);
-        assertThat(new String(manifests.values().iterator().next(), StandardCharsets.UTF_8)).isEqualTo(
-                hex("result") + " 6 file\n- 0 nested/empty\n" + hex("deep") + " 4 nested/inner\n");
-        assertThat(blobs).containsOnlyKeys(hex("result"), hex("deep"));
-        Optional<Map<Path, byte[]>> fetched = cache(elsewhere).fetch(Runnable::run, "step", step, in, target, "SHA-256");
+        Files.writeString(output.resolve("nested").resolve("inner"), "small");
+        cache(local).inline(100).store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        String address = "demo/01/" + key(in);
+        try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(stored.get(address)))) {
+            assertThat(zip.getNextEntry().getName()).isEqualTo("manifest");
+            assertThat(new String(zip.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("jenesis-cache/2 SHA-256\n"
+                    + "i " + hex("handed on") + " 9 copy\n"
+                    + "b " + hex("x".repeat(100)) + " 100 large.jar\n"
+                    + "d - 0 nested/empty\n"
+                    + "f " + hex("small") + " 5 nested/inner\n"
+                    + "f " + hex("small") + " 5 small\n");
+            assertThat(zip.getNextEntry().getName()).as("a file two paths name travels once").isEqualTo(hex("small"));
+            assertThat(new String(zip.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("small");
+            assertThat(zip.getNextEntry()).as("neither the input nor the large file is in the archive").isNull();
+        }
+        assertThat(stored.get("demo" + BLOBS + hex("x".repeat(100)))).content().isEqualTo("x".repeat(100));
+        Optional<Map<Path, byte[]>> fetched = cache(elsewhere).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256");
         assertThat(fetched).isPresent();
-        assertThat(fetched.get()).containsOnlyKeys(Path.of("file"), Path.of("nested", "inner"));
-        assertThat(target.resolve("file")).content().isEqualTo("result");
-        assertThat(target.resolve("nested").resolve("inner")).content().isEqualTo("deep");
+        assertThat(fetched.get()).containsOnlyKeys(Path.of("small"), Path.of("copy"), Path.of("large.jar"), Path.of("nested", "inner"));
+        assertThat(target.resolve("small")).content().isEqualTo("small");
+        assertThat(target.resolve("copy")).as("restored from the folder of the step's input").content().isEqualTo("handed on");
+        assertThat(target.resolve("large.jar")).content().isEqualTo("x".repeat(100));
+        assertThat(target.resolve("nested").resolve("inner")).content().isEqualTo("small");
         assertThat(target.resolve("nested").resolve("empty")).isEmptyDirectory();
-        assertThat(digests).containsOnly("SHA-256");
-    }
-
-    @Test
-    public void a_store_asks_before_it_uploads_and_uploads_only_what_the_server_lacks() throws IOException {
-        Files.writeString(output.resolve("shared"), "shared");
-        Files.writeString(output.resolve("first"), "first");
-        cache(local).store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
-        assertThat(requests).containsExactly(
-                "PUT /step/01/" + fold(new byte[]{9}),
-                "PUT /blobs",
-                "PUT /step/01/" + fold(new byte[]{9}));
-        assertThat(uploaded).containsExactlyInAnyOrder(hex("shared"), hex("first"));
-        requests.clear();
-        uploaded.clear();
-        Files.delete(output.resolve("first"));
-        Files.writeString(output.resolve("second"), "second");
-        cache(local).store(Runnable::run, "step", new byte[]{2}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
-        assertThat(uploaded).as("a file an earlier step uploaded is not sent again").containsExactly(hex("second"));
-        requests.clear();
-        uploaded.clear();
-        cache(elsewhere).store(Runnable::run, "step", new byte[]{3}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
-        assertThat(requests).as("a step of files the server holds is one request").containsExactly(
-                "PUT /step/03/" + fold(new byte[]{9}));
-        assertThat(uploaded).isEmpty();
-    }
-
-    @Test
-    public void a_fetch_downloads_only_the_files_this_machine_lacks() throws IOException {
-        byte[] step = {1};
-        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
-        Files.writeString(output.resolve("file"), "result");
-        Files.writeString(output.resolve("other"), "other");
-        cache(local).store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
-        requests.clear();
-        assertThat(cache(local).fetch(Runnable::run, "step", step, in, target, "SHA-256")).isPresent();
-        assertThat(requests).as("with every file on this machine a fetch is one request").containsExactly(
-                "GET /step/01/" + fold(new byte[]{9}));
-        assertThat(target.resolve("file")).content().isEqualTo("result");
-        requests.clear();
-        assertThat(cache(elsewhere).fetch(Runnable::run, "step", step, in, Files.createDirectory(elsewhere.resolve("target")), "SHA-256"))
-                .isPresent();
-        assertThat(requests).containsExactly("GET /step/01/" + fold(new byte[]{9}), "POST /blobs");
-        assertThat(elsewhere.resolve("target").resolve("other")).content().isEqualTo("other");
-        assertThat(elsewhere.resolve("sha-256").resolve("blobs").resolve(hex("other").substring(0, 2)).resolve(hex("other").substring(2)))
-                .as("a downloaded file is kept for the next build of any project")
-                .content()
-                .isEqualTo("other");
-    }
-
-    @Test
-    public void a_file_the_server_answers_with_other_content_is_a_miss() throws IOException {
-        byte[] step = {1};
-        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
-        Files.writeString(output.resolve("file"), "result");
-        cache(local).store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
-        blobs.put(hex("result"), "tampered".getBytes(StandardCharsets.UTF_8));
-        assertThat(cache(elsewhere).fetch(Runnable::run, "step", step, in, target, "SHA-256")).isEmpty();
-        try (Stream<Path> contents = Files.list(target)) {
-            assertThat(contents.findAny()).isEmpty();
-        }
-        try (Stream<Path> files = Files.walk(elsewhere)) {
-            assertThat(files.filter(Files::isRegularFile).filter(file -> !file.getFileName().toString().startsWith(".")).toList())
-                    .as("nothing that is not what its name says is kept")
-                    .isEmpty();
-        }
-    }
-
-    @Test
-    public void a_file_the_server_no_longer_holds_is_a_miss() throws IOException {
-        byte[] step = {1};
-        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
-        Files.writeString(output.resolve("file"), "result");
-        cache(local).store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
-        blobs.clear();
-        assertThat(cache(elsewhere).fetch(Runnable::run, "step", step, in, target, "SHA-256")).isEmpty();
-        try (Stream<Path> contents = Files.list(target)) {
-            assertThat(contents.findAny()).isEmpty();
-        }
-    }
-
-    @Test
-    public void a_manifest_naming_a_path_outside_the_target_is_a_miss() throws IOException {
-        byte[] step = {1};
-        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
-        blobs.put(hex("result"), "result".getBytes(StandardCharsets.UTF_8));
-        manifests.put("/step/01/" + fold(new byte[]{9}), (hex("result") + " 6 ../escape\n").getBytes(StandardCharsets.UTF_8));
-        assertThat(cache(local).fetch(Runnable::run, "step", step, in, target, "SHA-256")).isEmpty();
-        assertThat(target.resolveSibling("escape")).doesNotExist();
-    }
-
-    @Test
-    public void an_answer_that_is_no_manifest_is_a_miss() throws IOException {
-        manifests.put("/step/01/" + fold(new byte[]{9}), "<html>Sign in</html>".getBytes(StandardCharsets.UTF_8));
-        assertThat(cache(local).fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), target, "SHA-256"))
-                .isEmpty();
-        assertThat(requests).hasSize(1);
     }
 
     @Test
@@ -221,9 +118,219 @@ public class BuildExecutorHttpCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         cache(local).store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
-        Optional<Map<Path, byte[]>> fetched = cache(local).fetch(Runnable::run, "step", step, in, target, "SHA-256");
+        try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(stored.get("demo/01/" + key(in))))) {
+            zip.getNextEntry();
+            assertThat(new String(zip.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("jenesis-cache/2 SHA-256\n");
+        }
+        Optional<Map<Path, byte[]>> fetched = cache(elsewhere).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256");
         assertThat(fetched).isPresent();
         assertThat(fetched.get()).isEmpty();
+    }
+
+    @Test
+    public void a_large_file_is_asked_for_and_uploaded_once_however_many_steps_name_it() throws IOException {
+        Files.writeString(output.resolve("large"), "x".repeat(100));
+        BuildExecutorHttpCache cache = cache(local).inline(100);
+        cache.store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+        assertThat(requests).containsExactly(
+                "HEAD " + BLOBS + hex("x".repeat(100)),
+                "PUT " + BLOBS + hex("x".repeat(100)),
+                "PUT /01/" + key(inputs("source", "file", new byte[]{9})));
+        requests.clear();
+        cache.store(Runnable::run, "step", new byte[]{2}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+        assertThat(requests).as("a second step of the build naming the file sends its own archive alone").containsExactly(
+                "PUT /02/" + key(inputs("source", "file", new byte[]{9})));
+        requests.clear();
+        cache(elsewhere).inline(100)
+                .store(Runnable::run, "step", new byte[]{3}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+        assertThat(requests).as("another build asks, and does not upload what the server holds").containsExactly(
+                "HEAD " + BLOBS + hex("x".repeat(100)),
+                "PUT /03/" + key(inputs("source", "file", new byte[]{9})));
+    }
+
+    @Test
+    public void a_fetch_downloads_no_large_file_this_machine_holds() throws IOException {
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("large"), "x".repeat(100));
+        cache(local).inline(100).store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        requests.clear();
+        assertThat(cache(local).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256")).isPresent();
+        assertThat(requests).as("the step, and a word to the server that the file is in use").containsExactly(
+                "GET /01/" + key(in),
+                "HEAD " + BLOBS + hex("x".repeat(100)));
+        requests.clear();
+        assertThat(cache(elsewhere).fetch(Runnable::run, "step", step, in, folders("source"), Files.createDirectory(elsewhere.resolve("target")), "SHA-256"))
+                .isPresent();
+        assertThat(requests).containsExactly("GET /01/" + key(in), "GET " + BLOBS + hex("x".repeat(100)));
+        assertThat(elsewhere.resolve("sha-256").resolve("blobs").resolve(hex("x".repeat(100)).substring(0, 2)).resolve(hex("x".repeat(100)).substring(2)))
+                .as("a downloaded file is kept for the next build of any project")
+                .content()
+                .isEqualTo("x".repeat(100));
+    }
+
+    @Test
+    public void a_file_within_the_step_that_is_not_what_its_name_says_is_a_miss() throws IOException {
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.write(stored.computeIfAbsent("demo/01/" + key(in), _ -> served.resolve("tampered")), archive(
+                "jenesis-cache/2 SHA-256\nf " + hex("result") + " 6 file\n",
+                Map.of(hex("result"), "tampered")));
+        assertThat(cache(local).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256")).isEmpty();
+        assertThat(target).isEmptyDirectory();
+        assertThat(local.resolve("sha-256").resolve("blobs").resolve(hex("result").substring(0, 2)).resolve(hex("result").substring(2)))
+                .as("nothing that is not what its name says is kept")
+                .doesNotExist();
+    }
+
+    @Test
+    public void a_step_naming_a_file_it_does_not_carry_or_carrying_one_it_does_not_name_is_a_miss() throws IOException {
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Path entry = stored.computeIfAbsent("demo/01/" + key(in), _ -> served.resolve("entry"));
+        Files.write(entry, archive("jenesis-cache/2 SHA-256\nf " + hex("result") + " 6 file\n", Map.of()));
+        assertThat(cache(local).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256")).isEmpty();
+        Files.write(entry, archive("jenesis-cache/2 SHA-256\n", Map.of(hex("result"), "result")));
+        assertThat(cache(local).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256")).isEmpty();
+        Files.write(entry, archive("jenesis-cache/2 SHA-256\nf " + hex("other") + " 6 file\n", Map.of(hex("result"), "result")));
+        assertThat(cache(local).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256")).isEmpty();
+        assertThat(target).isEmptyDirectory();
+    }
+
+    @Test
+    public void a_large_file_the_server_answers_with_other_content_is_a_miss() throws IOException {
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("large"), "x".repeat(100));
+        Files.writeString(output.resolve("small"), "small");
+        cache(local).inline(100).store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        Files.writeString(stored.get("demo" + BLOBS + hex("x".repeat(100))), "tampered");
+        assertThat(cache(elsewhere).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256")).isEmpty();
+        assertThat(target).isEmptyDirectory();
+    }
+
+    @Test
+    public void a_large_file_the_server_does_not_hold_is_a_miss_and_the_next_store_uploads_it() throws IOException {
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("large"), "x".repeat(100));
+        BuildExecutorHttpCache cache = cache(local).inline(100);
+        cache.store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        stored.remove("demo" + BLOBS + hex("x".repeat(100)));
+        assertThat(cache(elsewhere).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256")).isEmpty();
+        assertThat(target).isEmptyDirectory();
+        requests.clear();
+        cache(elsewhere).inline(100).store(Runnable::run, "step", new byte[]{2}, in, output, "SHA-256", Map.of());
+        assertThat(requests).contains("PUT " + BLOBS + hex("x".repeat(100)));
+    }
+
+    @Test
+    public void a_large_file_the_server_refuses_leaves_the_step_unstored() throws IOException {
+        Files.writeString(output.resolve("large"), "x".repeat(100));
+        refused.put("PUT " + BLOBS, 413);
+        cache(local).inline(100)
+                .store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+        assertThat(requests).as("a step is not stored naming a file the server was not given").containsExactly(
+                "HEAD " + BLOBS + hex("x".repeat(100)),
+                "PUT " + BLOBS + hex("x".repeat(100)));
+    }
+
+    @Test
+    public void a_server_that_refuses_is_a_miss_and_an_abandoned_store() throws IOException {
+        Files.writeString(output.resolve("file"), "result");
+        for (int status : new int[]{401, 403, 413, 500, 507}) {
+            refused.put("", status);
+            cache(local).store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+            assertThat(cache(local).fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), folders("source"), target, "SHA-256"))
+                    .isEmpty();
+        }
+        assertThat(stored).isEmpty();
+    }
+
+    @Test
+    public void changed_inputs_name_another_step_and_no_address_is_that_of_one_zip_per_step() throws IOException {
+        Files.writeString(output.resolve("file"), "result");
+        cache(local).store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+        cache(local).store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{8}), output, "SHA-256", Map.of());
+        MessageDigest message = message();
+        message.update("source".getBytes(StandardCharsets.UTF_8));
+        message.update((byte) 0);
+        message.update("file".getBytes(StandardCharsets.UTF_8));
+        message.update((byte) 0);
+        message.update(new byte[]{9});
+        assertThat(requests).containsExactly(
+                        "PUT /01/" + key(inputs("source", "file", new byte[]{9})),
+                        "PUT /01/" + key(inputs("source", "file", new byte[]{8})))
+                .doesNotHaveDuplicates()
+                .doesNotContain("PUT /01/" + HexFormat.of().formatHex(message.digest()));
+        assertThat(cache(local).fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{7}), folders("source"), target, "SHA-256"))
+                .isEmpty();
+    }
+
+    @Test
+    public void a_large_file_within_a_step_and_one_apart_from_it_are_streamed() throws IOException {
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        try (FileChannel channel = FileChannel.open(output.resolve("within"), StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+            channel.write(ByteBuffer.wrap(new byte[]{1}), (128L << 20) - 1);
+        }
+        try (FileChannel channel = FileChannel.open(output.resolve("apart"), StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+            channel.write(ByteBuffer.wrap(new byte[]{2}), (160L << 20) - 1);
+        }
+        com.sun.management.ThreadMXBean threads = (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
+        long before = threads.getCurrentThreadAllocatedBytes();
+        cache(local).inline(144L << 20).store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        Optional<Map<Path, byte[]>> fetched = cache(elsewhere).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256");
+        long allocated = threads.getCurrentThreadAllocatedBytes() - before;
+        assertThat(fetched).isPresent();
+        assertThat(Files.size(target.resolve("within"))).isEqualTo(128L << 20);
+        assertThat(Files.size(target.resolve("apart"))).isEqualTo(160L << 20);
+        assertThat(stored).containsKeys("demo" + BLOBS + HexFormat.of().formatHex(fetched.get().get(Path.of("apart"))));
+        assertThat(allocated).as("288 MiB stored and restored without holding a file in memory").isLessThan(32L << 20);
+    }
+
+    @Test
+    public void two_projects_share_no_address_on_the_server() throws IOException {
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("large"), "x".repeat(100));
+        cache(local).inline(100).store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        requests.clear();
+        assertThat(cache(elsewhere).project("other").fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256"))
+                .isEmpty();
+        cache(elsewhere).inline(100).project("other").store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        assertThat(requests).as("the file one project stored is not there for another, which uploads its own").contains(
+                "PUT " + BLOBS + hex("x".repeat(100)));
+        assertThat(stored).containsKeys("demo" + BLOBS + hex("x".repeat(100)), "other" + BLOBS + hex("x".repeat(100)));
+        assertThat(projects).containsOnly("demo", "other");
+    }
+
+    @Test
+    public void a_manifest_naming_a_path_outside_the_target_is_a_miss() throws IOException {
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.write(stored.computeIfAbsent("demo/01/" + key(in), _ -> served.resolve("escape")), archive(
+                "jenesis-cache/2 SHA-256\nf " + hex("result") + " 6 ../escape\n",
+                Map.of(hex("result"), "result")));
+        assertThat(cache(local).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256")).isEmpty();
+        assertThat(target.resolveSibling("escape")).doesNotExist();
+    }
+
+    @Test
+    public void an_answer_that_is_no_step_of_this_format_is_a_miss() throws IOException {
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Path entry = stored.computeIfAbsent("demo/01/" + key(in), _ -> served.resolve("entry"));
+        Files.writeString(entry, "<html>Sign in</html>");
+        assertThat(cache(local).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256")).isEmpty();
+        Files.write(entry, archive("jenesis-cache/3 SHA-256\n", Map.of()));
+        assertThat(cache(local).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256")).isEmpty();
+        Files.write(entry, archive("jenesis-cache/2 SHA-256\nx " + hex("result") + " 6 file\n", Map.of()));
+        assertThat(cache(local).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256")).isEmpty();
+        assertThat(cache(local).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-1"))
+                .as("a build hashing with another digest could verify no file of it")
+                .isEmpty();
+        assertThat(requests).hasSize(4);
     }
 
     @Test
@@ -231,7 +338,7 @@ public class BuildExecutorHttpCacheTest {
         BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(
                 new Environment(Map.of("cache.token", "team-alpha", "cache.local", local.toString())),
                 uri);
-        cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), target, "SHA-256");
+        cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), folders("source"), target, "SHA-256");
         assertThat(keys).containsExactly("team-alpha");
         assertThatThrownBy(() -> BuildExecutorHttpCache.ofEnvironment(new Environment(Map.of("cache.key", "team-alpha")), uri))
                 .as("a setting under its former name would leave the cache server without a credential")
@@ -240,20 +347,25 @@ public class BuildExecutorHttpCacheTest {
     }
 
     @Test
-    public void keeps_the_files_of_a_server_in_the_folder_the_settings_name() throws IOException {
+    public void reads_the_folder_of_the_files_and_the_size_a_file_travels_within_its_step_up_to() throws IOException {
         BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(
-                new Environment(Map.of("cache.local", local.toString())),
+                new Environment(Map.of("cache.local", local.toString(), "cache.inline", "6")),
                 uri);
-        Files.writeString(output.resolve("file"), "result");
+        Files.writeString(output.resolve("apart"), "result");
+        Files.writeString(output.resolve("within"), "small");
         cache.store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
         assertThat(local.resolve("sha-256").resolve("blobs").resolve(hex("result").substring(0, 2)).resolve(hex("result").substring(2)))
                 .content()
                 .isEqualTo("result");
+        assertThat(requests).contains("PUT " + BLOBS + hex("result")).doesNotContain("PUT " + BLOBS + hex("small"));
+        assertThatThrownBy(() -> BuildExecutorHttpCache.ofEnvironment(new Environment(Map.of("cache.inline", "-1")), uri))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.cache.inline");
     }
 
     @Test
     public void fetch_returns_empty_on_miss() throws IOException {
-        assertThat(cache(local).fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), target, "SHA-256"))
+        assertThat(cache(local).fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), folders("source"), target, "SHA-256"))
                 .isEmpty();
     }
 
@@ -272,12 +384,13 @@ public class BuildExecutorHttpCacheTest {
         Files.writeString(output.resolve("file"), "result");
         cache(local).store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
         requests.clear();
-        assertThat(cache(local).read(false).fetch(Runnable::run, "step", step, in, target, "SHA-256")).isEmpty();
+        assertThat(cache(local).read(false).fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256")).isEmpty();
         assertThat(requests).isEmpty();
     }
 
     @Test
-    public void a_cache_that_hangs_does_not_hang_the_build() throws IOException {
+    public void a_cache_that_does_not_answer_or_is_not_there_does_not_hang_or_fail_the_build() throws IOException {
+        Files.writeString(output.resolve("file"), "result");
         try (ServerSocket hanging = new ServerSocket(0, 0, InetAddress.getLoopbackAddress())) {
             Thread accepting = Thread.ofVirtual().start(() -> {
                 try {
@@ -293,22 +406,27 @@ public class BuildExecutorHttpCacheTest {
                     .token("team-alpha")
                     .project("demo");
             long started = System.nanoTime();
-            assertThat(cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), target, "SHA-256"))
+            assertThat(cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), folders("source"), target, "SHA-256"))
                     .isEmpty();
             assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(20));
             accepting.interrupt();
         }
+        server.stop(0);
+        assertThat(cache(local).fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), folders("source"), target, "SHA-256"))
+                .isEmpty();
+        cache(local).store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), output, "SHA-256", Map.of());
+        cache(local).touch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), "SHA-256");
     }
 
     @Test
     public void sends_the_token_and_the_project_as_headers_and_omits_them_when_unset() throws IOException {
-        cache(local).fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), target, "SHA-256");
+        cache(local).fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), folders("source"), target, "SHA-256");
         assertThat(keys).containsExactly("team-alpha");
         assertThat(projects).containsExactly("demo");
         keys.clear();
         projects.clear();
         new BuildExecutorHttpCache(uri).local(new BuildExecutorFileCache(local))
-                .fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), target, "SHA-256");
+                .fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), folders("source"), target, "SHA-256");
         assertThat(keys).containsExactly("null");
         assertThat(projects).containsExactly("null");
     }
@@ -318,17 +436,16 @@ public class BuildExecutorHttpCacheTest {
         BuildExecutorHttpCache cache = new BuildExecutorHttpCache(URI.create("http://cache.example.test/"))
                 .local(new BuildExecutorFileCache(local))
                 .token("team-alpha");
-        assertThatThrownBy(() -> cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), target, "SHA-256"))
+        assertThatThrownBy(() -> cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), folders("source"), target, "SHA-256"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.cache.insecure");
     }
 
     @Test
     public void touch_sends_a_head_request_for_the_step() throws IOException {
-        byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
-        cache(local).touch(Runnable::run, "step", step, in, "SHA-256");
-        assertThat(requests).containsExactly("HEAD /step/01/" + fold(new byte[]{9}));
+        cache(local).touch(Runnable::run, "step", new byte[]{1}, in, "SHA-256");
+        assertThat(requests).containsExactly("HEAD /01/" + key(in));
         assertThat(keys).contains("team-alpha");
         assertThat(projects).contains("demo");
     }
@@ -344,26 +461,57 @@ public class BuildExecutorHttpCacheTest {
         return new BuildExecutorHttpCache(uri).local(new BuildExecutorFileCache(folder)).token("team-alpha").project("demo");
     }
 
-    private static String fold(byte[] hash) {
+    private SequencedMap<String, Path> folders(String name) {
+        SequencedMap<String, Path> folders = new LinkedHashMap<>();
+        folders.put(name, argument);
+        return folders;
+    }
+
+    private static byte[] archive(String manifest, Map<String, String> files) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
+            zip.putNextEntry(new ZipEntry("manifest"));
+            zip.write(manifest.getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+            for (Map.Entry<String, String> file : files.entrySet()) {
+                zip.putNextEntry(new ZipEntry(file.getKey()));
+                zip.write(file.getValue().getBytes(StandardCharsets.UTF_8));
+                zip.closeEntry();
+            }
+        }
+        return bytes.toByteArray();
+    }
+
+    private static String key(SequencedMap<String, Map<Path, byte[]>> inputs) {
+        MessageDigest message = message();
+        message.update("jenesis-cache/2".getBytes(StandardCharsets.UTF_8));
+        message.update((byte) 0);
+        inputs.forEach((argument, files) -> {
+            message.update(argument.getBytes(StandardCharsets.UTF_8));
+            message.update((byte) 0);
+            files.forEach((file, hash) -> {
+                message.update(file.toString().getBytes(StandardCharsets.UTF_8));
+                message.update((byte) 0);
+                message.update(hash);
+            });
+        });
+        return HexFormat.of().formatHex(message.digest());
+    }
+
+    private static MessageDigest message() {
         try {
-            MessageDigest message = MessageDigest.getInstance("SHA-256");
-            message.update("source".getBytes(StandardCharsets.UTF_8));
-            message.update((byte) 0);
-            message.update("file".getBytes(StandardCharsets.UTF_8));
-            message.update((byte) 0);
-            message.update(hash);
-            return HexFormat.of().formatHex(message.digest());
+            return MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException e) {
             throw new AssertionError(e);
         }
     }
 
+    private static byte[] sha256(String content) {
+        return message().digest(content.getBytes(StandardCharsets.UTF_8));
+    }
+
     private static String hex(String content) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new AssertionError(e);
-        }
+        return HexFormat.of().formatHex(sha256(content));
     }
 
     private static SequencedMap<String, Map<Path, byte[]>> inputs(String argument, String file, byte[] hash) {
