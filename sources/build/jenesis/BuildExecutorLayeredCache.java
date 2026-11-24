@@ -17,21 +17,20 @@ public final class BuildExecutorLayeredCache implements BuildExecutorCache {
                                              String identity,
                                              byte[] step,
                                              SequencedMap<String, Map<Path, byte[]>> inputs,
-                                             boolean remote,
                                              Path target,
                                              String digest) throws IOException {
-        Optional<Map<Path, byte[]>> local = front.fetch(executor, identity, step, inputs, remote, target, digest);
+        Optional<Map<Path, byte[]>> local = front.fetch(executor, identity, step, inputs, target, digest);
         if (local.isPresent()) {
             try {
-                back.touch(executor, identity, step, inputs, remote, digest);
+                back.touch(executor, identity, step, inputs, digest);
             } catch (IOException | RuntimeException _) {
             }
             return local;
         }
-        Optional<Map<Path, byte[]>> shared = back.fetch(executor, identity, step, inputs, remote, target, digest);
+        Optional<Map<Path, byte[]>> shared = back.fetch(executor, identity, step, inputs, target, digest);
         if (shared.isPresent()) {
             try {
-                front.store(executor, identity, step, inputs, remote, target, digest, shared.get());
+                front.store(executor, identity, step, inputs, target, digest, shared.get());
             } catch (IOException | RuntimeException _) {
             }
         }
@@ -43,15 +42,14 @@ public final class BuildExecutorLayeredCache implements BuildExecutorCache {
                       String identity,
                       byte[] step,
                       SequencedMap<String, Map<Path, byte[]>> inputs,
-                      boolean remote,
                       Path output,
                       String digest,
                       Map<Path, byte[]> checksums) throws IOException {
         try {
-            front.store(executor, identity, step, inputs, remote, output, digest, checksums);
+            front.store(executor, identity, step, inputs, output, digest, checksums);
         } catch (IOException | RuntimeException _) {
         }
-        back.store(executor, identity, step, inputs, remote, output, digest, checksums);
+        back.store(executor, identity, step, inputs, output, digest, checksums);
     }
 
     @Override
@@ -64,14 +62,13 @@ public final class BuildExecutorLayeredCache implements BuildExecutorCache {
                       String identity,
                       byte[] step,
                       SequencedMap<String, Map<Path, byte[]>> inputs,
-                      boolean remote,
                       String digest) {
         try {
-            front.touch(executor, identity, step, inputs, remote, digest);
+            front.touch(executor, identity, step, inputs, digest);
         } catch (IOException | RuntimeException _) {
         }
         try {
-            back.touch(executor, identity, step, inputs, remote, digest);
+            back.touch(executor, identity, step, inputs, digest);
         } catch (IOException | RuntimeException _) {
         }
     }

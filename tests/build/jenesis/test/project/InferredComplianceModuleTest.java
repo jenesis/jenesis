@@ -93,7 +93,7 @@ public class InferredComplianceModuleTest {
         SequencedMap<String, BuildExecutorModule> custom = new LinkedHashMap<>();
         custom.put("license", (executor, inherited) -> executor.addStep("report", (_, context, arguments) -> {
             Files.writeString(context.next().resolve("inputs.txt"), String.join("\n", arguments.sequencedKeySet()));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, inherited.sequencedKeySet()));
         SequencedMap<String, Path> outputs = execute(new InferredComplianceModule(new LinkedHashSet<>(List.of(configuration))).custom(custom),
                 "compliance/license/check",
@@ -111,7 +111,7 @@ public class InferredComplianceModuleTest {
         SequencedMap<String, Path> outputs = execute(new InferredComplianceModule(new LinkedHashSet<>(List.of(configuration)))
                         .custom("report", (_, context, _) -> {
                             Files.writeString(context.next().resolve("report.txt"), "reported");
-                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                            return CompletableFuture.completedStage(new BuildStepResult());
                         }),
                 "compliance/custom/report");
         assertThat(outputs.get("compliance/custom/report").resolve("report.txt")).content().isEqualTo("reported");

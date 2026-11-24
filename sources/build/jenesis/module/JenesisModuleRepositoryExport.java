@@ -62,7 +62,7 @@ public class JenesisModuleRepositoryExport implements BuildStep {
                 }
             });
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult().cached(false));
     }
 
     private static void link(Path file, Path destination, Set<Path> cleaned) throws IOException {

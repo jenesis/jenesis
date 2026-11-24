@@ -167,7 +167,7 @@ public class MavenRepositoryRelease implements BuildStep {
                     }
                 }
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult().cached(false));
         }
         Instant now = Instant.now();
         String updated = UPDATED.format(now);
@@ -277,7 +277,7 @@ public class MavenRepositoryRelease implements BuildStep {
             append(versioning, "lastUpdated", updated);
             upload(folder, METADATA, write(document, Files.createDirectories(written).resolve(METADATA)), written);
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult().cached(false));
     }
 
     private void released(URI target) {

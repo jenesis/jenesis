@@ -216,6 +216,6 @@ public class Pom implements BuildStep {
             coordinate.setProperty("version", version);
             coordinate.store(folder.resolve("pom.properties"));
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 }

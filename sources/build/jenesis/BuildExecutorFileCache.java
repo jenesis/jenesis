@@ -47,7 +47,6 @@ public record BuildExecutorFileCache(Path root,
                                              String identity,
                                              byte[] step,
                                              SequencedMap<String, Map<Path, byte[]>> inputs,
-                                             boolean remote,
                                              Path target,
                                              String digest) throws IOException {
         if (!read) {
@@ -111,7 +110,6 @@ public record BuildExecutorFileCache(Path root,
                       String identity,
                       byte[] step,
                       SequencedMap<String, Map<Path, byte[]>> inputs,
-                      boolean remote,
                       Path output,
                       String digest,
                       Map<Path, byte[]> checksums) throws IOException {
@@ -250,7 +248,6 @@ public record BuildExecutorFileCache(Path root,
                       String identity,
                       byte[] step,
                       SequencedMap<String, Map<Path, byte[]>> inputs,
-                      boolean remote,
                       String digest) {
         if (!touch || !write) {
             return;

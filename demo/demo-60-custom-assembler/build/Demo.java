@@ -29,7 +29,7 @@ public class Demo {
                     }
                 }
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }));
         Project project = Project.ofEnvironment(environment, Path.of(".")).assembler((descriptor, repositories, resolvers) -> checked
                 .apply(descriptor.sources("preprocess"), repositories, resolvers)
@@ -64,7 +64,7 @@ public class Demo {
                                 }
                             }
                         }
-                        return CompletableFuture.completedStage(new BuildStepResult(true));
+                        return CompletableFuture.completedStage(new BuildStepResult());
                     }, descriptor.sources().stream());
                     stock.accept(sub, inherited);
                 }));

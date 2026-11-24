@@ -148,7 +148,7 @@ public class LanguageTest {
                         if (ToolProvider.getSystemJavaCompiler().run(null, null, null, options.toArray(String[]::new)) != 0) {
                             throw new IllegalStateException("Cannot compile " + files);
                         }
-                        return CompletableFuture.completedStage(new BuildStepResult(true));
+                        return CompletableFuture.completedStage(new BuildStepResult());
                     }
                 }
                 """);
@@ -179,7 +179,7 @@ public class LanguageTest {
                         Files.writeString(context.next().resolve("resolved").resolve("tool.pom"), "<project/>");
                         Files.writeString(context.next().resolve("poms.properties"),
                                 group + "\\\\:tool/maven/sample/tool/pom/1.0=resolved/tool.pom SHA-256/4567\\n");
-                        return CompletableFuture.completedStage(new BuildStepResult(true));
+                        return CompletableFuture.completedStage(new BuildStepResult());
                     }
                 }
                 """);
@@ -205,7 +205,7 @@ public class LanguageTest {
                                                                   SequencedMap<String, BuildStepArgument> arguments)
                             throws IOException {
                         Files.writeString(Files.createDirectories(context.next().resolve("javadoc")).resolve("index.html"), "greet");
-                        return CompletableFuture.completedStage(new BuildStepResult(true));
+                        return CompletableFuture.completedStage(new BuildStepResult());
                     }
                 }
                 """);

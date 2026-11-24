@@ -65,7 +65,7 @@ public class ClassTransformModuleTest {
                                                       SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.CLASSES + "sample"))
                     .resolve(name + ".class"), name);
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -102,7 +102,7 @@ public class ClassTransformModuleTest {
             Path manifest = context.next().resolve(file);
             Files.createDirectories(manifest.getParent());
             Files.writeString(manifest, "Manifest-Version: 1.0\n" + attributes + "\n");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 }

@@ -22,7 +22,7 @@ public class MavenRepositoryStaging implements BuildStep {
         Collected collected = collectModules(arguments);
         Pairings pairings = pairTests(collected.stagedByArtifactId(), collected.artifactIds(), collected.testModules());
         stageModules(context.next(), collected.stagedByArtifactId(), pairings, Inventory.attachments(arguments.values()));
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     private Collected collectModules(SequencedMap<String, BuildStepArgument> arguments) throws IOException {

@@ -21,7 +21,7 @@ public class Demo {
                         Path config = Files.createDirectory(context.next().resolve(JMod.CONFIG));
                         Files.writeString(config.resolve("app.properties"),
                                 "greeting=Configured in a .jmod, linked into the runtime by jlink\n");
-                        return CompletableFuture.completedStage(new BuildStepResult(true));
+                        return CompletableFuture.completedStage(new BuildStepResult());
                     });
                     stock.accept(sub, inherited);
                 })).build("stage");

@@ -480,7 +480,7 @@ public class MavenProject implements BuildExecutorModule {
                             coordinates.setProperty(properties.getProperty("pom"),
                                     context.next().relativize(pomFile).toString().replace(File.separatorChar, '/'));
                             coordinates.store(context.next().resolve(IDENTITY));
-                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                            return CompletableFuture.completedStage(new BuildStepResult());
                         });
                         int feature = Runtime.version().feature();
                         module.addStep(MANIFESTS, (_, context, manifestArgs) -> {
@@ -715,7 +715,7 @@ public class MavenProject implements BuildExecutorModule {
                             }
                             descriptor.store(context.next().resolve(BuildStep.MODULE));
                             metadata(properties, manifestArgs.values()).store(context.next().resolve(BuildStep.METADATA));
-                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                            return CompletableFuture.completedStage(new BuildStepResult());
                         }, modInherited.sequencedKeySet());
                     }
                 }, paths.sequencedKeySet().stream());
@@ -791,7 +791,7 @@ public class MavenProject implements BuildExecutorModule {
                 throws IOException {
             Path descriptors = arguments.get(PREVIOUS + PREPARE).folder().resolve(BOM);
             if (!Files.isDirectory(descriptors)) {
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }
             List<BuildStepArgument> upstream = arguments.entrySet().stream()
                     .filter(entry -> !entry.getKey().equals(PREVIOUS + PREPARE))
@@ -845,7 +845,7 @@ public class MavenProject implements BuildExecutorModule {
             if (!inventory.isEmpty()) {
                 inventory.store(context.next().resolve(Inventory.INVENTORY));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -878,7 +878,7 @@ public class MavenProject implements BuildExecutorModule {
                     return FileVisitResult.CONTINUE;
                 }
             });
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult().cached(false));
         }
 
         @Override
@@ -1031,7 +1031,7 @@ public class MavenProject implements BuildExecutorModule {
             if (!skipped.isEmpty()) {
                 skipped.store(context.next().resolve(SKIPPED));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
 
         private static SequencedMap<MavenDependencyKey, MavenDependencyValue> versioned(

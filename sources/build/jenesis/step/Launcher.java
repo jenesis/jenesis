@@ -161,7 +161,7 @@ public class Launcher implements BuildStep {
                             name == null ? "The module" : name));
         }
         if (mainClass == null || shaded == null || jars.isEmpty()) {
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
         ModuleDescriptor.Version version = Optional.ofNullable(PathPlacement.moduleDescriptor(shaded))
                 .flatMap(ModuleDescriptor::version)
@@ -308,7 +308,7 @@ public class Launcher implements BuildStep {
                 explode(out, entry.getValue(), "jars/" + entry.getKey() + "/", _ -> true);
             }
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     private void explode(JarOutputStream out, Path file, String prefix, Predicate<String> include)

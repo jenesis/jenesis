@@ -155,7 +155,6 @@ class BuildExecutorDefault implements BuildExecutor {
                 BiConsumer<Boolean, Throwable> completion = callback.step(
                         location + identity,
                         new LinkedHashSet<>(summaries.keySet()));
-                boolean cacheRemotely = step.shouldCacheRemotely();
                 Path next = target.resolve(identity + BuildExecutor.NEXT),
                         salvaged = target.resolve(identity + BuildExecutor.NEXT + PERSISTENT);
                 if (Files.exists(salvaged)) {
@@ -179,7 +178,6 @@ class BuildExecutorDefault implements BuildExecutor {
                             location + identity,
                             currentStepHash,
                             inputs,
-                            cacheRemotely,
                             nextOutput,
                             algorithm);
                     boolean fromCache = cached.isPresent();
@@ -199,7 +197,7 @@ class BuildExecutorDefault implements BuildExecutor {
                     }
                     CompletionStage<BuildStepResult> stepStage;
                     if (fromCache) {
-                        stepStage = CompletableFuture.completedStage(new BuildStepResult(true));
+                        stepStage = CompletableFuture.completedStage(new BuildStepResult());
                     } else {
                         BuildStepContext context = new BuildStepContext(
                                 consistent ? previous.output() : null,
@@ -252,7 +250,7 @@ class BuildExecutorDefault implements BuildExecutor {
                             SequencedProperties stepProperties = new SequencedProperties();
                             stepProperties.setProperty("serialization", HexFormat.of().formatHex(currentStepHash));
                             stepProperties.storeAtomically(previous.step());
-                            if (cache.stores() && !fromCache && result.next()) {
+                            if (cache.stores() && !fromCache && result.next() && result.cached()) {
                                 String stored = location + identity;
                                 try {
                                     executor.execute(() -> {
@@ -262,7 +260,6 @@ class BuildExecutorDefault implements BuildExecutor {
                                                     location + identity,
                                                     currentStepHash,
                                                     inputs,
-                                                    cacheRemotely,
                                                     previous.output(),
                                                     algorithm,
                                                     checksums);
@@ -306,7 +303,7 @@ class BuildExecutorDefault implements BuildExecutor {
                     }
                     completion.accept(false, null);
                     try {
-                        cache.touch(executor, location + identity, currentStepHash, inputs, cacheRemotely, algorithm);
+                        cache.touch(executor, location + identity, currentStepHash, inputs, algorithm);
                     } catch (IOException _) {
                     }
                     return CompletableFuture.completedStage(Map.of(identity, Map.of(
@@ -935,7 +932,16 @@ class BuildExecutorDefault implements BuildExecutor {
 
         @Override
         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-            Files.delete(file);
+            try {
+                Files.delete(file);
+            } catch (AccessDeniedException e) {
+                DosFileAttributeView view = Files.getFileAttributeView(file, DosFileAttributeView.class);
+                if (view == null || !view.readAttributes().isReadOnly()) {
+                    throw e;
+                }
+                view.setReadOnly(false);
+                Files.delete(file);
+            }
             return FileVisitResult.CONTINUE;
         }
 

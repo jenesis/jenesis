@@ -41,7 +41,7 @@ public record NativeImageMetadata() implements BuildStep {
             }
         }
         if (artifact == null) {
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
         String suffix = ".nativeimage";
         Path target = null;
@@ -85,6 +85,6 @@ public record NativeImageMetadata() implements BuildStep {
                 });
             }
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 }

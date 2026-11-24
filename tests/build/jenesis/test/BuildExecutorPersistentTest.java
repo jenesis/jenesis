@@ -35,7 +35,7 @@ public class BuildExecutorPersistentTest {
         executor.addStep("step", (_, context, _) -> {
             assertThat(context.persistent()).isEmptyDirectory();
             Files.writeString(context.next().resolve("file"), "written");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "source");
         executor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(root.resolve("step").resolve("output").resolve("file")).exists();
@@ -110,7 +110,7 @@ public class BuildExecutorPersistentTest {
                         .sorted()
                         .collect(Collectors.joining(",")));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "step");
         executor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(root.resolve("dependent").resolve("output").resolve("files")).content().isEqualTo("file");
@@ -127,10 +127,10 @@ public class BuildExecutorPersistentTest {
                 throw new IllegalStateException("failed after counting");
             }
             if (content.equals("keep")) {
-                return CompletableFuture.completedStage(new BuildStepResult(false));
+                return CompletableFuture.completedStage(new BuildStepResult().next(false));
             }
             Files.writeString(context.next().resolve("file"), Integer.toString(value));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         };
     }
 

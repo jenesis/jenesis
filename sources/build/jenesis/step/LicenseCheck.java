@@ -149,7 +149,7 @@ public class LicenseCheck implements BuildStep {
         if (!violations.isEmpty()) {
             throw new IllegalStateException("Disallowed dependency licenses: " + String.join(", ", violations));
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     private static List<License> resolve(String coordinate, List<License> declared, Path jar, Map<String, String> overrides) {

@@ -156,7 +156,7 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 throws IOException {
             Files.writeString(Files.createDirectories(context.next().resolve(Javadoc.JAVADOC))
                     .resolve("INTENTIONALLY_EMPTY"), "This module publishes no API documentation.\n");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 }

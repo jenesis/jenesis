@@ -74,7 +74,7 @@ public class BuildExecutorCacheTest {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         };
         buildExecutor.addSource("source", source);
         buildExecutor.addStep("step", buildStep, "source");
@@ -97,7 +97,7 @@ public class BuildExecutorCacheTest {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         };
         runStep(cache, buildStep);
         assertThat(cache.storeDigest).isEqualTo("MD5");
@@ -108,39 +108,20 @@ public class BuildExecutorCacheTest {
     }
 
     @Test
-    public void carries_the_steps_remote_caching_declaration_to_every_call() throws IOException {
+    public void a_result_that_declines_caching_is_never_stored() throws IOException {
         Files.writeString(source.resolve("file"), "foo");
         RecordingCache cache = new RecordingCache(false);
-        runStep(cache, new LocalOnlyStep());
-        assertThat(cache.fetchRemote).isFalse();
-        assertThat(cache.storeRemote).isFalse();
-        RecordingCache upToDate = new RecordingCache(false);
-        runStep(upToDate, new LocalOnlyStep());
-        assertThat(upToDate.touchRemote).isFalse();
-        RecordingCache remote = new RecordingCache(false);
-        runStep(remote, (_, context, _) -> {
+        runStep(cache, (_, context, _) -> {
             Files.writeString(context.next().resolve("file"), "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult().cached(false));
         });
-        assertThat(remote.fetchRemote).as("a step that says nothing is cached anywhere").isTrue();
-        assertThat(remote.storeRemote).isTrue();
-    }
-
-    private static final class LocalOnlyStep implements BuildStep {
-
-        @Override
-        public boolean shouldCacheRemotely() {
-            return false;
-        }
-
-        @Override
-        public CompletionStage<BuildStepResult> apply(Executor executor,
-                                                      BuildStepContext context,
-                                                      SequencedMap<String, BuildStepArgument> arguments)
-                throws IOException {
-            Files.writeString(context.next().resolve("file"), "local");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
-        }
+        assertThat(cache.stores).as("a step with effects outside its folder is run again, never restored").hasValue(0);
+        RecordingCache stored = new RecordingCache(false);
+        runStep(stored, (_, context, _) -> {
+            Files.writeString(context.next().resolve("file"), "bar");
+            return CompletableFuture.completedStage(new BuildStepResult());
+        });
+        assertThat(stored.stores).as("a step that says nothing is stored").hasValue(1);
     }
 
     @Test
@@ -150,7 +131,7 @@ public class BuildExecutorCacheTest {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         };
         runStep(new RecordingCache(false), buildStep);
         RecordingCache upToDate = new RecordingCache(false);
@@ -215,7 +196,7 @@ public class BuildExecutorCacheTest {
             Files.writeString(
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         };
         buildExecutor.addSource("source", source);
         buildExecutor.addStep("step", buildStep, "source");
@@ -244,7 +225,7 @@ public class BuildExecutorCacheTest {
                     context.next().resolve("file"),
                     Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
             Files.writeString(context.supplement().resolve("note"), "scratch");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         };
         buildExecutor.addSource("source", source);
         buildExecutor.addStep("step", buildStep, "source");
@@ -290,7 +271,6 @@ public class BuildExecutorCacheTest {
         private volatile String fetchIdentity, storeIdentity, touchIdentity;
         private volatile byte[] fetchStep, storeStep, touchStep;
         private volatile SequencedMap<String, Map<Path, byte[]>> fetchInputs, storeInputs, touchInputs;
-        private volatile boolean fetchRemote = true, storeRemote = true, touchRemote = true;
         private volatile Path storeOutput;
         private volatile String storeDigest;
         private volatile Map<Path, byte[]> storeChecksums;
@@ -309,13 +289,11 @@ public class BuildExecutorCacheTest {
                           String identity,
                           byte[] step,
                           SequencedMap<String, Map<Path, byte[]>> inputs,
-                          boolean remote,
                           String digest) {
             touches.incrementAndGet();
             touchIdentity = identity;
             touchStep = step;
             touchInputs = inputs;
-            touchRemote = remote;
         }
 
         @Override
@@ -323,14 +301,12 @@ public class BuildExecutorCacheTest {
                                                String identity,
                                                byte[] step,
                                                SequencedMap<String, Map<Path, byte[]>> inputs,
-                                               boolean remote,
                                                Path target,
                                                String digest) throws IOException {
             fetches.incrementAndGet();
             fetchIdentity = identity;
             fetchStep = step;
             fetchInputs = inputs;
-            fetchRemote = remote;
             if (!hit) {
                 return Optional.empty();
             }
@@ -343,7 +319,6 @@ public class BuildExecutorCacheTest {
                           String identity,
                           byte[] step,
                           SequencedMap<String, Map<Path, byte[]>> inputs,
-                          boolean remote,
                           Path output,
                           String digest,
                           Map<Path, byte[]> checksums) {
@@ -351,7 +326,6 @@ public class BuildExecutorCacheTest {
             storeIdentity = identity;
             storeStep = step;
             storeInputs = inputs;
-            storeRemote = remote;
             storeOutput = output;
             storeDigest = digest;
             storeChecksums = checksums;
@@ -397,7 +371,6 @@ public class BuildExecutorCacheTest {
                                                String identity,
                                                byte[] step,
                                                SequencedMap<String, Map<Path, byte[]>> inputs,
-                                               boolean remote,
                                                Path target,
                                                String digest) {
             return Optional.empty();
@@ -408,7 +381,6 @@ public class BuildExecutorCacheTest {
                           String identity,
                           byte[] step,
                           SequencedMap<String, Map<Path, byte[]>> inputs,
-                          boolean remote,
                           Path output,
                           String digest,
                           Map<Path, byte[]> checksums) {

@@ -1165,7 +1165,7 @@ public class MavenProjectTest {
                     <artifactId>artifact</artifactId>
                     <version>1</version>
                     <!--jenesis.attach
-                    io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=value
+                    io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=two  words
                     -->
                 </project>
                 """);
@@ -1190,7 +1190,7 @@ public class MavenProjectTest {
                     .as("an agent is resolved for the runs it joins, never published as a dependency of the module")
                     .noneMatch(key -> key.startsWith("main/runtime/maven/io.opentelemetry.javaagent/"));
             assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.ATTACHMENTS))).containsOnly(
-                    Map.entry("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=value"));
+                    Map.entry("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=two  words"));
         }
     }
 
@@ -3095,7 +3095,7 @@ public class MavenProjectTest {
             values.setProperty("version", "2");
             values.setProperty("scm.tag", "v2");
             values.store(context.next().resolve(BuildStep.METADATA));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "file", "command");
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
@@ -3230,7 +3230,7 @@ public class MavenProjectTest {
             SequencedProperties values = new SequencedProperties();
             values.setProperty("version", "2");
             values.store(context.next().resolve(BuildStep.METADATA));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "command");
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
@@ -3286,7 +3286,7 @@ public class MavenProjectTest {
             SequencedProperties values = new SequencedProperties();
             values.setProperty("version", "2");
             values.store(context.next().resolve(BuildStep.METADATA));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "command");
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
@@ -3321,7 +3321,7 @@ public class MavenProjectTest {
             SequencedProperties values = new SequencedProperties();
             values.setProperty("version", "2");
             values.store(context.next().resolve(BuildStep.METADATA));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         commanded.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "command");
         commanded.execute(Runnable::run).toCompletableFuture().join();

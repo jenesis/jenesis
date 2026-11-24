@@ -13,6 +13,7 @@ import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Aot;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Bundle;
 import build.jenesis.step.Classifiers;
@@ -280,8 +281,15 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                     Map<String, Resolver> resolvers) throws IOException {
         Packaging packaging = Packaging.configured(
                 BuildStep.locate(descriptor.configuration(), "packaging.properties"));
+        Aot aot = Aot.ofEnvironment(environment, descriptor.configuration());
         SequencedMap<String, SequencedMap<String, String>> overrides = perTool(descriptor.configuration(), "process-"),
                 environments = perTool(descriptor.configuration(), "environment-");
+        SequencedMap<String, String> agents = new LinkedHashMap<>();
+        Path attached = BuildStep.locate(descriptor.configuration(), BuildStep.AGENTS);
+        if (attached != null) {
+            SequencedProperties.ofFiles(attached).forEachProperty((token, options) ->
+                    agents.put(token, environment.variable(attached + " sets " + token, options)));
+        }
         ProcessHandler.Factory factory = ProcessHandler.Factory.ofEnvironment(environment);
         ModularizeModule modules = descriptor.pathPlacement() == PathPlacement.MODULE_PATH
                 ? null
@@ -339,7 +347,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             List.copyOf(packaging.formats()),
                             List.copyOf(descriptor.manifests()),
                             overrides,
-                            environments),
+                            environments,
+                            agents),
                     inherited.stream());
             if (sbom != null) {
                 sub.addStep("sbom",
@@ -421,7 +430,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                         upstreamSources.stream())
                                 .flatMap(Function.identity()));
             }
-            if (packaging.jmod() || packaging.jlink() || packaging.jpackaged() || packaging.nativeImage()) {
+            if (aot != null || packaging.jmod() || packaging.jlink() || packaging.jpackaged() || packaging.nativeImage()) {
                 sub.addStep("legal", Legal.ofEnvironment(environment), Stream.concat(Stream.of("binary"), closure.stream()));
             }
             if (packaging.jmod()) {
@@ -539,7 +548,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             }, AssemblyRequirement.of().after(AssemblyDescriptor.BUILD));
         }
         SequencedMap<String, BuildExecutorModule> packagers = hooks.getOrDefault("package", none);
-        if (packaging.jlink() || packaging.jpackaged() || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null
+        if (aot != null || packaging.jlink() || packaging.jpackaged() || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null
                 || !packagers.isEmpty()) {
             assembly = assembly.andThen("package", (sub, inherited) -> {
                 if (unstaged(inherited)) {
@@ -562,7 +571,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     inputs.removeIf(key -> replaced.contains(phased(key)));
                 }
                 SequencedSet<String> linked = new LinkedHashSet<>(inputs);
-                if (!packaging.jmod() && (packaging.jlink() || packaging.jpackaged())) {
+                if (!packaging.jmod() && (aot != null || packaging.jlink() || packaging.jpackaged())) {
                     SequencedSet<String> packed = descriptor.resources().stream()
                             .map(InferredMultiProjectAssembler::local)
                             .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -570,12 +579,19 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             inherited.sequencedKeySet().stream().filter(key -> packed.contains(phased(key)))));
                     linked.add("jmod");
                 }
-                if (packaging.jlink()) {
+                if (aot != null || packaging.jlink()) {
                     sub.addStep("jlink", JLink.ofEnvironment(environment, factory), linked);
-                    images.add("jlink");
+                }
+                if (aot != null) {
+                    sub.addStep("aot", aot.image(packaging.jlink()), Stream.concat(Stream.of("jlink"), linked.stream()));
+                }
+                if (packaging.jlink()) {
+                    images.add(aot == null ? "jlink" : "aot");
                 }
                 for (String format : packaging.formats()) {
-                    sub.addStep(packaging.step(format), JPackage.ofEnvironment(environment, factory).type(format), packaging.jlink()
+                    sub.addStep(packaging.step(format), JPackage.ofEnvironment(environment, factory).type(format), aot != null
+                                ? Stream.concat(Stream.of("jlink", "aot"), linked.stream())
+                                : packaging.jlink()
                                 ? Stream.concat(Stream.of("jlink"), linked.stream())
                                 : linked.stream());
                 }
@@ -706,7 +722,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     }
                 }
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -734,7 +750,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
             }
             if (!Files.isDirectory(image)) {
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
@@ -757,7 +773,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     }
                 }
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -943,7 +959,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                            List<String> packageTypes,
                            List<String> manifests,
                            SequencedMap<String, SequencedMap<String, String>> overrides,
-                           SequencedMap<String, SequencedMap<String, String>> environments) implements BuildStep {
+                           SequencedMap<String, SequencedMap<String, String>> environments,
+                           SequencedMap<String, String> agents) implements BuildStep {
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -955,11 +972,25 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             String artifact = null;
             String moduleName = null;
             SequencedProperties described = null;
+            SequencedProperties attached = new SequencedProperties();
             boolean tests = false;
             for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
                 BuildStepArgument argument = entry.getValue();
                 if (argument.removed()) {
                     continue;
+                }
+                Path attachmentsFile = argument.folder().resolve(BuildStep.ATTACHMENTS);
+                if (manifests.contains(entry.getKey()) && Files.isRegularFile(attachmentsFile)) {
+                    SequencedProperties declared = SequencedProperties.ofFiles(attachmentsFile);
+                    for (String key : declared.stringPropertyNames()) {
+                        String[] segments = key.split("/", 4);
+                        String options = agents.getOrDefault(segments[0] + "/" + segments[2] + "/" + segments[3],
+                                agents.getOrDefault(segments[2] + "/" + segments[3],
+                                        segments[2].equals("module") || segments[3].indexOf('/') == segments[3].lastIndexOf('/')
+                                                ? agents.get(segments[3])
+                                                : null));
+                        attached.setProperty(key, options == null ? declared.getProperty(key) : options);
+                    }
                 }
                 Path moduleFile = argument.folder().resolve(BuildStep.MODULE);
                 if (Files.isRegularFile(moduleFile)) {
@@ -1110,6 +1141,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
                 launcher.store(context.next().resolve("launcher.properties"));
             }
+            if (!attached.isEmpty()) {
+                attached.store(context.next().resolve(BuildStep.AGENTS));
+            }
             if (moduleName != null) {
                 SequencedProperties jlink = new SequencedProperties();
                 jlink.setProperty("--add-modules", moduleName);
@@ -1134,7 +1168,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             if (!staged || tests && !stagesTests) {
                 Files.createFile(context.next().resolve(Inventory.UNSTAGED));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
 
     }

@@ -17,7 +17,7 @@ import build.jenesis.step.ProcessHandler;
 public class JDepsModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
-    private static final String STRICT = "strict.jdeps", REPORT = BuildStep.REPORTS + "jdeps/jdeps.txt";
+    private static final String STRICT = "jdeps.strict", REPORT = BuildStep.REPORTS + "jdeps/jdeps.txt";
     private static final Pattern FINDING = Pattern.compile("^\\s+(\\S+)\\s+->\\s+(\\S+)\\s+(JDK (?:removed )?internal API.*?)\\s*$"),
             REPLACEMENT = Pattern.compile("^(\\S+)\\s{2,}(\\S.*?)\\s*$");
 

@@ -43,7 +43,7 @@ class-path jar already and gets nothing.
 A module that ships its own `META-INF/services/<service>` for a service it also
 `provides` fails the build, since the build writes that file itself.
 
-`-Djenesis.generate.classpath=false` switches the step off, in a profile if need
+`-Djenesis.classpath.generate=false` switches the step off, in a profile if need
 be, without deleting the file.
 
 Layout
