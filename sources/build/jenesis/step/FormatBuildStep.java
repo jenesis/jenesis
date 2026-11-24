@@ -107,7 +107,7 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
             throws IOException {
         return super.apply(executor, context, arguments).thenCompose(result -> {
             if (!result.next()) {
-                return CompletableFuture.completedStage(result);
+                return CompletableFuture.completedStage(result.cached(verify));
             }
             try {
                 HashFunction hash = new HashDigestFunction("SHA-256");
@@ -119,7 +119,7 @@ public abstract class FormatBuildStep extends ProcessBuildStep {
                     after.putAll(formattable(argument.folder(), hash, executor));
                 }
                 HashFunction.write(context.next().resolve(FORMATTED), after);
-                return CompletableFuture.completedStage(result);
+                return CompletableFuture.completedStage(result.cached(verify));
             } catch (IOException e) {
                 return CompletableFuture.failedStage(e);
             }

@@ -3095,7 +3095,7 @@ public class MavenProjectTest {
             values.setProperty("version", "2");
             values.setProperty("scm.tag", "v2");
             values.store(context.next().resolve(BuildStep.METADATA));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "file", "command");
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
@@ -3230,7 +3230,7 @@ public class MavenProjectTest {
             SequencedProperties values = new SequencedProperties();
             values.setProperty("version", "2");
             values.store(context.next().resolve(BuildStep.METADATA));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "command");
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
@@ -3286,7 +3286,7 @@ public class MavenProjectTest {
             SequencedProperties values = new SequencedProperties();
             values.setProperty("version", "2");
             values.store(context.next().resolve(BuildStep.METADATA));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "command");
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
@@ -3321,7 +3321,7 @@ public class MavenProjectTest {
             SequencedProperties values = new SequencedProperties();
             values.setProperty("version", "2");
             values.store(context.next().resolve(BuildStep.METADATA));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         commanded.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver), "command");
         commanded.execute(Runnable::run).toCompletableFuture().join();

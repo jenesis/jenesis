@@ -155,7 +155,7 @@ public class LicenseHeaderModule implements BuildExecutorModule {
                                 .map(entry -> "  " + entry.getKey() + ": " + entry.getValue())
                                 .collect(Collectors.joining("\n")));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult().cached(verify));
         }
     }
 }

@@ -339,7 +339,7 @@ public class Inventory implements BuildStep {
             if (!inventory.isEmpty()) {
                 inventory.store(context.next().resolve(INVENTORY));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
         SequencedSet<Path> runtime = new LinkedHashSet<>(artifacts);
         for (Map.Entry<String, Path> entry : closureJars.entrySet()) {
@@ -562,7 +562,7 @@ public class Inventory implements BuildStep {
         if (!inventory.isEmpty()) {
             inventory.store(context.next().resolve(INVENTORY));
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     private String key(String token) {

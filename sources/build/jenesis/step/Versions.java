@@ -155,7 +155,7 @@ public class Versions implements BuildStep {
                 }
             });
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     private static void mergeAttributes(Attributes target, Attributes source, Path file) {

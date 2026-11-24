@@ -106,7 +106,7 @@ public class AssemblyDescriptorTest {
     private static BuildExecutorModule writing(String name) {
         return (executor, _) -> executor.addStep(name, (_, context, _) -> {
             Files.writeString(context.next().resolve(name + ".txt"), name);
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
     }
 

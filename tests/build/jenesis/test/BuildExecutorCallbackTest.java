@@ -168,7 +168,7 @@ public class BuildExecutorCallbackTest {
     @Test
     public void a_build_records_its_steps_in_the_target_folder() throws IOException {
         BuildExecutor executor = new BuildExecutor.Configuration().progress(false).of(target);
-        executor.addStep("foo", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+        executor.addStep("foo", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()));
         executor.addStep("bar", (_, context, _) -> {
             Files.writeString(context.supplement().resolve("log"), "evidence");
             throw new IllegalArgumentException("bar is broken");
@@ -193,7 +193,7 @@ public class BuildExecutorCallbackTest {
         List<List<Map<String, Object>>> builds = new ArrayList<>();
         for (int build = 0; build < 2; build++) {
             BuildExecutor executor = new BuildExecutor.Configuration().progress(false).of(target);
-            executor.addStep("foo", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+            executor.addStep("foo", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()));
             executor.execute(Runnable::run).toCompletableFuture().join();
             builds.add(events());
         }
@@ -212,7 +212,7 @@ public class BuildExecutorCallbackTest {
     @Test
     public void a_build_records_a_selector_it_refuses() throws IOException {
         BuildExecutor executor = new BuildExecutor.Configuration().progress(false).of(target);
-        executor.addStep("foo", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+        executor.addStep("foo", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()));
         assertThatThrownBy(() -> executor.execute(Runnable::run, "bar")).hasMessageContaining("Unknown selector: bar");
         assertThat(events().getLast())
                 .as("a selector refused before any step ran still ends the file, so a reader is not left waiting")
@@ -223,7 +223,7 @@ public class BuildExecutorCallbackTest {
     @Test
     public void a_build_records_no_events_when_switched_off() throws IOException {
         BuildExecutor executor = new BuildExecutor.Configuration().progress(false).events(false).of(target);
-        executor.addStep("foo", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+        executor.addStep("foo", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()));
         executor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(target.resolve(BuildExecutor.EVENTS)).doesNotExist();
     }

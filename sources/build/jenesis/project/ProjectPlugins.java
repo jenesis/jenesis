@@ -658,7 +658,7 @@ public record ProjectPlugins(Path pins,
             }
             located.store(context.next().resolve(ROOT));
             metadata.store(context.next().resolve(METADATA));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -722,7 +722,7 @@ public record ProjectPlugins(Path pins,
             if (!additions.isEmpty()) {
                 additions.store(context.next().resolve(Inventory.INVENTORY));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -764,7 +764,7 @@ public record ProjectPlugins(Path pins,
                     }
                 }
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -778,7 +778,7 @@ public record ProjectPlugins(Path pins,
             SequencedProperties sealed = new SequencedProperties();
             BuildStep.listing(arguments).forEach(sealed::setProperty);
             sealed.store(context.next().resolve("sealed.properties"));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -803,7 +803,7 @@ public record ProjectPlugins(Path pins,
                 throw new IllegalStateException("An inspection changed what it inspects: " + changed
                         + " - an inspection writes only into its own output");
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 }

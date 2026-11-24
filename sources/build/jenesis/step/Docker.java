@@ -84,7 +84,7 @@ public class Docker implements BuildStep {
         Path folder = context.next().resolve(DOCKER);
         String instructions = jpackage == null ? launched(folder, arguments) : packaged(folder, jpackage, arguments);
         if (instructions == null) {
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
         List<Path> folders = arguments.values().stream()
                 .filter(argument -> !argument.removed())
@@ -140,7 +140,7 @@ public class Docker implements BuildStep {
             separator = " \\\n      ";
         }
         Files.writeString(folder.resolve("Dockerfile"), dockerfile.append('\n').append(instructions).toString());
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     private static String packaged(Path folder,

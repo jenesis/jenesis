@@ -77,7 +77,7 @@ public class Group implements BuildStep {
         SequencedProperties groups = new SequencedProperties();
         edges.forEach((name, targets) -> groups.setProperty(name, String.join(",", targets)));
         groups.store(context.next().resolve(GROUPS));
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     private static boolean reaches(Map<String, SequencedSet<String>> edges, String origin, String target) {

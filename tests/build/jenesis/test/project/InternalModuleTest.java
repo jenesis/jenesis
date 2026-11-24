@@ -102,7 +102,7 @@ public class InternalModuleTest {
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "hello");
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 });
                             }
                         }
@@ -140,7 +140,7 @@ public class InternalModuleTest {
                                                               java.util.Map<String, build.jenesis.Resolver> resolvers) {
                                 BuildStep step = (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "hello");
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 };
                                 return step.asModule("marker");
                             }
@@ -155,7 +155,7 @@ public class InternalModuleTest {
                 Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
         buildExecutor.addStep("after", (_, context, arguments) -> {
             Files.copy(arguments.firstEntry().getValue().folder().resolve("out.txt"), context.next().resolve("out.txt"));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, "internal/marker");
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
@@ -240,7 +240,7 @@ public class InternalModuleTest {
                                     String count = String.valueOf(++created);
                                     return (BuildExecutor executor, SequencedMap<String, Path> inherited) -> executor.addStep("marker", (_, context, _) -> {
                                         Files.writeString(context.next().resolve("created.txt"), count);
-                                        return CompletableFuture.completedStage(new BuildStepResult(true));
+                                        return CompletableFuture.completedStage(new BuildStepResult());
                                     });
                                 }
                             }
@@ -291,7 +291,7 @@ public class InternalModuleTest {
                                 return new Observation(new Engine(group, properties.get("option")),
                                         (executor, _) -> executor.addStep("report", (_, context, _) -> {
                                             Files.writeString(context.next().resolve("report.txt"), group);
-                                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                                            return CompletableFuture.completedStage(new BuildStepResult());
                                         }));
                             }
                             public record Engine(String name, String option) implements ObservabilityEngine {
@@ -322,7 +322,7 @@ public class InternalModuleTest {
                     + observation.engine().commands(Collections.emptyNavigableMap(), Path.of("output"));
             executor.addStep("engine", (_, context, _) -> {
                 Files.writeString(context.next().resolve("engine.txt"), engine);
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             });
             executor.addModule("report", observation.report());
         }, "prepared");
@@ -362,7 +362,7 @@ public class InternalModuleTest {
                                 BuildExecutorModule compiler = (BuildExecutor executor, SequencedMap<String, Path> inherited) ->
                                         executor.addStep("compile", (_, context, _) -> {
                                             Files.writeString(context.next().resolve("compiled.txt"), target);
-                                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                                            return CompletableFuture.completedStage(new BuildStepResult());
                                         });
                                 return new Language(new LinkedHashSet<>(List.of(".greet")), Language.Order.AFTER_JAVAC, compiler, null);
                             }
@@ -465,7 +465,7 @@ public class InternalModuleTest {
                     + framework.failed(Path.of("supplement"), Path.of("output")).isPresent();
             executor.addStep("described", (_, context, _) -> {
                 Files.writeString(context.next().resolve("framework.txt"), described);
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             });
         }, "prepared");
 
@@ -498,7 +498,7 @@ public class InternalModuleTest {
                                 String handed = new TreeSet<>(repositories.keySet()) + " " + new TreeSet<>(resolvers.keySet());
                                 return (executor, _) -> executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), handed);
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 });
                             }
                         }
@@ -539,7 +539,7 @@ public class InternalModuleTest {
                                                               java.util.Map<String, build.jenesis.Resolver> resolvers) {
                                 return (executor, _) -> executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), group);
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 });
                             }
                         }
@@ -604,7 +604,7 @@ public class InternalModuleTest {
                                                               java.util.Map<String, build.jenesis.Resolver> resolvers) {
                                 return (executor, _) -> executor.addStep("resolved", (_, context, _) -> {
                                     Files.writeString(context.next().resolve(BuildStep.DEPENDENCIES), "%s");
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 });
                             }
                         }
@@ -640,7 +640,7 @@ public class InternalModuleTest {
                     public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                         executor.addStep("marker", (_, context, _) -> {
                             Files.writeString(context.next().resolve("out.txt"), "%s");
-                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                            return CompletableFuture.completedStage(new BuildStepResult());
                         });
                     }
                 }
@@ -719,7 +719,7 @@ public class InternalModuleTest {
                                 String text = greeting;
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), text);
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 });
                             }
                         }
@@ -763,7 +763,7 @@ public class InternalModuleTest {
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "hello");
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 });
                             }
                         }
@@ -805,13 +805,13 @@ public class InternalModuleTest {
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("first", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("payload.txt"), "produced");
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 });
                                 executor.addStep("second", (_, context, args) -> {
                                     Path predecessor = args.get("first").folder();
                                     String content = Files.readString(predecessor.resolve("payload.txt"));
                                     Files.writeString(context.next().resolve("out.txt"), "seen:" + content);
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 }, "first");
                             }
                         }
@@ -854,7 +854,7 @@ public class InternalModuleTest {
                                 executor.addModule("inner", (sub, _) -> {
                                     sub.addStep("marker", (_, context, _) -> {
                                         Files.writeString(context.next().resolve("out.txt"), "nested");
-                                        return CompletableFuture.completedStage(new BuildStepResult(true));
+                                        return CompletableFuture.completedStage(new BuildStepResult());
                                     });
                                 });
                             }
@@ -895,12 +895,12 @@ public class InternalModuleTest {
                                 return this;
                             }
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
-                                executor.addStep("hidden", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
-                                executor.addStep("shown", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+                                executor.addStep("hidden", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()));
+                                executor.addStep("shown", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()));
                                 executor.addModule("inner", new BuildExecutorModule() {
                                     public void accept(BuildExecutor sub, SequencedMap<String, Path> ignored) {
-                                        sub.addStep("hidden", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
-                                        sub.addStep("shown", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+                                        sub.addStep("hidden", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()));
+                                        sub.addStep("shown", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()));
                                     }
                                     public Optional<String> resolve(String path) {
                                         return path.equals("hidden") ? Optional.empty() : Optional.of(path);
@@ -972,7 +972,7 @@ public class InternalModuleTest {
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "named");
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 });
                             }
                         }
@@ -1147,7 +1147,7 @@ public class InternalModuleTest {
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "hello");
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 });
                             }
                         }
@@ -1156,7 +1156,7 @@ public class InternalModuleTest {
         buildExecutor.addStep("manifests", (_, context, _) -> {
             Files.writeString(context.next().resolve("versions.properties"),
                     "main/module/build.jenesis=1.0.0 SHA-256/" + sha256(jenesisJar) + "\n");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
@@ -1194,7 +1194,7 @@ public class InternalModuleTest {
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "hello");
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 });
                             }
                         }
@@ -1203,7 +1203,7 @@ public class InternalModuleTest {
         buildExecutor.addStep("manifests", (_, context, _) -> {
             Files.writeString(context.next().resolve("versions.properties"),
                     "main/module/build.jenesis=1.0.0 SHA-256/" + "00".repeat(32) + "\n");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
@@ -1243,7 +1243,7 @@ public class InternalModuleTest {
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "hello");
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 });
                             }
                         }
@@ -1252,7 +1252,7 @@ public class InternalModuleTest {
         buildExecutor.addStep("manifests", (_, context, _) -> {
             Files.writeString(context.next().resolve("versions.properties"),
                     "main/module/build.jenesis=1.0.0 SHA-256/" + "00".repeat(32) + "\n");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         });
         buildExecutor.addModule("internal", InternalModule.ofEnvironment(Environment.NONE,
                 "module",
@@ -1303,7 +1303,7 @@ public class InternalModuleTest {
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "pinned");
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 });
                             }
                         }
@@ -1348,7 +1348,7 @@ public class InternalModuleTest {
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), "isolated");
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 });
                             }
                         }
@@ -1430,7 +1430,7 @@ public class InternalModuleTest {
                             public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
                                 executor.addStep("marker", (_, context, _) -> {
                                     Files.writeString(context.next().resolve("out.txt"), Tool.greeting());
-                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                    return CompletableFuture.completedStage(new BuildStepResult());
                                 });
                             }
                         }

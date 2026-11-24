@@ -191,7 +191,7 @@ public class PinPom implements BuildStep {
                 Files.writeString(pomFile, updated);
             }
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult().cached(false));
     }
 
     private static String expand(String token) {

@@ -101,7 +101,7 @@ public class ModularStaging implements BuildStep {
                 }
             }
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     private static Path single(List<Path> entries,

@@ -72,6 +72,6 @@ public class ImageStaging implements BuildStep {
                 });
             }
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 }

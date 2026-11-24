@@ -382,7 +382,7 @@ public class ProjectTest {
             SequencedProperties dependencies = new SequencedProperties();
             dependencies.setProperty(dependency, "missing.jar SHA-256/xyz");
             dependencies.store(context.next().resolve(BuildStep.DEPENDENCIES));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -601,26 +601,26 @@ public class ProjectTest {
                     .rootCause()
                     .hasMessage("the gate refuses");
             assertThat(project.plugins(new ProjectPlugins().release("announce", (_, _, _) ->
-                    CompletableFuture.completedStage(new BuildStepResult(true)))).build(Project.RELEASE).keySet())
+                    CompletableFuture.completedStage(new BuildStepResult()))).build(Project.RELEASE).keySet())
                     .as("a releaser runs within release")
                     .anyMatch(key -> key.startsWith(Project.RELEASE + "/" + ProjectPlugins.CUSTOM + "/announce"));
             SequencedMap<String, Path> staged = project.plugins(new ProjectPlugins().transform("site", (_, context, _) -> {
                 Path page = context.next().resolve("project/site/index.html");
                 Files.createDirectories(page.getParent());
                 Files.writeString(page, "site");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             })).build(Project.STAGE);
             assertThat(staged.get(Project.STAGE + "/" + ProjectPlugins.PROJECT).resolve("site/index.html"))
                     .as("what a transform places in the project is staged as it stands")
                     .hasContent("site");
             Project benched = project.plugins(new ProjectPlugins().goal("bench", (_, _, _) ->
-                    CompletableFuture.completedStage(new BuildStepResult(true))));
+                    CompletableFuture.completedStage(new BuildStepResult())));
             assertThat(benched.build().keySet())
                     .as("a goal runs only when it is named")
                     .noneMatch(key -> key.startsWith(Project.PLUGIN + "/"));
             SequencedMap<String, Path> summed = project.plugins(new ProjectPlugins().supplement("checksums", (_, context, _) -> {
                 Files.writeString(Files.createDirectories(context.next().resolve("project")).resolve("SHA256SUMS"), "sums");
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             })).build(Project.STAGE);
             assertThat(summed.get(Project.STAGE + "/" + ProjectPlugins.PROJECT).resolve("SHA256SUMS"))
                     .as("what a transform of stage adds joins the staged tree it names")

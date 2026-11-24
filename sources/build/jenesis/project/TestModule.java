@@ -968,7 +968,7 @@ public class TestModule implements BuildExecutorModule {
             if (!versions.isEmpty()) {
                 versions.store(context.next().resolve(BuildStep.VERSIONS));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
 
         private static String released(SequencedMap<String, String> pinned,
@@ -1149,7 +1149,7 @@ public class TestModule implements BuildExecutorModule {
             TestTags requested = TestTags.parse(tag);
             List<TestTags> ran = ran(context, arguments);
             if (requested.coveredBy(ran)) {
-                return CompletableFuture.completedStage(new BuildStepResult(false));
+                return CompletableFuture.completedStage(new BuildStepResult().next(false));
             }
             List<TestTags> covered = new ArrayList<>(ran);
             covered.add(requested);

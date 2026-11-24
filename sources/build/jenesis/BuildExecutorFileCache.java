@@ -47,7 +47,6 @@ public record BuildExecutorFileCache(Path root,
                                            String identity,
                                            byte[] step,
                                            SequencedMap<String, Map<Path, byte[]>> inputs,
-                                           boolean remote,
                                            Path target) throws IOException {
         if (!read) {
             return Optional.empty();
@@ -70,7 +69,7 @@ public record BuildExecutorFileCache(Path root,
             touch(entry);
             touch(folder);
         }
-        return Optional.of(new BuildStepResult(true));
+        return Optional.of(new BuildStepResult());
     }
 
     @Override
@@ -78,7 +77,6 @@ public record BuildExecutorFileCache(Path root,
                       String identity,
                       byte[] step,
                       SequencedMap<String, Map<Path, byte[]>> inputs,
-                      boolean remote,
                       Path output,
                       String digest,
                       Map<Path, byte[]> checksums) throws IOException {
@@ -104,8 +102,7 @@ public record BuildExecutorFileCache(Path root,
     public void touch(Executor executor,
                       String identity,
                       byte[] step,
-                      SequencedMap<String, Map<Path, byte[]>> inputs,
-                      boolean remote) {
+                      SequencedMap<String, Map<Path, byte[]>> inputs) {
         if (!touch || !write) {
             return;
         }

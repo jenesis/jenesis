@@ -144,7 +144,7 @@ public class Signatures extends ProcessBuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         if (verification == Verification.NONE) {
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
         SequencedMap<String, SequencedSet<String>> declared = new TreeMap<>();
         SequencedMap<String, String> resolved = new LinkedHashMap<>();
@@ -420,7 +420,7 @@ public class Signatures extends ProcessBuildStep {
             throw new IllegalStateException("Unverified dependency signatures:\n  "
                     + String.join("\n  ", violations));
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     private Path materialise(Executor executor,

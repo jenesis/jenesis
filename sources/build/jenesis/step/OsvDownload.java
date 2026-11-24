@@ -106,7 +106,7 @@ public class OsvDownload implements BuildStep {
             }
         }
         feed.store(context.next().resolve("advisories.properties"));
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 
     public static List<List<String>> identifiers(String response) {

@@ -60,6 +60,6 @@ public class DownloadModuleUris implements BuildStep {
             Files.deleteIfExists(temporary);
             throw t;
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult());
     }
 }

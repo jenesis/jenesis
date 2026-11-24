@@ -160,7 +160,7 @@ public record Classifiers(SequencedMap<String, SequencedMap<String, Path>> folde
                 }
                 Path module = argument.folder().resolve(MODULE);
                 if (Files.isRegularFile(module) && SequencedProperties.ofFiles(module).getProperty("test") != null) {
-                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                    return CompletableFuture.completedStage(new BuildStepResult());
                 }
                 inputs.add(argument.folder());
                 if (!Files.isDirectory(argument.folder().resolve(FOLDERS))) {
@@ -179,7 +179,7 @@ public record Classifiers(SequencedMap<String, SequencedMap<String, Path>> folde
                 properties.store(context.next().resolve(DORMANT));
             }
             if (classifiers.isEmpty()) {
-                return CompletableFuture.completedStage(new BuildStepResult(true));
+                return CompletableFuture.completedStage(new BuildStepResult());
             }
             if (jars.size() != 1) {
                 throw new IllegalStateException("A classifier publishes a variant of the module's jar, but the module"
@@ -224,7 +224,7 @@ public record Classifiers(SequencedMap<String, SequencedMap<String, Path>> folde
                         context.next().relativize(variant).toString().replace(File.separatorChar, '/'));
             }
             classified.store(context.next().resolve(CLASSIFIED));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
 
         private void write(String classifier, SequencedMap<Path, String> folders, Path jar, Path variant)

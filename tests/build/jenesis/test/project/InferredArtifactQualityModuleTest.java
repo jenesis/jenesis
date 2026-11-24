@@ -33,7 +33,7 @@ public class InferredArtifactQualityModuleTest {
         executor.addSource("project", project);
         executor.addModule("quality", new InferredArtifactQualityModule(new LinkedHashSet<>(), Map.of(), Map.of()).custom("lines", (_, context, arguments) -> {
             Files.writeString(context.next().resolve("checked.txt"), String.valueOf(arguments.size()));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }), "project");
 
         assertThat(executor.execute().get("quality/custom/lines").resolve("checked.txt")).hasContent("1");
@@ -42,9 +42,9 @@ public class InferredArtifactQualityModuleTest {
     @Test
     public void refuses_a_check_whose_name_is_taken() {
         InferredArtifactQualityModule module = new InferredArtifactQualityModule(new LinkedHashSet<>(), Map.of(), Map.of())
-                .custom("lines", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+                .custom("lines", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult()));
 
-        assertThatThrownBy(() -> module.custom("lines", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true))))
+        assertThatThrownBy(() -> module.custom("lines", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult())))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("is added already");
     }

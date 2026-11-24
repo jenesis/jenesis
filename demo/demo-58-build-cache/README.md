@@ -105,28 +105,28 @@ a local hit also sends the server a best-effort `HEAD` (it never transfers the
 body), and the server treats it as a read, bumping the entry's recency just as a
 `GET` would. Each tier keeps its own LRU and both stay warm.
 
-A step that stays local
------------------------
+A step no cache stands in for
+-----------------------------
 
-Not every step is worth sending over a network. A step that copies a module's
-resolved dependencies into its own folder produces a large output from files the
-machine already has, so uploading it costs more than re-running it would. Such a
-step declines the shared tier:
+A step is cached because its output is all it does. A step that does more - one
+that publishes, or writes a file into the project as `pin` and the IDE steps do -
+has to run on this machine every time, since restoring its folder would leave the
+effect out. Such a step says so on the result it returns:
 
-    public class Copy implements BuildStep {
+    public class Publish implements BuildStep {
 
         @Override
-        public boolean shouldCacheRemotely() {
-            return false;
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments) {
+            ...
+            return CompletableFuture.completedStage(new BuildStepResult().cached(false));
         }
-
-        ...
     }
 
-Nothing else changes: the step is still cached under `.jenesis/cache`, so a
-rebuild on this machine still skips the work, and it is neither fetched from,
-stored in nor announced to a cache server. The default is `true`, so a step that
-says nothing is cached in both tiers as before.
+Its output is stored in no cache, neither under `.jenesis/cache` nor on a server,
+so no later build finds an entry to restore in its place. A result that says
+nothing, `new BuildStepResult()`, is stored in every tier as before.
 
 Layout
 ------

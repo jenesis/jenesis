@@ -383,7 +383,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
             properties.setProperty(RESOURCE, Boolean.toString(flags[1]));
             properties.setProperty(EXTENSIONS, String.join(",", extensions));
             properties.store(context.next().resolve(SCAN_FILE));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -504,7 +504,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
             if (!poms.isEmpty()) {
                 poms.store(context.next().resolve(Dependencies.POMS));
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
 
         private void link(BuildStepArgument argument,
@@ -568,7 +568,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                     }
                 });
             }
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 }

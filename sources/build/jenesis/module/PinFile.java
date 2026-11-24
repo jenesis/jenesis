@@ -127,6 +127,6 @@ public record PinFile(SequencedSet<String> paths,
             Files.createDirectories(parent);
         }
         pins.store(file);
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+        return CompletableFuture.completedStage(new BuildStepResult().cached(false));
     }
 }

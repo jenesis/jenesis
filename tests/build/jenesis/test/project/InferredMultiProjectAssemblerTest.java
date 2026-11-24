@@ -696,7 +696,7 @@ public class InferredMultiProjectAssemblerTest {
                                                       SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.SOURCES + "sample")).resolve("Generated.java"),
                     "package sample; public class Generated { }");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -1018,7 +1018,7 @@ public class InferredMultiProjectAssemblerTest {
         SequencedMap<String, BuildExecutorModule> custom = new LinkedHashMap<>();
         custom.put("prepare", (executor, inherited) -> executor.addStep("inputs", (_, context, arguments) -> {
             Files.writeString(context.next().resolve("inputs.txt"), String.join("\n", arguments.sequencedKeySet()));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }, inherited.sequencedKeySet()));
         SequencedMap<String, Path> outputs = fixture.execute(new InferredMultiProjectAssembler().custom(custom),
                 "build/prepare",
@@ -1098,7 +1098,7 @@ public class InferredMultiProjectAssemblerTest {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Files.write(context.next().resolve("inputs.txt"), arguments.sequencedKeySet());
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -1257,7 +1257,7 @@ public class InferredMultiProjectAssemblerTest {
             Files.writeString(Files.createDirectories(context.next().resolve(BuildStep.CLASSES + "sample")).resolve("Sample.class"),
                     base + suffix);
             Files.writeString(context.next().resolve("transformed.properties"), suffix + "=\n");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -1299,7 +1299,7 @@ public class InferredMultiProjectAssemblerTest {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Files.writeString(Files.createDirectories(context.next().resolve(JPackage.PACKAGES)).resolve(name), "package");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 
@@ -1320,7 +1320,7 @@ public class InferredMultiProjectAssemblerTest {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             Files.writeString(context.next().resolve("marker.txt"), "");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 

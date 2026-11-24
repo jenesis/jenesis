@@ -134,7 +134,7 @@ public class LauncherModule implements BuildExecutorModule {
             SequencedProperties requires = new SequencedProperties();
             requires.setProperty(group + "/runtime/maven/build.jenesis/build.jenesis.launcher/RELEASE", "");
             requires.store(context.next().resolve(BuildStep.REQUIRES));
-            return CompletableFuture.completedStage(new BuildStepResult(true));
+            return CompletableFuture.completedStage(new BuildStepResult());
         }
     }
 }
