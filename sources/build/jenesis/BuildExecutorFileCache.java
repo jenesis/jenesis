@@ -59,11 +59,31 @@ public record BuildExecutorFileCache(Path root,
         if (!Files.isRegularFile(manifest)) {
             return Optional.empty();
         }
-        Map<Path, byte[]> checksums;
+        Optional<Map<Path, byte[]>> checksums;
+        try {
+            checksums = restore(executor, Files.readAllLines(manifest), target, digest);
+        } catch (IOException _) {
+            checksums = Optional.empty();
+        }
+        if (checksums.isEmpty()) {
+            if (write) {
+                Files.deleteIfExists(manifest);
+            }
+            return checksums;
+        }
+        if (touch && write) {
+            touch(manifest);
+            touch(folder);
+        }
+        return checksums;
+    }
+
+    Optional<Map<Path, byte[]>> restore(Executor executor, List<String> lines, Path target, String digest) {
+        Path store = root.resolve(digest.toLowerCase(Locale.ROOT));
         try {
             Path base = target.normalize();
             Map<Path, String> expected = new LinkedHashMap<>();
-            for (String line : Files.readAllLines(manifest)) {
+            for (String line : lines) {
                 String[] entry = line.split(" ", 3);
                 Path destination = BuildStep.resolveContained(base, entry[2]);
                 if (entry[0].equals(DIRECTORY)) {
@@ -78,7 +98,7 @@ public record BuildExecutorFileCache(Path root,
                 }
                 expected.put(Path.of(entry[2]), entry[0]);
             }
-            checksums = HashFunction.read(target, new HashDigestFunction(digest), executor);
+            Map<Path, byte[]> checksums = HashFunction.read(target, new HashDigestFunction(digest), executor);
             boolean intact = checksums.keySet().equals(expected.keySet());
             for (Map.Entry<Path, String> entry : expected.entrySet()) {
                 byte[] checksum = checksums.get(entry.getKey());
@@ -90,20 +110,13 @@ public record BuildExecutorFileCache(Path root,
                 }
             }
             if (!intact) {
-                throw new IOException("A file of " + manifest + " is not what its checksum names");
+                throw new IOException("A file restored to " + target + " is not what its checksum names");
             }
+            return Optional.of(checksums);
         } catch (IOException | RuntimeException _) {
             clean(target);
-            if (write) {
-                Files.deleteIfExists(manifest);
-            }
             return Optional.empty();
         }
-        if (touch && write) {
-            touch(manifest);
-            touch(folder);
-        }
-        return Optional.of(checksums);
     }
 
     @Override
@@ -126,63 +139,10 @@ public record BuildExecutorFileCache(Path root,
         }
         Path temporary = null;
         try {
+            List<String> lines = persist(output, digest, checksums);
             Files.createDirectories(folder);
-            try {
-                Files.createFile(root.resolve(BuildExecutor.SKIP_MARKER));
-            } catch (FileAlreadyExistsException _) {
-            }
-            HashFunction hash = new HashDigestFunction(digest);
-            SequencedMap<String, String> lines = new TreeMap<>();
-            Files.walkFileTree(output, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes)
-                        throws IOException {
-                    try (DirectoryStream<Path> children = Files.newDirectoryStream(directory)) {
-                        if (!directory.equals(output) && !children.iterator().hasNext()) {
-                            String name = output.relativize(directory).toString().replace(File.separatorChar, '/');
-                            lines.put(name, DIRECTORY + " 0 " + name);
-                        }
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                    byte[] checksum = checksums.get(output.relativize(file));
-                    String name = output.relativize(file).toString().replace(File.separatorChar, '/'),
-                            hex = HexFormat.of().formatHex(checksum == null ? hash.hash(file) : checksum);
-                    if (name.indexOf('\n') >= 0 || name.indexOf('\r') >= 0) {
-                        throw new IOException("A cache holds no file named across lines: " + file);
-                    }
-                    Path blob = blob(store, hex);
-                    if (!Files.exists(blob)) {
-                        Files.createDirectories(blob.getParent());
-                        boolean linked = false;
-                        if (links && !Files.isSymbolicLink(file)) {
-                            try {
-                                Files.createLink(blob, file);
-                                linked = true;
-                            } catch (FileAlreadyExistsException _) {
-                                linked = true;
-                            } catch (UnsupportedOperationException | FileSystemException _) {
-                            }
-                        }
-                        if (!linked) {
-                            Path copy = Files.createTempFile(blob.getParent(), "tmp", null);
-                            try {
-                                Files.copy(file, copy, StandardCopyOption.REPLACE_EXISTING);
-                                Files.move(copy, blob, StandardCopyOption.REPLACE_EXISTING);
-                            } finally {
-                                Files.deleteIfExists(copy);
-                            }
-                        }
-                    }
-                    lines.put(name, hex + " " + attributes.size() + " " + name);
-                    return FileVisitResult.CONTINUE;
-                }
-            });
             temporary = Files.createTempFile(folder, "tmp", null);
-            Files.write(temporary, lines.values());
+            Files.write(temporary, lines);
             try {
                 Files.move(temporary, manifest, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException _) {
@@ -192,9 +152,7 @@ public record BuildExecutorFileCache(Path root,
             if (evict(folder, versions) | evict(store.resolve(STEPS), steps)) {
                 sweep(store);
             }
-            if (size > 0) {
-                evictBySize(store.resolve(BLOBS));
-            }
+            trim(digest);
         } catch (IOException | RuntimeException _) {
         } finally {
             if (temporary != null) {
@@ -238,6 +196,111 @@ public record BuildExecutorFileCache(Path root,
                 }
             });
         }
+    }
+
+    List<String> persist(Path output, String digest, Map<Path, byte[]> checksums) throws IOException {
+        Path store = root.resolve(digest.toLowerCase(Locale.ROOT));
+        Files.createDirectories(store.resolve(BLOBS));
+        try {
+            Files.createFile(root.resolve(BuildExecutor.SKIP_MARKER));
+        } catch (FileAlreadyExistsException _) {
+        }
+        HashFunction hash = new HashDigestFunction(digest);
+        SequencedMap<String, String> lines = new TreeMap<>();
+        Files.walkFileTree(output, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes)
+                    throws IOException {
+                try (DirectoryStream<Path> children = Files.newDirectoryStream(directory)) {
+                    if (!directory.equals(output) && !children.iterator().hasNext()) {
+                        String name = output.relativize(directory).toString().replace(File.separatorChar, '/');
+                        lines.put(name, DIRECTORY + " 0 " + name);
+                    }
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                byte[] checksum = checksums.get(output.relativize(file));
+                String name = output.relativize(file).toString().replace(File.separatorChar, '/'),
+                        hex = HexFormat.of().formatHex(checksum == null ? hash.hash(file) : checksum);
+                if (name.indexOf('\n') >= 0 || name.indexOf('\r') >= 0) {
+                    throw new IOException("A cache holds no file named across lines: " + file);
+                }
+                Path blob = blob(store, hex);
+                if (!Files.exists(blob)) {
+                    Files.createDirectories(blob.getParent());
+                    boolean linked = false;
+                    if (links && !Files.isSymbolicLink(file)) {
+                        try {
+                            Files.createLink(blob, file);
+                            linked = true;
+                        } catch (FileAlreadyExistsException _) {
+                            linked = true;
+                        } catch (UnsupportedOperationException | FileSystemException _) {
+                        }
+                    }
+                    if (!linked) {
+                        Path copy = Files.createTempFile(blob.getParent(), "tmp", null);
+                        try {
+                            Files.copy(file, copy, StandardCopyOption.REPLACE_EXISTING);
+                            Files.move(copy, blob, StandardCopyOption.REPLACE_EXISTING);
+                        } finally {
+                            Files.deleteIfExists(copy);
+                        }
+                    }
+                }
+                lines.put(name, hex + " " + attributes.size() + " " + name);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return List.copyOf(lines.values());
+    }
+
+    boolean admit(String digest, String hex, InputStream content) throws IOException {
+        Path blob = blob(root.resolve(digest.toLowerCase(Locale.ROOT)), hex);
+        Files.createDirectories(blob.getParent());
+        try {
+            Files.createFile(root.resolve(BuildExecutor.SKIP_MARKER));
+        } catch (FileAlreadyExistsException _) {
+        }
+        MessageDigest message;
+        try {
+            message = MessageDigest.getInstance(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        Path copy = Files.createTempFile(blob.getParent(), "tmp", null);
+        try {
+            try (OutputStream out = new DigestOutputStream(Files.newOutputStream(copy), message)) {
+                content.transferTo(out);
+            }
+            if (!HexFormat.of().formatHex(message.digest()).equals(hex)) {
+                return false;
+            }
+            Files.move(copy, blob, StandardCopyOption.REPLACE_EXISTING);
+            return true;
+        } finally {
+            Files.deleteIfExists(copy);
+        }
+    }
+
+    Path file(String digest, String hex) {
+        return blob(root.resolve(digest.toLowerCase(Locale.ROOT)), hex);
+    }
+
+    void trim(String digest) {
+        if (size > 0) {
+            try {
+                evictBySize(root.resolve(digest.toLowerCase(Locale.ROOT)).resolve(BLOBS));
+            } catch (IOException _) {
+            }
+        }
+    }
+
+    public BuildExecutorFileCache size(long size) {
+        return new BuildExecutorFileCache(root, algorithm, links, steps, versions, size, ttl, touch, lru, read, write);
     }
 
     @Override

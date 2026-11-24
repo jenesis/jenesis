@@ -5,9 +5,13 @@ import build.jenesis.Environment.Setting;
 
 public final class BuildExecutorHttpCache implements BuildExecutorCache {
 
-    public static final String KEY = "Jenesis-Cache-Key", PROJECT = "Jenesis-Cache-Project";
+    public static final String KEY = "Jenesis-Cache-Key",
+            PROJECT = "Jenesis-Cache-Project",
+            DIGEST = "Jenesis-Cache-Digest";
+    private static final Set<String> ARCHIVES = Set.of("jar", "zip", "jmod", "war", "ear", "gz", "tgz", "xz", "zst", "png", "jpg");
 
     private final URI uri;
+    private final BuildExecutorFileCache local;
     private final String token;
     private final String project;
     private final String algorithm;
@@ -16,13 +20,26 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     private final boolean read;
     private final boolean write;
     private final boolean insecure;
+    private final AtomicBoolean trimmed = new AtomicBoolean();
 
     public BuildExecutorHttpCache(URI uri) {
-        this(uri, null, null, "SHA-256", Duration.parse("PT1S"), Duration.parse("PT10S"), true, true, false);
+        this(uri,
+                new BuildExecutorFileCache(Path.of(System.getProperty("user.home"), ".jenesis", "cache")),
+                null,
+                null,
+                "SHA-256",
+                Duration.parse("PT1S"),
+                Duration.parse("PT10S"),
+                true,
+                true,
+                false);
     }
 
     public static BuildExecutorHttpCache ofEnvironment(Environment environment, URI uri) {
         BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri);
+        Path folder = environment.path("cache.local", Setting.MACHINE);
+        BuildExecutorFileCache local = folder == null ? cache.local : new BuildExecutorFileCache(folder);
+        cache = cache.local(local.size() > 0 ? local : local.size(10L << 30));
         if (environment.getProperty("cache.key", Setting.MACHINE) != null
                 || System.getenv("JENESIS_CACHE_KEY") != null) {
             throw new IllegalArgumentException("jenesis.cache.key and JENESIS_CACHE_KEY are named jenesis.cache.token"
@@ -52,6 +69,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     }
 
     private BuildExecutorHttpCache(URI uri,
+                                   BuildExecutorFileCache local,
                                    String token,
                                    String project,
                                    String algorithm,
@@ -61,6 +79,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                                    boolean write,
                                    boolean insecure) {
         this.uri = uri;
+        this.local = local;
         this.token = token;
         this.project = project;
         this.algorithm = algorithm;
@@ -72,35 +91,39 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     }
 
     public BuildExecutorHttpCache insecure(boolean insecure) {
-        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+    }
+
+    public BuildExecutorHttpCache local(BuildExecutorFileCache local) {
+        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache token(String token) {
-        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache project(String project) {
-        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache algorithm(String algorithm) {
-        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache connectTimeout(Duration connectTimeout) {
-        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache read(boolean read) {
-        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache write(boolean write) {
-        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache readTimeout(Duration readTimeout) {
-        return new BuildExecutorHttpCache(uri, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
+        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     @Override
@@ -114,21 +137,63 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         if (!read || !remote) {
             return Optional.empty();
         }
-        HttpURLConnection connection = connect("GET", step, inputs);
+        List<String> lines;
+        HttpURLConnection manifest = connect("GET", address(step, inputs), digest);
         try {
-            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
+            if (manifest.getResponseCode() != HttpURLConnection.HTTP_OK) {
                 return Optional.empty();
             }
-            try (InputStream stream = connection.getInputStream()) {
-                unzip(stream, target);
+            try (InputStream stream = manifest.getInputStream()) {
+                lines = new String(stream.readAllBytes(), StandardCharsets.UTF_8).lines()
+                        .filter(line -> !line.isBlank())
+                        .toList();
             }
-            return Optional.of(HashFunction.read(target, new HashDigestFunction(digest), executor));
         } catch (IOException _) {
-            clean(target);
             return Optional.empty();
         } finally {
-            connection.disconnect();
+            manifest.disconnect();
         }
+        Set<String> missing = new LinkedHashSet<>();
+        for (String line : lines) {
+            String[] entry = line.split(" ", 3);
+            if (entry.length < 3 || !entry[0].equals(BuildExecutorFileCache.DIRECTORY) && !isHex(entry[0])) {
+                return Optional.empty();
+            }
+            if (!entry[0].equals(BuildExecutorFileCache.DIRECTORY) && !Files.isRegularFile(local.file(digest, entry[0]))) {
+                missing.add(entry[0]);
+            }
+        }
+        if (!missing.isEmpty()) {
+            byte[] wanted = String.join("\n", missing).getBytes(StandardCharsets.UTF_8);
+            HttpURLConnection blobs = connect("POST", "blobs", digest);
+            try {
+                blobs.setDoOutput(true);
+                blobs.setFixedLengthStreamingMode(wanted.length);
+                blobs.setRequestProperty("Content-Type", "text/plain");
+                try (OutputStream out = blobs.getOutputStream()) {
+                    out.write(wanted);
+                }
+                if (blobs.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                    return Optional.empty();
+                }
+                try (ZipInputStream zip = new ZipInputStream(blobs.getInputStream())) {
+                    for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+                        if (missing.contains(entry.getName()) && local.admit(digest, entry.getName(), zip)) {
+                            missing.remove(entry.getName());
+                        }
+                    }
+                }
+            } catch (IOException _) {
+                return Optional.empty();
+            } finally {
+                blobs.disconnect();
+            }
+            trim(executor, digest);
+            if (!missing.isEmpty()) {
+                return Optional.empty();
+            }
+        }
+        return local.restore(executor, lines, target, digest);
     }
 
     @Override
@@ -140,8 +205,81 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                       Path output,
                       String digest,
                       Map<Path, byte[]> checksums) throws IOException {
-        if (write && remote) {
-            upload(step, inputs, output);
+        if (!write || !remote) {
+            return;
+        }
+        Path temporary = null;
+        try {
+            List<String> lines = local.persist(output, digest, checksums);
+            trim(executor, digest);
+            byte[] manifest = lines.stream()
+                    .map(line -> line + "\n")
+                    .collect(Collectors.joining())
+                    .getBytes(StandardCharsets.UTF_8);
+            for (int attempt = 0; attempt < 2; attempt++) {
+                List<String> missing;
+                HttpURLConnection connection = connect("PUT", address(step, inputs), digest);
+                try {
+                    connection.setDoOutput(true);
+                    connection.setFixedLengthStreamingMode(manifest.length);
+                    connection.setRequestProperty("Content-Type", "text/plain");
+                    try (OutputStream out = connection.getOutputStream()) {
+                        out.write(manifest);
+                    }
+                    if (connection.getResponseCode() != HttpURLConnection.HTTP_CONFLICT || attempt > 0) {
+                        return;
+                    }
+                    try (InputStream stream = connection.getErrorStream()) {
+                        missing = stream == null
+                                ? List.of()
+                                : new String(stream.readAllBytes(), StandardCharsets.UTF_8).lines().toList();
+                    }
+                } finally {
+                    connection.disconnect();
+                }
+                Map<String, String> names = new HashMap<>();
+                for (String line : lines) {
+                    String[] entry = line.split(" ", 3);
+                    names.put(entry[0], entry[2]);
+                }
+                temporary = Files.createTempFile("jenesis-cache", ".zip");
+                try (ZipOutputStream zip = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(temporary)))) {
+                    for (String hex : new LinkedHashSet<>(missing)) {
+                        String name = names.get(hex);
+                        if (name == null || hex.equals(BuildExecutorFileCache.DIRECTORY)) {
+                            continue;
+                        }
+                        zip.setLevel(ARCHIVES.contains(name.substring(name.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT))
+                                ? Deflater.NO_COMPRESSION
+                                : Deflater.BEST_SPEED);
+                        zip.putNextEntry(new ZipEntry(hex));
+                        Files.copy(local.file(digest, hex), zip);
+                        zip.closeEntry();
+                    }
+                }
+                HttpURLConnection upload = connect("PUT", "blobs", digest);
+                try {
+                    upload.setDoOutput(true);
+                    upload.setFixedLengthStreamingMode(Files.size(temporary));
+                    upload.setRequestProperty("Content-Type", "application/zip");
+                    try (OutputStream out = upload.getOutputStream()) {
+                        Files.copy(temporary, out);
+                    }
+                    if (upload.getResponseCode() >= HttpURLConnection.HTTP_MULT_CHOICE) {
+                        return;
+                    }
+                } finally {
+                    upload.disconnect();
+                }
+            }
+        } catch (IOException _) {
+        } finally {
+            if (temporary != null) {
+                try {
+                    Files.deleteIfExists(temporary);
+                } catch (IOException _) {
+                }
+            }
         }
     }
 
@@ -163,7 +301,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         try {
             executor.execute(() -> {
                 try {
-                    HttpURLConnection connection = connect("HEAD", step, inputs);
+                    HttpURLConnection connection = connect("HEAD", address(step, inputs), digest);
                     try {
                         connection.getResponseCode();
                     } finally {
@@ -176,41 +314,25 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         }
     }
 
-    private void upload(byte[] step, SequencedMap<String, Map<Path, byte[]>> inputs, Path output) {
-        Path temporary = null;
-        try {
-            temporary = Files.createTempFile("jenesis-cache", ".zip");
-            zip(output, temporary);
-            HttpURLConnection connection = connect("PUT", step, inputs);
-            connection.setDoOutput(true);
-            connection.setFixedLengthStreamingMode(Files.size(temporary));
-            connection.setRequestProperty("Content-Type", "application/zip");
-            connection.setRequestProperty("Expect", "100-continue");
-            try (OutputStream out = connection.getOutputStream()) {
-                Files.copy(temporary, out);
-            } catch (ProtocolException _) {
-            }
-            connection.getResponseCode();
-            connection.disconnect();
-        } catch (IOException _) {
-        } finally {
-            if (temporary != null) {
-                try {
-                    Files.deleteIfExists(temporary);
-                } catch (IOException _) {
-                }
+    private void trim(Executor executor, String digest) {
+        if (trimmed.compareAndSet(false, true)) {
+            try {
+                executor.execute(() -> local.trim(digest));
+            } catch (RejectedExecutionException _) {
             }
         }
     }
 
-    private HttpURLConnection connect(String method, byte[] step, SequencedMap<String, Map<Path, byte[]>> inputs) throws IOException {
+    private String address(byte[] step, SequencedMap<String, Map<Path, byte[]>> inputs) {
+        return "step/" + HexFormat.of().formatHex(step) + "/" + HexFormat.of().formatHex(fold(inputs));
+    }
+
+    private HttpURLConnection connect(String method, String path, String digest) throws IOException {
         String base = uri.toString();
         if (base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
         }
-        URI target = URI.create(base
-                + "/" + HexFormat.of().formatHex(step)
-                + "/" + HexFormat.of().formatHex(fold(inputs)));
+        URI target = URI.create(base + "/" + path);
         String scheme = target.getScheme(), host = target.getHost();
         boolean loopback = "localhost".equals(host) || "127.0.0.1".equals(host) || "::1".equals(host);
         if (!"https".equals(scheme) && !loopback && !insecure) {
@@ -226,6 +348,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         connection.setReadTimeout((int) Math.min(readTimeout.toMillis(), Integer.MAX_VALUE));
         connection.setInstanceFollowRedirects(false);
         connection.setRequestProperty("User-Agent", "Jenesis");
+        connection.setRequestProperty(DIGEST, digest);
         if (token != null) {
             connection.setRequestProperty(KEY, token);
         }
@@ -256,76 +379,15 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         return message.digest();
     }
 
-    private static void zip(Path source, Path target) throws IOException {
-        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(target))) {
-            Files.walkFileTree(source, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes)
-                        throws IOException {
-                    if (!directory.equals(source)) {
-                        zip.putNextEntry(new ZipEntry(name(source, directory) + "/"));
-                        zip.closeEntry();
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                    zip.putNextEntry(new ZipEntry(name(source, file)));
-                    Files.copy(file, zip);
-                    zip.closeEntry();
-                    return FileVisitResult.CONTINUE;
-                }
-            });
+    private static boolean isHex(String name) {
+        if (name.length() < 8) {
+            return false;
         }
-    }
-
-    private static String trimmed(String name) {
-        return name.endsWith("/") ? name.substring(0, name.length() - 1) : name;
-    }
-
-    private static String name(Path source, Path path) {
-        return source.relativize(path).toString().replace('\\', '/');
-    }
-
-    private static void unzip(InputStream source, Path target) throws IOException {
-        Path base = target.normalize();
-        PushbackInputStream archive = new PushbackInputStream(source, 2);
-        byte[] signature = archive.readNBytes(2);
-        if (signature.length < 2 || signature[0] != 'P' || signature[1] != 'K') {
-            throw new IOException("The cache answered with what is no archive of a step's output");
-        }
-        archive.unread(signature);
-        ZipInputStream zip = new ZipInputStream(archive);
-        for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
-            if (entry.isDirectory()) {
-                Files.createDirectories(BuildStep.resolveContained(base, trimmed(entry.getName())));
-                continue;
+        for (int index = 0; index < name.length(); index++) {
+            if (Character.digit(name.charAt(index), 16) < 0) {
+                return false;
             }
-            Path destination = BuildStep.resolveContained(base, entry.getName());
-            Files.createDirectories(destination.getParent());
-            Files.copy(zip, destination, StandardCopyOption.REPLACE_EXISTING);
         }
-    }
-
-    private static void clean(Path target) {
-        try (DirectoryStream<Path> children = Files.newDirectoryStream(target)) {
-            for (Path child : children) {
-                Files.walkFileTree(child, new SimpleFileVisitor<>() {
-                    @Override
-                    public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                        Files.deleteIfExists(file);
-                        return FileVisitResult.CONTINUE;
-                    }
-
-                    @Override
-                    public FileVisitResult postVisitDirectory(Path directory, IOException exception) throws IOException {
-                        Files.deleteIfExists(directory);
-                        return FileVisitResult.CONTINUE;
-                    }
-                });
-            }
-        } catch (IOException _) {
-        }
+        return true;
     }
 }

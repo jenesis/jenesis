@@ -74,11 +74,19 @@ a `file://` location on a local or shared (NFS, network drive) file system:
     -Djenesis.cache.uri=file:///mnt/team/jenesis-cache # a shared (or local) folder
 
 A `file://` URI resolves a `BuildExecutorFileCache` (the same on-disk format as the
-local cache); an `http(s)://` URL selects `BuildExecutorHttpCache`, which GETs and
-PUTs each step's output as one zip to the server, naming the cache project with
+local cache); an `http(s)://` URL selects `BuildExecutorHttpCache`, which speaks the
+protocol below to the server, naming the cache project with
 `-Djenesis.cache.project=<project>` and authenticating with
 `-Djenesis.cache.token=<token>` (both sent as headers, never in the URL). A non-URI
 value is rejected - use `file://` for an on-disk location.
+
+A cache server is asked for files, never for a step's whole output. The build keeps
+every file it downloads or uploads in a folder of this machine, `~/.jenesis/cache`
+unless `-Djenesis.cache.local=<folder>` names another, in the layout shown under
+*What the cache keeps*. A file any build of any project already brought there is
+not downloaded again, and a step whose files the server already holds is stored
+with one small request. That folder is capped at 10 GiB unless its
+`cache.properties` names another `size`.
 
 The shared cache can be used **two ways**.
 
@@ -169,6 +177,36 @@ naming a file the cache no longer holds is dropped the same way.
 The checksums are those of `jenesis.executor.digest`, SHA-256 by default. A build
 under another digest keeps a store of its own beside this one, as it could verify
 no file of this one.
+
+The protocol of a cache server
+------------------------------
+
+Every request carries `Jenesis-Cache-Digest`, the algorithm that names the files
+(`SHA-256`), `Jenesis-Cache-Project` where a project is named and
+`Jenesis-Cache-Key` where a token is set. `<uri>` is `jenesis.cache.uri`,
+`<step>` the hexadecimal hash of the step and `<inputs>` that of its inputs. A
+manifest is UTF-8 text, one line per file, `<checksum> <size> <path>`, sorted by
+path, with `/` between the segments of a path and `- 0 <path>` for an empty
+folder; a checksum is lower-case hexadecimal.
+
+| request | body | answer |
+| ------- | ---- | ------ |
+| `GET <uri>/step/<step>/<inputs>` | none | `200` and the manifest, or `404` |
+| `HEAD <uri>/step/<step>/<inputs>` | none | `200` or `404`; tells the server the step is in use |
+| `POST <uri>/blobs` | the checksums wanted, one per line | `200` and a zip with one entry per file the server holds, named by its checksum; a file it does not hold is left out |
+| `PUT <uri>/step/<step>/<inputs>` | the manifest | `2xx` once stored, or `409` and the checksums the server lacks, one per line |
+| `PUT <uri>/blobs` | a zip with one entry per file, named by its checksum | `2xx` once every entry is stored |
+
+A build restores a step by asking for its manifest, then for the files this
+machine lacks in one `POST`, and checks every file against its name before it
+keeps it; a file that fails the check, or that the server left out, makes the step
+a miss and it runs. A build stores a step by sending its manifest; on `409` it
+uploads the files named in the answer in one zip and sends the manifest again. A
+server stores a manifest only while it holds every file it names, checks an
+uploaded file against its name, and keeps the files of one project apart from
+those of another, so that no project learns what another built by asking for a
+checksum. The zip a build uploads deflates fast and stores what is already an
+archive.
 
 Tuning with `cache.properties`
 ------------------------------
