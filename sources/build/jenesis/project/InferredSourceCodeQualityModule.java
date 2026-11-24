@@ -65,19 +65,19 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
                                                                 Map<String, Resolver> resolvers) {
         return new InferredSourceCodeQualityModule(configuration,
                 ExternalModule.official(environment, "checkstyle", null, repositories, resolvers),
-                environment.flag("check.checkstyle", true, Setting.PROJECT),
+                environment.flag("checkstyle.check", true, Setting.PROJECT),
                 ExternalModule.official(environment, "pmd", null, repositories, resolvers),
-                environment.flag("check.pmd", true, Setting.PROJECT),
+                environment.flag("pmd.check", true, Setting.PROJECT),
                 ExternalModule.official(environment, "detekt", null, repositories, resolvers),
-                environment.flag("check.detekt", true, Setting.PROJECT),
+                environment.flag("detekt.check", true, Setting.PROJECT),
                 ExternalModule.official(environment, "ktlint", "check", repositories, resolvers),
-                environment.flag("check.ktlint", true, Setting.PROJECT),
+                environment.flag("ktlint.check", true, Setting.PROJECT),
                 ExternalModule.official(environment, "scalastyle", null, repositories, resolvers),
-                environment.flag("check.scalastyle", true, Setting.PROJECT),
+                environment.flag("scalastyle.check", true, Setting.PROJECT),
                 ExternalModule.official(environment, "scalafmt", "check", repositories, resolvers),
-                environment.flag("check.scalafmt", true, Setting.PROJECT),
+                environment.flag("scalafmt.check", true, Setting.PROJECT),
                 ExternalModule.official(environment, "codenarc", null, repositories, resolvers),
-                environment.flag("check.codenarc", true, Setting.PROJECT),
+                environment.flag("codenarc.check", true, Setting.PROJECT),
                 Collections.emptyNavigableMap());
     }
 

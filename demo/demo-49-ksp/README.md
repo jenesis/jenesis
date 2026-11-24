@@ -42,7 +42,7 @@ KSP is an official plugin: the build resolves it as
 `module/build.jenesis.plugin.ksp` and runs it in every module whose
 configuration folder holds a `ksp.properties`, beside the Kotlin plugin that
 compiles the module's `.kt` sources, as in `../demo-46-kotlin`. Neither needs a
-line in `jenesis.plugins.properties`, and `-Djenesis.generate.ksp=false`
+line in `jenesis.plugins.properties`, and `-Djenesis.ksp.generate=false`
 switches KSP off.
 
 The processors are named like a compiler plugin, by coordinate in the group

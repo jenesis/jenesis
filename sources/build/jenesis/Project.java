@@ -1618,7 +1618,7 @@ public record Project(
                       maven-jdeps-plugin jdkinternals and test-jdkinternals
                           -> jdeps.properties (37), the JDK's jdeps --jdk-internals over main and
                           test classes; accept=<internal classes or packages used on purpose>;
-                          failOnWarning, true by default there -> jenesis.strict.jdeps=true
+                          failOnWarning, true by default there -> jenesis.jdeps.strict=true
                       maven-jdeprscan-plugin forRemoval, release
                           -> jdeprscan.properties (37), the JDK's jdeprscan --for-removal;
                           removal=false reports every deprecated API, release=<n> checks the
@@ -1725,7 +1725,7 @@ public record Project(
                           analysisConfigurationFiles -> configuration=<a JSON file beside it>,
                           revapi's own configuration as an array of
                           extensions, as revapi.differences ignores; failing the build ->
-                          jenesis.strict.revapi=true; a test module is never compared
+                          jenesis.revapi.strict=true; a test module is never compared
 
                     ## Dependencies
 
@@ -2480,8 +2480,8 @@ public record Project(
                     build resolves the tool's
                     plugin from jenesis-plugins on its own, as it does the JDK's
                     checks (jdeps.properties, jdeprscan.properties). A linter reports its findings;
-                    jenesis.strict.<tool>=true fails the build on them instead, and
-                    jenesis.check.<tool>=false skips the linter (jenesis.validate.<tool>=false for
+                    jenesis.<tool>.strict=true fails the build on them instead, and
+                    jenesis.<tool>.check=false skips the linter (jenesis.<tool>.validate=false for
                     SpotBugs, forbiddenapis and the JDK's checks). Whether a
                     [FINDINGS] line with their number and its report is printed is
                     jenesis.print.findings, true by default.
@@ -2716,9 +2716,9 @@ public record Project(
                     Asciidoctor needs its properties, as they name the folder of documents. The
                     file's other values reach the plugin, so
                     plugin-<name>.properties is for no plugin of theirs. An official plugin is switched
-                    off by jenesis.<part>.<name>=false, named after the part of the build it
-                    belongs to (jenesis.check.pmd=false, jenesis.generate.xjc=false,
-                    jenesis.language.kotlin=false, jenesis.release.jreleaser=false, ...), and a plugin
+                    off by jenesis.<name>.<part>=false, named after the part of the build it
+                    belongs to (jenesis.pmd.check=false, jenesis.xjc.generate=false,
+                    jenesis.kotlin.language=false, jenesis.jreleaser.release=false, ...), and a plugin
                     jenesis.plugins.properties names by jenesis.plugin.<name>=false, each a boolean,
                     true by default, so a plugin of the project's own shares no setting with an
                     official one, whatever it is named.
@@ -3636,7 +3636,7 @@ public record Project(
             project = project.signatures(project.configuration().toArray(Path[]::new));
         }
         ExternalModule releasing = ExternalModule.official(environment, ProjectPlugins.JRELEASER, null, Map.of(), Map.of());
-        boolean releasable = environment.flag("release." + ProjectPlugins.JRELEASER, true, Setting.PROJECT);
+        boolean releasable = environment.flag(ProjectPlugins.JRELEASER + ".release", true, Setting.PROJECT);
         Path jreleaser = releasable
                 ? BuildStep.locate(project.configuration(), ProjectPlugins.JRELEASER + ".properties")
                 : null;
@@ -3667,7 +3667,7 @@ public record Project(
                     .resolutions(resolutions));
         }
         ExternalModule documenting = ExternalModule.official(environment, ProjectPlugins.ASCIIDOCTOR, null, Map.of(), Map.of());
-        Path asciidoctor = environment.flag("documentation." + ProjectPlugins.ASCIIDOCTOR, true, Setting.PROJECT)
+        Path asciidoctor = environment.flag(ProjectPlugins.ASCIIDOCTOR + ".documentation", true, Setting.PROJECT)
                 ? BuildStep.locate(project.configuration(), ProjectPlugins.ASCIIDOCTOR + ".properties")
                 : null;
         if (asciidoctor != null) {
@@ -3698,7 +3698,7 @@ public record Project(
                     .resolutions(resolutions));
         }
         ExternalModule marking = ExternalModule.official(environment, ProjectPlugins.GRADLE_PLUGIN, null, Map.of(), Map.of());
-        Path gradlePlugin = environment.flag("artifact." + ProjectPlugins.GRADLE_PLUGIN, true, Setting.PROJECT)
+        Path gradlePlugin = environment.flag(ProjectPlugins.GRADLE_PLUGIN + ".artifact", true, Setting.PROJECT)
                 ? BuildStep.locate(project.configuration(), ProjectPlugins.GRADLE_PLUGIN + ".properties")
                 : null;
         if (gradlePlugin != null) {
@@ -4771,7 +4771,7 @@ public record Project(
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.resources||Comma-separated <path>:<target> pairs of project files or folders placed among the resources of every module, as NOTICE:META-INF/NOTICE,LICENSE:META-INF/LICENSE
                 project.plugins|true|false leaves out every plugin that jenesis.plugins.properties names, while pin still pins those of the whole project
-                documentation.asciidoctor|true|Asciidoctor, activated by an asciidoctor.properties of the configuration folder naming the folder of documents as documents=, whose documents it converts and stages with the project's files
+                asciidoctor.documentation|true|Asciidoctor, activated by an asciidoctor.properties of the configuration folder naming the folder of documents as documents=, whose documents it converts and stages with the project's files
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache; a file a project provides names only a folder inside the project
                 project.docker|false|Run the whole build inside a container
                 project.image||Image for that container
@@ -4901,67 +4901,67 @@ public record Project(
                 execute.env||Host environment variables to forward
                 sbom.cyclonedx|true|Emit a CycloneDX SBOM; sbom.properties selects its format
                 graalvm.license||Licence the SBOM beside a native image records for the GraalVM that compiled it, as an SPDX identifier or a name; empty records none
-                compliance.license|true|Run the license check a licensing.properties activates
-                compliance.vulnerability|true|Run the vulnerability check a vulnerability.properties activates
-                check.checkstyle|true|Checkstyle, activated by a checkstyle.properties naming its checkstyle.xml as configuration= or, where none is found, by a checkstyle.xml of a configuration folder; false leaves it out
-                strict.vulnerability|false|The vulnerability check fails the build where the advisory service's answer does not cover every dependency asked about, where it otherwise records that under reports/compliance/advisories.txt and reports no advisory for them
-                strict.checkstyle|false|Checkstyle fails the build when it exits reporting a violation, where it otherwise records its findings
-                check.pmd|true|PMD, activated by a pmd.properties naming its pmd.xml as configuration= or, where none is found, by a pmd.xml of a configuration folder; false leaves it out
-                strict.pmd|false|PMD fails the build when it exits reporting a violation, where it otherwise records its findings
-                check.detekt|true|detekt, activated by a detekt.properties naming its detekt.yml as configuration= or, where none is found, by a detekt.yml of a configuration folder; false leaves it out
-                strict.detekt|false|detekt fails the build when it exits reporting a violation, where it otherwise records its findings
-                check.ktlint|true|ktlint linting the Kotlin sources, activated by a ktlint.properties naming its .editorconfig as configuration= or, where none is found, by a .editorconfig of a configuration folder; false leaves the linting out, as jenesis.format.ktlint=false does the formatting
-                strict.ktlint|false|ktlint linting fails the build when it exits reporting a violation, where it otherwise records its findings
-                check.scalastyle|true|Scalastyle, activated by a scalastyle.properties naming its scalastyle-config.xml as configuration= or, where none is found, by a scalastyle-config.xml of a configuration folder; false leaves it out
-                strict.scalastyle|false|Scalastyle fails the build when it exits reporting a violation, where it otherwise records its findings
-                check.scalafmt|true|scalafmt checking the Scala sources, activated by a scalafmt.properties naming its .scalafmt.conf as configuration= or, where none is found, by a .scalafmt.conf of a configuration folder; false leaves the check out, as jenesis.format.scalafmt=false does the formatting
-                strict.scalafmt|false|scalafmt checking fails the build on a source it would format differently, where it otherwise lists such a source
-                check.codenarc|true|CodeNarc, activated by a codenarc.properties naming its codenarc.xml as configuration= or, where none is found, by a codenarc.xml of a configuration folder; false leaves it out
-                strict.codenarc|false|CodeNarc fails the build on any finding, where it otherwise records its findings
-                validate.spotbugs|true|SpotBugs, activated by a spotbugs.properties, which may name an exclusion filter as configuration=, or, where none is found, by a spotbugs-exclude.xml of a configuration folder; false leaves it out
-                strict.spotbugs|false|SpotBugs fails the build on any finding, where it otherwise records its findings
-                validate.forbiddenapis|true|forbiddenapis, activated by a forbiddenapis.properties; false leaves it out
-                strict.forbiddenapis|false|forbiddenapis fails the build on any finding, where it otherwise records its findings
-                validate.jdeps|true|jdeps --jdk-internals, activated by a jdeps.properties; false leaves it out
-                strict.jdeps|false|jdeps fails the build on any JDK internal API the classes use, where it otherwise records them
-                validate.jdeprscan|true|jdeprscan, activated by a jdeprscan.properties; false leaves it out
-                strict.jdeprscan|false|jdeprscan fails the build on any use of an API deprecated for removal, where it otherwise records them
-                format.openrewrite|true|OpenRewrite, activated by an openrewrite.properties naming a rewrite.yml as configuration=, whose recipes it runs, or recipes as recipes=, or, where none is found, by a rewrite.yml of a configuration folder; it runs before the Java formatter and reads the module's dependencies
-                format.googlejavaformat|true|google-java-format, activated by a googlejavaformat.properties whose lines are its options; refused beside another Java formatter
-                format.palantir|true|palantir-java-format, activated by a palantir.properties whose lines are its options; refused beside another Java formatter
-                format.openjavaformat|true|open-java-format, activated by an openjavaformat.properties whose lines are its options; refused beside another Java formatter
-                format.spotless|true|Spotless, activated by a spotless.properties naming sets of files of a module's sources and resources and the Spotless steps each set runs; a set running a Java, Kotlin or Scala formatter or licenseHeader is refused beside that tool's own file
-                format.princeofspace|true|The Prince of Space formatter, activated by a princeofspace.properties whose lines are its options; refused beside another Java formatter
-                format.eclipse|true|The Eclipse formatter, activated by an eclipse.properties, which may name the profile Eclipse exports as configuration=, or, where none is found, by an eclipse-formatter.xml of a configuration folder; refused beside another Java formatter
-                format.ktlint|true|ktlint formatting the Kotlin sources, activated by what activates its linting; false leaves the formatting out while ktlint still lints, as where ktfmt formats them
-                format.ktfmt|true|ktfmt formatting, activated by a ktfmt.properties, which names its style and what it does to the imports; refused beside ktlint formatting the same sources
-                format.scalafmt|true|scalafmt formatting the Scala sources, activated by what activates its check; false leaves the formatting out while scalafmt still checks them
-                format.license|true|The license header check, activated by a licenseheader.properties, whose text every Java, Kotlin, Scala and Groovy source of a module must start with as a block comment, exactly as it stands, or, without text, as SPDX lines naming the license and copyright the project declares
+                license.compliance|true|Run the license check a licensing.properties activates
+                vulnerability.compliance|true|Run the vulnerability check a vulnerability.properties activates
+                vulnerability.strict|false|The vulnerability check fails the build where the advisory service's answer does not cover every dependency asked about, where it otherwise records that under reports/compliance/advisories.txt and reports no advisory for them
+                checkstyle.check|true|Checkstyle, activated by a checkstyle.properties naming its checkstyle.xml as configuration= or, where none is found, by a checkstyle.xml of a configuration folder; false leaves it out
+                checkstyle.strict|false|Checkstyle fails the build when it exits reporting a violation, where it otherwise records its findings
+                pmd.check|true|PMD, activated by a pmd.properties naming its pmd.xml as configuration= or, where none is found, by a pmd.xml of a configuration folder; false leaves it out
+                pmd.strict|false|PMD fails the build when it exits reporting a violation, where it otherwise records its findings
+                detekt.check|true|detekt, activated by a detekt.properties naming its detekt.yml as configuration= or, where none is found, by a detekt.yml of a configuration folder; false leaves it out
+                detekt.strict|false|detekt fails the build when it exits reporting a violation, where it otherwise records its findings
+                ktlint.check|true|ktlint linting the Kotlin sources, activated by a ktlint.properties naming its .editorconfig as configuration= or, where none is found, by a .editorconfig of a configuration folder; false leaves the linting out, as jenesis.ktlint.format=false does the formatting
+                ktlint.strict|false|ktlint linting fails the build when it exits reporting a violation, where it otherwise records its findings
+                scalastyle.check|true|Scalastyle, activated by a scalastyle.properties naming its scalastyle-config.xml as configuration= or, where none is found, by a scalastyle-config.xml of a configuration folder; false leaves it out
+                scalastyle.strict|false|Scalastyle fails the build when it exits reporting a violation, where it otherwise records its findings
+                scalafmt.check|true|scalafmt checking the Scala sources, activated by a scalafmt.properties naming its .scalafmt.conf as configuration= or, where none is found, by a .scalafmt.conf of a configuration folder; false leaves the check out, as jenesis.scalafmt.format=false does the formatting
+                scalafmt.strict|false|scalafmt checking fails the build on a source it would format differently, where it otherwise lists such a source
+                codenarc.check|true|CodeNarc, activated by a codenarc.properties naming its codenarc.xml as configuration= or, where none is found, by a codenarc.xml of a configuration folder; false leaves it out
+                codenarc.strict|false|CodeNarc fails the build on any finding, where it otherwise records its findings
+                spotbugs.validate|true|SpotBugs, activated by a spotbugs.properties, which may name an exclusion filter as configuration=, or, where none is found, by a spotbugs-exclude.xml of a configuration folder; false leaves it out
+                spotbugs.strict|false|SpotBugs fails the build on any finding, where it otherwise records its findings
+                forbiddenapis.validate|true|forbiddenapis, activated by a forbiddenapis.properties; false leaves it out
+                forbiddenapis.strict|false|forbiddenapis fails the build on any finding, where it otherwise records its findings
+                jdeps.validate|true|jdeps --jdk-internals, activated by a jdeps.properties; false leaves it out
+                jdeps.strict|false|jdeps fails the build on any JDK internal API the classes use, where it otherwise records them
+                jdeprscan.validate|true|jdeprscan, activated by a jdeprscan.properties; false leaves it out
+                jdeprscan.strict|false|jdeprscan fails the build on any use of an API deprecated for removal, where it otherwise records them
+                openrewrite.format|true|OpenRewrite, activated by an openrewrite.properties naming a rewrite.yml as configuration=, whose recipes it runs, or recipes as recipes=, or, where none is found, by a rewrite.yml of a configuration folder; it runs before the Java formatter and reads the module's dependencies
+                googlejavaformat.format|true|google-java-format, activated by a googlejavaformat.properties whose lines are its options; refused beside another Java formatter
+                palantir.format|true|palantir-java-format, activated by a palantir.properties whose lines are its options; refused beside another Java formatter
+                openjavaformat.format|true|open-java-format, activated by an openjavaformat.properties whose lines are its options; refused beside another Java formatter
+                spotless.format|true|Spotless, activated by a spotless.properties naming sets of files of a module's sources and resources and the Spotless steps each set runs; a set running a Java, Kotlin or Scala formatter or licenseHeader is refused beside that tool's own file
+                princeofspace.format|true|The Prince of Space formatter, activated by a princeofspace.properties whose lines are its options; refused beside another Java formatter
+                eclipse.format|true|The Eclipse formatter, activated by an eclipse.properties, which may name the profile Eclipse exports as configuration=, or, where none is found, by an eclipse-formatter.xml of a configuration folder; refused beside another Java formatter
+                ktlint.format|true|ktlint formatting the Kotlin sources, activated by what activates its linting; false leaves the formatting out while ktlint still lints, as where ktfmt formats them
+                ktfmt.format|true|ktfmt formatting, activated by a ktfmt.properties, which names its style and what it does to the imports; refused beside ktlint formatting the same sources
+                scalafmt.format|true|scalafmt formatting the Scala sources, activated by what activates its check; false leaves the formatting out while scalafmt still checks them
+                license.format|true|The license header check, activated by a licenseheader.properties, whose text every Java, Kotlin, Scala and Groovy source of a module must start with as a block comment, exactly as it stands, or, without text, as SPDX lines naming the license and copyright the project declares
                 format.rewrite|false|Let the formatters rewrite sources instead of verifying them
-                generate.classpath|true|META-INF/services entries generated from a module-info's provides, and Enable-Native-Access for a module granting itself, so its jar also serves the class path, activated by a classpath.properties
+                classpath.generate|true|META-INF/services entries generated from a module-info's provides, and Enable-Native-Access for a module granting itself, so its jar also serves the class path, activated by a classpath.properties
                 abi.mode||The ABI a module's classes offer, written as abi.properties with one hash per class file: modular for the public and protected members of the packages a module exports, classpath for every package with its package-private members as well; a module whose dependencies changed only below their ABI is not compiled again, and a test module compares the module it tests by every package with its package-private members, which its tests reach; empty writes none and compiles every dependent again
-                generate.xjc|true|JAXB generation, activated by an xjc.properties
-                generate.protoc|true|protoc generation, activated by a protoc.properties
-                generate.avro|true|Avro generation, activated by an avro.properties
-                generate.wsimport|true|JAX-WS generation, activated by a wsimport.properties
-                generate.openapi|true|OpenAPI generation, activated by an openapi.properties
-                generate.antlr|true|ANTLR generation, activated by an antlr.properties
-                generate.ksp|true|Kotlin Symbol Processing over the module's sources, activated by a ksp.properties, with the processors named by @jenesis.plugin ksp:processor <coordinate>
-                observe.native|true|native-image reachability agent, activated by a graal.properties
-                observe.jfr|true|Java Flight Recorder in the test JVM, activated by a jfr.properties whose lines are the options of the recording
-                observe.jacoco|true|JaCoCo coverage, activated by a jacoco.properties
-                observe.asyncprofiler|true|async-profiler in the test JVM, activated by an asyncprofiler.properties whose lines are the options of the profiler
-                observe.pitest|true|PIT mutation testing, activated by a pitest.properties
-                artifact.japicmp|true|japicmp API comparison, activated by a japicmp.properties
-                artifact.revapi|true|revapi API comparison, activated by a revapi.properties
-                artifact.mavenplugin|true|Maven plugin descriptor, activated by a mavenplugin.properties, written into the module's classes from the mojos they declare by Maven's own plugin tools
-                artifact.gradleplugin|true|Gradle plugin markers, activated by a gradleplugin.properties of the project's configuration folder, staged for every plugin a staged jar declares in META-INF/gradle-plugins
-                strict.revapi|false|revapi fails the build on any difference that reaches its severity, where it otherwise records them
+                xjc.generate|true|JAXB generation, activated by an xjc.properties
+                protoc.generate|true|protoc generation, activated by a protoc.properties
+                avro.generate|true|Avro generation, activated by an avro.properties
+                wsimport.generate|true|JAX-WS generation, activated by a wsimport.properties
+                openapi.generate|true|OpenAPI generation, activated by an openapi.properties
+                antlr.generate|true|ANTLR generation, activated by an antlr.properties
+                ksp.generate|true|Kotlin Symbol Processing over the module's sources, activated by a ksp.properties, with the processors named by @jenesis.plugin ksp:processor <coordinate>
+                native.observe|true|native-image reachability agent, activated by a graal.properties
+                jfr.observe|true|Java Flight Recorder in the test JVM, activated by a jfr.properties whose lines are the options of the recording
+                jacoco.observe|true|JaCoCo coverage, activated by a jacoco.properties
+                asyncprofiler.observe|true|async-profiler in the test JVM, activated by an asyncprofiler.properties whose lines are the options of the profiler
+                pitest.observe|true|PIT mutation testing, activated by a pitest.properties
+                japicmp.artifact|true|japicmp API comparison, activated by a japicmp.properties
+                revapi.artifact|true|revapi API comparison, activated by a revapi.properties
+                mavenplugin.artifact|true|Maven plugin descriptor, activated by a mavenplugin.properties, written into the module's classes from the mojos they declare by Maven's own plugin tools
+                gradleplugin.artifact|true|Gradle plugin markers, activated by a gradleplugin.properties of the project's configuration folder, staged for every plugin a staged jar declares in META-INF/gradle-plugins
+                revapi.strict|false|revapi fails the build on any difference that reaches its severity, where it otherwise records them
                 pmd.priority|5|The lowest rule priority PMD runs, from 1, the highest, to 5, the lowest, as maven-pmd-plugin's minimumPriority
-                language.kotlin|true|Kotlin, the official plugin build.jenesis.plugin.kotlin, resolved where a module holds a .kt source; false leaves it out, and such a source then fails the build
-                language.scala|true|Scala, the official plugin build.jenesis.plugin.scala, resolved where a module holds a .scala source; false leaves it out, and such a source then fails the build
-                language.groovy|true|Groovy, the official plugin build.jenesis.plugin.groovy, resolved where a module holds a .groovy source; false leaves it out, and such a source then fails the build
-                language.clojure|true|Clojure, the official plugin build.jenesis.plugin.clojure, resolved where a module holds a .clj source, which compiles its namespaces with the Clojure the module depends on; false leaves it out, and such a source then fails the build
+                kotlin.language|true|Kotlin, the official plugin build.jenesis.plugin.kotlin, resolved where a module holds a .kt source; false leaves it out, and such a source then fails the build
+                scala.language|true|Scala, the official plugin build.jenesis.plugin.scala, resolved where a module holds a .scala source; false leaves it out, and such a source then fails the build
+                groovy.language|true|Groovy, the official plugin build.jenesis.plugin.groovy, resolved where a module holds a .groovy source; false leaves it out, and such a source then fails the build
+                clojure.language|true|Clojure, the official plugin build.jenesis.plugin.clojure, resolved where a module holds a .clj source, which compiles its namespaces with the Clojure the module depends on; false leaves it out, and such a source then fails the build
                 kotlin.incremental|false|Compile Kotlin incrementally through the Kotlin Build Tools API of Kotlin 2.3 or newer, resolved as org.jetbrains.kotlin:kotlin-build-tools-impl, which recompiles only what a change reaches, in a JVM of its own per compile or in one kept warm under process.mode=daemon; the -J and -D lines of process-kotlinc.properties configure that JVM
                 scala.incremental|false|Compile Scala incrementally with Zinc, resolved as org.scala-sbt:zinc_2.13 in the group scala:zinc and driving the compiler through org.scala-lang:scala3-sbt-bridge at the compiler's version, which recompiles only what a change reaches, in a JVM of its own per compile or in one kept warm under process.mode=daemon; the lines of process-scalac.properties configure that JVM
                 jarsigner.keystore||Key store jarsigner signs the produced jar with, in place of the unsigned one, relative to the working directory on the command line, to ~/.jenesis in its files and to the project root in a project's; a release machine supplies it, and a build that names any jarsigner setting without it fails rather than shipping unsigned; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
@@ -4973,7 +4973,7 @@ public record Project(
                 jarsigner.arguments||Further jarsigner arguments, whitespace separated; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 release.uri||Jenesis module repository a release puts each staged module's jar into, one put per module at module/<module>/<version>/<module>.jar, so every module needs a version; the https address of a Jenesis Repository's jenesis repository, as jenesis.module.uri names it; a java repository takes Maven publishes only and refuses the put (env JENESIS_RELEASE_URI)
                 release.publish|false|Publish what a release puts and runs - the jenesis.release.uri and jenesis.deploy.uri puts and the plugins of the hook point release, JReleaser's without --dry-run; without it, release and every pin run the release dry, checking what was staged and naming what it would put; only the command line may set it
-                release.jreleaser|true|JReleaser, activated by a jreleaser.properties of the configuration folder naming its jreleaser.yml as configuration=, with the other values of that file, or, where none is found, by a jreleaser.yml, .yaml, .toml or .json of a configuration folder
+                jreleaser.release|true|JReleaser, activated by a jreleaser.properties of the configuration folder naming its jreleaser.yml as configuration=, with the other values of that file, or, where none is found, by a jreleaser.yml, .yaml, .toml or .json of a configuration folder
                 release.token||Authorization header value for that repository, sent as given (env JENESIS_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named
                 deploy.uri||Maven repository a release puts the staged Maven tree into, every file at <group path>/<artifactId>/<version>/<file> with its .md5, .sha1, .sha256 and .sha512, then the artifact's maven-metadata.xml merged with the one the repository holds; a SNAPSHOT version is put under a unique timestamped name beside its own maven-metadata.xml, as Maven deploys one; nothing is signed, so a release to Maven Central goes through the JReleaser plugin, which signs it and uses Central's publishing service, while its snapshot repository takes a SNAPSHOT from here as any repository does (env MAVEN_RELEASE_URI)
                 deploy.token||Authorization header value for that repository, sent as given, so it names its scheme, as Bearer <token> or Basic <credentials> (env MAVEN_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named

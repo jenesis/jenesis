@@ -932,7 +932,16 @@ class BuildExecutorDefault implements BuildExecutor {
 
         @Override
         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-            Files.delete(file);
+            try {
+                Files.delete(file);
+            } catch (AccessDeniedException e) {
+                DosFileAttributeView view = Files.getFileAttributeView(file, DosFileAttributeView.class);
+                if (view == null || !view.readAttributes().isReadOnly()) {
+                    throw e;
+                }
+                view.setReadOnly(false);
+                Files.delete(file);
+            }
             return FileVisitResult.CONTINUE;
         }
 

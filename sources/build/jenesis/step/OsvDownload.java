@@ -24,7 +24,7 @@ public class OsvDownload implements BuildStep {
 
     public static OsvDownload ofEnvironment(Environment environment) {
         return new OsvDownload(URI.create("https://api.osv.dev"),
-                environment.flag("strict.vulnerability", false, Setting.PROJECT),
+                environment.flag("vulnerability.strict", false, Setting.PROJECT),
                 environment.flag("repository.insecure", Setting.MACHINE),
                 environment.flag("repository.offline", Setting.PROJECT));
     }
@@ -72,7 +72,7 @@ public class OsvDownload implements BuildStep {
             if (offline) {
                 throw new IllegalStateException("Cannot ask " + endpoint + " for the advisories of "
                         + coordinates.size() + " dependencies while offline"
-                        + " (unset -Djenesis.repository.offline, or set -Djenesis.compliance.vulnerability=false)");
+                        + " (unset -Djenesis.repository.offline, or set -Djenesis.vulnerability.compliance=false)");
             }
             List<List<String>> identifiers = identifiers(request(endpoint.resolve("/v1/querybatch"), queryBatch(coordinates), insecure));
             if (identifiers.size() != coordinates.size()) {
@@ -80,7 +80,7 @@ public class OsvDownload implements BuildStep {
                         + " dependencies with " + identifiers.size() + " results, so it is not known which of them"
                         + " are affected: check that no proxy answers in its place";
                 if (strict) {
-                    throw new IllegalStateException(unknown + ", or leave out -Djenesis.strict.vulnerability to"
+                    throw new IllegalStateException(unknown + ", or leave out -Djenesis.vulnerability.strict to"
                             + " record this and build on");
                 }
                 Files.writeString(Files.createDirectories(context.next().resolve(REPORTS + "compliance"))

@@ -261,7 +261,7 @@ public class InferredSourceFormattingModuleTest {
                 .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("[googlejavaformat, palantir]")
-                .hasMessageContaining("jenesis.format.<name>=false");
+                .hasMessageContaining("jenesis.<name>.format=false");
     }
 
     @Test
@@ -375,7 +375,7 @@ public class InferredSourceFormattingModuleTest {
                 .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("runs a Kotlin formatter of Spotless while ktfmt formats the same Kotlin sources")
-                .hasMessageContaining("jenesis.format.ktfmt=false");
+                .hasMessageContaining("jenesis.ktfmt.format=false");
     }
 
     @Test
@@ -412,7 +412,7 @@ public class InferredSourceFormattingModuleTest {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule("format",
-                InferredSourceFormattingModule.ofEnvironment(new Environment(Map.of("format.spotless", "false")),
+                InferredSourceFormattingModule.ofEnvironment(new Environment(Map.of("spotless.format", "false")),
                         new LinkedHashSet<>(List.of(project)),
                         Map.of(),
                         Map.of()),
@@ -420,7 +420,7 @@ public class InferredSourceFormattingModuleTest {
         executor.execute();
 
         assertThat(root.resolve("format/" + InferredSourceFormattingModule.SPOTLESS))
-                .as("jenesis.format.spotless=false leaves spotless.properties unread")
+                .as("jenesis.spotless.format=false leaves spotless.properties unread")
                 .doesNotExist();
     }
 
@@ -431,7 +431,7 @@ public class InferredSourceFormattingModuleTest {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule("format",
-                InferredSourceFormattingModule.ofEnvironment(new Environment(Map.of("format.googlejavaformat", "false")),
+                InferredSourceFormattingModule.ofEnvironment(new Environment(Map.of("googlejavaformat.format", "false")),
                         new LinkedHashSet<>(List.of(project)),
                         Map.of(),
                         Map.of()),

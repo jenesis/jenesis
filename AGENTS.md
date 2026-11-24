@@ -244,13 +244,16 @@ for that next build.
 
 **Official plugins are discovered.** A module under `project/` (`JDepsModule`, `LicenseHeaderModule`, …) runs what
 the JDK ships and activates when its file is in a configuration folder. Every tool the build discovers, shipped or
-downloaded, is switched off by `jenesis.<part>.<tool>=false`, named after the part of the build it belongs to -
+downloaded, is switched off by `jenesis.<tool>.<part>=false`, named after the tool and the part of the build it
+belongs to -
 `check`, `format`, `validate`, `artifact`, `generate`, `language`, `observe`, `compliance`, `documentation`, `release` -
 and read by the `ofEnvironment` of the inferred module that wires it, as the boolean beside its child; a tool wired in
-two namespaces, as ktlint lints in `check` and formats in `format`, is switched in each apart. A checker's findings
-fail the build only under `jenesis.strict.<name>=true` and are reported otherwise. A plugin `jenesis.plugins.properties`
+two namespaces, as ktlint lints in `check` and formats in `format`, is switched in each apart, and every setting of
+a tool shares its group (`jenesis.pmd.check`, `jenesis.pmd.strict`, `jenesis.pmd.priority`). A checker's findings
+fail the build only under `jenesis.<name>.strict=true` and are reported otherwise. A plugin `jenesis.plugins.properties`
 names is switched off by `jenesis.plugin.<name>=false` instead, so the two never share a setting and no name is
-reserved. A tool the build would download is an official plugin of `jenesis/jenesis-plugins`: the inferred module that
+reserved for a plugin a project declares, while an official tool takes no name of a group of settings. A tool the
+build would download is an official plugin of `jenesis/jenesis-plugins`: the inferred module that
 ran it holds it as `ExternalModule.official`, resolved as `module/build.jenesis.plugin.<name>` in the group `<name>`,
 and wires it where a
 configuration folder holds its `<name>.properties` (a language plugin where the scan finds a `.kt`, `.scala` or

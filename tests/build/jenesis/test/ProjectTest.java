@@ -288,9 +288,9 @@ public class ProjectTest {
                 .containsKey("gradleplugin");
 
         Map<String, String> switchedOff = new HashMap<>(settings);
-        switchedOff.put("artifact.gradleplugin", "false");
+        switchedOff.put("gradleplugin.artifact", "false");
         assertThat(Project.ofEnvironment(new Environment(switchedOff), root).plugins().supplements())
-                .as("jenesis.artifact.gradleplugin switches the markers off")
+                .as("jenesis.gradleplugin.artifact switches the markers off")
                 .doesNotContainKey("gradleplugin");
     }
 
@@ -314,10 +314,10 @@ public class ProjectTest {
         Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("jreleaser.yml"),
                 "project:\n  name: example\n");
         Map<String, String> switchedOff = new HashMap<>(settings);
-        switchedOff.put("release.jreleaser", "false");
+        switchedOff.put("jreleaser.release", "false");
 
         assertThat(Project.ofEnvironment(new Environment(switchedOff), root).plugins().releasers())
-                .as("an official plugin is switched off by jenesis.<part>.<name>")
+                .as("an official plugin is switched off by jenesis.<name>.<part>")
                 .doesNotContainKey("jreleaser");
     }
 
@@ -326,7 +326,7 @@ public class ProjectTest {
         Files.writeString(root.resolve("jenesis.plugins.properties"), "pmd+postprocess/transform=./linter\n");
         Files.createDirectories(root.resolve("linter"));
         Map<String, String> official = new HashMap<>(settings), declared = new HashMap<>(settings);
-        official.put("check.pmd", "false");
+        official.put("pmd.check", "false");
         declared.put("plugin.pmd", "false");
 
         assertThat(Project.ofEnvironment(new Environment(official), root).plugins().transforms())
@@ -368,7 +368,7 @@ public class ProjectTest {
     public void reads_no_asciidoctor_properties_once_asciidoctor_is_switched_off() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("asciidoctor.properties"), "");
         Map<String, String> switched = new HashMap<>(settings);
-        switched.put("documentation.asciidoctor", "false");
+        switched.put("asciidoctor.documentation", "false");
 
         assertThat(Project.ofEnvironment(new Environment(switched), root)).isNotNull();
     }

@@ -66,8 +66,8 @@ public class OsvDownloadTest {
                     new BuildStepArgument(argument, Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED)))));
             assertThatThrownBy(() -> OsvDownload.ofEnvironment(new Environment(Map.of(
                     "repository.insecure", "true",
-                    "strict.vulnerability", "true"))).endpoint(endpoint).apply(Runnable::run, context, arguments))
-                    .as("under jenesis.strict.vulnerability an answer that covers no dependency fails the build")
+                    "vulnerability.strict", "true"))).endpoint(endpoint).apply(Runnable::run, context, arguments))
+                    .as("under jenesis.vulnerability.strict an answer that covers no dependency fails the build")
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("with 0 results");
             assertThat(next.resolve("advisories.properties")).doesNotExist();
