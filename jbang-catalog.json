@@ -1,0 +1,22 @@
+{
+  "aliases": {
+    "jenesis-make": {
+      "script-ref": "build.jenesis:build.jenesis:0.18.2",
+      "description": "Builds the project in the current folder with the released Jenesis engine.",
+      "java": "25+",
+      "main": "build.jenesis.Make"
+    },
+    "jenesis-exec": {
+      "script-ref": "build.jenesis:build.jenesis:0.18.2",
+      "description": "Builds the project in the current folder with the released Jenesis engine and runs its main class.",
+      "java": "25+",
+      "main": "build.jenesis.Execute"
+    },
+    "jpx": {
+      "script-ref": "build.jenesis:build.jenesis:0.18.2",
+      "description": "Runs a published Java module or Maven artifact, as npx does for npm packages.",
+      "java": "25+",
+      "main": "build.jenesis.Jpx"
+    }
+  }
+}

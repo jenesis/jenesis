@@ -171,6 +171,29 @@ jobs:
           bin: jpx jpx-jdk
           require: bin:java@25
 
+      # The catalog names the release JBang resolves from Maven Central, so it moves once that is
+      # published. A release of a version below the one it names leaves it alone.
+      - name: Name the release in the JBang catalog
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git fetch origin main
+          git worktree add --detach "${RUNNER_TEMP}/catalog" FETCH_HEAD
+          cd "${RUNNER_TEMP}/catalog"
+          NAMED="$(sed -nE 's/.*"build\.jenesis:build\.jenesis:([0-9]+\.[0-9]+\.[0-9]+)".*/\1/p' jbang-catalog.json | head -n1)"
+          if [ -z "${NAMED}" ]; then
+            echo "jbang-catalog.json names no release of build.jenesis:build.jenesis." >&2
+            exit 1
+          fi
+          if [ "${NAMED}" = "${VERSION}" ] || [ "$(printf '%s\n%s\n' "${NAMED}" "${VERSION}" | sort -V | tail -n1)" != "${VERSION}" ]; then
+            echo "The catalog names ${NAMED}, which ${VERSION} does not supersede."
+            exit 0
+          fi
+          sed -i -E "s/(build\.jenesis:build\.jenesis:)[0-9]+\.[0-9]+\.[0-9]+/\1${VERSION}/" jbang-catalog.json
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -am "Name release ${VERSION} in the JBang catalog"
+          git push origin HEAD:main
+
       - name: Upload JReleaser logs
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

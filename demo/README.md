@@ -133,6 +133,7 @@ Quick index
 | 81 | [`tools-api`](demo-81-tools-api/README.md)                        | Run a build, or a published program, inside another program's JVM            | `java build/Demo.java`            |
 | 82 | [`clojure`](demo-82-clojure/README.md)                            | Java and a Clojure namespace in one `pom.xml` module, compiled ahead of time | `java build/jenesis/Execute.java` |
 | 83 | [`credential-exchange`](demo-83-credential-exchange/README.md)    | Sign a CI job in to a repository or cache server without a stored secret     | `java build/Demo.java`            |
+| 84 | [`jbang`](demo-84-jbang/README.md)                                | A build written as a JBang script, on the released engine JBang resolves     | `jbang build/Demo.java`           |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1342,3 +1343,26 @@ elsewhere `jenesis.exchange.identity` names the variable or file that holds it. 
 server whose request differs is described by `encoding` and `parameters`, as JFrog
 Artifactory is, and any other is asked by a helper program. The demo runs three
 builds against a stand-in server that admits only a token it issued.
+
+## 66. A build as a JBang script - [`jbang`](demo-84-jbang/README.md)
+
+A build program can be a [JBang](https://www.jbang.dev) script, and a project of
+your own then carries no `build/jenesis` folder: the first lines of its script name
+the JDK and a released engine, which JBang resolves from Maven Central,
+
+    //JAVA 25+
+    //DEPS build.jenesis:build.jenesis:0.18.2
+
+and its `main` builds the project with `new Make("build.jenesis.Project")`, as the
+build programs of the earlier demos do. The demo's own `build/Demo.java` names the
+engine of this repository instead, as every demo runs the sources it sits beside:
+
+    //SOURCES ../../../sources/build/**/*.java
+
+`jbang build/Demo.java` compiles those sources with the script, downloads a JDK
+where the machine's own is older than 25, stages the module and runs it.
+
+The repository's `jbang-catalog.json` offers the released commands the same way,
+without a script: `jbang jenesis-make@jenesis/jenesis` builds the project in the
+current folder, `jenesis-exec@jenesis/jenesis` builds and runs it, and
+`jpx@jenesis/jenesis` runs a published program.

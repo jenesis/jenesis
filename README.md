@@ -36,6 +36,41 @@ curl -fsSL https://get.jenesis.build | JENESIS_MODE=submodule bash   # ... as a 
 sdk install jpx
 ```
 
+With [JBang](https://www.jbang.dev), the released engine runs with nothing installed into the project, from the
+catalog at the root of this repository:
+
+```bash
+jbang jenesis-make@jenesis/jenesis                  # build the project in the current folder
+jbang jpx@jenesis/jenesis org.junit.platform.console --version
+```
+
+The catalog names one release, the newest, and a release moves it. JBang asks GitHub for a catalog again once
+its copy is twelve hours old, and `jbang --fresh jenesis-make@jenesis/jenesis` asks at once. To stay on one
+release, name its coordinate in place of the alias:
+
+```bash
+jbang --java 25+ --main build.jenesis.Make build.jenesis:build.jenesis:0.18.2
+```
+
+`jbang app install jenesis-make@jenesis/jenesis` puts the alias on the path as a command of its own name, so
+the three commands are called the same whichever way they were installed. The other commands of `sdk/` have no
+alias, because each does what a launch of the released jar cannot: `jenesis` and `jenesis-unsafe` verify a
+project's vendored sources against the published ones before running them, `jenesis-init`, `jenesis-validate`
+and `jenesis-version` read the sources an installation ships, `jenesis-switch` changes the calling shell, and
+`jenesis-jdk` and `jpx-jdk` install a JDK with a package manager.
+
+What the JBang route does not check: `jenesis` verifies `build/jenesis/` against the sources its release
+published and refuses a release at or below its floor, while an alias runs the release the catalog names and
+reads neither the vendored folder nor `jenesis.version`, so a project recording another version is built by a
+different engine than it vendors, without a message. JBang fetches the jar over HTTPS with the SHA-1 beside it,
+runs the jar even where the two differ, and checks no signature; `install.sh` installs a release only if it
+matches the SHA-256 published beside it, and the Homebrew and Scoop packages name the SHA-256 of their archive.
+What JBang resolves, the engine and whatever else a script's `//DEPS` names with its transitive dependencies,
+lands on the class path outside the versions and checksums a project pins.
+JBang reads the catalog from the default branch whenever an alias runs and asks for no confirmation, so
+whoever can change `jbang-catalog.json` on `main` changes what every alias runs; a coordinate named on the
+command line takes the catalog out. A build runs the project's code and plugins either way.
+
 Then, from the project root:
 
 ```bash
@@ -52,9 +87,10 @@ What is in this repository
 |------|----------|
 | `sources/` | The build tool itself, module `build.jenesis` - `Make`, `Execute` and `Jpx` are the entry points, and the `jenesis-make`, `jenesis-exec` and `jpx` `ToolProvider`s are the same three inside another program's JVM; `Project` is the configuration API they run and has no `main`. |
 | `tests/` | Its tests, module `build.jenesis.test`. |
-| `demo/` | 66 self-contained example projects, one per feature, indexed by [`demo/README.md`](demo/README.md). |
+| `demo/` | 84 self-contained example projects, one per feature, indexed by [`demo/README.md`](demo/README.md). |
 | `sdk/` | The SDKMAN distribution layout and its shell-script tests (`sdk/jenesis`, `sdk/jpx`). `jenesis-unsafe` reads the version recorded in a project's `build/jenesis/jenesis.version`, installs it where the package manager can, verifies the vendored sources against the published ones and runs the compiled engine - a tree that does not match is refused, so no unreviewed build code is ever executed. `jenesis` is that launcher behind a floor: a recorded version the floor covers is no longer considered safe, and is refused with `jenesis-unsafe` named for the builds that have to run it all the same. `jenesis-make` runs the installed version as it stands, and `jenesis-switch` moves the shell to the recorded one. Both stay on the released engine, so a refused project still builds as a standard build; only running the vendored sources yourself - in source mode, or off classes compiled once with `javac` - executes the vendored engine. `jenesis-jdk` installs a JDK for a `jenesis.toolchain.version` with SDKMAN, mise or Scoop, once a user names it as `jenesis.toolchain.installer`. |
 | `distribution/` | Packager templates that override JReleaser's own, per distribution: the Homebrew formulae, which wrap each command rather than symlinking it so a script still finds its own installation, and the Scoop manifest that describes jpx rather than the build tool. JReleaser would look for these under `src/jreleaser/distributions/`, so each packager in `jreleaser.yml` names its `templateDirectory` here instead - this project has no `src/` tree. |
+| `jbang-catalog.json` | The [JBang](https://www.jbang.dev) catalog: the aliases `jenesis-make`, `jenesis-exec` and `jpx`, named after the commands of the SDKMAN, Homebrew and Scoop distributions that they stand for, each running its main class out of the `build.jenesis:build.jenesis` release it names, on a JDK 25 or newer that JBang downloads where none is installed. `jbang jenesis-make@jenesis/jenesis` reads it from the default branch, and like `jenesis-make` it runs the released engine as it stands, whatever a project vendors under `build/jenesis/`. |
 | `build/jenesis` | A symlink to `sources/build/jenesis`, so the project builds itself with itself. |
 | `benchmark/` | The performance harness and its methodology, see [`benchmark/README.md`](benchmark/README.md). |
 | `installation/` | `install.sh`, the script served at `get.jenesis.build`, and `install.test.sh`, its tests: each mode is installed into a throwaway project and built, run by CI on every platform. `worker.js` is the Cloudflare Worker that serves that script from the default branch, with `worker.test.js` covering it on Node's built-in runner. |
@@ -203,6 +239,12 @@ Continuous integration
   - `native-image` - the GraalVM demo, on a GraalVM runner, executing the produced binary;
   - `sdk` - stages the jar, populates the SDKMAN layout and runs the `sdk/jenesis` and `sdk/jpx` script tests.
 
+  A demo lane that sets `jbang: true` has JBang installed before it runs, as one that sets `jdk` has that JDK:
+  the `jbang` lane runs the script of `demo-84-jbang`, which compiles the engine of the commit through its
+  `//SOURCES` line, and each alias of `jbang-catalog.json`, which runs the release the catalog names.
+  `jbang-plain-java` runs the same script with `java` alone. `JbangCatalogTest` holds the catalog to one alias
+  per tool, named after its command, with its main class and one release for all three.
+
   Every build runs under `-Djenesis.dependency.pin=strict`, so an unpinned dependency fails CI: run `pin` and
   commit the result when you change one. Each job uploads its `target/` on failure. Every workflow names
   `MAVEN_REPOSITORY_URI` in its file as Google's mirror of Central followed by Central itself, as described under
@@ -258,6 +300,20 @@ because mise switches versions from `mise.toml` itself. mise links those command
 which is why every script follows a link back to its installation. mise remembers the signer as this
 workflow's file, so signing from any other workflow is a signer change that each user has to accept before
 mise installs again - the steps stay in `release.yml`. mise holds a new release back for 24 hours by default.
+
+The last step moves the one file that names a release for [JBang](https://www.jbang.dev): `jbang-catalog.json`,
+whose three aliases run `build.jenesis:build.jenesis:<version>`. It rewrites the version on the head of `main`,
+whichever commit was released, and pushes that one commit with the workflow's own token, after JReleaser has
+published the release the catalog then names. Nothing else is touched: the script of `demo/demo-84-jbang` builds
+with the sources of its checkout and names no release. A release below the version the catalog names leaves it
+alone. If `main` moved while the step ran, the push is refused and the step fails, and the same edit by hand
+finishes the release.
+
+The catalog names a version rather than `RELEASE`, `LATEST` or a range, all of which JBang accepts. JBang
+records what such a coordinate resolved to and never asks Maven Central again until a run passes `--fresh`, so
+an alias that floats would keep each user on the release of their first run, while a catalog that names the
+release reaches them when JBang next fetches it. `LATEST` and a range also pick a snapshot or a pre-release
+where a repository lists one.
 
 Credentials never enter the build: it stops at the unsigned, validated bundle.
 
