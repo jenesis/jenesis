@@ -65,6 +65,8 @@ reads neither the vendored folder nor `jenesis.version`, so a project recording 
 different engine than it vendors, without a message. JBang fetches the jar over HTTPS with the SHA-1 beside it,
 runs the jar even where the two differ, and checks no signature; `install.sh` installs a release only if it
 matches the SHA-256 published beside it, and the Homebrew and Scoop packages name the SHA-256 of their archive.
+What JBang resolves, the engine and whatever else a script's `//DEPS` names with its transitive dependencies,
+lands on the class path outside the versions and checksums a project pins.
 JBang reads the catalog from the default branch whenever an alias runs and asks for no confirmation, so
 whoever can change `jbang-catalog.json` on `main` changes what every alias runs; a coordinate named on the
 command line takes the catalog out. A build runs the project's code and plugins either way.

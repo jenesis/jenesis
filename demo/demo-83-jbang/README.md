@@ -106,6 +106,10 @@ What this route does not check
     `build/jenesis/` folder, with the version it records, is not read.
   * JBang downloads the jar over HTTPS and fetches the SHA-1 published beside it, but
     runs the jar even where the two differ, and it checks no signature.
+  * Whatever JBang resolves - the engine, which is one jar that depends on nothing,
+    and anything else a script names in `//DEPS`, with its transitive dependencies -
+    lands on the class path and is not covered by the versions and checksums the
+    project pins.
   * An alias is whatever `jbang-catalog.json` on the default branch of
     `jenesis/jenesis` says when it runs, and JBang asks for no confirmation. The
     `//DEPS` line of a script, or a coordinate on the command line, names the
