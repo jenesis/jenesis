@@ -1340,8 +1340,8 @@ whose first lines name the JDK and the released engine,
 
 and whose `main` builds the project with `new Make("build.jenesis.Project")`, as the
 build programs of the earlier demos do. `jbang build/Demo.java` resolves that jar
-from Maven Central, downloads a JDK where the machine has none of version 25 or
-newer, stages the module and runs it. The engine that runs is the published one,
+from Maven Central, downloads a JDK where the machine's own is older than 25,
+stages the module and runs it. The engine that runs is the published one,
 so moving to another release is an edit of the `//DEPS` line.
 
 The repository's `jbang-catalog.json` offers the released commands the same way,

@@ -25,7 +25,7 @@ so the file stays plain Java:
     //DEPS build.jenesis:build.jenesis:0.18.2
 
 `//JAVA 25+` asks for a JDK of version 25 or newer, and JBang downloads one where
-the machine has none. `//DEPS` names the engine by its Maven coordinate. The rest is
+the machine's own is older. `//DEPS` names the engine by its Maven coordinate. The rest is
 a program that stages the project and runs what it staged:
 
     Make.Result staged = new Make("build.jenesis.Project").build("stage");
