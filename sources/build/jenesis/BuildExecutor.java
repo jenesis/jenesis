@@ -48,7 +48,7 @@ public interface BuildExecutor {
                             : Repository.Origin.of(environment, "cache.uri") == Repository.Origin.PROJECT
                             ? BuildExecutorHttpCache.ofEnvironment(environment, uri).token(null)
                             : BuildExecutorHttpCache.ofEnvironment(environment, uri);
-                    case "file" -> new BuildExecutorFileCache(Path.of(uri));
+                    case "file" -> BuildExecutorFileCache.ofEnvironment(environment, Path.of(uri));
                     default -> throw new IllegalArgumentException(
                             "Unsupported cache URI scheme (expected http, https, or file): " + location);
                 };

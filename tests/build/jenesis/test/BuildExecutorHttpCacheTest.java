@@ -364,6 +364,29 @@ public class BuildExecutorHttpCacheTest {
     }
 
     @Test
+    public void a_build_told_not_to_write_sends_a_cache_server_nothing_to_store_and_restores_from_it() throws IOException {
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("large"), "x".repeat(100));
+        Files.writeString(output.resolve("small"), "small");
+        BuildExecutorHttpCache reading = BuildExecutorHttpCache.ofEnvironment(
+                new Environment(Map.of("cache.write", "false", "cache.inline", "100", "cache.local", elsewhere.toString())),
+                uri).token("team-alpha").project("demo");
+        assertThat(reading.stores()).isFalse();
+        assertThat(BuildExecutorHttpCache.ofEnvironment(Environment.NONE, uri).stores()).isTrue();
+        reading.store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        assertThat(requests).as("neither a large file is asked for or sent, nor the step").isEmpty();
+        cache(local).inline(100).store(Runnable::run, "step", step, in, output, "SHA-256", Map.of());
+        requests.clear();
+        assertThat(reading.fetch(Runnable::run, "step", step, in, folders("source"), target, "SHA-256")).isPresent();
+        assertThat(requests).containsExactly("GET /01/" + key(in), "GET " + BLOBS + hex("x".repeat(100)));
+        assertThat(target.resolve("large")).content().isEqualTo("x".repeat(100));
+        assertThat(elsewhere.resolve("sha-256").resolve("blobs").resolve(hex("x".repeat(100)).substring(0, 2)).resolve(hex("x".repeat(100)).substring(2)))
+                .as("what it downloads it keeps on this machine, which is the build's own store")
+                .exists();
+    }
+
+    @Test
     public void fetch_returns_empty_on_miss() throws IOException {
         assertThat(cache(local).fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), folders("source"), target, "SHA-256"))
                 .isEmpty();

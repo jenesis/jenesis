@@ -66,6 +66,9 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         if (read != null) {
             cache = cache.readTimeout(Duration.parse(read));
         }
+        if (!environment.flag("cache.write", true, Setting.PROJECT)) {
+            cache = cache.write(false);
+        }
         long inline = environment.number("cache.inline", cache.inline, Setting.PROJECT);
         if (inline < 0) {
             throw new IllegalArgumentException("jenesis.cache.inline is " + inline

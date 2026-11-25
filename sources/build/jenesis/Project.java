@@ -3775,7 +3775,7 @@ public record Project(
             project = project.artifacts(artifacts);
         }
         if (environment.keys().containsKey("project.cache")) {
-            project = project.cache(new BuildExecutorFileCache(environment.path("project.cache",
+            project = project.cache(BuildExecutorFileCache.ofEnvironment(environment, environment.path("project.cache",
                     ".jenesis/cache",
                     Setting.CONFINED)));
         }
@@ -4904,6 +4904,7 @@ public record Project(
                 cache.inline|65536|Size in bytes from which a file of a step is stored on a cache server apart from the step and once however many steps wrote it; a smaller file travels within its step
                 cache.project||Project name sent to a cache server (env JENESIS_CACHE_PROJECT)
                 cache.token||Token sent to a cache server (env JENESIS_CACHE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and a cache server a project's own files named is not sent it
+                cache.write|true|Store what a build produced in the build cache; false reads the cache alone, as a folder that cannot be written to is read without being asked
                 cache.connect|PT1S|Connect timeout for a cache server
                 cache.read|PT10S|Read timeout for a cache server
                 cache.insecure|false|Permit the cache token over plaintext http off loopback, and over https accept a certificate that does not verify; likewise yours alone to allow
