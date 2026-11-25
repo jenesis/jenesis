@@ -673,7 +673,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             }
         }
 
-        static Process start(ProcessBuilder builder) throws IOException {
+        public static Process start(ProcessBuilder builder) throws IOException {
             Process process = builder.start();
             RUNNING.add(process);
             process.onExit().thenRun(() -> RUNNING.remove(process));

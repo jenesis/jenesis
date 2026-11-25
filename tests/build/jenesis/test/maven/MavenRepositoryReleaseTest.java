@@ -224,7 +224,7 @@ public class MavenRepositoryReleaseTest {
     public void sends_the_authorization_header_value_as_given() throws IOException {
         stage("1.0.0", "greeter-1.0.0.jar", "classes");
 
-        run(release().token("Basic ZGVwbG95OnNlY3JldA=="));
+        run(release().credential(new Repository.Credential(new Repository.Credential.Source.Token("Basic ZGVwbG95OnNlY3JldA=="), Repository.Origin.USER)));
 
         assertThat(requests).isNotEmpty().allMatch(request -> request.endsWith(" Basic ZGVwbG95OnNlY3JldA=="));
     }

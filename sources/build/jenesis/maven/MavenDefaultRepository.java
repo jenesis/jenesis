@@ -17,7 +17,7 @@ public class MavenDefaultRepository implements MavenRepository {
     private final boolean writable;
     private final Map<String, URI> validations;
     private final Consumer<String> callback;
-    private final String token;
+    private final Repository.Credential credential;
     private final Repository.Connection connection;
 
     public static MavenRepository of() {
@@ -61,17 +61,17 @@ public class MavenDefaultRepository implements MavenRepository {
                 : repository.overlay(DiscoveryMavenRepository.ofEnvironment(environment, discovery));
     }
 
-    public static MavenRepository of(URI repository, String token) {
-        return ofEnvironment(Environment.NONE, repository, token);
+    public static MavenRepository of(URI repository, Repository.Credential credential) {
+        return ofEnvironment(Environment.NONE, repository, credential);
     }
 
     public static MavenRepository ofEnvironment(Environment environment,
                                                 URI repository,
-                                                String token) {
+                                                Repository.Credential credential) {
         return single(environment,
                 repository.toString().endsWith("/") ? repository : URI.create(repository + "/"),
                 localRepository(environment),
-                token,
+                credential,
                 environment.flag("print.fetch", Setting.PROJECT) ? environment.out() : null);
     }
 
@@ -94,7 +94,7 @@ public class MavenDefaultRepository implements MavenRepository {
     private static MavenRepository single(Environment environment,
                                           URI uri,
                                           Path local,
-                                          String token,
+                                          Repository.Credential credential,
                                           Consumer<String> printing) {
         Palette palette = Palette.ofEnvironment(environment);
         return ofEnvironment(environment,
@@ -106,7 +106,7 @@ public class MavenDefaultRepository implements MavenRepository {
                         "[FETCHED]",
                         palette.reset(),
                         uri.resolve(path))),
-                token);
+                credential);
     }
 
     static Map<String, URI> validations(URI uri) {
@@ -201,15 +201,15 @@ public class MavenDefaultRepository implements MavenRepository {
     }
 
     public MavenDefaultRepository(URI repository, Path local, Map<String, URI> validations, Consumer<String> callback) {
-        this(repository, local, validations, callback, null);
+        this(repository, local, validations, callback, Repository.Credential.NONE);
     }
 
     public MavenDefaultRepository(URI repository,
                                   Path local,
                                   Map<String, URI> validations,
                                   Consumer<String> callback,
-                                  String token) {
-        this(Environment.NONE, repository, local, validations, callback, token);
+                                  Repository.Credential credential) {
+        this(Environment.NONE, repository, local, validations, callback, credential);
     }
 
     public static MavenDefaultRepository ofEnvironment(Environment environment,
@@ -217,8 +217,8 @@ public class MavenDefaultRepository implements MavenRepository {
                                                 Path local,
                                                 Map<String, URI> validations,
                                                 Consumer<String> callback,
-                                                String token) {
-        return new MavenDefaultRepository(environment, repository, local, validations, callback, token);
+                                                Repository.Credential credential) {
+        return new MavenDefaultRepository(environment, repository, local, validations, callback, credential);
     }
 
     private MavenDefaultRepository(Environment environment,
@@ -226,27 +226,27 @@ public class MavenDefaultRepository implements MavenRepository {
                                    Path local,
                                    Map<String, URI> validations,
                                    Consumer<String> callback,
-                                   String token) {
-        this(repository, local, validations, callback, token, Repository.Connection.ofEnvironment(environment));
+                                   Repository.Credential credential) {
+        this(repository, local, validations, callback, credential, Repository.Connection.ofEnvironment(environment));
     }
 
     private MavenDefaultRepository(URI repository,
                                    Path local,
                                    Map<String, URI> validations,
                                    Consumer<String> callback,
-                                   String token,
+                                   Repository.Credential credential,
                                    Repository.Connection connection) {
         this.repository = repository;
         this.local = local;
         this.writable = local != null && Files.isWritable(local);
         this.validations = validations;
         this.callback = callback;
-        this.token = token;
+        this.credential = credential.target(repository);
         this.connection = connection;
     }
 
     public MavenDefaultRepository connection(Repository.Connection connection) {
-        return new MavenDefaultRepository(repository, local, validations, callback, token, connection);
+        return new MavenDefaultRepository(repository, local, validations, callback, credential, connection);
     }
 
     public MavenDefaultRepository printing(Consumer<String> printing, Palette palette) {
@@ -256,7 +256,7 @@ public class MavenDefaultRepository implements MavenRepository {
                         palette.info(),
                         "[FETCHED]",
                         palette.reset(),
-                        repository.resolve(path))), token, connection);
+                        repository.resolve(path))), credential, connection);
     }
 
     @SuppressWarnings("unchecked")
@@ -431,7 +431,7 @@ public class MavenDefaultRepository implements MavenRepository {
                 digests,
                 path.substring(dash + 1, dot),
                 path.substring(dot),
-                token,
+                credential,
                 connection);
     }
 
@@ -440,14 +440,14 @@ public class MavenDefaultRepository implements MavenRepository {
                                            SequencedMap<LazyRepositoryItem, MessageDigest> digests,
                                            String prefix,
                                            String suffix,
-                                           String token,
+                                           Repository.Credential credential,
                                            Path directory) throws IOException {
         Path temporary = directory == null
                 ? Files.createTempFile(prefix, suffix)
                 : Files.createTempFile(directory, prefix, suffix);
         try {
             for (int attempt = 0; ; attempt++) {
-                try (InputStream stream = Repository.open(connection, uri, token)) {
+                try (InputStream stream = Repository.open(connection, uri, credential)) {
                     try {
                         Files.copy(stream, temporary, StandardCopyOption.REPLACE_EXISTING);
                         break;
@@ -597,7 +597,7 @@ public class MavenDefaultRepository implements MavenRepository {
                                 SequencedMap<LazyRepositoryItem, MessageDigest> digests,
                                 String prefix,
                                 String suffix,
-                                String token,
+                                Repository.Credential credential,
                                 Repository.Connection connection) implements LazyRepositoryItem {
 
         @Override
@@ -622,7 +622,7 @@ public class MavenDefaultRepository implements MavenRepository {
 
         @Override
         public Optional<InputStream> toLazyInputStream() throws IOException {
-            Optional<Path> temporary = download(connection, uri, digests, prefix, suffix, token, null);
+            Optional<Path> temporary = download(connection, uri, digests, prefix, suffix, credential, null);
             if (temporary.isEmpty()) {
                 return Optional.empty();
             }
@@ -652,7 +652,7 @@ public class MavenDefaultRepository implements MavenRepository {
                 return LazyRepositoryItem.super.materialize();
             }
             Files.createDirectories(path.getParent());
-            Optional<Path> temporary = download(connection, uri, digests, prefix, suffix, token, path.getParent());
+            Optional<Path> temporary = download(connection, uri, digests, prefix, suffix, credential, path.getParent());
             if (temporary.isEmpty()) {
                 return Optional.empty();
             }

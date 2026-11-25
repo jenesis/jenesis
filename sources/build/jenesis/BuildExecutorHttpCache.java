@@ -12,7 +12,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
 
     private final URI uri;
     private final BuildExecutorFileCache local;
-    private final String token;
+    private final Repository.Credential credential;
     private final String project;
     private final String algorithm;
     private final Duration connectTimeout;
@@ -26,7 +26,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     public BuildExecutorHttpCache(URI uri) {
         this(uri,
                 new BuildExecutorFileCache(Path.of(System.getProperty("user.home"), ".jenesis", "cache")),
-                null,
+                Repository.Credential.NONE,
                 null,
                 "SHA-256",
                 Duration.parse("PT1S"),
@@ -48,10 +48,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                     + " and JENESIS_CACHE_TOKEN now: rename the one that is set, as the cache server would be sent"
                     + " no credential otherwise");
         }
-        String token = environment.getProperty("cache.token", System.getenv("JENESIS_CACHE_TOKEN"), Setting.MACHINE);
-        if (token != null) {
-            cache = cache.token(token);
-        }
+        cache = cache.credential(Repository.Credential.of(environment, "cache.token", "JENESIS_CACHE_TOKEN"));
         String project = environment.getProperty("cache.project",
                 System.getenv("JENESIS_CACHE_PROJECT"),
                 Setting.PROJECT);
@@ -80,7 +77,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
 
     private BuildExecutorHttpCache(URI uri,
                                    BuildExecutorFileCache local,
-                                   String token,
+                                   Repository.Credential credential,
                                    String project,
                                    String algorithm,
                                    Duration connectTimeout,
@@ -91,7 +88,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                                    long inline) {
         this.uri = uri;
         this.local = local;
-        this.token = token;
+        this.credential = credential.target(uri);
         this.project = project;
         this.algorithm = algorithm;
         this.connectTimeout = connectTimeout;
@@ -103,43 +100,49 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     }
 
     public BuildExecutorHttpCache insecure(boolean insecure) {
-        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
+        return new BuildExecutorHttpCache(uri, local, credential, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
     }
 
     public BuildExecutorHttpCache inline(long inline) {
-        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
+        return new BuildExecutorHttpCache(uri, local, credential, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
     }
 
     public BuildExecutorHttpCache local(BuildExecutorFileCache local) {
-        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
+        return new BuildExecutorHttpCache(uri, local, credential, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
     }
 
     public BuildExecutorHttpCache token(String token) {
-        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
+        return credential(token == null
+                ? Repository.Credential.NONE
+                : new Repository.Credential(new Repository.Credential.Source.Token(token), Repository.Origin.USER));
+    }
+
+    public BuildExecutorHttpCache credential(Repository.Credential credential) {
+        return new BuildExecutorHttpCache(uri, local, credential, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
     }
 
     public BuildExecutorHttpCache project(String project) {
-        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
+        return new BuildExecutorHttpCache(uri, local, credential, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
     }
 
     public BuildExecutorHttpCache algorithm(String algorithm) {
-        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
+        return new BuildExecutorHttpCache(uri, local, credential, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
     }
 
     public BuildExecutorHttpCache connectTimeout(Duration connectTimeout) {
-        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
+        return new BuildExecutorHttpCache(uri, local, credential, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
     }
 
     public BuildExecutorHttpCache read(boolean read) {
-        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
+        return new BuildExecutorHttpCache(uri, local, credential, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
     }
 
     public BuildExecutorHttpCache write(boolean write) {
-        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
+        return new BuildExecutorHttpCache(uri, local, credential, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
     }
 
     public BuildExecutorHttpCache readTimeout(Duration readTimeout) {
-        return new BuildExecutorHttpCache(uri, local, token, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
+        return new BuildExecutorHttpCache(uri, local, credential, project, algorithm, connectTimeout, readTimeout, read, write, insecure, inline);
     }
 
     @Override
@@ -454,8 +457,15 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         connection.setReadTimeout((int) Math.min(readTimeout.toMillis(), Integer.MAX_VALUE));
         connection.setInstanceFollowRedirects(false);
         connection.setRequestProperty("User-Agent", "Jenesis");
-        if (token != null) {
-            connection.setRequestProperty("Authorization", "Bearer " + token);
+        try {
+            String token = credential.token(new Repository.Connection()
+                    .insecure(insecure || loopback && "http".equals(scheme))
+                    .connectTimeout((int) Math.min(connectTimeout.toMillis(), Integer.MAX_VALUE))
+                    .readTimeout((int) Math.min(readTimeout.toMillis(), Integer.MAX_VALUE)));
+            if (token != null) {
+                connection.setRequestProperty("Authorization", "Bearer " + token);
+            }
+        } catch (IOException _) {
         }
         if (project != null) {
             connection.setRequestProperty(PROJECT, project);
