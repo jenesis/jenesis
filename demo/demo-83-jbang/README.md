@@ -78,6 +78,16 @@ released commands to a project that has no build program of its own:
     jbang jenesis-exec@jenesis/jenesis Ada Lovelace
     jbang jpx@jenesis/jenesis org.junit.platform.console@6.1.3 --version
 
+The catalog names the newest release and moves with every release. JBang fetches a
+catalog again once its copy is twelve hours old, and at once under `--fresh`:
+
+    jbang --fresh jenesis-make@jenesis/jenesis
+
+A build that is to stay on one release names the coordinate instead of the alias,
+as the script above does in its `//DEPS` line:
+
+    jbang --java 25+ --main build.jenesis.Make build.jenesis:build.jenesis:0.18.2 stage
+
 Each alias runs the released engine as it stands, as the installed `jenesis-make`,
 `jenesis-exec` and `jpx` commands do. Selectors and `-Djenesis.*` settings follow
 the alias as they follow the command.

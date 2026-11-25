@@ -44,6 +44,14 @@ jbang jenesis-make@jenesis/jenesis                  # build the project in the c
 jbang jpx@jenesis/jenesis org.junit.platform.console --version
 ```
 
+The catalog names one release, the newest, and a release moves it. JBang asks GitHub for a catalog again once
+its copy is twelve hours old, and `jbang --fresh jenesis-make@jenesis/jenesis` asks at once. To stay on one
+release, name its coordinate in place of the alias:
+
+```bash
+jbang --java 25+ --main build.jenesis.Make build.jenesis:build.jenesis:0.18.2
+```
+
 Then, from the project root:
 
 ```bash
@@ -280,6 +288,12 @@ with the two READMEs that quote it. It rewrites the version on the head of `main
 and pushes that one commit with the workflow's own token, after JReleaser has published the release the catalog
 then names. A release below the version the catalog names leaves it alone. If `main` moved while the step ran,
 the push is refused and the step fails, and the same edit by hand finishes the release.
+
+The catalog names a version rather than `RELEASE`, `LATEST` or a range, all of which JBang accepts. JBang
+records what such a coordinate resolved to and never asks Maven Central again until a run passes `--fresh`, so
+an alias that floats would keep each user on the release of their first run, while a catalog that names the
+release reaches them when JBang next fetches it. `LATEST` and a range also pick a snapshot or a pre-release
+where a repository lists one.
 
 Credentials never enter the build: it stops at the unsigned, validated bundle.
 
