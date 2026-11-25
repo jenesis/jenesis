@@ -2984,7 +2984,7 @@ public record Project(
                 case "demos" -> """
                     # Jenesis - Copy a demo
 
-                    82 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    83 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -3056,7 +3056,8 @@ public record Project(
                                          78, 79 discovery (a dependency resolved from its
                                          publisher's own domain, as a module or by coordinate)
                       Running it         80 jpx (run a released program without building),
-                                         81 tools-api (a build inside another program's JVM)
+                                         81 tools-api (a build inside another program's JVM),
+                                         83 jbang (a build as a JBang script, on the released engine)
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;

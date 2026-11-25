@@ -132,6 +132,7 @@ Quick index
 | 80 | [`jpx`](demo-80-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
 | 81 | [`tools-api`](demo-81-tools-api/README.md)                        | Run a build, or a published program, inside another program's JVM            | `java build/Demo.java`            |
 | 82 | [`clojure`](demo-82-clojure/README.md)                            | Java and a Clojure namespace in one `pom.xml` module, compiled ahead of time | `java build/jenesis/Execute.java` |
+| 83 | [`jbang`](demo-83-jbang/README.md)                                | A build written as a JBang script, on the released engine JBang resolves     | `jbang build/Demo.java`           |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1327,3 +1328,23 @@ namespace after `javac`, so it calls the module's Java type. It compiles with th
 `org.clojure:clojure` the `pom.xml` declares, as classes compiled ahead of time are
 tied to the Clojure that compiled them, and ships each source beside its classes.
 `-Djenesis.clojure.language=false` leaves the plugin out.
+
+## 65. A build as a JBang script - [`jbang`](demo-83-jbang/README.md)
+
+Every demo so far carries the engine as source under `build/jenesis`. This one
+carries none: its `build/Demo.java` is a [JBang](https://www.jbang.dev) script
+whose first lines name the JDK and the released engine,
+
+    //JAVA 25+
+    //DEPS build.jenesis:build.jenesis:0.18.2
+
+and whose `main` builds the project with `new Make("build.jenesis.Project")`, as the
+build programs of the earlier demos do. `jbang build/Demo.java` resolves that jar
+from Maven Central, downloads a JDK where the machine has none of version 25 or
+newer, stages the module and runs it. The engine that runs is the published one,
+so moving to another release is an edit of the `//DEPS` line.
+
+The repository's `jbang-catalog.json` offers the released commands the same way,
+without a script: `jbang jenesis-make@jenesis/jenesis` builds the project in the
+current folder, `jenesis-exec@jenesis/jenesis` builds and runs it, and
+`jpx@jenesis/jenesis` runs a published program.
