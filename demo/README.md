@@ -1345,6 +1345,6 @@ stages the module and runs it. The engine that runs is the published one,
 so moving to another release is an edit of the `//DEPS` line.
 
 The repository's `jbang-catalog.json` offers the released commands the same way,
-without a script: `jbang jenesis-make@jenesis/jenesis` builds the project in the
-current folder, `jenesis-exec@jenesis/jenesis` builds and runs it, and
+without a script: `jbang make@jenesis/jenesis` builds the project in the
+current folder, `execute@jenesis/jenesis` builds and runs it, and
 `jpx@jenesis/jenesis` runs a published program.

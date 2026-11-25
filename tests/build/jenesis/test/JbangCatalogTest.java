@@ -14,12 +14,15 @@ public class JbangCatalogTest {
     private static final Pattern RELEASE = Pattern.compile("build\\.jenesis:build\\.jenesis:(\\d+\\.\\d+\\.\\d+)");
 
     @Test
-    public void every_tool_has_an_alias_of_its_name_that_runs_its_main_class_on_java_25() throws Exception {
+    public void every_tool_has_an_alias_named_after_its_main_class_that_runs_it_on_java_25() throws Exception {
         Map<?, ?> aliases = aliases();
         Map<String, String> tools = Stream.<ToolProvider>of(new MakeTool(), new ExecuteTool(), new JpxTool())
-                .collect(Collectors.toMap(ToolProvider::name, tool -> tool.getClass().getName().replaceFirst("Tool$", "")));
+                .map(tool -> tool.getClass().getName().replaceFirst("Tool$", ""))
+                .collect(Collectors.toMap(
+                        main -> main.substring(main.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT),
+                        Function.identity()));
         assertThat(aliases.keySet())
-                .as("an alias answers to the name its command has on a command line")
+                .as("an alias is the name of the entry point it runs")
                 .isEqualTo(tools.keySet());
         for (Map.Entry<String, String> tool : tools.entrySet()) {
             Map<?, ?> alias = (Map<?, ?>) aliases.get(tool.getKey());

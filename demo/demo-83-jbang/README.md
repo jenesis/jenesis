@@ -74,14 +74,14 @@ to another release is an edit of that one line.
 The `jbang-catalog.json` at the root of the `jenesis/jenesis` repository offers the
 released commands to a project that has no build program of its own:
 
-    jbang jenesis-make@jenesis/jenesis stage
-    jbang jenesis-exec@jenesis/jenesis Ada Lovelace
+    jbang make@jenesis/jenesis stage
+    jbang execute@jenesis/jenesis Ada Lovelace
     jbang jpx@jenesis/jenesis org.junit.platform.console@6.1.3 --version
 
 The catalog names the newest release and moves with every release. JBang fetches a
 catalog again once its copy is twelve hours old, and at once under `--fresh`:
 
-    jbang --fresh jenesis-make@jenesis/jenesis
+    jbang --fresh make@jenesis/jenesis
 
 A build that is to stay on one release names the coordinate instead of the alias,
 as the script above does in its `//DEPS` line:
@@ -91,3 +91,9 @@ as the script above does in its `//DEPS` line:
 Each alias runs the released engine as it stands, as the installed `jenesis-make`,
 `jenesis-exec` and `jpx` commands do. Selectors and `-Djenesis.*` settings follow
 the alias as they follow the command.
+
+`jbang app install` puts an alias on the path as a command of the alias's name,
+and a command named `make` would stand in front of GNU make. `--name` chooses
+another:
+
+    jbang app install --name jenesis-make make@jenesis/jenesis
