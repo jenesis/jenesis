@@ -219,7 +219,11 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                 if (file == null) {
                     return Optional.empty();
                 }
-                local.adopt(digest, hex, file);
+                try (InputStream stream = Files.newInputStream(file)) {
+                    if (!local.admit(digest, hex, stream)) {
+                        return Optional.empty();
+                    }
+                }
             }
             for (String hex : separate) {
                 String blob = address(digest, hex);
