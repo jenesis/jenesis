@@ -132,7 +132,7 @@ public class JenesisModuleRepositoryReleaseTest {
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "greeter");
         stage("demo.app", "2.0.0", "demo.app.jar", "app");
 
-        run(release().token("Bearer secret"));
+        run(release().credential(new Repository.Credential(new Repository.Credential.Source.Token("Bearer secret"), Repository.Origin.USER)));
 
         assertThat(requests).containsExactly(
                 "PUT /repository/releases/module/demo.app/2.0.0/demo.app.jar Bearer secret",

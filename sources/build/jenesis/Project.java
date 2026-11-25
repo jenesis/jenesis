@@ -87,7 +87,13 @@ public record Project(
             PROMPT = "prompt",
             PROPERTIES = "properties",
             CONFIGURATION = "configuration";
-    private static final Set<String> CREDENTIALS = Set.of("release.token", "deploy.token", "cache.token");
+    private static final Set<String> CREDENTIALS = Stream.of("cache", "module", "maven", "release", "deploy")
+            .flatMap(group -> Stream.of("exchange", "helper", "identity", "audience", "parameters", "encoding")
+                    .map(key -> group + "." + key))
+            .collect(Collectors.toCollection(() -> new TreeSet<>(Set.of("release.token",
+                    "deploy.token",
+                    "cache.token",
+                    "exchange.identity"))));
     private static final Map<String, String> REPOSITORIES = Map.of("maven.uri", "MAVEN_REPOSITORY_URI",
             "maven.token", "MAVEN_REPOSITORY_TOKEN",
             "module.uri", "JENESIS_REPOSITORY_URI",
@@ -2984,7 +2990,7 @@ public record Project(
                 case "demos" -> """
                     # Jenesis - Copy a demo
 
-                    83 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    84 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -3058,6 +3064,8 @@ public record Project(
                       Running it         80 jpx (run a released program without building),
                                          81 tools-api (a build inside another program's JVM),
                                          84 jbang (a build as a JBang script, on the released engine)
+                      In CI              83 credential-exchange (a repository or cache server
+                                         signed in to without a stored secret)
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
@@ -4734,7 +4742,7 @@ public record Project(
                 required.add(selector);
             }
         }
-        try (Closeable _ = ProcessHandler.scope()) {
+        try (Closeable _ = ProcessHandler.scope(); Closeable _ = Repository.Credential.scope()) {
             return executor.execute(required, optional);
         }
     }
@@ -4887,6 +4895,13 @@ public record Project(
                 maven.uri||Maven remotes, comma-separated and queried left to right; a |<groupId> suffix, repeatable, asks a remote only for that group and the groups below it, and @<name> splices the chain that jenesis.<name> or the environment variable <name> holds; an empty value names no remote at all, so only discovery and the artifacts a build stored answer (env MAVEN_REPOSITORY_URI)
                 maven.local||Local Maven repository (env MAVEN_REPOSITORY_LOCAL), ~/.m2/repository where it exists, relative to the working directory on the command line, to ~/.jenesis in its files and to the project root in a project's; empty keeps no local Maven repository, so that everything resolved is kept in jenesis.project.artifacts alone and a CI job caches the project's .jenesis folder only, while export refuses to run; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 maven.token||Authorization header value for the Maven remotes, sent as given, so it names its scheme, as Bearer <token> or Basic <credentials> (env MAVEN_REPOSITORY_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one; a token the environment provides is sent only to the remotes the environment names, a remote a project's own files named is never sent one, and neither is the built-in public repository
+                maven.exchange||Path, on the host of each Maven remote the credential is sent to, of an OAuth 2.0 Token Exchange endpoint (RFC 8693), as /api/token of a Jenesis Repository: in place of a stored jenesis.maven.token, the identity token the CI job is issued is exchanged there, at first use and again once the expires_in of the answer has run out, for a short-lived token that is sent as Authorization: Bearer <token>; a URL is accepted where it names the scheme, host and port of each Maven remote the credential is sent to and refused otherwise, so that an identity token only reaches the server it is exchanged for, over https unless jenesis.repository.insecure allows plaintext; the request names each Maven remote the credential is sent to as its resource; a credential has one source, so that naming jenesis.maven.token or jenesis.maven.helper as well is refused; nothing is exchanged under jenesis.repository.offline, and a build in a container is handed none of this; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                maven.identity||Where the identity token to exchange is read from, as env <variable> or file <path>, a relative path below ~/.jenesis in its files and the working directory on the command line, read anew for every exchange, so that a token a platform rotates in a file is followed; default: jenesis.exchange.identity; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                maven.audience||Audience an identity token is requested for where GitHub Actions issues it, which the trust of the server names; default: the scheme, host and port of the exchange, as https://repository.example.com; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                maven.parameters||Further parameters of the exchange request, comma-separated <name>=<value> entries, as provider_name=github; an entry replaces a parameter of its name, and <name>= leaves that parameter out, as resource= does; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                maven.encoding|form|How the exchange request is written: form, as RFC 8693 lays it out, or json, an object of the same members, as JFrog Artifactory reads it; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                maven.helper||Program that issues the credential where no setting describes the exchange of a server, whitespace-separated with its arguments: it is run at first use, once for each build, with the URI of each Maven remote the credential is sent to as its last argument and the environment of the build, and the first line it prints is the token, sent as Authorization: Bearer <token> and never printed; printing nothing sends no credential, and any exit code but 0 fails what asked; a name without a path is looked up on the PATH, a relative path below ~/.jenesis in its files and the working directory on the command line; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                exchange.identity||Where the identity token of every exchange is read from unless the setting of a credential, as jenesis.maven.identity, names another: env <variable> or file <path>; default: the environment variable JENESIS_IDENTITY_TOKEN where it is set, otherwise the token GitHub Actions issues a job under permissions: id-token: write, requested for the audience of the exchange through ACTIONS_ID_TOKEN_REQUEST_URL and ACTIONS_ID_TOKEN_REQUEST_TOKEN; an identity token is sent to the exchange it is read for and nowhere else; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 maven.embed|true|Carry the POM and a pom.properties in the jar under META-INF/maven/<groupId>/<artifactId>/, as Maven does, where the layout publishes to Maven
                 maven.sources||Folders beside src/main/java and src/test/java that a pom.xml module compiles too, comma-separated names such as kotlin,groovy, each read as src/main/<name> and src/test/<name> where it exists
                 maven.unified|true|Resolve the compile, provided, runtime and test dependencies a pom.xml module declares as one graph, as Maven does, so that a test or runtime dependency decides which version of a shared dependency the main classes compile and run with; false resolves each class path on its own, so the main classes compile and run with the versions a consumer of the published POM resolves; a MavenProject built in code resolves as one graph unless unified(false) says otherwise
@@ -4894,6 +4909,12 @@ public record Project(
                 module.uri||Jenesis module remotes, likewise, where a |<module> suffix asks a remote only for that module and the modules whose name it prefixes, and a maven:[<segments>:]<uri> entry reads a remote as a Maven repository by the publishing convention, taking that many leading segments of a module name as its groupId where it names a count and jenesis.maven.segments where it does not, and a mapped:<uri or @>:<list>[;<list>...] entry reads a module only from the Maven repository at that URI, or the one jenesis.maven.uri configures for @, at the <groupId>/<artifactId>[/<type>[/<classifier>]] that one of the properties lists, each a URI or an absolute path, maps it to; an empty value names no remote at all, so only discovery, the local module folder and the artifacts a build stored answer (env JENESIS_REPOSITORY_URI)
                 module.local||Local module repository (env JENESIS_REPOSITORY_LOCAL), ~/.jenesis by default, relative to the working directory on the command line, to ~/.jenesis in its files and to the project root in a project's, read before every module remote and keeping each versioned module, artifact and POM the module index served under <module>/<version>/, so that an offline build of a fresh checkout finds what a module name resolved to, and the answers of discovery under well-known/; empty keeps no local module repository, so that everything resolved and every answer of discovery is kept in jenesis.project.artifacts alone and a CI job caches the project's .jenesis folder only, while export refuses to run; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 module.token||Authorization header value for the module remote, sent as given (env JENESIS_REPOSITORY_TOKEN); likewise, and only the first remote of the chain is sent it, so a fallback mirror never sees it
+                module.exchange||Path, on the host of the module remote, of the token exchange that issues its credential in place of jenesis.module.token, as jenesis.maven.exchange describes it; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                module.identity||Where the identity token of that exchange is read from, as jenesis.maven.identity; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                module.audience||Audience of that identity token, as jenesis.maven.audience; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                module.parameters||Further parameters of that exchange, as jenesis.maven.parameters; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                module.encoding|form|How the request of that exchange is written, as jenesis.maven.encoding; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                module.helper||Program that issues the credential of the module remote, as jenesis.maven.helper describes it; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 module.source|service|Who resolves a module's coordinates: service asks the repository at jenesis.module.uri, git reads the published index itself and fetches from jenesis.maven.uri
                 module.index||Location of that published index when git resolves it, a folder of per-module TSV files (env JENESIS_INDEX_URI); default: the jenesis-modules data on GitHub
                 module.prerelease||Accept a pre-release when asking the module index for a module's newest version
@@ -4905,6 +4926,12 @@ public record Project(
                 cache.inline|65536|Size in bytes from which a file of a step is stored on a cache server apart from the step and once however many steps wrote it; a smaller file travels within its step
                 cache.project||Project name sent to a cache server (env JENESIS_CACHE_PROJECT)
                 cache.token||Token sent to a cache server as Authorization: Bearer <token> (env JENESIS_CACHE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and a cache server a project's own files named is not sent it
+                cache.exchange||Path, on the host of the cache server, of the token exchange that issues its credential in place of jenesis.cache.token, as jenesis.maven.exchange describes it, plaintext permitted to a server on loopback or by jenesis.cache.insecure; a cache server that cannot be exchanged with is a cache that misses; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                cache.identity||Where the identity token of that exchange is read from, as jenesis.maven.identity; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                cache.audience||Audience of that identity token, as jenesis.maven.audience; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                cache.parameters||Further parameters of that exchange, as jenesis.maven.parameters; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                cache.encoding|form|How the request of that exchange is written, as jenesis.maven.encoding; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                cache.helper||Program that issues the credential of the cache server, as jenesis.maven.helper describes it; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 cache.write|true|Store what a build produced in the build cache; false reads the cache alone, as a folder that cannot be written to is read without being asked
                 cache.connect|PT1S|Connect timeout for a cache server
                 cache.read|PT10S|Read timeout for a cache server
@@ -5009,8 +5036,20 @@ public record Project(
                 release.publish|false|Publish what a release puts and runs - the jenesis.release.uri and jenesis.deploy.uri puts and the plugins of the hook point release, JReleaser's without --dry-run; without it, release and every pin run the release dry, checking what was staged and naming what it would put; only the command line may set it
                 jreleaser.release|true|JReleaser, activated by a jreleaser.properties of the configuration folder naming its jreleaser.yml as configuration=, with the other values of that file, or, where none is found, by a jreleaser.yml, .yaml, .toml or .json of a configuration folder
                 release.token||Authorization header value for that repository, sent as given (env JENESIS_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named
+                release.exchange||Path, on the host of the repository of jenesis.release.uri, of the token exchange that issues its credential in place of jenesis.release.token, as jenesis.maven.exchange describes it; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                release.identity||Where the identity token of that exchange is read from, as jenesis.maven.identity; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                release.audience||Audience of that identity token, as jenesis.maven.audience; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                release.parameters||Further parameters of that exchange, as jenesis.maven.parameters; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                release.encoding|form|How the request of that exchange is written, as jenesis.maven.encoding; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                release.helper||Program that issues the credential of the repository of jenesis.release.uri, as jenesis.maven.helper describes it; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 deploy.uri||Maven repository a release puts the staged Maven tree into, every file at <group path>/<artifactId>/<version>/<file> with its .md5, .sha1, .sha256 and .sha512, then the artifact's maven-metadata.xml merged with the one the repository holds; a SNAPSHOT version is put under a unique timestamped name beside its own maven-metadata.xml, as Maven deploys one; nothing is signed, so a release to Maven Central goes through the JReleaser plugin, which signs it and uses Central's publishing service, while its snapshot repository takes a SNAPSHOT from here as any repository does (env MAVEN_RELEASE_URI)
                 deploy.token||Authorization header value for that repository, sent as given, so it names its scheme, as Bearer <token> or Basic <credentials> (env MAVEN_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named
+                deploy.exchange||Path, on the host of the repository of jenesis.deploy.uri, of the token exchange that issues its credential in place of jenesis.deploy.token, as jenesis.maven.exchange describes it; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                deploy.identity||Where the identity token of that exchange is read from, as jenesis.maven.identity; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                deploy.audience||Audience of that identity token, as jenesis.maven.audience; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                deploy.parameters||Further parameters of that exchange, as jenesis.maven.parameters; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                deploy.encoding|form|How the request of that exchange is written, as jenesis.maven.encoding; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                deploy.helper||Program that issues the credential of the repository of jenesis.deploy.uri, as jenesis.maven.helper describes it; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 """;
 
     private static SortedMap<String, String> settings(Environment environment) {

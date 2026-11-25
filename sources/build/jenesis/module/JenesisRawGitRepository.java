@@ -18,7 +18,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
     private final Scope scope;
     private final URI data;
     private final URI repository;
-    private final String token;
+    private final Repository.Credential credential;
     private final Predicate<String> predicate;
     private final Repository.Connection connection;
     private final Boolean prerelease;
@@ -28,30 +28,30 @@ public class JenesisRawGitRepository implements JenesisRepository {
     private final Map<String, Optional<String>> tsvCache = new ConcurrentHashMap<>();
 
     public JenesisRawGitRepository(Scope scope, URI data, URI repository) {
-        this(scope, data, repository, null);
+        this(scope, data, repository, Repository.Credential.NONE);
     }
 
-    public JenesisRawGitRepository(Scope scope, URI data, URI repository, String token) {
-        this(Environment.NONE, scope, data, repository, token);
+    public JenesisRawGitRepository(Scope scope, URI data, URI repository, Repository.Credential credential) {
+        this(Environment.NONE, scope, data, repository, credential);
     }
 
     public static JenesisRawGitRepository ofEnvironment(Environment environment,
                                                         Scope scope,
                                                         URI data,
                                                         URI repository,
-                                                        String token) {
-        return new JenesisRawGitRepository(environment, scope, data, repository, token);
+                                                        Repository.Credential credential) {
+        return new JenesisRawGitRepository(environment, scope, data, repository, credential);
     }
 
     private JenesisRawGitRepository(Environment environment,
                                     Scope scope,
                                     URI data,
                                     URI repository,
-                                    String token) {
+                                    Repository.Credential credential) {
         this(scope,
              trailingSlash(data),
              trailingSlash(repository),
-             token,
+             credential,
              _ -> true,
              Repository.Connection.ofEnvironment(environment),
              environment.flagOrNull("module.prerelease", Setting.PROJECT),
@@ -63,7 +63,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
     private JenesisRawGitRepository(Scope scope,
                                     URI data,
                                     URI repository,
-                                    String token,
+                                    Repository.Credential credential,
                                     Predicate<String> predicate,
                                     Repository.Connection connection,
                                     Boolean prerelease,
@@ -73,7 +73,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
         this.scope = scope;
         this.data = data;
         this.repository = repository;
-        this.token = token;
+        this.credential = credential.target(repository);
         this.predicate = predicate;
         this.connection = connection;
         this.prerelease = prerelease;
@@ -86,7 +86,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
         return new JenesisRawGitRepository(scope,
                                            data,
                                            repository,
-                                           token,
+                                           credential,
                                            predicate,
                                            connection,
                                            prerelease,
@@ -99,7 +99,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
         return new JenesisRawGitRepository(scope,
                                            data,
                                            repository,
-                                           token,
+                                           credential,
                                            predicate,
                                            connection,
                                            prerelease,
@@ -112,7 +112,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
         return new JenesisRawGitRepository(scope,
                                            data,
                                            repository,
-                                           token,
+                                           credential,
                                            predicate,
                                            connection,
                                            prerelease,
@@ -125,7 +125,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
         return new JenesisRawGitRepository(scope,
                                            data,
                                            repository,
-                                           token,
+                                           credential,
                                            predicate,
                                            connection,
                                            prerelease,
@@ -138,7 +138,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
         return new JenesisRawGitRepository(scope,
                                            data,
                                            repository,
-                                           token,
+                                           credential,
                                            predicate,
                                            connection,
                                            prerelease,
@@ -230,7 +230,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
                 Predicate<String> combining = own;
                 effective = value -> inherited.test(value) && combining.test(value);
             }
-            Repository.Credential granted = repository == null ? credential : credential.token(null);
+            Repository.Credential granted = repository == null ? credential : Repository.Credential.NONE;
             JenesisRepository current;
             if (location.startsWith("@")) {
                 String name = location.substring(1);
@@ -314,7 +314,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
         if (contained.isAbsolute() || contained.getPath().startsWith("..")) {
             throw new IllegalArgumentException("Resolved location " + location + " escapes repository root " + repository);
         }
-        return open(connection, location, token).map(stream -> {
+        return open(connection, location, credential).map(stream -> {
             if (printing != null) {
                 printing.accept("%s%-11s%s %s".formatted(palette.info(),
                         "[FETCHED]",
@@ -324,7 +324,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
             AtomicReference<InputStream> first = new AtomicReference<>(stream);
             return (RepositoryItem) () -> {
                 InputStream reopened = first.getAndSet(null);
-                return reopened != null ? reopened : Repository.open(connection, location, token);
+                return reopened != null ? reopened : Repository.open(connection, location, credential);
             };
         });
     }
@@ -335,7 +335,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
         URI tsvUri = data.resolve(moduleName.replace('.', '/') + "/" + tsvName);
         Optional<String> tsv = tsvCache.get(tsvUri.toString());
         if (tsv == null) {
-            Optional<InputStream> stream = open(connection, tsvUri, null);
+            Optional<InputStream> stream = open(connection, tsvUri, Repository.Credential.NONE);
             if (stream.isEmpty()) {
                 tsv = Optional.empty();
             } else {
@@ -380,9 +380,9 @@ public class JenesisRawGitRepository implements JenesisRepository {
 
     private static Optional<InputStream> open(Repository.Connection connection,
                                               URI uri,
-                                              String token) throws IOException {
+                                              Repository.Credential credential) throws IOException {
         try {
-            return Optional.of(Repository.open(connection, uri, token));
+            return Optional.of(Repository.open(connection, uri, credential));
         } catch (FileNotFoundException _) {
             return Optional.empty();
         }

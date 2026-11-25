@@ -19,7 +19,7 @@ public class JenesisModuleRepository implements JenesisRepository {
     private static final String MODULE = "module", MAVEN = "maven", MAPPED = "mapped";
 
     private final URI root;
-    private final String token;
+    private final Repository.Credential credential;
     private final Repository.Connection connection;
     private final List<URI> mavens;
     private final Boolean prerelease;
@@ -117,8 +117,8 @@ public class JenesisModuleRepository implements JenesisRepository {
             if (location.isEmpty()) {
                 throw new IllegalStateException("No URI in Jenesis module repository entry: " + candidate);
             }
-            Repository.Credential granted = repository == null ? credential : credential.token(null);
-            Repository.Credential grantedMaven = repository == null ? maven : maven.token(null);
+            Repository.Credential granted = repository == null ? credential : Repository.Credential.NONE;
+            Repository.Credential grantedMaven = repository == null ? maven : Repository.Credential.NONE;
             JenesisRepository current;
             if (type.equals(MAPPED)) {
                 int scheme = location.indexOf(':');
@@ -140,7 +140,9 @@ public class JenesisModuleRepository implements JenesisRepository {
                             + "or another one by its URI, not " + target + ", in Jenesis module repository entry: " + candidate);
                 }
                 URI uri = target.equals("@") ? null : URI.create(target.endsWith("/") ? target : target + "/");
-                String token = uri == null ? null : grantedMaven.grant(origin);
+                Repository.Credential mapped = uri == null
+                        ? Repository.Credential.NONE
+                        : grantedMaven.grant(origin).target(uri);
                 Repository.Connection connection = Repository.Connection.ofEnvironment(environment);
                 SequencedMap<String, MavenDependencyKey> mapping = new LinkedHashMap<>();
                 Map<String, Map.Entry<URI, String>> declared = new HashMap<>();
@@ -162,11 +164,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                         source = path.toUri();
                     }
                     SequencedProperties properties = new SequencedProperties();
-                    try (InputStream in = Repository.open(connection, source, uri != null
-                            && Objects.equals(uri.getScheme(), source.getScheme())
-                            && uri.getHost() != null
-                            && uri.getHost().equalsIgnoreCase(source.getHost())
-                            && uri.getPort() == source.getPort() ? token : null)) {
+                    try (InputStream in = Repository.open(connection, source, mapped)) {
                         properties.load(in);
                     } catch (FileNotFoundException e) {
                         throw new IllegalStateException("The module list " + source + " of Jenesis module repository entry "
@@ -199,7 +197,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                 }
                 current = MavenModuleRepository.ofEnvironment(environment, uri == null
                         ? MavenDefaultRepository.ofEnvironment(environment)
-                        : MavenDefaultRepository.ofEnvironment(environment, uri, token)).mapping(mapping);
+                        : MavenDefaultRepository.ofEnvironment(environment, uri, mapped)).mapping(mapping);
             } else if (location.startsWith("@")) {
                 String name = location.substring(1);
                 String value;
@@ -312,24 +310,26 @@ public class JenesisModuleRepository implements JenesisRepository {
     }
 
     public JenesisModuleRepository(URI root) {
-        this(root, null);
+        this(root, Repository.Credential.NONE);
     }
 
-    public JenesisModuleRepository(URI root, String token) {
-        this(Environment.NONE, root, token);
+    public JenesisModuleRepository(URI root, Repository.Credential credential) {
+        this(Environment.NONE, root, credential);
     }
 
     public static JenesisModuleRepository ofEnvironment(Environment environment, URI root) {
-        return new JenesisModuleRepository(environment, root, null);
+        return new JenesisModuleRepository(environment, root, Repository.Credential.NONE);
     }
 
-    public static JenesisModuleRepository ofEnvironment(Environment environment, URI root, String token) {
-        return new JenesisModuleRepository(environment, root, token);
+    public static JenesisModuleRepository ofEnvironment(Environment environment,
+                                                        URI root,
+                                                        Repository.Credential credential) {
+        return new JenesisModuleRepository(environment, root, credential);
     }
 
-    private JenesisModuleRepository(Environment environment, URI root, String token) {
+    private JenesisModuleRepository(Environment environment, URI root, Repository.Credential credential) {
         this(root,
-             token,
+             credential,
              Repository.Connection.ofEnvironment(environment),
              toMavenRepositories(environment.getProperty("maven.uri",
                                                          System.getenv("MAVEN_REPOSITORY_URI"), Setting.PROJECT)),
@@ -341,7 +341,7 @@ public class JenesisModuleRepository implements JenesisRepository {
     }
 
     private JenesisModuleRepository(URI root,
-                                    String token,
+                                    Repository.Credential credential,
                                     Repository.Connection connection,
                                     List<URI> mavens,
                                     Boolean prerelease,
@@ -351,7 +351,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                                     Path local) {
         String text = root.toString();
         this.root = text.endsWith("/") ? root : URI.create(text + "/");
-        this.token = token;
+        this.credential = credential.target(this.root);
         this.connection = connection;
         this.mavens = mavens;
         this.prerelease = prerelease;
@@ -363,7 +363,7 @@ public class JenesisModuleRepository implements JenesisRepository {
 
     public JenesisModuleRepository connection(Repository.Connection connection) {
         return new JenesisModuleRepository(root,
-                token,
+                credential,
                 connection,
                 mavens,
                 prerelease,
@@ -375,7 +375,7 @@ public class JenesisModuleRepository implements JenesisRepository {
 
     public JenesisModuleRepository mavens(List<URI> mavens) {
         return new JenesisModuleRepository(root,
-                token,
+                credential,
                 connection,
                 mavens,
                 prerelease,
@@ -387,7 +387,7 @@ public class JenesisModuleRepository implements JenesisRepository {
 
     public JenesisModuleRepository prerelease(Boolean prerelease) {
         return new JenesisModuleRepository(root,
-                token,
+                credential,
                 connection,
                 mavens,
                 prerelease,
@@ -399,7 +399,7 @@ public class JenesisModuleRepository implements JenesisRepository {
 
     public JenesisModuleRepository speculative(Boolean speculative) {
         return new JenesisModuleRepository(root,
-                token,
+                credential,
                 connection,
                 mavens,
                 prerelease,
@@ -411,7 +411,7 @@ public class JenesisModuleRepository implements JenesisRepository {
 
     public JenesisModuleRepository printing(Consumer<String> printing, Palette palette) {
         return new JenesisModuleRepository(root,
-                token,
+                credential,
                 connection,
                 mavens,
                 prerelease,
@@ -423,7 +423,7 @@ public class JenesisModuleRepository implements JenesisRepository {
 
     public JenesisModuleRepository local(Path local) {
         return new JenesisModuleRepository(root,
-                token,
+                credential,
                 connection,
                 mavens,
                 prerelease,
@@ -507,7 +507,7 @@ public class JenesisModuleRepository implements JenesisRepository {
         for (int index = 0; stream == null; index++) {
             headers = toHeaders(uri, mavens.isEmpty() ? null : mavens.get(index));
             try {
-                stream = Repository.open(connection, uri, token, headers);
+                stream = Repository.open(connection, uri, credential, headers);
             } catch (Repository.Missing missing) {
                 if (index + 1 >= mavens.size() || missing.location().equals(uri)) {
                     return Optional.empty();
@@ -526,7 +526,7 @@ public class JenesisModuleRepository implements JenesisRepository {
         AtomicReference<InputStream> first = new AtomicReference<>(stream);
         RepositoryItem item = () -> {
             InputStream reopened = first.getAndSet(null);
-            return reopened != null ? reopened : Repository.open(connection, uri, token, requested);
+            return reopened != null ? reopened : Repository.open(connection, uri, credential, requested);
         };
         if (version == null || local == null || !Files.isDirectory(local) || !Files.isWritable(local)) {
             return Optional.of(item);

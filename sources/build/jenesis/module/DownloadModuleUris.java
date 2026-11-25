@@ -41,7 +41,7 @@ public class DownloadModuleUris implements BuildStep {
             try (BufferedWriter writer = Files.newBufferedWriter(temporary)) {
                 for (URI location : locations.get()) {
                     try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                            Repository.open(location, null),
+                            Repository.open(location, Repository.Credential.NONE),
                             StandardCharsets.UTF_8))) {
                         Iterator<String> it = reader.lines().iterator();
                         while (it.hasNext()) {

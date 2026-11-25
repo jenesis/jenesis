@@ -28,56 +28,66 @@ public class RepositoryTest {
 
     @Test
     public void a_token_of_the_environment_reaches_only_the_repositories_the_environment_names() {
-        Repository.Credential credential = new Repository.Credential("Bearer secret",
-                Repository.Origin.ENVIRONMENT);
+        Repository.Credential credential = secret(Repository.Origin.ENVIRONMENT);
 
-        assertThat(credential.grant(Repository.Origin.ENVIRONMENT)).isEqualTo("Bearer secret");
-        assertThat(credential.grant(Repository.Origin.USER))
+        assertThat(credential.grant(Repository.Origin.ENVIRONMENT)).isEqualTo(credential);
+        assertThat(credential.grant(Repository.Origin.USER).source())
                 .as("a url a property names does not receive an ambient credential")
-                .isNull();
-        assertThat(credential.grant(Repository.Origin.PROJECT)).isNull();
-        assertThat(credential.grant(Repository.Origin.DEFAULT)).isNull();
+                .isEqualTo(new Repository.Credential.Source.Absent());
+        assertThat(credential.grant(Repository.Origin.PROJECT).source())
+                .isEqualTo(new Repository.Credential.Source.Absent());
+        assertThat(credential.grant(Repository.Origin.DEFAULT).source())
+                .isEqualTo(new Repository.Credential.Source.Absent());
     }
 
     @Test
     public void a_token_the_user_names_reaches_what_the_user_and_the_environment_name() {
-        Repository.Credential credential = new Repository.Credential("Bearer secret", Repository.Origin.USER);
+        Repository.Credential credential = secret(Repository.Origin.USER);
 
-        assertThat(credential.grant(Repository.Origin.USER)).isEqualTo("Bearer secret");
-        assertThat(credential.grant(Repository.Origin.ENVIRONMENT)).isEqualTo("Bearer secret");
+        assertThat(credential.grant(Repository.Origin.USER)).isEqualTo(credential);
+        assertThat(credential.grant(Repository.Origin.ENVIRONMENT)).isEqualTo(credential);
     }
 
     @Test
     public void no_token_reaches_a_repository_that_a_project_named() {
-        assertThat(new Repository.Credential("Bearer secret", Repository.Origin.USER)
-                .grant(Repository.Origin.PROJECT))
+        assertThat(secret(Repository.Origin.USER).grant(Repository.Origin.PROJECT).source())
                 .as("a url from a file the project provides is never handed a credential")
-                .isNull();
+                .isEqualTo(new Repository.Credential.Source.Absent());
     }
 
     @Test
     public void no_token_reaches_a_repository_that_no_configuration_named() {
-        assertThat(new Repository.Credential("Bearer secret", Repository.Origin.USER)
-                .grant(Repository.Origin.DEFAULT))
+        assertThat(secret(Repository.Origin.USER).grant(Repository.Origin.DEFAULT).source())
                 .as("the built-in public repository is never handed a credential")
-                .isNull();
+                .isEqualTo(new Repository.Credential.Source.Absent());
     }
 
     @Test
     public void a_token_a_project_named_is_never_handed_out() {
-        Repository.Credential credential = new Repository.Credential("Bearer secret",
-                Repository.Origin.PROJECT);
+        Repository.Credential credential = secret(Repository.Origin.PROJECT);
 
-        assertThat(credential.grant(Repository.Origin.USER)).isNull();
-        assertThat(credential.grant(Repository.Origin.ENVIRONMENT)).isNull();
-        assertThat(credential.grant(Repository.Origin.PROJECT)).isNull();
+        assertThat(credential.grant(Repository.Origin.USER).source())
+                .isEqualTo(new Repository.Credential.Source.Absent());
+        assertThat(credential.grant(Repository.Origin.ENVIRONMENT).source())
+                .isEqualTo(new Repository.Credential.Source.Absent());
+        assertThat(credential.grant(Repository.Origin.PROJECT).source())
+                .isEqualTo(new Repository.Credential.Source.Absent());
     }
 
     @Test
-    public void a_credential_without_a_token_grants_nothing() {
-        assertThat(new Repository.Credential("Bearer secret", Repository.Origin.USER).token(null)
-                .grant(Repository.Origin.USER))
-                .isNull();
+    public void a_credential_without_a_source_authorizes_nothing() throws IOException {
+        assertThat(Repository.Credential.NONE.grant(Repository.Origin.USER).authorization(connection())).isNull();
+    }
+
+    @Test
+    public void a_token_is_sent_as_it_is_given() throws IOException {
+        assertThat(secret(Repository.Origin.USER).authorization(connection())).isEqualTo("Bearer secret");
+    }
+
+    @Test
+    public void a_credential_does_not_print_its_token() {
+        assertThat(secret(Repository.Origin.USER).toString()).doesNotContain("secret");
+        assertThat(secret(Repository.Origin.USER).source().toString()).doesNotContain("secret");
     }
 
     @Test
@@ -87,7 +97,7 @@ public class RepositoryTest {
                 "test.credential",
                 "JENESIS_TEST_CREDENTIAL_THAT_IS_NOT_SET");
 
-        assertThat(credential.token()).isEqualTo("Bearer property");
+        assertThat(credential.source()).isEqualTo(new Repository.Credential.Source.Token("Bearer property"));
         assertThat(credential.origin()).isEqualTo(Repository.Origin.USER);
     }
 
@@ -103,6 +113,10 @@ public class RepositoryTest {
     public void an_origin_is_the_user_where_no_project_file_supplied_a_setting() {
         assertThat(Repository.Origin.of(new Environment(Map.of()), "maven.uri"))
                 .isEqualTo(Repository.Origin.USER);
+    }
+
+    private static Repository.Credential secret(Repository.Origin origin) {
+        return new Repository.Credential(new Repository.Credential.Source.Token("Bearer secret"), origin);
     }
 
     private Repository.Connection connection() {
@@ -134,7 +148,7 @@ public class RepositoryTest {
         HttpServer server = serve(hit -> hit < 3 ? 502 : 200, Map.of(), hits);
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            try (InputStream stream = Repository.open(connection().retries(2).backoff(Duration.ofMillis(1)), uri, null)) {
+            try (InputStream stream = Repository.open(connection().retries(2).backoff(Duration.ofMillis(1)), uri, Repository.Credential.NONE)) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("payload");
             }
             assertThat(hits.get()).isEqualTo(3);
@@ -150,7 +164,7 @@ public class RepositoryTest {
         HttpServer server = serve(_ -> 502, Map.of(), hits);
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            assertThatThrownBy(() -> Repository.open(connection().retries(1).backoff(Duration.ofMillis(1)), uri, null).close())
+            assertThatThrownBy(() -> Repository.open(connection().retries(1).backoff(Duration.ofMillis(1)), uri, Repository.Credential.NONE).close())
                     .isInstanceOf(IOException.class)
                     .hasMessageContaining("502");
             assertThat(hits.get()).isEqualTo(2);
@@ -166,7 +180,7 @@ public class RepositoryTest {
         HttpServer server = serve(_ -> 429, Map.of(), hits);
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            assertThatThrownBy(() -> Repository.open(connection().retries(1).backoff(Duration.ofMillis(1)), uri, null).close())
+            assertThatThrownBy(() -> Repository.open(connection().retries(1).backoff(Duration.ofMillis(1)), uri, Repository.Credential.NONE).close())
                     .isInstanceOf(IOException.class)
                     .hasMessageContaining("429 Too Many Requests after 2 attempt(s)")
                     .hasMessageContaining("configure a mirror of this repository")
@@ -195,7 +209,7 @@ public class RepositoryTest {
         server.start();
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            assertThatThrownBy(() -> Repository.open(connection().retries(0).backoff(Duration.ofMillis(1)), uri, null).close())
+            assertThatThrownBy(() -> Repository.open(connection().retries(0).backoff(Duration.ofMillis(1)), uri, Repository.Credential.NONE).close())
                     .isInstanceOf(IOException.class)
                     .hasMessageContaining("/artifact.jar")
                     .hasCauseInstanceOf(SocketTimeoutException.class);
@@ -213,7 +227,7 @@ public class RepositoryTest {
         HttpServer server = serve(_ -> 200, Map.of(), hits);
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            assertThatThrownBy(() -> Repository.open(connection(), uri, null).close())
+            assertThatThrownBy(() -> Repository.open(connection(), uri, Repository.Credential.NONE).close())
                     .as("offline reads as a network that cannot be reached, so a cached fallback still answers")
                     .isInstanceOf(IOException.class)
                     .hasMessageContaining(uri.toString())
@@ -223,7 +237,7 @@ public class RepositoryTest {
             server.stop(0);
         }
         Path file = Files.writeString(folder.resolve("artifact.jar"), "local");
-        try (InputStream stream = Repository.open(connection(), file.toUri(), null)) {
+        try (InputStream stream = Repository.open(connection(), file.toUri(), Repository.Credential.NONE)) {
             assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("local");
         }
     }
@@ -256,7 +270,7 @@ public class RepositoryTest {
         server.start();
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            assertThatThrownBy(() -> Repository.open(connection().retries(0).backoff(Duration.ofMillis(1)), uri, null).close())
+            assertThatThrownBy(() -> Repository.open(connection().retries(0).backoff(Duration.ofMillis(1)), uri, Repository.Credential.NONE).close())
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Refusing to follow a redirect to " + target)
                     .hasMessageContaining("only followed to an http or https location");
@@ -292,7 +306,7 @@ public class RepositoryTest {
         origin.start();
         try {
             URI uri = URI.create("http://localhost:" + origin.getAddress().getPort() + "/artifact.jar");
-            try (InputStream stream = Repository.open(connection().retries(0).backoff(Duration.ofMillis(1)), uri, "Bearer secret")) {
+            try (InputStream stream = Repository.open(connection().retries(0).backoff(Duration.ofMillis(1)), uri, secret(Repository.Origin.USER))) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("payload");
             }
             assertThat(originToken.get()).isEqualTo("Bearer secret");
@@ -341,10 +355,10 @@ public class RepositoryTest {
         server.start();
         try {
             URI uri = URI.create("https://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            assertThatThrownBy(() -> Repository.open(new Repository.Connection().retries(0), uri, null).close())
+            assertThatThrownBy(() -> Repository.open(new Repository.Connection().retries(0), uri, Repository.Credential.NONE).close())
                     .isInstanceOf(IOException.class)
                     .hasMessageContaining("jenesis.repository.insecure");
-            try (InputStream in = Repository.open(new Repository.Connection().retries(0).insecure(true), uri, null)) {
+            try (InputStream in = Repository.open(new Repository.Connection().retries(0).insecure(true), uri, Repository.Credential.NONE)) {
                 assertThat(in)
                         .as("a certificate signed by nobody and naming another host is accepted where insecure allows it")
                         .hasContent("jar");
@@ -357,7 +371,7 @@ public class RepositoryTest {
     @Test
     public void open_refuses_an_insecure_scheme_without_the_opt_in() {
         URI uri = URI.create("http://localhost:1/artifact.jar");
-        assertThatThrownBy(() -> Repository.open(connection().retries(0).backoff(Duration.ofMillis(1)), uri, null).close())
+        assertThatThrownBy(() -> Repository.open(connection().retries(0).backoff(Duration.ofMillis(1)), uri, Repository.Credential.NONE).close())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("insecure scheme");
     }
@@ -369,7 +383,7 @@ public class RepositoryTest {
         HttpServer server = serve(_ -> 404, Map.of(), hits);
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            assertThatThrownBy(() -> Repository.open(connection().retries(2).backoff(Duration.ofMillis(1)), uri, null).close())
+            assertThatThrownBy(() -> Repository.open(connection().retries(2).backoff(Duration.ofMillis(1)), uri, Repository.Credential.NONE).close())
                     .isInstanceOf(FileNotFoundException.class);
             assertThat(hits.get()).isEqualTo(1);
         } finally {
@@ -384,7 +398,7 @@ public class RepositoryTest {
         HttpServer server = serve(hit -> hit < 2 ? 429 : 200, Map.of("Retry-After", "0"), hits);
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            try (InputStream stream = Repository.open(connection().retries(2).backoff(Duration.ofSeconds(30)), uri, null)) {
+            try (InputStream stream = Repository.open(connection().retries(2).backoff(Duration.ofSeconds(30)), uri, Repository.Credential.NONE)) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("payload");
             }
             assertThat(hits.get()).isEqualTo(2);
@@ -402,7 +416,7 @@ public class RepositoryTest {
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
             long start = System.nanoTime();
-            try (InputStream stream = Repository.open(connection().retries(2).backoff(Duration.ofSeconds(30)), uri, null)) {
+            try (InputStream stream = Repository.open(connection().retries(2).backoff(Duration.ofSeconds(30)), uri, Repository.Credential.NONE)) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("payload");
             }
             long elapsedMillis = (System.nanoTime() - start) / 1_000_000;

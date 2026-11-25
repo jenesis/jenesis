@@ -119,7 +119,7 @@ public final class Discovery {
                     bytes = null;
                 } else {
                     Repository.Connection once = connection.retries(0).connectTimeout(timeout).readTimeout(timeout);
-                    try (InputStream inputStream = Repository.open(once, source, null)) {
+                    try (InputStream inputStream = Repository.open(once, source, Repository.Credential.NONE)) {
                         bytes = inputStream.readAllBytes();
                     } catch (FileNotFoundException _) {
                         bytes = null;

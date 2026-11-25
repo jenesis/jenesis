@@ -143,7 +143,7 @@ public final class Sigstore {
         if ("file".equals(trustedRoot.getScheme())) {
             return Files.readString(Path.of(trustedRoot));
         }
-        try (InputStream stream = Repository.open(trustedRoot, null)) {
+        try (InputStream stream = Repository.open(trustedRoot, Repository.Credential.NONE)) {
             return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
