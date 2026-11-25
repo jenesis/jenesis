@@ -241,6 +241,62 @@ public class BuildExecutorFileCacheTest {
     }
 
     @Test
+    public void a_build_told_not_to_write_reads_the_cache_and_stores_nothing() throws IOException {
+        byte[] stored = {1}, declined = {2};
+        SequencedMap<String, Map<Path, byte[]>> inputs = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("file"), "result");
+        new BuildExecutorFileCache(cacheRoot).store(Runnable::run, "step", stored, inputs, output, "SHA-256", Map.of());
+        BuildExecutorFileCache cache = BuildExecutorFileCache.ofEnvironment(
+                new Environment(Map.of("cache.write", "false")),
+                cacheRoot);
+        assertThat(cache.stores()).isFalse();
+        cache.store(Runnable::run, "step", declined, inputs, output, "SHA-256", Map.of());
+        assertThat(steps().resolve(HexFormat.of().formatHex(declined))).doesNotExist();
+        assertThat(cache.fetch(Runnable::run, "step", stored, inputs, target, "SHA-256")).isPresent();
+        assertThat(target.resolve("file")).content().isEqualTo("result");
+        assertThat(BuildExecutorFileCache.ofEnvironment(new Environment(Map.of()), cacheRoot).stores()).isTrue();
+    }
+
+    @Test
+    public void a_folder_that_cannot_be_written_to_is_read_and_fails_no_build() throws IOException {
+        Assumptions.assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"));
+        byte[] stored = {1}, tampered = {2}, declined = {3};
+        SequencedMap<String, Map<Path, byte[]>> inputs = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("file"), "result");
+        new BuildExecutorFileCache(cacheRoot).store(Runnable::run, "step", stored, inputs, output, "SHA-256", Map.of());
+        Files.delete(output.resolve("file"));
+        Files.writeString(output.resolve("file"), "other");
+        new BuildExecutorFileCache(cacheRoot).store(Runnable::run, "step", tampered, inputs, output, "SHA-256", Map.of());
+        Files.writeString(blob("other"), "wrong");
+        List<Path> folders;
+        try (Stream<Path> walk = Files.walk(cacheRoot)) {
+            folders = walk.filter(Files::isDirectory).toList();
+        }
+        for (Path folder : folders) {
+            Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("r-xr-xr-x"));
+        }
+        try {
+            Assumptions.assumeFalse(Files.isWritable(cacheRoot), "a user no permission holds back writes anywhere");
+            BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+            assertThat(cache.fetch(Runnable::run, "step", stored, inputs, target, "SHA-256")).isPresent();
+            assertThat(target.resolve("file")).content().isEqualTo("result");
+            assertThat(cache.fetch(Runnable::run, "step", tampered, inputs, firstTarget, "SHA-256"))
+                    .as("a file that is not what its checksum names is a miss where it cannot be dropped either")
+                    .isEmpty();
+            try (Stream<Path> contents = Files.list(firstTarget)) {
+                assertThat(contents.findAny()).isEmpty();
+            }
+            cache.store(Runnable::run, "step", declined, inputs, output, "SHA-256", Map.of());
+            cache.touch(Runnable::run, "step", stored, inputs, "SHA-256");
+            assertThat(steps().resolve(HexFormat.of().formatHex(declined))).doesNotExist();
+        } finally {
+            for (Path folder : folders) {
+                Files.setPosixFilePermissions(folder, PosixFilePermissions.fromString("rwxr-xr-x"));
+            }
+        }
+    }
+
+    @Test
     public void a_tampered_file_is_a_miss_that_drops_the_file_and_its_manifest() throws IOException {
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         byte[] step = {1};

@@ -203,7 +203,11 @@ dropped the next time it is asked for. On a file system without link counts ever
 file is a candidate, oldest first. `read` and `write` are the typical CI split: a
 privileged job builds with the defaults (both `true`) to populate the cache, while
 everyone else sets `write=false` to consume it read-only without mutating it.
-Setting both to `false` turns the cache off entirely.
+Setting both to `false` turns the cache off entirely. A build reads the cache alone
+without a change to the folder under `-Djenesis.cache.write=false`, which holds for a
+cache server as well, and a folder that cannot be written to - a read-only mount, a
+folder of another user - is read as it is: what a build would store or evict is left
+out, and the build passes.
 
 Where this fits
 ---------------
