@@ -184,6 +184,36 @@ public class DaemonTest {
     }
 
     @Test
+    public void finishes_the_build_it_runs_when_asked_to_stop() throws Exception {
+        BlockingEntry.ENTERED.drainPermits();
+        BlockingEntry.RELEASED.drainPermits();
+        Future<Exchange> running = Executors.newVirtualThreadPerTaskExecutor().submit(() -> request(token(),
+                "fingerprint",
+                false,
+                null,
+                BlockingEntry.class.getName(),
+                Map.of()));
+        assertThat(BlockingEntry.ENTERED.tryAcquire(30, TimeUnit.SECONDS)).isTrue();
+        try {
+            assertThat(request(token(), "fingerprint", true, null, Map.of()).code())
+                    .as("a client making room within the limit asks the daemon used least recently to stop")
+                    .isEqualTo(0);
+            daemon.join(Duration.ofSeconds(10));
+            assertThat(daemon.isAlive())
+                    .as("a daemon asked to stop takes no further build")
+                    .isFalse();
+            assertThat(running.isDone())
+                    .as("the build the daemon runs is not ended by the request to stop")
+                    .isFalse();
+        } finally {
+            BlockingEntry.RELEASED.release();
+        }
+        assertThat(running.get(30, TimeUnit.SECONDS).code())
+                .as("the client of the running build receives its result")
+                .isEqualTo(0);
+    }
+
+    @Test
     public void lists_every_setting_with_the_value_in_force() throws IOException {
         Exchange exchange = build(Map.of("jenesis.test.skip", "true"), "configuration");
         assertThat(exchange.code()).isEqualTo(0);
