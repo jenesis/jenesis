@@ -240,7 +240,7 @@ Continuous integration
   - `sdk` - stages the jar, populates the SDKMAN layout and runs the `sdk/jenesis` and `sdk/jpx` script tests.
 
   A demo lane that sets `jbang: true` has JBang installed before it runs, as one that sets `jdk` has that JDK:
-  the `jbang` lane runs the script of `demo-83-jbang` and each alias of `jbang-catalog.json` with it, against
+  the `jbang` lane runs the script of `demo-84-jbang` and each alias of `jbang-catalog.json` with it, against
   the release the catalog names, while `jbang-plain-java` runs the same script on the engine of the commit.
   `JbangCatalogTest` holds the catalog to one alias per tool, its main class, and the release the demo's script
   names.
@@ -302,7 +302,7 @@ workflow's file, so signing from any other workflow is a signer change that each
 mise installs again - the steps stay in `release.yml`. mise holds a new release back for 24 hours by default.
 
 The last step moves what names a release for [JBang](https://www.jbang.dev): `jbang-catalog.json`, whose three
-aliases run `build.jenesis:build.jenesis:<version>`, and the `//DEPS` line of `demo/demo-83-jbang/build/Demo.java`
+aliases run `build.jenesis:build.jenesis:<version>`, and the `//DEPS` line of `demo/demo-84-jbang/build/Demo.java`
 with the two READMEs that quote it. It rewrites the version on the head of `main`, whichever commit was released,
 and pushes that one commit with the workflow's own token, after JReleaser has published the release the catalog
 then names. A release below the version the catalog names leaves it alone. If `main` moved while the step ran,

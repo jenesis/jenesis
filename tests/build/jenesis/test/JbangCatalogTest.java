@@ -42,7 +42,7 @@ public class JbangCatalogTest {
         assertThat(references).as("a release moves every alias at once").hasSize(1);
         Matcher release = RELEASE.matcher(references.iterator().next().toString());
         assertThat(release.matches()).as("an alias names a release, which JBang resolves from Maven Central").isTrue();
-        assertThat(Files.readAllLines(Path.of("demo", "demo-83-jbang", "build", "Demo.java")))
+        assertThat(Files.readAllLines(Path.of("demo", "demo-84-jbang", "build", "Demo.java")))
                 .as("the demo's script builds with the release the catalog runs")
                 .contains("//DEPS " + release.group());
     }

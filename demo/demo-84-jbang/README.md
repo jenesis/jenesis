@@ -12,7 +12,7 @@ What to write
 
 The project is a module and a class, and the script beside them:
 
-    demo/demo-83-jbang
+    demo/demo-84-jbang
     |-- build/Demo.java          the build, as a JBang script
     `-- sources/
         |-- module-info.java     module demo.jbang, with @jenesis.main sample.Sample
@@ -50,7 +50,7 @@ The first run compiles the script and resolves the engine; later runs reuse both
 The build prints its steps as any Jenesis build does, and the script ends with the
 staged jar and the line the built module prints:
 
-    [STARTED]   Building in '/path/to/demo-83-jbang/target' in daemon mode...
+    [STARTED]   Building in '/path/to/demo-84-jbang/target' in daemon mode...
     ...
     [EXECUTED]  stage/modular in 0.01 seconds
     [EXECUTED]  stage/maven in 0.01 seconds

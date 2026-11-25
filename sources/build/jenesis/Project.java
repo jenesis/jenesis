@@ -3057,7 +3057,7 @@ public record Project(
                                          publisher's own domain, as a module or by coordinate)
                       Running it         80 jpx (run a released program without building),
                                          81 tools-api (a build inside another program's JVM),
-                                         83 jbang (a build as a JBang script, on the released engine)
+                                         84 jbang (a build as a JBang script, on the released engine)
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;

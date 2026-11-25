@@ -190,7 +190,7 @@ jobs:
             exit 0
           fi
           sed -i -E "s/(build\.jenesis:build\.jenesis:)[0-9]+\.[0-9]+\.[0-9]+/\1${VERSION}/" \
-            jbang-catalog.json demo/demo-83-jbang/build/Demo.java demo/demo-83-jbang/README.md demo/README.md
+            jbang-catalog.json demo/demo-84-jbang/build/Demo.java demo/demo-84-jbang/README.md demo/README.md
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
             commit -am "Name release ${VERSION} in the JBang catalog"
           git push origin HEAD:main
