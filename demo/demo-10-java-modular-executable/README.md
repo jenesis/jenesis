@@ -468,6 +468,17 @@ layers is refused, as is one launched from the class path, since the runtime ima
 holds named modules alone. `-Djenesis.package.aot=false` builds everything without
 the training run.
 
+A Java agent is such a module option in disguise: `-javaagent` adds the module
+`java.instrument` to the JVM, so a cache trained without it is refused once an agent
+is attached, as a monitoring agent often is in production. An application meant to
+run under one declares `requires java.instrument;` in its `module-info.java`, which
+puts the module into the runtime image, and names `--add-modules=java.instrument`
+in `process-java.properties`. The launcher hands the option on at every start, so
+the app-image uses its cache with an agent and without one. The JVM loads the
+classes of a cache before an agent starts: an agent that only transforms a class as
+it loads never sees them, while one that retransforms loaded classes, as the
+OpenTelemetry agent does, still applies its changes.
+
 Where to go from here?
 ----------------------
 
