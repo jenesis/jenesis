@@ -2277,7 +2277,7 @@ public class MavenProjectTest {
     }
 
     @Test
-    public void builds_a_module_without_sources_that_configures_a_plugin_and_names_one_that_does_not() throws IOException {
+    public void builds_a_module_without_sources_as_a_module_of_the_reactor_and_names_one_no_plugin_fills() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0">
@@ -2328,12 +2328,24 @@ public class MavenProjectTest {
                 mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(results)
-                .as("a plugin the module configures generates what it compiles")
-                .containsKeys("maven/module-generated/manifests", "maven/module-generated/coordinates")
-                .doesNotContainKeys("maven/module-empty/manifests");
-        assertThat(printed).containsExactly("[SKIPPED]   group:empty builds no jar, as " + Path.of("empty", "pom.xml") + " has neither sources nor"
-                + " resources: a plugin that generates them is configured by a plugin-<name>.properties in "
-                + Path.of("empty", "src", "main", "build.jenesis") + ", which builds the module");
+                .as("a jar module without sources is a module of the build, so that one depending on it resolves it there")
+                .containsKeys("maven/module-generated/manifests",
+                        "maven/module-generated/coordinates",
+                        "maven/module-empty/manifests",
+                        "maven/module-empty/coordinates");
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-empty/coordinates").resolve(BuildStep.IDENTITY))
+                .stringPropertyNames())
+                .as("the module is assigned the coordinate another module of the reactor declares")
+                .contains("maven/group/empty/1");
+        assertThat(printed)
+                .as("a module a plugin fills needs no notice, one that stays empty is named with what a user can do")
+                .containsExactly("[EMPTY]     group:empty builds a jar without classes, as " + Path.of("empty", "pom.xml")
+                        + " has neither sources nor resources: the jar and the dependencies of the pom.xml stand for the"
+                        + " module wherever another one depends on it. Where a Maven plugin fills the jar, as"
+                        + " dependency:unpack-dependencies does, a module compiling against that content fails here - a"
+                        + " plugin-<name>.properties in " + Path.of("empty", "src", "main", "build.jenesis")
+                        + " configures a plugin that generates it, and an empty .jenesis.skip in the folder of a module"
+                        + " leaves that module out");
     }
 
     @Test

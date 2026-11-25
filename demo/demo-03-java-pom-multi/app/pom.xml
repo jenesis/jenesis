@@ -17,7 +17,7 @@
     <dependencies>
         <dependency>
             <groupId>build.jenesis.demo</groupId>
-            <artifactId>greeter</artifactId>
+            <artifactId>starter</artifactId>
             <version>1.0.0</version>
         </dependency>
     </dependencies>
