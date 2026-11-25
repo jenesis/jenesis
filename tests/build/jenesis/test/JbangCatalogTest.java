@@ -11,8 +11,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class JbangCatalogTest {
 
-    private static final Pattern RELEASE = Pattern.compile("build\\.jenesis:build\\.jenesis:(\\d+\\.\\d+\\.\\d+)");
-
     @Test
     public void every_tool_has_an_alias_of_its_name_that_runs_its_main_class_on_java_25() throws Exception {
         Map<?, ?> aliases = aliases();
@@ -35,16 +33,14 @@ public class JbangCatalogTest {
     }
 
     @Test
-    public void every_alias_and_the_demo_script_resolve_one_release_of_the_published_artifact() throws IOException {
+    public void every_alias_resolves_one_release_of_the_published_artifact() throws IOException {
         Set<Object> references = aliases().values().stream()
                 .map(alias -> ((Map<?, ?>) alias).get("script-ref"))
                 .collect(Collectors.toSet());
         assertThat(references).as("a release moves every alias at once").hasSize(1);
-        Matcher release = RELEASE.matcher(references.iterator().next().toString());
-        assertThat(release.matches()).as("an alias names a release, which JBang resolves from Maven Central").isTrue();
-        assertThat(Files.readAllLines(Path.of("demo", "demo-84-jbang", "build", "Demo.java")))
-                .as("the demo's script builds with the release the catalog runs")
-                .contains("//DEPS " + release.group());
+        assertThat(references.iterator().next().toString())
+                .as("an alias names a release, which JBang resolves from Maven Central")
+                .matches("build\\.jenesis:build\\.jenesis:\\d+\\.\\d+\\.\\d+");
     }
 
     private static Map<?, ?> aliases() throws IOException {

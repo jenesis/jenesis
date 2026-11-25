@@ -2,10 +2,10 @@ JBang demo
 ==========
 
 A build written as a [JBang](https://www.jbang.dev) script: one Java file that names
-the JDK it needs and the released `build.jenesis` it builds with, and a `main` that
-drives the build through the same API the tools of the earlier demos run on. JBang
-resolves the engine from Maven Central, so this project carries no `build/jenesis/`
-folder at all - the only build code in it is the script.
+the JDK it needs and the engine it builds with, and a `main` that drives the build
+through the same API the tools of the earlier demos run on. JBang supplies the
+engine, so a project built this way carries no `build/jenesis/` folder at all - the
+only build code in it is the script.
 
 What to write
 -------------
@@ -19,14 +19,27 @@ The project is a module and a class, and the script beside them:
         `-- sample/Sample.java
 
 The script opens with two JBang directives. To the Java compiler they are comments,
-so the file stays plain Java:
+so the file stays plain Java. In a project of your own they read:
 
     //JAVA 25+
     //DEPS build.jenesis:build.jenesis:0.18.2
 
 `//JAVA 25+` asks for a JDK of version 25 or newer, and JBang downloads one where
-the machine's own is older. `//DEPS` names the engine by its Maven coordinate. The rest is
-a program that stages the project and runs what it staged:
+the machine's own is older. `//DEPS` names a released engine by its Maven
+coordinate, which JBang resolves from Maven Central.
+
+This demo's script differs in its second line. Every demo of this repository builds
+with the engine of its checkout, the others through a `build/jenesis` link into
+`sources/build/jenesis`, and this one by naming the same sources to JBang:
+
+    //JAVA 25+
+    //SOURCES ../../../sources/build/**/*.java
+
+JBang compiles those sources together with the script, so the demo runs the engine
+it sits beside rather than a release. Outside this repository there are no such
+sources, and the `//DEPS` line is the one to write.
+
+The rest is a program that stages the project and runs what it staged:
 
     Make.Result staged = new Make("build.jenesis.Project").build("stage");
     if (staged.code() != 0) {
@@ -46,7 +59,8 @@ From this directory, with `jbang` on the path:
 
     jbang build/Demo.java Ada Lovelace
 
-The first run compiles the script and resolves the engine; later runs reuse both.
+The first run compiles the script, here with the engine's sources, which takes some
+seconds; later runs reuse the result until a source changes.
 The build prints its steps as any Jenesis build does, and the script ends with the
 staged jar and the line the built module prints:
 
@@ -67,9 +81,10 @@ property, and whatever follows the script is the script's own:
 Which engine runs
 -----------------
 
-The engine is the **published** one, the jar the `//DEPS` line names, as JBang
-resolved it. Nothing is compiled from a `build/jenesis/` folder, so moving the build
-to another release is an edit of that one line.
+With a `//DEPS` line, the engine is the **published** one, the jar the line names,
+as JBang resolved it, and moving the build to another release is an edit of that
+line. In this demo it is the engine of the checkout, compiled by JBang. Either way
+nothing is read from a `build/jenesis/` folder.
 
 The `jbang-catalog.json` at the root of the `jenesis/jenesis` repository offers the
 released commands to a project that has no build program of its own:
@@ -104,8 +119,10 @@ What this route does not check
     sources its release published before it runs them. Nothing of the kind happens
     here: the engine is the release the script or the alias names, and a
     `build/jenesis/` folder, with the version it records, is not read.
-  * JBang downloads the jar over HTTPS and fetches the SHA-1 published beside it, but
-    runs the jar even where the two differ, and it checks no signature.
+  * Where JBang downloads the engine, for a `//DEPS` line or an alias, it fetches the
+    jar over HTTPS with the SHA-1 published beside it, but runs the jar even where
+    the two differ, and it checks no signature. This demo's own script downloads no
+    engine.
   * Whatever JBang resolves - the engine, which is one jar that depends on nothing,
     and anything else a script names in `//DEPS`, with its transitive dependencies -
     lands on the class path and is not covered by the versions and checksums the

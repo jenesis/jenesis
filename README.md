@@ -240,10 +240,10 @@ Continuous integration
   - `sdk` - stages the jar, populates the SDKMAN layout and runs the `sdk/jenesis` and `sdk/jpx` script tests.
 
   A demo lane that sets `jbang: true` has JBang installed before it runs, as one that sets `jdk` has that JDK:
-  the `jbang` lane runs the script of `demo-84-jbang` and each alias of `jbang-catalog.json` with it, against
-  the release the catalog names, while `jbang-plain-java` runs the same script on the engine of the commit.
-  `JbangCatalogTest` holds the catalog to one alias per tool, its main class, and the release the demo's script
-  names.
+  the `jbang` lane runs the script of `demo-84-jbang`, which compiles the engine of the commit through its
+  `//SOURCES` line, and each alias of `jbang-catalog.json`, which runs the release the catalog names.
+  `jbang-plain-java` runs the same script with `java` alone. `JbangCatalogTest` holds the catalog to one alias
+  per tool, named after its command, with its main class and one release for all three.
 
   Every build runs under `-Djenesis.dependency.pin=strict`, so an unpinned dependency fails CI: run `pin` and
   commit the result when you change one. Each job uploads its `target/` on failure. Every workflow names
@@ -301,12 +301,13 @@ which is why every script follows a link back to its installation. mise remember
 workflow's file, so signing from any other workflow is a signer change that each user has to accept before
 mise installs again - the steps stay in `release.yml`. mise holds a new release back for 24 hours by default.
 
-The last step moves what names a release for [JBang](https://www.jbang.dev): `jbang-catalog.json`, whose three
-aliases run `build.jenesis:build.jenesis:<version>`, and the `//DEPS` line of `demo/demo-84-jbang/build/Demo.java`
-with the two READMEs that quote it. It rewrites the version on the head of `main`, whichever commit was released,
-and pushes that one commit with the workflow's own token, after JReleaser has published the release the catalog
-then names. A release below the version the catalog names leaves it alone. If `main` moved while the step ran,
-the push is refused and the step fails, and the same edit by hand finishes the release.
+The last step moves the one file that names a release for [JBang](https://www.jbang.dev): `jbang-catalog.json`,
+whose three aliases run `build.jenesis:build.jenesis:<version>`. It rewrites the version on the head of `main`,
+whichever commit was released, and pushes that one commit with the workflow's own token, after JReleaser has
+published the release the catalog then names. Nothing else is touched: the script of `demo/demo-84-jbang` builds
+with the sources of its checkout and names no release. A release below the version the catalog names leaves it
+alone. If `main` moved while the step ran, the push is refused and the step fails, and the same edit by hand
+finishes the release.
 
 The catalog names a version rather than `RELEASE`, `LATEST` or a range, all of which JBang accepts. JBang
 records what such a coordinate resolved to and never asks Maven Central again until a run passes `--fresh`, so

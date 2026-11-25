@@ -1,5 +1,5 @@
 //JAVA 25+
-//DEPS build.jenesis:build.jenesis:0.18.2
+//SOURCES ../../../sources/build/**/*.java
 
 package build;
 

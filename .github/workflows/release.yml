@@ -171,8 +171,8 @@ jobs:
           bin: jpx jpx-jdk
           require: bin:java@25
 
-      # The catalog and the demo's script name the release JBang resolves from Maven Central, so they
-      # move once it is published. A release of a version below the one they name leaves them alone.
+      # The catalog names the release JBang resolves from Maven Central, so it moves once that is
+      # published. A release of a version below the one it names leaves it alone.
       - name: Name the release in the JBang catalog
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -189,8 +189,7 @@ jobs:
             echo "The catalog names ${NAMED}, which ${VERSION} does not supersede."
             exit 0
           fi
-          sed -i -E "s/(build\.jenesis:build\.jenesis:)[0-9]+\.[0-9]+\.[0-9]+/\1${VERSION}/" \
-            jbang-catalog.json demo/demo-84-jbang/build/Demo.java demo/demo-84-jbang/README.md demo/README.md
+          sed -i -E "s/(build\.jenesis:build\.jenesis:)[0-9]+\.[0-9]+\.[0-9]+/\1${VERSION}/" jbang-catalog.json
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
             commit -am "Name release ${VERSION} in the JBang catalog"
           git push origin HEAD:main

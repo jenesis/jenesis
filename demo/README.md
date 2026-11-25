@@ -1346,18 +1346,21 @@ builds against a stand-in server that admits only a token it issued.
 
 ## 66. A build as a JBang script - [`jbang`](demo-84-jbang/README.md)
 
-Every demo so far carries the engine as source under `build/jenesis`. This one
-carries none: its `build/Demo.java` is a [JBang](https://www.jbang.dev) script
-whose first lines name the JDK and the released engine,
+A build program can be a [JBang](https://www.jbang.dev) script, and a project of
+your own then carries no `build/jenesis` folder: the first lines of its script name
+the JDK and a released engine, which JBang resolves from Maven Central,
 
     //JAVA 25+
     //DEPS build.jenesis:build.jenesis:0.18.2
 
-and whose `main` builds the project with `new Make("build.jenesis.Project")`, as the
-build programs of the earlier demos do. `jbang build/Demo.java` resolves that jar
-from Maven Central, downloads a JDK where the machine's own is older than 25,
-stages the module and runs it. The engine that runs is the published one,
-so moving to another release is an edit of the `//DEPS` line.
+and its `main` builds the project with `new Make("build.jenesis.Project")`, as the
+build programs of the earlier demos do. The demo's own `build/Demo.java` names the
+engine of this repository instead, as every demo runs the sources it sits beside:
+
+    //SOURCES ../../../sources/build/**/*.java
+
+`jbang build/Demo.java` compiles those sources with the script, downloads a JDK
+where the machine's own is older than 25, stages the module and runs it.
 
 The repository's `jbang-catalog.json` offers the released commands the same way,
 without a script: `jbang jenesis-make@jenesis/jenesis` builds the project in the
