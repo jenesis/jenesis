@@ -1,12 +1,12 @@
 {
   "aliases": {
-    "make": {
+    "jenesis-make": {
       "script-ref": "build.jenesis:build.jenesis:0.18.2",
       "description": "Builds the project in the current folder with the released Jenesis engine.",
       "java": "25+",
       "main": "build.jenesis.Make"
     },
-    "execute": {
+    "jenesis-exec": {
       "script-ref": "build.jenesis:build.jenesis:0.18.2",
       "description": "Builds the project in the current folder with the released Jenesis engine and runs its main class.",
       "java": "25+",

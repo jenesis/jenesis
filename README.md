@@ -40,24 +40,24 @@ With [JBang](https://www.jbang.dev), the released engine runs with nothing insta
 catalog at the root of this repository:
 
 ```bash
-jbang make@jenesis/jenesis                  # build the project in the current folder
+jbang jenesis-make@jenesis/jenesis                  # build the project in the current folder
 jbang jpx@jenesis/jenesis org.junit.platform.console --version
 ```
 
 The catalog names one release, the newest, and a release moves it. JBang asks GitHub for a catalog again once
-its copy is twelve hours old, and `jbang --fresh make@jenesis/jenesis` asks at once. To stay on one
+its copy is twelve hours old, and `jbang --fresh jenesis-make@jenesis/jenesis` asks at once. To stay on one
 release, name its coordinate in place of the alias:
 
 ```bash
 jbang --java 25+ --main build.jenesis.Make build.jenesis:build.jenesis:0.18.2
 ```
 
-`jbang app install` names a command after its alias, and a `make` on the path would stand in front of GNU
-make, so an installation names the command itself:
-
-```bash
-jbang app install --name jenesis-make make@jenesis/jenesis
-```
+`jbang app install jenesis-make@jenesis/jenesis` puts the alias on the path as a command of its own name, so
+the three commands are called the same whichever way they were installed. The other commands of `sdk/` have no
+alias, because each does what a launch of the released jar cannot: `jenesis` and `jenesis-unsafe` verify a
+project's vendored sources against the published ones before running them, `jenesis-init`, `jenesis-validate`
+and `jenesis-version` read the sources an installation ships, `jenesis-switch` changes the calling shell, and
+`jenesis-jdk` and `jpx-jdk` install a JDK with a package manager.
 
 Then, from the project root:
 
@@ -78,7 +78,7 @@ What is in this repository
 | `demo/` | 83 self-contained example projects, one per feature, indexed by [`demo/README.md`](demo/README.md). |
 | `sdk/` | The SDKMAN distribution layout and its shell-script tests (`sdk/jenesis`, `sdk/jpx`). `jenesis-unsafe` reads the version recorded in a project's `build/jenesis/jenesis.version`, installs it where the package manager can, verifies the vendored sources against the published ones and runs the compiled engine - a tree that does not match is refused, so no unreviewed build code is ever executed. `jenesis` is that launcher behind a floor: a recorded version the floor covers is no longer considered safe, and is refused with `jenesis-unsafe` named for the builds that have to run it all the same. `jenesis-make` runs the installed version as it stands, and `jenesis-switch` moves the shell to the recorded one. Both stay on the released engine, so a refused project still builds as a standard build; only running the vendored sources yourself - in source mode, or off classes compiled once with `javac` - executes the vendored engine. `jenesis-jdk` installs a JDK for a `jenesis.toolchain.version` with SDKMAN, mise or Scoop, once a user names it as `jenesis.toolchain.installer`. |
 | `distribution/` | Packager templates that override JReleaser's own, per distribution: the Homebrew formulae, which wrap each command rather than symlinking it so a script still finds its own installation, and the Scoop manifest that describes jpx rather than the build tool. JReleaser would look for these under `src/jreleaser/distributions/`, so each packager in `jreleaser.yml` names its `templateDirectory` here instead - this project has no `src/` tree. |
-| `jbang-catalog.json` | The [JBang](https://www.jbang.dev) catalog: the aliases `make`, `execute` and `jpx`, one per entry point and named after it, each running its main class out of the `build.jenesis:build.jenesis` release it names, on a JDK 25 or newer that JBang downloads where none is installed. `jbang make@jenesis/jenesis` reads it from the default branch, and like `jenesis-make` it runs the released engine as it stands, whatever a project vendors under `build/jenesis/`. |
+| `jbang-catalog.json` | The [JBang](https://www.jbang.dev) catalog: the aliases `jenesis-make`, `jenesis-exec` and `jpx`, named after the commands of the SDKMAN, Homebrew and Scoop distributions that they stand for, each running its main class out of the `build.jenesis:build.jenesis` release it names, on a JDK 25 or newer that JBang downloads where none is installed. `jbang jenesis-make@jenesis/jenesis` reads it from the default branch, and like `jenesis-make` it runs the released engine as it stands, whatever a project vendors under `build/jenesis/`. |
 | `build/jenesis` | A symlink to `sources/build/jenesis`, so the project builds itself with itself. |
 | `benchmark/` | The performance harness and its methodology, see [`benchmark/README.md`](benchmark/README.md). |
 | `installation/` | `install.sh`, the script served at `get.jenesis.build`, and `install.test.sh`, its tests: each mode is installed into a throwaway project and built, run by CI on every platform. `worker.js` is the Cloudflare Worker that serves that script from the default branch, with `worker.test.js` covering it on Node's built-in runner. |
@@ -230,7 +230,7 @@ Continuous integration
   A demo lane that sets `jbang: true` has JBang installed before it runs, as one that sets `jdk` has that JDK:
   the `jbang` lane runs the script of `demo-83-jbang` and each alias of `jbang-catalog.json` with it, against
   the release the catalog names, while `jbang-plain-java` runs the same script on the engine of the commit.
-  `JbangCatalogTest` holds the catalog to one alias per tool, named after its main class, and the release the demo's script
+  `JbangCatalogTest` holds the catalog to one alias per tool, its main class, and the release the demo's script
   names.
 
   Every build runs under `-Djenesis.dependency.pin=strict`, so an unpinned dependency fails CI: run `pin` and
