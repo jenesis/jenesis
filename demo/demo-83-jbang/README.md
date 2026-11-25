@@ -96,3 +96,20 @@ the alias as they follow the command.
 name, the name the same command has when a package manager installs it:
 
     jbang app install jenesis-make@jenesis/jenesis
+
+What this route does not check
+------------------------------
+
+  * The installed `jenesis` command verifies a project's `build/jenesis/` against the
+    sources its release published before it runs them. Nothing of the kind happens
+    here: the engine is the release the script or the alias names, and a
+    `build/jenesis/` folder, with the version it records, is not read.
+  * JBang downloads the jar over HTTPS and fetches the SHA-1 published beside it, but
+    runs the jar even where the two differ, and it checks no signature.
+  * An alias is whatever `jbang-catalog.json` on the default branch of
+    `jenesis/jenesis` says when it runs, and JBang asks for no confirmation. The
+    `//DEPS` line of a script, or a coordinate on the command line, names the
+    release without the catalog.
+
+A build runs the project's code and its plugins whichever engine runs it, so this is
+about which engine runs and how it was obtained.

@@ -59,6 +59,16 @@ project's vendored sources against the published ones before running them, `jene
 and `jenesis-version` read the sources an installation ships, `jenesis-switch` changes the calling shell, and
 `jenesis-jdk` and `jpx-jdk` install a JDK with a package manager.
 
+What the JBang route does not check: `jenesis` verifies `build/jenesis/` against the sources its release
+published and refuses a release at or below its floor, while an alias runs the release the catalog names and
+reads neither the vendored folder nor `jenesis.version`, so a project recording another version is built by a
+different engine than it vendors, without a message. JBang fetches the jar over HTTPS with the SHA-1 beside it,
+runs the jar even where the two differ, and checks no signature; `install.sh` installs a release only if it
+matches the SHA-256 published beside it, and the Homebrew and Scoop packages name the SHA-256 of their archive.
+JBang reads the catalog from the default branch whenever an alias runs and asks for no confirmation, so
+whoever can change `jbang-catalog.json` on `main` changes what every alias runs; a coordinate named on the
+command line takes the catalog out. A build runs the project's code and plugins either way.
+
 Then, from the project root:
 
 ```bash
