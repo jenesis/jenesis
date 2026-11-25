@@ -1131,9 +1131,11 @@ public class TestModule implements BuildExecutorModule {
         @Override
         protected Optional<String> diagnosis(BuildStepContext context) {
             Path reports = context.next().resolve(BuildStep.REPORTS + "tests");
-            return (reporting || mode.recordsFailures()) && Files.isDirectory(reports)
-                    ? Optional.of("The reports of the test run are in " + reports)
-                    : Optional.empty();
+            return Optional.of(((reporting || mode.recordsFailures()) && Files.isDirectory(reports)
+                    ? "The reports of the test run are in " + reports + "\n"
+                    : "")
+                    + "To run one failed test class alone, add -Djenesis.test.filter='.*<its name>'"
+                    + " -Djenesis.print.tests=true ahead of the entry point of the build's command");
         }
 
         @Override

@@ -591,9 +591,10 @@ public record Project(
                       script to write. Pass selectors as command-line arguments; without one,
                       %{name}build%{reset} runs.
 
-                        %{name}java build/jenesis/Make.java%{reset}         Build every module
-                        %{name}java build/jenesis/Make.java stage%{reset}   Run another selector
-                        %{name}jenesis stage%{reset}                        The same on the installed CLI
+                        %{name}java build/jenesis/Make.java%{reset}            Build every module
+                        %{name}java build/jenesis/Make.java +<module>%{reset}  Build one module and what it needs
+                        %{name}java build/jenesis/Make.java stage%{reset}      Run another selector
+                        %{name}jenesis stage%{reset}                           The same on the installed CLI
 
                       Every step prints a line naming its place in the build graph, and those
                       names are the selector grammar: run %{name}build%{reset} once and read them back.
@@ -748,9 +749,25 @@ public record Project(
                     ## Essentials
 
                       java build/jenesis/Make.java [selectors...]  build; no selector runs `build`
+                      java build/jenesis/Make.java +<module>        build and test one module
+                      java -Djenesis.test.filter='.*GreeterTest' -Djenesis.print.tests=true \\
+                          build/jenesis/Make.java +<module>         run one test class of it
                       java build/jenesis/Make.java configuration    every setting and the value in force
                       java build/jenesis/Execute.java [args...]     build and run the main class
 
+                    - Work on one module with +<module> rather than the whole build: it builds and
+                      tests that module, and builds the modules it needs without running their tests.
+                      <module> is the folder holding the pom.xml or module-info.java, a/b written
+                      +a+b; where tests are a module-info.java module of their own, name that folder,
+                      as +greeter-test.
+                    - A -Djenesis.<key> setting stands before Make.java, a selector after it.
+                      jenesis.test.filter is a regex over the class name: '.*(FooTest|BarTest)' runs
+                      two classes and '.*FooTest#method' one method. A selection that ran is not run
+                      again while nothing it reads changed; -Djenesis.test.force=true runs it anyway.
+                    - A failed test run prints the end of its output with each failed test, and names
+                      the file holding all of it, <step folder>~/supplement/output; that of a run that
+                      passed is <step folder>/supplement/output, and -Djenesis.print.tests=true
+                      streams either while it runs.
                     - Never delete target/ and never pass -Djenesis.executor.rebuild=true: every step
                       is keyed by its inputs, so a build re-runs exactly what changed.
                     - What a step produced is in %{target}/<step path>/output/ - a build step's
@@ -773,6 +790,10 @@ public record Project(
 
                       java build/jenesis/Make.java                                 build, then read
                                                                                    target/.jenesis.events.jsonl
+                      java build/jenesis/Make.java +<module>                       from then on, the module
+                                                                                   you work on and its tests
+                      java -Djenesis.test.filter='.*<Class>' -Djenesis.print.tests=true \\
+                          build/jenesis/Make.java +<module>                        one test class, streamed
                       java build/jenesis/Make.java configuration | grep -F "[set]" what this project changed
                       java build/jenesis/Make.java dependencies                    what each module resolves
 
