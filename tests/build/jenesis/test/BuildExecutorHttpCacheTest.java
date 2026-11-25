@@ -32,7 +32,7 @@ public class BuildExecutorHttpCacheTest {
             String project = String.valueOf(exchange.getRequestHeaders().getFirst(BuildExecutorHttpCache.PROJECT)),
                     path = exchange.getRequestURI().getPath(),
                     method = exchange.getRequestMethod();
-            keys.add(String.valueOf(exchange.getRequestHeaders().getFirst(BuildExecutorHttpCache.KEY)));
+            keys.add(String.valueOf(exchange.getRequestHeaders().getFirst("Authorization")));
             projects.add(project);
             requests.add(method + " " + path);
             try {
@@ -339,7 +339,7 @@ public class BuildExecutorHttpCacheTest {
                 new Environment(Map.of("cache.token", "team-alpha", "cache.local", local.toString())),
                 uri);
         cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), folders("source"), target, "SHA-256");
-        assertThat(keys).containsExactly("team-alpha");
+        assertThat(keys).containsExactly("Bearer team-alpha");
         assertThatThrownBy(() -> BuildExecutorHttpCache.ofEnvironment(new Environment(Map.of("cache.key", "team-alpha")), uri))
                 .as("a setting under its former name would leave the cache server without a credential")
                 .isInstanceOf(IllegalArgumentException.class)
@@ -444,7 +444,7 @@ public class BuildExecutorHttpCacheTest {
     @Test
     public void sends_the_token_and_the_project_as_headers_and_omits_them_when_unset() throws IOException {
         cache(local).fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), folders("source"), target, "SHA-256");
-        assertThat(keys).containsExactly("team-alpha");
+        assertThat(keys).containsExactly("Bearer team-alpha");
         assertThat(projects).containsExactly("demo");
         keys.clear();
         projects.clear();
@@ -469,7 +469,7 @@ public class BuildExecutorHttpCacheTest {
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         cache(local).touch(Runnable::run, "step", new byte[]{1}, in, "SHA-256");
         assertThat(requests).containsExactly("HEAD /01/" + key(in));
-        assertThat(keys).contains("team-alpha");
+        assertThat(keys).contains("Bearer team-alpha");
         assertThat(projects).contains("demo");
     }
 

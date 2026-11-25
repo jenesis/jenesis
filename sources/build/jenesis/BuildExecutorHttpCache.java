@@ -5,7 +5,7 @@ import build.jenesis.Environment.Setting;
 
 public final class BuildExecutorHttpCache implements BuildExecutorCache {
 
-    public static final String KEY = "Jenesis-Cache-Key", PROJECT = "Jenesis-Cache-Project";
+    public static final String PROJECT = "Jenesis-Cache-Project";
     private static final String FORMAT = "jenesis-cache/2", MANIFEST = "manifest";
     private static final int LIMIT = 64 << 20;
     private static final Set<String> ARCHIVES = Set.of("jar", "zip", "jmod", "war", "ear", "gz", "tgz", "xz", "zst", "png", "jpg");
@@ -455,7 +455,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         connection.setInstanceFollowRedirects(false);
         connection.setRequestProperty("User-Agent", "Jenesis");
         if (token != null) {
-            connection.setRequestProperty(KEY, token);
+            connection.setRequestProperty("Authorization", "Bearer " + token);
         }
         if (project != null) {
             connection.setRequestProperty(PROJECT, project);

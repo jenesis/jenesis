@@ -185,8 +185,8 @@ The protocol of a cache server
 
 A cache server stores opaque entries under two hexadecimal segments and answers
 three requests. `<uri>` is `jenesis.cache.uri`; every request carries
-`Jenesis-Cache-Project` where a project is named and `Jenesis-Cache-Key` where a
-token is set, and the server keeps the entries of one project apart from those of
+`Jenesis-Cache-Project` where a project is named and `Authorization: Bearer <token>`
+where a token is set, and the server keeps the entries of one project apart from those of
 another.
 
 | request | answer |
