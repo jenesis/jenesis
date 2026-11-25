@@ -238,7 +238,7 @@ public record DiscoveredLocation(String domain,
     }
 
     private static byte[] read(URI uri, Repository.Connection connection) throws IOException {
-        try (InputStream inputStream = Repository.open(connection, uri, null)) {
+        try (InputStream inputStream = Repository.open(connection, uri, Repository.Credential.NONE)) {
             return inputStream.readAllBytes();
         } catch (FileNotFoundException _) {
             return null;

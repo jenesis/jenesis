@@ -132,6 +132,7 @@ Quick index
 | 80 | [`jpx`](demo-80-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
 | 81 | [`tools-api`](demo-81-tools-api/README.md)                        | Run a build, or a published program, inside another program's JVM            | `java build/Demo.java`            |
 | 82 | [`clojure`](demo-82-clojure/README.md)                            | Java and a Clojure namespace in one `pom.xml` module, compiled ahead of time | `java build/jenesis/Execute.java` |
+| 83 | [`credential-exchange`](demo-83-credential-exchange/README.md)    | Sign a CI job in to a repository or cache server without a stored secret     | `java build/Demo.java`            |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1327,3 +1328,17 @@ namespace after `javac`, so it calls the module's Java type. It compiles with th
 `org.clojure:clojure` the `pom.xml` declares, as classes compiled ahead of time are
 tied to the Clojure that compiled them, and ships each source beside its classes.
 `-Djenesis.clojure.language=false` leaves the plugin out.
+
+## 65. Signing in without a stored secret - [`credential-exchange`](demo-83-credential-exchange/README.md)
+
+A CI job needs no stored token to reach a private repository or a cache server.
+`-Djenesis.cache.exchange=/api/token` has the build post the identity token its CI
+platform issues to that path on the cache server's own host, as OAuth 2.0 Token
+Exchange (RFC 8693) lays it out, and send the short-lived token the server issues as
+a bearer token; `jenesis.maven.exchange`, `jenesis.module.exchange`,
+`jenesis.release.exchange` and `jenesis.deploy.exchange` do the same for the other
+credentials. GitHub Actions is asked for the token under `id-token: write`, and
+elsewhere `jenesis.exchange.identity` names the variable or file that holds it. A
+server whose request differs is described by `encoding` and `parameters`, as JFrog
+Artifactory is, and any other is asked by a helper program. The demo runs three
+builds against a stand-in server that admits only a token it issued.

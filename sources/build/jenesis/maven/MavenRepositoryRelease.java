@@ -23,13 +23,13 @@ public class MavenRepositoryRelease implements BuildStep {
 
     private final URI repository;
     private final boolean publish;
-    private final transient String token;
+    private final transient Repository.Credential credential;
     private final transient Repository.Connection connection;
     private final transient Consumer<String> printing;
     private final transient Palette palette;
 
     public MavenRepositoryRelease(URI repository) {
-        this(repository, false, null, new Repository.Connection(), null, Palette.NONE);
+        this(repository, false, Repository.Credential.NONE, new Repository.Connection(), null, Palette.NONE);
     }
 
     public static URI configured(Environment environment) {
@@ -54,7 +54,7 @@ public class MavenRepositoryRelease implements BuildStep {
 
     private MavenRepositoryRelease(URI repository,
                                    boolean publish,
-                                   String token,
+                                   Repository.Credential credential,
                                    Repository.Connection connection,
                                    Consumer<String> printing,
                                    Palette palette) {
@@ -65,30 +65,30 @@ public class MavenRepositoryRelease implements BuildStep {
         String text = repository.toString();
         this.repository = text.endsWith("/") ? repository : URI.create(text + "/");
         this.publish = publish;
-        this.token = token;
+        this.credential = credential.target(this.repository);
         this.connection = connection;
         this.printing = printing;
         this.palette = palette;
     }
 
     public MavenRepositoryRelease repository(URI repository) {
-        return new MavenRepositoryRelease(repository, publish, token, connection, printing, palette);
+        return new MavenRepositoryRelease(repository, publish, credential, connection, printing, palette);
     }
 
     public MavenRepositoryRelease publish(boolean publish) {
-        return new MavenRepositoryRelease(repository, publish, token, connection, printing, palette);
+        return new MavenRepositoryRelease(repository, publish, credential, connection, printing, palette);
     }
 
-    public MavenRepositoryRelease token(String token) {
-        return new MavenRepositoryRelease(repository, publish, token, connection, printing, palette);
+    public MavenRepositoryRelease credential(Repository.Credential credential) {
+        return new MavenRepositoryRelease(repository, publish, credential, connection, printing, palette);
     }
 
     public MavenRepositoryRelease connection(Repository.Connection connection) {
-        return new MavenRepositoryRelease(repository, publish, token, connection, printing, palette);
+        return new MavenRepositoryRelease(repository, publish, credential, connection, printing, palette);
     }
 
     public MavenRepositoryRelease printing(Consumer<String> printing, Palette palette) {
-        return new MavenRepositoryRelease(repository, publish, token, connection, printing, palette);
+        return new MavenRepositoryRelease(repository, publish, credential, connection, printing, palette);
     }
 
     @Override
@@ -346,8 +346,9 @@ public class MavenRepositoryRelease implements BuildStep {
                     http.setReadTimeout(connection.readTimeout());
                     http.setInstanceFollowRedirects(false);
                     http.setRequestProperty("User-Agent", "Jenesis");
-                    if (token != null) {
-                        http.setRequestProperty("Authorization", token);
+                    String authorization = credential.authorization(connection);
+                    if (authorization != null) {
+                        http.setRequestProperty("Authorization", authorization);
                     }
                     if (file != null) {
                         http.setDoOutput(true);
@@ -393,7 +394,8 @@ public class MavenRepositoryRelease implements BuildStep {
                 throw new IllegalStateException("The repository refused " + method + " " + target
                         + " with status " + status + detail
                         + ": set jenesis.deploy.token to an Authorization header value that may publish"
-                        + " to it, as Basic <credentials> or Bearer <token>");
+                        + " to it, as Basic <credentials> or Bearer <token>, or jenesis.deploy.exchange to the"
+                        + " path it exchanges the job's identity token at");
             }
             if (status == 409) {
                 throw new IllegalStateException("The repository holds other content at " + target

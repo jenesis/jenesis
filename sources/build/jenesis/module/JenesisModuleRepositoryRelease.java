@@ -17,13 +17,13 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
 
     private final URI repository;
     private final boolean publish;
-    private final transient String token;
+    private final transient Repository.Credential credential;
     private final transient Repository.Connection connection;
     private final transient Consumer<String> printing;
     private final transient Palette palette;
 
     public JenesisModuleRepositoryRelease(URI repository) {
-        this(repository, false, null, new Repository.Connection(), null, Palette.NONE);
+        this(repository, false, Repository.Credential.NONE, new Repository.Connection(), null, Palette.NONE);
     }
 
     public static URI configured(Environment environment) {
@@ -48,7 +48,7 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
 
     private JenesisModuleRepositoryRelease(URI repository,
                                            boolean publish,
-                                           String token,
+                                           Repository.Credential credential,
                                            Repository.Connection connection,
                                            Consumer<String> printing,
                                            Palette palette) {
@@ -59,30 +59,30 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
         String text = repository.toString();
         this.repository = text.endsWith("/") ? repository : URI.create(text + "/");
         this.publish = publish;
-        this.token = token;
+        this.credential = credential.target(this.repository);
         this.connection = connection;
         this.printing = printing;
         this.palette = palette;
     }
 
     public JenesisModuleRepositoryRelease repository(URI repository) {
-        return new JenesisModuleRepositoryRelease(repository, publish, token, connection, printing, palette);
+        return new JenesisModuleRepositoryRelease(repository, publish, credential, connection, printing, palette);
     }
 
     public JenesisModuleRepositoryRelease publish(boolean publish) {
-        return new JenesisModuleRepositoryRelease(repository, publish, token, connection, printing, palette);
+        return new JenesisModuleRepositoryRelease(repository, publish, credential, connection, printing, palette);
     }
 
-    public JenesisModuleRepositoryRelease token(String token) {
-        return new JenesisModuleRepositoryRelease(repository, publish, token, connection, printing, palette);
+    public JenesisModuleRepositoryRelease credential(Repository.Credential credential) {
+        return new JenesisModuleRepositoryRelease(repository, publish, credential, connection, printing, palette);
     }
 
     public JenesisModuleRepositoryRelease connection(Repository.Connection connection) {
-        return new JenesisModuleRepositoryRelease(repository, publish, token, connection, printing, palette);
+        return new JenesisModuleRepositoryRelease(repository, publish, credential, connection, printing, palette);
     }
 
     public JenesisModuleRepositoryRelease printing(Consumer<String> printing, Palette palette) {
-        return new JenesisModuleRepositoryRelease(repository, publish, token, connection, printing, palette);
+        return new JenesisModuleRepositoryRelease(repository, publish, credential, connection, printing, palette);
     }
 
     @Override
@@ -169,8 +169,9 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
                     http.setFixedLengthStreamingMode(Files.size(file));
                     http.setRequestProperty("User-Agent", "Jenesis");
                     http.setRequestProperty("Content-Type", "application/octet-stream");
-                    if (token != null) {
-                        http.setRequestProperty("Authorization", token);
+                    String authorization = credential.authorization(connection);
+                    if (authorization != null) {
+                        http.setRequestProperty("Authorization", authorization);
                     }
                     try (OutputStream out = http.getOutputStream()) {
                         Files.copy(file, out);
@@ -206,7 +207,8 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
             if (status == 401 || status == 403) {
                 throw new IllegalStateException("The repository refused to accept " + target
                         + " with status " + status + detail
-                        + ": set jenesis.release.token to a key that may publish to it");
+                        + ": set jenesis.release.token to a key that may publish to it, or"
+                        + " jenesis.release.exchange to the path it exchanges the job's identity token at");
             }
             if (status == 409) {
                 throw new IllegalStateException("The repository holds other content at " + target

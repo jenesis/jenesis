@@ -59,6 +59,29 @@ public class MakeToolTest {
     }
 
     @Test
+    public void lists_how_each_credential_is_exchanged_without_holding_an_identity_token() throws IOException {
+        Files.writeString(root.resolve("module-info.java"), "module foo {}");
+        StringWriter out = new StringWriter(), err = new StringWriter();
+        int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out), new PrintWriter(err),
+                "-Djenesis.make.root=" + root,
+                "-Djenesis.maven.exchange=/api/token",
+                "-Djenesis.maven.identity=env JOB_IDENTITY",
+                "-Djenesis.print.progress=false",
+                "configuration");
+        assertThat(code).isEqualTo(0);
+        assertThat(out.toString())
+                .as("an identity is named by where it is read from, so that no setting holds a token to print")
+                .contains("jenesis.maven.exchange=/api/token")
+                .contains("jenesis.maven.identity=env JOB_IDENTITY")
+                .contains("jenesis.exchange.identity=");
+        for (String group : List.of("cache", "module", "maven", "release", "deploy")) {
+            for (String key : List.of("exchange", "identity", "audience", "parameters", "encoding", "helper")) {
+                assertThat(out.toString()).contains("jenesis." + group + "." + key + "=");
+            }
+        }
+    }
+
+    @Test
     public void resolves_a_relative_path_of_its_command_line_against_the_working_directory() throws IOException {
         Files.writeString(root.resolve("module-info.java"), "module foo {}");
         StringWriter out = new StringWriter(), err = new StringWriter();

@@ -3,6 +3,7 @@ package build.jenesis.test.module;
 import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.Environment;
+import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.module.JenesisRawGitRepository;
 import build.jenesis.module.JenesisRepository;
@@ -239,7 +240,7 @@ public class JenesisRawGitRepositoryTest {
                 JenesisRepository.Scope.MODULE,
                 data.toUri(),
                 maven.toUri(),
-                null).fetch(Runnable::run, "widget"))).isEqualTo("v2m1");
+                Repository.Credential.NONE).fetch(Runnable::run, "widget"))).isEqualTo("v2m1");
     }
 
     private JenesisRawGitRepository named() {

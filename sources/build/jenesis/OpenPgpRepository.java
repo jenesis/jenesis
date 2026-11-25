@@ -149,7 +149,7 @@ public class OpenPgpRepository implements Repository {
     private Optional<RepositoryItem> served(String coordinate) throws IOException {
         URI uri = server.resolve("pks/lookup?op=get&options=mr&search=0x" + coordinate);
         byte[] key;
-        try (InputStream stream = Repository.open(connection, uri, null)) {
+        try (InputStream stream = Repository.open(connection, uri, Repository.Credential.NONE)) {
             key = stream.readAllBytes();
         } catch (FileNotFoundException _) {
             return Optional.empty();
