@@ -54,6 +54,7 @@ open module build.jenesis.test {
     requires java.compiler;
     requires java.xml;
     requires jdk.httpserver;
+    requires jdk.management;
     requires org.junit.jupiter;
     requires org.assertj.core;
 

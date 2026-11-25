@@ -74,11 +74,21 @@ a `file://` location on a local or shared (NFS, network drive) file system:
     -Djenesis.cache.uri=file:///mnt/team/jenesis-cache # a shared (or local) folder
 
 A `file://` URI resolves a `BuildExecutorFileCache` (the same on-disk format as the
-local cache); an `http(s)://` URL selects `BuildExecutorHttpCache`, which GETs and
-PUTs each step's output as one zip to the server, naming the cache project with
+local cache); an `http(s)://` URL selects `BuildExecutorHttpCache`, which speaks the
+protocol below to the server, naming the cache project with
 `-Djenesis.cache.project=<project>` and authenticating with
 `-Djenesis.cache.token=<token>` (both sent as headers, never in the URL). A non-URI
 value is rejected - use `file://` for an on-disk location.
+
+A cache server is sent one archive per step, which leaves out what is held
+elsewhere: a file an input of the step holds, and a file of 64 KiB or more, which
+is stored once on the server however many steps wrote it. The build keeps every
+file it downloads or uploads in a folder of this machine, `~/.jenesis/cache` unless
+`-Djenesis.cache.local=<folder>` names another, in the layout shown under *What the
+cache keeps*. A large file any build of any project brought there is not
+downloaded again. That folder is capped at 10 GiB unless its `cache.properties`
+names another `size`. `-Djenesis.cache.inline=<bytes>` moves the size from which a
+file is stored apart from its step.
 
 The shared cache can be used **two ways**.
 
@@ -170,6 +180,54 @@ The checksums are those of `jenesis.executor.digest`, SHA-256 by default. A buil
 under another digest keeps a store of its own beside this one, as it could verify
 no file of this one.
 
+The protocol of a cache server
+------------------------------
+
+A cache server stores opaque entries under two hexadecimal segments and answers
+three requests. `<uri>` is `jenesis.cache.uri`; every request carries
+`Jenesis-Cache-Project` where a project is named and `Authorization: Bearer <token>`
+where a token is set, and the server keeps the entries of one project apart from those of
+another.
+
+| request | answer |
+| ------- | ------ |
+| `GET <uri>/<a>/<b>` | `200` and the entry, or `404` |
+| `HEAD <uri>/<a>/<b>` | `200` or `404`; tells the server the entry is in use |
+| `PUT <uri>/<a>/<b>` with a `Content-Length` | `201` once stored, `204` where the entry exists, which is never rewritten |
+
+A build stores two kinds of entry.
+
+A **step** is stored at `<step>/<key>`: the hash of the step, and the hash of its
+inputs taken after the text `jenesis-cache/2` and a zero byte. It is a zip read
+front to back. Its first entry, `manifest`, is UTF-8 text of lines ending in a
+line feed: `jenesis-cache/2 <digest algorithm>`, then one line
+`<kind> <checksum> <size> <path>` per file, sorted by path, with `/` between the
+segments of a path and a lower-case hexadecimal checksum.
+
+| kind | the file |
+| ---- | -------- |
+| `f` | is an entry of the zip named by its checksum, once however many paths name it |
+| `i` | is a file of an input of the step with that checksum, and is not sent |
+| `b` | is 64 KiB or larger and stored apart, at `<blob>/<checksum>` |
+| `d` | is an empty folder, written `d - 0 <path>` |
+
+A **large file** is stored at `<blob>/<checksum>` as its bytes: `<blob>` is the
+hexadecimal form of the text `blob:` and the digest algorithm in lower case,
+`626c6f623a7368612d323536` for SHA-256.
+
+To store a step, a build asks with `HEAD` for each large file it has not asked
+for before, sends with `PUT` those the server answers `404` for, and only then
+sends the step, so that no step names a file the server was not given. An entry
+of the zip deflates fast, and one that is an archive already is stored as it is.
+
+To restore a step, a build reads its zip, takes each `i` file from the folder of
+the input that holds it and each `b` file from this machine or, where it is not
+held, from the server with `GET`, and checks every file against its checksum. A
+file that fails the check, an entry the manifest does not name, or a large file
+the server does not hold makes the step a miss, and it runs. Any other answer of
+the server - a refused credential, an entry too large, no answer within the
+timeouts - is a miss or a step left unstored, never a failed build.
+
 Tuning with `cache.properties`
 ------------------------------
 
@@ -205,7 +263,8 @@ privileged job builds with the defaults (both `true`) to populate the cache, whi
 everyone else sets `write=false` to consume it read-only without mutating it.
 Setting both to `false` turns the cache off entirely. A build reads the cache alone
 without a change to the folder under `-Djenesis.cache.write=false`, which holds for a
-cache server as well, and a folder that cannot be written to - a read-only mount, a
+cache server as well: such a build sends a server nothing, and keeps what it
+downloads in the folder of this machine, which is its own. A folder that cannot be written to - a read-only mount, a
 folder of another user - is read as it is: what a build would store or evict is left
 out, and the build passes.
 

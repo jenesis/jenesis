@@ -143,6 +143,7 @@ public class ProjectReproductionTest {
                                                String identity,
                                                byte[] step,
                                                SequencedMap<String, Map<Path, byte[]>> inputs,
+                                               SequencedMap<String, Path> folders,
                                                Path target,
                                                String digest) {
             touched.add(target);
