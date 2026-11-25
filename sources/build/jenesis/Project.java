@@ -762,7 +762,7 @@ public record Project(
                       output is reused.
                     - Whenever you add or change a dependency, offer to run `pin`.
                     - Find the demo that matches the task and copy its shape rather than inventing
-                      configuration. A number a page cites, as (62), is the demo-62-* folder of
+                      configuration. A number a page cites, as (63), is the demo-63-* folder of
                       https://github.com/jenesis/jenesis/tree/main/demo; skill/demos lists them.
                     - Moving a Maven or Gradle build here? Follow skill/migrate step by step, and end
                       with the summary of the migration it asks for. A user hands an agent that task by
@@ -1234,7 +1234,7 @@ public record Project(
                       the version          version=<version> in project.properties at the root,
                                            which -Djenesis.project.version overrides
 
-                    demo-02 is one module, demo-04 several with a test module, demo-73 the
+                    demo-02 is one module, demo-04 several with a test module, demo-75 the
                     published coordinate; skill/tags lists every tag.
 
                     ## 4. Replace each plugin
@@ -1346,11 +1346,11 @@ public record Project(
                                            pom.xml build that shaded keeps the dependency plain
                                            until phase two; the published POM lists the launcher
                                            and the API module, never what a layer holds (demo
-                                           24, 25)
+                                           25, 26)
                       one runnable jar     launcher=true in packaging.properties, which stores
-                                           every jar apart inside it (demo 08), or bundle=true,
+                                           every jar apart inside it (demo 09), or bundle=true,
                                            a zip of the jars and the argument file that launches
-                                           them (demo 10)
+                                           them (demo 11)
                       fewer dependencies   publish the dependency as a dependency, and make a
                                            `requires static` on it a `requires`
 
@@ -1366,7 +1366,7 @@ public record Project(
                                            stubs for the newer JDK types it uses, and route each
                                            call that needs the newer JVM through a class of one
                                            name in the base and in META-INF/versions/<N>/, the
-                                           base answering what the older JVM can (demo 11);
+                                           base answering what the older JVM can (demo 12);
                                            a public class only META-INF/versions/<N>/ holds makes
                                            a jar the JDK's jar tool refuses
                       classes compiled against but never shipped, API stubs above all
@@ -1462,9 +1462,9 @@ public record Project(
                     was given, never a POM's, and fails on a blank one unless jreleaser.yml names
                     it. Without that setting, `release` and every `pin` run
                     the release dry and publish nothing. The job's credentials become the JRELEASER_*
-                    variables JReleaser reads (74). A job that deployed to a repository of its own rather than to
+                    variables JReleaser reads (75). A job that deployed to a repository of its own rather than to
                     Maven Central names it in MAVEN_RELEASE_URI and its key in MAVEN_RELEASE_TOKEN
-                    instead (74). Then let `ide` write the IntelliJ, VS Code or Eclipse
+                    instead (75). Then let `ide` write the IntelliJ, VS Code or Eclipse
                     project so no IDE depends on the old build: one IDE module per module, its
                     tests in its test sources. The IDE files it writes into a source folder never
                     reach a jar. A Maven layout keeps its pom.xml files, which are now its build
@@ -1545,7 +1545,7 @@ public record Project(
                       clojure-maven-plugin / clojure -> .clj sources in src/main/clojure, named by
                           jenesis.maven.sources=clojure and compiled by the Clojure plugin the build
                           resolves where a module holds one, after javac and with the
-                          org.clojure:clojure the pom.xml declares (82)
+                          org.clojure:clojure the pom.xml declares (54)
                       jaxb2-maven-plugin / a JAXB plugin -> xjc.properties, binding the schemas
                           as @schemas/xjc=<folder> (17)
                       protobuf-maven-plugin / com.google.protobuf -> protoc.properties, binding
@@ -1579,7 +1579,7 @@ public record Project(
                       moditect add-module-info, a descriptor for a Java 8 base
                           -> module-info.java in sources/META-INF/versions/9/ (12)
                       replacer, templating, a generated version class
-                          -> a plugin at binary/generated that writes the source (62)
+                          -> a plugin at binary/generated that writes the source (63)
                       maven-resources-plugin targetPath, a file outside the resource folders
                           -> -Djenesis.project.resources=<file>:<path in the jar>
                       animal-sniffer with a JDK signature -> maven.compiler.release, as javac
@@ -1720,7 +1720,7 @@ public record Project(
                           as XML or DSL, which configures awkwardly; here a plugin of the project at
                           binary/transform constructs the net.bytebuddy.build.Plugin instances in Java,
                           with values from plugin-<name>.properties, and runs them with Plugin.Engine
-                          over the module's compiled classes and its compile class path (64)
+                          over the module's compiled classes and its compile class path (65)
                       japicmp-maven-plugin / me.champeau.gradle.japicmp -> japicmp.properties (45),
                           which takes the plugin's parameters
                       revapi-maven-plugin / org.revapi.revapi-gradle-plugin -> revapi.properties
@@ -1777,7 +1777,7 @@ public record Project(
                           (13); addDefaultImplementationEntries -> on by default: Implementation-Title
                           and -Vendor, and -Version where the POM, project.properties or
                           jenesis.project.version names one
-                      maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (8, 74),
+                      maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (8, 75),
                           whose jar holds the sources and, as Maven's and Gradle's do, the resources,
                           including those of -Djenesis.project.resources, for a staged module only;
                           set it, and the next one,
@@ -1785,7 +1785,7 @@ public record Project(
                           never in jenesis.properties, so that a regular build neither archives the
                           sources nor renders the documentation and nothing waits for either
                       maven-javadoc-plugin / withJavadocJar(), Dokka
-                          -> -Djenesis.project.documentation=true (8, 74), which documents
+                          -> -Djenesis.project.documentation=true (8, 75), which documents
                           every staged module, a test module only under jenesis.stage.tests, one with a
                           module-info.java as that module (module-summary.html, its pages below the
                           module's name), as maven-javadoc-plugin and Gradle do; javadoc runs with
@@ -1807,17 +1807,17 @@ public record Project(
                           <module>-<classifier>.jar; <classifier>= republishes the jar as it is.
                           A platform's variant goes into the classifiers.properties of a profile
                           folder, and a consumer selects one with @jenesis.pin <module>
-                          :<classifier> or a pom.xml <classifier> (66)
+                          :<classifier> or a pom.xml <classifier> (67)
                       maven-plugin-plugin / packaging maven-plugin -> <packaging>jar</packaging>,
                           as Maven reads a plugin from its descriptor alone, and a
-                          mavenplugin.properties in the module's configuration folder (75), whose
+                          mavenplugin.properties in the module's configuration folder (77), whose
                           descriptor Maven's own plugin tools write into the jar from the mojos and
                           their javadoc; goalPrefix -> goalprefix=<prefix>, maven-plugin-api and
                           maven-plugin-annotations in scope provided or by requires static
                       java-gradle-plugin gradlePlugin.plugins -> a META-INF/gradle-plugins/<id>.properties
                           naming implementation-class among the resources, the Gradle API in scope
                           provided or by requires static, and a gradleplugin.properties in the
-                          project's configuration folder (76), which stages the marker the plugins
+                          project's configuration folder (78), which stages the marker the plugins
                           block resolves an ID by; com.gradle.plugin-publish, the Gradle Plugin
                           Portal's own publisher, has no counterpart
                       exec-maven-plugin or maven-antrun-plugin running make, cmake or cargo,
@@ -1825,14 +1825,14 @@ public record Project(
                           -> a plugin at binary/compiled that forks the native tool as an
                           EnvironmentalProcessBuildStep and writes its library below a folder of
                           its output, as library/linux-x86_64/, which classifiers.properties names
-                          as linux-x86_64=library/linux-x86_64 (66); os-maven-plugin's
+                          as linux-x86_64=library/linux-x86_64 (67); os-maven-plugin's
                           ${os.detected.classifier} -> one profile per platform, each building on
                           its own machine; the compiler is the machine's, as with Maven and Gradle.
                           javac -h, as maven-compiler-plugin's <headerOutputDirectory> or Gradle's
                           options.headerOutputDirectory -> the same plugin first wires
                           new Javac(ProcessHandler.Factory.of()).headers(true), which compiles the
                           module's sources and hands on nothing but headers/, one header per class
-                          with a native method, for the C compiler's include path (67)
+                          with a native method, for the C compiler's include path (68)
                       dokka-maven-plugin / org.jetbrains.dokka -> dokka.properties (46): moduleName
                           -> module-name (documentation by default), documentedVisibilities ->
                           documented-visibilities=public,internal,..., suppressObviousFunctions,
@@ -1847,7 +1847,7 @@ public record Project(
                           no counterpart, an unknown key fails the build, and a Gradle source set or
                           a multi-module aggregate has none either: each module is documented alone
                       asciidoctor-maven-plugin process-asciidoc / org.asciidoctor.jvm.convert
-                          -> asciidoctor.properties in the configuration folder (71), whose
+                          -> asciidoctor.properties in the configuration folder (72), whose
                           documents=<folder, relative to it> - ../src/docs/asciidoc for their
                           default - is converted once for the whole project, staged as
                           target/stage/project/output/docs/; a file whose name starts with _ is a
@@ -1864,14 +1864,14 @@ public record Project(
                       jib-maven-plugin / com.google.cloud.tools.jib
                           -> docker=<image>, a build context; the build never runs Docker (9, 10)
                       native-maven-plugin / org.graalvm.buildtools.native
-                          -> native=true, graal.properties (57)
-                      maven-jarsigner-plugin / jar signing -> jenesis.jarsigner.* (72)
-                      maven-install-plugin / publishToMavenLocal -> `export` (73)
+                          -> native=true, graal.properties (58)
+                      maven-jarsigner-plugin / jar signing -> jenesis.jarsigner.* (73)
+                      maven-install-plugin / publishToMavenLocal -> `export` (74)
                       maven-deploy-plugin, distributionManagement to a repository of your own /
                           maven-publish to one -> `release` with jenesis.deploy.uri and
                           jenesis.deploy.token, which puts the staged Maven tree there
                           with its checksums and maven-metadata.xml, unsigned, a SNAPSHOT under
-                          a unique timestamped name (74); altDeploymentRepository -> the same
+                          a unique timestamped name (75); altDeploymentRepository -> the same
                           setting on the command line
                       deploy to Maven Central, central-publishing, maven-gpg-plugin / maven-publish
                           to Central, signing
@@ -1882,7 +1882,7 @@ public record Project(
                           version the build was given as -Djenesis.project.version, which a
                           pom.xml build passes to `release` and `pin` alike, as no POM's version
                           reaches it, unless jreleaser.yml names one, and
-                          the staged trees as template properties (74), the other values of
+                          the staged trees as template properties (75), the other values of
                           jreleaser.properties, and with --dry-run,
                           publishing nothing, unless the command line passes
                           -Djenesis.release.publish=true; JReleaser releases versions without
@@ -1910,7 +1910,7 @@ public record Project(
                       <profiles> chosen with -P or a property / properties and conventions
                           -> jenesis-<profile>.properties; those activated by <jdk> or
                           <activeByDefault> are read from the POM (8)
-                      a Gradle build cache -> jenesis.cache.uri (58)
+                      a Gradle build cache -> jenesis.cache.uri (59)
 
                     ## No built-in
 
@@ -2674,7 +2674,7 @@ public record Project(
                     than the JVM, so two runs in one program never clash; everything after them is
                     what the command line would take. A setting that replaces the process a build
                     runs in - toolchain.version, project.docker, execute.docker - is refused by name
-                    there, and so is a -J option, as the JDK's own tools refuse one; demo-81-tools-api
+                    there, and so is a -J option, as the JDK's own tools refuse one; demo-83-tools-api
                     shows the whole contract.
 
                     Every command line here, the commands and the tools alike, reads @<file> as the
@@ -2813,9 +2813,9 @@ public record Project(
 
                     Write one only when skill/registry has no line for the job. A plugin adds steps
                     to the stock build and replaces none; skill/plugins wires it in. The smallest
-                    whole example is demo-62-internal-module, the same plugin published is
-                    demo-63-external-module, demo-64-byte-buddy rewrites compiled classes with
-                    Byte Buddy, and demo-65-project-plugins uses every project-wide hook point.
+                    whole example is demo-63-internal-module, the same plugin published is
+                    demo-64-external-module, demo-65-byte-buddy rewrites compiled classes with
+                    Byte Buddy, and demo-66-project-plugins uses every project-wide hook point.
 
                     ## The shape
 
@@ -2953,7 +2953,7 @@ public record Project(
                     META-INF/services entry; a modular layout refuses it. Configure the tool in that
                     code, too: where a Maven or Gradle plugin discovers the tool's own extensions and takes their settings as XML,
                     as Byte Buddy's build plugin does, the provider constructs them in Java and reads
-                    only plain values from plugin-<name>.properties, as demo-64 does with Byte Buddy. A JDK tool is forked by extending ProcessBuildStep,
+                    only plain values from plugin-<name>.properties, as demo-65 does with Byte Buddy. A JDK tool is forked by extending ProcessBuildStep,
                     which also reads process-<tool>.properties; one that runs a program extends
                     EnvironmentalProcessBuildStep for environment-<tool>.properties. A tool's main
                     method, as java -cp <jars> <class or Launcher.java> <arguments>, runs through
@@ -3037,35 +3037,35 @@ public record Project(
                       Other languages    46 kotlin, 47 kotlin-quality, 48 kotlin-plugin,
                                          49 ksp (a Kotlin symbol processor), 50 scala,
                                          51 scala-quality, 52 groovy, 53 groovy-quality,
-                                         82 clojure (a pom.xml module beside src/main/clojure)
-                      At run time        54 agents (@jenesis.attach),
-                                         55 native-access (@jenesis.native),
-                                         56 native-access-layer (passed on to a layer),
-                                         57 native-image (GraalVM)
-                      Operating it       58 build-cache, 59 docker-isolation
-                      Extending it       60 custom-assembler, 61 custom-jmod, 62 internal-module,
-                                         63 external-module,
-                                         64 byte-buddy (Byte Buddy's plugins over the compiled classes),
-                                         65 project-plugins (hooks from a first check to release),
-                                         66 classifiers (variants a module of the build publishes,
+                                         54 clojure (a pom.xml module beside src/main/clojure)
+                      At run time        55 agents (@jenesis.attach),
+                                         56 native-access (@jenesis.native),
+                                         57 native-access-layer (passed on to a layer),
+                                         58 native-image (GraalVM)
+                      Operating it       59 build-cache, 60 docker-isolation
+                      Extending it       61 custom-assembler, 62 custom-jmod, 63 internal-module,
+                                         64 external-module,
+                                         65 byte-buddy (Byte Buddy's plugins over the compiled classes),
+                                         66 project-plugins (hooks from a first check to release),
+                                         67 classifiers (variants a module of the build publishes,
                                          selected by a sibling),
-                                         67 jni (a C library a plugin compiles against the headers),
-                                         68 custom-maven, 69 custom-modular,
-                                         70 custom-build (no Project at all)
-                      Shipping it        71 asciidoctor (AsciiDoc documents converted for the whole
+                                         68 jni (a C library a plugin compiles against the headers),
+                                         69 custom-maven, 70 custom-modular,
+                                         71 custom-build (no Project at all)
+                      Shipping it        72 asciidoctor (AsciiDoc documents converted for the whole
                                          project and staged beside its modules),
-                                         72 code-signing (jarsigner), 73 export (into the local repositories),
-                                         74 publishing (Maven Central),
-                                         75 maven-plugin (a Maven plugin and its descriptor),
-                                         76 gradle-plugin (a Gradle plugin and its marker)
-                      Resolving it       77 module-convention (resolving what you published),
-                                         78, 79 discovery (a dependency resolved from its
+                                         73 code-signing (jarsigner), 74 export (into the local repositories),
+                                         75 publishing (Maven Central),
+                                         76 credential-exchange (a repository or cache server
+                                         signed in to without a stored secret),
+                                         77 maven-plugin (a Maven plugin and its descriptor),
+                                         78 gradle-plugin (a Gradle plugin and its marker)
+                      Resolving it       79 module-convention (resolving what you published),
+                                         80, 81 discovery (a dependency resolved from its
                                          publisher's own domain, as a module or by coordinate)
-                      Running it         80 jpx (run a released program without building),
-                                         81 tools-api (a build inside another program's JVM),
-                                         84 jbang (a build as a JBang script, on the released engine)
-                      In CI              83 credential-exchange (a repository or cache server
-                                         signed in to without a stored secret)
+                      Running it         82 jpx (run a released program without building),
+                                         83 tools-api (a build inside another program's JVM),
+                                         84 jbang (a build as a JBang script)
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
