@@ -2120,9 +2120,9 @@ public class BuildExecutorTest implements Serializable {
     private static final AtomicBoolean INTERRUPTED = new AtomicBoolean();
     private static final AtomicReference<CompletableFuture<BuildStepResult>> PENDING = new AtomicReference<>();
 
-    private BuildExecutor timing(int concurrency) throws IOException {
+    private BuildExecutor timing(int concurrency, Duration timeout) throws IOException {
         return BuildExecutor.of(root2,
-                Duration.ofMillis(200),
+                timeout,
                 hash,
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(),
@@ -2135,7 +2135,7 @@ public class BuildExecutorTest implements Serializable {
     @Test
     public void a_step_working_past_the_timeout_within_its_call_is_interrupted_and_fails() throws IOException {
         INTERRUPTED.set(false);
-        BuildExecutor timing = timing(0);
+        BuildExecutor timing = timing(0, Duration.ofMillis(200));
         timing.addStep("step", (_, _, _) -> {
             try {
                 Thread.sleep(30_000);
@@ -2156,7 +2156,7 @@ public class BuildExecutorTest implements Serializable {
     @Test
     public void a_step_whose_answer_is_pending_past_the_timeout_has_it_failed() throws IOException {
         PENDING.set(null);
-        BuildExecutor timing = timing(1);
+        BuildExecutor timing = timing(1, Duration.ofMillis(200));
         timing.addStep("step", (_, _, _) -> {
             PENDING.set(new CompletableFuture<>());
             return PENDING.get();
@@ -2169,11 +2169,11 @@ public class BuildExecutorTest implements Serializable {
 
     @Test
     public void a_step_is_not_timed_while_it_waits_for_a_permit() throws IOException {
-        BuildExecutor timing = timing(1);
+        BuildExecutor timing = timing(1, Duration.ofMillis(1500));
         for (String identity : List.of("first", "second", "third")) {
             timing.addStep(identity, (_, context, _) -> {
                 try {
-                    Thread.sleep(80);
+                    Thread.sleep(600);
                 } catch (InterruptedException e) {
                     throw new IllegalStateException(e);
                 }
