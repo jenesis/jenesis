@@ -2,7 +2,7 @@ Java (multi-module POM) demo
 ============================
 
 Build a multi-module Maven-style project where one module depends on another:
-a root aggregator `pom.xml` lists two sub-modules, and one sub-module depends on
+a root aggregator `pom.xml` lists its sub-modules, and one sub-module depends on
 the sibling plus a real external Maven dependency, so you get intra-project and
 external resolution side by side with no build script to write. The `greeter`
 module also carries a JUnit test, so the demo doubles as a Maven-layout testing
@@ -18,7 +18,7 @@ From this directory:
 Layout
 ------
 
-The project is an aggregator `pom.xml` over two module directories:
+The project is an aggregator `pom.xml` over its module directories:
 
     demo/demo-03-java-pom-multi
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
@@ -27,8 +27,9 @@ The project is an aggregator `pom.xml` over two module directories:
     |   |-- pom.xml          <sourceDirectory> + <testSourceDirectory>; a test-scoped JUnit dependency
     |   |-- sources/sample/greeter/Greeter.java
     |   `-- test/sample/greeter/GreeterTest.java
+    |-- starter/pom.xml      a jar module without sources: it depends on greeter
     |-- app/                the consumer module
-    |   |-- pom.xml          depends on greeter + commons-lang3
+    |   |-- pom.xml          depends on starter
     |   `-- sources/sample/app/App.java   uses Greeter + StringUtils
     |-- bom/pom.xml          a bill of materials over greeter and app (packaging pom)
     `-- hello/pom.xml        the library's former coordinate, relocated to greeter
@@ -38,12 +39,35 @@ an aggregator and never builds it as a jar; its presence is what selects the
 MAVEN layout (`Project.Layout.of`). Jenesis then walks the tree, discovers every
 `pom.xml`, and builds one module per descriptor.
 
-The `app` module declares two dependencies: `build.jenesis.demo:greeter` (the
-sibling library) and `org.apache.commons:commons-lang3` (an external artifact).
-Jenesis builds `greeter` first, exposes its output through the sibling's `assign`
-step, and prepends that as a repository when resolving `app`, so the sibling
-coordinate resolves from within the build while `commons-lang3` is fetched from
-Maven Central.
+The `app` module declares one dependency, `build.jenesis.demo:starter`, a module
+of this build that brings the sibling library `build.jenesis.demo:greeter`, which
+in turn brings `org.apache.commons:commons-lang3`, an external artifact. Jenesis
+builds `greeter` first, exposes its output through the sibling's `assign` step,
+and prepends that as a repository when resolving the modules after it, so a
+sibling coordinate resolves from within the build while `commons-lang3` is
+fetched from Maven Central.
+
+A module without sources
+------------------------
+
+`starter/pom.xml` declares `<packaging>jar</packaging>` and its dependency on
+`greeter`, and the folder holds nothing else. Such a module is a module of the
+build like any other: its jar holds its POM and no class, and a module that
+depends on it, as `app` does, resolves it inside the build and receives the
+dependencies its `pom.xml` declares. The build says so in a line of its own:
+
+```text
+[EMPTY]     build.jenesis.demo:starter builds a jar without classes, as starter/pom.xml has neither sources nor resources: ...
+```
+
+    java build/jenesis/Make.java +app
+
+builds `greeter`, `starter` and `app`, and `stage` publishes `starter` with its
+jar and its POM. Where a Maven build fills such a jar with a plugin, as
+`dependency:unpack-dependencies` does, the jar stays empty here and a module
+compiling against that content fails: a `plugin-<name>.properties` in the
+module's `src/main/build.jenesis` configures a plugin that generates it, and an
+empty `.jenesis.skip` in a module's folder leaves that module out of the build.
 
 Publishing a bill of materials
 ------------------------------
@@ -51,7 +75,7 @@ Publishing a bill of materials
 `bom/pom.xml` is a module of `<packaging>pom</packaging>` that lists no modules
 but declares a `<dependencyManagement>` naming `greeter` and `app` at
 `${project.version}`. Such a POM is a BOM: nothing is compiled for it, and a
-`stage` publishes it beside the two jars, as its POM alone:
+`stage` publishes it beside the jars, as its POM alone:
 
     java -Djenesis.test.skip=true build/jenesis/Make.java stage
 

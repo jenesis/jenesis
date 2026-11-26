@@ -441,18 +441,23 @@ public class MavenProject implements BuildExecutorModule {
                                 || configuresPlugin(base.resolve("src/test/build.jenesis"));
                     }
                     if (!active && !testModule) {
-                        active = configuresPlugin(base.resolve("src/main/build.jenesis"))
-                                || configuresPlugin(base.resolve("build.jenesis"));
-                        if (!active && printing != null) {
-                            printing.accept(("%s%-11s%s %s builds no jar, as %s has neither sources nor resources:"
-                                    + " a plugin that generates them is configured by a plugin-<name>.properties in"
-                                    + " %s, which builds the module")
+                        active = true;
+                        if (printing != null
+                                && !configuresPlugin(base.resolve("src/main/build.jenesis"))
+                                && !configuresPlugin(base.resolve("build.jenesis"))) {
+                            printing.accept(("%s%-11s%s %s builds a jar without classes, as %s has neither sources nor"
+                                    + " resources: the jar and the dependencies of the pom.xml stand for the module"
+                                    + " wherever another one depends on it. Where a Maven plugin fills the jar, as"
+                                    + " dependency:unpack-dependencies does, a module compiling against that content"
+                                    + " fails here - a plugin-<name>.properties in %s configures a plugin that"
+                                    + " generates it, and an empty %s in the folder of a module leaves that module out")
                                     .formatted(palette.warning(),
-                                            "[SKIPPED]",
+                                            "[EMPTY]",
                                             palette.reset(),
                                             properties.getProperty("groupId") + ":" + properties.getProperty("artifactId"),
                                             Path.of(properties.getProperty("path")).resolve("pom.xml"),
-                                            Path.of(properties.getProperty("path")).resolve("src/main/build.jenesis")));
+                                            Path.of(properties.getProperty("path")).resolve("src/main/build.jenesis"),
+                                            BuildExecutor.SKIP_MARKER));
                         }
                     }
                     if (active && printing != null && !testModule && properties.getProperty("release") == null) {

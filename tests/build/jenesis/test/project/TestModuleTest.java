@@ -317,6 +317,10 @@ public class TestModuleTest {
             while (cause.getCause() != null) {
                 cause = cause.getCause();
             }
+            assertThat(cause)
+                    .as("the failure names the settings that run one failed class alone")
+                    .hasMessageContaining("To run one failed test class alone, add -Djenesis.test.filter='.*<its name>'"
+                            + " -Djenesis.print.tests=true ahead of the entry point of the build's command");
             if (reporting) {
                 String named = cause.getMessage().lines()
                         .filter(line -> line.startsWith("The reports of the test run are in "))
