@@ -30,6 +30,7 @@ import build.jenesis.step.Group;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Javac;
 import build.jenesis.step.Versions;
+import build.jenesis.step.Warnings;
 import java.util.jar.Attributes;
 
 import static build.jenesis.BuildStep.IDENTITY;
@@ -48,7 +49,7 @@ public class MavenProject implements BuildExecutorModule {
 
     public static final String POM = "pom/", MAVEN = "maven/", BOM = "bom/";
     private static final String SCAN = "scan", POM_METADATA = "metadata.", RELOCATION = "relocation.", BOMS = "boms",
-            POMS = "poms", SKIPPED = "skipped.properties", INDEX = "index.properties";
+            POMS = "poms", SKIPPED = "skipped.properties", INDEX = "index.properties", WARNINGS = "warnings";
     private static final Set<String> JARS = Set.of("jar", "bundle"), AGGREGATES = Set.of("pom", "bom");
     private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-";
     private static final Set<String> COMMANDED = Set.of("version", "scm.tag", "scm.revision", "scm.tree");
@@ -299,7 +300,7 @@ public class MavenProject implements BuildExecutorModule {
     public Optional<String> resolve(String path) {
         String wrapped = MultiProjectModule.MODULE + "/";
         if (path.startsWith(wrapped)) {
-            return Optional.of(path.substring(wrapped.length()));
+            return path.endsWith("/" + WARNINGS) ? Optional.empty() : Optional.of(path.substring(wrapped.length()));
         }
         return path.equals(BOMS + "/" + POMS) ? Optional.of(BOMS) : Optional.empty();
     }
@@ -351,16 +352,15 @@ public class MavenProject implements BuildExecutorModule {
         }, Stream.concat(Stream.of(PREPARE), inherited.sequencedKeySet().stream()));
         buildExecutor.addModule(MODULE, (modules, paths) -> {
             Path skipped = paths.get(PREVIOUS + PREPARE).resolve(SKIPPED);
-            if (printing != null && Files.exists(skipped)) {
-                SequencedProperties.ofFiles(skipped).forEachProperty((pom, packaging) -> printing.accept(
-                        ("%s%-11s%s %s builds nothing, as its packaging %s is none of jar and bundle, the packagings"
+            if (Files.exists(skipped)) {
+                SequencedMap<String, String> unbuilt = new LinkedHashMap<>();
+                SequencedProperties.ofFiles(skipped).forEachProperty((pom, packaging) -> unbuilt.put(
+                        ("%s builds nothing, as its packaging %s is none of jar and bundle, the packagings"
                                 + " this build builds: where it is a jar with more in it, declare <packaging>jar</packaging>"
                                 + " and let a plugin add the rest")
-                                .formatted(palette.warning(),
-                                        "[SKIPPED]",
-                                        palette.reset(),
-                                        Path.of(pom),
-                                        packaging)));
+                                .formatted(Path.of(pom), packaging),
+                        "[SKIPPED]"));
+                modules.addStep(WARNINGS, new Warnings(_ -> unbuilt).printing(printing, palette));
             }
             Path described = paths.get(PREVIOUS + PREPARE).resolve(MAVEN);
             SequencedProperties descriptors = SequencedProperties.ofFiles(described.resolve(INDEX));
@@ -390,6 +390,7 @@ public class MavenProject implements BuildExecutorModule {
                     }
                     int index = 0;
                     Set<Path> directories = new HashSet<>();
+                    SequencedMap<String, String> warnings = new LinkedHashMap<>();
                     for (int resourceIndex = 0; ; resourceIndex++) {
                         String resource = properties.getProperty("resources." + resourceIndex);
                         if (resource == null) {
@@ -414,15 +415,11 @@ public class MavenProject implements BuildExecutorModule {
                             module.addSource("resources-" + ++index, Bind.asResources(), resources);
                             active = true;
                         } else if (!Files.exists(resources)
-                                && !Path.of(resource).normalize().equals(Path.of("src", testModule ? "test" : "main", "resources"))
-                                && printing != null) {
-                            printing.accept(("%s%-11s%s %s names the resource directory %s, which does not exist"
-                                    + " beside it, so it adds no resources")
-                                    .formatted(palette.warning(),
-                                            "[RESOURCES]",
-                                            palette.reset(),
-                                            Path.of(properties.getProperty("path")).resolve("pom.xml"),
-                                            resource));
+                                && !Path.of(resource).normalize().equals(Path.of("src", testModule ? "test" : "main", "resources"))) {
+                            warnings.put(("%s names the resource directory %s, which does not exist beside it, so it adds"
+                                    + " no resources")
+                                    .formatted(Path.of(properties.getProperty("path")).resolve("pom.xml"), resource),
+                                    "[RESOURCES]");
                         }
                     }
                     String tests = properties.value("tests");
@@ -442,33 +439,31 @@ public class MavenProject implements BuildExecutorModule {
                     }
                     if (!active && !testModule) {
                         active = true;
-                        if (printing != null
-                                && !configuresPlugin(base.resolve("src/main/build.jenesis"))
+                        if (!configuresPlugin(base.resolve("src/main/build.jenesis"))
                                 && !configuresPlugin(base.resolve("build.jenesis"))) {
-                            printing.accept(("%s%-11s%s %s builds a jar without classes, as %s has neither sources nor"
+                            warnings.put(("%s builds a jar without classes, as %s has neither sources nor"
                                     + " resources: the jar and the dependencies of the pom.xml stand for the module"
                                     + " wherever another one depends on it. Where a Maven plugin fills the jar, as"
                                     + " dependency:unpack-dependencies does, a module compiling against that content"
                                     + " fails here - a plugin-<name>.properties in %s configures a plugin that"
                                     + " generates it, and an empty %s in the folder of a module leaves that module out")
-                                    .formatted(palette.warning(),
-                                            "[EMPTY]",
-                                            palette.reset(),
-                                            properties.getProperty("groupId") + ":" + properties.getProperty("artifactId"),
+                                    .formatted(properties.getProperty("groupId") + ":" + properties.getProperty("artifactId"),
                                             Path.of(properties.getProperty("path")).resolve("pom.xml"),
                                             Path.of(properties.getProperty("path")).resolve("src/main/build.jenesis"),
-                                            BuildExecutor.SKIP_MARKER));
+                                            BuildExecutor.SKIP_MARKER),
+                                    "[EMPTY]");
                         }
                     }
-                    if (active && printing != null && !testModule && properties.getProperty("release") == null) {
-                        printing.accept(("%s%-11s%s %s compiles for release %d, the JDK the build runs on, as %s sets"
+                    if (active && !testModule && properties.getProperty("release") == null) {
+                        warnings.put(("%s compiles for release %d, the JDK the build runs on, as %s sets"
                                 + " neither maven.compiler.release nor its target or source - maven.compiler.release sets it")
-                                .formatted(palette.warning(),
-                                        "[RELEASE]",
-                                        palette.reset(),
-                                        properties.getProperty("groupId") + ":" + properties.getProperty("artifactId"),
+                                .formatted(properties.getProperty("groupId") + ":" + properties.getProperty("artifactId"),
                                         Runtime.version().feature(),
-                                        Path.of(properties.getProperty("path")).resolve("pom.xml")));
+                                        Path.of(properties.getProperty("path")).resolve("pom.xml")),
+                                "[RELEASE]");
+                    }
+                    if (!warnings.isEmpty()) {
+                        module.addStep(WARNINGS, new Warnings(_ -> warnings).printing(printing, palette));
                     }
                     if (active) {
                         SequencedSet<Path> folders = new LinkedHashSet<>();

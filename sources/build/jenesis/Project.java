@@ -643,7 +643,10 @@ public record Project(
                       %{name}-Djenesis.print.checksum%{reset}  Print each step's input and output checksums, to
                                                 see what made a step re-run
                       %{name}-Djenesis.print.progress=false%{reset}
-                                                Drop the progress lines themselves
+                                                Drop the progress lines themselves: a build that passes
+                                                prints nothing and one that fails its error. Add
+                                                %{name}-Djenesis.test.summary%{reset} for one line counting the
+                                                tests of each test run
 
                       To always build this way, keep the setting in your own
                       %{name}~/.jenesis/jenesis.properties%{reset} rather than typing it (see below).
@@ -740,62 +743,43 @@ public record Project(
                 case "start" -> """
                     # Jenesis build tool - operating instructions
 
-                    You are in a Jenesis-built Java project. This overview is what every task needs;
-                    each page below goes deeper and is printed by naming it as a selector, as
-                    `java build/jenesis/Make.java skill/tags`, and `skill` alone prints them all.
-                    Full documentation: https://jenesis.build/tool. `help` prints a short human
-                    orientation.
+                    You are in a Jenesis-built Java project. `java build/jenesis/Make.java skill/<page>`
+                    prints a page listed below, `skill` all of them and `help` the selectors;
+                    https://jenesis.build/tool is the documentation.
 
                     ## Essentials
 
-                      java build/jenesis/Make.java [selectors...]  build; no selector runs `build`
-                      java build/jenesis/Make.java +<module>        build and test one module
-                      java -Djenesis.test.filter='.*GreeterTest' -Djenesis.print.tests=true \\
-                          build/jenesis/Make.java +<module>         run one test class of it
-                      java build/jenesis/Make.java configuration    every setting and the value in force
-                      java build/jenesis/Execute.java [args...]     build and run the main class
+                      java -Djenesis.print.progress=false -Djenesis.test.summary \\
+                          build/jenesis/Make.java +<module>      build and test one module, quietly
+                      java -Djenesis.print.progress=false -Djenesis.test.summary \\
+                          -Djenesis.test.filter='.*GreeterTest' \\
+                          build/jenesis/Make.java +<module>      run one test class of it
 
-                    - Work on one module with +<module> rather than the whole build: it builds and
-                      tests that module, and builds the modules it needs without running their tests.
-                      <module> is the folder holding the pom.xml or module-info.java, a/b written
-                      +a+b; where tests are a module-info.java module of their own, name that folder,
-                      as +greeter-test.
+                    - Run quietly, as above, and read the exit code. A build that passes exits 0 and
+                      prints one line for each test run, and nothing else:
+                        [TESTS]     greeter: 12 tests found, 12 successful, 0 failed, 0 skipped, 0 aborted in 1.48 seconds
+                      No line means that no test ran, as nothing the tests read changed since they
+                      passed. A build that fails exits 1 and prints the error: what the compiler
+                      reported, or each failed test with its assertion, and the file holding all that
+                      the run printed. Filter nothing and cut nothing: the output is the result.
+                    - Without the two settings every step prints a line as well - [EXECUTED],
+                      [SKIPPED] when its inputs had not changed, [FAILED] with the error - and the
+                      build ends with [COMPLETED] or [FAILED]: hundreds of lines for a result of one.
+                    - Repeating a build is cheap, as every step is keyed by its inputs and only what
+                      changed runs again. Iterate on +<module> with a test filter, and end with one
+                      build without a selector, which runs the tests of every module the change
+                      reaches and of no other that passed before. Never delete target/ and never
+                      pass -Djenesis.executor.rebuild=true.
+                    - +<module> builds and tests one module and builds the modules it needs without
+                      running their tests. <module> is the folder holding the pom.xml or
+                      module-info.java, a/b written +a+b; where tests are a module-info.java module
+                      of their own, name that folder, as +greeter-test.
                     - A -Djenesis.<key> setting stands before Make.java, a selector after it.
                       jenesis.test.filter is a regex over the class name: '.*(FooTest|BarTest)' runs
-                      two classes and '.*FooTest#method' one method. A selection that ran is not run
-                      again while nothing it reads changed; -Djenesis.test.force=true runs it anyway.
-                    - A failed test run prints the end of its output with each failed test, and names
-                      the file holding all of it, <step folder>~/supplement/output; that of a run that
-                      passed is <step folder>/supplement/output, and -Djenesis.print.tests=true
-                      streams either while it runs.
-                    - Never delete target/ and never pass -Djenesis.executor.rebuild=true: every step
-                      is keyed by its inputs, so a build re-runs exactly what changed.
-                    - What a step produced is in %{target}/<step path>/output/ - a build step's
-                      below %{target}/build/, a staged tree's in %{target}/stage/<tree>/ - and
-                      that path without the target/ prefix and /output is a selector of its own.
-                    - A step prints [EXECUTED] when it ran, [SKIPPED] when its inputs had not changed
-                      and its last output was reused, and [FAILED] with the error.
-                    - After editing a build step's code, bump its serialVersionUID, or its cached
-                      output is reused.
-                    - Whenever you add or change a dependency, offer to run `pin`.
-                    - Find the demo that matches the task and copy its shape rather than inventing
-                      configuration. A number a page cites, as (63), is the demo-63-* folder of
-                      https://github.com/jenesis/jenesis/tree/main/demo; skill/demos lists them.
-                    - Moving a Maven or Gradle build here? Follow skill/migrate step by step, and end
-                      with the summary of the migration it asks for. A user hands an agent that task by
-                      entering `! java build/jenesis/Make.java prompt/migrate` in its prompt, or by
-                      pasting what the command prints.
-
-                    ## First moves in a project you do not know
-
-                      java build/jenesis/Make.java                                 build, then read
-                                                                                   target/.jenesis.events.jsonl
-                      java build/jenesis/Make.java +<module>                       from then on, the module
-                                                                                   you work on and its tests
-                      java -Djenesis.test.filter='.*<Class>' -Djenesis.print.tests=true \\
-                          build/jenesis/Make.java +<module>                        one test class, streamed
-                      java build/jenesis/Make.java configuration | grep -F "[set]" what this project changed
-                      java build/jenesis/Make.java dependencies                    what each module resolves
+                      two classes and '.*FooTest#method' one method. -Djenesis.test.force=true runs a
+                      selection again although nothing changed, and -Djenesis.print.tests=true
+                      streams what the tests print.
+                    - After adding or changing a dependency, offer to run `pin` (skill/pinning).
 
                     ## Pages
 
@@ -803,17 +787,20 @@ public record Project(
                       skill/layout     maven, modular or modular_to_maven, and how one is picked
                       skill/migrate    move a Maven or Gradle build here, one concern at a time
                       skill/registry   the built-in that replaces each Maven or Gradle plugin
-                      skill/target     what target/ holds, folders as selectors, per-module properties
+                      skill/target     what target/ holds, each step's outcome, folders as selectors
                       skill/selectors  the entry points, +<module>, : and ::
                       skill/tags       pins, BOMs, aliases, layers, agents, native access, signatures
                       skill/tools      a file in a module switches a tool on: tests, quality, generators
                       skill/settings   the configuration selector, where settings live, the useful ones
-                      skill/execute    Execute, the ToolProvider services, @<file> arguments
+                      skill/execute    Execute runs the main class; ToolProvider services, @<file>
                       skill/pinning    versions, checksums, signatures, and when to offer them
                       skill/plugins    jenesis.plugins.properties, its hook points, inputs and arguments
                       skill/extend     write a plugin for what nothing built in does
-                      skill/demos      the demos as a recipe book, by topic
+                      skill/demos      the demos as a recipe book, by topic: copy the one that matches
                       skill/engine     editing a build step, and reading the source when stuck
+
+                    A number a page cites, as (63), is the demo-63-* folder of
+                    https://github.com/jenesis/jenesis/tree/main/demo.
                     """;
                 case "invoke" -> """
                     # Jenesis - Invoke the build
@@ -1421,13 +1408,14 @@ public record Project(
                     The tests run against the module's jar, so a test that turns
                     getResource into a java.io.File fails with "URI is not hierarchical";
                     -Djenesis.test.jars=false runs them against its classes and resources folders
-                    instead, as Maven does, while the modules it depends on stay jars. A build prints
-                    no test totals: -Djenesis.print.tests streams the runner's summary, and the test
-                    step's supplement/output keeps it. A test run writes no report unless
+                    instead, as Maven does, while the modules it depends on stay jars. A test run
+                    ends with a [TESTS] line counting the tests it found and how they ended, and the
+                    test step's supplement/output keeps all that the runner printed, which
+                    -Djenesis.print.tests streams. A test run writes no report unless
                     -Djenesis.test.reporting=true asks for the legacy JUnit XML and the
                     open-test-reporting XML in the module's reports/tests, whose folder a failed run
-                    then names above the runner's output: pass it when a failure needs the record of
-                    every test, as when more tests failed than the printed tail of the output holds,
+                    then names above the failed tests: pass it when a failure needs the record of
+                    every test, as when more tests failed than the failure prints,
                     or when CI reads the reports, and leave it off otherwise, as writing them slows a
                     test run.
 
@@ -2022,8 +2010,8 @@ public record Project(
                     what the step wrote and a .jenesis.failed marker beside its output/ and
                     supplement/, until the step runs again. A tool that fails prints the last 200
                     lines of its output and of its error (jenesis.process.tail), out of how many,
-                    naming the file under supplement/ that holds all of them, which for a failed
-                    test run names each failed test as the runner printed it. One build at a time
+                    naming the file under supplement/ that holds all of them; a failed test run
+                    prints each failed test as the runner reported it in their place. One build at a time
                     per target: the root holds an exclusive .jenesis.lock and a second process fails
                     fast.
 
@@ -2607,6 +2595,10 @@ public record Project(
                                                        runs - the first move when a step fails or
                                                        will not finish; narrow it with
                                                        print.<command>, as print.javac
+                      -Djenesis.print.progress=false   drop the line of every step and the warnings:
+                                                       a build that passes prints nothing and one
+                                                       that fails its error; -Djenesis.test.summary
+                                                       adds a [TESTS] line counting each test run
                       -Djenesis.dependency.pin=strict  fail the build on any unpinned artifact
                       -Djenesis.test.filter=<regex>    run one test class or method; <module>/<regex>
                                                        runs it in that module alone
@@ -4879,7 +4871,7 @@ public record Project(
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
                 archive.timestamp|1980-02-01T00:00:00Z|ISO-8601 date-time with an offset recorded on every entry of the jars, jmods and zips the build writes; empty keeps the times the tools record and makes the archives unreproducible; set explicitly, it is also the creation time a generated Docker image is labelled with
                 palette.colors|ansi|ansi colours what the build prints with ANSI escape sequences; none prints plain text
-                print.progress|true|The build progress lines
+                print.progress|true|A line for each step and module of the build, its start and its end, and the warnings about what a pom.xml or module-info.java declares; false leaves a build that passes with the output of its selector alone, while a failure still prints its error
                 print.process|false|Stream each external tool's command line and output as it runs
                 print.<command>||The same for one tool only, as print.javac or print.tests
                 print.command|false|Each external tool command line, without its output
@@ -4969,6 +4961,7 @@ public record Project(
                 test.mode|alphabetic|Which tests run and in which order: alphabetic runs every test by class name, incremental only those a change reaches since the last successful run, none where it reaches none, prioritized those first and every other test after them, failed only the classes that failed in the run before, and failedfirst those first and every other test after them; failed and failedfirst record failures from the reports they turn on, where the framework writes them - the JUnit Platform and TestNG, not JUnit 4; incremental runs every test a filter, an exclude or a tag selects, and every mode runs every test by class name where no earlier run is recorded, nothing changed or nothing failed
                 test.parallel|false|Let the engine execute the matched tests concurrently
                 test.concurrency|0|Run at most this many test runs at once across the build, each a forked JVM, while every other step keeps running; 1 runs one module's tests at a time, as Maven does, and 0 leaves them bounded by process.concurrency alone
+                test.summary||A line for each test run that ends, naming the module and counting the tests found, successful, failed, skipped and aborted beside the time the run took, as far as the test framework counts them; unset, it is printed where jenesis.print.progress is
                 test.reporting|false|Write a test run's reports into the module's reports/tests folder - the legacy JUnit XML and the open-test-reporting XML - and name that folder when the run fails; without it the JUnit Platform writes none
                 stage.tests|false|Stage test modules alongside the main ones; a test module is otherwise unstaged, as stage=false leaves a module
                 tree.format|full|full|compact|java: what the dependencies selector prints; java prints, for every module but the test modules, the options, module path, class path and main class java runs it with, as the lines of an argument file

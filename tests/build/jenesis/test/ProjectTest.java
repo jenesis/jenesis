@@ -715,21 +715,26 @@ public class ProjectTest {
     }
 
     @Test
-    public void skill_start_shows_how_to_build_one_module_and_run_one_test_class() throws IOException {
+    public void skill_start_leads_to_the_quiet_loop_on_one_module_and_one_test_class() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
         List<String> printed = new ArrayList<>();
-        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).out(printed::add), root, new LinkedHashSet<>(), Project.SKILL + "/start")).isEmpty();
+        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString(),
+                "print.progress", "false")).out(printed::add), root, new LinkedHashSet<>(), Project.SKILL + "/start")).isEmpty();
         String briefing = String.join("\n", printed);
-        assertThat(briefing.substring(briefing.indexOf("## Essentials"), briefing.indexOf("## First moves")))
-                .as("an agent acts on the one-module loop without opening another page")
-                .contains("java build/jenesis/Make.java +<module>",
-                        "java -Djenesis.test.filter='.*GreeterTest' -Djenesis.print.tests=true \\",
-                        "builds the modules it needs without running their tests",
-                        "-Djenesis.test.force=true runs it anyway",
-                        "<step folder>~/supplement/output");
-        assertThat(briefing.substring(briefing.indexOf("## First moves"), briefing.indexOf("## Pages")))
-                .as("the first moves end in the loop an agent stays in")
-                .contains("java build/jenesis/Make.java +<module>", "-Djenesis.test.filter='.*<Class>'");
+        assertThat(briefing.substring(briefing.indexOf("## Essentials"), briefing.indexOf("## Pages")))
+                .as("an agent acts on the quiet one-module loop without opening another page")
+                .contains("java -Djenesis.print.progress=false -Djenesis.test.summary \\",
+                        "build/jenesis/Make.java +<module>",
+                        "-Djenesis.test.filter='.*GreeterTest' \\",
+                        "[TESTS]     greeter: 12 tests found, 12 successful, 0 failed, 0 skipped, 0 aborted in 1.48 seconds",
+                        "exits 0",
+                        "exits 1",
+                        "builds the modules it needs without",
+                        "-Djenesis.test.force=true runs a",
+                        "end with one");
+        assertThat(briefing.getBytes(StandardCharsets.UTF_8).length)
+                .as("the page is handed to an agent in full before it starts, so every line of it costs")
+                .isLessThan(4096);
     }
 
     @Test

@@ -8,6 +8,9 @@ import java.lang.classfile.Attributes;
 public record JUnit4() implements TestFramework {
 
     private static final Set<String> MARKERS = Set.of("Lorg/junit/Test;", "Lorg/junit/runner/RunWith;");
+    private static final Pattern PASSED = Pattern.compile("OK \\((\\d+) tests?\\)");
+    private static final Pattern FAILED = Pattern.compile("Tests run: (\\d+), +Failures: (\\d+)");
+    private static final Pattern FAILURES = Pattern.compile("There (was 1 failure|were \\d+ failures):");
 
     @Override
     public String runnerModule() {
@@ -52,6 +55,40 @@ public record JUnit4() implements TestFramework {
             throw new IllegalArgumentException("JUnit4 does not support running individual methods");
         }
         return List.copyOf(classes);
+    }
+
+    @Override
+    public Optional<Summary> summary(Path supplement, Path output) throws IOException {
+        Path printed = supplement.resolve("output");
+        if (!Files.isRegularFile(printed)) {
+            return Optional.empty();
+        }
+        long run = -1, failed = 0;
+        List<String> failures = new ArrayList<>();
+        boolean failing = false;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(Files.newInputStream(printed),
+                StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                Matcher passed = PASSED.matcher(line), counted = FAILED.matcher(line);
+                if (passed.matches()) {
+                    run = Long.parseLong(passed.group(1));
+                    failed = 0;
+                } else if (counted.matches()) {
+                    run = Long.parseLong(counted.group(1));
+                    failed = Long.parseLong(counted.group(2));
+                } else if (FAILURES.matcher(line).matches()) {
+                    failures.clear();
+                    failing = true;
+                } else if (line.equals("FAILURES!!!")) {
+                    failing = false;
+                }
+                if (failing && !line.isBlank()) {
+                    failures.add(line);
+                }
+            }
+        }
+        return run < 0 ? Optional.empty() : Optional.of(new Summary(run, run - failed, failed, -1, -1, failures));
     }
 
     @Override

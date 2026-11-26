@@ -48,6 +48,7 @@ public class TestModuleTest {
 
     @BeforeEach
     public void setUp() throws Exception {
+        settings.put("palette.colors", "none");
         Path artifacts = Files.createDirectory(dependencies.resolve(BuildStep.ARTIFACTS));
         Files.createDirectory(emptyDependencies.resolve(BuildStep.ARTIFACTS));
         List<String> appended = new ArrayList<>();
@@ -89,12 +90,13 @@ public class TestModuleTest {
 
     @Test
     public void can_execute_junit() throws IOException {
+        List<String> printed = new ArrayList<>();
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", dependencies);
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings),
+                TestModule.ofEnvironment(new Environment(settings).out(printed::add),
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
@@ -104,6 +106,38 @@ public class TestModuleTest {
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
         assertThat(reportedErrors(supplement)).isEmpty();
+        assertThat(printed)
+                .as("a test run ends with one line counting what it ran")
+                .singleElement()
+                .asString()
+                .matches("\\[TESTS]     \\.: 1 tests found, 1 successful, 0 failed, 0 skipped, 0 aborted in \\d+\\.\\d\\d seconds");
+    }
+
+    @Test
+    public void prints_no_summary_without_progress_unless_the_summary_is_asked_for() throws IOException {
+        for (boolean summary : List.of(false, true)) {
+            List<String> printed = new ArrayList<>();
+            Map<String, String> quiet = new HashMap<>(settings);
+            quiet.put("print.progress", "false");
+            quiet.put("test.force", "true");
+            if (summary) {
+                quiet.put("test.summary", "true");
+            }
+            BuildExecutor executor = newExecutor();
+            executor.addSource("dependencies", dependencies);
+            executor.addSource("classes", classes);
+            executor.addModule(
+                    "test",
+                    TestModule.ofEnvironment(new Environment(quiet).out(printed::add),
+                            Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                            Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                            .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
+                    "dependencies", "classes");
+            executor.execute();
+            assertThat(printed)
+                    .as("a build that prints no progress leaves its output to what a selector prints")
+                    .hasSize(summary ? 1 : 0);
+        }
     }
 
     @Test
@@ -297,12 +331,13 @@ public class TestModuleTest {
                 """,
                 bootModuleJars());
         for (boolean reporting : List.of(false, true)) {
+            List<String> printed = new ArrayList<>();
             BuildExecutor executor = newExecutor();
             executor.addSource("dependencies", dependencies);
             executor.addSource("classes", classes);
             executor.addModule(
                     "test",
-                    TestModule.ofEnvironment(new Environment(settings),
+                    TestModule.ofEnvironment(new Environment(settings).out(printed::add),
                             Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                             Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                             .isTest(candidate -> candidate.endsWith("BrokenTest")).jarsOnly(false).reporting(reporting),
@@ -313,10 +348,21 @@ public class TestModuleTest {
                     .as("the runner names the failed test in the output the failure prints, reports or not")
                     .hasStackTraceContaining("fails()")
                     .hasStackTraceContaining("broken");
+            assertThat(printed)
+                    .as("a failed run counts what it ran as a run that passed does")
+                    .singleElement()
+                    .asString()
+                    .startsWith("[TESTS]     .: 1 tests found, 0 successful, 1 failed, 0 skipped, 0 aborted in ");
             Throwable cause = failure;
             while (cause.getCause() != null) {
                 cause = cause.getCause();
             }
+            assertThat(cause)
+                    .as("the failure prints the failed tests, not the tests that passed beside them, and names the file with all of it")
+                    .hasMessageContaining("Failed tests - ")
+                    .hasMessageContaining("supplement" + File.separator + "output holds all that the run printed")
+                    .hasMessageContaining("Failures (1):")
+                    .hasMessageNotContaining("JUnit Jupiter ✘");
             assertThat(cause)
                     .as("the failure names the settings that run one failed class alone")
                     .hasMessageContaining("To run one failed test class alone, add -Djenesis.test.filter='.*<its name>'"
@@ -875,12 +921,13 @@ public class TestModuleTest {
         requires.setProperty("main/runtime/maven/junit/junit", "");
         requires.store(junit4Dependencies.resolve(BuildStep.REQUIRES));
 
+        List<String> printed = new ArrayList<>();
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", junit4Dependencies);
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings),
+                TestModule.ofEnvironment(new Environment(settings).out(printed::add),
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .framework(new JUnit4())
@@ -891,6 +938,11 @@ public class TestModuleTest {
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
         assertThat(supplement.resolve("output")).content().contains("OK (1 test)");
+        assertThat(printed)
+                .as("JUnit 4 counts the tests it ran and those that failed, and no others")
+                .singleElement()
+                .asString()
+                .startsWith("[TESTS]     .: 1 tests found, 1 successful, 0 failed in ");
     }
 
     @Test
@@ -989,12 +1041,13 @@ public class TestModuleTest {
                     public void test() { System.out.println("Hello world!"); }
                 }
                 """, List.of(testngJar));
+        List<String> printed = new ArrayList<>();
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", testngDependencies);
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings),
+                TestModule.ofEnvironment(new Environment(settings).out(printed::add),
                         Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
                         Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .framework(new TestNG())
@@ -1003,7 +1056,11 @@ public class TestModuleTest {
         executor.execute();
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
-        assertThat(supplement.resolve("output")).content().contains("Hello world!");
+        assertThat(supplement.resolve("output")).content().contains("Hello world!");        assertThat(printed)
+                .as("TestNG counts the tests it ran, failed and skipped")
+                .singleElement()
+                .asString()
+                .startsWith("[TESTS]     .: 1 tests found, 1 successful, 0 failed, 0 skipped in ");
     }
 
     @Test

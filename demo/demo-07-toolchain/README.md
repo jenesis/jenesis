@@ -13,7 +13,7 @@ properties. Jenesis never downloads or installs a JDK by itself: a build that fi
 no match fails, listing what it found, unless you named an installer as shown below.
 
 The module declares no release, so it compiles for the JDK that runs the build, as a
-`[RELEASE]` line says on every build, and its main class prints that JDK's feature
+`[RELEASE]` line says in the first build, and its main class prints that JDK's feature
 version. A module that should not follow the JDK names its release with
 `@jenesis.release`, which silences the line.
 

@@ -73,6 +73,93 @@ public class TestFrameworkTest {
     }
 
     @Test
+    public void reads_the_summary_of_the_junit_platform_from_what_its_console_printed() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("supplement")).resolve("output"), """
+                [         9 tests found           ]
+                ╷
+                └─ JUnit Jupiter ✔
+                   └─ FirstTest ✔
+                      └─ fails() ✘ expected
+
+                Failures (1):
+                  JUnit Jupiter:FirstTest:fails()
+                    => java.lang.AssertionError: expected
+
+                Test run finished after 64 ms
+                [         3 containers found      ]
+                [         1 containers failed     ]
+                [         4 tests found           ]
+                [         1 tests skipped         ]
+                [         3 tests started         ]
+                [         0 tests aborted         ]
+                [         2 tests successful      ]
+                [         1 tests failed          ]
+                """);
+        assertThat(new JUnitPlatform().summary(root.resolve("supplement"), root.resolve("output")))
+                .as("the counts are the last the console printed, and the failures what it lists before them")
+                .contains(new TestFramework.Summary(4, 2, 1, 1, 0, List.of("Failures (1):",
+                        "  JUnit Jupiter:FirstTest:fails()",
+                        "    => java.lang.AssertionError: expected")));
+        assertThat(new TestFramework.Summary(4, 2, 1, 1, 0, List.of()).counts())
+                .isEqualTo("4 tests found, 2 successful, 1 failed, 1 skipped, 0 aborted");
+    }
+
+    @Test
+    public void reads_the_summary_of_junit_4_from_what_its_runner_printed() throws IOException {
+        Path output = Files.createDirectories(root.resolve("supplement")).resolve("output");
+        Files.writeString(output, """
+                JUnit version 4.13.2
+                ..
+                Time: 0.004
+
+                OK (2 tests)
+
+                """);
+        assertThat(new JUnit4().summary(root.resolve("supplement"), root.resolve("output")))
+                .contains(new TestFramework.Summary(2, 2, 0, -1, -1, List.of()));
+        Files.writeString(output, """
+                JUnit version 4.13.2
+                ..E
+                Time: 0.006
+                There was 1 failure:
+                1) fails(sample.FirstTest)
+                java.lang.AssertionError: expected
+
+                FAILURES!!!
+                Tests run: 2,  Failures: 1
+
+                """);
+        assertThat(new JUnit4().summary(root.resolve("supplement"), root.resolve("output")))
+                .contains(new TestFramework.Summary(2, 1, 1, -1, -1, List.of("There was 1 failure:",
+                        "1) fails(sample.FirstTest)",
+                        "java.lang.AssertionError: expected")));
+        assertThat(new TestFramework.Summary(2, 1, 1, -1, -1, List.of()).counts())
+                .as("the runner of JUnit 4 counts neither the tests it skipped nor those it aborted")
+                .isEqualTo("2 tests found, 1 successful, 1 failed");
+    }
+
+    @Test
+    public void reads_the_summary_of_testng_from_what_its_runner_printed() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("supplement")).resolve("output"), """
+                ===============================================
+                Command line suite
+                Total tests run: 4, Passes: 2, Failures: 1, Skips: 1
+                ===============================================
+                """);
+        assertThat(new TestNG().summary(root.resolve("supplement"), root.resolve("output")))
+                .contains(new TestFramework.Summary(4, 2, 1, 1, -1, List.of()));
+    }
+
+    @Test
+    public void reads_no_summary_where_the_runner_printed_none() throws IOException {
+        assertThat(new JUnitPlatform().summary(root.resolve("supplement"), root.resolve("output"))).isEmpty();
+        Files.writeString(Files.createDirectories(root.resolve("supplement")).resolve("output"), "Hello world!");
+        assertThat(new JUnitPlatform().summary(root.resolve("supplement"), root.resolve("output"))).isEmpty();
+        assertThat(new JUnit4().summary(root.resolve("supplement"), root.resolve("output"))).isEmpty();
+        assertThat(new TestNG().summary(root.resolve("supplement"), root.resolve("output"))).isEmpty();
+    }
+
+    @Test
     public void reads_no_failed_tests_of_junit_4() throws IOException {
         assertThat(new JUnit4().failed(root.resolve("supplement"), root.resolve("output")))
                 .as("JUnit 4 writes no report to read, so failed and failedfirst run every test by class name")

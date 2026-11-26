@@ -10,6 +10,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.Environment.Setting;
 import build.jenesis.ObservabilityEngine;
+import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.Permits;
 import build.jenesis.Pinning;
@@ -53,6 +54,8 @@ public class TestModule implements BuildExecutorModule {
     private final List<ObservabilityEngine> observers;
     private final Mode mode;
     private final ProcessBuildStep.Terms terms;
+    private final Consumer<String> summarizing;
+    private final Palette palette;
     private final boolean skip;
 
     public TestModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
@@ -79,6 +82,8 @@ public class TestModule implements BuildExecutorModule {
                 List.of(),
                 Mode.ALPHABETIC,
                 new ProcessBuildStep.Terms(),
+                null,
+                Palette.NONE,
                 false);
     }
 
@@ -117,6 +122,10 @@ public class TestModule implements BuildExecutorModule {
                 List.of(),
                 Mode.of(environment.value("test.mode", "alphabetic", Setting.PROJECT)),
                 terms,
+                environment.flag("test.summary",
+                        environment.flag("print.progress", true, Setting.PROJECT),
+                        Setting.PROJECT) ? environment.out() : null,
+                Palette.ofEnvironment(environment),
                 environment.flag("test.skip", Setting.PROJECT));
     }
 
@@ -177,6 +186,8 @@ public class TestModule implements BuildExecutorModule {
                        List<ObservabilityEngine> observers,
                        Mode mode,
                        ProcessBuildStep.Terms terms,
+                       Consumer<String> summarizing,
+                       Palette palette,
                        boolean skip) {
         this.skip = skip;
         this.framework = framework;
@@ -202,6 +213,8 @@ public class TestModule implements BuildExecutorModule {
         this.observers = observers;
         this.mode = mode;
         this.terms = terms;
+        this.summarizing = summarizing;
+        this.palette = palette;
     }
 
     public TestModule framework(TestFramework framework) {
@@ -228,6 +241,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -255,6 +270,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -282,6 +299,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -309,6 +328,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -336,6 +357,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -363,6 +386,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -390,6 +415,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -417,6 +444,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -444,6 +473,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -471,6 +502,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -498,6 +531,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -525,6 +560,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -552,6 +589,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -589,6 +628,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -616,6 +657,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -643,6 +686,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -670,6 +715,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -697,6 +744,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms.permits(permits),
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -724,6 +773,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -751,6 +802,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -778,6 +831,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -805,6 +860,37 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
+                skip);
+    }
+
+    public TestModule summarizing(Consumer<String> summarizing, Palette palette) {
+        return new TestModule(framework,
+                frameworks,
+                isTest,
+                factory,
+                resolvers,
+                dependencies,
+                jarsOnly,
+                requireFramework,
+                pinning,
+                pathPlacement,
+                moduleName,
+                filter,
+                exclude,
+                tag,
+                engines,
+                scan,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                mode,
+                terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -832,6 +918,8 @@ public class TestModule implements BuildExecutorModule {
                 observers,
                 mode,
                 terms,
+                summarizing,
+                palette,
                 skip);
     }
 
@@ -885,7 +973,9 @@ public class TestModule implements BuildExecutorModule {
                         reporting,
                         group,
                         observers,
-                        mode),
+                        mode,
+                        summarizing,
+                        palette),
                 Stream.concat(upstream.stream(), Stream.of(DEPENDENCIES)));
     }
 
@@ -1081,6 +1171,8 @@ public class TestModule implements BuildExecutorModule {
         private final String group;
         private final List<ObservabilityEngine> observers;
         private final transient Mode mode;
+        private final transient Consumer<String> summarizing;
+        private final transient Palette palette;
 
         private Run(ProcessBuildStep.Terms terms,
                     Function<List<String>, ProcessHandler.OfProcess> factory,
@@ -1100,7 +1192,9 @@ public class TestModule implements BuildExecutorModule {
                     boolean reporting,
                     String group,
                     List<ObservabilityEngine> observers,
-                    Mode mode) {
+                    Mode mode,
+                    Consumer<String> summarizing,
+                    Palette palette) {
             super(factory == null ? ProcessHandler.OfProcess.ofJavaHome("bin/java") : factory,
                   pathPlacement,
                   jarsOnly,
@@ -1121,6 +1215,8 @@ public class TestModule implements BuildExecutorModule {
             this.group = group;
             this.observers = observers;
             this.mode = mode;
+            this.summarizing = summarizing;
+            this.palette = palette;
         }
 
         @Override
@@ -1136,6 +1232,21 @@ public class TestModule implements BuildExecutorModule {
                     : "")
                     + "To run one failed test class alone, add -Djenesis.test.filter='.*<its name>'"
                     + " -Djenesis.print.tests=true ahead of the entry point of the build's command");
+        }
+
+        @Override
+        protected String report(BuildStepContext context, Path output, Path error) throws IOException {
+            List<String> failures = framework.summary(context.supplement(), context.next())
+                    .map(TestFramework.Summary::failures)
+                    .orElse(List.of());
+            if (failures.isEmpty()) {
+                return super.report(context, output, error);
+            }
+            int shown = terms.tail() > 0 ? Math.min(terms.tail(), failures.size()) : failures.size();
+            return "\n\nFailed tests"
+                    + (shown < failures.size() ? ", the first " + shown + " out of " + failures.size() + " lines" : "")
+                    + " - " + output + " holds all that the run printed, " + error.getFileName() + " beside it its errors:\n"
+                    + String.join("\n", failures.subList(0, shown)) + "\n";
         }
 
         @Override
@@ -1157,7 +1268,38 @@ public class TestModule implements BuildExecutorModule {
             covered.add(requested);
             new Scope(filter, exclude, covered).store(context.next().resolve("testscope.properties"));
             SequencedMap<String, String> handed = BuildStep.listing(arguments);
-            return super.apply(executor, context, arguments).thenApply(completed -> {
+            long started = System.nanoTime();
+            return super.apply(executor, context, arguments).whenComplete((_, _) -> {
+                if (summarizing == null) {
+                    return;
+                }
+                try {
+                    Optional<TestFramework.Summary> summary = framework.summary(context.supplement(), context.next());
+                    if (summary.isEmpty()) {
+                        return;
+                    }
+                    String module = moduleName == null ? "." : moduleName;
+                    for (BuildStepArgument argument : arguments.values()) {
+                        Path described = argument.removed() ? null : argument.folder().resolve(BuildStep.MODULE);
+                        if (described != null && Files.isRegularFile(described)) {
+                            String path = SequencedProperties.ofFiles(described).value("path");
+                            module = path == null ? module : path;
+                            break;
+                        }
+                    }
+                    summarizing.accept("%s%-11s%s %s: %s %sin %.2f seconds%s".formatted(
+                            summary.get().failed() > 0 ? palette.failure() : palette.status(),
+                            "[TESTS]",
+                            palette.reset(),
+                            module,
+                            summary.get().counts(),
+                            palette.detail(),
+                            ((double) (System.nanoTime() - started) / 1_000_000) / 1_000,
+                            palette.reset()));
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }).thenApply(completed -> {
                 SequencedMap<String, String> left;
                 try {
                     left = BuildStep.listing(arguments);
