@@ -29,6 +29,7 @@ import build.jenesis.project.TestModule;
 import build.jenesis.project.TestNG;
 import build.jenesis.step.Javac;
 import java.lang.classfile.ClassFile;
+import java.lang.classfile.ClassModel;
 import java.lang.classfile.attribute.ModuleAttribute;
 import java.lang.constant.ModuleDesc;
 import java.util.jar.Attributes;
@@ -1190,6 +1191,35 @@ public class TestModuleTest {
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
         assertThat(supplement.resolve("java.args")).content().contains("--select-class=sample.TestSample");
+    }
+
+    @Test
+    public void a_filter_runs_no_class_it_matches_that_holds_no_test() throws IOException {
+        Path sampleClasses = classes.resolve(Javac.CLASSES + "sample");
+        compileSource(sampleClasses, "TestSampleFixture", """
+                package sample;
+                public class TestSampleFixture {
+                    public static class Nested { }
+                }
+                """, bootModuleJars());
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new Annotated())
+                        .filter("sample\\.TestSample.*").jarsOnly(false),
+                "dependencies", "classes");
+        executor.execute();
+
+        assertThat(root.resolve("test").resolve("executed").resolve("supplement").resolve("java.args")).content()
+                .contains("--select-class=sample.TestSample")
+                .as("a filter wide enough to match a fixture or a nested class beside a test runs the test alone")
+                .doesNotContain("TestSampleFixture");
     }
 
     @Test
@@ -2403,6 +2433,47 @@ public class TestModuleTest {
                 false,
                 false,
                 0);
+    }
+
+    private record Annotated() implements TestFramework {
+
+        @Override
+        public String runnerModule() {
+            return new JUnitPlatform().runnerModule();
+        }
+
+        @Override
+        public String runnerClass() {
+            return new JUnitPlatform().runnerClass();
+        }
+
+        @Override
+        public boolean isMarkedBy(ModuleDescriptor module) {
+            return new JUnitPlatform().isMarkedBy(module);
+        }
+
+        @Override
+        public Set<String> reflectingModules() {
+            return new JUnitPlatform().reflectingModules();
+        }
+
+        @Override
+        public boolean holdsTests(ClassModel type) {
+            return type.methods().stream()
+                    .flatMap(method -> method.findAttribute(java.lang.classfile.Attributes.runtimeVisibleAnnotations()).stream())
+                    .flatMap(annotations -> annotations.annotations().stream())
+                    .anyMatch(annotation -> annotation.className().equalsString("Lorg/junit/jupiter/api/Test;"));
+        }
+
+        @Override
+        public List<String> arguments(Path supplement,
+                                      Path output,
+                                      SequencedSet<String> classes,
+                                      SequencedMap<String, SequencedSet<String>> methods,
+                                      boolean parallel,
+                                      boolean reporting) {
+            return new JUnitPlatform().arguments(supplement, output, classes, methods, parallel, reporting);
+        }
     }
 
     private static SequencedProperties readRequires(Path stepFolder) throws IOException {

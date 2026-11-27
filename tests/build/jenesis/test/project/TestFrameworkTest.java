@@ -84,6 +84,9 @@ public class TestFrameworkTest {
                 Failures (1):
                   JUnit Jupiter:FirstTest:fails()
                     => java.lang.AssertionError: expected
+                       sample/sample.FirstTest.fails(FirstTest.java:7)
+                       java.base/java.lang.reflect.Method.invoke(Method.java:565)
+                       [...]
 
                 Test run finished after 64 ms
                 [         3 containers found      ]
@@ -99,7 +102,8 @@ public class TestFrameworkTest {
                 .as("the counts are the last the console printed, and the failures what it lists before them")
                 .contains(new TestFramework.Summary(4, 2, 1, 1, 0, List.of("Failures (1):",
                         "  JUnit Jupiter:FirstTest:fails()",
-                        "    => java.lang.AssertionError: expected")));
+                        "    => java.lang.AssertionError: expected",
+                        "       sample/sample.FirstTest.fails(FirstTest.java:7)")));
         assertThat(new TestFramework.Summary(4, 2, 1, 1, 0, List.of()).counts())
                 .isEqualTo("4 tests found, 2 successful, 1 failed, 1 skipped, 0 aborted");
     }
@@ -124,6 +128,11 @@ public class TestFrameworkTest {
                 There was 1 failure:
                 1) fails(sample.FirstTest)
                 java.lang.AssertionError: expected
+                \tat org.junit.Assert.fail(Assert.java:89)
+                \tat sample.FirstTest.fails(FirstTest.java:7)
+                Caused by: java.lang.IllegalStateException: cause
+                \tat sample.FirstTest.fails(FirstTest.java:5)
+                \t... 12 more
 
                 FAILURES!!!
                 Tests run: 2,  Failures: 1
@@ -132,7 +141,10 @@ public class TestFrameworkTest {
         assertThat(new JUnit4().summary(root.resolve("supplement"), root.resolve("output")))
                 .contains(new TestFramework.Summary(2, 1, 1, -1, -1, List.of("There was 1 failure:",
                         "1) fails(sample.FirstTest)",
-                        "java.lang.AssertionError: expected")));
+                        "java.lang.AssertionError: expected",
+                        "\tat org.junit.Assert.fail(Assert.java:89)",
+                        "Caused by: java.lang.IllegalStateException: cause",
+                        "\tat sample.FirstTest.fails(FirstTest.java:5)")));
         assertThat(new TestFramework.Summary(2, 1, 1, -1, -1, List.of()).counts())
                 .as("the runner of JUnit 4 counts neither the tests it skipped nor those it aborted")
                 .isEqualTo("2 tests found, 1 successful, 1 failed");

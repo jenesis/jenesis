@@ -1559,7 +1559,9 @@ public class TestModule implements BuildExecutorModule {
                             if (left) {
                                 excludedClasses.add(className);
                             } else if (spec.method == null) {
-                                matchedClasses.add(className);
+                                if (holdsTests(resolved, model, locator)) {
+                                    matchedClasses.add(className);
+                                }
                             } else {
                                 methods.add(spec.method);
                             }
@@ -1627,7 +1629,7 @@ public class TestModule implements BuildExecutorModule {
                             + ". Adjust jenesis.test.filter, or set jenesis.test.skip to skip testing.");
                 }
                 Consumer<String> reporting = terms.reporting();
-                if (reporting != null) {
+                if (reporting != null && compiled.get() + contained > 0) {
                     reporting.accept("tests ran no test, as no class " + unmatched
                             + " is named as a test, which jenesis.test.filter can change");
                 }

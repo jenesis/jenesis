@@ -24,6 +24,7 @@ public record JUnitPlatform(String console) implements TestFramework {
     private static final Pattern COUNT = Pattern.compile(
             "\\[ *(\\d+) tests (found|skipped|aborted|successful|failed) *]");
     private static final Pattern FAILURES = Pattern.compile("Failures \\(\\d+\\):");
+    private static final Pattern FRAME = Pattern.compile("\\s+(\\S+\\((Native Method|Unknown Source|\\S+\\.java(:\\d+)?)\\)|\\[\\.\\.\\.])");
 
     public JUnitPlatform() {
         this(null);
@@ -201,7 +202,7 @@ public record JUnitPlatform(String console) implements TestFramework {
         }
         Map<String, Long> counts = new HashMap<>();
         List<String> failures = new ArrayList<>();
-        boolean failing = false;
+        boolean failing = false, located = false;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(Files.newInputStream(printed),
                 StandardCharsets.UTF_8))) {
             String line;
@@ -215,9 +216,11 @@ public record JUnitPlatform(String console) implements TestFramework {
                 } else if (line.startsWith("Test run finished after ")) {
                     failing = false;
                 }
-                if (failing && !line.isBlank()) {
+                boolean frame = FRAME.matcher(line).matches();
+                if (failing && !line.isBlank() && !(frame && located)) {
                     failures.add(line);
                 }
+                located = frame;
             }
         }
         return counts.size() < 5 ? Optional.empty() : Optional.of(new Summary(counts.get("found"),

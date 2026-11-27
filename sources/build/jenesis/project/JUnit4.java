@@ -11,6 +11,7 @@ public record JUnit4() implements TestFramework {
     private static final Pattern PASSED = Pattern.compile("OK \\((\\d+) tests?\\)");
     private static final Pattern FAILED = Pattern.compile("Tests run: (\\d+), +Failures: (\\d+)");
     private static final Pattern FAILURES = Pattern.compile("There (was 1 failure|were \\d+ failures):");
+    private static final Pattern FRAME = Pattern.compile("\\s+(at .+|\\.\\.\\. \\d+ (more|trimmed))");
 
     @Override
     public String runnerModule() {
@@ -65,7 +66,7 @@ public record JUnit4() implements TestFramework {
         }
         long run = -1, failed = 0;
         List<String> failures = new ArrayList<>();
-        boolean failing = false;
+        boolean failing = false, located = false;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(Files.newInputStream(printed),
                 StandardCharsets.UTF_8))) {
             String line;
@@ -83,9 +84,11 @@ public record JUnit4() implements TestFramework {
                 } else if (line.equals("FAILURES!!!")) {
                     failing = false;
                 }
-                if (failing && !line.isBlank()) {
+                boolean frame = FRAME.matcher(line).matches();
+                if (failing && !line.isBlank() && !(frame && located)) {
                     failures.add(line);
                 }
+                located = frame;
             }
         }
         return run < 0 ? Optional.empty() : Optional.of(new Summary(run, run - failed, failed, -1, -1, failures));

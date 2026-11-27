@@ -234,7 +234,7 @@ public record Project(
             executor.addModule(PLUGIN, project.toolPlugins().goal(project.profiles()));
             return name -> {
                 int slash = name.indexOf('/');
-                String module = BuildExecutorModule.encodePath((slash == -1 ? name : name.substring(0, slash)).replace('+', '/'));
+                String module = BuildExecutorModule.encodePath(project.module(name));
                 return slash == -1
                         ? new Selection(List.of(prefix + "/" + AssemblyDescriptor.BUILD + "-module-" + module),
                                 List.of(prefix + "/" + AssemblyDescriptor.BUILD + "-testmodule-" + module))
@@ -335,7 +335,7 @@ public record Project(
             executor.addModule(PLUGIN, project.toolPlugins().goal(project.profiles()));
             return name -> {
                 int slash = name.indexOf('/');
-                String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
+                String module = project.module(name);
                 return Selection.of(prefix + "/" + AssemblyDescriptor.BUILD + "-module-" + BuildExecutorModule.encodePath(module)
                         + (slash == -1 ? "" : "/" + name.substring(slash + 1)));
             };
@@ -446,7 +446,7 @@ public record Project(
             executor.addModule(PLUGIN, project.toolPlugins().goal(project.profiles()));
             return name -> {
                 int slash = name.indexOf('/');
-                String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
+                String module = project.module(name);
                 return Selection.of(prefix + "/" + AssemblyDescriptor.BUILD + "-module-" + BuildExecutorModule.encodePath(module)
                         + (slash == -1 ? "" : "/" + name.substring(slash + 1)));
             };
@@ -772,8 +772,9 @@ public record Project(
                       pass -Djenesis.executor.rebuild=true.
                     - +<module> builds and tests one module and builds the modules it needs without
                       running their tests. <module> is the folder holding the pom.xml or
-                      module-info.java, a/b written +a+b; where tests are a module-info.java module
-                      of their own, name that folder, as +greeter-test.
+                      module-info.java, a/b written +a+b, and two modules are two selectors, as
+                      +a+b +c; where tests are a module-info.java module of their own, name that
+                      folder, as +greeter-test.
                     - A -Djenesis.<key> setting stands before Make.java, a selector after it.
                       jenesis.test.filter is a regex over the class name: '.*(FooTest|BarTest)' runs
                       two classes and '.*FooTest#method' one method. -Djenesis.test.force=true runs a
@@ -4738,6 +4739,23 @@ public record Project(
         return built;
     }
 
+    private String module(String selector) {
+        int slash = selector.indexOf('/');
+        if (slash == -1) {
+            return selector.replace('+', '/');
+        }
+        String module = selector.substring(0, slash).replace('+', '/'), step = selector.substring(slash + 1);
+        Path folder = root.resolve(module).resolve(step.split("[+/]", 2)[0]);
+        if (step.contains("+") && Files.isDirectory(folder) || Files.isRegularFile(folder.resolve("pom.xml"))) {
+            throw new IllegalArgumentException("The selector +" + selector + " names the folder "
+                    + root.relativize(folder).toString().replace(File.separatorChar, '/')
+                    + " with a /, which names a step of a module: join the folders of a module with +, as +"
+                    + root.relativize(folder).toString().replace(File.separatorChar, '+')
+                    + ", and write each module as a selector of its own");
+        }
+        return module;
+    }
+
     private SequencedMap<String, Path> build(BuildExecutorCallback callback, String... selectors) throws IOException {
         BuildExecutor.Configuration configuration = configurator.get();
         if (cache != null) {
@@ -5296,9 +5314,13 @@ public record Project(
         if (t instanceof InterruptedException) {
             Thread.currentThread().interrupt();
         }
-        StringWriter trace = new StringWriter();
-        t.printStackTrace(new PrintWriter(trace));
-        trace.toString().lines().forEach(environment.err());
+        if (t instanceof IllegalArgumentException && t.getCause() == null && t.getMessage() != null) {
+            t.getMessage().lines().forEach(environment.err());
+        } else {
+            StringWriter trace = new StringWriter();
+            t.printStackTrace(new PrintWriter(trace));
+            trace.toString().lines().forEach(environment.err());
+        }
         environment.err().accept("");
         environment.err().accept("The build failed with the error above; `help` explains how to run Jenesis.");
     }

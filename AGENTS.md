@@ -311,6 +311,12 @@ what it printed in `context.persistent()`, and is exported to no other module. A
 result and no progress, read as `jenesis.test.summary`; unset it follows `jenesis.print.progress`, as a build without
 progress prints what its selector prints and nothing else, which a script redirects into a file.
 
+**A failure prints what stops the build.** A step that fails reports what a reader acts on and names the file that
+holds the rest: `javac` its errors without its warnings, a test run each failed test with its assertion and the one
+frame it failed in. A filter of tests runs the classes it matches that hold a test, so that a pattern wide enough to
+match a fixture or a nested class beside a test runs the test alone. An `IllegalArgumentException` that reaches the
+entry point is printed as its message, as it names what was given and what would be valid.
+
 **Processes.** A step forking a JDK tool extends `ProcessBuildStep` and accepts `process-<tool>.properties`; one running
 a program extends `EnvironmentalProcessBuildStep` and accepts `environment-<tool>.properties`, whose variables (with
 `@<key>` as `jenesis.variable.<key>`) it is handed beside the platform's own (`PATH`, `HOME`, `LANG`, `TMPDIR`,

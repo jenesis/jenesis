@@ -759,6 +759,19 @@ public class ProjectTest {
     }
 
     @Test
+    public void a_module_selector_naming_a_folder_with_a_slash_is_refused_naming_its_spelling() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        Files.createDirectories(root.resolve("plugins/rest"));
+        List<String> errors = new ArrayList<>();
+        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).err(errors::add), root, new LinkedHashSet<>(), "+plugins/rest+plugins/other"))
+                .isNull();
+        assertThat(errors)
+                .anyMatch(line -> line.contains("names the folder plugins/rest with a /") && line.contains("as +plugins+rest"))
+                .as("a selector that cannot be read is answered by what to write, without a stack trace")
+                .noneMatch(line -> line.startsWith("\tat "));
+    }
+
+    @Test
     public void skill_names_its_pages_when_one_does_not_exist() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
         List<String> errors = new ArrayList<>();
