@@ -382,7 +382,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                         if (acceptableExitCode(exitCode, executor, context, arguments)) {
                             future.complete(new BuildStepResult());
                         } else {
-                            throw new IllegalStateException("Unexpected exit code: " + exitCode + "\n"
+                            throw new ProcessExitException("Unexpected exit code: " + exitCode + "\n"
                                     + (exitCode == KILLED && handler.external()
                                             ? "The process was killed with SIGKILL, possibly by the kernel's"
                                                     + " out-of-memory killer: lower jenesis.process.concurrency, or the"

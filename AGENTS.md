@@ -315,7 +315,9 @@ progress prints what its selector prints and nothing else, which a script redire
 holds the rest: `javac` its errors without its warnings, a test run each failed test with its assertion and the one
 frame it failed in. A filter of tests runs the classes it matches that hold a test, so that a pattern wide enough to
 match a fixture or a nested class beside a test runs the test alone. An `IllegalArgumentException` that reaches the
-entry point is printed as its message, as it names what was given and what would be valid.
+entry point is printed as its message, as it names what was given and what would be valid, and a process that ended
+with a code the step does not accept, a `ProcessExitException`, as the step that failed and its report: neither
+prints a stack trace, which says where the engine noticed and nothing about the project.
 
 **Processes.** A step forking a JDK tool extends `ProcessBuildStep` and accepts `process-<tool>.properties`; one running
 a program extends `EnvironmentalProcessBuildStep` and accepts `environment-<tool>.properties`, whose variables (with

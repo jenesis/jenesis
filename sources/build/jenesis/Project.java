@@ -38,6 +38,7 @@ import build.jenesis.step.Bom;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.ImageStaging;
 import build.jenesis.step.Inventory;
+import build.jenesis.step.ProcessExitException;
 import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.ProjectFiles;
 import build.jenesis.step.ReportStaging;
@@ -3456,11 +3457,10 @@ public record Project(
     }
 
     public Project(Path root) {
-        this(root, new InferredMultiProjectAssembler(), Environment.NONE);
+        this(resolvedRoot(root), new InferredMultiProjectAssembler(), Environment.NONE);
     }
 
-    private Project(Path root, MultiProjectAssembler<? super ProjectModuleDescriptor> assembler, Environment environment) {
-        Path resolved = resolvedRoot(root);
+    private Project(Path resolved, MultiProjectAssembler<? super ProjectModuleDescriptor> assembler, Environment environment) {
         SequencedSet<Path> configuration = Collections.unmodifiableSequencedSet(
                 new LinkedHashSet<>(List.of(resolved.resolve("build.jenesis"))));
         this(resolved,
@@ -3683,7 +3683,13 @@ public record Project(
             }
             assembler = assembler.resources(resources);
         }
-        Project project = new Project(root, assembler, environment).plugins(projectPlugins);
+        Path directory = environment.path("process.directory", Setting.CONFINED);
+        Project project = new Project(
+                (directory == null ? root : directory).toAbsolutePath().normalize().equals(Path.of("").toAbsolutePath().normalize())
+                        ? resolvedRoot(root)
+                        : root.toAbsolutePath().normalize(),
+                assembler,
+                environment).plugins(projectPlugins);
         String configuration = environment.getProperty("project.configuration", Setting.PROJECT);
         if (configuration != null) {
             project = project.configuration(locations(environment, "project.configuration", configuration, project).toArray(Path[]::new));
@@ -5314,8 +5320,18 @@ public record Project(
         if (t instanceof InterruptedException) {
             Thread.currentThread().interrupt();
         }
+        Throwable root = t;
+        while (root instanceof CompletionException && root.getCause() != null) {
+            root = root.getCause();
+        }
         if (t instanceof IllegalArgumentException && t.getCause() == null && t.getMessage() != null) {
             t.getMessage().lines().forEach(environment.err());
+        } else if (root instanceof ProcessExitException) {
+            for (Throwable failure = t; failure != null; failure = failure.getCause()) {
+                if (failure instanceof BuildExecutorException || failure == root) {
+                    failure.getMessage().lines().forEach(environment.err());
+                }
+            }
         } else {
             StringWriter trace = new StringWriter();
             t.printStackTrace(new PrintWriter(trace));

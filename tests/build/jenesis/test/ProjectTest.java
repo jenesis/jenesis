@@ -759,6 +759,20 @@ public class ProjectTest {
     }
 
     @Test
+    public void a_source_that_does_not_compile_is_reported_without_a_stack_trace() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        Files.writeString(Files.createDirectories(root.resolve("sources/example")).resolve("Broken.java"), "package example; class Broken { int value = missing; }");
+        List<String> errors = new ArrayList<>();
+        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).err(errors::add), root, new LinkedHashSet<>()))
+                .isNull();
+        assertThat(errors)
+                .anyMatch(line -> line.startsWith("Failed to execute "))
+                .anyMatch(line -> line.contains("Broken.java") && line.contains("error:"))
+                .as("a process that fails is answered by its report, as a frame of the engine says nothing about the project")
+                .noneMatch(line -> line.startsWith("\tat "));
+    }
+
+    @Test
     public void a_module_selector_naming_a_folder_with_a_slash_is_refused_naming_its_spelling() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
         Files.createDirectories(root.resolve("plugins/rest"));
@@ -965,6 +979,18 @@ public class ProjectTest {
     @Test
     public void system_property_overrides_target() {
         assertThat(Project.ofEnvironment(new Environment(Map.of("project.target", "custom-target")), Path.of(".")).target()).isEqualTo(Path.of("custom-target"));
+    }
+
+    @Test
+    public void target_is_absolute_where_processes_run_in_another_folder(@TempDir Path directory) {
+        assertThat(Project.ofEnvironment(new Environment(Map.of("process.directory", directory.toString())), Path.of(".")).target())
+                .as("a process started in another folder resolves a relative path against that folder")
+                .isEqualTo(Path.of("target").toAbsolutePath().normalize());
+    }
+
+    @Test
+    public void target_is_relative_where_processes_run_in_the_working_directory() {
+        assertThat(Project.ofEnvironment(new Environment(Map.of("process.directory", ".")), Path.of(".")).target()).isEqualTo(Path.of("target"));
     }
 
     @Test
