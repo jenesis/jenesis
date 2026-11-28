@@ -304,6 +304,21 @@ step changed or the build cache supplied its output, kept when a run reports not
 failed run left as well and does not trust it beyond what it can check. A run from an empty folder writes the same
 bytes, only more slowly.
 
+**A warning is a step's.** What a layout warns about in the project's files - a release left unset, a resource
+directory that does not exist - it hands to a `Warnings` step rather than printing it while a module is wired, which
+every build would repeat. The step prints a warning in the first build that prints and again once it changes, keeps
+what it printed in `context.persistent()`, and is exported to no other module. A test run's `[TESTS]` line is a
+result and no progress, read as `jenesis.test.summary`; unset it follows `jenesis.print.progress`, as a build without
+progress prints what its selector prints and nothing else, which a script redirects into a file.
+
+**A failure prints what stops the build.** A step that fails reports what a reader acts on and names the file that
+holds the rest: `javac` its errors without its warnings, a test run each failed test with its assertion and the one
+frame it failed in. A filter of tests runs the classes it matches that hold a test, so that a pattern wide enough to
+match a fixture or a nested class beside a test runs the test alone. An `IllegalArgumentException` that reaches the
+entry point is printed as its message, as it names what was given and what would be valid, and a process that ended
+with a code the step does not accept, a `ProcessExitException`, as the step that failed and its report: neither
+prints a stack trace, which says where the engine noticed and nothing about the project.
+
 **Processes.** A step forking a JDK tool extends `ProcessBuildStep` and accepts `process-<tool>.properties`; one running
 a program extends `EnvironmentalProcessBuildStep` and accepts `environment-<tool>.properties`, whose variables (with
 `@<key>` as `jenesis.variable.<key>`) it is handed beside the platform's own (`PATH`, `HOME`, `LANG`, `TMPDIR`,

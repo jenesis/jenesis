@@ -10,6 +10,9 @@ import org.xml.sax.Attributes;
 
 public record TestNG() implements TestFramework {
 
+    private static final Pattern TOTAL = Pattern.compile(
+            "Total tests run: *(\\d+),(?: Passes: *\\d+,)? Failures: *(\\d+), Skips: *(\\d+).*");
+
     @Override
     public String runnerModule() {
         return "org.testng";
@@ -94,6 +97,29 @@ public record TestNG() implements TestFramework {
                 }
             }
         }) ? Optional.of(failed) : Optional.empty();
+    }
+
+    @Override
+    public Optional<Summary> summary(Path supplement, Path output) throws IOException {
+        Path printed = supplement.resolve("output");
+        if (!Files.isRegularFile(printed)) {
+            return Optional.empty();
+        }
+        Summary summary = null;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(Files.newInputStream(printed),
+                StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                Matcher total = TOTAL.matcher(line);
+                if (total.matches()) {
+                    long run = Long.parseLong(total.group(1)),
+                            failed = Long.parseLong(total.group(2)),
+                            skipped = Long.parseLong(total.group(3));
+                    summary = new Summary(run, run - failed - skipped, failed, skipped, -1, List.of());
+                }
+            }
+        }
+        return Optional.ofNullable(summary);
     }
 
     @Override

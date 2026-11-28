@@ -40,6 +40,10 @@ public interface TestFramework extends Serializable {
         return Optional.empty();
     }
 
+    default Optional<Summary> summary(Path supplement, Path output) throws IOException {
+        return Optional.empty();
+    }
+
     default List<String> tags(List<String> arguments, TestTags requested, List<TestTags> ran) {
         if (!requested.all()) {
             throw new IllegalArgumentException(getClass().getSimpleName() + " cannot select tests by tag, so it cannot run "
@@ -55,5 +59,14 @@ public interface TestFramework extends Serializable {
                     + " - leave it out for these tests");
         }
         return arguments;
+    }
+
+    record Summary(long found, long successful, long failed, long skipped, long aborted, List<String> failures) {
+
+        public String counts() {
+            return found + " tests found, " + successful + " successful, " + failed + " failed"
+                    + (skipped < 0 ? "" : ", " + skipped + " skipped")
+                    + (aborted < 0 ? "" : ", " + aborted + " aborted");
+        }
     }
 }

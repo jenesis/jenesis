@@ -715,21 +715,26 @@ public class ProjectTest {
     }
 
     @Test
-    public void skill_start_shows_how_to_build_one_module_and_run_one_test_class() throws IOException {
+    public void skill_start_leads_to_the_quiet_loop_on_one_module_and_one_test_class() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
         List<String> printed = new ArrayList<>();
-        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).out(printed::add), root, new LinkedHashSet<>(), Project.SKILL + "/start")).isEmpty();
+        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString(),
+                "print.progress", "false")).out(printed::add), root, new LinkedHashSet<>(), Project.SKILL + "/start")).isEmpty();
         String briefing = String.join("\n", printed);
-        assertThat(briefing.substring(briefing.indexOf("## Essentials"), briefing.indexOf("## First moves")))
-                .as("an agent acts on the one-module loop without opening another page")
-                .contains("java build/jenesis/Make.java +<module>",
-                        "java -Djenesis.test.filter='.*GreeterTest' -Djenesis.print.tests=true \\",
-                        "builds the modules it needs without running their tests",
-                        "-Djenesis.test.force=true runs it anyway",
-                        "<step folder>~/supplement/output");
-        assertThat(briefing.substring(briefing.indexOf("## First moves"), briefing.indexOf("## Pages")))
-                .as("the first moves end in the loop an agent stays in")
-                .contains("java build/jenesis/Make.java +<module>", "-Djenesis.test.filter='.*<Class>'");
+        assertThat(briefing.substring(briefing.indexOf("## Essentials"), briefing.indexOf("## Pages")))
+                .as("an agent acts on the quiet one-module loop without opening another page")
+                .contains("java -Djenesis.print.progress=false -Djenesis.test.summary \\",
+                        "build/jenesis/Make.java +<module>",
+                        "-Djenesis.test.filter='.*GreeterTest' \\",
+                        "[TESTS]     greeter: 12 tests found, 12 successful, 0 failed, 0 skipped, 0 aborted in 1.48 seconds",
+                        "exits 0",
+                        "exits 1",
+                        "builds the modules it needs without",
+                        "-Djenesis.test.force=true runs a",
+                        "end with one");
+        assertThat(briefing.getBytes(StandardCharsets.UTF_8).length)
+                .as("the page is handed to an agent in full before it starts, so every line of it costs")
+                .isLessThan(4096);
     }
 
     @Test
@@ -751,6 +756,33 @@ public class ProjectTest {
             assertThat(printed).as(page).anyMatch(text -> text.startsWith("# Jenesis - "));
             assertThat(String.join("\n", printed)).as(page).doesNotContain("## Essentials");
         }
+    }
+
+    @Test
+    public void a_source_that_does_not_compile_is_reported_without_a_stack_trace() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        Files.writeString(Files.createDirectories(root.resolve("sources/example")).resolve("Broken.java"), "package example; class Broken { int value = missing; }");
+        List<String> errors = new ArrayList<>();
+        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).err(errors::add), root, new LinkedHashSet<>()))
+                .isNull();
+        assertThat(errors)
+                .anyMatch(line -> line.startsWith("Failed to execute "))
+                .anyMatch(line -> line.contains("Broken.java") && line.contains("error:"))
+                .as("a process that fails is answered by its report, as a frame of the engine says nothing about the project")
+                .noneMatch(line -> line.startsWith("\tat "));
+    }
+
+    @Test
+    public void a_module_selector_naming_a_folder_with_a_slash_is_refused_naming_its_spelling() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        Files.createDirectories(root.resolve("plugins/rest"));
+        List<String> errors = new ArrayList<>();
+        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).err(errors::add), root, new LinkedHashSet<>(), "+plugins/rest+plugins/other"))
+                .isNull();
+        assertThat(errors)
+                .anyMatch(line -> line.contains("names the folder plugins/rest with a /") && line.contains("as +plugins+rest"))
+                .as("a selector that cannot be read is answered by what to write, without a stack trace")
+                .noneMatch(line -> line.startsWith("\tat "));
     }
 
     @Test
@@ -947,6 +979,18 @@ public class ProjectTest {
     @Test
     public void system_property_overrides_target() {
         assertThat(Project.ofEnvironment(new Environment(Map.of("project.target", "custom-target")), Path.of(".")).target()).isEqualTo(Path.of("custom-target"));
+    }
+
+    @Test
+    public void target_is_absolute_where_processes_run_in_another_folder(@TempDir Path directory) {
+        assertThat(Project.ofEnvironment(new Environment(Map.of("process.directory", directory.toString())), Path.of(".")).target())
+                .as("a process started in another folder resolves a relative path against that folder")
+                .isEqualTo(Path.of("target").toAbsolutePath().normalize());
+    }
+
+    @Test
+    public void target_is_relative_where_processes_run_in_the_working_directory() {
+        assertThat(Project.ofEnvironment(new Environment(Map.of("process.directory", ".")), Path.of(".")).target()).isEqualTo(Path.of("target"));
     }
 
     @Test

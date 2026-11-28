@@ -28,6 +28,7 @@ import build.jenesis.step.Dependencies;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Javac;
 import build.jenesis.step.Versions;
+import build.jenesis.step.Warnings;
 import java.util.jar.Attributes;
 
 import static build.jenesis.project.MultiProjectModule.ARTIFACTS;
@@ -41,7 +42,7 @@ import static build.jenesis.project.MultiProjectModule.SOURCES;
 
 public class ModularProject implements BuildExecutorModule {
 
-    private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-";
+    private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-", WARNINGS = "warnings";
 
     private final String group;
     private final String prefix;
@@ -53,6 +54,8 @@ public class ModularProject implements BuildExecutorModule {
     private final SequencedSet<Path> signatures;
     private final int segments;
     private final boolean maven;
+    private final Consumer<String> printing;
+    private final Palette palette;
 
     public ModularProject(String prefix, Path root) {
         this("main",
@@ -64,11 +67,15 @@ public class ModularProject implements BuildExecutorModule {
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
                 MavenModuleRepository.segments(),
-                true);
+                true,
+                null,
+                Palette.NONE);
     }
 
     public static ModularProject ofEnvironment(Environment environment, String prefix, Path root) {
-        ModularProject project = new ModularProject(prefix, root).platform(Platform.ofEnvironment(environment));
+        ModularProject project = new ModularProject(prefix, root).platform(Platform.ofEnvironment(environment))
+                .printing(environment.flag("print.progress", true, Setting.PROJECT) ? environment.out() : null,
+                        Palette.ofEnvironment(environment));
         Integer segments = environment.numberOrNull("maven.segments", Setting.PROJECT);
         return segments == null ? project : project.segments(segments);
     }
@@ -82,7 +89,9 @@ public class ModularProject implements BuildExecutorModule {
                            SequencedSet<Path> boms,
                            SequencedSet<Path> signatures,
                            int segments,
-                           boolean maven) {
+                           boolean maven,
+                           Consumer<String> printing,
+                           Palette palette) {
         this.group = group;
         this.prefix = prefix;
         this.root = root;
@@ -93,30 +102,36 @@ public class ModularProject implements BuildExecutorModule {
         this.signatures = signatures;
         this.segments = segments;
         this.maven = maven;
+        this.printing = printing;
+        this.palette = palette;
+    }
+
+    public ModularProject printing(Consumer<String> printing, Palette palette) {
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven, printing, palette);
     }
 
     public ModularProject group(String group) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven, printing, palette);
     }
 
     public ModularProject filter(Predicate<Path> filter) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven, printing, palette);
     }
 
     public ModularProject modular(boolean modular) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven, printing, palette);
     }
 
     public ModularProject platform(Platform platform) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven, printing, palette);
     }
 
     public ModularProject boms(SequencedSet<Path> boms) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven, printing, palette);
     }
 
     public ModularProject signatures(SequencedSet<Path> signatures) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven, printing, palette);
     }
 
     public ModularProject segments(int segments) {
@@ -129,11 +144,13 @@ public class ModularProject implements BuildExecutorModule {
                 boms,
                 signatures,
                 MavenModuleRepository.checkedSegments(segments),
-                maven);
+                maven,
+                printing,
+                palette);
     }
 
     public ModularProject maven(boolean maven) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments, maven, printing, palette);
     }
 
     public static BuildExecutorModule make(Environment environment,
@@ -170,33 +187,11 @@ public class ModularProject implements BuildExecutorModule {
                                            SequencedSet<Path> signatures,
                                            MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
         Dependencies dependencyModule = Dependencies.ofEnvironment(environment, repositories, resolvers);
-        Consumer<String> printing = environment.flag("print.progress",
-                true,
-                Setting.PROJECT) ? environment.out() : null;
-        Palette palette = Palette.ofEnvironment(environment);
         return new MultiProjectModule(ModularProject.ofEnvironment(environment, prefix, root)
                 .group(group).filter(filter).modular(modular).maven(maven).boms(boms).signatures(signatures),
                 identity -> Optional.of(identity.substring(0, identity.indexOf('/'))),
                 _ -> (name, dependencies, arguments) -> {
                     Path location = MultiProjectModule.location(root, arguments);
-                    if (printing != null) {
-                        for (Map.Entry<String, Path> argument : arguments.entrySet()) {
-                            Path module = argument.getValue().resolve(BuildStep.MODULE);
-                            if (argument.getKey().endsWith("/" + MANIFESTS) && Files.isRegularFile(module)) {
-                                SequencedProperties properties = SequencedProperties.ofFiles(module);
-                                if (properties.value("release") == null) {
-                                    printing.accept(("%s%-11s%s %s compiles for release %d, the JDK the build runs on,"
-                                            + " as %s declares no @jenesis.release - @jenesis.release sets it")
-                                            .formatted(palette.warning(),
-                                                    "[RELEASE]",
-                                                    palette.reset(),
-                                                    properties.getProperty("module"),
-                                                    Runtime.version().feature(),
-                                                    Path.of(properties.getProperty("path")).resolve("module-info.java")));
-                                }
-                            }
-                        }
-                    }
                     SequencedSet<String> spdxInherited = new LinkedHashSet<>();
                     for (int index = 0; index < spdx.size(); index++) {
                         spdxInherited.add(BuildExecutorModule.PREVIOUS + MultiProjectModule.SPDX + "-" + index);
@@ -758,6 +753,11 @@ public class ModularProject implements BuildExecutorModule {
     }
 
     @Override
+    public Optional<String> resolve(String path) {
+        return path.endsWith("/" + WARNINGS) ? Optional.empty() : Optional.of(path);
+    }
+
+    @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
         List<Path> moduleInfos = new ArrayList<>();
         Files.walkFileTree(root, new SimpleFileVisitor<>() {
@@ -837,6 +837,24 @@ public class ModularProject implements BuildExecutorModule {
                             segments,
                             maven), manifestDeps);
                     module.addStep(COORDINATES, new Coordinates(prefix), MANIFESTS);
+                    module.addStep(WARNINGS, new Warnings(arguments -> {
+                        SequencedProperties properties;
+                        try {
+                            properties = SequencedProperties.ofFiles(arguments.get(MANIFESTS).folder().resolve(BuildStep.MODULE));
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                        SequencedMap<String, String> warnings = new LinkedHashMap<>();
+                        if (properties.value("release") == null) {
+                            warnings.put(("%s compiles for release %d, the JDK the build runs on, as %s declares no"
+                                    + " @jenesis.release - @jenesis.release sets it")
+                                    .formatted(properties.getProperty("module"),
+                                            Runtime.version().feature(),
+                                            Path.of(properties.getProperty("path")).resolve("module-info.java")),
+                                    "[RELEASE]");
+                        }
+                        return warnings;
+                    }).printing(printing, palette), MANIFESTS);
                 }, inherited.sequencedKeySet().stream());
             }
         }

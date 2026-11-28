@@ -22,6 +22,8 @@ public class Javac extends ProcessBuildStep {
     private static final Set<String> SYSTEM_MODULE_OPTIONS = Set.of("--add-exports", "--add-reads", "--patch-module");
     private static final Set<String> SOURCE_OPTIONS = Set.of("--source", "-source");
     private static final Set<String> TARGET_OPTIONS = Set.of("--target", "-target");
+    private static final Pattern DIAGNOSTIC = Pattern.compile("(.+:\\d+: )?(error|warning): .*");
+    private static final Pattern COUNTED = Pattern.compile("(Note: .*|\\d+ (errors?|warnings?)|only showing the first .*)");
     private static final ModuleInfoParser MODULE_INFO_PARSER = new ModuleInfoParser();
 
     private final boolean includeResources;
@@ -775,5 +777,34 @@ public class Javac extends ProcessBuildStep {
         String normalized = relative.toString().replace(File.separatorChar, '/');
         Matcher matcher = VERSIONED.matcher(normalized);
         return matcher.matches() ? Integer.parseInt(matcher.group(1)) : null;
+    }
+
+    @Override
+    protected String report(BuildStepContext context, Path output, Path error) throws IOException {
+        List<String> errors = new ArrayList<>();
+        for (Path file : List.of(output, error)) {
+            if (Files.exists(file)) {
+                boolean failing = false;
+                for (String line : Files.readAllLines(file)) {
+                    Matcher diagnostic = DIAGNOSTIC.matcher(line);
+                    if (diagnostic.matches()) {
+                        failing = diagnostic.group(2).equals("error");
+                    } else if (COUNTED.matcher(line).matches()) {
+                        failing = false;
+                    }
+                    if (failing) {
+                        errors.add(line);
+                    }
+                }
+            }
+        }
+        if (errors.isEmpty()) {
+            return super.report(context, output, error);
+        }
+        int shown = terms.tail() > 0 ? Math.min(terms.tail(), errors.size()) : errors.size();
+        return "\n\nCompilation errors"
+                + (shown < errors.size() ? ", the first " + shown + " out of " + errors.size() + " lines" : "")
+                + " - " + error + " holds all that javac printed, its warnings included:\n"
+                + String.join("\n", errors.subList(0, shown)) + "\n";
     }
 }

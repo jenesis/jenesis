@@ -35,7 +35,7 @@ public class ProjectReproductionTest {
         project(new Stamp(false), "target").build();
         project(new Stamp(false), "elsewhere").build();
         List<String> reproduced = printed.stream().filter(line -> line.startsWith("The build reproduced")).toList();
-        assertThat(reproduced).hasSize(2).allSatisfy(line -> assertThat(line).contains("3 steps wrote the same output"));
+        assertThat(reproduced).hasSize(2).allSatisfy(line -> assertThat(line).contains("14 steps wrote the same output"));
         assertThat(reproduced.getFirst().substring(reproduced.getFirst().indexOf("fingerprint")))
                 .as("a build into another folder agrees on the fingerprint, as another machine would")
                 .matches("fingerprint SHA-256:[0-9a-f]{64}")

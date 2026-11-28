@@ -21,6 +21,10 @@ public record JUnitPlatform(String console) implements TestFramework {
             VINTAGE_ENGINE = "org.junit.vintage.engine";
     private static final ModuleDescriptor.Version BANNER = ModuleDescriptor.Version.parse("1.5"),
             SUBCOMMANDS = ModuleDescriptor.Version.parse("1.10");
+    private static final Pattern COUNT = Pattern.compile(
+            "\\[ *(\\d+) tests (found|skipped|aborted|successful|failed) *]");
+    private static final Pattern FAILURES = Pattern.compile("Failures \\(\\d+\\):");
+    private static final Pattern FRAME = Pattern.compile("\\s+(\\S+\\((Native Method|Unknown Source|\\S+\\.java(:\\d+)?)\\)|\\[\\.\\.\\.])");
 
     public JUnitPlatform() {
         this(null);
@@ -188,6 +192,43 @@ public record JUnitPlatform(String console) implements TestFramework {
             }
         }
         return Optional.of(failed);
+    }
+
+    @Override
+    public Optional<Summary> summary(Path supplement, Path output) throws IOException {
+        Path printed = supplement.resolve("output");
+        if (!Files.isRegularFile(printed)) {
+            return Optional.empty();
+        }
+        Map<String, Long> counts = new HashMap<>();
+        List<String> failures = new ArrayList<>();
+        boolean failing = false, located = false;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(Files.newInputStream(printed),
+                StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                Matcher count = COUNT.matcher(line);
+                if (count.matches()) {
+                    counts.put(count.group(2), Long.parseLong(count.group(1)));
+                } else if (FAILURES.matcher(line).matches()) {
+                    failures.clear();
+                    failing = true;
+                } else if (line.startsWith("Test run finished after ")) {
+                    failing = false;
+                }
+                boolean frame = FRAME.matcher(line).matches();
+                if (failing && !line.isBlank() && !(frame && located)) {
+                    failures.add(line);
+                }
+                located = frame;
+            }
+        }
+        return counts.size() < 5 ? Optional.empty() : Optional.of(new Summary(counts.get("found"),
+                counts.get("successful"),
+                counts.get("failed"),
+                counts.get("skipped"),
+                counts.get("aborted"),
+                failures));
     }
 
     @Override

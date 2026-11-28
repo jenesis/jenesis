@@ -382,7 +382,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                         if (acceptableExitCode(exitCode, executor, context, arguments)) {
                             future.complete(new BuildStepResult());
                         } else {
-                            throw new IllegalStateException("Unexpected exit code: " + exitCode + "\n"
+                            throw new ProcessExitException("Unexpected exit code: " + exitCode + "\n"
                                     + (exitCode == KILLED && handler.external()
                                             ? "The process was killed with SIGKILL, possibly by the kernel's"
                                                     + " out-of-memory killer: lower jenesis.process.concurrency, or the"
@@ -392,8 +392,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                                     + diagnosis(context).map(diagnosis -> diagnosis + "\n").orElse("")
                                     + "To reproduce, execute:\n "
                                     + executed
-                                    + tail("Output", output)
-                                    + tail("Error", error));
+                                    + report(context, output, error));
                         }
                     } catch (Throwable t) {
                         future.completeExceptionally(t);
@@ -416,6 +415,10 @@ public abstract class ProcessBuildStep implements BuildStep {
             }
         });
         return result;
+    }
+
+    protected String report(BuildStepContext context, Path output, Path error) throws IOException {
+        return tail("Output", output) + tail("Error", error);
     }
 
     protected String tail(String label, Path file) throws IOException {

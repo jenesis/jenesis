@@ -83,6 +83,30 @@ public class JavacTest {
                 .isDirectoryNotContaining("glob:**/sample_Plain.h");
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void reports_the_errors_of_a_failed_compilation_without_its_warnings(boolean process) throws IOException {
+        Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(folder.resolve("Warned.java"), "package sample; public class Warned { Object value = new Removed(); }\n");
+        Files.writeString(folder.resolve("Removed.java"), "package sample; @Deprecated(forRemoval = true) public class Removed { }\n");
+        Files.writeString(folder.resolve("Broken.java"), "package sample; public class Broken { int value = \"text\"; }\n");
+        assertThatThrownBy(() -> new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement, persistent),
+                        new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                                sources,
+                                Map.of(Path.of("sources/sample/Warned.java"), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of("sources/sample/Removed.java"), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of("sources/sample/Broken.java"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join())
+                .hasMessageContaining("Compilation errors")
+                .hasMessageContaining("Broken.java:1: error: incompatible types")
+                .hasMessageContaining("int value = \"text\";")
+                .as("a warning is in the file the message names, as an error is what stops the build")
+                .hasMessageNotContaining("Warned.java");
+        assertThat(supplement.resolve("error")).content().contains("Warned.java:1: warning:");
+    }
+
     @Test
     public void writes_no_jni_headers_unless_asked() throws IOException {
         Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Native.java"),

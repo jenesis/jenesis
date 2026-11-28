@@ -166,6 +166,17 @@ closure, with its checksum) overrides it, so the pinned version always wins - yo
 could pin a higher console version here than the derived default and Jenesis would
 honor it.
 
+A test run ends with one line that names the module and counts its tests:
+
+```text
+[TESTS]     greeter: 2 tests found, 2 successful, 0 failed, 0 skipped, 0 aborted in 0.70 seconds
+```
+
+The counts are those the test framework reports: the JUnit Platform all five,
+TestNG all but the aborted tests, and the runner of JUnit 4 the tests it ran and
+those that failed. A build that runs no test, as nothing the tests read changed since
+they passed, prints no such line.
+
 Sharing test code across modules
 --------------------------------
 
@@ -220,9 +231,9 @@ name. `greeter` ships two tests, so this runs only one of them:
 
     java -Djenesis.test.filter='.*GreeterTest#prefix_is_a_greeting' build/jenesis/Make.java
 
-The test step's summary then reports `1 tests successful` instead of the default
-`2`. The `-D` flag must come **before** the source file - anything after it is
-read as a selector.
+The `[TESTS]` line then counts `1 tests found` instead of the default `2`. The
+`-D` flag must come **before** the source file - anything after it is read as a
+selector.
 
 `-Djenesis.test.exclude` takes the same comma-separated class patterns, without a
 `#<method>`, and leaves out the classes they match while the default naming stays
@@ -273,8 +284,9 @@ this line.
 When a test fails
 -----------------
 
-A failing test fails the build, and the error prints the end of the runner's
-output, where it names each failed test with its stack trace. With
+A failing test fails the build. The `[TESTS]` line counts the failed tests, and
+the error prints each of them as the runner reported it, with its stack trace,
+beside the path of the file that holds all the run printed. With
 `-Djenesis.test.reporting=true`, the error also names the folder holding the
 run's reports:
 
@@ -288,6 +300,33 @@ which keeps the run as it ended: the command under `supplement/command`, the
 runner's whole output under `supplement/output` and `supplement/error`, and its
 reports under `reports/tests` with `-Djenesis.test.reporting=true` - beside a
 `.jenesis.failed` marker. It stays until the step runs again.
+
+Reading a build's result quietly
+--------------------------------
+
+Every step and module of a build prints a progress line, which is what a person
+watches and more than a script or a coding agent needs.
+`-Djenesis.print.progress=false` drops those lines and the warnings about what a
+`pom.xml` declares, so a build that passes prints nothing but what its selector
+prints, and `-Djenesis.test.summary` adds the `[TESTS]` line of each test run:
+
+    java -Djenesis.print.progress=false -Djenesis.test.summary build/jenesis/Make.java +greeter
+
+```text
+[TESTS]     greeter: 2 tests found, 2 successful, 0 failed, 0 skipped, 0 aborted in 0.70 seconds
+```
+
+The exit code is the verdict: 0 for a build that passed, 1 for one that failed.
+Run again, the command prints nothing, as no test ran. A build that fails prints
+its error as it does with the progress lines - the compiler's messages, or the
+failed tests - so nothing has to be filtered out of either. Without
+`-Djenesis.test.summary`, a quiet build prints the `[TESTS]` line no more than a
+progress line, which keeps a command such as `dependencies` writing its tree, and
+only that, into a file.
+
+A warning about what a `pom.xml` declares, such as the `[EMPTY]` and `[RELEASE]`
+lines of this project, is printed by the first build that prints progress and
+again once it changes, not by every build.
 
 Pinned dependencies
 -------------------
